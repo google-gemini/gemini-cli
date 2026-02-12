@@ -36,6 +36,10 @@ import { loadExtensions } from '../config/extension.js';
 import { Task } from './task.js';
 import { requestStorage } from '../http/requestStorage.js';
 import { pushTaskStateFailed } from '../utils/executor_utils.js';
+import {
+  A2UI_CLIENT_CAPABILITIES_KEY,
+  A2UI_EXTENSION_URI,
+} from '../a2ui/a2ui-extension.js';
 
 /**
  * Provides a wrapper for Task. Passes data from Task to SDKTask.
@@ -435,6 +439,22 @@ export class CoderAgentExecutor implements AgentExecutor {
 
     const currentTask = wrapper.task;
 
+    // Detect A2UI extension activation from the request
+    // Check if user message metadata contains A2UI client capabilities
+    // or if the extensions header includes the A2UI URI
+    const messageMetadata = userMessage.metadata;
+    const hasA2UICapabilities =
+      messageMetadata?.[A2UI_CLIENT_CAPABILITIES_KEY] != null;
+    // Also check if extension URI is referenced in message extensions
+    const messageExtensions = messageMetadata?.['extensions'];
+    const hasA2UIExtension =
+      Array.isArray(messageExtensions) &&
+      messageExtensions.includes(A2UI_EXTENSION_URI);
+    if (hasA2UICapabilities || hasA2UIExtension) {
+      currentTask.a2uiEnabled = true;
+      logger.info(`[CoderAgentExecutor] A2UI enabled for task ${taskId}`);
+    }
+
     if (['canceled', 'failed', 'completed'].includes(currentTask.taskState)) {
       logger.warn(
         `[CoderAgentExecutor] Attempted to execute task ${taskId} which is already in state ${currentTask.taskState}. Ignoring.`,
@@ -552,6 +572,9 @@ export class CoderAgentExecutor implements AgentExecutor {
       logger.info(
         `[CoderAgentExecutor] Task ${taskId}: Agent turn finished, setting to input-required.`,
       );
+      // Finalize A2UI surfaces before marking complete
+      currentTask.finalizeA2UISurfaces();
+
       const stateChange: StateChange = {
         kind: CoderAgentEvent.StateChangeEvent,
       };

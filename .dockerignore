@@ -1,0 +1,15 @@
+.git
+.github
+.gcp
+bundle
+evals
+integration-tests
+docs
+packages/cli
+packages/vscode-ide-companion
+packages/test-utils
+**/*.test.ts
+**/*.test.js
+**/src/**/*.ts
+!packages/a2a-server/dist/**
+!packages/core/dist/**

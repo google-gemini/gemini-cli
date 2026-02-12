@@ -28,6 +28,7 @@ import { commandRegistry } from '../commands/command-registry.js';
 import { debugLogger, SimpleExtensionLoader } from '@google/gemini-cli-core';
 import type { Command, CommandArgument } from '../commands/types.js';
 import { GitService } from '@google/gemini-cli-core';
+import { getA2UIAgentExtension } from '../a2ui/a2ui-extension.js';
 
 type CommandResponse = {
   name: string;
@@ -46,11 +47,12 @@ const coderAgentCard: AgentCard = {
     url: 'https://google.com',
   },
   protocolVersion: '0.3.0',
-  version: '0.0.2', // Incremented version
+  version: '0.1.0', // A2UI-enabled version
   capabilities: {
     streaming: true,
-    pushNotifications: false,
+    pushNotifications: true,
     stateTransitionHistory: true,
+    extensions: [getA2UIAgentExtension()],
   },
   securitySchemes: undefined,
   security: undefined,
@@ -330,7 +332,8 @@ export async function main() {
     const expressApp = await createApp();
     const port = Number(process.env['CODER_AGENT_PORT'] || 0);
 
-    const server = expressApp.listen(port, 'localhost', () => {
+    const host = process.env['CODER_AGENT_HOST'] || 'localhost';
+    const server = expressApp.listen(port, host, () => {
       const address = server.address();
       let actualPort;
       if (process.env['CODER_AGENT_PORT']) {

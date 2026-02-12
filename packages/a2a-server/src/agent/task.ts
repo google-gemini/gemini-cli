@@ -56,6 +56,15 @@ import type {
   Citation,
 } from '../types.js';
 import type { PartUnion, Part as genAiPart } from '@google/genai';
+import {
+  createToolCallApprovalSurface,
+  updateToolCallStatus,
+  createAgentResponseSurface,
+  updateAgentResponseText,
+  createThoughtPart as createA2UIThoughtPart,
+  deleteToolApprovalSurface,
+} from '../a2ui/a2ui-surface-manager.js';
+import { isA2UIPart, extractA2UIActions } from '../a2ui/a2ui-extension.js';
 
 type UnionKeys<T> = T extends T ? keyof T : never;
 
@@ -74,6 +83,11 @@ export class Task {
   currentPromptId: string | undefined;
   promptCount = 0;
   autoExecute: boolean;
+
+  // A2UI support
+  a2uiEnabled = false;
+  private accumulatedText = '';
+  private a2uiResponseSurfaceCreated = false;
 
   // For tool waiting logic
   private pendingToolCalls: Map<string, string> = new Map(); //toolCallId --> status
@@ -390,6 +404,44 @@ export class Task {
             ? { kind: CoderAgentEvent.ToolCallConfirmationEvent }
             : { kind: CoderAgentEvent.ToolCallUpdateEvent };
         const message = this.toolStatusMessage(tc, this.id, this.contextId);
+
+        // Add A2UI parts for tool call updates if A2UI is enabled
+        if (this.a2uiEnabled) {
+          try {
+            if (tc.status === 'awaiting_approval') {
+              const a2uiPart = createToolCallApprovalSurface(this.id, {
+                callId: tc.request.callId,
+                name: tc.request.name,
+                displayName: tc.tool?.displayName || tc.tool?.name,
+                description: tc.tool?.description,
+                args: tc.request.args as Record<string, unknown> | undefined,
+                kind: tc.tool?.kind,
+              });
+              message.parts.push(a2uiPart);
+              logger.info(
+                `[Task] A2UI: Added tool approval surface for ${tc.request.callId}`,
+              );
+            } else if (['success', 'error', 'cancelled'].includes(tc.status)) {
+              const output =
+                'liveOutput' in tc ? String(tc.liveOutput) : undefined;
+              const a2uiPart = updateToolCallStatus(
+                this.id,
+                tc.request.callId,
+                tc.status,
+                output,
+              );
+              message.parts.push(a2uiPart);
+              logger.info(
+                `[Task] A2UI: Updated tool status for ${tc.request.callId}: ${tc.status}`,
+              );
+            }
+          } catch (a2uiError) {
+            logger.error(
+              '[Task] A2UI: Error generating tool call surface:',
+              a2uiError,
+            );
+          }
+        }
 
         const event = this._createStatusUpdateEvent(
           this.taskState,
@@ -954,7 +1006,66 @@ export class Task {
     let anyConfirmationHandled = false;
     let hasContentForLlm = false;
 
+    // Reset A2UI accumulated text for new user turn
+    if (this.a2uiEnabled) {
+      this.accumulatedText = '';
+      this.a2uiResponseSurfaceCreated = false;
+    }
+
     for (const part of userMessage.parts) {
+      // Handle A2UI action messages (e.g., button clicks for tool approval)
+      if (this.a2uiEnabled && isA2UIPart(part)) {
+        const actions = extractA2UIActions(part);
+        for (const action of actions) {
+          if (action.action.name === 'tool_confirmation') {
+            const ctx = action.action.context;
+            // Convert A2UI action to a tool confirmation data part
+            const syntheticPart: Part = {
+              kind: 'data',
+              data: {
+                callId: ctx['callId'],
+                outcome: ctx['outcome'],
+              },
+            } as Part;
+            const handled =
+              await this._handleToolConfirmationPart(syntheticPart);
+            if (handled) {
+              anyConfirmationHandled = true;
+              // Emit a delete surface part for the approval UI
+              try {
+                const deletePart = deleteToolApprovalSurface(
+                  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+                  (ctx['taskId'] as string) || this.id,
+                  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+                  ctx['callId'] as string,
+                );
+                const deleteMessage: Message = {
+                  kind: 'message',
+                  role: 'agent',
+                  parts: [deletePart],
+                  messageId: uuidv4(),
+                  taskId: this.id,
+                  contextId: this.contextId,
+                };
+                const event = this._createStatusUpdateEvent(
+                  this.taskState,
+                  { kind: CoderAgentEvent.ToolCallUpdateEvent },
+                  deleteMessage,
+                  false,
+                );
+                this.eventBus?.publish(event);
+              } catch (a2uiError) {
+                logger.error(
+                  '[Task] A2UI: Error deleting approval surface:',
+                  a2uiError,
+                );
+              }
+            }
+          }
+        }
+        continue;
+      }
+
       const confirmationHandled = await this._handleToolConfirmationPart(part);
       if (confirmationHandled) {
         anyConfirmationHandled = true;
@@ -1020,6 +1131,33 @@ export class Task {
     }
     logger.info('[Task] Sending text content to event bus.');
     const message = this._createTextMessage(content);
+
+    // Add A2UI response surface parts if A2UI is enabled
+    if (this.a2uiEnabled) {
+      try {
+        this.accumulatedText += content;
+        if (!this.a2uiResponseSurfaceCreated) {
+          const surfacePart = createAgentResponseSurface(this.id);
+          message.parts.push(surfacePart);
+          this.a2uiResponseSurfaceCreated = true;
+          logger.info(
+            `[Task] A2UI: Created agent response surface for task ${this.id}`,
+          );
+        }
+        const updatePart = updateAgentResponseText(
+          this.id,
+          this.accumulatedText,
+          'Working...',
+        );
+        message.parts.push(updatePart);
+      } catch (a2uiError) {
+        logger.error(
+          '[Task] A2UI: Error generating text content surface:',
+          a2uiError,
+        );
+      }
+    }
+
     const textContent: TextContent = {
       kind: CoderAgentEvent.TextContentEvent,
     };
@@ -1041,15 +1179,35 @@ export class Task {
       return;
     }
     logger.info('[Task] Sending thought to event bus.');
+    const parts: Part[] = [
+      {
+        kind: 'data',
+        data: content,
+      } as Part,
+    ];
+
+    // Add A2UI thought surface if A2UI is enabled
+    if (this.a2uiEnabled) {
+      try {
+        const a2uiPart = createA2UIThoughtPart(
+          this.id,
+          content.subject || 'Thinking...',
+          content.description || '',
+        );
+        parts.push(a2uiPart);
+        logger.info(`[Task] A2UI: Added thought surface for task ${this.id}`);
+      } catch (a2uiError) {
+        logger.error(
+          '[Task] A2UI: Error generating thought surface:',
+          a2uiError,
+        );
+      }
+    }
+
     const message: Message = {
       kind: 'message',
       role: 'agent',
-      parts: [
-        {
-          kind: 'data',
-          data: content,
-        } as Part,
-      ],
+      parts,
       messageId: uuidv4(),
       taskId: this.id,
       contextId: this.contextId,
@@ -1068,6 +1226,43 @@ export class Task {
         traceId,
       ),
     );
+  }
+
+  /**
+   * Finalizes A2UI surfaces when the agent turn is complete.
+   * Updates the response surface status to "Done".
+   */
+  finalizeA2UISurfaces(): void {
+    if (!this.a2uiEnabled || !this.a2uiResponseSurfaceCreated) {
+      return;
+    }
+    try {
+      const finalPart = updateAgentResponseText(
+        this.id,
+        this.accumulatedText,
+        'Done',
+      );
+      const message: Message = {
+        kind: 'message',
+        role: 'agent',
+        parts: [finalPart],
+        messageId: uuidv4(),
+        taskId: this.id,
+        contextId: this.contextId,
+      };
+      const event = this._createStatusUpdateEvent(
+        this.taskState,
+        { kind: CoderAgentEvent.TextContentEvent },
+        message,
+        false,
+      );
+      this.eventBus?.publish(event);
+      logger.info(
+        `[Task] A2UI: Finalized response surface for task ${this.id}`,
+      );
+    } catch (a2uiError) {
+      logger.error('[Task] A2UI: Error finalizing surfaces:', a2uiError);
+    }
   }
 
   _sendCitation(citation: string) {

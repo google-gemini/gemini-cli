@@ -1,0 +1,35 @@
+steps:
+  # Step 1: Install all dependencies and build
+  - name: 'node:20-slim'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        apt-get update && apt-get install -y python3 make g++ git
+        npm pkg delete scripts.prepare
+        npm install
+        npm run build
+    env:
+      - 'HUSKY=0'
+
+  # Step 2: Build Docker image (using pre-built dist/ from step 1)
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/gemini-a2a/a2a-server:latest'
+      - '-f'
+      - 'packages/a2a-server/Dockerfile'
+      - '.'
+
+  # Step 3: Push to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/gemini-a2a/a2a-server:latest'
+
+images:
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/gemini-a2a/a2a-server:latest'
+timeout: '1800s'
+options:
+  machineType: 'E2_HIGHCPU_8'
