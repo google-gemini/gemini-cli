@@ -134,6 +134,7 @@ export interface ColorizeCodeOptions {
   settings: MergedSettings;
   hideLineNumbers?: boolean;
   disableColor?: boolean;
+  returnLines?: boolean;
 }
 
 /**
@@ -151,12 +152,13 @@ export function colorizeCode({
   settings,
   hideLineNumbers = false,
   disableColor = false,
-}: ColorizeCodeOptions): React.ReactNode {
+  returnLines = false,
+}: ColorizeCodeOptions): React.ReactNode | React.ReactNode[] {
   const codeToHighlight = code.replace(/\n$/, '');
   const activeTheme = theme || themeManager.getActiveTheme();
   const showLineNumbers = hideLineNumbers ? false : settings.ui.showLineNumbers;
 
-  const useMaxSizedBox = !isAlternateBufferEnabled(settings);
+  const useMaxSizedBox = !isAlternateBufferEnabled(settings) && !returnLines;
   try {
     // Render the HAST tree using the adapted theme
     // Apply the theme's default foreground color to the top-level Text element
@@ -205,6 +207,10 @@ export function colorizeCode({
       );
     });
 
+    if (returnLines) {
+      return renderedLines;
+    }
+
     if (useMaxSizedBox) {
       return (
         <MaxSizedBox
@@ -252,6 +258,10 @@ export function colorizeCode({
         </Text>
       </Box>
     ));
+
+    if (returnLines) {
+      return fallbackLines;
+    }
 
     if (useMaxSizedBox) {
       return (

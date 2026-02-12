@@ -14,14 +14,14 @@ import { theme as semanticTheme } from '../../semantic-colors.js';
 import type { Theme } from '../../themes/theme.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
 
-interface DiffLine {
+export interface DiffLine {
   type: 'add' | 'del' | 'context' | 'hunk' | 'other';
   oldLine?: number;
   newLine?: number;
   content: string;
 }
 
-function parseDiffWithLineNumbers(diffContent: string): DiffLine[] {
+export function parseDiffWithLineNumbers(diffContent: string): DiffLine[] {
   const lines = diffContent.split('\n');
   const result: DiffLine[] = [];
   let currentOldLine = 0;
@@ -113,17 +113,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
     return parseDiffWithLineNumbers(diffContent);
   }, [diffContent]);
 
-  const isNewFile = useMemo(() => {
-    if (parsedLines.length === 0) return false;
-    return parsedLines.every(
-      (line) =>
-        line.type === 'add' ||
-        line.type === 'hunk' ||
-        line.type === 'other' ||
-        line.content.startsWith('diff --git') ||
-        line.content.startsWith('new file mode'),
-    );
-  }, [parsedLines]);
+  const isNewFileResult = useMemo(() => isNewFile(parsedLines), [parsedLines]);
 
   const renderedOutput = useMemo(() => {
     if (!diffContent || typeof diffContent !== 'string') {
@@ -153,7 +143,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
       );
     }
 
-    if (isNewFile) {
+    if (isNewFileResult) {
       // Extract only the added lines' content
       const addedContent = parsedLines
         .filter((line) => line.type === 'add')
@@ -174,20 +164,31 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
         disableColor,
       });
     } else {
-      return renderDiffContent(
-        parsedLines,
-        filename,
-        tabWidth,
-        availableTerminalHeight,
-        terminalWidth,
-        disableColor,
+      const key = filename
+        ? `diff-box-${filename}`
+        : `diff-box-${crypto.createHash('sha1').update(JSON.stringify(parsedLines)).digest('hex')}`;
+
+      return (
+        <MaxSizedBox
+          maxHeight={availableTerminalHeight}
+          maxWidth={terminalWidth}
+          key={key}
+        >
+          {renderDiffLines({
+            parsedLines,
+            filename,
+            tabWidth,
+            terminalWidth,
+            disableColor,
+          })}
+        </MaxSizedBox>
       );
     }
   }, [
     diffContent,
     parsedLines,
     screenReaderEnabled,
-    isNewFile,
+    isNewFileResult,
     filename,
     availableTerminalHeight,
     terminalWidth,
@@ -200,14 +201,33 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   return renderedOutput;
 };
 
-const renderDiffContent = (
-  parsedLines: DiffLine[],
-  filename: string | undefined,
+export const isNewFile = (parsedLines: DiffLine[]): boolean => {
+  if (parsedLines.length === 0) return false;
+  return parsedLines.every(
+    (line) =>
+      line.type === 'add' ||
+      line.type === 'hunk' ||
+      line.type === 'other' ||
+      line.content.startsWith('diff --git') ||
+      line.content.startsWith('new file mode'),
+  );
+};
+
+export interface RenderDiffLinesOptions {
+  parsedLines: DiffLine[];
+  filename?: string;
+  tabWidth?: number;
+  terminalWidth: number;
+  disableColor?: boolean;
+}
+
+export const renderDiffLines = ({
+  parsedLines,
+  filename,
   tabWidth = DEFAULT_TAB_WIDTH,
-  availableTerminalHeight: number | undefined,
-  terminalWidth: number,
+  terminalWidth,
   disableColor = false,
-) => {
+}: RenderDiffLinesOptions): React.ReactNode[] => {
   // 1. Normalize whitespace (replace tabs with spaces) *before* further processing
   const normalizedLines = parsedLines.map((line) => ({
     ...line,
@@ -220,15 +240,16 @@ const renderDiffContent = (
   );
 
   if (displayableLines.length === 0) {
-    return (
+    return [
       <Box
+        key="no-changes"
         borderStyle="round"
         borderColor={semanticTheme.border.default}
         padding={1}
       >
         <Text dimColor>No changes detected.</Text>
-      </Box>
-    );
+      </Box>,
+    ];
   }
 
   const maxLineNumber = Math.max(
@@ -257,10 +278,6 @@ const renderDiffContent = (
   if (!isFinite(baseIndentation)) {
     baseIndentation = 0;
   }
-
-  const key = filename
-    ? `diff-box-${filename}`
-    : `diff-box-${crypto.createHash('sha1').update(JSON.stringify(parsedLines)).digest('hex')}`;
 
   let lastLineNumber: number | null = null;
   const MAX_CONTEXT_LINES_WITHOUT_GAP = 5;
@@ -383,15 +400,7 @@ const renderDiffContent = (
     [],
   );
 
-  return (
-    <MaxSizedBox
-      maxHeight={availableTerminalHeight}
-      maxWidth={terminalWidth}
-      key={key}
-    >
-      {content}
-    </MaxSizedBox>
-  );
+  return content;
 };
 
 const getLanguageFromExtension = (extension: string): string | null => {
