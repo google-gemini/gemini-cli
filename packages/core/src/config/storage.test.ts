@@ -161,7 +161,7 @@ describe('Storage – additional helpers', () => {
     expect(storage.getProjectTempPlansDir()).toBe(expected);
   });
 
-  it('getProjectTempPlansDir returns ~/.gemini/tmp/<identifier>/plans/<sessionId> when sessionId is provided', async () => {
+  it('getProjectTempPlansDir returns ~/.gemini/tmp/<identifier>/<sessionId>/plans when sessionId is provided', async () => {
     const sessionId = 'test-session-id';
     const storageWithSession = new Storage(projectRoot, sessionId);
     ProjectRegistry.prototype.getShortId = vi
@@ -169,7 +169,7 @@ describe('Storage – additional helpers', () => {
       .mockReturnValue(PROJECT_SLUG);
     await storageWithSession.initialize();
     const tempDir = storageWithSession.getProjectTempDir();
-    const expected = path.join(tempDir, 'plans', sessionId);
+    const expected = path.join(tempDir, sessionId, 'plans');
     expect(storageWithSession.getProjectTempPlansDir()).toBe(expected);
   });
 });

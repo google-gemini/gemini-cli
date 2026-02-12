@@ -244,11 +244,17 @@ export class Storage {
   }
 
   getProjectTempPlansDir(): string {
-    const basePlansDir = path.join(this.getProjectTempDir(), 'plans');
     if (this.sessionId) {
-      return path.join(basePlansDir, this.sessionId);
+      return path.join(this.getProjectTempDir(), this.sessionId, 'plans');
     }
-    return basePlansDir;
+    return path.join(this.getProjectTempDir(), 'plans');
+  }
+
+  getProjectTempTasksDir(): string {
+    if (this.sessionId) {
+      return path.join(this.getProjectTempDir(), this.sessionId, 'tasks');
+    }
+    return path.join(this.getProjectTempDir(), 'tasks');
   }
 
   getExtensionsDir(): string {
