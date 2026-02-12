@@ -11,6 +11,7 @@ import {
   READ_FILE_TOOL_NAME,
   SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
+  WRITE_TODOS_TOOL_NAME,
 } from './definitions/coreTools.js';
 
 // Centralized constants for tool names.
@@ -24,9 +25,9 @@ export {
   READ_FILE_TOOL_NAME,
   SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
+  WRITE_TODOS_TOOL_NAME,
 };
 
-export const WRITE_TODOS_TOOL_NAME = 'write_todos';
 export const WEB_SEARCH_TOOL_NAME = 'google_web_search';
 export const WEB_FETCH_TOOL_NAME = 'web_fetch';
 export const EDIT_TOOL_NAME = 'replace';
