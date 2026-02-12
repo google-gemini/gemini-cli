@@ -15,6 +15,8 @@ export const READ_FILE_TOOL_NAME = 'read_file';
 export const SHELL_TOOL_NAME = 'run_shell_command';
 export const WRITE_FILE_TOOL_NAME = 'write_file';
 export const ACTIVATE_SKILL_TOOL_NAME = 'activate_skill';
+export const EXIT_PLAN_MODE_TOOL_NAME = 'exit_plan_mode';
+export const ENTER_PLAN_MODE_TOOL_NAME = 'enter_plan_mode';
 
 // ============================================================================
 // READ_FILE TOOL
@@ -126,6 +128,51 @@ export const GREP_DEFINITION: ToolDefinition = {
     },
   },
 };
+
+// ============================================================================
+// PLAN_MODE TOOLS
+// ============================================================================
+
+export const ENTER_PLAN_MODE_DEFINITION: ToolDefinition = {
+  base: {
+    name: ENTER_PLAN_MODE_TOOL_NAME,
+    description:
+      'Switch to Plan Mode to safely research, design, and plan complex changes using read-only tools.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        reason: {
+          type: 'string',
+          description:
+            'Short reason explaining why you are entering plan mode.',
+        },
+      },
+    },
+  },
+};
+
+/**
+ * Returns the tool definition for exiting plan mode.
+ */
+export function getExitPlanModeDefinition(plansDir: string): ToolDefinition {
+  return {
+    base: {
+      name: EXIT_PLAN_MODE_TOOL_NAME,
+      description:
+        'Signals that the planning phase is complete and requests user approval to start implementation.',
+      parametersJsonSchema: {
+        type: 'object',
+        required: ['plan_path'],
+        properties: {
+          plan_path: {
+            type: 'string',
+            description: `The file path to the finalized plan (e.g., "${plansDir}/feature-x.md"). This path MUST be within the designated plans directory: ${plansDir}/`,
+          },
+        },
+      },
+    },
+  };
+}
 
 // ============================================================================
 // ACTIVATE_SKILL TOOL

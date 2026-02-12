@@ -23,6 +23,8 @@ import {
   GLOB_DEFINITION,
   LS_DEFINITION,
   getShellDefinition,
+  ENTER_PLAN_MODE_DEFINITION,
+  getExitPlanModeDefinition,
   getActivateSkillDefinition,
 } from './coreTools.js';
 
@@ -58,6 +60,11 @@ describe('coreTools snapshots for specific models', () => {
     {
       name: 'run_shell_command',
       definition: getShellDefinition(true, true),
+    },
+    { name: 'enter_plan_mode', definition: ENTER_PLAN_MODE_DEFINITION },
+    {
+      name: 'exit_plan_mode',
+      definition: getExitPlanModeDefinition('/mock/plans'),
     },
     {
       name: 'activate_skill',
