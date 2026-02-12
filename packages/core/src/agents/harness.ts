@@ -125,7 +125,7 @@ export class AgentHarness {
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     const startTime = Date.now();
     debugLogger.debug(
-      `[AgentHarness] Starting unified ReAct loop for agent: ${this.behavior.name}`,
+      `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Starting unified ReAct loop`,
     );
 
     const maxTurnsLimit = maxTurns ?? DEFAULT_MAX_TURNS;
@@ -164,6 +164,10 @@ export class AgentHarness {
     try {
       while (this.turnCounter < maxTurnsLimit) {
         const promptId = `${this.behavior.agentId}#${this.turnCounter}`;
+        debugLogger.debug(
+          `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Starting turn ${this.turnCounter} (promptId: ${promptId})`,
+        );
+
         if (combinedSignal.aborted) {
           terminateReason = deadlineTimer.signal.aborted
             ? AgentTerminateMode.TIMEOUT
@@ -370,12 +374,16 @@ export class AgentHarness {
       }
     } finally {
       deadlineTimer.abort();
+      const duration = Date.now() - startTime;
+      debugLogger.debug(
+        `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Finished. Outcome: ${terminateReason}, Duration: ${duration}ms, Turns: ${this.turnCounter}`,
+      );
       logAgentFinish(
         this.config,
         new AgentFinishEvent(
           this.behavior.agentId,
           this.behavior.name,
-          Date.now() - startTime,
+          duration,
           this.turnCounter,
           terminateReason,
         ),
@@ -425,6 +433,10 @@ export class AgentHarness {
       (c) => c.name === TASK_COMPLETE_TOOL_NAME,
     );
     const otherCalls = calls.filter((c) => c.name !== TASK_COMPLETE_TOOL_NAME);
+
+    debugLogger.debug(
+      `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Executing ${calls.length} tool calls (${otherCalls.length} scheduled)`,
+    );
 
     let completedCalls: Array<{
       request: ToolCallRequestInfo;

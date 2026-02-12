@@ -38,6 +38,7 @@ import { promptIdContext } from '../utils/promptIdContext.js';
 import { logRecoveryAttempt } from '../telemetry/loggers.js';
 import { RecoveryAttemptEvent } from '../telemetry/types.js';
 import { DeadlineTimer } from '../utils/deadlineTimer.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 import type { ToolRegistry } from '../tools/tool-registry.js';
 
@@ -158,7 +159,11 @@ export class MainAgentBehavior implements AgentBehavior {
     this.agentId = `${parentPrefix}main-${randomIdPart}`;
   }
 
-  async initialize(_toolRegistry: ToolRegistry) {}
+  async initialize(_toolRegistry: ToolRegistry) {
+    debugLogger.debug(
+      `[MainAgentBehavior] [${this.name}:${this.agentId}] Initialized`,
+    );
+  }
 
   async getSystemInstruction() {
     const systemMemory = this.config.getUserMemory();
@@ -340,6 +345,9 @@ export class SubagentBehavior implements AgentBehavior {
   }
 
   async initialize(toolRegistry: ToolRegistry) {
+    debugLogger.debug(
+      `[SubagentBehavior] [${this.name}:${this.agentId}] Initializing tool registry`,
+    );
     const parentToolRegistry = this.config.getToolRegistry();
     if (this.definition.toolConfig) {
       for (const toolRef of this.definition.toolConfig.tools) {
@@ -479,6 +487,9 @@ export class SubagentBehavior implements AgentBehavior {
     reason: AgentTerminateMode,
     signal: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent, boolean> {
+    debugLogger.debug(
+      `[SubagentBehavior] [${this.name}:${this.agentId}] Entering recovery mode. Reason: ${reason}`,
+    );
     const recoveryStartTime = Date.now();
     let success = false;
     const graceTimeoutController = new DeadlineTimer(

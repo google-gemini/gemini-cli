@@ -8,6 +8,7 @@ import { type Config } from '../config/config.js';
 import { AgentHarness, type AgentHarnessOptions } from './harness.js';
 import { type AgentDefinition, type LocalAgentDefinition } from './types.js';
 import { MainAgentBehavior, SubagentBehavior } from './behavior.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * Factory for creating agent executors/harnesses.
@@ -31,6 +32,10 @@ export class AgentFactory {
     } else {
       behavior = new MainAgentBehavior(config, options.parentPromptId);
     }
+
+    debugLogger.debug(
+      `[AgentFactory] Creating harness for agent: ${behavior.name} (agentId: ${behavior.agentId})`,
+    );
 
     return new AgentHarness({
       config,
