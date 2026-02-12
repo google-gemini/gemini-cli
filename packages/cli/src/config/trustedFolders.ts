@@ -17,6 +17,7 @@ import {
   homedir,
   isHeadlessMode,
   coreEvents,
+  type HeadlessModeOptions,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 import stripJsonComments from 'strip-json-comments';
@@ -128,7 +129,11 @@ export class LoadedTrustedFolders {
   isPathTrusted(
     location: string,
     config?: Record<string, TrustLevel>,
+    headlessOptions?: HeadlessModeOptions,
   ): boolean | undefined {
+    if (isHeadlessMode(headlessOptions)) {
+      return true;
+    }
     const configToUse = config ?? this.user.config;
 
     // Resolve location to its realpath for canonical comparison
@@ -333,6 +338,7 @@ export function isFolderTrustEnabled(settings: Settings): boolean {
 function getWorkspaceTrustFromLocalConfig(
   workspaceDir: string,
   trustConfig?: Record<string, TrustLevel>,
+  headlessOptions?: HeadlessModeOptions,
 ): TrustResult {
   const folders = loadTrustedFolders();
   const configToUse = trustConfig ?? folders.user.config;
@@ -346,7 +352,11 @@ function getWorkspaceTrustFromLocalConfig(
     );
   }
 
-  const isTrusted = folders.isPathTrusted(workspaceDir, configToUse);
+  const isTrusted = folders.isPathTrusted(
+    workspaceDir,
+    configToUse,
+    headlessOptions,
+  );
   return {
     isTrusted,
     source: isTrusted !== undefined ? 'file' : undefined,
@@ -357,8 +367,9 @@ export function isWorkspaceTrusted(
   settings: Settings,
   workspaceDir: string = process.cwd(),
   trustConfig?: Record<string, TrustLevel>,
+  headlessOptions?: HeadlessModeOptions,
 ): TrustResult {
-  if (isHeadlessMode()) {
+  if (isHeadlessMode(headlessOptions)) {
     return { isTrusted: true, source: undefined };
   }
 
@@ -372,5 +383,9 @@ export function isWorkspaceTrusted(
   }
 
   // Fall back to the local user configuration
-  return getWorkspaceTrustFromLocalConfig(workspaceDir, trustConfig);
+  return getWorkspaceTrustFromLocalConfig(
+    workspaceDir,
+    trustConfig,
+    headlessOptions,
+  );
 }

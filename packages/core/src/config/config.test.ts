@@ -1037,6 +1037,44 @@ describe('Server Config (config.ts)', () => {
       expect(registeredWrappers).toHaveLength(1);
     });
 
+    it('should register subagents as tools even when they are not in allowedTools', async () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        allowedTools: ['read_file'], // codebase-investigator is NOT here
+        agents: {
+          overrides: {
+            codebase_investigator: { enabled: true },
+          },
+        },
+      };
+      const config = new Config(params);
+
+      const mockAgentDefinition = {
+        name: 'codebase-investigator',
+        description: 'Agent 1',
+        instructions: 'Inst 1',
+      };
+
+      const AgentRegistryMock = (
+        (await vi.importMock('../agents/registry.js')) as {
+          AgentRegistry: Mock;
+        }
+      ).AgentRegistry;
+      AgentRegistryMock.prototype.getAllDefinitions.mockReturnValue([
+        mockAgentDefinition,
+      ]);
+
+      const SubAgentToolMock = (
+        (await vi.importMock('../agents/subagent-tool.js')) as {
+          SubagentTool: Mock;
+        }
+      ).SubagentTool;
+
+      await config.initialize();
+
+      expect(SubAgentToolMock).toHaveBeenCalled();
+    });
+
     it('should not register subagents as tools when agents are disabled', async () => {
       const params: ConfigParameters = {
         ...baseParams,
