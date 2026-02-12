@@ -13,14 +13,6 @@ import {
 } from '../components/shared/text-buffer.js';
 import { getCachedStringWidth } from '../utils/textUtils.js';
 
-interface FzfResult {
-  item: string;
-  start: number;
-  end: number;
-  score: number;
-  positions?: number[];
-}
-
 export interface GenericListItem {
   key: string;
   label: string;
@@ -54,21 +46,11 @@ export function useFuzzyList<T extends GenericListItem>({
   );
 
   // FZF instance for fuzzy searching
-  const { fzfInstance, searchMap } = useMemo(() => {
-    const map = new Map<string, string>();
-    const searchItems: string[] = [];
-
-    items.forEach((item) => {
-      searchItems.push(item.label);
-      map.set(item.label.toLowerCase(), item.key);
-    });
-
-    const fzf = new AsyncFzf(searchItems, {
+  const fzfInstance = useMemo(() => new AsyncFzf(items, {
       fuzzy: 'v2',
       casing: 'case-insensitive',
-    });
-    return { fzfInstance: fzf, searchMap: map };
-  }, [items]);
+      selector: (item: T) => item.label,
+    }), [items]);
 
   // Perform search
   useEffect(() => {
@@ -83,12 +65,8 @@ export function useFuzzyList<T extends GenericListItem>({
 
       if (!active) return;
 
-      const matchedKeys = new Set<string>();
-      results.forEach((res: FzfResult) => {
-        const key = searchMap.get(res.item.toLowerCase());
-        if (key) matchedKeys.add(key);
-      });
-      setFilteredKeys(Array.from(matchedKeys));
+      const matchedKeys = results.map((res: { item: T }) => res.item.key);
+      setFilteredKeys(matchedKeys);
       onSearch?.(searchQuery);
     };
 
@@ -98,7 +76,7 @@ export function useFuzzyList<T extends GenericListItem>({
     return () => {
       active = false;
     };
-  }, [searchQuery, fzfInstance, searchMap, items, onSearch]);
+  }, [searchQuery, fzfInstance, items, onSearch]);
 
   // Get mainAreaWidth for search buffer viewport from UIState
   const { mainAreaWidth } = useUIState();
@@ -130,10 +108,7 @@ export function useFuzzyList<T extends GenericListItem>({
       const labelFull =
         item.label + (item.scopeMessage ? ` ${item.scopeMessage}` : '');
       const lWidth = getCachedStringWidth(labelFull);
-      const dWidth = item.description
-        ? getCachedStringWidth(item.description)
-        : 0;
-      max = Math.max(max, lWidth, dWidth);
+      max = Math.max(max, lWidth);
     });
     return max;
   }, [items]);
