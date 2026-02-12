@@ -329,6 +329,11 @@ export const useSlashCommandProcessor = (
         ],
         controller.signal,
       );
+
+      if (controller.signal.aborted) {
+        return;
+      }
+
       setCommands(commandService.getCommands());
     })();
 
