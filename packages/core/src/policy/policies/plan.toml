@@ -26,12 +26,20 @@
 #   999: YOLO mode allow-all (becomes 1.999 in default tier)
 
 # Catch-All: Deny everything by default in Plan mode.
+# Catch-All Deny works only for tool names that are set with low priority approve and are explicitly part of "plan" mode
 
 [[rule]]
 decision = "deny"
 priority = 60
 modes = ["plan"]
 deny_message = "You are in Plan Mode with access to read-only tools. Execution of scripts (including those from skills) is blocked."
+
+# Deny run_shell_command in Plan mode.
+[[rule]]
+toolName = ["run_shell_command"]
+decision = "deny"
+priority = 100
+modes = ["plan"]
 
 # Explicitly Allow Read-Only Tools in Plan mode.
 
@@ -54,3 +62,4 @@ decision = "allow"
 priority = 70
 modes = ["plan"]
 argsPattern = "\"file_path\":\"[^\"]+/\\.gemini/tmp/[a-zA-Z0-9_-]+/plans/[a-zA-Z0-9_-]+\\.md\""
+

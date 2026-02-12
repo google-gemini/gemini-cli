@@ -548,6 +548,9 @@ export class PolicyEngine {
         if (!rule.modes.includes(this.approvalMode)) {
           continue;
         }
+      } else {
+        // If no mode is given we shouldn't exclude the tool from the model
+        continue;
       }
 
       // Handle Global Rules

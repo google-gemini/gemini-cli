@@ -2047,32 +2047,71 @@ describe('PolicyEngine', () => {
         expected: [],
       },
       {
+        name: 'should ignore rules without explicit modes',
+        rules: [{ toolName: 'tool1', decision: PolicyDecision.DENY }],
+        expected: [],
+      },
+      {
         name: 'should include tools with DENY decision',
         rules: [
-          { toolName: 'tool1', decision: PolicyDecision.DENY },
-          { toolName: 'tool2', decision: PolicyDecision.ALLOW },
+          {
+            toolName: 'tool1',
+            decision: PolicyDecision.DENY,
+            modes: [ApprovalMode.DEFAULT],
+          },
+          {
+            toolName: 'tool2',
+            decision: PolicyDecision.ALLOW,
+            modes: [ApprovalMode.DEFAULT],
+          },
         ],
         expected: ['tool1'],
       },
       {
         name: 'should respect priority and ignore lower priority rules (DENY wins)',
         rules: [
-          { toolName: 'tool1', decision: PolicyDecision.DENY, priority: 100 },
-          { toolName: 'tool1', decision: PolicyDecision.ALLOW, priority: 10 },
+          {
+            toolName: 'tool1',
+            decision: PolicyDecision.DENY,
+            priority: 100,
+            modes: [ApprovalMode.DEFAULT],
+          },
+          {
+            toolName: 'tool1',
+            decision: PolicyDecision.ALLOW,
+            priority: 10,
+            modes: [ApprovalMode.DEFAULT],
+          },
         ],
         expected: ['tool1'],
       },
       {
         name: 'should respect priority and ignore lower priority rules (ALLOW wins)',
         rules: [
-          { toolName: 'tool1', decision: PolicyDecision.ALLOW, priority: 100 },
-          { toolName: 'tool1', decision: PolicyDecision.DENY, priority: 10 },
+          {
+            toolName: 'tool1',
+            decision: PolicyDecision.ALLOW,
+            priority: 100,
+            modes: [ApprovalMode.DEFAULT],
+          },
+          {
+            toolName: 'tool1',
+            decision: PolicyDecision.DENY,
+            priority: 10,
+            modes: [ApprovalMode.DEFAULT],
+          },
         ],
         expected: [],
       },
       {
         name: 'should NOT include ASK_USER tools even in non-interactive mode',
-        rules: [{ toolName: 'tool1', decision: PolicyDecision.ASK_USER }],
+        rules: [
+          {
+            toolName: 'tool1',
+            decision: PolicyDecision.ASK_USER,
+            modes: [ApprovalMode.DEFAULT],
+          },
+        ],
         nonInteractive: true,
         expected: [],
       },
@@ -2083,6 +2122,7 @@ describe('PolicyEngine', () => {
             toolName: 'tool1',
             decision: PolicyDecision.DENY,
             argsPattern: /something/,
+            modes: [ApprovalMode.DEFAULT],
           },
         ],
         expected: [],
@@ -2123,6 +2163,7 @@ describe('PolicyEngine', () => {
             toolName: 'dangerous-tool',
             decision: PolicyDecision.DENY,
             priority: 10,
+            modes: [ApprovalMode.YOLO],
           },
         ],
         approvalMode: ApprovalMode.YOLO,
@@ -2130,7 +2171,13 @@ describe('PolicyEngine', () => {
       },
       {
         name: 'should respect server wildcard DENY',
-        rules: [{ toolName: 'server__*', decision: PolicyDecision.DENY }],
+        rules: [
+          {
+            toolName: 'server__*',
+            decision: PolicyDecision.DENY,
+            modes: [ApprovalMode.DEFAULT],
+          },
+        ],
         expected: ['server__*'],
       },
       {
@@ -2140,11 +2187,13 @@ describe('PolicyEngine', () => {
             toolName: 'server__*',
             decision: PolicyDecision.DENY,
             priority: 100,
+            modes: [ApprovalMode.DEFAULT],
           },
           {
             toolName: 'server__tool1',
             decision: PolicyDecision.DENY,
             priority: 10,
+            modes: [ApprovalMode.DEFAULT],
           },
         ],
         expected: ['server__*', 'server__tool1'],
@@ -2156,11 +2205,13 @@ describe('PolicyEngine', () => {
             toolName: 'server__*',
             decision: PolicyDecision.ALLOW,
             priority: 100,
+            modes: [ApprovalMode.DEFAULT],
           },
           {
             toolName: 'server__tool1',
             decision: PolicyDecision.DENY,
             priority: 10,
+            modes: [ApprovalMode.DEFAULT],
           },
         ],
         expected: [],
