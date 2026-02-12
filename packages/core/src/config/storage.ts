@@ -244,6 +244,14 @@ export class Storage {
   }
 
   getProjectTempPlansDir(): string {
+    // Check if a custom directory is specified via environment variable
+    if (process.env['GEMINI_PLANS_DIR']) {
+      if (this.sessionId) {
+        return path.join(process.env['GEMINI_PLANS_DIR'], this.sessionId);
+      }
+      return process.env['GEMINI_PLANS_DIR'];
+    }
+
     if (this.sessionId) {
       return path.join(this.getProjectTempDir(), this.sessionId, 'plans');
     }
