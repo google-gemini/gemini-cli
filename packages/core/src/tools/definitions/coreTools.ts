@@ -15,6 +15,8 @@ export const READ_FILE_TOOL_NAME = 'read_file';
 export const SHELL_TOOL_NAME = 'run_shell_command';
 export const WRITE_FILE_TOOL_NAME = 'write_file';
 export const WRITE_TODOS_TOOL_NAME = 'write_todos';
+export const GET_INTERNAL_DOCS_TOOL_NAME = 'get_internal_docs';
+export const ASK_USER_TOOL_NAME = 'ask_user';
 
 // ============================================================================
 // READ_FILE TOOL
@@ -225,6 +227,106 @@ The agent did not use the todo list because this task could be completed by a ti
       },
       required: ['todos'],
       additionalProperties: false,
+    },
+  },
+};
+
+// ============================================================================
+// GET_INTERNAL_DOCS TOOL
+// ============================================================================
+
+export const GET_INTERNAL_DOCS_DEFINITION: ToolDefinition = {
+  base: {
+    name: GET_INTERNAL_DOCS_TOOL_NAME,
+    description:
+      'Returns the content of Gemini CLI internal documentation files. If no path is provided, returns a list of all available documentation paths.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        path: {
+          description:
+            "The relative path to the documentation file (e.g., 'cli/commands.md'). If omitted, lists all available documentation.",
+          type: 'string',
+        },
+      },
+    },
+  },
+};
+
+// ============================================================================
+// ASK_USER TOOL
+// ============================================================================
+
+export const ASK_USER_DEFINITION: ToolDefinition = {
+  base: {
+    name: ASK_USER_TOOL_NAME,
+    description:
+      'Ask the user one or more questions to gather preferences, clarify requirements, or make decisions.',
+    parametersJsonSchema: {
+      type: 'object',
+      required: ['questions'],
+      properties: {
+        questions: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 4,
+          items: {
+            type: 'object',
+            required: ['question', 'header'],
+            properties: {
+              question: {
+                type: 'string',
+                description:
+                  'The complete question to ask the user. Should be clear, specific, and end with a question mark.',
+              },
+              header: {
+                type: 'string',
+                maxLength: 16,
+                description:
+                  'MUST be 16 characters or fewer or the call will fail. Very short label displayed as a chip/tag. Use abbreviations: "Auth" not "Authentication", "Config" not "Configuration". Examples: "Auth method", "Library", "Approach", "Database".',
+              },
+              type: {
+                type: 'string',
+                enum: ['choice', 'text', 'yesno'],
+                default: 'choice',
+                description:
+                  "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation.",
+              },
+              options: {
+                type: 'array',
+                description:
+                  "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added. Not needed for 'text' or 'yesno' types.",
+                items: {
+                  type: 'object',
+                  required: ['label', 'description'],
+                  properties: {
+                    label: {
+                      type: 'string',
+                      description:
+                        'The display text for this option (1-5 words). Example: "OAuth 2.0"',
+                    },
+                    description: {
+                      type: 'string',
+                      description:
+                        'Brief explanation of this option. Example: "Industry standard, supports SSO"',
+                    },
+                  },
+                },
+              },
+              multiSelect: {
+                type: 'boolean',
+                description:
+                  "Only applies when type='choice'. Set to true to allow selecting multiple options.",
+              },
+              placeholder: {
+                type: 'string',
+                description:
+                  "Hint text shown in the input field. For type='text', shown in the main input. For type='choice', shown in the 'Other' custom input.",
+              },
+            },
+          },
+        },
+      },
     },
   },
 };
