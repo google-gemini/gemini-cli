@@ -1792,7 +1792,7 @@ console.log(JSON.stringify({
         ),
         settings: {
           enableHooks: true,
-          disabledHooks: [disabledCmd],
+          disabledHooks: [normalizePath(disabledCmd)],
           hooks: {
             BeforeTool: [
               {
@@ -1862,7 +1862,7 @@ console.log(JSON.stringify({
       rig.setup('Hook Disabling', {
         settings: {
           enableHooks: true,
-          disabledHooks: [disabledCmd],
+          disabledHooks: [normalizePath(disabledCmd)],
           hooks: {
             BeforeTool: [
               {
