@@ -23,12 +23,53 @@ import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/moc
 import type { Config, Storage } from '@google/gemini-cli-core';
 import { expect, vi } from 'vitest';
 
+/**
+ * Required methods that the mock config must implement.
+ * When new methods are added to Config and used by tool execution,
+ * add them here to ensure tests fail fast with clear errors.
+ */
+type RequiredConfigMethods = Pick<
+  Config,
+  | 'getToolRegistry'
+  | 'getApprovalMode'
+  | 'getIdeMode'
+  | 'isInteractive'
+  | 'getAllowedTools'
+  | 'getWorkspaceContext'
+  | 'getTargetDir'
+  | 'getCheckpointingEnabled'
+  | 'storage'
+  | 'getTruncateToolOutputThreshold'
+  | 'getFastModeTimeoutMs'
+  | 'getActiveModel'
+  | 'getDebugMode'
+  | 'getContentGeneratorConfig'
+  | 'getModel'
+  | 'getUsageStatisticsEnabled'
+  | 'setFallbackModelHandler'
+  | 'initialize'
+  | 'getProxy'
+  | 'getHistory'
+  | 'getEmbeddingModel'
+  | 'getSessionId'
+  | 'getUserTier'
+  | 'getMessageBus'
+  | 'getPolicyEngine'
+  | 'getEnableExtensionReloading'
+  | 'getEnableHooks'
+  | 'getMcpClientManager'
+  | 'getGitService'
+  | 'getHookSystem'
+  | 'getGeminiClient'
+>;
+
 export function createMockConfig(
   overrides: Partial<Config> = {},
 ): Partial<Config> {
   const tmpDir = tmpdir();
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const mockConfig = {
+  // Type assertion validates that we implement RequiredConfigMethods
+  // If a required method is missing, TypeScript will error here
+  const mockConfig: RequiredConfigMethods & Record<string, unknown> = {
     getToolRegistry: vi.fn().mockReturnValue({
       getTool: vi.fn(),
       getAllToolNames: vi.fn().mockReturnValue([]),
@@ -51,6 +92,7 @@ export function createMockConfig(
     } as Storage,
     getTruncateToolOutputThreshold: () =>
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+    getFastModeTimeoutMs: vi.fn().mockReturnValue(0),
     getActiveModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
     getDebugMode: vi.fn().mockReturnValue(false),
     getContentGeneratorConfig: vi.fn().mockReturnValue({ model: 'gemini-pro' }),
@@ -71,16 +113,25 @@ export function createMockConfig(
       getMcpServers: vi.fn().mockReturnValue({}),
     }),
     getGitService: vi.fn(),
+    // These are initialized below after mockConfig is created
+    getMessageBus: vi.fn(),
+    getHookSystem: vi.fn(),
+    getGeminiClient: vi.fn(),
+    getPolicyEngine: vi.fn(),
     ...overrides,
-  } as unknown as Config;
+  };
+
+  // Initialize methods that depend on mockConfig reference
   mockConfig.getMessageBus = vi.fn().mockReturnValue(createMockMessageBus());
   mockConfig.getHookSystem = vi
     .fn()
-    .mockReturnValue(new HookSystem(mockConfig));
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    .mockReturnValue(new HookSystem(mockConfig as Config));
 
   mockConfig.getGeminiClient = vi
     .fn()
-    .mockReturnValue(new GeminiClient(mockConfig));
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    .mockReturnValue(new GeminiClient(mockConfig as Config));
 
   mockConfig.getPolicyEngine = vi.fn().mockReturnValue({
     check: async () => {
