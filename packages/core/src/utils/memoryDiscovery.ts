@@ -615,9 +615,9 @@ export async function loadJitSubdirectoryMemory(
   // Find the deepest trusted root that contains the target path
   for (const root of trustedRoots) {
     const resolvedRoot = normalizePath(root);
-    const resolvedRootWithTrailing = resolvedRoot.endsWith(path.sep)
+    const resolvedRootWithTrailing = resolvedRoot.endsWith('/')
       ? resolvedRoot
-      : resolvedRoot + path.sep;
+      : resolvedRoot + '/';
 
     if (
       resolvedTarget === resolvedRoot ||

@@ -332,6 +332,8 @@ describe('confirmation.ts', () => {
       // Wait for the loop to process the modification and re-subscribe
       await listenerPromise2;
 
+      expect(mockState.updateArgs).toHaveBeenCalled();
+
       // Second response: User approves the modified params
       emitResponse({
         type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
@@ -343,7 +345,6 @@ describe('confirmation.ts', () => {
       const result = await promise;
       expect(result.outcome).toBe(ToolConfirmationOutcome.ProceedOnce);
       expect(mockModifier.handleModifyWithEditor).toHaveBeenCalled();
-      expect(mockState.updateArgs).toHaveBeenCalled();
     });
 
     it('should handle inline modification (payload)', async () => {
