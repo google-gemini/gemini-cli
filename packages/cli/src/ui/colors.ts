@@ -15,7 +15,7 @@ export const Colors: ColorsTheme = {
     return themeManager.getActiveTheme().colors.Foreground;
   },
   get Background() {
-    return themeManager.getActiveTheme().colors.Background;
+    return themeManager.getColors().Background;
   },
   get LightBlue() {
     return themeManager.getActiveTheme().colors.LightBlue;
@@ -51,7 +51,7 @@ export const Colors: ColorsTheme = {
     return themeManager.getActiveTheme().colors.Gray;
   },
   get DarkGray() {
-    return themeManager.getActiveTheme().colors.DarkGray;
+    return themeManager.getColors().DarkGray;
   },
   get GradientColors() {
     return themeManager.getActiveTheme().colors.GradientColors;

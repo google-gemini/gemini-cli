@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import { render } from '../../test-utils/render.js';
 import { Box, Text } from 'ink';
+import { useEffect } from 'react';
 import { Composer } from './Composer.js';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
 import {
@@ -23,12 +24,17 @@ vi.mock('../contexts/VimModeContext.js', () => ({
     vimMode: 'INSERT',
   })),
 }));
-import { ApprovalMode } from '@google/gemini-cli-core';
+import { ApprovalMode, tokenLimit } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 import { StreamingState, ToolCallStatus } from '../types.js';
 import { TransientMessageType } from '../../utils/events.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { SessionMetrics } from '../contexts/SessionContext.js';
+
+const composerTestControls = vi.hoisted(() => ({
+  suggestionsVisible: false,
+  isAlternateBuffer: false,
+}));
 
 // Mock child components
 vi.mock('./LoadingIndicator.js', () => ({
@@ -90,14 +96,28 @@ vi.mock('./DetailedMessagesDisplay.js', () => ({
 }));
 
 vi.mock('./InputPrompt.js', () => ({
-  InputPrompt: ({ placeholder }: { placeholder?: string }) => (
-    <Text>InputPrompt: {placeholder}</Text>
-  ),
+  InputPrompt: ({
+    placeholder,
+    onSuggestionsVisibilityChange,
+  }: {
+    placeholder?: string;
+    onSuggestionsVisibilityChange?: (visible: boolean) => void;
+  }) => {
+    useEffect(() => {
+      onSuggestionsVisibilityChange?.(composerTestControls.suggestionsVisible);
+    }, [onSuggestionsVisibilityChange]);
+
+    return <Text>InputPrompt: {placeholder}</Text>;
+  },
   calculatePromptWidths: vi.fn(() => ({
     inputWidth: 80,
     suggestionsWidth: 40,
     containerWidth: 84,
   })),
+}));
+
+vi.mock('../hooks/useAlternateBuffer.js', () => ({
+  useAlternateBuffer: () => composerTestControls.isAlternateBuffer,
 }));
 
 vi.mock('./Footer.js', () => ({
@@ -154,15 +174,19 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     ctrlDPressedOnce: false,
     showEscapePrompt: false,
     shortcutsHelpVisible: false,
+    cleanUiDetailsVisible: true,
     ideContextState: null,
     geminiMdFileCount: 0,
     renderMarkdown: true,
     filteredConsoleMessages: [],
     history: [],
     sessionStats: {
+      sessionId: 'test-session',
+      sessionStartTime: new Date(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      metrics: {} as any,
       lastPromptTokenCount: 0,
-      sessionTokenCount: 0,
-      totalPrompts: 0,
+      promptCount: 0,
     },
     branchName: 'main',
     debugMessage: '',
@@ -187,8 +211,12 @@ const createMockUIActions = (): UIActions =>
     handleFinalSubmit: vi.fn(),
     handleClearScreen: vi.fn(),
     setShellModeActive: vi.fn(),
+    setCleanUiDetailsVisible: vi.fn(),
+    toggleCleanUiDetailsVisible: vi.fn(),
+    revealCleanUiDetailsTemporarily: vi.fn(),
     onEscapePromptChange: vi.fn(),
     vimHandleInput: vi.fn(),
+    setShortcutsHelpVisible: vi.fn(),
   }) as Partial<UIActions> as UIActions;
 
 const createMockConfig = (overrides = {}): Config =>
@@ -232,6 +260,11 @@ const renderComposer = (
   );
 
 describe('Composer', () => {
+  beforeEach(() => {
+    composerTestControls.suggestionsVisible = false;
+    composerTestControls.isAlternateBuffer = false;
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -337,17 +370,18 @@ describe('Composer', () => {
       expect(output).toContain('LoadingIndicator: Thinking ...');
     });
 
-    it('keeps shortcuts hint visible while loading', () => {
+    it('hides shortcuts hint while loading', () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         elapsedTime: 1,
+        cleanUiDetailsVisible: false,
       });
 
       const { lastFrame } = renderComposer(uiState);
 
       const output = lastFrame();
       expect(output).toContain('LoadingIndicator');
-      expect(output).toContain('ShortcutsHint');
+      expect(output).not.toContain('ShortcutsHint');
     });
 
     it('renders LoadingIndicator without thought when accessibility disables loading phrases', () => {
@@ -513,6 +547,21 @@ describe('Composer', () => {
   });
 
   describe('Input and Indicators', () => {
+    it('hides non-essential UI details in clean mode', () => {
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      const output = lastFrame();
+      expect(output).toContain('ShortcutsHint');
+      expect(output).toContain('InputPrompt');
+      expect(output).not.toContain('Footer');
+      expect(output).not.toContain('ApprovalModeIndicator');
+      expect(output).not.toContain('ContextSummaryDisplay');
+    });
+
     it('renders InputPrompt when input is active', () => {
       const uiState = createMockUIState({
         isInputActive: true,
@@ -580,6 +629,92 @@ describe('Composer', () => {
       const { lastFrame } = renderComposer(uiState);
 
       expect(lastFrame()).not.toContain('raw markdown mode');
+    });
+
+    it.each([
+      [ApprovalMode.YOLO, 'YOLO'],
+      [ApprovalMode.PLAN, 'plan'],
+      [ApprovalMode.AUTO_EDIT, 'auto edit'],
+    ])(
+      'shows minimal mode badge "%s" when clean UI details are hidden',
+      (mode, label) => {
+        const uiState = createMockUIState({
+          cleanUiDetailsVisible: false,
+          showApprovalModeIndicator: mode,
+        });
+
+        const { lastFrame } = renderComposer(uiState);
+        expect(lastFrame()).toContain(label);
+      },
+    );
+
+    it('hides minimal mode badge while loading in clean mode', () => {
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+        streamingState: StreamingState.Responding,
+        elapsedTime: 1,
+        showApprovalModeIndicator: ApprovalMode.PLAN,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+      const output = lastFrame();
+      expect(output).toContain('LoadingIndicator');
+      expect(output).not.toContain('plan');
+      expect(output).not.toContain('ShortcutsHint');
+    });
+
+    it('hides minimal mode badge while action-required state is active', () => {
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+        showApprovalModeIndicator: ApprovalMode.PLAN,
+        customDialog: (
+          <Box>
+            <Text>Prompt</Text>
+          </Box>
+        ),
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+      const output = lastFrame();
+      expect(output).not.toContain('plan');
+      expect(output).not.toContain('ShortcutsHint');
+    });
+
+    it('shows Esc rewind prompt in minimal mode without showing full UI', () => {
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+        showEscapePrompt: true,
+        history: [{ id: 1, type: 'user', text: 'msg' }],
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+      const output = lastFrame();
+      expect(output).toContain('ToastDisplay');
+      expect(output).not.toContain('ContextSummaryDisplay');
+    });
+
+    it('shows context usage bleed-through when over 60%', () => {
+      const model = 'gemini-2.5-pro';
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+        currentModel: model,
+        sessionStats: {
+          sessionId: 'test-session',
+          sessionStartTime: new Date(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          metrics: {} as any,
+          lastPromptTokenCount: Math.floor(tokenLimit(model) * 0.7),
+          promptCount: 0,
+        },
+      });
+      const settings = createMockSettings({
+        ui: {
+          footer: { hideContextPercentage: false },
+        },
+      });
+
+      const { lastFrame } = renderComposer(uiState, settings);
+      expect(lastFrame()).toContain('%');
     });
   });
 
@@ -679,11 +814,127 @@ describe('Composer', () => {
     });
 
     it('keeps shortcuts hint visible when no action is required', () => {
-      const uiState = createMockUIState();
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+      });
 
       const { lastFrame } = renderComposer(uiState);
 
       expect(lastFrame()).toContain('ShortcutsHint');
+    });
+
+    it('shows shortcuts hint when full UI details are visible', () => {
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: true,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain('ShortcutsHint');
+    });
+
+    it('hides shortcuts hint while loading in minimal mode', () => {
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+        streamingState: StreamingState.Responding,
+        elapsedTime: 1,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).not.toContain('ShortcutsHint');
+    });
+
+    it('shows shortcuts help in minimal mode when toggled on', () => {
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+        shortcutsHelpVisible: true,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain('ShortcutsHelp');
+    });
+
+    it('hides shortcuts hint when suggestions are visible above input in alternate buffer', () => {
+      composerTestControls.isAlternateBuffer = true;
+      composerTestControls.suggestionsVisible = true;
+
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+        showApprovalModeIndicator: ApprovalMode.PLAN,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).not.toContain('ShortcutsHint');
+      expect(lastFrame()).not.toContain('plan');
+    });
+
+    it('hides approval mode indicator when suggestions are visible above input in alternate buffer', () => {
+      composerTestControls.isAlternateBuffer = true;
+      composerTestControls.suggestionsVisible = true;
+
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: true,
+        showApprovalModeIndicator: ApprovalMode.YOLO,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).not.toContain('ApprovalModeIndicator');
+    });
+
+    it('keeps shortcuts hint when suggestions are visible below input in regular buffer', () => {
+      composerTestControls.isAlternateBuffer = false;
+      composerTestControls.suggestionsVisible = true;
+
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain('ShortcutsHint');
+    });
+  });
+
+  describe('Shortcuts Help', () => {
+    it('shows shortcuts help in passive state', () => {
+      const uiState = createMockUIState({
+        shortcutsHelpVisible: true,
+        streamingState: StreamingState.Idle,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain('ShortcutsHelp');
+    });
+
+    it('hides shortcuts help while streaming', () => {
+      const uiState = createMockUIState({
+        shortcutsHelpVisible: true,
+        streamingState: StreamingState.Responding,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).not.toContain('ShortcutsHelp');
+    });
+
+    it('hides shortcuts help when action is required', () => {
+      const uiState = createMockUIState({
+        shortcutsHelpVisible: true,
+        customDialog: (
+          <Box>
+            <Text>Dialog content</Text>
+          </Box>
+        ),
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).not.toContain('ShortcutsHelp');
     });
   });
 });
