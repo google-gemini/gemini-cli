@@ -523,5 +523,5 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.UNFOCUS_SHELL_INPUT]: 'Move focus from the shell back to Gemini.',
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
   [Command.RESTART_APP]: 'Restart the application.',
-  [Command.SUSPEND_APP]: 'Suspend the application (not yet implemented).',
+  [Command.SUSPEND_APP]: 'Suspend the CLI and move it to the background.',
 };

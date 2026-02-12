@@ -120,7 +120,7 @@ available combinations.
 | Move focus from the shell back to Gemini.                                                             | `Shift + Tab`              |
 | Clear the terminal screen and redraw the UI.                                                          | `Ctrl + L`                 |
 | Restart the application.                                                                              | `R`                        |
-| Suspend the application (not yet implemented).                                                        | `Ctrl + Z`                 |
+| Suspend the CLI and move it to the background.                                                        | `Ctrl + Z`                 |
 
 <!-- KEYBINDINGS-AUTOGEN:END -->
 

@@ -135,6 +135,7 @@ vi.mock('./hooks/vim.js');
 vi.mock('./hooks/useFocus.js');
 vi.mock('./hooks/useBracketedPaste.js');
 vi.mock('./hooks/useLoadingIndicator.js');
+vi.mock('./hooks/useSuspend.js');
 vi.mock('./hooks/useFolderTrust.js');
 vi.mock('./hooks/useIdeTrustListener.js');
 vi.mock('./hooks/useMessageQueue.js');
@@ -197,7 +198,7 @@ import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
-import { useKeypress } from './hooks/useKeypress.js';
+import { useSuspend } from './hooks/useSuspend.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import {
@@ -270,6 +271,7 @@ describe('AppContainer State Management', () => {
   const mockedUseTextBuffer = useTextBuffer as Mock;
   const mockedUseLogger = useLogger as Mock;
   const mockedUseLoadingIndicator = useLoadingIndicator as Mock;
+  const mockedUseSuspend = useSuspend as Mock;
   const mockedUseInputHistoryStore = useInputHistoryStore as Mock;
   const mockedUseHookDisplayState = useHookDisplayState as Mock;
   const mockedUseTerminalTheme = useTerminalTheme as Mock;
@@ -401,6 +403,9 @@ describe('AppContainer State Management', () => {
       elapsedTime: '0.0s',
       currentLoadingPhrase: '',
     });
+    mockedUseSuspend.mockReturnValue({
+      handleSuspend: vi.fn(),
+    });
     mockedUseHookDisplayState.mockReturnValue([]);
     mockedUseTerminalTheme.mockReturnValue(undefined);
     mockedUseShellInactivityStatus.mockReturnValue({
@@ -440,8 +445,8 @@ describe('AppContainer State Management', () => {
           ...defaultMergedSettings.ui,
           showStatusInTitle: false,
           hideWindowTitle: false,
+          useAlternateBuffer: false,
         },
-        useAlternateBuffer: false,
       },
     } as unknown as LoadedSettings;
 
@@ -727,10 +732,10 @@ describe('AppContainer State Management', () => {
         getChatRecordingService: vi.fn(() => mockChatRecordingService),
       };
 
-      const configWithRecording = {
-        ...mockConfig,
-        getGeminiClient: vi.fn(() => mockGeminiClient),
-      } as unknown as Config;
+      const configWithRecording = makeFakeConfig();
+      vi.spyOn(configWithRecording, 'getGeminiClient').mockReturnValue(
+        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
+      );
 
       expect(() => {
         renderAppContainer({
@@ -761,11 +766,13 @@ describe('AppContainer State Management', () => {
         setHistory: vi.fn(),
       };
 
-      const configWithRecording = {
-        ...mockConfig,
-        getGeminiClient: vi.fn(() => mockGeminiClient),
-        getSessionId: vi.fn(() => 'test-session-123'),
-      } as unknown as Config;
+      const configWithRecording = makeFakeConfig();
+      vi.spyOn(configWithRecording, 'getGeminiClient').mockReturnValue(
+        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
+      );
+      vi.spyOn(configWithRecording, 'getSessionId').mockReturnValue(
+        'test-session-123',
+      );
 
       expect(() => {
         renderAppContainer({
@@ -801,10 +808,10 @@ describe('AppContainer State Management', () => {
         getUserTier: vi.fn(),
       };
 
-      const configWithRecording = {
-        ...mockConfig,
-        getGeminiClient: vi.fn(() => mockGeminiClient),
-      } as unknown as Config;
+      const configWithRecording = makeFakeConfig();
+      vi.spyOn(configWithRecording, 'getGeminiClient').mockReturnValue(
+        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
+      );
 
       renderAppContainer({
         config: configWithRecording,
@@ -835,10 +842,10 @@ describe('AppContainer State Management', () => {
         })),
       };
 
-      const configWithClient = {
-        ...mockConfig,
-        getGeminiClient: vi.fn(() => mockGeminiClient),
-      } as unknown as Config;
+      const configWithClient = makeFakeConfig();
+      vi.spyOn(configWithClient, 'getGeminiClient').mockReturnValue(
+        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
+      );
 
       const resumedData = {
         conversation: {
@@ -891,10 +898,10 @@ describe('AppContainer State Management', () => {
         getChatRecordingService: vi.fn(),
       };
 
-      const configWithClient = {
-        ...mockConfig,
-        getGeminiClient: vi.fn(() => mockGeminiClient),
-      } as unknown as Config;
+      const configWithClient = makeFakeConfig();
+      vi.spyOn(configWithClient, 'getGeminiClient').mockReturnValue(
+        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
+      );
 
       const resumedData = {
         conversation: {
@@ -944,10 +951,10 @@ describe('AppContainer State Management', () => {
         getUserTier: vi.fn(),
       };
 
-      const configWithRecording = {
-        ...mockConfig,
-        getGeminiClient: vi.fn(() => mockGeminiClient),
-      } as unknown as Config;
+      const configWithRecording = makeFakeConfig();
+      vi.spyOn(configWithRecording, 'getGeminiClient').mockReturnValue(
+        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
+      );
 
       renderAppContainer({
         config: configWithRecording,
@@ -1938,6 +1945,19 @@ describe('AppContainer State Management', () => {
 
         pressKey('\x04'); // Ctrl+D
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+        unmount();
+      });
+    });
+
+    describe('CTRL+Z', () => {
+      it('should call handleSuspend', async () => {
+        const handleSuspend = vi.fn();
+        mockedUseSuspend.mockReturnValue({ handleSuspend });
+        await setupKeypressTest();
+
+        pressKey('\x1A'); // Ctrl+Z
+
+        expect(handleSuspend).toHaveBeenCalledTimes(1);
         unmount();
       });
     });
