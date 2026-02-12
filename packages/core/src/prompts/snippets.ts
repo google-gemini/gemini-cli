@@ -165,10 +165,9 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
 
 ## Context Efficiency:
-- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results by explicitly setting \`total_max_matches\` or \`max_matches_per_file\`, especially during the research phase.
-- For broad discovery, use names_only=true or max_matches_per_file=1 to identify files without retrieving their context.
-- Limit unnecessary context consumption from file reads by using ${GREP_TOOL_NAME} (configured with \`max_matches_per_file\`) to search large files (> 1kb) or ${READ_FILE_TOOL_NAME} with the desired offset and limit.
-- If the file is small, prefer reading the whole thing over "scrolling" through it by reading ranges repeatedly.
+- Always minimize wasted context window by aggressively scoping and limiting all of your ${GREP_TOOL_NAME} searches. e.g.: always pass total_max_matches, include, and max_matches_per_file.
+- Use names_only=true or max_matches_per_file=1 to find a list of files that contain a pattern.
+- Limit unnecessary context consumption from file reads by using ${GREP_TOOL_NAME} (configured with \`max_matches_per_file\`).
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in ${formattedFilenames} files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
