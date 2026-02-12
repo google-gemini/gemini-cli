@@ -96,6 +96,8 @@ describe('MainContent', () => {
     cleanUiDetailsVisible: true,
     bannerData: { defaultText: '', warningText: '' },
     bannerVisible: false,
+    copyModeEnabled: false,
+    terminalWidth: 100,
   };
 
   beforeEach(() => {
@@ -275,6 +277,7 @@ describe('MainContent', () => {
         vi.mocked(useAlternateBuffer).mockReturnValue(isAlternateBuffer);
         const ptyId = 123;
         const uiState = {
+          ...defaultMockUiState,
           history: [],
           pendingHistoryItems: [
             {

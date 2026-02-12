@@ -131,9 +131,11 @@ available combinations.
 - `!` on an empty prompt: Enter or exit shell mode.
 - `?` on an empty prompt: Toggle the shortcuts panel above the input. Press
   `Esc`, `Backspace`, or any printable key to close it. Press `?` again to close
-  the panel and insert a `?` into the prompt.
+  the panel and insert a `?` into the prompt. You can hide only the hint text
+  via `ui.showShortcutsHint`, without changing this keyboard behavior.
 - `Tab` + `Tab` (while typing in the prompt): Toggle between minimal and full UI
-  details when no completion/search interaction is active.
+  details when no completion/search interaction is active and
+  `ui.focusUiPreview` is enabled.
 - `Shift + Tab` (while typing in the prompt): Cycle approval modes.
 - `\` (at end of a line) + `Enter`: Insert a newline without leaving single-line
   mode.

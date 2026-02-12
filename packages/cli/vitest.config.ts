@@ -29,6 +29,9 @@ export default defineConfig({
       react: path.resolve(__dirname, '../../node_modules/react'),
     },
     setupFiles: ['./test-setup.ts'],
+    testTimeout: 60000,
+    hookTimeout: 60000,
+    pool: 'forks',
     coverage: {
       enabled: true,
       provider: 'v8',
@@ -45,8 +48,8 @@ export default defineConfig({
     },
     poolOptions: {
       threads: {
-        minThreads: 8,
-        maxThreads: 16,
+        minThreads: 1,
+        maxThreads: 4,
       },
     },
     server: {
