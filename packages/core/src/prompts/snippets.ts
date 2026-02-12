@@ -167,7 +167,7 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 ## Context Efficiency:
 - Always minimize wasted context window by aggressively scoping and limiting all of your ${GREP_TOOL_NAME} searches. e.g.: always pass total_max_matches, include, and max_matches_per_file.
 - Use names_only=true or max_matches_per_file=1 to find a list of files that contain a pattern.
-- Limit unnecessary context consumption from file reads by using ${GREP_TOOL_NAME} (configured with \`max_matches_per_file\`).
+- Limit unnecessary context consumption from file reads by always using ${GREP_TOOL_NAME} (configured with \`max_matches_per_file\`) to search large files (> 1kb).
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in ${formattedFilenames} files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
