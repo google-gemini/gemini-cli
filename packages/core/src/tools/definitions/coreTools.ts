@@ -86,16 +86,17 @@ export const GREP_DEFINITION: ToolDefinition = {
       type: 'object',
       properties: {
         pattern: {
-          description: `The regular expression (regex) pattern to search for within file contents (e.g., 'function\\s+myFunction', 'import\\s+\\{.*\\}\\s+from\\s+.*').`,
+          description: `The pattern to search for. By default, treated as a Rust-flavored regular expression. Use '\\b' for precise symbol matching (e.g., '\\bMatchMe\\b').`,
           type: 'string',
         },
         dir_path: {
           description:
-            'Optional: The absolute path to the directory to search within. If omitted, searches the current working directory.',
+            "Directory or file to search. Directories are searched recursively. Relative paths are resolved against current working directory. Defaults to current working directory ('.') if omitted.",
           type: 'string',
         },
         include: {
-          description: `Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).`,
+          description:
+            "Glob pattern to filter files (e.g., '*.ts', 'src/**'). Recommended for large repositories to reduce noise. Defaults to all files if omitted.",
           type: 'string',
         },
         exclude_pattern: {
@@ -106,6 +107,38 @@ export const GREP_DEFINITION: ToolDefinition = {
         names_only: {
           description:
             'Optional: If true, only the file paths of the matches will be returned, without the line content or line numbers. This is useful for gathering a list of files.',
+          type: 'boolean',
+        },
+        case_sensitive: {
+          description:
+            'If true, search is case-sensitive. Defaults to false (ignore case) if omitted.',
+          type: 'boolean',
+        },
+        fixed_strings: {
+          description:
+            'If true, treats the `pattern` as a literal string instead of a regular expression. Defaults to false (basic regex) if omitted.',
+          type: 'boolean',
+        },
+        context: {
+          description:
+            'Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.',
+          type: 'integer',
+        },
+        after: {
+          description:
+            'Show this many lines after each match (equivalent to grep -A). Defaults to 0 if omitted.',
+          type: 'integer',
+          minimum: 0,
+        },
+        before: {
+          description:
+            'Show this many lines before each match (equivalent to grep -B). Defaults to 0 if omitted.',
+          type: 'integer',
+          minimum: 0,
+        },
+        no_ignore: {
+          description:
+            'If true, searches all files including those usually ignored (like in .gitignore, build/, dist/, etc). Defaults to false if omitted.',
           type: 'boolean',
         },
         max_matches_per_file: {
