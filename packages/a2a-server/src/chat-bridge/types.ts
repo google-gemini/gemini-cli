@@ -136,4 +136,6 @@ export interface ChatBridgeConfig {
   projectNumber?: string;
   /** Whether to enable debug logging */
   debug?: boolean;
+  /** GCS bucket name for session persistence (optional) */
+  gcsBucket?: string;
 }

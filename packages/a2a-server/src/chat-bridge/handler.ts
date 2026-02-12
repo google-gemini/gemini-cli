@@ -25,17 +25,18 @@ export class ChatBridgeHandler {
   private initialized = false;
 
   constructor(private config: ChatBridgeConfig) {
-    this.sessionStore = new SessionStore();
+    this.sessionStore = new SessionStore(config.gcsBucket);
     this.a2aClient = new A2ABridgeClient(config.a2aServerUrl);
   }
 
   /**
-   * Initializes the A2A client connection.
+   * Initializes the A2A client connection and restores persisted sessions.
    * Must be called before handling events.
    */
   async initialize(): Promise<void> {
     if (this.initialized) return;
     await this.a2aClient.initialize();
+    await this.sessionStore.restore();
     this.initialized = true;
     logger.info(
       `[ChatBridge] Handler initialized, connected to ${this.config.a2aServerUrl}`,

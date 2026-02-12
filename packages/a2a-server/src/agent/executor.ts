@@ -77,6 +77,24 @@ class TaskWrapper {
       artifacts: [],
     };
     sdkTask.metadata!['_contextId'] = this.task.contextId;
+
+    // Persist conversation history for session resumability.
+    // GCSTaskStore saves this as a separate object and restores it on load.
+    try {
+      const conversationHistory = this.task.geminiClient.getHistory();
+      if (conversationHistory.length > 0) {
+        sdkTask.metadata!['_conversationHistory'] = conversationHistory;
+        logger.info(
+          `Task ${this.task.id}: Persisting ${conversationHistory.length} conversation history entries.`,
+        );
+      }
+    } catch {
+      // GeminiClient may not be initialized yet
+      logger.warn(
+        `Task ${this.task.id}: Could not get conversation history for persistence.`,
+      );
+    }
+
     return sdkTask;
   }
 }
@@ -131,7 +149,25 @@ export class CoderAgentExecutor implements AgentExecutor {
       agentSettings.autoExecute,
     );
     runtimeTask.taskState = persistedState._taskState;
-    await runtimeTask.geminiClient.initialize();
+
+    // Restore conversation history if available from the TaskStore.
+    // This enables session resumability — the LLM gets full context of
+    // prior interactions rather than starting with a blank slate.
+    const conversationHistory = metadata['_conversationHistory'];
+    if (Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+      logger.info(
+        `Task ${sdkTask.id}: Resuming with ${conversationHistory.length} conversation history entries.`,
+      );
+      // History was serialized from GeminiClient.getHistory() which returns
+      // Content[]. After JSON round-trip it's structurally identical.
+      await runtimeTask.geminiClient.initialize();
+      runtimeTask.geminiClient.setHistory(
+         
+        conversationHistory,
+      );
+    } else {
+      await runtimeTask.geminiClient.initialize();
+    }
 
     const wrapper = new TaskWrapper(runtimeTask, agentSettings);
     this.tasks.set(sdkTask.id, wrapper);

@@ -217,6 +217,7 @@ export async function createApp() {
         a2aServerUrl: chatBridgeUrl,
         projectNumber: process.env['CHAT_PROJECT_NUMBER'],
         debug: process.env['CHAT_BRIDGE_DEBUG'] === 'true',
+        gcsBucket: process.env['GCS_BUCKET_NAME'],
       });
       expressApp.use(chatRoutes);
       logger.info(
