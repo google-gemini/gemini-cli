@@ -216,6 +216,7 @@ const createMockUIActions = (): UIActions =>
     revealCleanUiDetailsTemporarily: vi.fn(),
     onEscapePromptChange: vi.fn(),
     vimHandleInput: vi.fn(),
+    setShortcutsHelpVisible: vi.fn(),
   }) as Partial<UIActions> as UIActions;
 
 const createMockConfig = (overrides = {}): Config =>
@@ -369,7 +370,7 @@ describe('Composer', () => {
       expect(output).toContain('LoadingIndicator: Thinking ...');
     });
 
-    it('hides shortcuts hint while loading in clean mode', () => {
+    it('hides shortcuts hint while loading', () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         elapsedTime: 1,
@@ -895,6 +896,45 @@ describe('Composer', () => {
       const { lastFrame } = renderComposer(uiState);
 
       expect(lastFrame()).toContain('ShortcutsHint');
+    });
+  });
+
+  describe('Shortcuts Help', () => {
+    it('shows shortcuts help in passive state', () => {
+      const uiState = createMockUIState({
+        shortcutsHelpVisible: true,
+        streamingState: StreamingState.Idle,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain('ShortcutsHelp');
+    });
+
+    it('hides shortcuts help while streaming', () => {
+      const uiState = createMockUIState({
+        shortcutsHelpVisible: true,
+        streamingState: StreamingState.Responding,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).not.toContain('ShortcutsHelp');
+    });
+
+    it('hides shortcuts help when action is required', () => {
+      const uiState = createMockUIState({
+        shortcutsHelpVisible: true,
+        customDialog: (
+          <Box>
+            <Text>Dialog content</Text>
+          </Box>
+        ),
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).not.toContain('ShortcutsHelp');
     });
   });
 });
