@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -70,8 +70,11 @@ export function useFuzzyList<T extends GenericListItem>({
       onSearch?.(searchQuery);
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    doSearch();
+    void doSearch().catch((error) => {
+      // eslint-disable-next-line no-console
+      console.error('Search failed:', error);
+      setFilteredKeys(items.map((i) => i.key)); // Reset to all items on error
+    });
 
     return () => {
       active = false;
