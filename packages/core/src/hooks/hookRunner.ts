@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
+import type { HookConfig } from './types.js';
+import { HookEventName, ConfigSource } from './types.js';
+import type { Config } from '../config/config.js';
 import type {
   HookConfig,
   HookInput,
@@ -297,7 +300,12 @@ export class HookRunner {
         timedOut = true;
 
         if (process.platform === 'win32' && child.pid) {
-          spawn('taskkill', ['/pid', child.pid.toString(), '/f', '/t']);
+          try {
+            execSync(`taskkill /pid ${child.pid} /f /t`);
+          } catch (_e) {
+            // Ignore errors if process is already dead or access denied
+            debugLogger.debug(`Taskkill failed: ${_e}`);
+          }
         } else {
           child.kill('SIGTERM');
         }
@@ -306,7 +314,12 @@ export class HookRunner {
         setTimeout(() => {
           if (!child.killed) {
             if (process.platform === 'win32' && child.pid) {
-              spawn('taskkill', ['/pid', child.pid.toString(), '/f', '/t']);
+              try {
+                execSync(`taskkill /pid ${child.pid} /f /t`);
+              } catch (_e) {
+                // Ignore
+                debugLogger.debug(`Taskkill failed: ${_e}`);
+              }
             } else {
               child.kill('SIGKILL');
             }
