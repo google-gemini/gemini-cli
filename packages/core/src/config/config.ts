@@ -2458,26 +2458,16 @@ export class Config {
       agentsOverrides['codebase_investigator']?.enabled !== false ||
       agentsOverrides['cli_help']?.enabled !== false
     ) {
-      const allowedTools = this.getAllowedTools();
       const definitions = this.agentRegistry.getAllDefinitions();
 
       for (const definition of definitions) {
-        const isAllowed =
-          !allowedTools || allowedTools.includes(definition.name);
-
-        if (isAllowed) {
-          try {
-            const tool = new SubagentTool(
-              definition,
-              this,
-              this.getMessageBus(),
-            );
-            registry.registerTool(tool);
-          } catch (e: unknown) {
-            debugLogger.warn(
-              `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
-            );
-          }
+        try {
+          const tool = new SubagentTool(definition, this, this.getMessageBus());
+          registry.registerTool(tool);
+        } catch (e: unknown) {
+          debugLogger.warn(
+            `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
+          );
         }
       }
     }
