@@ -20,7 +20,7 @@ import { cleanup } from 'ink-testing-library';
 import { act, useContext, type ReactElement } from 'react';
 import { AppContainer } from './AppContainer.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
-import { type TrackedToolCall } from './hooks/useReactToolScheduler.js';
+import { type TrackedToolCall } from './hooks/useToolScheduler.js';
 import {
   type Config,
   makeFakeConfig,

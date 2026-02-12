@@ -220,10 +220,6 @@ describe('App', () => {
     } as UIState;
 
     const configWithExperiment = makeFakeConfig();
-    vi.spyOn(
-      configWithExperiment,
-      'isEventDrivenSchedulerEnabled',
-    ).mockReturnValue(true);
     vi.spyOn(configWithExperiment, 'isTrustedFolder').mockReturnValue(true);
     vi.spyOn(configWithExperiment, 'getIdeMode').mockReturnValue(false);
 
