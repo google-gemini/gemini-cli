@@ -449,6 +449,14 @@ describe('Trusted Folders', () => {
         false,
       );
     });
+
+    it('should return true for isPathTrusted when isHeadlessMode is true', async () => {
+      const geminiCore = await import('@google/gemini-cli-core');
+      vi.spyOn(geminiCore, 'isHeadlessMode').mockReturnValue(true);
+
+      const folders = loadTrustedFolders();
+      expect(folders.isPathTrusted('/any-untrusted-path')).toBe(true);
+    });
   });
 
   describe('Trusted Folders Caching', () => {
