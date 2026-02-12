@@ -331,6 +331,18 @@ describe('keyMatchers', () => {
       negative: [createKey('d'), createKey('c', { ctrl: true })],
     },
     {
+      command: Command.SUSPEND_APP,
+      positive: [
+        createKey('z', { ctrl: true }),
+        createKey('z', { ctrl: true, shift: true }),
+      ],
+      negative: [
+        createKey('z'),
+        createKey('y', { ctrl: true }),
+        createKey('z', { alt: true }),
+      ],
+    },
+    {
       command: Command.SHOW_MORE_LINES,
       positive: [
         createKey('s', { ctrl: true }),
