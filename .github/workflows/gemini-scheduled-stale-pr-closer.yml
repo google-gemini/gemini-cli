@@ -61,7 +61,7 @@ jobs:
             const isGooglerCache = new Map();
             const isGoogler = async (login) => {
               if (isGooglerCache.has(login)) return isGooglerCache.get(login);
-              
+
               try {
                 // Check membership in 'googlers' or 'google' orgs
                 const orgs = ['googlers', 'google'];
@@ -82,7 +82,7 @@ jobs:
               } catch (e) {
                 core.warning(`Failed to check org membership for ${login}: ${e.message}`);
               }
-              
+
               isGooglerCache.set(login, false);
               return false;
             };
@@ -91,7 +91,7 @@ jobs:
               const isTeamMember = maintainerLogins.has(login.toLowerCase());
               const isRepoMaintainer = ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(assoc);
               if (isTeamMember || isRepoMaintainer) return true;
-              
+
               return await isGoogler(login);
             };
 

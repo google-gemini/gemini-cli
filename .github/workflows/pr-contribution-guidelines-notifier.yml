@@ -57,7 +57,7 @@ jobs:
 
             const authorAssociation = context.payload.pull_request.author_association;
             const isRepoMaintainer = ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(authorAssociation);
-            
+
             if (isRepoMaintainer || await isGoogler(username)) {
               core.info(`${username} is a maintainer or Googler. No notification needed.`);
               return;
