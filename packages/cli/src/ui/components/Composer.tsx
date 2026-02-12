@@ -186,35 +186,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           justifyContent={isNarrow ? 'flex-start' : 'space-between'}
         >
           <Box
-            marginLeft={1}
-            marginRight={isNarrow ? 0 : 1}
-            flexDirection="row"
-            alignItems="center"
-            flexGrow={1}
-          >
-            {showUiDetails && showLoadingIndicator && (
-              <LoadingIndicator
-                inline
-                thought={
-                  uiState.streamingState ===
-                    StreamingState.WaitingForConfirmation ||
-                  config.getAccessibility()?.enableLoadingPhrases === false
-                    ? undefined
-                    : uiState.thought
-                }
-                currentLoadingPhrase={
-                  config.getAccessibility()?.enableLoadingPhrases === false
-                    ? undefined
-                    : uiState.currentLoadingPhrase
-                }
-                thoughtLabel={
-                  inlineThinkingMode === 'full' ? 'Thinking ...' : undefined
-                }
-                elapsedTime={uiState.elapsedTime}
-              />
-            )}
-          </Box>
-          <Box
             marginTop={isNarrow ? 1 : 0}
             flexDirection="column"
             alignItems={isNarrow ? 'flex-start' : 'flex-end'}
@@ -304,6 +275,29 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           </Box>
         )}
         {showShortcutsHelp && <ShortcutsHelp />}
+        {showUiDetails && showLoadingIndicator && (
+          <Box marginLeft={1} marginBottom={1}>
+            <LoadingIndicator
+              inline
+              thought={
+                uiState.streamingState ===
+                  StreamingState.WaitingForConfirmation ||
+                config.getAccessibility()?.enableLoadingPhrases === false
+                  ? undefined
+                  : uiState.thought
+              }
+              currentLoadingPhrase={
+                config.getAccessibility()?.enableLoadingPhrases === false
+                  ? undefined
+                  : uiState.currentLoadingPhrase
+              }
+              thoughtLabel={
+                inlineThinkingMode === 'full' ? 'Thinking ...' : undefined
+              }
+              elapsedTime={uiState.elapsedTime}
+            />
+          </Box>
+        )}
         {showUiDetails && <HorizontalLine />}
         {showUiDetails && (
           <Box
@@ -326,45 +320,51 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
               {hasToast ? (
                 <ToastDisplay />
               ) : (
-                !showLoadingIndicator && (
-                  <Box
-                    flexDirection={isNarrow ? 'column' : 'row'}
-                    alignItems={isNarrow ? 'flex-start' : 'center'}
-                  >
-                    {showApprovalIndicator && (
-                      <ApprovalModeIndicator
-                        approvalMode={showApprovalModeIndicator}
-                        isPlanEnabled={config.isPlanEnabled()}
-                      />
-                    )}
-                    {uiState.shellModeActive && (
-                      <Box
-                        marginLeft={showApprovalIndicator && !isNarrow ? 1 : 0}
-                        marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
-                      >
-                        <ShellModeIndicator />
-                      </Box>
-                    )}
-                    {showRawMarkdownIndicator && (
-                      <Box
-                        marginLeft={
-                          (showApprovalIndicator || uiState.shellModeActive) &&
-                          !isNarrow
-                            ? 1
-                            : 0
-                        }
-                        marginTop={
-                          (showApprovalIndicator || uiState.shellModeActive) &&
-                          isNarrow
-                            ? 1
-                            : 0
-                        }
-                      >
-                        <RawMarkdownIndicator />
-                      </Box>
-                    )}
-                  </Box>
-                )
+                <Box
+                  flexDirection={isNarrow ? 'column' : 'row'}
+                  alignItems={isNarrow ? 'flex-start' : 'center'}
+                >
+                  {showApprovalIndicator && (
+                    <ApprovalModeIndicator
+                      approvalMode={showApprovalModeIndicator}
+                      isPlanEnabled={config.isPlanEnabled()}
+                    />
+                  )}
+                  {!showLoadingIndicator && (
+                    <>
+                      {uiState.shellModeActive && (
+                        <Box
+                          marginLeft={
+                            showApprovalIndicator && !isNarrow ? 1 : 0
+                          }
+                          marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
+                        >
+                          <ShellModeIndicator />
+                        </Box>
+                      )}
+                      {showRawMarkdownIndicator && (
+                        <Box
+                          marginLeft={
+                            (showApprovalIndicator ||
+                              uiState.shellModeActive) &&
+                            !isNarrow
+                              ? 1
+                              : 0
+                          }
+                          marginTop={
+                            (showApprovalIndicator ||
+                              uiState.shellModeActive) &&
+                            isNarrow
+                              ? 1
+                              : 0
+                          }
+                        >
+                          <RawMarkdownIndicator />
+                        </Box>
+                      )}
+                    </>
+                  )}
+                </Box>
               )}
             </Box>
 

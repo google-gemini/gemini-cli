@@ -455,6 +455,23 @@ describe('Composer', () => {
       expect(output).toContain('LoadingIndicator');
     });
 
+    it('renders both LoadingIndicator and ApprovalModeIndicator when streaming in full UI mode', () => {
+      const uiState = createMockUIState({
+        streamingState: StreamingState.Responding,
+        thought: {
+          subject: 'Thinking',
+          description: '',
+        },
+        showApprovalModeIndicator: ApprovalMode.PLAN,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      const output = lastFrame();
+      expect(output).toContain('LoadingIndicator: Thinking');
+      expect(output).toContain('ApprovalModeIndicator');
+    });
+
     it('does NOT render LoadingIndicator when embedded shell is focused and background shell is NOT visible', () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
