@@ -4,10 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  type Part,
-  type FunctionDeclaration,
-} from '@google/genai';
+import { type Part, type FunctionDeclaration } from '@google/genai';
 import { type Config } from '../config/config.js';
 import { GeminiChat } from '../core/geminiChat.js';
 import {
@@ -31,16 +28,11 @@ import { ToolRegistry } from '../tools/tool-registry.js';
 import { scheduleAgentTools } from './agent-scheduler.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
-import {
-  logAgentStart,
-  logAgentFinish,
-} from '../telemetry/loggers.js';
-import {
-  AgentStartEvent,
-  AgentFinishEvent,
-} from '../telemetry/types.js';
+import { logAgentStart, logAgentFinish } from '../telemetry/loggers.js';
+import { AgentStartEvent, AgentFinishEvent } from '../telemetry/types.js';
 import { DeadlineTimer } from '../utils/deadlineTimer.js';
 import { type AgentBehavior } from './behavior.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const TASK_COMPLETE_TOOL_NAME = 'complete_task';
 
@@ -58,7 +50,7 @@ export interface AgentHarnessOptions {
 /**
  * A unified harness for executing agents (both main CLI and subagents).
  * Consolidates ReAct loop logic, tool scheduling, and state management.
- * 
+ *
  * Uses an AgentBehavior plugin to handle specific personality differences.
  */
 export class AgentHarness {
@@ -91,7 +83,7 @@ export class AgentHarness {
    * Initializes the harness, creating the underlying chat object.
    */
   async initialize(): Promise<void> {
-    await this.behavior.initialize();
+    await this.behavior.initialize(this.toolRegistry);
     this.chat = await this.createChat();
   }
 
@@ -123,6 +115,9 @@ export class AgentHarness {
     maxTurns?: number,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     const startTime = Date.now();
+    debugLogger.debug(
+      `[AgentHarness] Starting unified ReAct loop for agent: ${this.behavior.name}`,
+    );
 
     const maxTurnsLimit = maxTurns ?? DEFAULT_MAX_TURNS;
     const maxTimeMinutes = DEFAULT_MAX_TIME_MINUTES;
@@ -171,31 +166,47 @@ export class AgentHarness {
         }
 
         // 1. Hook: Before Agent
-        const beforeResult = await this.behavior.fireBeforeAgent(currentRequest);
+        const beforeResult =
+          await this.behavior.fireBeforeAgent(currentRequest);
         if (beforeResult.stop) {
-          terminateReason = AgentTerminateMode.ABORTED; 
+          terminateReason = AgentTerminateMode.ABORTED;
           if (beforeResult.systemMessage) {
-            yield { type: GeminiEventType.Error, value: { error: { message: beforeResult.systemMessage } } };
+            yield {
+              type: GeminiEventType.Error,
+              value: { error: { message: beforeResult.systemMessage } },
+            };
           }
           break;
         }
         if (beforeResult.additionalContext) {
-           currentRequest.push({ text: `<hook_context>${beforeResult.additionalContext}</hook_context>` });
+          currentRequest.push({
+            text: `<hook_context>${beforeResult.additionalContext}</hook_context>`,
+          });
         }
 
         // 2. Sync Environment (IDE Context etc)
-        const envSync = await this.behavior.syncEnvironment(this.chat!.getHistory());
+        const envSync = await this.behavior.syncEnvironment(
+          this.chat!.getHistory(),
+        );
         if (envSync.additionalParts) {
-           currentRequest.push(...envSync.additionalParts);
+          currentRequest.push(...envSync.additionalParts);
         }
 
         // 3. Compression
         const compressionResult = await this.tryCompressChat(promptId);
-        if (compressionResult.compressionStatus === CompressionStatus.COMPRESSED) {
-          yield { type: GeminiEventType.ChatCompressed, value: compressionResult };
+        if (
+          compressionResult.compressionStatus === CompressionStatus.COMPRESSED
+        ) {
+          yield {
+            type: GeminiEventType.ChatCompressed,
+            value: compressionResult,
+          };
         }
 
-        await this.toolOutputMaskingService.mask(this.chat!.getHistory(), this.config);
+        await this.toolOutputMaskingService.mask(
+          this.chat!.getHistory(),
+          this.config,
+        );
 
         // 4. Loop Detection
         if (await this.loopDetector.turnStarted(combinedSignal)) {
@@ -205,14 +216,19 @@ export class AgentHarness {
         }
 
         // 5. Model Selection/Routing
-        const modelToUse = await this.selectModel(currentRequest, combinedSignal);
+        const modelToUse = await this.selectModel(
+          currentRequest,
+          combinedSignal,
+        );
         if (!this.currentSequenceModel) {
           yield { type: GeminiEventType.ModelInfo, value: modelToUse };
           this.currentSequenceModel = modelToUse;
         }
 
         // 6. Update tools for this model
-        this.chat!.setTools([{ functionDeclarations: this.prepareToolsList() }]);
+        this.chat!.setTools([
+          { functionDeclarations: this.prepareToolsList() },
+        ]);
 
         // 7. Run the turn
         const turnStream = promptIdContext.run(promptId, () =>
@@ -225,7 +241,7 @@ export class AgentHarness {
           yield event;
           if (event.type === GeminiEventType.Error) hasError = true;
           if (event.type === GeminiEventType.Content && event.value) {
-             cumulativeResponse += event.value;
+            cumulativeResponse += event.value;
           }
 
           if (event.type === GeminiEventType.ToolCallRequest) {
@@ -246,19 +262,23 @@ export class AgentHarness {
         }
 
         // 8. Hook: After Agent
-        const afterResult = await this.behavior.fireAfterAgent(currentRequest, cumulativeResponse, turn);
+        const afterResult = await this.behavior.fireAfterAgent(
+          currentRequest,
+          cumulativeResponse,
+          turn,
+        );
         if (afterResult.stop) {
-           terminateReason = AgentTerminateMode.GOAL;
-           if (afterResult.contextCleared) {
-              await this.initialize();
-           }
-           break;
+          terminateReason = AgentTerminateMode.GOAL;
+          if (afterResult.contextCleared) {
+            await this.initialize();
+          }
+          break;
         }
         if (afterResult.shouldContinue) {
-           currentRequest = [{ text: afterResult.reason || 'Continue' }];
-           this.turnCounter++;
-           turn = new Turn(this.chat!, this.behavior.agentId);
-           continue;
+          currentRequest = [{ text: afterResult.reason || 'Continue' }];
+          this.turnCounter++;
+          turn = new Turn(this.chat!, this.behavior.agentId);
+          continue;
         }
 
         if (combinedSignal.aborted) {
@@ -277,8 +297,8 @@ export class AgentHarness {
           );
 
           if (this.behavior.isGoalReached(toolResults)) {
-             terminateReason = AgentTerminateMode.GOAL;
-             return turn;
+            terminateReason = AgentTerminateMode.GOAL;
+            return turn;
           }
 
           currentRequest = toolResults.map((r) => r.part);
@@ -286,41 +306,59 @@ export class AgentHarness {
           turn = new Turn(this.chat!, this.behavior.agentId);
         } else {
           // No tool calls. Check for continuation.
-          const nextParts = await this.behavior.getContinuationRequest(turn, combinedSignal);
+          const nextParts = await this.behavior.getContinuationRequest(
+            turn,
+            combinedSignal,
+          );
           if (nextParts) {
             currentRequest = nextParts;
             this.turnCounter++;
             turn = new Turn(this.chat!, this.behavior.agentId);
             continue;
           }
-          
+
           if (this.behavior.name !== 'main') {
-             terminateReason = AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL;
+            terminateReason = AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL;
           } else {
-             terminateReason = AgentTerminateMode.GOAL;
+            terminateReason = AgentTerminateMode.GOAL;
           }
           break;
         }
       }
 
       // FINALIZATION & RECOVERY
-      if (terminateReason !== AgentTerminateMode.GOAL && terminateReason !== AgentTerminateMode.ABORTED) {
-         if (this.turnCounter >= maxTurnsLimit) terminateReason = AgentTerminateMode.MAX_TURNS;
+      if (
+        terminateReason !== AgentTerminateMode.GOAL &&
+        terminateReason !== AgentTerminateMode.ABORTED
+      ) {
+        if (this.turnCounter >= maxTurnsLimit)
+          terminateReason = AgentTerminateMode.MAX_TURNS;
 
-         const recoverySuccess = yield* this.behavior.executeRecovery(turn, terminateReason, signal);
-         if (recoverySuccess) {
-            terminateReason = AgentTerminateMode.GOAL;
-            return turn;
-         }
+        const recoverySuccess = yield* this.behavior.executeRecovery(
+          turn,
+          terminateReason,
+          signal,
+        );
+        if (recoverySuccess) {
+          terminateReason = AgentTerminateMode.GOAL;
+          return turn;
+        }
 
-         if (this.behavior.name !== 'main') {
-            yield {
-              type: GeminiEventType.Error,
-              value: { error: { message: this.behavior.getFinalFailureMessage(terminateReason, maxTurnsLimit, maxTimeMinutes) } }
-            };
-         }
+        if (this.behavior.name !== 'main') {
+          yield {
+            type: GeminiEventType.Error,
+            value: {
+              error: {
+                message: this.behavior.getFinalFailureMessage(
+                  terminateReason,
+                  maxTurnsLimit,
+                  maxTimeMinutes,
+                ),
+              },
+            },
+          };
+        }
       }
-
     } finally {
       deadlineTimer.abort();
       logAgentFinish(
@@ -339,7 +377,8 @@ export class AgentHarness {
   }
 
   private async tryCompressChat(promptId: string) {
-    const model = this.currentSequenceModel ?? resolveModel(this.config.getActiveModel());
+    const model =
+      this.currentSequenceModel ?? resolveModel(this.config.getActiveModel());
     const { info } = await this.compressionService.compress(
       this.chat!,
       promptId,
@@ -362,7 +401,9 @@ export class AgentHarness {
       signal,
       requestedModel: this.config.getModel(),
     };
-    const decision = await this.config.getModelRouterService().route(routingContext);
+    const decision = await this.config
+      .getModelRouterService()
+      .route(routingContext);
     return decision.model;
   }
 
@@ -371,7 +412,9 @@ export class AgentHarness {
     signal: AbortSignal,
     onWaitingForConfirmation?: (waiting: boolean) => void,
   ): Promise<Array<{ name: string; part: Part }>> {
-    const taskCompleteCalls = calls.filter((c) => c.name === TASK_COMPLETE_TOOL_NAME);
+    const taskCompleteCalls = calls.filter(
+      (c) => c.name === TASK_COMPLETE_TOOL_NAME,
+    );
     const otherCalls = calls.filter((c) => c.name !== TASK_COMPLETE_TOOL_NAME);
 
     let completedCalls: Array<{

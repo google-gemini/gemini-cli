@@ -39,6 +39,8 @@ import { logRecoveryAttempt } from '../telemetry/loggers.js';
 import { RecoveryAttemptEvent } from '../telemetry/types.js';
 import { DeadlineTimer } from '../utils/deadlineTimer.js';
 
+import type { ToolRegistry } from '../tools/tool-registry.js';
+
 const TASK_COMPLETE_TOOL_NAME = 'complete_task';
 const GRACE_PERIOD_MS = 60 * 1000;
 
@@ -53,9 +55,10 @@ export interface AgentBehavior {
   readonly name: string;
 
   /** Initializes any state needed for the agent. */
-  initialize(): Promise<void>;
+  initialize(toolRegistry: ToolRegistry): Promise<void>;
 
   /** Returns the system instruction for the chat. */
+
   getSystemInstruction(): Promise<string | undefined>;
 
   /** Returns the initial chat history. */
@@ -75,9 +78,7 @@ export interface AgentBehavior {
   /**
    * Fires the "Before Agent" hooks if applicable.
    */
-  fireBeforeAgent(
-    request: Part[],
-  ): Promise<{
+  fireBeforeAgent(request: Part[]): Promise<{
     stop?: boolean;
     reason?: string;
     systemMessage?: string;
@@ -157,7 +158,7 @@ export class MainAgentBehavior implements AgentBehavior {
     this.agentId = `${parentPrefix}main-${randomIdPart}`;
   }
 
-  async initialize() {}
+  async initialize(_toolRegistry: ToolRegistry) {}
 
   async getSystemInstruction() {
     const systemMemory = this.config.getUserMemory();
@@ -338,7 +339,25 @@ export class SubagentBehavior implements AgentBehavior {
     this.agentId = `${parentPrefix}${this.name}-${randomIdPart}`;
   }
 
-  async initialize() {}
+  async initialize(toolRegistry: ToolRegistry) {
+    const parentToolRegistry = this.config.getToolRegistry();
+    if (this.definition.toolConfig) {
+      for (const toolRef of this.definition.toolConfig.tools) {
+        if (typeof toolRef === 'string') {
+          const tool = parentToolRegistry.getTool(toolRef);
+          if (tool) toolRegistry.registerTool(tool);
+        } else if (typeof toolRef === 'object' && 'build' in toolRef) {
+          toolRegistry.registerTool(toolRef);
+        }
+      }
+    } else {
+      for (const toolName of parentToolRegistry.getAllToolNames()) {
+        const tool = parentToolRegistry.getTool(toolName);
+        if (tool) toolRegistry.registerTool(tool);
+      }
+    }
+    toolRegistry.sortTools();
+  }
 
   async getSystemInstruction() {
     const augmentedInputs = {

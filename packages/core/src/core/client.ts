@@ -797,6 +797,9 @@ export class GeminiClient {
     }
 
     if (this.config.isAgentHarnessEnabled()) {
+      debugLogger.debug(
+        '[GeminiClient] Using AgentHarness for message execution.',
+      );
       this.sessionTurnCount++;
       if (
         this.config.getMaxSessionTurns() > 0 &&

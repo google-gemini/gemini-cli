@@ -57,12 +57,10 @@ describe('AgentHarness', () => {
     mockConfig.getIdeMode = vi.fn().mockReturnValue(false);
     mockConfig.getBaseLlmClient = vi.fn().mockReturnValue({});
     mockConfig.getModelRouterService = vi.fn().mockReturnValue({
-      route: vi
-        .fn()
-        .mockResolvedValue({
-          model: 'gemini-test-model',
-          metadata: { source: 'test' },
-        }),
+      route: vi.fn().mockResolvedValue({
+        model: 'gemini-test-model',
+        metadata: { source: 'test' },
+      }),
     });
 
     vi.clearAllMocks();
@@ -172,6 +170,185 @@ describe('AgentHarness', () => {
             e.value.name === 'complete_task',
         ),
       ).toBe(true);
+      expect(vi.mocked(logAgentFinish)).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ terminate_reason: AgentTerminateMode.GOAL }),
+      );
+    });
+
+    it('handles multiple turns and model routing', async () => {
+      const definition: LocalAgentDefinition<z.ZodUnknown> = {
+        kind: 'local',
+        name: 'multi-turn-agent',
+        description: 'Testing multiple turns',
+        inputConfig: {
+          inputSchema: { type: 'object', properties: {}, required: [] },
+        },
+        modelConfig: { model: 'initial-model' },
+        runConfig: { maxTurns: 5 },
+        promptConfig: { systemPrompt: 'Test' },
+      };
+
+      const behavior = new SubagentBehavior(mockConfig, definition);
+      const harness = new AgentHarness({ config: mockConfig, behavior });
+
+      const mockChat = {
+        sendMessageStream: vi.fn(),
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        addHistory: vi.fn(),
+        setSystemInstruction: vi.fn(),
+        maybeIncludeSchemaDepthContext: vi.fn(),
+        getLastPromptTokenCount: vi.fn().mockReturnValue(0),
+      } as unknown as GeminiChat;
+      (GeminiChat as unknown as Mock).mockReturnValue(mockChat);
+
+      // Turn 1: Model calls a tool
+      (mockChat.sendMessageStream as Mock).mockResolvedValueOnce(
+        (async function* () {
+          yield {
+            type: StreamEventType.CHUNK,
+            value: {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'Thinking...' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+              functionCalls: [{ name: 'tool_1', args: {}, id: 'c1' }],
+            },
+          };
+        })(),
+      );
+
+      // Turn 2: Model finishes with complete_task
+      (mockChat.sendMessageStream as Mock).mockResolvedValueOnce(
+        (async function* () {
+          yield {
+            type: StreamEventType.CHUNK,
+            value: {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'Done' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+              functionCalls: [
+                {
+                  name: 'complete_task',
+                  args: { result: 'Success' },
+                  id: 'c2',
+                },
+              ],
+            },
+          };
+        })(),
+      );
+
+      (scheduleAgentTools as unknown as Mock).mockResolvedValue([
+        {
+          request: { name: 'tool_1', callId: 'c1' },
+          status: 'success',
+          response: {
+            responseParts: [
+              { functionResponse: { name: 'tool_1', response: {}, id: 'c1' } },
+            ],
+          },
+        },
+      ]);
+
+      const run = harness.run(
+        [{ text: 'Start' }],
+        new AbortController().signal,
+      );
+      while (true) {
+        const { done } = await run.next();
+        if (done) break;
+      }
+
+      // Should have called LLM twice
+      expect(mockChat.sendMessageStream).toHaveBeenCalledTimes(2);
+      expect(mockConfig.getModelRouterService().route).toHaveBeenCalled();
+    });
+
+    it('attempts recovery when max turns is reached', async () => {
+      const definition: LocalAgentDefinition<z.ZodUnknown> = {
+        kind: 'local',
+        name: 'unproductive-agent',
+        description: 'Reaches max turns',
+        inputConfig: {
+          inputSchema: { type: 'object', properties: {}, required: [] },
+        },
+        modelConfig: { model: 'test' },
+        runConfig: { maxTurns: 1 },
+        promptConfig: { systemPrompt: 'Test' },
+      };
+
+      const behavior = new SubagentBehavior(mockConfig, definition);
+      const harness = new AgentHarness({ config: mockConfig, behavior });
+
+      const mockChat = {
+        sendMessageStream: vi.fn(),
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        addHistory: vi.fn(),
+        setSystemInstruction: vi.fn(),
+        maybeIncludeSchemaDepthContext: vi.fn(),
+        getLastPromptTokenCount: vi.fn().mockReturnValue(0),
+      } as unknown as GeminiChat;
+      (GeminiChat as unknown as Mock).mockReturnValue(mockChat);
+
+      // Turn 1: Model does nothing (just content) -> reaches limit
+      (mockChat.sendMessageStream as Mock).mockResolvedValueOnce(
+        (async function* () {
+          yield {
+            type: StreamEventType.CHUNK,
+            value: {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'Thinking...' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            },
+          };
+        })(),
+      );
+
+      // Turn 2 (Recovery): Model yields complete_task
+      (mockChat.sendMessageStream as Mock).mockResolvedValueOnce(
+        (async function* () {
+          yield {
+            type: StreamEventType.CHUNK,
+            value: {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'Final Answer' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+              functionCalls: [
+                {
+                  name: 'complete_task',
+                  args: { result: 'Recovered' },
+                  id: 'rec',
+                },
+              ],
+            },
+          };
+        })(),
+      );
+
+      const run = harness.run(
+        [{ text: 'Start' }],
+        new AbortController().signal,
+      );
+      while (true) {
+        const { done } = await run.next();
+        if (done) break;
+      }
+
+      // Expect goal to be reached via recovery
       expect(vi.mocked(logAgentFinish)).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ terminate_reason: AgentTerminateMode.GOAL }),
