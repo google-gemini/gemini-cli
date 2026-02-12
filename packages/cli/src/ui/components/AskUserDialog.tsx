@@ -786,16 +786,11 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     ? Math.max(1, availableHeight - overhead)
     : undefined;
 
-  // We increase the max allowed height for the question to nearly the full available height.
-  // This avoids premature truncation of the question text.
   const questionHeight =
     listHeight && !isAlternateBuffer
       ? Math.max(1, listHeight - DIALOG_PADDING)
       : undefined;
 
-  // We dynamically calculate how many items to show in the list based on the
-  // ACTUAL height of the question text. If the question is short, we can show
-  // more items. If it's long, we truncate the list to make room for the question.
   const measuredHeight = Math.min(
     actualQuestionHeight,
     questionHeight ?? Infinity,

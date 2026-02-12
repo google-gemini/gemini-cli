@@ -23,6 +23,11 @@ interface MaxSizedBoxProps {
   maxHeight?: number;
   overflowDirection?: 'top' | 'bottom';
   additionalHiddenLinesCount?: number;
+  /**
+   * Callback triggered whenever the measured height of the content changes.
+   * Useful for parent components that need to adjust their layout based on
+   * the actual size of truncated content.
+   */
   onHeightChange?: (height: number) => void;
 }
 
