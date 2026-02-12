@@ -5,6 +5,7 @@
  */
 
 import {
+  ACTIVATE_SKILL_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
@@ -18,6 +19,7 @@ import {
 // need to reference a tool's name without importing the tool's implementation.
 
 export {
+  ACTIVATE_SKILL_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
@@ -35,7 +37,6 @@ export const LS_TOOL_NAME_LEGACY = 'list_directory'; // Just to be safe if anyth
 
 export const MEMORY_TOOL_NAME = 'save_memory';
 export const GET_INTERNAL_DOCS_TOOL_NAME = 'get_internal_docs';
-export const ACTIVATE_SKILL_TOOL_NAME = 'activate_skill';
 export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
 export const ASK_USER_TOOL_NAME = 'ask_user';
 export const ASK_USER_DISPLAY_NAME = 'Ask User';

@@ -14,6 +14,7 @@ export const LS_TOOL_NAME = 'list_directory';
 export const READ_FILE_TOOL_NAME = 'read_file';
 export const SHELL_TOOL_NAME = 'run_shell_command';
 export const WRITE_FILE_TOOL_NAME = 'write_file';
+export const ACTIVATE_SKILL_TOOL_NAME = 'activate_skill';
 
 // ============================================================================
 // READ_FILE TOOL
@@ -125,6 +126,45 @@ export const GREP_DEFINITION: ToolDefinition = {
     },
   },
 };
+
+// ============================================================================
+// ACTIVATE_SKILL TOOL
+// ============================================================================
+
+/**
+ * Returns the tool definition for activating a skill.
+ */
+export function getActivateSkillDefinition(
+  skillNames: string[],
+): ToolDefinition {
+  const availableSkillsHint =
+    skillNames.length > 0
+      ? ` (Available: ${skillNames.map((n) => `'${n}'`).join(', ')})`
+      : '';
+
+  const schema: ToolDefinition['base']['parametersJsonSchema'] = {
+    type: 'object',
+    properties: {
+      name: {
+        type: 'string',
+        description: 'The name of the skill to activate.',
+      },
+    },
+    required: ['name'],
+  };
+
+  if (skillNames.length > 0 && schema?.properties?.['name']) {
+    schema.properties['name'].enum = skillNames;
+  }
+
+  return {
+    base: {
+      name: ACTIVATE_SKILL_TOOL_NAME,
+      description: `Activates a specialized agent skill by name${availableSkillsHint}. Returns the skill's instructions wrapped in \`<activated_skill>\` tags. These provide specialized guidance for the current task. Use this when you identify a task that matches a skill's description. ONLY use names exactly as they appear in the \`<available_skills>\` section.`,
+      parametersJsonSchema: schema,
+    },
+  };
+}
 
 // ============================================================================
 // GLOB TOOL

@@ -23,6 +23,7 @@ import {
   GLOB_DEFINITION,
   LS_DEFINITION,
   getShellDefinition,
+  getActivateSkillDefinition,
 } from './coreTools.js';
 
 describe('coreTools snapshots for specific models', () => {
@@ -57,6 +58,10 @@ describe('coreTools snapshots for specific models', () => {
     {
       name: 'run_shell_command',
       definition: getShellDefinition(true, true),
+    },
+    {
+      name: 'activate_skill',
+      definition: getActivateSkillDefinition(['skill1', 'skill2']),
     },
   ];
 
