@@ -50,7 +50,7 @@ export interface SessionInfo {
  * Receives logs via WebSocket from CLI sessions.
  */
 export class DevTools extends EventEmitter {
-  private static instance: DevTools;
+  private static instance: DevTools | undefined;
   private logs: NetworkLog[] = [];
   private consoleLogs: InspectorConsoleLog[] = [];
   private server: http.Server | null = null;
@@ -58,6 +58,8 @@ export class DevTools extends EventEmitter {
   private sessions = new Map<string, SessionInfo>();
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private port = 25417;
+  private static readonly DEFAULT_PORT = 25417;
+  private static readonly MAX_PORT_RETRIES = 10;
 
   private constructor() {
     super();
@@ -117,7 +119,6 @@ export class DevTools extends EventEmitter {
           response: payload.response
             ? { ...existing.response, ...payload.response }
             : existing.response,
-           
         } as NetworkLog;
       }
       this.emit('update', this.logs[existingIndex]);
@@ -160,8 +161,7 @@ export class DevTools extends EventEmitter {
         resolve();
       }
       // Reset singleton so a fresh start() is possible
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      DevTools.instance = undefined as unknown as DevTools;
+      DevTools.instance = undefined;
     });
   }
 
@@ -227,6 +227,9 @@ export class DevTools extends EventEmitter {
           'code' in e &&
           e.code === 'EADDRINUSE'
         ) {
+          if (this.port - DevTools.DEFAULT_PORT >= DevTools.MAX_PORT_RETRIES) {
+            return;
+          }
           this.port++;
           this.server?.listen(this.port, '127.0.0.1');
         }
@@ -252,7 +255,8 @@ export class DevTools extends EventEmitter {
 
           // Handle registration first
           if (message.type === 'register') {
-            sessionId = message.sessionId;
+            sessionId = String(message.sessionId);
+            if (!sessionId) return;
 
             this.sessions.set(sessionId, {
               sessionId,

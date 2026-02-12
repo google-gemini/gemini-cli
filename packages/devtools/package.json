@@ -11,7 +11,7 @@
     }
   },
   "scripts": {
-    "build": "npm run build:client && tsc --outDir dist/src --declaration --module ESNext --target ESNext --moduleResolution bundler src/index.ts",
+    "build": "npm run build:client && tsc -p tsconfig.build.json",
     "build:client": "node esbuild.client.js"
   },
   "files": [
