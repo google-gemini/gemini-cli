@@ -2802,15 +2802,7 @@ export function useTextBuffer({
         paste &&
         escapePastedPaths
       ) {
-        let potentialPath = ch.trim();
-        const quoteMatch = potentialPath.match(/^'(.*)'$/);
-        if (quoteMatch) {
-          potentialPath = quoteMatch[1];
-        }
-
-        potentialPath = potentialPath.trim();
-
-        const processed = parsePastedPaths(potentialPath);
+        const processed = parsePastedPaths(ch.trim());
         if (processed) {
           textToInsert = processed;
         }

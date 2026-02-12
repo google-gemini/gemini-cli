@@ -31,12 +31,13 @@ const REF_CONTENT_FOOTER = `\n${REFERENCE_CONTENT_END}`;
  * Regex source for the path/command part of an @ reference.
  * It uses strict ASCII whitespace delimiters to allow Unicode characters like NNBSP in filenames.
  *
- * 1. \\. matches any escaped character (e.g., \ ).
- * 2. [^ \t\n\r,;!?()\[\]{}.] matches any character that is NOT a delimiter and NOT a period.
- * 3. \.(?!$|[ \t\n\r]) matches a period ONLY if it is NOT followed by whitespace or end-of-string.
+ * 1. "(?:[^"]*)" matches a double-quoted string (for Windows paths with spaces).
+ * 2. \\. matches any escaped character (e.g., \ ).
+ * 3. [^ \t\n\r,;!?()\[\]{}.] matches any character that is NOT a delimiter and NOT a period.
+ * 4. \.(?!$|[ \t\n\r]) matches a period ONLY if it is NOT followed by whitespace or end-of-string.
  */
 export const AT_COMMAND_PATH_REGEX_SOURCE =
-  '(?:\\\\.|[^ \\t\\n\\r,;!?()\\[\\]{}.]|\\.(?!$|[ \\t\\n\\r]))+';
+  '(?:(?:"(?:[^"]*)")|(?:\\\\.|[^ \\t\\n\\r,;!?()\\[\\]{}.]|\\.(?!$|[ \\t\\n\\r])))+';
 
 interface HandleAtCommandParams {
   query: string;
@@ -85,8 +86,8 @@ function parseAllAtCommands(query: string): AtCommandPart[] {
       });
     }
 
-    // unescapePath expects the @ symbol to be present, and will handle it.
-    const atPath = unescapePath(fullMatch);
+    // We strip the @ before unescaping so that unescapePath can handle quoted paths correctly on Windows.
+    const atPath = '@' + unescapePath(fullMatch.substring(1));
     parts.push({ type: 'atPath', content: atPath });
 
     lastIndex = matchIndex + fullMatch.length;
