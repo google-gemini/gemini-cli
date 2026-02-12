@@ -30,15 +30,16 @@
     "@google/gemini-cli-core": "file:../core",
     "express": "^5.1.0",
     "fs-extra": "^11.3.0",
+    "strip-json-comments": "^3.1.1",
     "tar": "^7.5.2",
     "uuid": "^13.0.0",
     "winston": "^3.17.0"
   },
   "devDependencies": {
+    "@google/genai": "^1.30.0",
     "@types/express": "^5.0.3",
     "@types/fs-extra": "^11.0.4",
     "@types/supertest": "^6.0.3",
-    "@types/tar": "^6.1.13",
     "dotenv": "^16.4.5",
     "supertest": "^7.1.4",
     "typescript": "^5.3.3",
