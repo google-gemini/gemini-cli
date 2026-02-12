@@ -2047,8 +2047,27 @@ describe('PolicyEngine', () => {
         expected: [],
       },
       {
-        name: 'should ignore rules without explicit modes',
+        name: 'should apply rules without explicit modes to all modes',
         rules: [{ toolName: 'tool1', decision: PolicyDecision.DENY }],
+        expected: ['tool1'],
+      },
+      {
+        name: 'should NOT exclude tool if higher priority argsPattern rule exists',
+        rules: [
+          {
+            toolName: 'tool1',
+            decision: PolicyDecision.ALLOW,
+            argsPattern: /safe/,
+            priority: 100,
+            modes: [ApprovalMode.DEFAULT],
+          },
+          {
+            toolName: 'tool1',
+            decision: PolicyDecision.DENY,
+            priority: 10,
+            modes: [ApprovalMode.DEFAULT],
+          },
+        ],
         expected: [],
       },
       {
@@ -2197,6 +2216,33 @@ describe('PolicyEngine', () => {
           },
         ],
         expected: ['server__*', 'server__tool1'],
+      },
+      {
+        name: 'should exclude run_shell_command but NOT write_file in simulated Plan Mode',
+        approvalMode: ApprovalMode.PLAN,
+        rules: [
+          {
+            // Simulates the high-priority allow for plans directory
+            toolName: 'write_file',
+            decision: PolicyDecision.ALLOW,
+            priority: 70,
+            argsPattern: /plans/,
+            modes: [ApprovalMode.PLAN],
+          },
+          {
+            // Simulates the global deny in Plan Mode
+            decision: PolicyDecision.DENY,
+            priority: 60,
+            modes: [ApprovalMode.PLAN],
+          },
+          {
+            // Simulates a tool from another policy (e.g. write.toml)
+            toolName: 'run_shell_command',
+            decision: PolicyDecision.ASK_USER,
+            priority: 10,
+          },
+        ],
+        expected: ['run_shell_command'],
       },
       {
         name: 'should NOT exclude tool if covered by a higher priority wildcard ALLOW',
