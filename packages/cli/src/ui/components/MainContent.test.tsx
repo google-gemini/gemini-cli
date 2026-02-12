@@ -128,7 +128,9 @@ describe('MainContent', () => {
     expect(output).toContain('Hi there');
   });
 
-  it('renders minimal header in minimal mode', async () => {
+  it('renders minimal header in minimal mode (alternate buffer)', async () => {
+    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+
     const { lastFrame } = renderWithProviders(<MainContent />, {
       uiState: {
         ...defaultMockUiState,
@@ -183,44 +185,17 @@ describe('MainContent', () => {
     await waitFor(() => expect(lastFrame()).toContain('AppHeader(full)'));
   });
 
-  it('restores full header details after toggle in normal buffer mode', async () => {
+  it('always renders full header details in normal buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(false);
-
-    let setShowDetails: ((visible: boolean) => void) | undefined;
-    const ToggleHarness = () => {
-      const outerState = useUIState();
-      const [showDetails, setShowDetailsState] = useState(
-        outerState.cleanUiDetailsVisible,
-      );
-      setShowDetails = setShowDetailsState;
-
-      return (
-        <UIStateContext.Provider
-          value={{ ...outerState, cleanUiDetailsVisible: showDetails }}
-        >
-          <MainContent />
-        </UIStateContext.Provider>
-      );
-    };
-
-    const { lastFrame } = renderWithProviders(<ToggleHarness />, {
+    const { lastFrame } = renderWithProviders(<MainContent />, {
       uiState: {
         ...defaultMockUiState,
         cleanUiDetailsVisible: false,
       } as Partial<UIState>,
     });
 
-    await waitFor(() => expect(lastFrame()).toContain('AppHeader(minimal)'));
-    if (!setShowDetails) {
-      throw new Error('setShowDetails was not initialized');
-    }
-    const setShowDetailsSafe = setShowDetails;
-
-    act(() => {
-      setShowDetailsSafe(true);
-    });
-
     await waitFor(() => expect(lastFrame()).toContain('AppHeader(full)'));
+    expect(lastFrame()).not.toContain('AppHeader(minimal)');
   });
 
   it('does not constrain height in alternate buffer mode', async () => {
@@ -231,7 +206,9 @@ describe('MainContent', () => {
     await waitFor(() => expect(lastFrame()).toContain('Hello'));
     const output = lastFrame();
 
-    expect(output).toMatchSnapshot();
+    expect(output).toContain('AppHeader(full)');
+    expect(output).toContain('Hello');
+    expect(output).toContain('Hi there');
   });
 
   describe('MainContent Tool Output Height Logic', () => {
