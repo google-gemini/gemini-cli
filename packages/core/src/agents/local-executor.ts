@@ -443,6 +443,10 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     // Combine the external signal with the internal timeout signal.
     const combinedSignal = AbortSignal.any([signal, deadlineTimer.signal]);
 
+    debugLogger.debug(
+      `[LocalAgentExecutor] [${this.definition.name}:${this.agentId}] Starting agent run`,
+    );
+
     logAgentStart(
       this.runtimeContext,
       new AgentStartEvent(this.agentId, this.definition.name),
@@ -614,12 +618,16 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       throw error; // Re-throw other errors or external aborts.
     } finally {
       deadlineTimer.abort();
+      const duration = Date.now() - startTime;
+      debugLogger.debug(
+        `[LocalAgentExecutor] [${this.definition.name}:${this.agentId}] Finished. Outcome: ${terminateReason}, Duration: ${duration}ms, Turns: ${turnCounter}`,
+      );
       logAgentFinish(
         this.runtimeContext,
         new AgentFinishEvent(
           this.agentId,
           this.definition.name,
-          Date.now() - startTime,
+          duration,
           turnCounter,
           terminateReason,
         ),
