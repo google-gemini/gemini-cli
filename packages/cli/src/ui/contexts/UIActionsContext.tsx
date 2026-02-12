@@ -71,6 +71,10 @@ export interface UIActions {
   handleApiKeyCancel: () => void;
   setBannerVisible: (visible: boolean) => void;
   setShortcutsHelpVisible: (visible: boolean) => void;
+  setCleanUiDetailsVisible: (visible: boolean) => void;
+  toggleCleanUiDetailsVisible: () => void;
+  revealCleanUiDetailsTemporarily: (durationMs?: number) => void;
+  handleWarning: (message: string) => void;
   setEmbeddedShellFocused: (value: boolean) => void;
   dismissBackgroundShell: (pid: number) => void;
   setActiveBackgroundShellPid: (pid: number) => void;

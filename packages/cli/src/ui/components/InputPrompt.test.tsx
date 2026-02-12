@@ -149,8 +149,14 @@ describe('InputPrompt', () => {
   );
   const mockedUseKittyKeyboardProtocol = vi.mocked(useKittyKeyboardProtocol);
   const mockSetEmbeddedShellFocused = vi.fn();
+  const mockSetCleanUiDetailsVisible = vi.fn();
+  const mockToggleCleanUiDetailsVisible = vi.fn();
+  const mockRevealCleanUiDetailsTemporarily = vi.fn();
   const uiActions = {
     setEmbeddedShellFocused: mockSetEmbeddedShellFocused,
+    setCleanUiDetailsVisible: mockSetCleanUiDetailsVisible,
+    toggleCleanUiDetailsVisible: mockToggleCleanUiDetailsVisible,
+    revealCleanUiDetailsTemporarily: mockRevealCleanUiDetailsTemporarily,
   };
 
   beforeEach(() => {
@@ -2949,29 +2955,29 @@ describe('InputPrompt', () => {
     });
   });
 
-  describe('Tab focus toggle', () => {
+  describe('Tab clean UI toggle', () => {
     it.each([
       {
-        name: 'should toggle focus in on Tab when no suggestions or ghost text',
+        name: 'should toggle clean UI details on double-Tab when no suggestions or ghost text',
         showSuggestions: false,
         ghostText: '',
         suggestions: [],
-        expectedFocusToggle: true,
+        expectedUiToggle: true,
       },
       {
-        name: 'should accept ghost text and NOT toggle focus on Tab',
+        name: 'should accept ghost text and NOT toggle clean UI details on Tab',
         showSuggestions: false,
         ghostText: 'ghost text',
         suggestions: [],
-        expectedFocusToggle: false,
+        expectedUiToggle: false,
         expectedAcceptCall: true,
       },
       {
-        name: 'should NOT toggle focus on Tab when suggestions are present',
+        name: 'should NOT toggle clean UI details on Tab when suggestions are present',
         showSuggestions: true,
         ghostText: '',
         suggestions: [{ label: 'test', value: 'test' }],
-        expectedFocusToggle: false,
+        expectedUiToggle: false,
       },
     ])(
       '$name',
@@ -2979,7 +2985,7 @@ describe('InputPrompt', () => {
         showSuggestions,
         ghostText,
         suggestions,
-        expectedFocusToggle,
+        expectedUiToggle,
         expectedAcceptCall,
       }) => {
         const mockAccept = vi.fn();
@@ -3001,21 +3007,24 @@ describe('InputPrompt', () => {
           <InputPrompt {...props} />,
           {
             uiActions,
-            uiState: { activePtyId: 1 },
+            uiState: {},
           },
         );
 
         await act(async () => {
           stdin.write('\t');
+          if (expectedUiToggle) {
+            stdin.write('\t');
+          }
         });
 
         await waitFor(() => {
-          if (expectedFocusToggle) {
-            expect(uiActions.setEmbeddedShellFocused).toHaveBeenCalledWith(
-              true,
-            );
+          if (expectedUiToggle) {
+            expect(uiActions.toggleCleanUiDetailsVisible).toHaveBeenCalled();
           } else {
-            expect(uiActions.setEmbeddedShellFocused).not.toHaveBeenCalled();
+            expect(
+              uiActions.toggleCleanUiDetailsVisible,
+            ).not.toHaveBeenCalled();
           }
 
           if (expectedAcceptCall) {
@@ -3025,6 +3034,75 @@ describe('InputPrompt', () => {
         unmount();
       },
     );
+
+    it('should not reveal clean UI details on Shift+Tab when hidden', async () => {
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: false,
+        suggestions: [],
+        promptCompletion: {
+          text: '',
+          accept: vi.fn(),
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: false,
+          markSelected: vi.fn(),
+        },
+      });
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+          uiState: { activePtyId: 1, cleanUiDetailsVisible: false },
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x1b[Z');
+      });
+
+      await waitFor(() => {
+        expect(
+          uiActions.revealCleanUiDetailsTemporarily,
+        ).not.toHaveBeenCalled();
+      });
+      unmount();
+    });
+
+    it('should toggle clean UI details on double-Tab by default', async () => {
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: false,
+        suggestions: [],
+        promptCompletion: {
+          text: '',
+          accept: vi.fn(),
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: false,
+          markSelected: vi.fn(),
+        },
+      });
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+          uiState: {},
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\t');
+        stdin.write('\t');
+      });
+
+      await waitFor(() => {
+        expect(uiActions.toggleCleanUiDetailsVisible).toHaveBeenCalled();
+      });
+      unmount();
+    });
   });
 
   describe('mouse interaction', () => {
@@ -4345,6 +4423,18 @@ describe('InputPrompt', () => {
           vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
           vi.mocked(clipboardy.read).mockResolvedValue('clipboard text');
         },
+      },
+      {
+        name: 'Ctrl+R hotkey is pressed',
+        input: '\x12',
+      },
+      {
+        name: 'Ctrl+X hotkey is pressed',
+        input: '\x18',
+      },
+      {
+        name: 'F12 hotkey is pressed',
+        input: '\x1b[24~',
       },
     ])(
       'should close shortcuts help when a $name',
