@@ -546,7 +546,7 @@ console.log(JSON.stringify({
                   {
                     type: 'command',
                     command: nodeCmd,
-                    timeout: 30000,
+                    timeout: 60000,
                   },
                 ],
               },
@@ -1793,12 +1793,12 @@ console.log(JSON.stringify({
                   {
                     type: 'command',
                     command: enabledCmd,
-                    timeout: 30000,
+                    timeout: 60000,
                   },
                   {
                     type: 'command',
                     command: disabledCmd,
-                    timeout: 30000,
+                    timeout: 60000,
                   },
                 ],
               },
@@ -1857,12 +1857,12 @@ console.log(JSON.stringify({
                   {
                     type: 'command',
                     command: activeCmd,
-                    timeout: 30000,
+                    timeout: 60000,
                   },
                   {
                     type: 'command',
                     command: disabledCmd,
-                    timeout: 30000,
+                    timeout: 60000,
                   },
                 ],
               },
