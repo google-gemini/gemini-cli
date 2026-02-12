@@ -10,6 +10,7 @@ import * as os from 'node:os';
 // Centralized tool names to avoid circular dependencies
 export const GLOB_TOOL_NAME = 'glob';
 export const GREP_TOOL_NAME = 'grep_search';
+export const RIP_GREP_TOOL_NAME = 'ripgrep_search';
 export const LS_TOOL_NAME = 'list_directory';
 export const READ_FILE_TOOL_NAME = 'read_file';
 export const SHELL_TOOL_NAME = 'run_shell_command';
@@ -82,6 +83,59 @@ export const WRITE_FILE_DEFINITION: ToolDefinition = {
 export const GREP_DEFINITION: ToolDefinition = {
   base: {
     name: GREP_TOOL_NAME,
+    description:
+      'Searches for a regular expression pattern within file contents. Max 100 matches.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        pattern: {
+          description: `The regular expression (regex) pattern to search for within file contents (e.g., 'function\\s+myFunction', 'import\\s+\\{.*\\}\\s+from\\s+.*').`,
+          type: 'string',
+        },
+        dir_path: {
+          description:
+            'Optional: The absolute path to the directory to search within. If omitted, searches the current working directory.',
+          type: 'string',
+        },
+        include: {
+          description: `Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).`,
+          type: 'string',
+        },
+        exclude_pattern: {
+          description:
+            'Optional: A regular expression pattern to exclude from the search results. If a line matches both the pattern and the exclude_pattern, it will be omitted.',
+          type: 'string',
+        },
+        names_only: {
+          description:
+            'Optional: If true, only the file paths of the matches will be returned, without the line content or line numbers. This is useful for gathering a list of files.',
+          type: 'boolean',
+        },
+        max_matches_per_file: {
+          description:
+            'Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.',
+          type: 'integer',
+          minimum: 1,
+        },
+        total_max_matches: {
+          description:
+            'Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.',
+          type: 'integer',
+          minimum: 1,
+        },
+      },
+      required: ['pattern'],
+    },
+  },
+};
+
+// ============================================================================
+// RIP_GREP TOOL
+// ============================================================================
+
+export const RIP_GREP_DEFINITION: ToolDefinition = {
+  base: {
+    name: RIP_GREP_TOOL_NAME,
     description:
       'Searches for a regular expression pattern within file contents. Max 100 matches.',
     parametersJsonSchema: {

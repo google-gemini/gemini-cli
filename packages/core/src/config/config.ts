@@ -2386,29 +2386,21 @@ export class Config {
       registry.registerTool(new ReadFileTool(this, this.messageBus)),
     );
 
-    if (this.getUseRipgrep()) {
-      let useRipgrep = false;
-      let errorString: undefined | string = undefined;
-      try {
-        useRipgrep = await canUseRipgrep();
-      } catch (error: unknown) {
-        errorString = String(error);
+    maybeRegister(RipGrepTool, async () => {
+      if (this.getUseRipgrep()) {
+        try {
+          if (await canUseRipgrep()) {
+            registry.registerTool(new RipGrepTool(this, this.messageBus));
+          }
+        } catch (error: unknown) {
+          logRipgrepFallback(this, new RipgrepFallbackEvent(String(error)));
+        }
       }
-      if (useRipgrep) {
-        maybeRegister(RipGrepTool, () =>
-          registry.registerTool(new RipGrepTool(this, this.messageBus)),
-        );
-      } else {
-        logRipgrepFallback(this, new RipgrepFallbackEvent(errorString));
-        maybeRegister(GrepTool, () =>
-          registry.registerTool(new GrepTool(this, this.messageBus)),
-        );
-      }
-    } else {
-      maybeRegister(GrepTool, () =>
-        registry.registerTool(new GrepTool(this, this.messageBus)),
-      );
-    }
+    });
+
+    maybeRegister(GrepTool, () =>
+      registry.registerTool(new GrepTool(this, this.messageBus)),
+    );
 
     maybeRegister(GlobTool, () =>
       registry.registerTool(new GlobTool(this, this.messageBus)),

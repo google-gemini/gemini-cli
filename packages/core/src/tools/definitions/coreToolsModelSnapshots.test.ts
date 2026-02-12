@@ -20,6 +20,7 @@ import {
   READ_FILE_DEFINITION,
   WRITE_FILE_DEFINITION,
   GREP_DEFINITION,
+  RIP_GREP_DEFINITION,
   GLOB_DEFINITION,
   LS_DEFINITION,
   getShellDefinition,
@@ -54,6 +55,7 @@ describe('coreTools snapshots for specific models', () => {
     { name: 'read_file', definition: READ_FILE_DEFINITION },
     { name: 'write_file', definition: WRITE_FILE_DEFINITION },
     { name: 'grep_search', definition: GREP_DEFINITION },
+    { name: 'ripgrep_search', definition: RIP_GREP_DEFINITION },
     { name: 'glob', definition: GLOB_DEFINITION },
     { name: 'list_directory', definition: LS_DEFINITION },
     {
