@@ -7,7 +7,6 @@
 export enum LlmRole {
   MAIN = 'main',
   SUBAGENT = 'subagent',
-  SUBAGENT_CODEBASE_INVESTIGATOR = 'subagent_codebase_investigator',
   UTILITY_TOOL = 'utility_tool',
   UTILITY_COMPRESSOR = 'utility_compressor',
   UTILITY_SUMMARIZER = 'utility_summarizer',

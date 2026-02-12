@@ -700,10 +700,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       modelToUse = requestedModel;
     }
 
-    const role =
-      this.definition.name === 'codebase_investigator'
-        ? LlmRole.SUBAGENT_CODEBASE_INVESTIGATOR
-        : LlmRole.SUBAGENT;
+    const role = LlmRole.SUBAGENT;
 
     const responseStream = await chat.sendMessageStream(
       {
