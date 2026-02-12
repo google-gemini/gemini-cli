@@ -161,12 +161,6 @@ Slash commands provide meta-level control over the CLI itself.
   it simpler for them to provide project-specific instructions to the Gemini
   agent.
 
-### `/introspect`
-
-- **Description:** Provide debugging information about the current Gemini CLI
-  session, including the state of loaded sub-agents and active hooks. This
-  command is primarily for advanced users and developers.
-
 ### `/mcp`
 
 - **Description:** Manage configured Model Context Protocol (MCP) servers.

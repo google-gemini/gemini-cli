@@ -51,7 +51,6 @@ Technical reference documentation for each capability of Gemini CLI.
 - **[/hooks](../hooks/index.md):** Manage hooks for lifecycle events.
 - **[/ide](../ide-integration/index.md):** Manage IDE integration.
 - **[/init](../cli/commands.md#init):** Create a GEMINI.md context file.
-- **[/introspect](../cli/commands.md#introspect):** Debugging information.
 - **[/mcp](../tools/mcp-server.md):** Manage Model Context Protocol servers.
 - **[/memory](../cli/commands.md#memory):** Manage instructional context.
 - **[/model](./model.md):** Choose Gemini model.
