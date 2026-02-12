@@ -560,7 +560,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
     super(
       RipGrepTool.Name,
       'SearchText',
-      GREP_DEFINITION.base.description,
+      GREP_DEFINITION.base.description!,
       Kind.Search,
       {
         properties: {
