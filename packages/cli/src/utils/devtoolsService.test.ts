@@ -70,12 +70,20 @@ vi.mock('./activityLogger.js', () => ({
   },
 }));
 
+const mockShouldLaunchBrowser = vi.hoisted(() => vi.fn(() => true));
+const mockOpenBrowserSecurely = vi.hoisted(() =>
+  vi.fn(() => Promise.resolve()),
+);
+
 vi.mock('@google/gemini-cli-core', () => ({
   debugLogger: {
     log: vi.fn(),
     debug: vi.fn(),
     error: vi.fn(),
+    warn: vi.fn(),
   },
+  shouldLaunchBrowser: mockShouldLaunchBrowser,
+  openBrowserSecurely: mockOpenBrowserSecurely,
 }));
 
 vi.mock('ws', () => ({
@@ -92,6 +100,7 @@ vi.mock('gemini-cli-devtools', () => ({
 import {
   setupInitialActivityLogger,
   startDevToolsServer,
+  toggleDevToolsPanel,
   resetForTesting,
 } from './devtoolsService.js';
 
@@ -424,6 +433,100 @@ describe('devtoolsService', () => {
 
       // Only 3 calls to addNetworkTransport (capped at MAX_PROMOTION_ATTEMPTS)
       expect(mockAddNetworkTransport).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  describe('toggleDevToolsPanel', () => {
+    it('calls toggle (to close) when already open', async () => {
+      const config = createMockConfig();
+      const toggle = vi.fn();
+      const setOpen = vi.fn();
+
+      const promise = toggleDevToolsPanel(config, true, toggle, setOpen);
+      await promise;
+
+      expect(toggle).toHaveBeenCalledTimes(1);
+      expect(setOpen).not.toHaveBeenCalled();
+    });
+
+    it('does NOT call toggle or setOpen when browser opens successfully', async () => {
+      const config = createMockConfig();
+      const toggle = vi.fn();
+      const setOpen = vi.fn();
+
+      mockShouldLaunchBrowser.mockReturnValue(true);
+      mockOpenBrowserSecurely.mockResolvedValue(undefined);
+      mockDevToolsInstance.start.mockResolvedValue('http://127.0.0.1:25417');
+      mockDevToolsInstance.getPort.mockReturnValue(25417);
+
+      const promise = toggleDevToolsPanel(config, false, toggle, setOpen);
+
+      await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
+      MockWebSocket.instances[0].simulateError();
+
+      await promise;
+
+      expect(toggle).not.toHaveBeenCalled();
+      expect(setOpen).not.toHaveBeenCalled();
+    });
+
+    it('calls setOpen when browser fails to open', async () => {
+      const config = createMockConfig();
+      const toggle = vi.fn();
+      const setOpen = vi.fn();
+
+      mockShouldLaunchBrowser.mockReturnValue(true);
+      mockOpenBrowserSecurely.mockRejectedValue(new Error('no browser'));
+      mockDevToolsInstance.start.mockResolvedValue('http://127.0.0.1:25417');
+      mockDevToolsInstance.getPort.mockReturnValue(25417);
+
+      const promise = toggleDevToolsPanel(config, false, toggle, setOpen);
+
+      await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
+      MockWebSocket.instances[0].simulateError();
+
+      await promise;
+
+      expect(toggle).not.toHaveBeenCalled();
+      expect(setOpen).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls setOpen when shouldLaunchBrowser returns false', async () => {
+      const config = createMockConfig();
+      const toggle = vi.fn();
+      const setOpen = vi.fn();
+
+      mockShouldLaunchBrowser.mockReturnValue(false);
+      mockDevToolsInstance.start.mockResolvedValue('http://127.0.0.1:25417');
+      mockDevToolsInstance.getPort.mockReturnValue(25417);
+
+      const promise = toggleDevToolsPanel(config, false, toggle, setOpen);
+
+      await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
+      MockWebSocket.instances[0].simulateError();
+
+      await promise;
+
+      expect(toggle).not.toHaveBeenCalled();
+      expect(setOpen).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls setOpen when DevTools server fails to start', async () => {
+      const config = createMockConfig();
+      const toggle = vi.fn();
+      const setOpen = vi.fn();
+
+      mockDevToolsInstance.start.mockRejectedValue(new Error('fail'));
+
+      const promise = toggleDevToolsPanel(config, false, toggle, setOpen);
+
+      await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
+      MockWebSocket.instances[0].simulateError();
+
+      await promise;
+
+      expect(toggle).not.toHaveBeenCalled();
+      expect(setOpen).toHaveBeenCalledTimes(1);
     });
   });
 });

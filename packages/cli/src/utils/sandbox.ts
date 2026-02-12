@@ -162,8 +162,11 @@ export async function start_sandbox(
             process.kill(-proxyProcess.pid, 'SIGTERM');
           }
         };
+        process.off('exit', stopProxy);
         process.on('exit', stopProxy);
+        process.off('SIGINT', stopProxy);
         process.on('SIGINT', stopProxy);
+        process.off('SIGTERM', stopProxy);
         process.on('SIGTERM', stopProxy);
 
         // commented out as it disrupts ink rendering
@@ -659,8 +662,11 @@ export async function start_sandbox(
         debugLogger.log('stopping proxy container ...');
         execSync(`${config.command} rm -f ${SANDBOX_PROXY_NAME}`);
       };
+      process.off('exit', stopProxy);
       process.on('exit', stopProxy);
+      process.off('SIGINT', stopProxy);
       process.on('SIGINT', stopProxy);
+      process.off('SIGTERM', stopProxy);
       process.on('SIGTERM', stopProxy);
 
       // commented out as it disrupts ink rendering

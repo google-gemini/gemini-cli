@@ -2360,7 +2360,7 @@ SOFTWARE.
 
 
 ============================================================
-zod-to-json-schema@3.25.0
+zod-to-json-schema@3.25.1
 (https://github.com/StefanTerdell/zod-to-json-schema)
 
 ISC License

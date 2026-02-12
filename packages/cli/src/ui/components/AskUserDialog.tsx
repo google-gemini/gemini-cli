@@ -93,6 +93,7 @@ type AskUserDialogAction =
       payload: {
         index: number;
         answer: string;
+        submit?: boolean;
       };
     }
   | { type: 'SET_EDITING_CUSTOM'; payload: { isEditing: boolean } }
@@ -114,7 +115,7 @@ function askUserDialogReducerLogic(
 
   switch (action.type) {
     case 'SET_ANSWER': {
-      const { index, answer } = action.payload;
+      const { index, answer, submit } = action.payload;
       const hasAnswer =
         answer !== undefined && answer !== null && answer.trim() !== '';
       const newAnswers = { ...state.answers };
@@ -128,6 +129,7 @@ function askUserDialogReducerLogic(
       return {
         ...state,
         answers: newAnswers,
+        submitted: submit ? true : state.submitted,
       };
     }
     case 'SET_EDITING_CUSTOM': {
@@ -283,8 +285,8 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
 
   const buffer = useTextBuffer({
     initialText: initialAnswer,
-    viewport: { width: Math.max(1, bufferWidth), height: 1 },
-    singleLine: true,
+    viewport: { width: Math.max(1, bufferWidth), height: 3 },
+    singleLine: false,
   });
 
   const { text: textValue } = buffer;
@@ -317,9 +319,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
 
   const handleSubmit = useCallback(
     (val: string) => {
-      if (val.trim()) {
-        onAnswer(val.trim());
-      }
+      onAnswer(val.trim());
     },
     [onAnswer],
   );
@@ -561,8 +561,8 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
   const customBuffer = useTextBuffer({
     initialText: initialCustomText,
-    viewport: { width: Math.max(1, bufferWidth), height: 1 },
-    singleLine: true,
+    viewport: { width: Math.max(1, bufferWidth), height: 3 },
+    singleLine: false,
   });
 
   const customOptionText = customBuffer.text;
@@ -850,9 +850,22 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
                   buffer={customBuffer}
                   placeholder={placeholder}
                   focus={context.isSelected}
-                  onSubmit={() => handleSelect(optionItem)}
+                  onSubmit={(val) => {
+                    if (question.multiSelect) {
+                      const fullAnswer = buildAnswerString(
+                        selectedIndices,
+                        true,
+                        val,
+                      );
+                      if (fullAnswer) {
+                        onAnswer(fullAnswer);
+                      }
+                    } else if (val.trim()) {
+                      onAnswer(val.trim());
+                    }
+                  }}
                 />
-                {isChecked && !question.multiSelect && (
+                {isChecked && !question.multiSelect && !context.isSelected && (
                   <Text color={theme.status.success}> ✓</Text>
                 )}
               </Box>
@@ -1012,21 +1025,27 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
     (answer: string) => {
       if (submitted) return;
 
-      dispatch({
-        type: 'SET_ANSWER',
-        payload: {
-          index: currentQuestionIndex,
-          answer,
-        },
-      });
-
       if (questions.length > 1) {
+        dispatch({
+          type: 'SET_ANSWER',
+          payload: {
+            index: currentQuestionIndex,
+            answer,
+          },
+        });
         goToNextTab();
       } else {
-        dispatch({ type: 'SUBMIT' });
+        dispatch({
+          type: 'SET_ANSWER',
+          payload: {
+            index: currentQuestionIndex,
+            answer,
+            submit: true,
+          },
+        });
       }
     },
-    [currentQuestionIndex, questions.length, submitted, goToNextTab],
+    [currentQuestionIndex, questions, submitted, goToNextTab],
   );
 
   const handleReviewSubmit = useCallback(() => {

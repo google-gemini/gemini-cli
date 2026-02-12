@@ -14,10 +14,15 @@ const installationManager = new InstallationManager();
 
 export function getCommonAttributes(config: Config): Attributes {
   const email = userAccountManager.getCachedGoogleAccount();
+  const experiments = config.getExperiments();
   return {
     'session.id': config.getSessionId(),
     'installation.id': installationManager.getInstallationId(),
     interactive: config.isInteractive(),
     ...(email && { 'user.email': email }),
+    ...(experiments &&
+      experiments.experimentIds.length > 0 && {
+        'experiments.ids': experiments.experimentIds,
+      }),
   };
 }

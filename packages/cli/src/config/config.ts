@@ -177,7 +177,8 @@ export async function parseArguments(
           type: 'array',
           string: true,
           nargs: 1,
-          description: 'Tools that are allowed to run without confirmation',
+          description:
+            '[DEPRECATED: Use Policy Engine instead See https://geminicli.com/docs/core/policy-engine] Tools that are allowed to run without confirmation',
           coerce: (tools: string[]) =>
             // Handle comma-separated values
             tools.flatMap((tool) => tool.split(',').map((t) => t.trim())),
@@ -445,7 +446,11 @@ export async function loadCliConfig(
     process.env['VITEST'] === 'true'
       ? false
       : (settings.security?.folderTrust?.enabled ?? false);
-  const trustedFolder = isWorkspaceTrusted(settings, cwd)?.isTrusted ?? false;
+  const trustedFolder =
+    isWorkspaceTrusted(settings, cwd, undefined, {
+      prompt: argv.prompt,
+      query: argv.query,
+    })?.isTrusted ?? false;
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
@@ -602,8 +607,7 @@ export async function loadCliConfig(
   const interactive =
     !!argv.promptInteractive ||
     !!argv.experimentalAcp ||
-    (!isHeadlessMode({ prompt: argv.prompt }) &&
-      !argv.query &&
+    (!isHeadlessMode({ prompt: argv.prompt, query: argv.query }) &&
       !argv.isCommand);
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];

@@ -246,7 +246,6 @@ describe('useGeminiStream', () => {
     getContentGenerator: vi.fn(),
     isInteractive: () => false,
     getExperiments: () => {},
-    isEventDrivenSchedulerEnabled: vi.fn(() => false),
     getMaxSessionTurns: vi.fn(() => 100),
     isJitContextEnabled: vi.fn(() => false),
     getGlobalMemory: vi.fn(() => ''),

@@ -462,6 +462,15 @@ const SETTINGS_SCHEMA = {
         description: 'Hide helpful tips in the UI',
         showInDialog: true,
       },
+      showShortcutsHint: {
+        type: 'boolean',
+        label: 'Show Shortcuts Hint',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description: 'Show the "? for shortcuts" hint above the input.',
+        showInDialog: true,
+      },
       hideBanner: {
         type: 'boolean',
         label: 'Hide Banner',
@@ -1434,7 +1443,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Automatically configure Node.js memory limits',
-        showInDialog: false,
+        showInDialog: true,
       },
       dnsResolutionOrder: {
         type: 'string',
@@ -1483,7 +1492,7 @@ const SETTINGS_SCHEMA = {
         label: 'Tool Output Masking',
         category: 'Experimental',
         requiresRestart: true,
-        ignoreInDocs: true,
+        ignoreInDocs: false,
         default: {},
         description:
           'Advanced settings for tool output masking to manage context window efficiency.',
@@ -1494,9 +1503,9 @@ const SETTINGS_SCHEMA = {
             label: 'Enable Tool Output Masking',
             category: 'Experimental',
             requiresRestart: true,
-            default: false,
+            default: true,
             description: 'Enables tool output masking to save tokens.',
-            showInDialog: false,
+            showInDialog: true,
           },
           toolProtectionThreshold: {
             type: 'number',
