@@ -24,6 +24,7 @@ import {
   LS_DEFINITION,
   getShellDefinition,
   EDIT_DEFINITION,
+  WEB_SEARCH_DEFINITION,
 } from './coreTools.js';
 
 describe('coreTools snapshots for specific models', () => {
@@ -60,6 +61,7 @@ describe('coreTools snapshots for specific models', () => {
       definition: getShellDefinition(true, true),
     },
     { name: 'replace', definition: EDIT_DEFINITION },
+    { name: 'google_web_search', definition: WEB_SEARCH_DEFINITION },
   ];
 
   for (const modelId of modelIds) {
