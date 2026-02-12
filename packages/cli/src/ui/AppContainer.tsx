@@ -1348,7 +1348,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     return () => {
       clearTimeout(handler);
     };
-  }, [terminalWidth, refreshStatic]);
+  }, [terminalWidth, terminalHeight, refreshStatic]);
 
   useEffect(() => {
     const unsubscribe = ideContextStore.subscribe(setIdeContextState);
