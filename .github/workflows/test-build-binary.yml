@@ -1,15 +1,6 @@
 name: 'Test Build Binary'
 
 on:
-  push:
-    branches:
-      - 'main'
-      - 'release/**'
-      - 'build-binary'
-  pull_request:
-    branches:
-      - 'main'
-      - 'release/**'
   workflow_dispatch:
 
 permissions:
@@ -43,6 +34,16 @@ jobs:
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@v4'
+
+      - name: 'Optimize Windows Performance'
+        if: "matrix.os == 'windows-latest'"
+        run: |
+          Set-MpPreference -DisableRealtimeMonitoring $true
+          Stop-Service -Name "wsearch" -Force -ErrorAction SilentlyContinue
+          Set-Service -Name "wsearch" -StartupType Disabled
+          Stop-Service -Name "SysMain" -Force -ErrorAction SilentlyContinue
+          Set-Service -Name "SysMain" -StartupType Disabled
+        shell: 'powershell'
 
       - name: 'Set up Node.js'
         uses: 'actions/setup-node@v4'

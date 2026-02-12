@@ -163,7 +163,7 @@ function prepareRuntime(manifest, getAssetFn, deps = {}) {
         }
       } catch (e) {
         console.error(
-          'Fatal Error: Failed to setup secure runtime. Please try running again and error persists please reinstall.',
+          'Fatal Error: Failed to setup secure runtime. Please try running again and if error persists please reinstall.',
           e,
         );
         try {
