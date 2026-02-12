@@ -162,7 +162,7 @@ export class ChatBridgeHandler {
         this.sessionStore.updateTaskId(threadName, newTaskId);
 
         const threadKey = message.thread.threadKey || threadName;
-        return renderResponse(response, threadKey);
+        return renderResponse(response, threadKey, threadName);
       } catch (error) {
         const errorMsg =
           error instanceof Error ? error.message : 'Unknown error';
@@ -205,7 +205,7 @@ export class ChatBridgeHandler {
 
       // Convert A2A response to Chat format
       const threadKey = message.thread.threadKey || threadName;
-      return renderResponse(response, threadKey);
+      return renderResponse(response, threadKey, threadName);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       logger.error(`[ChatBridge] Error handling message: ${errorMsg}`, error);

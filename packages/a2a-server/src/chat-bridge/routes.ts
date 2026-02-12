@@ -253,6 +253,15 @@ function wrapAddOnsResponse(response: ChatResponse): Record<string, unknown> {
   if (response.cardsV2) {
     message['cardsV2'] = response.cardsV2;
   }
+  // Include thread info so the reply goes to the user's thread
+  // instead of appearing as a top-level message
+  if (response.thread) {
+    const thread: Record<string, string> = {};
+    if (response.thread.name) thread['name'] = response.thread.name;
+    if (response.thread.threadKey)
+      thread['threadKey'] = response.thread.threadKey;
+    message['thread'] = thread;
+  }
 
   // For action responses (like CARD_CLICKED acknowledgments), use updateMessageAction
   if (response.actionResponse?.type === 'UPDATE_MESSAGE') {

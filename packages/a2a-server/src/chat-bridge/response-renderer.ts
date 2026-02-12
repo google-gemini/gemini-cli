@@ -71,6 +71,7 @@ export function extractToolApprovals(
 export function renderResponse(
   response: A2AResponse,
   threadKey?: string,
+  threadName?: string,
 ): ChatResponse {
   const parts = extractAllParts(response);
   const textContent = extractTextFromParts(parts);
@@ -145,8 +146,10 @@ export function renderResponse(
     chatResponse.cardsV2 = cards;
   }
 
-  if (threadKey) {
-    chatResponse.thread = { threadKey };
+  if (threadKey || threadName) {
+    chatResponse.thread = {};
+    if (threadKey) chatResponse.thread.threadKey = threadKey;
+    if (threadName) chatResponse.thread.name = threadName;
   }
 
   // Ensure we always return something

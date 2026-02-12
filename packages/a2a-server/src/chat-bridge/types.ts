@@ -121,7 +121,7 @@ export interface ChatOnClick {
 export interface ChatResponse {
   text?: string;
   cardsV2?: ChatCardV2[];
-  thread?: { threadKey: string };
+  thread?: { threadKey?: string; name?: string };
   actionResponse?: {
     type: 'NEW_MESSAGE' | 'UPDATE_MESSAGE' | 'REQUEST_CONFIG';
   };

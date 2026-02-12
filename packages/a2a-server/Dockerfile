@@ -22,6 +22,9 @@ USER node
 ENV CODER_AGENT_WORKSPACE_PATH=/workspace
 ENV CODER_AGENT_PORT=8080
 ENV NODE_ENV=production
+# Prevent git from prompting for credentials interactively — fails fast instead of hanging
+ENV GIT_TERMINAL_PROMPT=0
+ENV CODER_AGENT_HOST=0.0.0.0
 
 EXPOSE 8080
 
