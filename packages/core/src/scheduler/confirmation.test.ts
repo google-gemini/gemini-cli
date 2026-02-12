@@ -31,7 +31,7 @@ import type { ToolModificationHandler } from './tool-modifier.js';
 import type { ValidatingToolCall, WaitingToolCall } from './types.js';
 import { ROOT_SCHEDULER_ID } from './types.js';
 import type { Config } from '../config/config.js';
-import { type EditorType, resolveEditorAsync } from '../utils/editor.js';
+import { type EditorType } from '../utils/editor.js';
 import { randomUUID } from 'node:crypto';
 
 // Mock Dependencies
@@ -43,7 +43,7 @@ vi.mock('../utils/editor.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../utils/editor.js')>();
   return {
     ...actual,
-    resolveEditorAsync: vi.fn().mockResolvedValue('vim'),
+    resolveEditorAsync: () => Promise.resolve('vim'),
   };
 });
 
@@ -97,7 +97,6 @@ describe('confirmation.ts', () => {
 
     beforeEach(() => {
       signal = new AbortController().signal;
-      vi.mocked(resolveEditorAsync).mockResolvedValue('vim');
 
       mockState = {
         getToolCall: vi.fn(),
