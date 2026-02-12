@@ -49,6 +49,7 @@ import {
   type UserTierId,
   type UserFeedbackPayload,
   type AgentDefinition,
+  type ApprovalMode,
   IdeClient,
   ideContextStore,
   getErrorMessage,
@@ -133,6 +134,7 @@ import { ShellFocusContext } from './contexts/ShellFocusContext.js';
 import { type ExtensionManager } from '../config/extension-manager.js';
 import { requestConsentInteractive } from '../config/extensions/consent.js';
 import { useSessionBrowser } from './hooks/useSessionBrowser.js';
+import { persistentState } from '../utils/persistentState.js';
 import { useSessionResume } from './hooks/useSessionResume.js';
 import { useIncludeDirsTrust } from './hooks/useIncludeDirsTrust.js';
 import { isWorkspaceTrusted } from '../config/trustedFolders.js';
@@ -183,6 +185,9 @@ interface AppContainerProps {
   initializationResult: InitializationResult;
   resumedSessionData?: ResumedSessionData;
 }
+
+const APPROVAL_MODE_REVEAL_DURATION_MS = 1200;
+const FOCUS_UI_ENABLED_STATE_KEY = 'focusUiEnabled';
 
 /**
  * The fraction of the terminal width to allocate to the shell.
@@ -796,7 +801,65 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const setIsBackgroundShellListOpenRef = useRef<(open: boolean) => void>(
     () => {},
   );
+  const [focusUiEnabledByDefault] = useState(
+    () => persistentState.get(FOCUS_UI_ENABLED_STATE_KEY) === true,
+  );
   const [shortcutsHelpVisible, setShortcutsHelpVisible] = useState(false);
+  const [cleanUiDetailsVisible, setCleanUiDetailsVisibleState] = useState(
+    !focusUiEnabledByDefault,
+  );
+  const modeRevealTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const cleanUiDetailsPinnedRef = useRef(!focusUiEnabledByDefault);
+
+  const clearModeRevealTimeout = useCallback(() => {
+    if (modeRevealTimeoutRef.current) {
+      clearTimeout(modeRevealTimeoutRef.current);
+      modeRevealTimeoutRef.current = null;
+    }
+  }, []);
+
+  const persistFocusUiPreference = useCallback((isFullUiVisible: boolean) => {
+    persistentState.set(FOCUS_UI_ENABLED_STATE_KEY, !isFullUiVisible);
+  }, []);
+
+  const setCleanUiDetailsVisible = useCallback(
+    (visible: boolean) => {
+      clearModeRevealTimeout();
+      cleanUiDetailsPinnedRef.current = visible;
+      setCleanUiDetailsVisibleState(visible);
+      persistFocusUiPreference(visible);
+    },
+    [clearModeRevealTimeout, persistFocusUiPreference],
+  );
+
+  const toggleCleanUiDetailsVisible = useCallback(() => {
+    clearModeRevealTimeout();
+    setCleanUiDetailsVisibleState((visible) => {
+      const nextVisible = !visible;
+      cleanUiDetailsPinnedRef.current = nextVisible;
+      persistFocusUiPreference(nextVisible);
+      return nextVisible;
+    });
+  }, [clearModeRevealTimeout, persistFocusUiPreference]);
+
+  const revealCleanUiDetailsTemporarily = useCallback(
+    (durationMs: number = APPROVAL_MODE_REVEAL_DURATION_MS) => {
+      if (cleanUiDetailsPinnedRef.current) {
+        return;
+      }
+      clearModeRevealTimeout();
+      setCleanUiDetailsVisibleState(true);
+      modeRevealTimeoutRef.current = setTimeout(() => {
+        if (!cleanUiDetailsPinnedRef.current) {
+          setCleanUiDetailsVisibleState(false);
+        }
+        modeRevealTimeoutRef.current = null;
+      }, durationMs);
+    },
+    [clearModeRevealTimeout],
+  );
+
+  useEffect(() => () => clearModeRevealTimeout(), [clearModeRevealTimeout]);
 
   const slashCommandActions = useMemo(
     () => ({
@@ -1057,11 +1120,25 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const shouldShowActionRequiredTitle = inactivityStatus === 'action_required';
   const shouldShowSilentWorkingTitle = inactivityStatus === 'silent_working';
 
+  const handleApprovalModeChangeWithUiReveal = useCallback(
+    (mode: ApprovalMode) => {
+      void handleApprovalModeChange(mode);
+      if (!cleanUiDetailsVisible) {
+        revealCleanUiDetailsTemporarily(APPROVAL_MODE_REVEAL_DURATION_MS);
+      }
+    },
+    [
+      handleApprovalModeChange,
+      cleanUiDetailsVisible,
+      revealCleanUiDetailsTemporarily,
+    ],
+  );
+
   // Auto-accept indicator
   const showApprovalModeIndicator = useApprovalModeIndicator({
     config,
     addItem: historyManager.addItem,
-    onApprovalModeChange: handleApprovalModeChange,
+    onApprovalModeChange: handleApprovalModeChangeWithUiReveal,
     isActive: !embeddedShellFocused,
   });
 
@@ -1376,6 +1453,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       appEvents.off(AppEvent.PasteTimeout, handlePasteTimeout);
       if (tabFocusTimeoutRef.current) {
         clearTimeout(tabFocusTimeoutRef.current);
+      }
+      if (modeRevealTimeoutRef.current) {
+        clearTimeout(modeRevealTimeoutRef.current);
       }
     };
   }, [showTransientMessage]);
@@ -1977,6 +2057,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ctrlDPressedOnce: ctrlDPressCount >= 1,
       showEscapePrompt,
       shortcutsHelpVisible,
+      cleanUiDetailsVisible,
       isFocused,
       elapsedTime,
       currentLoadingPhrase,
@@ -2087,6 +2168,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ctrlDPressCount,
       showEscapePrompt,
       shortcutsHelpVisible,
+      cleanUiDetailsVisible,
       isFocused,
       elapsedTime,
       currentLoadingPhrase,
@@ -2188,6 +2270,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeyCancel,
       setBannerVisible,
       setShortcutsHelpVisible,
+      setCleanUiDetailsVisible,
+      toggleCleanUiDetailsVisible,
+      revealCleanUiDetailsTemporarily,
+      handleWarning,
       setEmbeddedShellFocused,
       dismissBackgroundShell,
       setActiveBackgroundShellPid,
@@ -2264,6 +2350,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeyCancel,
       setBannerVisible,
       setShortcutsHelpVisible,
+      setCleanUiDetailsVisible,
+      toggleCleanUiDetailsVisible,
+      revealCleanUiDetailsTemporarily,
+      handleWarning,
       setEmbeddedShellFocused,
       dismissBackgroundShell,
       setActiveBackgroundShellPid,

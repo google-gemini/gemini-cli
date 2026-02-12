@@ -46,4 +46,10 @@ describe('ShortcutsHelp', () => {
       expect(lastFrame()).toMatchSnapshot();
     },
   );
+
+  it('always shows Tab Tab focus UI shortcut', () => {
+    const rendered = renderWithProviders(<ShortcutsHelp />);
+    expect(rendered.lastFrame()).toContain('Tab Tab');
+    rendered.unmount();
+  });
 });
