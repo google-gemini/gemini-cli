@@ -1343,7 +1343,8 @@ export class Config {
       !!sandboxConfig &&
       sandboxConfig.command === 'sandbox-exec' &&
       !!seatbeltProfile &&
-      seatbeltProfile.startsWith('restrictive-')
+      (seatbeltProfile.startsWith('restrictive-') ||
+        seatbeltProfile.startsWith('strict-'))
     );
   }
 
