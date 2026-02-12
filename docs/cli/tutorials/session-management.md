@@ -9,12 +9,12 @@ mistakes using the rewind feature.
 - Gemini CLI installed and authenticated.
 - At least one active or past session.
 
-## 1. Resume where you left off
+## How to resume where you left off
 
 It's common to switch context—maybe you're waiting for a build and want to work
 on a different feature. Gemini makes it easy to jump back in.
 
-### Resume the last session
+### Scenario: Resume the last session
 
 The fastest way to pick up your most recent work is with the `--resume` flag (or
 `-r`).
@@ -26,7 +26,7 @@ gemini -r
 This restores your chat history and memory, so you can say "Continue with the
 next step" immediately.
 
-### Browse past sessions
+### Scenario: Browse past sessions
 
 If you want to find a specific conversation from yesterday, use the interactive
 browser.
@@ -41,12 +41,12 @@ This opens a searchable list of all your past sessions. You'll see:
 
 Select a session and press **Enter** to load it.
 
-## 2. Manage your workspace
+## How to manage your workspace
 
 Over time, you'll accumulate a lot of history. Keeping your session list clean
 helps you find what you need.
 
-### Deleting sessions
+### Scenario: Deleting sessions
 
 In the `/resume` browser, navigate to a session you no longer need and press
 **x**. This permanently deletes the history for that specific conversation.
@@ -61,24 +61,20 @@ gemini --list-sessions
 gemini --delete-session 1
 ```
 
-## 3. Rewind time (Undo mistakes)
+## How to rewind time (Undo mistakes)
 
-We've all been there: you ask the agent to refactor a file, and it deletes
-something critical. Or maybe you just went down a rabbit hole and want to start
-over.
+Gemini CLI's **Rewind** feature is like `Ctrl+Z` for your workflow.
 
-Gemini CLI's **Rewind** feature is like `Ctrl+Z` for your entire workflow.
-
-### Triggering rewind
+### Scenario: Triggering rewind
 
 At any point in a chat, type `/rewind` or press **Esc** twice.
 
-### Choosing a restore point
+### Scenario: Choosing a restore point
 
 You'll see a list of your recent interactions. Select the point _before_ the
-mistake happened.
+undesired changes occurred.
 
-### Choosing what to revert
+### Scenario: Choosing what to revert
 
 Gemini gives you granular control over the undo process. You can choose to:
 
@@ -86,21 +82,17 @@ Gemini gives you granular control over the undo process. You can choose to:
     changed. (Useful if the code is good but the chat got off track).
 2.  **Revert code changes:** Keep the chat history but undo the file edits.
     (Useful if you want to keep the context but retry the implementation).
-3.  **Rewind both:** Restore everything to exactly how it was. (The "Panic
-    Button").
+3.  **Rewind both:** Restore everything to exactly how it was.
 
-**Tip:** This uses a hidden Git history, so it's safe even if you haven't
-committed your changes to your actual Git repo yet.
-
-## 4. Forking conversations
+## How to fork conversations
 
 Sometimes you want to try two different approaches to the same problem.
 
 1.  Start a session and get to a decision point.
-2.  **Save** the current state with `/chat save decision-point`.
-3.  Try "Approach A".
+2.  Save the current state with `/chat save decision-point`.
+3.  Try your first approach.
 4.  Later, use `/chat resume decision-point` to fork the conversation back to
-    that moment and try "Approach B".
+    that moment and try a different approach.
 
 This creates a new branch of history without losing your original work.
 

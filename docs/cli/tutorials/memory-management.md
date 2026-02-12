@@ -25,29 +25,30 @@ You'll use these features when you want to:
 - **Remember facts:** Save details like "My database port is 5432" so you don't
   have to repeat them.
 
-## 1. Define project-wide rules (GEMINI.md)
+## How to define project-wide rules (GEMINI.md)
 
 The most powerful way to control the agent's behavior is through `GEMINI.md`
 files. These are Markdown files containing instructions that are automatically
 loaded into every conversation.
 
-### Create a project context file
+### Scenario: Create a project context file
 
-In the root of your project, create a file named `GEMINI.md`.
+1.  In the root of your project, create a file named `GEMINI.md`.
 
-```markdown
-# Project Instructions
+2.  Add your instructions:
 
-- **Framework:** We use React with Vite.
-- **Styling:** Use Tailwind CSS for all styling. Do not write custom CSS.
-- **Testing:** All new components must include a Vitest unit test.
-- **Tone:** Be concise. Don't explain basic React concepts.
-```
+    ```markdown
+    # Project Instructions
 
-Now, every time you start a session in this directory, Gemini will know these
-rules. You won't have to say "use Tailwind" in every prompt.
+    - **Framework:** We use React with Vite.
+    - **Styling:** Use Tailwind CSS for all styling. Do not write custom CSS.
+    - **Testing:** All new components must include a Vitest unit test.
+    - **Tone:** Be concise. Don't explain basic React concepts.
+    ```
 
-### Understanding the hierarchy
+3.  Start a new session. Gemini CLI will now know these rules automatically.
+
+### Scenario: Using the hierarchy
 
 Context is loaded hierarchically. This allows you to have general rules for
 everything and specific rules for sub-projects.
@@ -59,12 +60,12 @@ everything and specific rules for sub-projects.
 **Example:** You might set "Always use strict typing" in your global config, but
 "Use Python 3.11" only in your backend repository.
 
-## 2. Teach the agent facts (Memory)
+## How to teach the agent facts (Memory)
 
 Sometimes you don't want to write a config file. You just want to tell the agent
 something once and have it remember forever. You can do this naturally in chat.
 
-### Saving a memory
+### Scenario: Saving a memory
 
 Just tell the agent to remember something.
 
@@ -75,7 +76,7 @@ memory file.
 
 **Prompt:** `Save the fact that the staging server IP is 10.0.0.5.`
 
-### Using memory in conversation
+### Scenario: Using memory in conversation
 
 Once a fact is saved, you don't need to invoke it explicitly. The agent "knows"
 it.
@@ -84,12 +85,12 @@ it.
 
 **Agent Response:** "I'll write a script to deploy to **10.0.0.5**..."
 
-## 3. Manage and inspect context
+## How to manage and inspect context
 
 As your project grows, you might want to see exactly what instructions the agent
 is following.
 
-### View active context
+### Scenario: View active context
 
 To see the full, concatenated set of instructions currently loaded (from all
 `GEMINI.md` files and saved memories), use the `/memory show` command.
@@ -99,7 +100,7 @@ To see the full, concatenated set of instructions currently loaded (from all
 This prints the raw text the model receives at the start of the session. It's
 excellent for debugging why the agent might be ignoring a rule.
 
-### Refresh context
+### Scenario: Refresh context
 
 If you edit a `GEMINI.md` file while a session is running, the agent won't know
 immediately. Force a reload with:

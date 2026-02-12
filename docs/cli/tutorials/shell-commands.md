@@ -9,7 +9,7 @@ automate complex workflows, and manage background processes safely.
 - Gemini CLI installed and authenticated.
 - Basic familiarity with your system's shell (Bash, Zsh, PowerShell, etc.).
 
-## 1. Run commands directly (`!`)
+## How to run commands directly (`!`)
 
 Sometimes you just need to check a file size or git status without asking the AI
 to do it for you. You can pass commands directly to your shell using the `!`
@@ -21,18 +21,19 @@ This executes `ls -la` immediately and prints the output to your terminal. The
 AI doesn't "see" this output unless you paste it back into the chat or use it in
 a prompt.
 
-### Shell mode
+### Scenario: Entering Shell mode
 
 If you're doing a lot of manual work, toggle "Shell Mode" by typing `!` and
-pressing Enter. Now, everything you type is sent to the shell until you exit
-(usually by pressing `Esc` or typing `exit`).
+pressing **Enter**. Now, everything you type is sent to the shell until you exit
+(usually by pressing **Esc** or typing `exit`).
 
-## 2. Automate complex tasks
+## How to automate complex tasks
 
-The real power comes when you ask the _agent_ to run commands. The agent can
-analyze the output and decide what to do next.
+You can automate tasks using a combination of Gemini CLI and shell commands.
 
-**Scenario:** You want to run tests and fix any failures.
+### Scenario: Run tests and fix failures
+
+You want to run tests and fix any failures.
 
 **Prompt:**
 `Run the unit tests. If any fail, analyze the error and try to fix the code.`
@@ -49,7 +50,7 @@ analyze the output and decide what to do next.
 
 This loop turns Gemini into an autonomous engineer.
 
-## 3. Manage background processes
+## How to manage background processes
 
 You can ask Gemini to start long-running tasks, like development servers or file
 watchers.
@@ -58,7 +59,7 @@ watchers.
 
 Gemini will run the command (e.g., `npm run dev`) and detach it.
 
-### Viewing active shells
+### Scenario: Viewing active shells
 
 To see what's running in the background, use the `/shells` command.
 
@@ -66,7 +67,7 @@ To see what's running in the background, use the `/shells` command.
 
 This opens a dashboard where you can view logs or kill runaway processes.
 
-## 4. Handle interactive commands
+## How to handle interactive commands
 
 Gemini CLI attempts to handle interactive commands (like `git add -p` or
 confirmation prompts) by streaming the output to you. However, for highly

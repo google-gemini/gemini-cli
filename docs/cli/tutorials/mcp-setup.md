@@ -1,23 +1,17 @@
 # Set up an MCP server
 
 Connect Gemini CLI to your external databases and services. In this guide,
-you'll learn how to extend the agent's capabilities by installing the GitHub MCP
-server and using it to manage your repositories.
+you'll learn how to extend Gemini CLI's capabilities by installing the GitHub
+MCP server and using it to manage your repositories.
 
 ## Prerequisites
 
 - Gemini CLI installed.
 - **Docker:** Required for this specific example (many MCP servers run as Docker
   containers).
-- **GitHub Token:** A Personal Access Token (PAT) with repo permissions.
+- **GitHub token:** A Personal Access Token (PAT) with repo permissions.
 
-## 1. Understand the goal
-
-We want to give Gemini the ability to read your repositories, check pull
-requests, and create issues—without you having to copy-paste links into the
-chat. We'll do this by running a small "sidecar" server that speaks MCP.
-
-## 2. Prepare your credentials
+## How to prepare your credentials
 
 Most MCP servers require authentication. For GitHub, you need a PAT.
 
@@ -30,7 +24,7 @@ Most MCP servers require authentication. For GitHub, you need a PAT.
 export GITHUB_PERSONAL_ACCESS_TOKEN="github_pat_..."
 ```
 
-## 3. Configure Gemini CLI
+## How to configure Gemini CLI
 
 You tell Gemini about new servers by editing your `settings.json`.
 
@@ -64,7 +58,7 @@ You tell Gemini about new servers by editing your `settings.json`.
 > We map the local environment variable into the container so your secret isn't
 > hardcoded in the config file.
 
-## 4. Verify the connection
+## How to verify the connection
 
 Restart Gemini CLI. It will automatically try to start the defined servers.
 
@@ -75,10 +69,12 @@ You should see: `✓ github: docker ... - Connected`
 If you see `Disconnected` or an error, check that Docker is running and your API
 token is valid.
 
-## 5. Use the new tools
+## How to use the new tools
 
 Now that the server is running, the agent has new capabilities ("tools"). You
 don't need to learn special commands; just ask in natural language.
+
+### Scenario: Listing pull requests
 
 **Prompt:** `List the open PRs in the google/gemini-cli repository.`
 
@@ -87,6 +83,8 @@ The agent will:
 1.  Recognize the request matches a GitHub tool.
 2.  Call `github_list_pull_requests`.
 3.  Present the data to you.
+
+### Scenario: Creating an issue
 
 **Prompt:**
 `Create an issue in my repo titled "Bug: Login fails" with the description "See logs".`

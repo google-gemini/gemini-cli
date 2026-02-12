@@ -20,7 +20,7 @@ after 10 turns of code generation. Task planning provides:
 3.  **Resilience:** If the agent gets stuck, the plan helps it get back on
     track.
 
-## 1. Ask for a plan
+## How to ask for a plan
 
 The best way to trigger task planning is to explicitly ask for it.
 
@@ -38,7 +38,7 @@ structured list.
 4.  [ ] Fix type errors in `server.js`.
 5.  [ ] Verify build passes.
 
-## 2. Review and iterate
+## How to review and iterate
 
 Once the plan is generated, it appears in your CLI. Review it.
 
@@ -49,7 +49,7 @@ Once the plan is generated, it appears in your CLI. Review it.
 
 The agent will update the todo list dynamically.
 
-## 3. Execute the plan
+## How to execute the plan
 
 Tell the agent to proceed.
 
@@ -62,7 +62,7 @@ box.
   `[IN_PROGRESS] Create tsconfig.json`).
 - **Progress:** Completed tasks are marked as done.
 
-## 4. Monitor progress (`Ctrl+T`)
+## How to monitor progress (`Ctrl+T`)
 
 For a long-running task, the full todo list might be hidden to save space. You
 can toggle the full view at any time.
@@ -72,7 +72,7 @@ can toggle the full view at any time.
 This shows the complete list, including pending, in-progress, and completed
 items. It's a great way to check "how much is left?" without scrolling back up.
 
-## 5. Handle unexpected changes
+## How to handle unexpected changes
 
 Plans change. Maybe you discover a library is incompatible halfway through.
 

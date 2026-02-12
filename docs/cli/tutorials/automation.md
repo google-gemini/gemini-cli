@@ -1,8 +1,8 @@
 # Automate tasks with headless mode
 
-Build custom AI tools with Gemini CLI scripting. In this guide, you'll learn how
-to pipe data into the agent, automate workflows with shell scripts, and generate
-structured JSON output for other programs.
+Automate tasks with Gemini CLI. Learn how to use headless mode, pipe data into
+Gemini CLI, automate workflows with shell scripts, and generate structured JSON
+output for other applications.
 
 ## Prerequisites
 
@@ -11,125 +11,172 @@ structured JSON output for other programs.
 
 ## Why headless mode?
 
-Headless mode runs Gemini once and exits. It's perfect for:
+Headless mode runs Gemini CLI once and exits. It's perfect for:
 - **CI/CD:** Analyzing pull requests automatically.
-- **Batch processing:** Summarizing 100 log files.
+- **Batch processing:** Summarizing a large number of log files.
 - **Tool building:** Creating your own "AI wrapper" scripts.
 
-## Piping input to Gemini CLI
+## How to use headless mode
 
-You can feed data into Gemini using the standard Unix pipe `|`.
+Run Gemini CLI in headless mode by providing a prompt as a positional argument.
+This bypasses the interactive chat interface and prints the response to standard
+output (stdout).
 
-**Example:**
-`cat error.log | gemini "Explain why this failed"`
+Run a single command:
 
-Gemini reads the standard input (stdin) as context and answers your question using
-standard output (stdout).
+```bash
+gemini "Write a poem about TypeScript"
+```
 
-**Example:**
-`git diff | gemini "Write a commit message for these changes"`
+## How to pipe input to Gemini CLI
 
-## Using Gemini output in scripts
+Feed data into Gemini using the standard Unix pipe `|`. Gemini reads the
+standard input (stdin) as context and answers your question using standard
+output.
+
+Pipe a file:
+
+```bash
+cat error.log | gemini "Explain why this failed"
+```
+
+Pipe a command:
+
+```bash
+git diff | gemini "Write a commit message for these changes"
+```
+
+## Use Gemini CLI output in scripts
 
 Because Gemini prints to stdout, you can chain it with other tools or save the
 results to a file.
 
 ### Scenario: Bulk documentation generator
 
-Imagine you have a folder of python scripts and want to generate a `README.md` for each
-one.
+You have a folder of Python scripts and want to generate a `README.md`
+for each one.
 
-**Create the script:**
+1.  Save the following code as `generate_docs.sh`:
 
-Save the following code as `generate_docs.sh`:
+    ```bash
+    #!/bin/bash
 
-```bash
-#!/bin/bash
+    # Loop through all Python files
+    for file in *.py; do
+      echo "Generating docs for $file..."
 
-# Loop through all Python files
-for file in *.py; do
-  echo "Generating docs for $file..."
-  
-  # Ask Gemini CLI to generate the documentation and print it to stdout
-  gemini "Generate a Markdown documentation summary for @$file. Print the result to standard output." > "${file%.py}.md"
-done
-```
+      # Ask Gemini CLI to generate the documentation and print it to stdout
+      gemini "Generate a Markdown documentation summary for @$file. Print the
+      result to standard output." > "${file%.py}.md"
+    done
+    ```
 
-**Run the script:**
+2.  Make the script executable and run it in your directory:
 
-Make the script executable and run it in your directory:
+    ```bash
+    chmod +x generate_docs.sh
+    ./generate_docs.sh
+    ```
 
-```bash
-chmod +x generate_docs.sh
-./generate_docs.sh
-```
+    This creates a corresponding Markdown file for every Python file in the
+    folder.
 
-This will create a corresponding markdown file for every Python file in the
-folder.
+## Extract structured JSON data
 
-## Extracting structured JSON data
+When writing a script, you often need structured data (JSON) to pass to tools
+like `jq`. To get pure JSON data from the model, combine the `--output-format
+json` flag with `jq` to parse the response field.
 
-If you're writing a script, you often need structured data (JSON) to pass to
-tools like `jq`. To get pure JSON data from the model, you combine the
-`--output-format json` flag with `jq` to parse the response field.
+### Scenario: Extract and return structured data
 
-**Workflow:**
+1.  Save the following script as `generate_json.sh`:
 
-Ask Gemini to output raw JSON, then use `jq` to extract the content.
+    ```bash
+    #!/bin/bash
 
-```bash
-gemini "Return a raw JSON object with keys 'version' and 'deps' from @package.json" \
-  --output-format json \
-  | jq -r '.response' \
-  > data.json
-```
+    # Ensure we are in a project root
+    if [ ! -f "package.json" ]; then
+      echo "Error: package.json not found."
+      exit 1
+    fi
 
-**Result (`data.json`):**
+    # Extract data
+    gemini --output-format json "Return a raw JSON object with keys 'version' and 'deps' from @package.json" | jq -r '.response' > data.json
+    ```
 
-```json
-{
-  "version": "1.0.0",
-  "deps": {
-    "react": "^18.2.0"
-  }
-}
-```
+2.  Run `generate_json.sh`:
 
-## Creating a "Smart Commit" alias
+    ```bash
+    chmod +x generate_json.sh
+    ./generate_json.sh
+    ```
 
-You can add this function to your `.bashrc` or `.zshrc` to create a `git commit`
-wrapper that writes the message for you.
+3. Check `data.json`. The file should look like this:
 
-**Add the alias:**
+    ```json
+    {
+      "version": "1.0.0",
+      "deps": {
+        "react": "^18.2.0"
+      }
+    }
+    ```
 
-```bash
-function gcommit() {
-  # Get the diff of staged changes
-  diff=$(git diff --staged)
+## Build your own custom AI tools
 
-  if [ -z "$diff" ]; then
-    echo "No staged changes to commit."
-    return 1
-  fi
+Use headless mode to perform custom, automated AI tasks.
 
-  # Ask Gemini to write the message
-  echo "Generating commit message..."
-  msg=$(echo "$diff" | gemini "Write a concise Conventional Commit message for this diff. Output ONLY the message.")
+### Scenario: Create a "Smart Commit" alias
 
-  # Commit with the generated message
-  git commit -m "$msg"
-}
-```
+You can add a function to your shell configuration (like `.zshrc` or `.bashrc`)
+to create a `git commit` wrapper that writes the message for you.
 
-**Use the alias:**
+1.  Open your `.zshrc` file (or `.bashrc` if you use Bash) in your preferred text
+    editor.
 
-After sourcing your config (`source ~/.zshrc`), simply type:
+    ```bash
+    nano ~/.zshrc
+    ```
 
-```bash
-gcommit
-```
+    **Note**: If you use VS Code, you can run `code ~/.zshrc`.
 
-Gemini will analyze your staged changes and commit them with a generated message.
+2.  Scroll to the very bottom of the file and paste this code:
+
+    ```bash
+    function gcommit() {
+      # Get the diff of staged changes
+      diff=$(git diff --staged)
+
+      if [ -z "$diff" ]; then
+        echo "No staged changes to commit."
+        return 1
+      fi
+
+      # Ask Gemini to write the message
+      echo "Generating commit message..."
+      msg=$(echo "$diff" | gemini "Write a concise Conventional Commit message for this diff. Output ONLY the message.")
+
+      # Commit with the generated message
+      git commit -m "$msg"
+    }
+    ```
+
+    Save your file and exit.
+
+3.  Run this command to make the function available immediately:
+
+    ```bash
+    source ~/.zshrc
+    ```
+
+4.  Use your new command:
+
+    ```bash
+    gcommit
+    ```
+
+    Gemini CLI will analyze your staged changes and commit them with a generated
+    message.
 
 ## Next steps
 

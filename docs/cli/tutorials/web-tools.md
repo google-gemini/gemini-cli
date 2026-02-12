@@ -9,10 +9,12 @@ URLs, and apply that knowledge to your code.
 - Gemini CLI installed and authenticated.
 - An internet connection.
 
-## 1. Research new technologies
+## How to research new technologies
 
 Imagine you want to use a library released yesterday. The model doesn't know
 about it yet. You need to teach it.
+
+### Scenario: Find documentation
 
 **Prompt:**
 `Search for the 'Bun 1.0' release notes and summarize the key changes.`
@@ -23,12 +25,14 @@ features that don't exist.
 
 **Prompt:** `Find the documentation for the 'React Router v7' loader API.`
 
-## 2. Fetch deep context
+## How to fetch deep context
 
 Search gives you a summary, but sometimes you need the raw details. The
 `web_fetch` tool lets you feed a specific URL directly into the agent's context.
 
-**Scenario:** You found a blog post with the exact solution to your bug.
+### Scenario: Reading a blog post
+
+You found a blog post with the exact solution to your bug.
 
 **Prompt:**
 `Read https://example.com/fixing-memory-leaks and explain how to apply it to my code.`
@@ -36,17 +40,16 @@ Search gives you a summary, but sometimes you need the raw details. The
 Gemini will retrieve the page content (stripping away ads and navigation) and
 use it to answer your question.
 
-### Comparing sources
+### Scenario: Comparing sources
 
 You can even fetch multiple pages to compare approaches.
 
 **Prompt:**
 `Compare the pagination patterns in https://api.example.com/v1/docs and https://api.example.com/v2/docs.`
 
-## 3. Apply knowledge to code
+## How to apply knowledge to code
 
-The real power comes when you combine web tools with file editing. You can
-bridge the gap between "reading the docs" and "writing the code."
+The real power comes when you combine web tools with file editing.
 
 **Workflow:**
 
@@ -55,19 +58,15 @@ bridge the gap between "reading the docs" and "writing the code."
 3.  **Implement:** "Great. Now use that pattern to create an `auth.ts` file in
     my project."
 
-This loop—Search, Fetch, Implement—allows you to build features using libraries
-you've never seen before, with the agent acting as a pair programmer who reads
-the documentation alongside you.
-
-## 4. Troubleshooting errors
+## How to troubleshoot errors
 
 When you hit an obscure error message, paste it into the chat.
 
 **Prompt:**
 `I'm getting 'Error: hydration mismatch' in Next.js. Search for recent solutions.`
 
-The agent will search GitHub issues, StackOverflow, and forums to find relevant
-fixes that might be too new to be in its base training set.
+The agent will search sources such as GitHub issues, StackOverflow, and forums
+to find relevant fixes that might be too new to be in its base training set.
 
 ## Next steps
 
