@@ -164,14 +164,13 @@ ${output.result}
         parentPromptId: promptIdContext.getStore(),
       });
 
-      const initialRequest = [{ text: 'Start' }]; // Placeholder for subagent start
+      const initialRequest = [{ text: 'Start' }];
       const stream = harness.run(initialRequest, signal);
 
       let turn: Turn | undefined;
       while (true) {
         const { value, done } = await stream.next();
         if (done) {
-           
           turn = value;
           break;
         }

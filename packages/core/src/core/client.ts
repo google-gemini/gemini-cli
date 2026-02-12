@@ -7,6 +7,7 @@
 import type {
   GenerateContentConfig,
   PartListUnion,
+  Part,
   Content,
   Tool,
   GenerateContentResponse,
@@ -64,6 +65,8 @@ import { resolveModel } from '../config/models.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
+import { AgentFactory } from '../agents/agent-factory.js';
+import { type AgentHarness } from '../agents/harness.js';
 
 const MAX_TURNS = 100;
 
@@ -90,6 +93,7 @@ export class GeminiClient {
   private currentSequenceModel: string | null = null;
   private lastSentIdeContext: IdeContext | undefined;
   private forceFullIdeContext = true;
+  private harness?: AgentHarness;
 
   /**
    * At any point in this conversation, was compression triggered without
@@ -790,6 +794,46 @@ export class GeminiClient {
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
+    }
+
+    if (this.config.isAgentHarnessEnabled()) {
+      this.sessionTurnCount++;
+      if (
+        this.config.getMaxSessionTurns() > 0 &&
+        this.sessionTurnCount > this.config.getMaxSessionTurns()
+      ) {
+        yield { type: GeminiEventType.MaxSessionTurns };
+        return new Turn(this.getChat(), prompt_id);
+      }
+
+      if (!this.harness || this.lastPromptId !== prompt_id) {
+         this.harness = AgentFactory.createHarness(this.config, undefined, {
+            parentPromptId: prompt_id
+         });
+         this.lastPromptId = prompt_id;
+      }
+      
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
+      const requestParts: Part[] = (Array.isArray(request) ? request : [{ text: partToString(request) }]) as any;
+      const stream = this.harness.run(requestParts, signal, turns);
+
+      let turn: Turn | undefined;
+      while (true) {
+        const { value, done } = await stream.next();
+        if (done) {
+          turn = value;
+          break;
+        }
+        yield value;
+      }
+
+      if (turn) {
+         // Sync history back to GeminiClient's chat for transcript persistence
+         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
+         this.getChat().setHistory((turn as any).chat.getHistory());
+         return turn;
+      }
+      return new Turn(this.getChat(), prompt_id);
     }
 
     const hooksEnabled = this.config.getEnableHooks();
