@@ -16,22 +16,26 @@ import {
   type Content,
 } from '@google/gemini-cli-core';
 
-import { type Tool, SdkTool, type z } from './tool.js';
+import { type Tool, SdkTool } from './tool.js';
 import { SdkAgentFilesystem } from './fs.js';
 import { SdkAgentShell } from './shell.js';
 import type { SessionContext } from './types.js';
 
 export interface GeminiCliAgentOptions {
   instructions: string;
-  tools?: Array<Tool<z.ZodType>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tools?: Array<Tool<any>>;
   model?: string;
   cwd?: string;
   debug?: boolean;
+  recordResponses?: string;
+  fakeResponses?: string;
 }
 
 export class GeminiCliAgent {
   private config: Config;
-  private tools: Array<Tool<z.ZodType>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private tools: Array<Tool<any>>;
 
   constructor(options: GeminiCliAgentOptions) {
     const cwd = options.cwd || process.cwd();
@@ -146,7 +150,7 @@ export class GeminiCliAgent {
               ? tool.createInvocationWithContext(
                   args as object,
                   this.config.getMessageBus(),
-                  context
+                  context,
                 )
               : tool.build(args as object);
 

@@ -25,18 +25,18 @@ export class ModelVisibleError extends Error {
   }
 }
 
-export interface ToolDefinition<T extends z.ZodType> {
+export interface ToolDefinition<T extends z.ZodTypeAny> {
   name: string;
   description: string;
   inputSchema: T;
   sendErrorsToModel?: boolean;
 }
 
-export interface Tool<T extends z.ZodType> extends ToolDefinition<T> {
+export interface Tool<T extends z.ZodTypeAny> extends ToolDefinition<T> {
   action: (params: z.infer<T>, context?: SessionContext) => Promise<unknown>;
 }
 
-class SdkToolInvocation<T extends z.ZodType> extends BaseToolInvocation<
+class SdkToolInvocation<T extends z.ZodTypeAny> extends BaseToolInvocation<
   z.infer<T>,
   ToolResult
 > {
@@ -87,7 +87,7 @@ class SdkToolInvocation<T extends z.ZodType> extends BaseToolInvocation<
   }
 }
 
-export class SdkTool<T extends z.ZodType> extends BaseDeclarativeTool<
+export class SdkTool<T extends z.ZodTypeAny> extends BaseDeclarativeTool<
   z.infer<T>,
   ToolResult
 > {
@@ -139,7 +139,7 @@ export class SdkTool<T extends z.ZodType> extends BaseDeclarativeTool<
   }
 }
 
-export function tool<T extends z.ZodType>(
+export function tool<T extends z.ZodTypeAny>(
   definition: ToolDefinition<T>,
   action: (params: z.infer<T>, context?: SessionContext) => Promise<unknown>,
 ): Tool<T> {

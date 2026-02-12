@@ -23,6 +23,7 @@ export interface AgentShellResult {
   output: string;
   stdout: string;
   stderr: string;
+  error?: Error;
 }
 
 export interface AgentShell {

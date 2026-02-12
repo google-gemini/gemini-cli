@@ -190,3 +190,6 @@ export * from './agents/types.js';
 // Export stdio utils
 export * from './utils/stdio.js';
 export * from './utils/terminal.js';
+
+// Export types from @google/genai
+export type { Content, Part, FunctionCall } from '@google/genai';
