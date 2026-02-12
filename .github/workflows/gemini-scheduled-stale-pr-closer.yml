@@ -44,7 +44,7 @@ jobs:
             // 1. Fetch maintainers for verification
             let maintainerLogins = new Set();
             const teams = ['gemini-cli-maintainers', 'gemini-cli-askmode-approvers', 'gemini-cli-docs'];
-            
+
             for (const team_slug of teams) {
               try {
                 const members = await github.paginate(github.rest.teams.listMembersInOrg, {
