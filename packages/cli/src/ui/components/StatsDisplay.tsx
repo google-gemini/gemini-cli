@@ -100,7 +100,6 @@ const buildModelRows = (
       outputTokens: metrics.tokens.candidates.toLocaleString(),
       bucket: quotas?.buckets?.find((b) => b.modelId === modelName),
       isActive: true,
-      roles: metrics.roles,
     };
   });
 
@@ -122,7 +121,6 @@ const buildModelRows = (
         outputTokens: '-',
         bucket,
         isActive: false,
-        roles: undefined,
       })) || [];
 
   return [...activeRows, ...quotaRows];
@@ -183,7 +181,7 @@ const ModelUsageTable: React.FC<{
     <Box flexDirection="column" marginTop={1}>
       {/* Header */}
       <Box alignItems="flex-end">
-        <Box width={nameWidth} flexShrink={1}>
+        <Box width={nameWidth}>
           <Text bold color={theme.text.primary} wrap="truncate-end">
             {modelUsageTitle}
           </Text>
@@ -280,148 +278,84 @@ const ModelUsageTable: React.FC<{
         borderRight={false}
         borderColor={theme.border.default}
         width={totalWidth}
-        flexShrink={1}
       ></Box>
 
       {rows.map((row) => (
-        <Box key={row.key} flexDirection="column">
-          <Box>
-            <Box width={nameWidth}>
-              <Text
-                color={row.isActive ? theme.text.primary : theme.text.secondary}
-                wrap="truncate-end"
-              >
-                {row.modelName}
-              </Text>
-            </Box>
-            <Box
-              width={requestsWidth}
-              flexDirection="column"
-              alignItems="flex-end"
-              flexShrink={0}
+        <Box key={row.key}>
+          <Box width={nameWidth}>
+            <Text
+              color={row.isActive ? theme.text.primary : theme.text.secondary}
+              wrap="truncate-end"
             >
-              <Text
-                color={row.isActive ? theme.text.primary : theme.text.secondary}
-              >
-                {row.requests}
-              </Text>
-            </Box>
-            {!showQuotaColumn && (
-              <>
-                <Box
-                  width={uncachedWidth}
-                  flexDirection="column"
-                  alignItems="flex-end"
-                  flexShrink={0}
-                >
-                  <Text
-                    color={
-                      row.isActive ? theme.text.primary : theme.text.secondary
-                    }
-                  >
-                    {row.inputTokens}
-                  </Text>
-                </Box>
-                <Box
-                  width={cachedWidth}
-                  flexDirection="column"
-                  alignItems="flex-end"
-                  flexShrink={0}
-                >
-                  <Text color={theme.text.secondary}>{row.cachedTokens}</Text>
-                </Box>
-                <Box
-                  width={outputTokensWidth}
-                  flexDirection="column"
-                  alignItems="flex-end"
-                  flexShrink={0}
-                >
-                  <Text
-                    color={
-                      row.isActive ? theme.text.primary : theme.text.secondary
-                    }
-                  >
-                    {row.outputTokens}
-                  </Text>
-                </Box>
-              </>
-            )}
-            <Box
-              width={usageLimitWidth}
-              flexDirection="column"
-              alignItems="flex-end"
-            >
-              {row.bucket &&
-                row.bucket.remainingFraction != null &&
-                row.bucket.resetTime && (
-                  <Text color={theme.text.secondary} wrap="truncate-end">
-                    {(row.bucket.remainingFraction * 100).toFixed(1)}%{' '}
-                    {formatResetTime(row.bucket.resetTime)}
-                  </Text>
-                )}
-            </Box>
+              {row.modelName}
+            </Text>
           </Box>
-          {row.roles &&
-            Object.entries(row.roles).map(([role, metrics]) => (
-              <Box key={role}>
-                <Box width={nameWidth} paddingLeft={2}>
-                  <Text color={theme.text.secondary}>↳ {role}</Text>
-                </Box>
-                <Box
-                  width={requestsWidth}
-                  flexDirection="column"
-                  alignItems="flex-end"
-                  flexShrink={0}
+          <Box
+            width={requestsWidth}
+            flexDirection="column"
+            alignItems="flex-end"
+            flexShrink={0}
+          >
+            <Text
+              color={row.isActive ? theme.text.primary : theme.text.secondary}
+            >
+              {row.requests}
+            </Text>
+          </Box>
+          {!showQuotaColumn && (
+            <>
+              <Box
+                width={uncachedWidth}
+                flexDirection="column"
+                alignItems="flex-end"
+                flexShrink={0}
+              >
+                <Text
+                  color={
+                    row.isActive ? theme.text.primary : theme.text.secondary
+                  }
                 >
-                  <Text color={theme.text.secondary}>
-                    {metrics.totalRequests}
-                  </Text>
-                </Box>
-                {!showQuotaColumn && (
-                  <>
-                    <Box
-                      width={uncachedWidth}
-                      flexDirection="column"
-                      alignItems="flex-end"
-                      flexShrink={0}
-                    >
-                      <Text color={theme.text.secondary}>
-                        {metrics.tokens.input.toLocaleString()}
-                      </Text>
-                    </Box>
-                    <Box
-                      width={cachedWidth}
-                      flexDirection="column"
-                      alignItems="flex-end"
-                      flexShrink={0}
-                    >
-                      <Text color={theme.text.secondary}>
-                        {metrics.tokens.cached.toLocaleString()}
-                      </Text>
-                    </Box>
-                    <Box
-                      width={outputTokensWidth}
-                      flexDirection="column"
-                      alignItems="flex-end"
-                      flexShrink={0}
-                    >
-                      <Text color={theme.text.secondary}>
-                        {metrics.tokens.candidates.toLocaleString()}
-                      </Text>
-                    </Box>
-                  </>
-                )}
-                {showQuotaColumn && (
-                  <Box
-                    width={usageLimitWidth}
-                    flexDirection="column"
-                    alignItems="flex-end"
-                  >
-                    <Text color={theme.text.secondary}>-</Text>
-                  </Box>
-                )}
+                  {row.inputTokens}
+                </Text>
               </Box>
-            ))}
+              <Box
+                width={cachedWidth}
+                flexDirection="column"
+                alignItems="flex-end"
+                flexShrink={0}
+              >
+                <Text color={theme.text.secondary}>{row.cachedTokens}</Text>
+              </Box>
+              <Box
+                width={outputTokensWidth}
+                flexDirection="column"
+                alignItems="flex-end"
+                flexShrink={0}
+              >
+                <Text
+                  color={
+                    row.isActive ? theme.text.primary : theme.text.secondary
+                  }
+                >
+                  {row.outputTokens}
+                </Text>
+              </Box>
+            </>
+          )}
+          <Box
+            width={usageLimitWidth}
+            flexDirection="column"
+            alignItems="flex-end"
+          >
+            {row.bucket &&
+              row.bucket.remainingFraction != null &&
+              row.bucket.resetTime && (
+                <Text color={theme.text.secondary} wrap="truncate-end">
+                  {(row.bucket.remainingFraction * 100).toFixed(1)}%{' '}
+                  {formatResetTime(row.bucket.resetTime)}
+                </Text>
+              )}
+          </Box>
         </Box>
       ))}
 
