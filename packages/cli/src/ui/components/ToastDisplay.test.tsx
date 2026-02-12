@@ -29,6 +29,7 @@ describe('ToastDisplay', () => {
   describe('shouldShowToast', () => {
     const baseState: Partial<UIState> = {
       ctrlCPressedOnce: false,
+      ctrlSPressed: false,
       transientMessage: null,
       ctrlDPressedOnce: false,
       showEscapePrompt: false,
@@ -44,6 +45,12 @@ describe('ToastDisplay', () => {
     it('returns true when ctrlCPressedOnce is true', () => {
       expect(
         shouldShowToast({ ...baseState, ctrlCPressedOnce: true } as UIState),
+      ).toBe(true);
+    });
+
+    it('returns true when ctrlSPressed is true', () => {
+      expect(
+        shouldShowToast({ ...baseState, ctrlSPressed: true } as UIState),
       ).toBe(true);
     });
 
@@ -109,6 +116,13 @@ describe('ToastDisplay', () => {
   it('renders Ctrl+C prompt', () => {
     const { lastFrame } = renderToastDisplay({
       ctrlCPressedOnce: true,
+    });
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('renders Ctrl+S prompt', () => {
+    const { lastFrame } = renderToastDisplay({
+      ctrlSPressed: true,
     });
     expect(lastFrame()).toMatchSnapshot();
   });

@@ -1398,6 +1398,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [ctrlDPressCount, setCtrlDPressCount] = useState(0);
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [ctrlSPressed, setCtrlSPressed] = useState(false);
+  const ctrlSTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [ideContextState, setIdeContextState] = useState<
     IdeContext | undefined
@@ -1567,6 +1569,19 @@ Logging in with Google... Restarting Gemini CLI to continue.
     }
   }, [ctrlDPressCount, config, setCtrlDPressCount, handleSlashCommand]);
 
+  useEffect(() => {
+    if (ctrlSTimerRef.current) {
+      clearTimeout(ctrlSTimerRef.current);
+      ctrlSTimerRef.current = null;
+    }
+    if (ctrlSPressed) {
+      ctrlSTimerRef.current = setTimeout(() => {
+        setCtrlSPressed(false);
+        ctrlSTimerRef.current = null;
+      }, WARNING_PROMPT_DURATION_MS);
+    }
+  }, [ctrlSPressed]);
+
   const handleEscapePromptChange = useCallback((showPrompt: boolean) => {
     setShowEscapePrompt(showPrompt);
   }, []);
@@ -1620,6 +1635,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return true;
       } else if (keyMatchers[Command.SUSPEND_APP](key)) {
         handleSuspend();
+      } else if (
+        keyMatchers[Command.TOGGLE_COPY_MODE](key) &&
+        !isAlternateBuffer
+      ) {
+        setCtrlSPressed(true);
         return true;
       }
 
@@ -2055,6 +2075,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       renderMarkdown,
       ctrlCPressedOnce: ctrlCPressCount >= 1,
       ctrlDPressedOnce: ctrlDPressCount >= 1,
+      ctrlSPressed,
       showEscapePrompt,
       shortcutsHelpVisible,
       cleanUiDetailsVisible,
@@ -2166,6 +2187,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       renderMarkdown,
       ctrlCPressCount,
       ctrlDPressCount,
+      ctrlSPressed,
       showEscapePrompt,
       shortcutsHelpVisible,
       cleanUiDetailsVisible,

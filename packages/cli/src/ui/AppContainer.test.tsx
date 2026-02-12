@@ -2355,6 +2355,7 @@ describe('AppContainer State Management', () => {
           expect(disableMouseEvents).toHaveBeenCalled();
         } else {
           expect(disableMouseEvents).not.toHaveBeenCalled();
+          expect(capturedUIState.ctrlSPressed).toBe(true);
         }
         unmount();
       });
