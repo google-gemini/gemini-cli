@@ -536,8 +536,7 @@ export const AppContainer = (props: AppContainerProps) => {
       stdout.write(ansiEscapes.clearTerminal);
     }
     setHistoryRemountKey((prev) => prev + 1);
-    app.rerender();
-  }, [setHistoryRemountKey, isAlternateBuffer, stdout, app]);
+  }, [setHistoryRemountKey, isAlternateBuffer, stdout]);
 
   const handleEditorClose = useCallback(() => {
     if (
