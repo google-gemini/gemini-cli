@@ -9,6 +9,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from 'react';
 import type { LoadedSettings } from '../../config/settings.js';
@@ -39,10 +40,20 @@ export const VimModeProvider = ({
   useEffect(() => {
     // Initialize vimEnabled from settings on mount
     const enabled = settings.merged.general.vimMode;
-    setVimEnabled(enabled);
+    setVimEnabled((prev) => {
+      if (prev !== enabled) {
+        return enabled;
+      }
+      return prev;
+    });
     // When vim mode is enabled, start in INSERT mode
     if (enabled) {
-      setVimMode('INSERT');
+      setVimMode((prev) => {
+        if (prev !== 'INSERT') {
+          return 'INSERT';
+        }
+        return prev;
+      });
     }
   }, [settings.merged.general.vimMode]);
 
@@ -57,12 +68,18 @@ export const VimModeProvider = ({
     return newValue;
   }, [vimEnabled, settings]);
 
-  const value = {
-    vimEnabled,
-    vimMode,
-    toggleVimEnabled,
-    setVimMode,
-  };
+  // Memoize the context value to prevent unnecessary re-renders of consumers
+  // (like useGeminiStream) which could otherwise trigger infinite loop warnings
+  // when re-subscribing to events.
+  const value = useMemo(
+    () => ({
+      vimEnabled,
+      vimMode,
+      toggleVimEnabled,
+      setVimMode,
+    }),
+    [vimEnabled, vimMode, toggleVimEnabled, setVimMode],
+  );
 
   return (
     <VimModeContext.Provider value={value}>{children}</VimModeContext.Provider>
