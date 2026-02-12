@@ -1,4 +1,4 @@
-# Gemini CLI installation, execution, and deployment
+# Gemini CLI installation, execution, and releases
 
 This document provides an overview of Gemini CLI's sytem requriements,
 installation methods, and release types.
@@ -83,6 +83,13 @@ You can also run Gemini CLI using one of the following advanced methods:
 ```bash
 # Using npx (no installation required)
 npx @google/gemini-cli
+```
+
+You can also execute the CLI directly from the main branch on GitHub, which is
+helpful for testing features still in development:
+
+```bash
+npx https://github.com/google-gemini/gemini-cli
 ```
 
 ### Run in a sandbox (Docker/Podman)
