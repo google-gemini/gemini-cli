@@ -53,6 +53,10 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
   // Safety check: ToolConfirmationMessage requires confirmationDetails
   if (!tool.confirmationDetails) return null;
 
+  const hideToolIdentity =
+    tool.confirmationDetails?.type === 'ask_user' ||
+    tool.confirmationDetails?.type === 'exit_plan_mode';
+
   // Render up to 100% of the available terminal height (minus 1 line for safety)
   // to maximize space for diffs and other content.
   const maxHeight =
@@ -64,16 +68,14 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
   // We subtract the lines used by the Queue wrapper:
   // - 2 lines for the rounded border
   // - 2 lines for the Header (text + margin)
-  // - 2 lines for Tool Identity (text + margin)
+  // - 2 lines for Tool Identity (text + margin) (ONLY if not hidden)
+  const overhead = hideToolIdentity ? 4 : 6;
   const availableContentHeight =
     constrainHeight && !isAlternateBuffer
-      ? Math.max(maxHeight - 6, 4)
+      ? Math.max(maxHeight - overhead, 4)
       : undefined;
 
   const borderColor = theme.status.warning;
-  const hideToolIdentity =
-    tool.confirmationDetails?.type === 'ask_user' ||
-    tool.confirmationDetails?.type === 'exit_plan_mode';
 
   return (
     <OverflowProvider>

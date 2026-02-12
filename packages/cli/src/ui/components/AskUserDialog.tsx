@@ -12,6 +12,7 @@ import {
   useEffect,
   useReducer,
   useContext,
+  useState,
 } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
@@ -489,6 +490,8 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
   const bufferWidth = availableWidth - horizontalPadding;
 
+  const [actualQuestionHeight, setActualQuestionHeight] = useState(0);
+
   const questionOptions = useMemo(
     () => question.options ?? [],
     [question.options],
@@ -782,13 +785,24 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   const listHeight = availableHeight
     ? Math.max(1, availableHeight - overhead)
     : undefined;
+
+  // We increase the max allowed height for the question to nearly the full available height.
+  // This avoids premature truncation of the question text.
   const questionHeight =
     listHeight && !isAlternateBuffer
-      ? Math.min(15, Math.max(1, listHeight - DIALOG_PADDING))
+      ? Math.max(1, listHeight - DIALOG_PADDING)
       : undefined;
+
+  // We dynamically calculate how many items to show in the list based on the
+  // ACTUAL height of the question text. If the question is short, we can show
+  // more items. If it's long, we truncate the list to make room for the question.
+  const measuredHeight = Math.min(
+    actualQuestionHeight,
+    questionHeight ?? Infinity,
+  );
   const maxItemsToShow =
     listHeight && questionHeight
-      ? Math.max(1, Math.floor((listHeight - questionHeight) / 2))
+      ? Math.max(1, Math.floor((listHeight - measuredHeight) / 2))
       : selectionItems.length;
 
   return (
@@ -799,6 +813,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
           maxHeight={questionHeight}
           maxWidth={availableWidth}
           overflowDirection="bottom"
+          onHeightChange={setActualQuestionHeight}
         >
           <Box flexDirection="column">
             <MarkdownDisplay

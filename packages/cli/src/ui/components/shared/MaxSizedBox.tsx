@@ -23,6 +23,7 @@ interface MaxSizedBoxProps {
   maxHeight?: number;
   overflowDirection?: 'top' | 'bottom';
   additionalHiddenLinesCount?: number;
+  onHeightChange?: (height: number) => void;
 }
 
 /**
@@ -35,11 +36,16 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
   maxHeight,
   overflowDirection = 'top',
   additionalHiddenLinesCount = 0,
+  onHeightChange,
 }) => {
   const id = useId();
   const { addOverflowingId, removeOverflowingId } = useOverflowActions() || {};
   const observerRef = useRef<ResizeObserver | null>(null);
   const [contentHeight, setContentHeight] = useState(0);
+
+  useEffect(() => {
+    onHeightChange?.(contentHeight);
+  }, [contentHeight, onHeightChange]);
 
   const onRefChange = useCallback(
     (node: DOMElement | null) => {
