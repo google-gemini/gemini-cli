@@ -10,7 +10,7 @@ installation methods, and release types.
   - Windows 11 24H2+
   - Ubuntu 20.04+
 - **Hardware:**
-  - "Casual" usage: 4GB+ RAM (short sessions, asking questions, small edits)
+  - "Casual" usage: 4GB+ RAM (short sessions, common tasks and edits)
   - "Power" usage: 16GB+ RAM (long sessions, large codebases, deep context)
 - **Runtime:** Node.js 20.0.0+
 - **Shell:** Bash or Zsh
@@ -18,45 +18,74 @@ installation methods, and release types.
   [Gemini Code Assist supported locations](https://developers.google.com/gemini-code-assist/resources/available-locations#americas)
 - **Internet connection required**
 
-## How to install and/or run Gemini CLI
+## Install Gemini CLI
 
-There are several ways to run Gemini CLI. The recommended option depends on how
-you intend to use Gemini CLI.
+We recommend most users install Gemini CLI using one of the following
+installation methods:
 
-- As a standard installation. This is the most straightforward method of using
-  Gemini CLI.
-- In a sandbox. This method offers increased security and isolation.
-- From the source. This is recommended for contributors to the project.
+- npm
+- Homebrew
+- MacPorts
+- Anaconda
 
-Gemini CLI comes pre-installed on
+Note that Gemini CLI comes pre-installed on
 [**Cloud Shell**](https://docs.cloud.google.com/shell/docs) and
 [**Cloud Workstations**](https://cloud.google.com/workstations).
 
-### 1. Standard installation (recommended for most users)
+### Install globally with npm
 
-This is the recommended way for end-users to install Gemini CLI. It involves
-downloading the Gemini CLI package from the NPM registry.
+```bash
+npm install -g @google/gemini-cli
+```
 
-- **Global install:**
+### Install globally with Homebrew (macOS/Linux)
 
-  ```bash
-  npm install -g @google/gemini-cli
-  ```
+```bash
+brew install gemini-cli
+```
 
-  Then, run the CLI from anywhere:
+### Install globally with MacPorts (macOS)
 
-  ```bash
-  gemini
-  ```
+```bash
+sudo port install gemini-cli
+```
 
-- **NPX execution:**
+### Install with Anaconda (for restricted environments)
 
-  ```bash
-  # Execute the latest version from NPM without a global install
-  npx @google/gemini-cli
-  ```
+```bash
+# Create and activate a new environment
+conda create -y -n gemini_env -c conda-forge nodejs
+conda activate gemini_env
 
-### 2. Run in a sandbox (Docker/Podman)
+# Install Gemini CLI globally via npm (inside the environment)
+npm install -g @google/gemini-cli
+```
+
+## Run Gemini CLI
+
+For most users, we recommend running Gemini CLI with the `gemini` command:
+
+```bash
+gemini
+```
+
+For a list of options and additional commands, see the
+[CLI cheatsheet](/docs/cli/cli-reference.md).
+
+You can also run Gemini CLI using one of the following advanced methods:
+
+- Run instantly with npx. You can run Gemini CLI without permanent installation.
+- In a sandbox. This method offers increased security and isolation.
+- From the source. This is recommended for contributors to the project.
+
+### Run instantly with npx
+
+```bash
+# Using npx (no installation required)
+npx @google/gemini-cli
+```
+
+### Run in a sandbox (Docker/Podman)
 
 For security and isolation, Gemini CLI can be run inside a container. This is
 the default way that the CLI executes tools that might have side effects.
@@ -75,7 +104,7 @@ the default way that the CLI executes tools that might have side effects.
   gemini --sandbox -y -p "your prompt here"
   ```
 
-### 3. Run from source (recommended for Gemini CLI contributors)
+### Run from source (recommended for Gemini CLI contributors)
 
 Contributors to the project will want to run the CLI directly from the source
 code.
@@ -98,12 +127,41 @@ code.
   gemini
   ```
 
-### 4. Running the latest Gemini CLI commit from GitHub
+## Releases
 
-You can run the most recently committed version of Gemini CLI directly from the
-GitHub repository. This is useful for testing features still in development.
+Gemini CLI has three release channels: nightly, preview, and stable. For most
+users, we recommend the stable release, which is the default installation.
+
+### Stable
+
+New stable releases are published each week. The stable release is the promotion
+of last week's `preview` release along with any bug fixes. The stable release
+uses `latest` tag, but omitting the tag also installs the latest stable release
+by default:
 
 ```bash
-# Execute the CLI directly from the main branch on GitHub
-npx https://github.com/google-gemini/gemini-cli
+# Both commands install the latest stable release.
+npm install -g @google/gemini-cli
+npm install -g @google/gemini-cli@latest
+```
+
+### Preview
+
+New preview releases will be published each week. These releases are not fully
+vetted and may contain regressions or other outstanding issues. Try out the
+preview release by using the `preview` tag:
+
+```bash
+npm install -g @google/gemini-cli@preview
+```
+
+### Nightly
+
+Nightly releases are published every day. The nightly release includes all
+changes from the main branch at time of release. It should be assumed there are
+pending validations and issues. You can help test the latest changes by
+installing with `nightly` tag:
+
+```bash
+npm install -g @google/gemini-cli@nightly
 ```
