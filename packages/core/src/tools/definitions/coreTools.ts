@@ -136,7 +136,7 @@ export const RIP_GREP_DEFINITION: ToolDefinition = {
   base: {
     name: GREP_TOOL_NAME,
     description:
-      'Searches for a regular expression pattern within file contents. Max 100 matches.',
+      'Searches for a regular expression pattern within file contents.',
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -222,7 +222,7 @@ export const WEB_SEARCH_DEFINITION: ToolDefinition = {
   base: {
     name: WEB_SEARCH_TOOL_NAME,
     description:
-      'Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based a query.',
+      'Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based on a query.',
     parametersJsonSchema: {
       type: 'object',
       properties: {
