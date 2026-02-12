@@ -57,12 +57,12 @@ describe('<LoadingIndicator />', () => {
     elapsedTime: 5,
   };
 
-  it('should not render when streamingState is Idle and no loading phrase or thought', () => {
+  it('should render blank when streamingState is Idle and no loading phrase or thought', () => {
     const { lastFrame } = renderWithContext(
       <LoadingIndicator elapsedTime={5} />,
       StreamingState.Idle,
     );
-    expect(lastFrame()).toBe('');
+    expect(lastFrame()?.trim()).toBe('');
   });
 
   it('should render spinner, phrase, and time when streamingState is Responding', () => {
@@ -146,7 +146,7 @@ describe('<LoadingIndicator />', () => {
       <LoadingIndicator elapsedTime={5} />,
       StreamingState.Idle,
     );
-    expect(lastFrame()).toBe(''); // Initial: Idle (no loading phrase)
+    expect(lastFrame()?.trim()).toBe(''); // Initial: Idle (no loading phrase)
 
     // Transition to Responding
     rerender(
@@ -183,7 +183,7 @@ describe('<LoadingIndicator />', () => {
         <LoadingIndicator elapsedTime={5} />
       </StreamingContext.Provider>,
     );
-    expect(lastFrame()).toBe(''); // Idle with no loading phrase
+    expect(lastFrame()?.trim()).toBe(''); // Idle with no loading phrase and no spinner
     unmount();
   });
 
@@ -217,6 +217,7 @@ describe('<LoadingIndicator />', () => {
     const output = lastFrame();
     expect(output).toBeDefined();
     if (output) {
+      expect(output).toContain('💬');
       expect(output).toContain('Thinking about something...');
       expect(output).not.toContain('and other stuff.');
     }
@@ -237,8 +238,21 @@ describe('<LoadingIndicator />', () => {
       StreamingState.Responding,
     );
     const output = lastFrame();
+    expect(output).toContain('💬');
     expect(output).toContain('This should be displayed');
     expect(output).not.toContain('This should not be displayed');
+    unmount();
+  });
+
+  it('should not display thought icon for non-thought loading phrases', () => {
+    const { lastFrame, unmount } = renderWithContext(
+      <LoadingIndicator
+        currentLoadingPhrase="some random tip..."
+        elapsedTime={3}
+      />,
+      StreamingState.Responding,
+    );
+    expect(lastFrame()).not.toContain('💬');
     unmount();
   });
 

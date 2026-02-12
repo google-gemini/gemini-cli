@@ -1132,7 +1132,7 @@ describe('fileUtils', () => {
     it('should save content to a file with safe name', async () => {
       const content = 'some content';
       const toolName = 'shell';
-      const id = '123';
+      const id = 'shell_123';
 
       const result = await saveTruncatedToolOutput(
         content,
@@ -1176,6 +1176,26 @@ describe('fileUtils', () => {
       expect(result.outputFile).toBe(expectedOutputFile);
     });
 
+    it('should not duplicate tool name when id already starts with it', async () => {
+      const content = 'content';
+      const toolName = 'run_shell_command';
+      const id = 'run_shell_command_1707400000000_0';
+
+      const result = await saveTruncatedToolOutput(
+        content,
+        toolName,
+        id,
+        tempRootDir,
+      );
+
+      const expectedOutputFile = path.join(
+        tempRootDir,
+        'tool-outputs',
+        'run_shell_command_1707400000000_0.txt',
+      );
+      expect(result.outputFile).toBe(expectedOutputFile);
+    });
+
     it('should sanitize id in filename', async () => {
       const content = 'content';
       const toolName = 'shell';
@@ -1200,7 +1220,7 @@ describe('fileUtils', () => {
     it('should sanitize sessionId in filename/path', async () => {
       const content = 'content';
       const toolName = 'shell';
-      const id = '1';
+      const id = 'shell_1';
       const sessionId = '../../etc/passwd';
 
       const result = await saveTruncatedToolOutput(

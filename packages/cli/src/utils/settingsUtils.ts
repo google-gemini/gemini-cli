@@ -145,6 +145,7 @@ export function getNestedValue(
     return value;
   }
   if (value && typeof value === 'object' && value !== null) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return getNestedValue(value as Record<string, unknown>, rest);
   }
   return undefined;
@@ -169,12 +170,14 @@ export function getEffectiveValue(
   // Check the current scope's settings first
   let value = getNestedValue(settings as Record<string, unknown>, path);
   if (value !== undefined) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return value as SettingsValue;
   }
 
   // Check the merged settings for an inherited value
   value = getNestedValue(mergedSettings as Record<string, unknown>, path);
   if (value !== undefined) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return value as SettingsValue;
   }
 
@@ -354,6 +357,7 @@ function setNestedValue(
     obj[first] = {};
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   setNestedValue(obj[first] as Record<string, unknown>, rest, value);
   return obj;
 }

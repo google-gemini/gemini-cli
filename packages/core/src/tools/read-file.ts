@@ -26,6 +26,7 @@ import {
   isPreviewModel,
   supportsMultimodalFunctionResponse,
 } from '../config/models.js';
+import { READ_FILE_DEFINITION } from './definitions/coreTools.js';
 
 /**
  * Parameters for the ReadFile tool
@@ -99,7 +100,10 @@ class ReadFileToolInvocation extends BaseToolInvocation<
       supportsMultimodalFunctionResponse(activeModel) ||
       isPreviewModel(activeModel);
 
-    const validationError = this.config.validatePathAccess(this.resolvedPath);
+    const validationError = this.config.validatePathAccess(
+      this.resolvedPath,
+      'read',
+    );
     if (validationError) {
       return {
         llmContent: validationError,
@@ -208,28 +212,9 @@ export class ReadFileTool extends BaseDeclarativeTool<
     super(
       ReadFileTool.Name,
       'ReadFile',
-      '', // Description is dynamic in getter
+      READ_FILE_DEFINITION.base.description!,
       Kind.Read,
-      {
-        properties: {
-          file_path: {
-            description: 'The path to the file to read.',
-            type: 'string',
-          },
-          offset: {
-            description:
-              "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
-            type: 'number',
-          },
-          limit: {
-            description:
-              "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
-            type: 'number',
-          },
-        },
-        required: ['file_path'],
-        type: 'object',
-      },
+      READ_FILE_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true,
       false,
@@ -240,8 +225,8 @@ export class ReadFileTool extends BaseDeclarativeTool<
     );
   }
 
-  override get schema(): FunctionDeclaration {
-    const activeModel = this.config.getActiveModel();
+  override getSchema(modelId?: string): FunctionDeclaration {
+    const activeModel = modelId ?? this.config.getActiveModel();
     const isGemini3 =
       supportsMultimodalFunctionResponse(activeModel) ||
       isPreviewModel(activeModel);
@@ -301,7 +286,10 @@ export class ReadFileTool extends BaseDeclarativeTool<
       params.file_path,
     );
 
-    const validationError = this.config.validatePathAccess(resolvedPath);
+    const validationError = this.config.validatePathAccess(
+      resolvedPath,
+      'read',
+    );
     if (validationError) {
       return validationError;
     }

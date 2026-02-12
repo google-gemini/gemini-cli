@@ -17,6 +17,8 @@ import { ToolErrorType } from './tool-error.js';
 import { GLOB_TOOL_NAME } from './tool-names.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { GLOB_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 // Subset of 'Path' interface provided by 'glob' that we can implement for testing
 export interface GlobPath {
@@ -123,8 +125,10 @@ class GlobToolInvocation extends BaseToolInvocation<
           this.config.getTargetDir(),
           this.params.dir_path,
         );
-        const validationError =
-          this.config.validatePathAccess(searchDirAbsolute);
+        const validationError = this.config.validatePathAccess(
+          searchDirAbsolute,
+          'read',
+        );
         if (validationError) {
           return {
             llmContent: validationError,
@@ -268,39 +272,9 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
     super(
       GlobTool.Name,
       'FindFiles',
-      'Finds files matching glob patterns (e.g., `src/**/*.ts`). Results are sorted by modification time (newest first). Ideal for structural discovery and identifying recent changes. **Avoid using this tool just to list files before reading them;** if you know the symbols you need, use `grep_search` directly.',
+      GLOB_DEFINITION.base.description!,
       Kind.Search,
-      {
-        properties: {
-          pattern: {
-            description:
-              "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
-            type: 'string',
-          },
-          dir_path: {
-            description:
-              'Optional: The absolute path to the directory to search within. If omitted, searches the root directory.',
-            type: 'string',
-          },
-          case_sensitive: {
-            description:
-              'Optional: Whether the search should be case-sensitive. Defaults to false.',
-            type: 'boolean',
-          },
-          respect_git_ignore: {
-            description:
-              'Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.',
-            type: 'boolean',
-          },
-          respect_gemini_ignore: {
-            description:
-              'Optional: Whether to respect .geminiignore patterns when finding files. Defaults to true.',
-            type: 'boolean',
-          },
-        },
-        required: ['pattern'],
-        type: 'object',
-      },
+      GLOB_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true,
       false,
@@ -318,7 +292,10 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
       params.dir_path || '.',
     );
 
-    const validationError = this.config.validatePathAccess(searchDirAbsolute);
+    const validationError = this.config.validatePathAccess(
+      searchDirAbsolute,
+      'read',
+    );
     if (validationError) {
       return validationError;
     }
@@ -359,5 +336,9 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
       _toolName,
       _toolDisplayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(GLOB_DEFINITION, modelId);
   }
 }

@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -20,7 +20,7 @@ import { cleanup } from 'ink-testing-library';
 import { act, useContext, type ReactElement } from 'react';
 import { AppContainer } from './AppContainer.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
-import { type TrackedToolCall } from './hooks/useReactToolScheduler.js';
+import { type TrackedToolCall } from './hooks/useToolScheduler.js';
 import {
   type Config,
   makeFakeConfig,
@@ -84,7 +84,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 import ansiEscapes from 'ansi-escapes';
-import { type LoadedSettings, mergeSettings } from '../config/settings.js';
+import { mergeSettings, type LoadedSettings } from '../config/settings.js';
 import type { InitializationResult } from '../core/initializer.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
@@ -92,6 +92,7 @@ import {
   UIActionsContext,
   type UIActions,
 } from './contexts/UIActionsContext.js';
+import { KeypressProvider } from './contexts/KeypressContext.js';
 
 // Mock useStdout to capture terminal title writes
 vi.mock('ink', async (importOriginal) => {
@@ -133,7 +134,6 @@ vi.mock('./hooks/useGeminiStream.js');
 vi.mock('./hooks/vim.js');
 vi.mock('./hooks/useFocus.js');
 vi.mock('./hooks/useBracketedPaste.js');
-vi.mock('./hooks/useKeypress.js');
 vi.mock('./hooks/useLoadingIndicator.js');
 vi.mock('./hooks/useFolderTrust.js');
 vi.mock('./hooks/useIdeTrustListener.js');
@@ -145,13 +145,30 @@ vi.mock('./contexts/SessionContext.js');
 vi.mock('./components/shared/text-buffer.js');
 vi.mock('./hooks/useLogger.js');
 vi.mock('./hooks/useInputHistoryStore.js');
+vi.mock('./hooks/atCommandProcessor.js');
 vi.mock('./hooks/useHookDisplayState.js');
+vi.mock('./hooks/useBanner.js', () => ({
+  useBanner: vi.fn((bannerData) => ({
+    bannerText: (
+      bannerData.warningText ||
+      bannerData.defaultText ||
+      ''
+    ).replace(/\\n/g, '\n'),
+  })),
+}));
+vi.mock('./hooks/useShellInactivityStatus.js', () => ({
+  useShellInactivityStatus: vi.fn(() => ({
+    shouldShowFocusHint: false,
+    inactivityStatus: 'none',
+  })),
+}));
 vi.mock('./hooks/useTerminalTheme.js', () => ({
   useTerminalTheme: vi.fn(),
 }));
 
 import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
+import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
 
 // Mock external utilities
 vi.mock('../utils/events.js');
@@ -180,7 +197,7 @@ import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
-import { useKeypress, type Key } from './hooks/useKeypress.js';
+import { useKeypress } from './hooks/useKeypress.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import {
@@ -215,13 +232,15 @@ describe('AppContainer State Management', () => {
     resumedSessionData?: ResumedSessionData;
   } = {}) => (
     <SettingsContext.Provider value={settings}>
-      <AppContainer
-        config={config}
-        version={version}
-        initializationResult={initResult}
-        startupWarnings={startupWarnings}
-        resumedSessionData={resumedSessionData}
-      />
+      <KeypressProvider config={config}>
+        <AppContainer
+          config={config}
+          version={version}
+          initializationResult={initResult}
+          startupWarnings={startupWarnings}
+          resumedSessionData={resumedSessionData}
+        />
+      </KeypressProvider>
     </SettingsContext.Provider>
   );
 
@@ -251,10 +270,10 @@ describe('AppContainer State Management', () => {
   const mockedUseTextBuffer = useTextBuffer as Mock;
   const mockedUseLogger = useLogger as Mock;
   const mockedUseLoadingIndicator = useLoadingIndicator as Mock;
-  const mockedUseKeypress = useKeypress as Mock;
   const mockedUseInputHistoryStore = useInputHistoryStore as Mock;
   const mockedUseHookDisplayState = useHookDisplayState as Mock;
   const mockedUseTerminalTheme = useTerminalTheme as Mock;
+  const mockedUseShellInactivityStatus = useShellInactivityStatus as Mock;
 
   const DEFAULT_GEMINI_STREAM_MOCK = {
     streamingState: 'idle',
@@ -384,6 +403,10 @@ describe('AppContainer State Management', () => {
     });
     mockedUseHookDisplayState.mockReturnValue([]);
     mockedUseTerminalTheme.mockReturnValue(undefined);
+    mockedUseShellInactivityStatus.mockReturnValue({
+      shouldShowFocusHint: false,
+      inactivityStatus: 'none',
+    });
 
     // Mock Config
     mockConfig = makeFakeConfig();
@@ -950,7 +973,7 @@ describe('AppContainer State Management', () => {
       });
       await waitFor(() => {
         // Assert that the context value is as expected
-        expect(capturedUIState.proQuotaRequest).toBeNull();
+        expect(capturedUIState.quota.proQuotaRequest).toBeNull();
       });
       unmount!();
     });
@@ -975,7 +998,7 @@ describe('AppContainer State Management', () => {
       });
       await waitFor(() => {
         // Assert: The mock request is correctly passed through the context
-        expect(capturedUIState.proQuotaRequest).toEqual(mockRequest);
+        expect(capturedUIState.quota.proQuotaRequest).toEqual(mockRequest);
       });
       unmount!();
     });
@@ -1246,8 +1269,15 @@ describe('AppContainer State Management', () => {
     });
 
     describe('Shell Focus Action Required', () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         vi.useFakeTimers();
+        // Use real implementation for these tests to verify title updates
+        const actual = await vi.importActual<
+          typeof import('./hooks/useShellInactivityStatus.js')
+        >('./hooks/useShellInactivityStatus.js');
+        mockedUseShellInactivityStatus.mockImplementation(
+          actual.useShellInactivityStatus,
+        );
       });
 
       afterEach(() => {
@@ -1741,47 +1771,36 @@ describe('AppContainer State Management', () => {
   });
 
   describe('Keyboard Input Handling (CTRL+C / CTRL+D)', () => {
-    let handleGlobalKeypress: (key: Key) => boolean;
     let mockHandleSlashCommand: Mock;
     let mockCancelOngoingRequest: Mock;
     let rerender: () => void;
     let unmount: () => void;
+    let stdin: ReturnType<typeof render>['stdin'];
 
     // Helper function to reduce boilerplate in tests
     const setupKeypressTest = async () => {
       const renderResult = renderAppContainer();
+      stdin = renderResult.stdin;
       await act(async () => {
         vi.advanceTimersByTime(0);
       });
 
-      rerender = () => renderResult.rerender(getAppContainer());
+      rerender = () => {
+        renderResult.rerender(getAppContainer());
+      };
       unmount = renderResult.unmount;
     };
 
-    const pressKey = (key: Partial<Key>, times = 1) => {
+    const pressKey = (sequence: string, times = 1) => {
       for (let i = 0; i < times; i++) {
         act(() => {
-          handleGlobalKeypress({
-            name: 'c',
-            shift: false,
-            alt: false,
-            ctrl: false,
-            cmd: false,
-            ...key,
-          } as Key);
+          stdin.write(sequence);
         });
         rerender();
       }
     };
 
     beforeEach(() => {
-      // Capture the keypress handler from the AppContainer
-      mockedUseKeypress.mockImplementation(
-        (callback: (key: Key) => boolean) => {
-          handleGlobalKeypress = callback;
-        },
-      );
-
       // Mock slash command handler
       mockHandleSlashCommand = vi.fn();
       mockedUseSlashCommandProcessor.mockReturnValue({
@@ -1826,7 +1845,7 @@ describe('AppContainer State Management', () => {
         });
         await setupKeypressTest();
 
-        pressKey({ name: 'c', ctrl: true });
+        pressKey('\x03'); // Ctrl+C
 
         expect(mockCancelOngoingRequest).toHaveBeenCalledTimes(1);
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
@@ -1836,7 +1855,7 @@ describe('AppContainer State Management', () => {
       it('should quit on second press', async () => {
         await setupKeypressTest();
 
-        pressKey({ name: 'c', ctrl: true }, 2);
+        pressKey('\x03', 2); // Ctrl+C
 
         expect(mockCancelOngoingRequest).toHaveBeenCalledTimes(2);
         expect(mockHandleSlashCommand).toHaveBeenCalledWith(
@@ -1851,7 +1870,7 @@ describe('AppContainer State Management', () => {
       it('should reset press count after a timeout', async () => {
         await setupKeypressTest();
 
-        pressKey({ name: 'c', ctrl: true });
+        pressKey('\x03'); // Ctrl+C
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
 
         // Advance timer past the reset threshold
@@ -1859,7 +1878,7 @@ describe('AppContainer State Management', () => {
           vi.advanceTimersByTime(WARNING_PROMPT_DURATION_MS + 1);
         });
 
-        pressKey({ name: 'c', ctrl: true });
+        pressKey('\x03'); // Ctrl+C
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
         unmount();
       });
@@ -1869,7 +1888,7 @@ describe('AppContainer State Management', () => {
       it('should quit on second press if buffer is empty', async () => {
         await setupKeypressTest();
 
-        pressKey({ name: 'd', ctrl: true }, 2);
+        pressKey('\x04', 2); // Ctrl+D
 
         expect(mockHandleSlashCommand).toHaveBeenCalledWith(
           '/quit',
@@ -1880,7 +1899,7 @@ describe('AppContainer State Management', () => {
         unmount();
       });
 
-      it('should NOT quit if buffer is not empty (bubbles from InputPrompt)', async () => {
+      it('should NOT quit if buffer is not empty', async () => {
         mockedUseTextBuffer.mockReturnValue({
           text: 'some text',
           setText: vi.fn(),
@@ -1890,30 +1909,12 @@ describe('AppContainer State Management', () => {
         });
         await setupKeypressTest();
 
-        // Capture return value
-        let result = true;
-        const originalPressKey = (key: Partial<Key>) => {
-          act(() => {
-            result = handleGlobalKeypress({
-              name: 'd',
-              shift: false,
-              alt: false,
-              ctrl: true,
-              cmd: false,
-              ...key,
-            } as Key);
-          });
-          rerender();
-        };
+        pressKey('\x04'); // Ctrl+D
 
-        originalPressKey({ name: 'd', ctrl: true });
-
-        // AppContainer's handler should return true if it reaches it
-        expect(result).toBe(true);
-        // But it should only be called once, so count is 1, not quitting yet.
+        // Should only be called once, so count is 1, not quitting yet.
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
 
-        originalPressKey({ name: 'd', ctrl: true });
+        pressKey('\x04'); // Ctrl+D
         // Now count is 2, it should quit.
         expect(mockHandleSlashCommand).toHaveBeenCalledWith(
           '/quit',
@@ -1927,7 +1928,7 @@ describe('AppContainer State Management', () => {
       it('should reset press count after a timeout', async () => {
         await setupKeypressTest();
 
-        pressKey({ name: 'd', ctrl: true });
+        pressKey('\x04'); // Ctrl+D
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
 
         // Advance timer past the reset threshold
@@ -1935,7 +1936,7 @@ describe('AppContainer State Management', () => {
           vi.advanceTimersByTime(WARNING_PROMPT_DURATION_MS + 1);
         });
 
-        pressKey({ name: 'd', ctrl: true });
+        pressKey('\x04'); // Ctrl+D
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
         unmount();
       });
@@ -1953,7 +1954,7 @@ describe('AppContainer State Management', () => {
       it('should focus shell input on Tab', async () => {
         await setupKeypressTest();
 
-        pressKey({ name: 'tab', shift: false });
+        pressKey('\t');
 
         expect(capturedUIState.embeddedShellFocused).toBe(true);
         unmount();
@@ -1963,11 +1964,11 @@ describe('AppContainer State Management', () => {
         await setupKeypressTest();
 
         // Focus first
-        pressKey({ name: 'tab', shift: false });
+        pressKey('\t');
         expect(capturedUIState.embeddedShellFocused).toBe(true);
 
         // Unfocus via Shift+Tab
-        pressKey({ name: 'tab', shift: true });
+        pressKey('\x1b[Z');
         expect(capturedUIState.embeddedShellFocused).toBe(false);
         unmount();
       });
@@ -1986,13 +1987,7 @@ describe('AppContainer State Management', () => {
 
         // Focus it
         act(() => {
-          handleGlobalKeypress({
-            name: 'tab',
-            shift: false,
-            alt: false,
-            ctrl: false,
-            cmd: false,
-          } as Key);
+          renderResult.stdin.write('\t');
         });
         expect(capturedUIState.embeddedShellFocused).toBe(true);
 
@@ -2027,7 +2022,7 @@ describe('AppContainer State Management', () => {
         expect(capturedUIState.embeddedShellFocused).toBe(false);
 
         // Press Tab
-        pressKey({ name: 'tab', shift: false });
+        pressKey('\t');
 
         // Should be focused
         expect(capturedUIState.embeddedShellFocused).toBe(true);
@@ -2055,7 +2050,7 @@ describe('AppContainer State Management', () => {
         expect(capturedUIState.embeddedShellFocused).toBe(false);
 
         // Press Ctrl+B
-        pressKey({ name: 'b', ctrl: true });
+        pressKey('\x02');
 
         // Should have toggled (closed) the shell
         expect(mockToggleBackgroundShell).toHaveBeenCalled();
@@ -2084,7 +2079,7 @@ describe('AppContainer State Management', () => {
         });
 
         // Press Ctrl+B
-        pressKey({ name: 'b', ctrl: true });
+        pressKey('\x02');
 
         // Should have toggled (shown) the shell
         expect(mockToggleBackgroundShell).toHaveBeenCalled();
@@ -2097,11 +2092,14 @@ describe('AppContainer State Management', () => {
   });
 
   describe('Copy Mode (CTRL+S)', () => {
-    let handleGlobalKeypress: (key: Key) => boolean;
     let rerender: () => void;
     let unmount: () => void;
+    let stdin: ReturnType<typeof render>['stdin'];
 
-    const setupCopyModeTest = async (isAlternateMode = false) => {
+    const setupCopyModeTest = async (
+      isAlternateMode = false,
+      childHandler?: Mock,
+    ) => {
       // Update settings for this test run
       const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const testSettings = {
@@ -2115,23 +2113,39 @@ describe('AppContainer State Management', () => {
         },
       } as unknown as LoadedSettings;
 
-      const renderResult = renderAppContainer({ settings: testSettings });
+      function TestChild() {
+        useKeypress(childHandler || (() => {}), {
+          isActive: !!childHandler,
+          priority: true,
+        });
+        return null;
+      }
+
+      const getTree = (settings: LoadedSettings) => (
+        <SettingsContext.Provider value={settings}>
+          <KeypressProvider config={mockConfig}>
+            <AppContainer
+              config={mockConfig}
+              version="1.0.0"
+              initializationResult={mockInitResult}
+            />
+            <TestChild />
+          </KeypressProvider>
+        </SettingsContext.Provider>
+      );
+
+      const renderResult = render(getTree(testSettings));
+      stdin = renderResult.stdin;
       await act(async () => {
         vi.advanceTimersByTime(0);
       });
 
-      rerender = () =>
-        renderResult.rerender(getAppContainer({ settings: testSettings }));
+      rerender = () => renderResult.rerender(getTree(testSettings));
       unmount = renderResult.unmount;
     };
 
     beforeEach(() => {
       mocks.mockStdout.write.mockClear();
-      mockedUseKeypress.mockImplementation(
-        (callback: (key: Key) => boolean) => {
-          handleGlobalKeypress = callback;
-        },
-      );
       vi.useFakeTimers();
     });
 
@@ -2157,15 +2171,7 @@ describe('AppContainer State Management', () => {
         mocks.mockStdout.write.mockClear(); // Clear initial enable call
 
         act(() => {
-          handleGlobalKeypress({
-            name: 's',
-            shift: false,
-            alt: false,
-            ctrl: true,
-            cmd: false,
-            insertable: false,
-            sequence: '\x13',
-          });
+          stdin.write('\x13'); // Ctrl+S
         });
         rerender();
 
@@ -2184,30 +2190,14 @@ describe('AppContainer State Management', () => {
 
           // Turn it on (disable mouse)
           act(() => {
-            handleGlobalKeypress({
-              name: 's',
-              shift: false,
-              alt: false,
-              ctrl: true,
-              cmd: false,
-              insertable: false,
-              sequence: '\x13',
-            });
+            stdin.write('\x13'); // Ctrl+S
           });
           rerender();
           expect(disableMouseEvents).toHaveBeenCalled();
 
           // Turn it off (enable mouse)
           act(() => {
-            handleGlobalKeypress({
-              name: 'any', // Any key should exit copy mode
-              shift: false,
-              alt: false,
-              ctrl: false,
-              cmd: false,
-              insertable: true,
-              sequence: 'a',
-            });
+            stdin.write('a'); // Any key should exit copy mode
           });
           rerender();
 
@@ -2220,15 +2210,7 @@ describe('AppContainer State Management', () => {
 
           // Enter copy mode
           act(() => {
-            handleGlobalKeypress({
-              name: 's',
-              shift: false,
-              alt: false,
-              ctrl: true,
-              cmd: false,
-              insertable: false,
-              sequence: '\x13',
-            });
+            stdin.write('\x13'); // Ctrl+S
           });
           rerender();
 
@@ -2236,19 +2218,42 @@ describe('AppContainer State Management', () => {
 
           // Press any other key
           act(() => {
-            handleGlobalKeypress({
-              name: 'a',
-              shift: false,
-              alt: false,
-              ctrl: false,
-              cmd: false,
-              insertable: true,
-              sequence: 'a',
-            });
+            stdin.write('a');
           });
           rerender();
 
           // Should have re-enabled mouse
+          expect(enableMouseEvents).toHaveBeenCalled();
+          unmount();
+        });
+
+        it('should have higher priority than other priority listeners when enabled', async () => {
+          // 1. Initial state with a child component's priority listener (already subscribed)
+          // It should NOT handle Ctrl+S so we can enter copy mode.
+          const childHandler = vi.fn().mockReturnValue(false);
+          await setupCopyModeTest(true, childHandler);
+
+          // 2. Enter copy mode
+          act(() => {
+            stdin.write('\x13'); // Ctrl+S
+          });
+          rerender();
+
+          // 3. Verify we are in copy mode
+          expect(disableMouseEvents).toHaveBeenCalled();
+
+          // 4. Press any key
+          childHandler.mockClear();
+          // Now childHandler should return true for other keys, simulating a greedy listener
+          childHandler.mockReturnValue(true);
+
+          act(() => {
+            stdin.write('a');
+          });
+          rerender();
+
+          // 5. Verify that the exit handler took priority and childHandler was NOT called
+          expect(childHandler).not.toHaveBeenCalled();
           expect(enableMouseEvents).toHaveBeenCalled();
           unmount();
         });
@@ -2733,5 +2738,68 @@ describe('AppContainer State Management', () => {
       expect(clearTerminalCalls).toHaveLength(0);
       compUnmount();
     });
+  });
+
+  describe('Permission Handling', () => {
+    it('shows permission dialog when checkPermissions returns paths', async () => {
+      const { checkPermissions } = await import(
+        './hooks/atCommandProcessor.js'
+      );
+      vi.mocked(checkPermissions).mockResolvedValue(['/test/file.txt']);
+
+      let unmount: () => void;
+      await act(async () => (unmount = renderAppContainer().unmount));
+
+      await waitFor(() => expect(capturedUIActions).toBeTruthy());
+
+      await act(async () =>
+        capturedUIActions.handleFinalSubmit('read @file.txt'),
+      );
+
+      expect(capturedUIState.permissionConfirmationRequest).not.toBeNull();
+      expect(capturedUIState.permissionConfirmationRequest?.files).toEqual([
+        '/test/file.txt',
+      ]);
+      await act(async () => unmount!());
+    });
+
+    it.each([true, false])(
+      'handles permissions when allowed is %s',
+      async (allowed) => {
+        const { checkPermissions } = await import(
+          './hooks/atCommandProcessor.js'
+        );
+        vi.mocked(checkPermissions).mockResolvedValue(['/test/file.txt']);
+        const addReadOnlyPathSpy = vi.spyOn(
+          mockConfig.getWorkspaceContext(),
+          'addReadOnlyPath',
+        );
+        const { submitQuery } = mockedUseGeminiStream();
+
+        let unmount: () => void;
+        await act(async () => (unmount = renderAppContainer().unmount));
+
+        await waitFor(() => expect(capturedUIActions).toBeTruthy());
+
+        await act(async () =>
+          capturedUIActions.handleFinalSubmit('read @file.txt'),
+        );
+
+        await act(async () =>
+          capturedUIState.permissionConfirmationRequest?.onComplete({
+            allowed,
+          }),
+        );
+
+        if (allowed) {
+          expect(addReadOnlyPathSpy).toHaveBeenCalledWith('/test/file.txt');
+        } else {
+          expect(addReadOnlyPathSpy).not.toHaveBeenCalled();
+        }
+        expect(submitQuery).toHaveBeenCalledWith('read @file.txt');
+        expect(capturedUIState.permissionConfirmationRequest).toBeNull();
+        await act(async () => unmount!());
+      },
+    );
   });
 });

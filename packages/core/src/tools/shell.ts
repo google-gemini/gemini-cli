@@ -43,6 +43,8 @@ import {
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { getShellDefinition } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -451,42 +453,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 }
 
-function getShellToolDescription(enableInteractiveShell: boolean): string {
-  const returnedInfo = `
-
-      The following information is returned:
-
-      Output: Combined stdout/stderr. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Exit Code: Only included if non-zero (command failed).
-      Error: Only included if a process-level error occurred (e.g., spawn failure).
-      Signal: Only included if process was terminated by a signal.
-      Background PIDs: Only included if background processes were started.
-      Process Group PGID: Only included if available.`;
-
-  const efficiencyGuidance =
-    "Output is limited to the last 2,000 lines. **This is the preferred tool for surgical extraction of code blocks.** Use `sed -n '50,100p' file` for ranges, or `sed -n '/class X/,/^}/p' file` for semantic blocks. Avoid 'cat' on large files to prevent context bloat.";
-
-  if (os.platform() === 'win32') {
-    const backgroundInstructions = enableInteractiveShell
-      ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use PowerShell background constructs.'
-      : 'Command can start background processes using PowerShell constructs such as `Start-Process -NoNewWindow` or `Start-Job`.';
-    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. ${backgroundInstructions} ${efficiencyGuidance}${returnedInfo}`;
-  } else {
-    const backgroundInstructions = enableInteractiveShell
-      ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use `&` to background commands.'
-      : 'Command can start background processes using `&`.';
-    return `This tool executes a given shell command as \`bash -c <command>\`. ${backgroundInstructions} Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`. ${efficiencyGuidance}${returnedInfo}`;
-  }
-}
-
-function getCommandDescription(): string {
-  if (os.platform() === 'win32') {
-    return 'Exact command to execute as `powershell.exe -NoProfile -Command <command>`';
-  } else {
-    return 'Exact bash command to execute as `bash -c <command>`';
-  }
-}
-
 export class ShellTool extends BaseDeclarativeTool<
   ShellToolParams,
   ToolResult
@@ -500,36 +466,16 @@ export class ShellTool extends BaseDeclarativeTool<
     void initializeShellParsers().catch(() => {
       // Errors are surfaced when parsing commands.
     });
+    const definition = getShellDefinition(
+      config.getEnableInteractiveShell(),
+      config.getEnableShellOutputEfficiency(),
+    );
     super(
       ShellTool.Name,
       'Shell',
-      getShellToolDescription(config.getEnableInteractiveShell()),
+      definition.base.description!,
       Kind.Execute,
-      {
-        type: 'object',
-        properties: {
-          command: {
-            type: 'string',
-            description: getCommandDescription(),
-          },
-          description: {
-            type: 'string',
-            description:
-              'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.',
-          },
-          dir_path: {
-            type: 'string',
-            description:
-              '(OPTIONAL) The path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
-          },
-          is_background: {
-            type: 'boolean',
-            description:
-              'Set to true if this command should be run in the background (e.g. for long-running servers or watchers). The command will be started, allowed to run for a brief moment to check for immediate errors, and then moved to the background.',
-          },
-        },
-        required: ['command'],
-      },
+      definition.base.parametersJsonSchema,
       messageBus,
       false, // output is not markdown
       true, // output can be updated
@@ -566,5 +512,13 @@ export class ShellTool extends BaseDeclarativeTool<
       _toolName,
       _toolDisplayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    const definition = getShellDefinition(
+      this.config.getEnableInteractiveShell(),
+      this.config.getEnableShellOutputEfficiency(),
+    );
+    return resolveToolDeclaration(definition, modelId);
   }
 }

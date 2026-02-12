@@ -385,3 +385,9 @@ exports[`<HistoryItemDisplay /> > renders InfoMessage for "info" type with multi
   ⚡ Line 2
   ⚡ Line 3"
 `;
+
+exports[`<HistoryItemDisplay /> > thinking items > renders thinking item when enabled 1`] = `
+"   Thinking
+ │ test
+"
+`;

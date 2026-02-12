@@ -636,7 +636,9 @@ export async function saveTruncatedToolOutput(
 ): Promise<{ outputFile: string }> {
   const safeToolName = sanitizeFilenamePart(toolName).toLowerCase();
   const safeId = sanitizeFilenamePart(id.toString()).toLowerCase();
-  const fileName = `${safeToolName}_${safeId}.txt`;
+  const fileName = safeId.startsWith(safeToolName)
+    ? `${safeId}.txt`
+    : `${safeToolName}_${safeId}.txt`;
 
   let toolOutputDir = path.join(projectTempDir, TOOL_OUTPUTS_DIR);
   if (sessionId) {
