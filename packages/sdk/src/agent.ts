@@ -122,6 +122,15 @@ export class GeminiCliAgent {
 
           // Cast toolCall.args to object to satisfy AnyDeclarativeTool.build
           const invocation = tool.build(args as object);
+
+          // Check if the tool execution requires confirmation according to policy
+          const confirmation = await invocation.shouldConfirmExecute(signal);
+          if (confirmation) {
+            throw new Error(
+              `Tool execution for '${toolCall.name}' requires confirmation, which is not supported in this SDK version.`,
+            );
+          }
+
           const result = await invocation.execute(signal);
 
           functionResponses.push({
