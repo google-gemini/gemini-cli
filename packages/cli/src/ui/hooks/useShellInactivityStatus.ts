@@ -12,7 +12,7 @@ import {
   SHELL_SILENT_WORKING_TITLE_DELAY_MS,
 } from '../constants.js';
 import type { StreamingState } from '../types.js';
-import { type TrackedToolCall } from './useReactToolScheduler.js';
+import { type TrackedToolCall } from './useToolScheduler.js';
 
 interface ShellInactivityStatusProps {
   activePtyId: number | string | null | undefined;
