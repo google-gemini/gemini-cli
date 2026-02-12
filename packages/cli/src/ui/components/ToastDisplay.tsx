@@ -13,7 +13,6 @@ import { TransientMessageType } from '../../utils/events.js';
 export function shouldShowToast(uiState: UIState): boolean {
   return (
     uiState.ctrlCPressedOnce ||
-    uiState.ctrlSPressed ||
     Boolean(uiState.transientMessage) ||
     uiState.ctrlDPressedOnce ||
     (uiState.showEscapePrompt &&
@@ -28,14 +27,6 @@ export const ToastDisplay: React.FC = () => {
   if (uiState.ctrlCPressedOnce) {
     return (
       <Text color={theme.status.warning}>Press Ctrl+C again to exit.</Text>
-    );
-  }
-
-  if (uiState.ctrlSPressed) {
-    return (
-      <Text color={theme.status.warning}>
-        Use Ctrl+O to expand and collapse blocks of content.
-      </Text>
     );
   }
 
