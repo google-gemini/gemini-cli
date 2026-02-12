@@ -197,7 +197,8 @@ import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
-import { useKeypress } from './hooks/useKeypress.js';
+import { useKeypress, type Key } from './hooks/useKeypress.js';
+import * as useKeypressModule from './hooks/useKeypress.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import {
@@ -2093,6 +2094,7 @@ describe('AppContainer State Management', () => {
 
   describe('Shortcuts Help Visibility', () => {
     let handleGlobalKeypress: (key: Key) => boolean;
+    let mockedUseKeypress: Mock;
     let rerender: () => void;
     let unmount: () => void;
 
@@ -2122,6 +2124,7 @@ describe('AppContainer State Management', () => {
     };
 
     beforeEach(() => {
+      mockedUseKeypress = vi.spyOn(useKeypressModule, 'useKeypress') as Mock;
       mockedUseKeypress.mockImplementation(
         (callback: (key: Key) => boolean) => {
           handleGlobalKeypress = callback;
@@ -2131,6 +2134,7 @@ describe('AppContainer State Management', () => {
     });
 
     afterEach(() => {
+      mockedUseKeypress.mockRestore();
       vi.useRealTimers();
       vi.restoreAllMocks();
     });
