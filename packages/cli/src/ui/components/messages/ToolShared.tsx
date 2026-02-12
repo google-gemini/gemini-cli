@@ -18,7 +18,7 @@ import { theme } from '../../semantic-colors.js';
 import {
   type Config,
   SHELL_TOOL_NAME,
-  ASK_USER_DISPLAY_NAME,
+  isCompletedAskUserTool,
   type ToolResultDisplay,
 } from '@google/gemini-cli-core';
 import { useInactivityTimer } from '../../hooks/useInactivityTimer.js';
@@ -205,13 +205,7 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
   }, [emphasis]);
 
   // Hide description for completed Ask User tools (the result display speaks for itself)
-  const isCompletedAskUser =
-    name === ASK_USER_DISPLAY_NAME &&
-    [
-      ToolCallStatus.Success,
-      ToolCallStatus.Error,
-      ToolCallStatus.Canceled,
-    ].includes(status);
+  const isCompletedAskUser = isCompletedAskUserTool(name, status);
 
   return (
     <Box overflow="hidden" height={1} flexGrow={1} flexShrink={1}>
