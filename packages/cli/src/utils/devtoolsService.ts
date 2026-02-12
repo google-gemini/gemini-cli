@@ -19,7 +19,7 @@ interface IDevTools {
   getPort(): number;
 }
 
-const DEVTOOLS_PKG = 'gemini-cli-devtools';
+const DEVTOOLS_PKG = '@google/gemini-cli-devtools';
 const DEFAULT_DEVTOOLS_PORT = 25417;
 const DEFAULT_DEVTOOLS_HOST = '127.0.0.1';
 const MAX_PROMOTION_ATTEMPTS = 3;
