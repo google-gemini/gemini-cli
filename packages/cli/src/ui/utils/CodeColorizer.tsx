@@ -20,7 +20,7 @@ import {
   MaxSizedBox,
   MINIMUM_MAX_HEIGHT,
 } from '../components/shared/MaxSizedBox.js';
-import type { LoadedSettings } from '../../config/settings.js';
+import type { MergedSettings } from '../../config/settings.js';
 import { debugLogger } from '@google/gemini-cli-core';
 import { isAlternateBufferEnabled } from '../hooks/useAlternateBuffer.js';
 
@@ -131,7 +131,7 @@ export interface ColorizeCodeOptions {
   availableHeight?: number;
   maxWidth: number;
   theme?: Theme | null;
-  settings: LoadedSettings;
+  settings: MergedSettings;
   hideLineNumbers?: boolean;
   disableColor?: boolean;
 }
@@ -154,9 +154,7 @@ export function colorizeCode({
 }: ColorizeCodeOptions): React.ReactNode {
   const codeToHighlight = code.replace(/\n$/, '');
   const activeTheme = theme || themeManager.getActiveTheme();
-  const showLineNumbers = hideLineNumbers
-    ? false
-    : settings.merged.ui.showLineNumbers;
+  const showLineNumbers = hideLineNumbers ? false : settings.ui.showLineNumbers;
 
   const useMaxSizedBox = !isAlternateBufferEnabled(settings);
   try {

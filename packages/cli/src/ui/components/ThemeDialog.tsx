@@ -365,7 +365,7 @@ def fibonacci(n):
                     availableHeight:
                       isAlternateBuffer === false ? codeBlockHeight : undefined,
                     maxWidth: colorizeCodeWidth,
-                    settings,
+                    settings: settings.merged,
                   })}
                   <Box marginTop={1} />
                   <DiffRenderer

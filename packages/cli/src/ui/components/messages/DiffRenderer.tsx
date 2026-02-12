@@ -170,7 +170,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
         availableHeight: availableTerminalHeight,
         maxWidth: terminalWidth,
         theme,
-        settings,
+        settings: settings.merged,
         disableColor,
       });
     } else {

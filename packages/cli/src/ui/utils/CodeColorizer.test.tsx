@@ -31,7 +31,7 @@ describe('colorizeCode', () => {
       code,
       language: 'javascript',
       maxWidth: 80,
-      settings,
+      settings: settings.merged,
       hideLineNumbers: true,
     });
 

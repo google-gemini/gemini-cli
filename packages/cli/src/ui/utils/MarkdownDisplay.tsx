@@ -49,7 +49,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
       language: 'markdown',
       availableHeight: isAlternateBuffer ? undefined : availableTerminalHeight,
       maxWidth: terminalWidth - CODE_BLOCK_PREFIX_PADDING,
-      settings,
+      settings: settings.merged,
       hideLineNumbers: true,
     });
     return (
@@ -365,7 +365,7 @@ const RenderCodeBlockInternal: React.FC<RenderCodeBlockProps> = ({
         language: lang,
         availableHeight: availableTerminalHeight,
         maxWidth: terminalWidth - CODE_BLOCK_PREFIX_PADDING,
-        settings,
+        settings: settings.merged,
       });
       return (
         <Box paddingLeft={CODE_BLOCK_PREFIX_PADDING} flexDirection="column">
@@ -382,7 +382,7 @@ const RenderCodeBlockInternal: React.FC<RenderCodeBlockProps> = ({
     language: lang,
     availableHeight: isAlternateBuffer ? undefined : availableTerminalHeight,
     maxWidth: terminalWidth - CODE_BLOCK_PREFIX_PADDING,
-    settings,
+    settings: settings.merged,
   });
 
   return (
