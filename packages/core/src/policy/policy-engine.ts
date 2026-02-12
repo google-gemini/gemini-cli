@@ -538,8 +538,10 @@ export class PolicyEngine {
     let globalVerdict: PolicyDecision | undefined;
 
     for (const rule of this.rules) {
-      // We only care about rules without args pattern for exclusion from the model
       if (rule.argsPattern) {
+        if (rule.toolName && rule.decision !== PolicyDecision.DENY) {
+          processedTools.add(rule.toolName);
+        }
         continue;
       }
 
