@@ -140,14 +140,23 @@ describe('ReadFileTool', () => {
       );
     });
 
-    it('should throw error if limit is zero or negative', () => {
+    it('should throw error if limit is zero or negative (except -1)', () => {
       const params: ReadFileToolParams = {
         file_path: path.join(tempRootDir, 'test.txt'),
         limit: 0,
       };
       expect(() => tool.build(params)).toThrow(
-        'Limit must be a positive number',
+        'Limit must be a positive number or -1 to read all',
       );
+    });
+
+    it('should allow limit=-1 as special value for read all', () => {
+      const params: ReadFileToolParams = {
+        file_path: path.join(tempRootDir, 'test.txt'),
+        limit: -1,
+      };
+      const result = tool.build(params);
+      expect(typeof result).not.toBe('string');
     });
   });
 
@@ -284,20 +293,74 @@ describe('ReadFileTool', () => {
       );
     });
 
-    it('should handle text file with lines exceeding maximum length', async () => {
+    it('should return error for text file exceeding read threshold', async () => {
+      // Create file just over 512 KiB threshold (default)
+      const filePath = path.join(tempRootDir, 'large-text.txt');
+      const content = 'x'.repeat(600 * 1024); // 600 KiB exceeds 512 KiB default
+      await fsp.writeFile(filePath, content, 'utf-8');
+
+      const params: ReadFileToolParams = { file_path: filePath };
+      const invocation = tool.build(params);
+
+      const result = await invocation.execute(abortSignal);
+      expect(result).toHaveProperty('error');
+      expect(result.error?.type).toBe(ToolErrorType.TEXT_FILE_READ_TOO_BROAD);
+      expect(result.llmContent).toContain('threshold');
+      expect(result.llmContent).toContain('offset/limit');
+    });
+
+    it('should allow bypassing threshold when limit is specified', async () => {
+      // Create file over threshold
+      const filePath = path.join(tempRootDir, 'large-text-bypass.txt');
+      const content = 'x\n'.repeat(600 * 1024); // 600 KiB, many lines
+      await fsp.writeFile(filePath, content, 'utf-8');
+
+      // Any explicit limit should bypass the threshold check
+      const params: ReadFileToolParams = {
+        file_path: filePath,
+        limit: 10, // Just read 10 lines
+      };
+      const invocation = tool.build(params);
+
+      const result = await invocation.execute(abortSignal);
+      // Should succeed, not return error
+      expect(result.error).toBeUndefined();
+      expect(typeof result.llmContent).toBe('string');
+    });
+
+    it('should allow reading entire file with limit=-1', async () => {
+      // Create file over threshold
+      const filePath = path.join(tempRootDir, 'large-text-full.txt');
+      const content = 'x'.repeat(600 * 1024); // 600 KiB
+      await fsp.writeFile(filePath, content, 'utf-8');
+
+      const params: ReadFileToolParams = {
+        file_path: filePath,
+        limit: -1,
+      };
+      const invocation = tool.build(params);
+
+      const result = await invocation.execute(abortSignal);
+      // Should succeed and return full content
+      expect(result.error).toBeUndefined();
+      expect(typeof result.llmContent).toBe('string');
+      expect((result.llmContent as string).length).toBeGreaterThan(0);
+    });
+
+    it('should handle text file with very long lines without truncation', async () => {
       const filePath = path.join(tempRootDir, 'longlines.txt');
-      const longLine = 'a'.repeat(2500); // Exceeds MAX_LINE_LENGTH_TEXT_FILE (2000)
+      const longLine = 'a'.repeat(2500); // Long line - no longer truncated
       const fileContent = `Short line\n${longLine}\nAnother short line`;
       await fsp.writeFile(filePath, fileContent, 'utf-8');
       const params: ReadFileToolParams = { file_path: filePath };
       const invocation = tool.build(params);
 
       const result = await invocation.execute(abortSignal);
-      expect(result.llmContent).toContain(
-        'IMPORTANT: The file content has been truncated',
-      );
-      expect(result.llmContent).toContain('--- FILE CONTENT (truncated) ---');
-      expect(result.returnDisplay).toContain('some lines were shortened');
+      // Long lines should be preserved without truncation
+      expect(result.llmContent).toContain(longLine);
+      expect(result.llmContent).toContain('Short line');
+      expect(result.llmContent).toContain('Another short line');
+      expect(result.returnDisplay).toBe('');
     });
 
     it('should handle image file and return appropriate content', async () => {

@@ -1284,6 +1284,15 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - `true`/`1`: Write to `./.gemini/system.md`. Otherwise treat the value as a
     path.
   - Run the CLI once with this set to generate the file.
+- **`GEMINI_TEXT_FILE_READ_THRESHOLD_BYTES`**:
+  - Controls the file size threshold for the `read_file` tool on text files.
+  - When the agent attempts to read a text file larger than this threshold
+    without specifying a `limit` parameter, the read is denied. The agent
+    receives guidance to either read in chunks (using `offset`/`limit`), use
+    surgical tools like `grep`/`head`/`tail`, or set `limit=-1` to explicitly
+    read the entire file.
+  - Default: `524288` (512 KiB). Set to `-1` to disable the threshold.
+  - Example: `export GEMINI_TEXT_FILE_READ_THRESHOLD_BYTES=1048576` (1 MiB)
 - **`SEATBELT_PROFILE`** (macOS specific):
   - Switches the Seatbelt (`sandbox-exec`) profile on macOS.
   - `permissive-open`: (Default) Restricts writes to the project folder (and a

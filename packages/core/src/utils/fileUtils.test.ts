@@ -991,7 +991,7 @@ describe('fileUtils', () => {
       expect(result.linesShown).toEqual([1, 2]);
     });
 
-    it('should truncate long lines in text files', async () => {
+    it('should preserve long lines in text files without truncation', async () => {
       const longLine = 'a'.repeat(2500);
       actualNodeFs.writeFileSync(
         testTextFilePath,
@@ -1005,14 +1005,10 @@ describe('fileUtils', () => {
       );
 
       expect(result.llmContent).toContain('Short line');
-      expect(result.llmContent).toContain(
-        longLine.substring(0, 2000) + '... [truncated]',
-      );
+      expect(result.llmContent).toContain(longLine); // Full line preserved
       expect(result.llmContent).toContain('Another short line');
-      expect(result.returnDisplay).toBe(
-        'Read all 3 lines from test.txt (some lines were shortened)',
-      );
-      expect(result.isTruncated).toBe(true);
+      expect(result.returnDisplay).toBe('');
+      expect(result.isTruncated).toBe(false);
     });
 
     it('should truncate when line count exceeds the limit', async () => {
@@ -1032,7 +1028,7 @@ describe('fileUtils', () => {
       expect(result.returnDisplay).toBe('Read lines 1-5 of 11 from test.txt');
     });
 
-    it('should truncate when a line length exceeds the character limit', async () => {
+    it('should preserve long lines when reading with explicit limit', async () => {
       const longLine = 'b'.repeat(2500);
       const lines = Array.from({ length: 10 }, (_, i) => `Line ${i + 1}`);
       lines.push(longLine); // Total 11 lines
@@ -1047,13 +1043,13 @@ describe('fileUtils', () => {
         11,
       );
 
-      expect(result.isTruncated).toBe(true);
-      expect(result.returnDisplay).toBe(
-        'Read all 11 lines from test.txt (some lines were shortened)',
-      );
+      // Long lines are preserved, no truncation since we read all lines
+      expect(result.isTruncated).toBe(false);
+      expect(result.llmContent).toContain(longLine);
+      expect(result.returnDisplay).toBe('');
     });
 
-    it('should truncate both line count and line length when both exceed limits', async () => {
+    it('should truncate line count but preserve long lines', async () => {
       const linesWithLongInMiddle = Array.from(
         { length: 20 },
         (_, i) => `Line ${i + 1}`,
@@ -1064,7 +1060,7 @@ describe('fileUtils', () => {
         linesWithLongInMiddle.join('\n'),
       );
 
-      // Read 10 lines out of 20, including the long line
+      // Read 10 lines out of 20, including the long line at index 4
       const result = await processSingleFileContent(
         testTextFilePath,
         tempRootDir,
@@ -1072,10 +1068,10 @@ describe('fileUtils', () => {
         0,
         10,
       );
+      // Line count truncation occurs (10 of 20), but long lines are preserved
       expect(result.isTruncated).toBe(true);
-      expect(result.returnDisplay).toBe(
-        'Read lines 1-10 of 20 from test.txt (some lines were shortened)',
-      );
+      expect(result.llmContent).toContain('c'.repeat(2500));
+      expect(result.returnDisplay).toBe('Read lines 1-10 of 20 from test.txt');
     });
 
     it('should return an error if the file size exceeds 20MB', async () => {

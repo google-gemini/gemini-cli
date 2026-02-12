@@ -210,8 +210,13 @@ export class ReadFileTool extends BaseDeclarativeTool<
     if (params.offset !== undefined && params.offset < 0) {
       return 'Offset must be a non-negative number';
     }
-    if (params.limit !== undefined && params.limit <= 0) {
-      return 'Limit must be a positive number';
+    // limit=-1 is allowed as a special value meaning "read all" (used to bypass threshold)
+    if (
+      params.limit !== undefined &&
+      params.limit <= 0 &&
+      params.limit !== -1
+    ) {
+      return 'Limit must be a positive number or -1 to read all';
     }
 
     const fileFilteringOptions = this.config.getFileFilteringOptions();

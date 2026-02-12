@@ -15,6 +15,7 @@ import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
 import { createRequire as createModuleRequire } from 'node:module';
 import { debugLogger } from './debugLogger.js';
+import { formatBytes } from './formatters.js';
 
 const requireModule = createModuleRequire(import.meta.url);
 
@@ -52,9 +53,18 @@ export async function loadWasmBinary(
   }
 }
 
-// Constants for text file processing
-const DEFAULT_MAX_LINES_TEXT_FILE = 2000;
-const MAX_LINE_LENGTH_TEXT_FILE = 2000;
+// Text file read threshold - configurable via ENV, -1 to disable
+const DEFAULT_TEXT_FILE_READ_THRESHOLD_BYTES = 512 * 1024; // 512 KiB
+const envValue = process.env['GEMINI_TEXT_FILE_READ_THRESHOLD_BYTES'];
+// Use Number() for stricter parsing than parseInt, which can misinterpret "1MB" as 1.
+// We also check that the value is an integer and handle empty strings.
+const parsedThreshold =
+  envValue === undefined || envValue.trim() === '' ? NaN : Number(envValue);
+
+const TEXT_FILE_READ_THRESHOLD_BYTES =
+  !isNaN(parsedThreshold) && Number.isInteger(parsedThreshold)
+    ? parsedThreshold
+    : DEFAULT_TEXT_FILE_READ_THRESHOLD_BYTES;
 
 // Default values for encoding and separator format
 export const DEFAULT_ENCODING: BufferEncoding = 'utf-8';
@@ -469,35 +479,50 @@ export async function processSingleFileContent(
         };
       }
       case 'text': {
+        // Bypass threshold if agent explicitly specifies a limit (showing intent to be surgical)
+        // limit=-1 means "read all intentionally", any positive limit means "read specific range"
+        const bypassThreshold = limit !== undefined;
+
+        // Check file size against threshold before reading (unless bypassed or disabled)
+        if (
+          !bypassThreshold &&
+          TEXT_FILE_READ_THRESHOLD_BYTES >= 0 &&
+          stats.size > TEXT_FILE_READ_THRESHOLD_BYTES
+        ) {
+          const thresholdFormatted = formatBytes(
+            TEXT_FILE_READ_THRESHOLD_BYTES,
+          );
+          const fileSizeFormatted = formatBytes(stats.size);
+          return {
+            llmContent:
+              `File read exceeds the ${thresholdFormatted} threshold (file is ${fileSizeFormatted}). ` +
+              'Read in chunks using offset/limit parameters, use selective tools like grep/head/tail/jq, ' +
+              'or set limit=-1 to bypass this check if you intentionally want the entire file.',
+            returnDisplay: `File read too broad. Exceeds ${thresholdFormatted} threshold.`,
+            error: `File read too broad: ${filePath} (${fileSizeFormatted} exceeds ${thresholdFormatted} threshold)`,
+            errorType: ToolErrorType.TEXT_FILE_READ_TOO_BROAD,
+          };
+        }
+
         // Use BOM-aware reader to avoid leaving a BOM character in content and to support UTF-16/32 transparently
         const content = await readFileWithEncoding(filePath);
         const lines = content.split('\n');
         const originalLineCount = lines.length;
 
         const startLine = offset || 0;
+        // limit=-1 or undefined means "read all", positive limit means read that many lines
         const effectiveLimit =
-          limit === undefined ? DEFAULT_MAX_LINES_TEXT_FILE : limit;
+          limit === undefined || limit === -1 ? originalLineCount : limit;
         // Ensure endLine does not exceed originalLineCount
         const endLine = Math.min(startLine + effectiveLimit, originalLineCount);
         // Ensure selectedLines doesn't try to slice beyond array bounds if startLine is too high
         const actualStartLine = Math.min(startLine, originalLineCount);
         const selectedLines = lines.slice(actualStartLine, endLine);
 
-        let linesWereTruncatedInLength = false;
-        const formattedLines = selectedLines.map((line) => {
-          if (line.length > MAX_LINE_LENGTH_TEXT_FILE) {
-            linesWereTruncatedInLength = true;
-            return (
-              line.substring(0, MAX_LINE_LENGTH_TEXT_FILE) + '... [truncated]'
-            );
-          }
-          return line;
-        });
+        const llmContent = selectedLines.join('\n');
 
         const contentRangeTruncated =
           startLine > 0 || endLine < originalLineCount;
-        const isTruncated = contentRangeTruncated || linesWereTruncatedInLength;
-        const llmContent = formattedLines.join('\n');
 
         // By default, return nothing to streamline the common case of a successful read_file.
         let returnDisplay = '';
@@ -505,17 +530,12 @@ export async function processSingleFileContent(
           returnDisplay = `Read lines ${
             actualStartLine + 1
           }-${endLine} of ${originalLineCount} from ${relativePathForDisplay}`;
-          if (linesWereTruncatedInLength) {
-            returnDisplay += ' (some lines were shortened)';
-          }
-        } else if (linesWereTruncatedInLength) {
-          returnDisplay = `Read all ${originalLineCount} lines from ${relativePathForDisplay} (some lines were shortened)`;
         }
 
         return {
           llmContent,
           returnDisplay,
-          isTruncated,
+          isTruncated: contentRangeTruncated,
           originalLineCount,
           linesShown: [actualStartLine + 1, endLine],
         };
