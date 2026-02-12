@@ -57,12 +57,12 @@ Technical reference documentation for each capability of Gemini CLI.
 - **[/directory](./cli/commands.md#directory-or-dir):** Manage workspace.
 - **[/docs](./cli/commands.md#docs):** Open documentation.
 - **[/editor](./cli/commands.md#editor):** Select editor.
-- **[/extensions](../extensions/index.md):** Manage extensions.
+- **[/extensions](./extensions/index.md):** Manage extensions.
 - **[/help](./cli/commands.md#help-or):** Show help.
-- **[/hooks](../hooks/index.md):** Hooks.
-- **[/ide](../ide-integration/index.md):** IDE integration.
+- **[/hooks](./hooks/index.md):** Hooks.
+- **[/ide](./ide-integration/index.md):** IDE integration.
 - **[/init](./cli/commands.md#init):** Initialize context.
-- **[/mcp](../tools/mcp-server.md):** MCP servers.
+- **[/mcp](./tools/mcp-server.md):** MCP servers.
 - **[/memory](./cli/commands.md#memory):** Manage memory.
 - **[/model](./cli/model.md):** Model selection.
 - **[/policies](./cli/commands.md#policies):** Manage policies.
@@ -92,7 +92,7 @@ Technical reference documentation for each capability of Gemini CLI.
   lookup for CLI features.
 - **[Memory (tool)](./tools/memory.md):** Storage details for persistent facts.
 - **[Model routing](./cli/model-routing.md):** Automatic fallback resilience.
-- **[Plan mode (experimental)](./plan-mode.md):** Use a safe, read-only mode for
+- **[Plan mode (experimental)](./cli/plan-mode.md):** Use a safe, read-only mode for
   planning complex changes.
 - **[Sandboxing](./cli/sandbox.md):** Isolate tool execution.
 - **[Shell (tool)](./tools/shell.md):** Detailed system execution parameters.
