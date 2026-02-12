@@ -15,7 +15,6 @@ import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
 import { createRequire as createModuleRequire } from 'node:module';
 import { debugLogger } from './debugLogger.js';
-import { normalizePath } from './paths.js';
 
 const requireModule = createModuleRequire(import.meta.url);
 
@@ -212,14 +211,16 @@ export function isWithinRoot(
   pathToCheck: string,
   rootDirectory: string,
 ): boolean {
-  const normalizedPathToCheck = normalizePath(pathToCheck);
-  const normalizedRootDirectory = normalizePath(rootDirectory);
+  const normalizedPathToCheck = path.resolve(pathToCheck);
+  const normalizedRootDirectory = path.resolve(rootDirectory);
 
   // Ensure the rootDirectory path ends with a separator for correct startsWith comparison,
-  // unless it's already a root path ending with a separator (e.g., '/' or 'c:/').
-  const rootWithSeparator = normalizedRootDirectory.endsWith('/')
-    ? normalizedRootDirectory
-    : normalizedRootDirectory + '/';
+  // unless it's the root path itself (e.g., '/' or 'C:\').
+  const rootWithSeparator =
+    normalizedRootDirectory === path.sep ||
+    normalizedRootDirectory.endsWith(path.sep)
+      ? normalizedRootDirectory
+      : normalizedRootDirectory + path.sep;
 
   return (
     normalizedPathToCheck === normalizedRootDirectory ||

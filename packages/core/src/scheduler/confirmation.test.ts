@@ -15,7 +15,7 @@ import {
   type Mock,
 } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { awaitConfirmation, resolveConfirmation } from './confirmation.js';
+import { resolveConfirmation } from './confirmation.js';
 import {
   MessageBusType,
   type ToolConfirmationResponse,
@@ -82,43 +82,6 @@ describe('confirmation.ts', () => {
       };
       mockMessageBus.on('newListener', handler);
     });
-
-  describe('awaitConfirmation', () => {
-    it('should resolve when confirmed response matches correlationId', async () => {
-      const correlationId = 'test-correlation-id';
-      const abortController = new AbortController();
-
-      const promise = awaitConfirmation(
-        mockMessageBus,
-        correlationId,
-        abortController.signal,
-      );
-
-      emitResponse({
-        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-        correlationId,
-        confirmed: true,
-      });
-
-      const result = await promise;
-      expect(result).toEqual({
-        outcome: ToolConfirmationOutcome.ProceedOnce,
-        payload: undefined,
-      });
-    });
-
-    it('should reject when abort signal is triggered', async () => {
-      const correlationId = 'abort-id';
-      const abortController = new AbortController();
-      const promise = awaitConfirmation(
-        mockMessageBus,
-        correlationId,
-        abortController.signal,
-      );
-      abortController.abort();
-      await expect(promise).rejects.toThrow('Operation cancelled');
-    });
-  });
 
   describe('resolveConfirmation', () => {
     let mockState: Mocked<SchedulerStateManager>;

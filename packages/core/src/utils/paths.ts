@@ -114,15 +114,11 @@ export function shortenPath(filePath: string, maxLen: number = 35): string {
 
   const parsedPath = path.parse(filePath);
   const root = parsedPath.root;
-  // Use forward slash if the path already uses it (common with normalized paths),
-  // otherwise fall back to platform-specific separator.
-  const separator =
-    root.includes('/') || filePath.includes('/') ? '/' : path.sep;
+  const separator = path.sep;
 
   // Get segments of the path *after* the root
   const relativePath = filePath.substring(root.length);
-  // Split by both forward and backward slashes to handle mixed or normalized paths
-  const segments = relativePath.split(/[\\/]/).filter((s) => s !== ''); // Filter out empty segments
+  const segments = relativePath.split(separator).filter((s) => s !== ''); // Filter out empty segments
 
   // Handle cases with no segments after root (e.g., "/", "C:\") or only one segment
   if (segments.length <= 1) {
