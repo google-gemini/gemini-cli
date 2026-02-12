@@ -1409,15 +1409,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     text: string;
     type: TransientMessageType;
   }>(WARNING_PROMPT_DURATION_MS);
-  const handleWarning = useCallback(
-    (message: string) => {
-      showTransientMessage({
-        text: message,
-        type: TransientMessageType.Warning,
-      });
-    },
-    [showTransientMessage],
-  );
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
     useFolderTrust(settings, setIsTrustedFolder, historyManager.addItem);
