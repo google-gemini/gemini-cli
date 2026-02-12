@@ -136,7 +136,8 @@ available combinations.
   insert a `?` into the prompt.
 - `Tab` + `Tab` (while typing in the prompt): Toggle between minimal and full UI
   details when no completion/search interaction is active. The selected mode is
-  remembered for future sessions.
+  remembered for future sessions. Full UI remains the default on first run, and
+  single `Tab` keeps its existing completion/focus behavior.
 - `Shift + Tab` (while typing in the prompt): Cycle approval modes.
 - `\` (at end of a line) + `Enter`: Insert a newline without leaving single-line
   mode.
