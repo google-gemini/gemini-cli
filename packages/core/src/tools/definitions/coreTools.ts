@@ -14,6 +14,7 @@ export const LS_TOOL_NAME = 'list_directory';
 export const READ_FILE_TOOL_NAME = 'read_file';
 export const SHELL_TOOL_NAME = 'run_shell_command';
 export const WRITE_FILE_TOOL_NAME = 'write_file';
+export const GET_INTERNAL_DOCS_TOOL_NAME = 'get_internal_docs';
 
 // ============================================================================
 // READ_FILE TOOL
@@ -122,6 +123,28 @@ export const GREP_DEFINITION: ToolDefinition = {
         },
       },
       required: ['pattern'],
+    },
+  },
+};
+
+// ============================================================================
+// GET_INTERNAL_DOCS TOOL
+// ============================================================================
+
+export const GET_INTERNAL_DOCS_DEFINITION: ToolDefinition = {
+  base: {
+    name: GET_INTERNAL_DOCS_TOOL_NAME,
+    description:
+      'Returns the content of Gemini CLI internal documentation files. If no path is provided, returns a list of all available documentation paths.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        path: {
+          description:
+            "The relative path to the documentation file (e.g., 'cli/commands.md'). If omitted, lists all available documentation.",
+          type: 'string',
+        },
+      },
     },
   },
 };

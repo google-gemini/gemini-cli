@@ -5,6 +5,7 @@
  */
 
 import {
+  GET_INTERNAL_DOCS_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
@@ -18,6 +19,7 @@ import {
 // need to reference a tool's name without importing the tool's implementation.
 
 export {
+  GET_INTERNAL_DOCS_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
@@ -34,7 +36,6 @@ export const READ_MANY_FILES_TOOL_NAME = 'read_many_files';
 export const LS_TOOL_NAME_LEGACY = 'list_directory'; // Just to be safe if anything used the old exported name directly
 
 export const MEMORY_TOOL_NAME = 'save_memory';
-export const GET_INTERNAL_DOCS_TOOL_NAME = 'get_internal_docs';
 export const ACTIVATE_SKILL_TOOL_NAME = 'activate_skill';
 export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
 export const ASK_USER_TOOL_NAME = 'ask_user';
