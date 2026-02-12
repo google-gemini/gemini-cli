@@ -366,15 +366,15 @@ Captures tool executions, output truncation, and Edit behavior.
         - `ask_user_dismissed` (boolean)
         - `ask_user_empty_submission` (boolean)
         - `ask_user_answer_count` (number)
-    - `diffStat` (if applicable), which includes:
-      - `model_added_lines` (number)
-      - `model_removed_lines` (number)
-      - `model_added_chars` (number)
-      - `model_removed_chars` (number)
-      - `user_added_lines` (number)
-      - `user_removed_lines` (number)
-      - `user_added_chars` (number)
-      - `user_removed_chars` (number)
+      - `diffStat` (if applicable), which includes:
+        - `model_added_lines` (number)
+        - `model_removed_lines` (number)
+        - `model_added_chars` (number)
+        - `model_removed_chars` (number)
+        - `user_added_lines` (number)
+        - `user_removed_lines` (number)
+        - `user_added_chars` (number)
+        - `user_removed_chars` (number)
 
 - `gemini_cli.tool_output_truncated`: Output of a tool call was truncated.
   - **Attributes**:
