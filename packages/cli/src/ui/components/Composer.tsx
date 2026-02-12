@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StatusDisplay } from './StatusDisplay.js';
@@ -27,7 +27,11 @@ import { useVimMode } from '../contexts/VimModeContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
-import { StreamingState } from '../types.js';
+import {
+  StreamingState,
+  type HistoryItemToolGroup,
+  ToolCallStatus,
+} from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
 import { theme } from '../semantic-colors.js';
@@ -49,17 +53,56 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
   const hideContextSummary =
     suggestionsVisible && suggestionsPosition === 'above';
+
+  const hasPendingToolConfirmation = useMemo(
+    () =>
+      (uiState.pendingHistoryItems ?? [])
+        .filter(
+          (item): item is HistoryItemToolGroup => item.type === 'tool_group',
+        )
+        .some((item) =>
+          item.tools.some((tool) => tool.status === ToolCallStatus.Confirming),
+        ),
+    [uiState.pendingHistoryItems],
+  );
+
+  const hasPendingActionRequired =
+    hasPendingToolConfirmation ||
+    Boolean(uiState.commandConfirmationRequest) ||
+    Boolean(uiState.authConsentRequest) ||
+    (uiState.confirmUpdateExtensionRequests?.length ?? 0) > 0 ||
+    Boolean(uiState.loopDetectionConfirmationRequest) ||
+    Boolean(uiState.proQuotaRequest) ||
+    Boolean(uiState.validationRequest) ||
+    Boolean(uiState.customDialog);
+
+  const isPassiveShortcutsHelpState =
+    uiState.isInputActive &&
+    uiState.streamingState === StreamingState.Idle &&
+    !hasPendingActionRequired;
+
+  const { setShortcutsHelpVisible } = uiActions;
+
+  useEffect(() => {
+    if (uiState.shortcutsHelpVisible && !isPassiveShortcutsHelpState) {
+      setShortcutsHelpVisible(false);
+    }
+  }, [
+    uiState.shortcutsHelpVisible,
+    isPassiveShortcutsHelpState,
+    setShortcutsHelpVisible,
+  ]);
+
   const showShortcutsHelp =
     uiState.shortcutsHelpVisible &&
     uiState.streamingState === StreamingState.Idle &&
-    !uiState.hasPendingActionRequired;
+    !hasPendingActionRequired;
   const showShortcutsHint =
-    uiState.streamingState === StreamingState.Idle &&
-    !uiState.hasPendingActionRequired;
+    uiState.streamingState === StreamingState.Idle && !hasPendingActionRequired;
   const showLoadingIndicator =
     (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
     uiState.streamingState === StreamingState.Responding &&
-    !uiState.hasPendingActionRequired;
+    !hasPendingActionRequired;
   const showApprovalIndicator = !uiState.shellModeActive;
   const showRawMarkdownIndicator = !uiState.renderMarkdown;
   const showEscToCancelHint =
