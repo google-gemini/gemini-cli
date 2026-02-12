@@ -416,11 +416,12 @@ export class Session {
   }
 
   setMode(modeId: acp.SessionModeId): acp.SetSessionModeResponse {
-    const mode = Object.values(ApprovalMode).find((m) => m === modeId);
+    const availableModes = buildAvailableModes(this.config.isPlanEnabled());
+    const mode = availableModes.find((m) => m.id === modeId);
     if (!mode) {
-      throw new Error(`Invalid mode: ${modeId}`);
+      throw new Error(`Invalid or unavailable mode: ${modeId}`);
     }
-    this.config.setApprovalMode(mode);
+    this.config.setApprovalMode(mode.id as ApprovalMode);
     return {};
   }
 
