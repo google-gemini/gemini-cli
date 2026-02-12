@@ -16,7 +16,7 @@ import {
   A2ABridgeClient,
   extractIdsFromResponse,
 } from './a2a-bridge-client.js';
-import { renderResponse } from './response-renderer.js';
+import { renderResponse, extractToolApprovals } from './response-renderer.js';
 import { logger } from '../utils/logger.js';
 
 export class ChatBridgeHandler {
@@ -85,11 +85,93 @@ export class ChatBridgeHandler {
 
     const threadName = message.thread.name;
     const spaceName = event.space.name;
+
+    // Handle slash commands
+    const trimmed = text.trim().toLowerCase();
+    if (
+      trimmed === '/reset' ||
+      trimmed === '/clear' ||
+      trimmed === 'reset' ||
+      trimmed === 'clear'
+    ) {
+      this.sessionStore.remove(threadName);
+      logger.info(`[ChatBridge] Session cleared for thread ${threadName}`);
+      return { text: 'Session cleared. Send a new message to start fresh.' };
+    }
+
     const session = this.sessionStore.getOrCreate(threadName, spaceName);
+
+    if (trimmed === '/yolo') {
+      session.yoloMode = true;
+      logger.info(`[ChatBridge] YOLO mode enabled for thread ${threadName}`);
+      return {
+        text: 'YOLO mode enabled. All tool calls will be auto-approved.',
+      };
+    }
+
+    if (trimmed === '/safe') {
+      session.yoloMode = false;
+      logger.info(`[ChatBridge] YOLO mode disabled for thread ${threadName}`);
+      return { text: 'Safe mode enabled. Tool calls will require approval.' };
+    }
 
     logger.info(
       `[ChatBridge] MESSAGE from ${event.user.displayName}: "${text.substring(0, 100)}"`,
     );
+
+    // Handle text-based tool approval responses
+    const lowerText = trimmed;
+    if (
+      session.pendingToolApproval &&
+      (lowerText === 'approve' ||
+        lowerText === 'yes' ||
+        lowerText === 'y' ||
+        lowerText === 'reject' ||
+        lowerText === 'no' ||
+        lowerText === 'n' ||
+        lowerText === 'always allow')
+    ) {
+      const approval = session.pendingToolApproval;
+      const isReject =
+        lowerText === 'reject' || lowerText === 'no' || lowerText === 'n';
+      const isAlwaysAllow = lowerText === 'always allow';
+      const outcome = isReject
+        ? 'cancel'
+        : isAlwaysAllow
+          ? 'proceed_always_tool'
+          : 'proceed_once';
+
+      logger.info(
+        `[ChatBridge] Text-based tool ${outcome}: callId=${approval.callId}, taskId=${approval.taskId}`,
+      );
+
+      session.pendingToolApproval = undefined;
+
+      try {
+        const response = await this.a2aClient.sendToolConfirmation(
+          approval.callId,
+          outcome,
+          approval.taskId,
+          { contextId: session.contextId },
+        );
+
+        const { contextId: newCtxId, taskId: newTaskId } =
+          extractIdsFromResponse(response);
+        if (newCtxId) session.contextId = newCtxId;
+        this.sessionStore.updateTaskId(threadName, newTaskId);
+
+        const threadKey = message.thread.threadKey || threadName;
+        return renderResponse(response, threadKey);
+      } catch (error) {
+        const errorMsg =
+          error instanceof Error ? error.message : 'Unknown error';
+        logger.error(
+          `[ChatBridge] Error sending tool confirmation: ${errorMsg}`,
+          error,
+        );
+        return { text: `Error processing tool confirmation: ${errorMsg}` };
+      }
+    }
 
     try {
       const response = await this.a2aClient.sendMessage(text, {
@@ -103,6 +185,22 @@ export class ChatBridgeHandler {
         session.contextId = contextId;
       }
       this.sessionStore.updateTaskId(threadName, taskId);
+
+      // Check for pending tool approvals and store for text-based confirmation
+      const approvals = extractToolApprovals(response);
+      if (approvals.length > 0) {
+        const firstApproval = approvals[0];
+        session.pendingToolApproval = {
+          callId: firstApproval.callId,
+          taskId: firstApproval.taskId,
+          toolName: firstApproval.displayName || firstApproval.name,
+        };
+        logger.info(
+          `[ChatBridge] Pending tool approval: ${firstApproval.displayName || firstApproval.name} callId=${firstApproval.callId}`,
+        );
+      } else {
+        session.pendingToolApproval = undefined;
+      }
 
       // Convert A2A response to Chat format
       const threadKey = message.thread.threadKey || threadName;

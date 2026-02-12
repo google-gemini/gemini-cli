@@ -13,6 +13,12 @@
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
 
+export interface PendingToolApproval {
+  callId: string;
+  taskId: string;
+  toolName: string;
+}
+
 export interface SessionInfo {
   /** A2A contextId - persists for the lifetime of the Chat thread. */
   contextId: string;
@@ -24,6 +30,10 @@ export interface SessionInfo {
   threadName: string;
   /** Last activity timestamp. */
   lastActivity: number;
+  /** Pending tool approval waiting for text-based response. */
+  pendingToolApproval?: PendingToolApproval;
+  /** When true, all tool calls are auto-approved. */
+  yoloMode?: boolean;
 }
 
 /**

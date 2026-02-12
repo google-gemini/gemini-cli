@@ -203,6 +203,27 @@ export async function createApp() {
       requestStorage.run({ req }, next);
     });
 
+    // Mount Google Chat bridge routes BEFORE A2A SDK routes.
+    // The A2A SDK's setupRoutes registers a catch-all jsonRpcHandler middleware
+    // at baseUrl="" that intercepts ALL POST requests and returns 400 for
+    // non-JSON-RPC payloads. Chat bridge must be registered first.
+    const chatBridgeUrl =
+      process.env['CHAT_BRIDGE_A2A_URL'] || process.env['CODER_AGENT_PORT']
+        ? `http://localhost:${process.env['CODER_AGENT_PORT'] || '8080'}`
+        : undefined;
+    if (chatBridgeUrl) {
+      expressApp.use(express.json());
+      const chatRoutes = createChatBridgeRoutes({
+        a2aServerUrl: chatBridgeUrl,
+        projectNumber: process.env['CHAT_PROJECT_NUMBER'],
+        debug: process.env['CHAT_BRIDGE_DEBUG'] === 'true',
+      });
+      expressApp.use(chatRoutes);
+      logger.info(
+        `[CoreAgent] Google Chat bridge enabled at /chat/webhook (A2A: ${chatBridgeUrl})`,
+      );
+    }
+
     const appBuilder = new A2AExpressApp(requestHandler);
     expressApp = appBuilder.setupRoutes(expressApp, '');
     expressApp.use(express.json());
@@ -305,23 +326,6 @@ export async function createApp() {
         res.status(500).send({ error: errorMessage });
       }
     });
-
-    // Mount Google Chat bridge routes if configured
-    const chatBridgeUrl =
-      process.env['CHAT_BRIDGE_A2A_URL'] || process.env['CODER_AGENT_PORT']
-        ? `http://localhost:${process.env['CODER_AGENT_PORT'] || '8080'}`
-        : undefined;
-    if (chatBridgeUrl) {
-      const chatRoutes = createChatBridgeRoutes({
-        a2aServerUrl: chatBridgeUrl,
-        projectNumber: process.env['CHAT_PROJECT_NUMBER'],
-        debug: process.env['CHAT_BRIDGE_DEBUG'] === 'true',
-      });
-      expressApp.use(chatRoutes);
-      logger.info(
-        `[CoreAgent] Google Chat bridge enabled at /chat/webhook (A2A: ${chatBridgeUrl})`,
-      );
-    }
 
     expressApp.get('/tasks/:taskId/metadata', async (req, res) => {
       const taskId = req.params.taskId;

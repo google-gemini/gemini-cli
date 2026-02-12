@@ -20,7 +20,6 @@ import type {
   ChatCardV2,
   ChatCardSection,
   ChatWidget,
-  ChatButton,
 } from './types.js';
 import {
   type A2AResponse,
@@ -29,7 +28,7 @@ import {
   extractA2UIParts,
 } from './a2a-bridge-client.js';
 
-interface ToolApprovalInfo {
+export interface ToolApprovalInfo {
   taskId: string;
   callId: string;
   name: string;
@@ -43,6 +42,26 @@ interface ToolApprovalInfo {
 interface AgentResponseInfo {
   text: string;
   status: string;
+}
+
+/**
+ * Extracts tool approval info from an A2A response.
+ * Used by the handler to track pending approvals for text-based confirmation.
+ */
+export function extractToolApprovals(
+  response: A2AResponse,
+): ToolApprovalInfo[] {
+  const parts = extractAllParts(response);
+  const a2uiMessageGroups = extractA2UIParts(parts);
+  const toolApprovals: ToolApprovalInfo[] = [];
+  const agentResponses: AgentResponseInfo[] = [];
+  const thoughts: Array<{ subject: string; description: string }> = [];
+
+  for (const messages of a2uiMessageGroups) {
+    parseA2UIMessages(messages, toolApprovals, agentResponses, thoughts);
+  }
+
+  return deduplicateToolApprovals(toolApprovals);
 }
 
 /**
@@ -66,11 +85,19 @@ export function renderResponse(
     parseA2UIMessages(messages, toolApprovals, agentResponses, thoughts);
   }
 
+  // Deduplicate tool approvals by surfaceId — A2UI history contains both
+  // initial 'awaiting_approval' and later 'success' events for auto-approved tools.
+  const dedupedApprovals = deduplicateToolApprovals(toolApprovals);
+
   const cards: ChatCardV2[] = [];
 
-  // Render tool approval cards
-  for (const approval of toolApprovals) {
-    cards.push(renderToolApprovalCard(approval));
+  // Only render tool approval cards for tools still awaiting approval.
+  // In YOLO mode, tools are auto-approved and their status becomes "success"
+  // so we skip rendering approval cards for those.
+  for (const approval of dedupedApprovals) {
+    if (approval.status === 'awaiting_approval') {
+      cards.push(renderToolApprovalCard(approval));
+    }
   }
 
   // Build text response from agent responses and plain text
@@ -99,7 +126,7 @@ export function renderResponse(
   // Add task state info
   if (response.kind === 'task' && response.status) {
     const state = response.status.state;
-    if (state === 'input-required' && toolApprovals.length > 0) {
+    if (state === 'input-required' && cards.length > 0) {
       responseTexts.push('*Waiting for your approval to continue...*');
     } else if (state === 'failed') {
       responseTexts.push('*Task failed.*');
@@ -170,6 +197,23 @@ function obj(
 }
 
 /**
+ * Deduplicates tool approvals by surfaceId, keeping the last entry per surface.
+ * In blocking mode, A2UI history accumulates ALL intermediate events — a tool
+ * surface may appear first as 'awaiting_approval' then as 'success' (YOLO mode).
+ * By keeping only the last entry per surfaceId, auto-approved tools show 'success'.
+ */
+function deduplicateToolApprovals(
+  approvals: ToolApprovalInfo[],
+): ToolApprovalInfo[] {
+  const byId = new Map<string, ToolApprovalInfo>();
+  for (const a of approvals) {
+    const key = `${a.taskId}_${a.callId}`;
+    byId.set(key, a);
+  }
+  return [...byId.values()];
+}
+
+/**
  * Parses A2UI v0.10 messages to extract known surface types.
  * Our server produces specific surfaces: tool approval, agent response, thought.
  */
@@ -221,6 +265,21 @@ function parseA2UIMessages(
           status: '',
         });
       }
+
+      // Tool status updates (e.g., YOLO mode changes status to 'success')
+      if (
+        surfaceId.startsWith('tool_approval_') &&
+        path === '/tool/status' &&
+        typeof updateDM['value'] === 'string'
+      ) {
+        // Find existing tool approval for this surface and update its status
+        const existing = toolApprovals.find(
+          (a) => `tool_approval_${a.taskId}_${a.callId}` === surfaceId,
+        );
+        if (existing) {
+          existing.status = updateDM['value'];
+        }
+      }
     }
 
     // Look for updateComponents to extract thought text
@@ -261,88 +320,76 @@ function extractComponentText(
 }
 
 /**
+ * Extracts a concise command summary from tool approval args.
+ * For shell tools, returns just the command string.
+ * For file tools, returns the file path.
+ */
+function extractCommandSummary(approval: ToolApprovalInfo): string {
+  if (!approval.args || approval.args === 'No arguments') return '';
+
+  try {
+    const parsed: unknown = JSON.parse(approval.args);
+    if (isRecord(parsed)) {
+      // Shell tool: {"command": "ls -F"}
+      if (typeof parsed['command'] === 'string') {
+        return parsed['command'];
+      }
+      // File tools: {"file_path": "/path/to/file", ...}
+      if (typeof parsed['file_path'] === 'string') {
+        const action =
+          approval.name || approval.displayName || 'File operation';
+        return `${action}: ${parsed['file_path']}`;
+      }
+    }
+  } catch {
+    // Not JSON, return as-is if short enough
+    if (approval.args.length <= 200) return approval.args;
+  }
+
+  return '';
+}
+
+/**
  * Renders a tool approval surface as a Google Chat Card V2.
  */
 function renderToolApprovalCard(approval: ToolApprovalInfo): ChatCardV2 {
   const widgets: ChatWidget[] = [];
 
-  // Tool description
-  if (approval.description) {
+  // Show a concise summary of what the tool will do.
+  // For shell commands, extract just the command string from the args JSON.
+  const commandSummary = extractCommandSummary(approval);
+  if (commandSummary) {
     widgets.push({
       decoratedText: {
-        text: approval.description,
-        topLabel: 'Description',
+        text: `\`${commandSummary}\``,
+        topLabel: approval.displayName || approval.name,
+        startIcon: { knownIcon: 'DESCRIPTION' },
         wrapText: true,
       },
     });
-  }
-
-  // Arguments preview
-  if (approval.args && approval.args !== 'No arguments') {
-    // Truncate long args for the card
+  } else if (approval.args && approval.args !== 'No arguments') {
+    // Fallback: show truncated args
     const truncatedArgs =
       approval.args.length > 300
         ? approval.args.substring(0, 300) + '...'
         : approval.args;
-
     widgets.push({
       decoratedText: {
         text: truncatedArgs,
-        topLabel: 'Arguments',
+        topLabel: approval.displayName || approval.name,
         startIcon: { knownIcon: 'DESCRIPTION' },
         wrapText: true,
       },
     });
   }
 
-  widgets.push({ divider: {} });
-
-  // Action buttons
-  const buttons: ChatButton[] = [
-    {
-      text: 'Approve',
-      onClick: {
-        action: {
-          function: 'tool_confirmation',
-          parameters: [
-            { key: 'callId', value: approval.callId },
-            { key: 'outcome', value: 'proceed_once' },
-            { key: 'taskId', value: approval.taskId },
-          ],
-        },
-      },
-      color: { red: 0.1, green: 0.45, blue: 0.91 },
+  // Text-based approval instructions (card click buttons don't work
+  // with the current Add-ons routing configuration)
+  widgets.push({
+    textParagraph: {
+      text: 'Reply <b>approve</b>, <b>always allow</b>, or <b>reject</b>',
     },
-    {
-      text: 'Always Allow',
-      onClick: {
-        action: {
-          function: 'tool_confirmation',
-          parameters: [
-            { key: 'callId', value: approval.callId },
-            { key: 'outcome', value: 'proceed_always_tool' },
-            { key: 'taskId', value: approval.taskId },
-          ],
-        },
-      },
-    },
-    {
-      text: 'Reject',
-      onClick: {
-        action: {
-          function: 'tool_confirmation',
-          parameters: [
-            { key: 'callId', value: approval.callId },
-            { key: 'outcome', value: 'cancel' },
-            { key: 'taskId', value: approval.taskId },
-          ],
-        },
-      },
-      color: { red: 0.85, green: 0.2, blue: 0.2 },
-    },
-  ];
-
-  widgets.push({ buttonList: { buttons } });
+  });
 
   const sections: ChatCardSection[] = [
     {
