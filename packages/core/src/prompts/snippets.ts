@@ -62,6 +62,7 @@ export interface PrimaryWorkflowsOptions {
 export interface OperationalGuidelinesOptions {
   interactive: boolean;
   isGemini3: boolean;
+  enableShellEfficiency: boolean;
   interactiveShellEnabled: boolean;
 }
 
@@ -98,7 +99,7 @@ export function getCoreSystemPrompt(options: SystemPromptOptions): string {
   return `
 ${renderPreamble(options.preamble)}
 
-${renderCoreMandates(options.coreMandates)}
+${renderCoreMandates(options.coreMandates, options.primaryWorkflows)}
 
 ${renderSubAgents(options.subAgents)}
 
@@ -112,7 +113,10 @@ ${
     : renderPrimaryWorkflows(options.primaryWorkflows)
 }
 
-${renderOperationalGuidelines(options.operationalGuidelines)}
+${renderOperationalGuidelines(
+  options.operationalGuidelines,
+  options.primaryWorkflows,
+)}
 
 ${renderInteractiveYoloMode(options.interactiveYoloMode)}
 
@@ -146,7 +150,10 @@ export function renderPreamble(options?: PreambleOptions): string {
     : 'You are Gemini CLI, an autonomous CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.';
 }
 
-export function renderCoreMandates(options?: CoreMandatesOptions): string {
+function renderCoreMandates(
+  options?: CoreMandatesOptions,
+  primaryWorkflowsOptions?: PrimaryWorkflowsOptions,
+): string {
   if (!options) return '';
   const filenames = options.contextFilenames ?? [DEFAULT_CONTEXT_FILENAME];
   const formattedFilenames =
@@ -157,17 +164,22 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
           .join(', ') + ` or \`${filenames[filenames.length - 1]}\``
       : `\`${filenames[0]}\``;
 
+  let contextEfficiency = '';
+  if (primaryWorkflowsOptions?.enableGrep) {
+    contextEfficiency = `
+## Context Efficiency:
+- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results using total_max_matches and max_matches_per_file, especially during the research phase.
+- For broad discovery, use names_only=true or max_matches_per_file=1 to identify files without retrieving their context.
+`;
+  }
+
   return `
 # Core Mandates
 
 ## Security & System Integrity
 - **Credential Protection:** Never log, print, or commit secrets, API keys, or sensitive credentials. Rigorously protect \`.env\` files, \`.git\`, and system configuration folders.
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
-
-## Context Efficiency:
-- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results using total_max_matches and max_matches_per_file, especially during the research phase.
-- For broad discovery, use names_only=true or max_matches_per_file=1 to identify files without retrieving their context.
-
+${contextEfficiency}
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in ${formattedFilenames} files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
 - **Conventions & Style:** Rigorously adhere to existing workspace conventions, architectural patterns, and style (naming, formatting, typing, commenting). During the research phase, analyze surrounding files, tests, and configuration to ensure your changes are seamless, idiomatic, and consistent with the local context. Never compromise idiomatic quality or completeness (e.g., proper declarations, type safety, documentation) to minimize tool calls; all supporting changes required by local conventions are part of a surgical update.
@@ -270,12 +282,23 @@ ${newApplicationSteps(options)}
 `.trim();
 }
 
-export function renderOperationalGuidelines(
+function renderOperationalGuidelines(
   options?: OperationalGuidelinesOptions,
+  primaryWorkflowsOptions?: PrimaryWorkflowsOptions,
 ): string {
   if (!options) return '';
+
+  const grepContext = primaryWorkflowsOptions?.enableGrep
+    ? `\`${GREP_TOOL_NAME}\` with context or `
+    : '';
+
   return `
 # Operational Guidelines
+
+${shellEfficiencyGuidelines(options.enableShellEfficiency)}
+
+## Token Efficiency
+- **Be Token-Frugal:** Every line of code or long tool output you pull into the conversation history increases the complexity and cost of the entire session. **Context persists.** Prefer surgical extraction tools (like ${grepContext}\`sed\`) over broad file reads.
 
 ## Tone and Style
 
@@ -528,11 +551,16 @@ function mandateContinueWork(interactive: boolean): string {
 function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
   let suggestion = '';
   if (options.enableEnterPlanModeTool) {
-    suggestion = ` For complex tasks, consider using the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to enter a dedicated planning phase before starting implementation.`;
+    suggestion = ` For complex tasks, consider using the ${formatToolName(
+      ENTER_PLAN_MODE_TOOL_NAME,
+    )} tool to enter a dedicated planning phase before starting implementation.`;
   }
 
+  const grepName = formatToolName(GREP_TOOL_NAME);
+  const readFileName = formatToolName(READ_FILE_TOOL_NAME);
+
   const searchTools: string[] = [];
-  if (options.enableGrep) searchTools.push(formatToolName(GREP_TOOL_NAME));
+  if (options.enableGrep) searchTools.push(grepName);
   if (options.enableGlob) searchTools.push(formatToolName(GLOB_TOOL_NAME));
 
   let searchSentence =
@@ -543,17 +571,21 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
     searchSentence = ` Use ${toolsStr} search ${toolOrTools} extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions.`;
   }
 
+  const validationClause = options.enableGrep
+    ? `Use ${grepName} with context or ${readFileName} with precise ranges to validate all assumptions.`
+    : `Use ${readFileName} to validate all assumptions.`;
+
   if (options.enableCodebaseInvestigator) {
     let subAgentSearch = '';
     if (searchTools.length > 0) {
       const toolsStr = searchTools.join(' or ');
-      subAgentSearch = ` For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use ${toolsStr} directly in parallel.`;
+      subAgentSearch = `For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use ${toolsStr} directly in parallel. `;
     }
 
-    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**.${subAgentSearch} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**. ${subAgentSearch}${validationClause} **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
   }
 
-  return `1. **Research:** Systematically map the codebase and validate assumptions.${searchSentence} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+  return `1. **Research:** Systematically map the codebase and validate assumptions.${searchSentence} ${validationClause} **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
 }
 
 function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
@@ -620,9 +652,32 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
 
 function planningPhaseSuggestion(options: PrimaryWorkflowsOptions): string {
   if (options.enableEnterPlanModeTool) {
-    return ` For complex tasks, consider using the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to enter a dedicated planning phase before starting implementation.`;
+    return ` For complex tasks, consider using the ${formatToolName(
+      ENTER_PLAN_MODE_TOOL_NAME,
+    )} tool to enter a dedicated planning phase before starting implementation.`;
   }
   return '';
+}
+
+function shellEfficiencyGuidelines(enabled: boolean): string {
+  if (!enabled) return '';
+  const isWindows = process.platform === 'win32';
+  const inspectExample = isWindows
+    ? "using commands like 'type' or 'findstr' (on CMD) and 'Get-Content' or 'Select-String' (on PowerShell)"
+    : "using commands like 'grep', 'tail', 'head'";
+  return `
+## Shell tool output token efficiency:
+
+IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
+
+- Always prefer command flags that reduce output verbosity when using ${formatToolName(
+    SHELL_TOOL_NAME,
+  )}.
+- Aim to minimize tool output tokens while still capturing necessary information.
+- If a command is expected to produce a lot of output, use quiet or silent flags where available and appropriate.
+- Always consider the trade-off between output verbosity and the need for information. If a command's full output is essential for understanding the result, avoid overly aggressive quieting that might obscure important details.
+- If a command does not have quiet/silent flags or for commands with potentially long output that may not be useful, redirect stdout and stderr to temp files in the project's temporary directory. For example: 'command > <temp_dir>/out.log 2> <temp_dir>/err.log'.
+- After the command runs, inspect the temp files (e.g. '<temp_dir>/out.log' and '<temp_dir>/err.log') ${inspectExample}. Remove the temp files when done.`;
 }
 
 function toneAndStyleNoChitchat(isGemini3: boolean): string {

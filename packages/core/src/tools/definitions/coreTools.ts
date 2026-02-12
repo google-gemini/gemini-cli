@@ -22,7 +22,7 @@ export const WRITE_FILE_TOOL_NAME = 'write_file';
 export const READ_FILE_DEFINITION: ToolDefinition = {
   base: {
     name: READ_FILE_TOOL_NAME,
-    description: `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
+    description: `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. For Gemini 3 models, use 'start_line' and 'end_line' for precise extraction. **Important:** For high token efficiency, avoid reading large files in their entirety. Use 'grep_search' to find symbols or 'run_shell_command' with 'sed' for surgical block extraction instead of broad file reads. Handles text, images, audio, and PDF files.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -38,6 +38,16 @@ export const READ_FILE_DEFINITION: ToolDefinition = {
         limit: {
           description:
             "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
+          type: 'number',
+        },
+        start_line: {
+          description:
+            'Optional: The 1-based line number to start reading from. (Gemini 3+)',
+          type: 'number',
+        },
+        end_line: {
+          description:
+            'Optional: The 1-based line number to end reading at (inclusive). (Gemini 3+)',
           type: 'number',
         },
       },
@@ -81,7 +91,7 @@ export const GREP_DEFINITION: ToolDefinition = {
   base: {
     name: GREP_TOOL_NAME,
     description:
-      'Searches for a regular expression pattern within file contents. Max 100 matches.',
+      'FAST regular expression search. This is the **primary discovery tool** for locating code. Use context parameters (`context`, `after`, `before`) to read code surrounding matches in a single turn, often eliminating the need for a separate `read_file` call. (max 100 matches).',
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -134,7 +144,7 @@ export const GLOB_DEFINITION: ToolDefinition = {
   base: {
     name: GLOB_TOOL_NAME,
     description:
-      'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.',
+      'Finds files matching glob patterns (e.g., `src/**/*.ts`). Results are sorted by modification time (newest first). Ideal for structural discovery and identifying recent changes. **Avoid using this tool just to list files before reading them;** if you know the symbols you need, use `grep_search` directly.',
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -245,16 +255,19 @@ export function getShellToolDescription(
       Background PIDs: Only included if background processes were started.
       Process Group PGID: Only included if available.`;
 
+  const surgicalExtractionGuidance = `
+      **This is the preferred tool for surgical extraction of code blocks.** Use \`sed -n '50,100p' file\` for ranges, or \`sed -n '/class X/,/^}/p' file\` for semantic blocks. Avoid 'cat' on large files to prevent context bloat. Output is limited to the last 2,000 lines.`;
+
   if (os.platform() === 'win32') {
     const backgroundInstructions = enableInteractiveShell
       ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use PowerShell background constructs.'
       : 'Command can start background processes using PowerShell constructs such as `Start-Process -NoNewWindow` or `Start-Job`.';
-    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. ${backgroundInstructions}${efficiencyGuidelines}${returnedInfo}`;
+    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. ${backgroundInstructions}${returnedInfo}${surgicalExtractionGuidance}${efficiencyGuidelines}`;
   } else {
     const backgroundInstructions = enableInteractiveShell
       ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use `&` to background commands.'
       : 'Command can start background processes using `&`.';
-    return `This tool executes a given shell command as \`bash -c <command>\`. ${backgroundInstructions} Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${efficiencyGuidelines}${returnedInfo}`;
+    return `This tool executes a given shell command as \`bash -c <command>\`. ${backgroundInstructions} Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${returnedInfo}${surgicalExtractionGuidance}${efficiencyGuidelines}`;
   }
 }
 
