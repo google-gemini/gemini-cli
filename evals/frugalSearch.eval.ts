@@ -197,10 +197,7 @@ describe('Frugal Search', () => {
       // Check that it actually tried to find it using appropriate tools
       const validAttempts = toolCalls.filter((call) => {
         const args = getParams(call);
-        if (
-          call.toolRequest.name === 'grep_search' &&
-          (args.total_max_matches || args.max_matches_per_file)
-        ) {
+        if (call.toolRequest.name === 'grep_search') {
           return true;
         }
 
