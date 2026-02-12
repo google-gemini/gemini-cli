@@ -14,7 +14,7 @@ import {
   type Mock,
   type MockedObject,
 } from 'vitest';
-import { render } from '../test-utils/render.js';
+import { render, persistentStateMock } from '../test-utils/render.js';
 import { waitFor } from '../test-utils/async.js';
 import { cleanup } from 'ink-testing-library';
 import { act, useContext, type ReactElement } from 'react';
@@ -295,6 +295,7 @@ describe('AppContainer State Management', () => {
   };
 
   beforeEach(() => {
+    persistentStateMock.reset();
     vi.clearAllMocks();
 
     mockIdeClient.getInstance.mockReturnValue(new Promise(() => {}));
@@ -482,7 +483,7 @@ describe('AppContainer State Management', () => {
       unmount!();
     });
 
-    it('shows full UI details by default when Focus UI preview is disabled', async () => {
+    it('shows full UI details by default', async () => {
       let unmount: () => void;
       await act(async () => {
         const result = renderAppContainer();
@@ -495,23 +496,13 @@ describe('AppContainer State Management', () => {
       unmount!();
     });
 
-    it('starts in minimal UI mode when Focus UI preview is enabled', async () => {
-      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-      const focusUiPreviewSettings = {
-        ...mockSettings,
-        merged: {
-          ...defaultMergedSettings,
-          ui: {
-            ...defaultMergedSettings.ui,
-            focusUiPreview: true,
-          },
-        },
-      } as unknown as LoadedSettings;
+    it('starts in minimal UI mode when Focus UI preference is persisted', async () => {
+      persistentStateMock.get.mockReturnValueOnce(true);
 
       let unmount: () => void;
       await act(async () => {
         const result = renderAppContainer({
-          settings: focusUiPreviewSettings,
+          settings: mockSettings,
         });
         unmount = result.unmount;
       });
@@ -519,6 +510,7 @@ describe('AppContainer State Management', () => {
       await waitFor(() => {
         expect(capturedUIState.cleanUiDetailsVisible).toBe(false);
       });
+      expect(persistentStateMock.get).toHaveBeenCalledWith('focusUiEnabled');
       unmount!();
     });
   });

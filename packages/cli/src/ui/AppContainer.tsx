@@ -128,6 +128,7 @@ import { ShellFocusContext } from './contexts/ShellFocusContext.js';
 import { type ExtensionManager } from '../config/extension-manager.js';
 import { requestConsentInteractive } from '../config/extensions/consent.js';
 import { useSessionBrowser } from './hooks/useSessionBrowser.js';
+import { persistentState } from '../utils/persistentState.js';
 import { useSessionResume } from './hooks/useSessionResume.js';
 import { useIncludeDirsTrust } from './hooks/useIncludeDirsTrust.js';
 import { isWorkspaceTrusted } from '../config/trustedFolders.js';
@@ -179,6 +180,7 @@ interface AppContainerProps {
 }
 
 const APPROVAL_MODE_REVEAL_DURATION_MS = 1200;
+const FOCUS_UI_ENABLED_STATE_KEY = 'focusUiEnabled';
 
 /**
  * The fraction of the terminal width to allocate to the shell.
@@ -788,13 +790,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const setIsBackgroundShellListOpenRef = useRef<(open: boolean) => void>(
     () => {},
   );
-  const focusUiPreviewEnabled = settings.merged.ui.focusUiPreview === true;
+  const [focusUiEnabledByDefault] = useState(
+    () => persistentState.get(FOCUS_UI_ENABLED_STATE_KEY) === true,
+  );
   const [shortcutsHelpVisible, setShortcutsHelpVisible] = useState(false);
   const [cleanUiDetailsVisible, setCleanUiDetailsVisibleState] = useState(
-    !focusUiPreviewEnabled,
+    !focusUiEnabledByDefault,
   );
   const modeRevealTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const cleanUiDetailsPinnedRef = useRef(!focusUiPreviewEnabled);
+  const cleanUiDetailsPinnedRef = useRef(!focusUiEnabledByDefault);
 
   const clearModeRevealTimeout = useCallback(() => {
     if (modeRevealTimeoutRef.current) {
@@ -803,36 +807,33 @@ Logging in with Google... Restarting Gemini CLI to continue.
     }
   }, []);
 
+  const persistFocusUiPreference = useCallback((isFullUiVisible: boolean) => {
+    persistentState.set(FOCUS_UI_ENABLED_STATE_KEY, !isFullUiVisible);
+  }, []);
+
   const setCleanUiDetailsVisible = useCallback(
     (visible: boolean) => {
-      if (!focusUiPreviewEnabled) {
-        clearModeRevealTimeout();
-        cleanUiDetailsPinnedRef.current = true;
-        setCleanUiDetailsVisibleState(true);
-        return;
-      }
       clearModeRevealTimeout();
       cleanUiDetailsPinnedRef.current = visible;
       setCleanUiDetailsVisibleState(visible);
+      persistFocusUiPreference(visible);
     },
-    [clearModeRevealTimeout, focusUiPreviewEnabled],
+    [clearModeRevealTimeout, persistFocusUiPreference],
   );
 
   const toggleCleanUiDetailsVisible = useCallback(() => {
-    if (!focusUiPreviewEnabled) {
-      return;
-    }
     clearModeRevealTimeout();
     setCleanUiDetailsVisibleState((visible) => {
       const nextVisible = !visible;
       cleanUiDetailsPinnedRef.current = nextVisible;
+      persistFocusUiPreference(nextVisible);
       return nextVisible;
     });
-  }, [clearModeRevealTimeout, focusUiPreviewEnabled]);
+  }, [clearModeRevealTimeout, persistFocusUiPreference]);
 
   const revealCleanUiDetailsTemporarily = useCallback(
     (durationMs: number = APPROVAL_MODE_REVEAL_DURATION_MS) => {
-      if (!focusUiPreviewEnabled || cleanUiDetailsPinnedRef.current) {
+      if (cleanUiDetailsPinnedRef.current) {
         return;
       }
       clearModeRevealTimeout();
@@ -844,15 +845,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
         modeRevealTimeoutRef.current = null;
       }, durationMs);
     },
-    [clearModeRevealTimeout, focusUiPreviewEnabled],
+    [clearModeRevealTimeout],
   );
 
-  useEffect(() => {
-    clearModeRevealTimeout();
-    const fullUiVisibleByDefault = !focusUiPreviewEnabled;
-    cleanUiDetailsPinnedRef.current = fullUiVisibleByDefault;
-    setCleanUiDetailsVisibleState(fullUiVisibleByDefault);
-  }, [clearModeRevealTimeout, focusUiPreviewEnabled]);
+  useEffect(() => () => clearModeRevealTimeout(), [clearModeRevealTimeout]);
 
   const slashCommandActions = useMemo(
     () => ({
@@ -1116,7 +1112,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const handleApprovalModeChangeWithUiReveal = useCallback(
     (mode: ApprovalMode) => {
       void handleApprovalModeChange(mode);
-      if (cleanUiDetailsVisible) {
+      if (!cleanUiDetailsVisible) {
         revealCleanUiDetailsTemporarily(APPROVAL_MODE_REVEAL_DURATION_MS);
       }
     },

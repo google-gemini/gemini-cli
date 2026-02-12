@@ -134,8 +134,8 @@ available combinations.
   the panel and insert a `?` into the prompt. You can hide only the hint text
   via `ui.showShortcutsHint`, without changing this keyboard behavior.
 - `Tab` + `Tab` (while typing in the prompt): Toggle between minimal and full UI
-  details when no completion/search interaction is active and
-  `ui.focusUiPreview` is enabled.
+  details when no completion/search interaction is active. The selected mode is
+  remembered for future sessions.
 - `Shift + Tab` (while typing in the prompt): Cycle approval modes.
 - `\` (at end of a line) + `Enter`: Insert a newline without leaving single-line
   mode.

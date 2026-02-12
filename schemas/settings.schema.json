@@ -266,13 +266,6 @@
           "default": false,
           "type": "boolean"
         },
-        "focusUiPreview": {
-          "title": "Focus UI (preview)",
-          "description": "Enable the Focus UI preview experience with minimal mode and Tab-Tab UI reveal.",
-          "markdownDescription": "Enable the Focus UI preview experience with minimal mode and Tab-Tab UI reveal.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
-        },
         "footer": {
           "title": "Footer",
           "description": "Settings for the footer.",

@@ -6,7 +6,6 @@
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { renderWithProviders } from '../../test-utils/render.js';
-import { createMockSettings } from '../../test-utils/settings.js';
 import { ShortcutsHelp } from './ShortcutsHelp.js';
 
 describe('ShortcutsHelp', () => {
@@ -48,21 +47,9 @@ describe('ShortcutsHelp', () => {
     },
   );
 
-  it('shows Tab Tab focus UI shortcut only when Focus UI preview is enabled', () => {
-    const disabled = renderWithProviders(<ShortcutsHelp />, {
-      settings: createMockSettings({
-        ui: { focusUiPreview: false },
-      }),
-    });
-    expect(disabled.lastFrame()).not.toContain('Tab Tab');
-    disabled.unmount();
-
-    const enabled = renderWithProviders(<ShortcutsHelp />, {
-      settings: createMockSettings({
-        ui: { focusUiPreview: true },
-      }),
-    });
-    expect(enabled.lastFrame()).toContain('Tab Tab');
-    enabled.unmount();
+  it('always shows Tab Tab focus UI shortcut', () => {
+    const rendered = renderWithProviders(<ShortcutsHelp />);
+    expect(rendered.lastFrame()).toContain('Tab Tab');
+    rendered.unmount();
   });
 });

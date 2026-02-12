@@ -233,11 +233,6 @@ their corresponding top-level category object in your `settings.json` file.
     input.
   - **Default:** `false`
 
-- **`ui.focusUiPreview`** (boolean):
-  - **Description:** Enable the Focus UI preview experience with minimal mode
-    and Tab-Tab UI reveal.
-  - **Default:** `false`
-
 - **`ui.footer.hideCWD`** (boolean):
   - **Description:** Hide the current working directory path in the footer.
   - **Default:** `false`

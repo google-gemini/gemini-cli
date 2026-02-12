@@ -10,34 +10,28 @@ import { theme } from '../semantic-colors.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { SectionHeader } from './shared/SectionHeader.js';
 import { useUIState } from '../contexts/UIStateContext.js';
-import { useSettings } from '../contexts/SettingsContext.js';
 
 type ShortcutItem = {
   key: string;
   description: string;
 };
 
-const buildShortcutItems = (focusUiPreviewEnabled: boolean): ShortcutItem[] => {
+const buildShortcutItems = (): ShortcutItem[] => {
   const isMac = process.platform === 'darwin';
   const altLabel = isMac ? 'Option' : 'Alt';
 
-  const items: ShortcutItem[] = [
+  return [
     { key: '!', description: 'shell mode' },
+    { key: '@', description: 'select file or folder' },
+    { key: 'Esc Esc', description: 'clear & rewind' },
+    { key: 'Tab Tab', description: 'focus UI' },
+    { key: 'Ctrl+Y', description: 'YOLO mode' },
     { key: 'Shift+Tab', description: 'cycle mode' },
     { key: 'Ctrl+V', description: 'paste images' },
-    { key: '@', description: 'select file or folder' },
-    { key: 'Ctrl+Y', description: 'YOLO mode' },
     { key: `${altLabel}+M`, description: 'raw markdown mode' },
-    { key: 'Esc Esc', description: 'clear & rewind' },
     { key: 'Ctrl+R', description: 'reverse-search history' },
     { key: 'Ctrl+X', description: 'open external editor' },
   ];
-
-  if (focusUiPreviewEnabled) {
-    items.push({ key: 'Tab Tab', description: 'focus UI' });
-  }
-
-  return items;
 };
 
 const Shortcut: React.FC<{ item: ShortcutItem }> = ({ item }) => (
@@ -53,16 +47,29 @@ const Shortcut: React.FC<{ item: ShortcutItem }> = ({ item }) => (
 
 export const ShortcutsHelp: React.FC = () => {
   const { terminalWidth } = useUIState();
-  const settings = useSettings();
-  const items = buildShortcutItems(settings.merged.ui.focusUiPreview === true);
-
   const isNarrow = isNarrowWidth(terminalWidth);
+  const items = buildShortcutItems();
+  const itemsForDisplay = isNarrow
+    ? items
+    : [
+        // Keep first column stable: !, @, Esc Esc, Tab Tab.
+        items[0],
+        items[5],
+        items[6],
+        items[1],
+        items[4],
+        items[7],
+        items[2],
+        items[8],
+        items[9],
+        items[3],
+      ];
 
   return (
     <Box flexDirection="column" width="100%">
       <SectionHeader title="Shortcuts (for more, see /help)" />
       <Box flexDirection="row" flexWrap="wrap" paddingLeft={1} paddingRight={2}>
-        {items.map((item, index) => (
+        {itemsForDisplay.map((item, index) => (
           <Box
             key={`${item.key}-${index}`}
             width={isNarrow ? '100%' : '33%'}
