@@ -5,7 +5,7 @@
  */
 
 import type { Config as CoreConfig } from '@google/gemini-cli-core';
-import { ShellExecutionService } from '@google/gemini-cli-core';
+import { ShellExecutionService, ShellTool } from '@google/gemini-cli-core';
 import type {
   AgentShell,
   AgentShellResult,
@@ -21,6 +21,32 @@ export class SdkAgentShell implements AgentShell {
   ): Promise<AgentShellResult> {
     const cwd = options?.cwd || this.config.getWorkingDir();
     const abortController = new AbortController();
+
+    // Use ShellTool to check policy
+    const shellTool = new ShellTool(this.config, this.config.getMessageBus());
+    try {
+      const invocation = shellTool.build({
+        command,
+        dir_path: cwd,
+      });
+
+      const confirmation = await invocation.shouldConfirmExecute(
+        abortController.signal,
+      );
+      if (confirmation) {
+        throw new Error(
+          'Command execution requires confirmation but no interactive session is available.',
+        );
+      }
+    } catch (error) {
+      return {
+        output: '',
+        stdout: '',
+        stderr: '',
+        exitCode: 1,
+        error: error instanceof Error ? error : new Error(String(error)),
+      };
+    }
 
     const handle = await ShellExecutionService.execute(
       command,
