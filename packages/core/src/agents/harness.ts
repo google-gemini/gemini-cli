@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type Part, type FunctionDeclaration } from '@google/genai';
+import {
+  type Part,
+  type FunctionDeclaration,
+  type Content,
+} from '@google/genai';
 import { type Config } from '../config/config.js';
 import { GeminiChat } from '../core/geminiChat.js';
 import {
@@ -45,6 +49,8 @@ export interface AgentHarnessOptions {
   inputs?: AgentInputs;
   /** If provided, this prompt_id will be used as a prefix. */
   parentPromptId?: string;
+  /** Existing chat history to initialize with (e.g. for main agent turns). */
+  history?: Content[];
 }
 
 /**
@@ -60,6 +66,7 @@ export class AgentHarness {
   private readonly compressionService: ChatCompressionService;
   private readonly toolOutputMaskingService: ToolOutputMaskingService;
   private readonly toolRegistry: ToolRegistry;
+  private readonly initialHistory?: Content[];
 
   private chat?: GeminiChat;
   private currentSequenceModel: string | null = null;
@@ -68,6 +75,7 @@ export class AgentHarness {
   constructor(options: AgentHarnessOptions) {
     this.config = options.config;
     this.behavior = options.behavior;
+    this.initialHistory = options.history;
 
     this.loopDetector = new LoopDetectionService(this.config);
     this.compressionService = new ChatCompressionService();
@@ -89,7 +97,8 @@ export class AgentHarness {
 
   private async createChat(): Promise<GeminiChat> {
     const systemInstruction = await this.behavior.getSystemInstruction();
-    const history = await this.behavior.getInitialHistory();
+    const history =
+      this.initialHistory ?? (await this.behavior.getInitialHistory());
     const tools = this.prepareToolsList();
 
     return new GeminiChat(

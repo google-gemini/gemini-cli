@@ -812,6 +812,7 @@ export class GeminiClient {
       if (!this.harness || this.lastPromptId !== prompt_id) {
         this.harness = AgentFactory.createHarness(this.config, undefined, {
           parentPromptId: prompt_id,
+          history: this.getChat().getHistory(),
         });
         this.lastPromptId = prompt_id;
       }
