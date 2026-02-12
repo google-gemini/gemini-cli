@@ -54,9 +54,11 @@ export function ExtensionRegistryView({
     let active = true;
     const fetchExtensions = async () => {
       try {
-        const result = await client.getExtensions(1, 1000); // Fetch a large enough batch
+        // Fetch all extensions to enable comprehensive local fuzzy search.
+        // Display virtualization/pagination is handled by SearchableList.
+        const extensions = await client.getAllExtensions();
         if (active) {
-          setExtensions(result.extensions);
+          setExtensions(extensions);
           setLoading(false);
         }
       } catch (err) {

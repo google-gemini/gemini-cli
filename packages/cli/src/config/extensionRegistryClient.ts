@@ -40,6 +40,13 @@ export class ExtensionRegistryClient {
     ExtensionRegistryClient.fetchPromise = null;
   }
 
+  /**
+   * Returns all extensions from the registry.
+   */
+  async getAllExtensions(): Promise<RegistryExtension[]> {
+    return this.fetchAllExtensions();
+  }
+
   async getExtensions(
     page: number = 1,
     limit: number = 10,

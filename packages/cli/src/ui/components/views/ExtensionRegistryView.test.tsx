@@ -14,7 +14,7 @@ import {
 } from '../../../config/extensionRegistryClient.js';
 import { type ExtensionManager } from '../../../config/extension-manager.js';
 
-vi.mock('../../config/extensionRegistryClient.js');
+vi.mock('../../../config/extensionRegistryClient.js');
 
 const mockExtensions = [
   {
@@ -37,6 +37,12 @@ describe('ExtensionRegistryView', () => {
   });
 
   it('should render loading state initially', async () => {
+    // Return a promise that doesn't resolve immediately to keep the loading state active
+    vi.spyOn(
+      ExtensionRegistryClient.prototype,
+      'getAllExtensions',
+    ).mockReturnValue(new Promise(() => {}));
+
     const mockExtensionManager = {
       getExtensions: vi.fn().mockReturnValue([]),
     };
@@ -52,11 +58,8 @@ describe('ExtensionRegistryView', () => {
   it('should render extensions after fetching', async () => {
     vi.spyOn(
       ExtensionRegistryClient.prototype,
-      'getExtensions',
-    ).mockResolvedValue({
-      extensions: mockExtensions as unknown as RegistryExtension[],
-      total: 2,
-    });
+      'getAllExtensions',
+    ).mockResolvedValue(mockExtensions as unknown as RegistryExtension[]);
 
     const mockExtensionManager = {
       getExtensions: vi.fn().mockReturnValue([]),
@@ -83,7 +86,7 @@ describe('ExtensionRegistryView', () => {
   it('should render error message on fetch failure', async () => {
     vi.spyOn(
       ExtensionRegistryClient.prototype,
-      'getExtensions',
+      'getAllExtensions',
     ).mockRejectedValue(new Error('Fetch failed'));
 
     const mockExtensionManager = {
@@ -110,11 +113,8 @@ describe('ExtensionRegistryView', () => {
   it('should call onSelect when an item is selected', async () => {
     vi.spyOn(
       ExtensionRegistryClient.prototype,
-      'getExtensions',
-    ).mockResolvedValue({
-      extensions: mockExtensions as unknown as RegistryExtension[],
-      total: 2,
-    });
+      'getAllExtensions',
+    ).mockResolvedValue(mockExtensions as unknown as RegistryExtension[]);
     const onSelect = vi.fn();
 
     const mockExtensionManager = {
