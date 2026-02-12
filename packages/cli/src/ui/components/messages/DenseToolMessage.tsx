@@ -5,8 +5,8 @@
  */
 
 import type React from 'react';
-import { useMemo } from 'react';
-import { Box, Text } from 'ink';
+import { useMemo, useState, useRef } from 'react';
+import { Box, Text, type DOMElement } from 'ink';
 import { ToolCallStatus } from '../../types.js';
 import type {
   IndividualToolCallDisplay,
@@ -17,7 +17,19 @@ import type {
 } from '../../types.js';
 import { ToolStatusIndicator } from './ToolShared.js';
 import { theme } from '../../semantic-colors.js';
-import { DiffRenderer } from './DiffRenderer.js';
+import {
+  DiffRenderer,
+  renderDiffLines,
+  isNewFile,
+  parseDiffWithLineNumbers,
+} from './DiffRenderer.js';
+import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
+import { useMouseClick } from '../../hooks/useMouseClick.js';
+import { ScrollableList } from '../shared/ScrollableList.js';
+import { COMPLETED_SHELL_MAX_LINES } from '../../constants.js';
+import { useSettings } from '../../contexts/SettingsContext.js';
+import { colorizeCode } from '../../utils/CodeColorizer.js';
+import { useToolActions } from '../../contexts/ToolActionsContext.js';
 
 interface DenseToolMessageProps extends IndividualToolCallDisplay {
   terminalWidth?: number;
@@ -262,6 +274,7 @@ function getGenericSuccessData(
 
 export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
   const {
+    callId,
     name,
     status,
     resultDisplay,
@@ -271,6 +284,19 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
     availableTerminalHeight,
     description: originalDescription,
   } = props;
+
+  const isAlternateBuffer = useAlternateBuffer();
+  const { merged: settings } = useSettings();
+  const { isExpanded: isExpandedInContext, toggleExpansion } = useToolActions();
+
+  // Handle optional context members
+  const [localIsExpanded, setLocalIsExpanded] = useState(false);
+  const isExpanded = isExpandedInContext
+    ? isExpandedInContext(callId)
+    : localIsExpanded;
+
+  const [isFocused, setIsFocused] = useState(false);
+  const toggleRef = useRef<DOMElement>(null);
 
   // 1. Unified File Data Extraction (Safely bridge resultDisplay and confirmationDetails)
   const diff = useMemo((): FileDiff | undefined => {
@@ -287,6 +313,25 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
     }
     return undefined;
   }, [resultDisplay, confirmationDetails]);
+
+  const handleToggle = () => {
+    const next = !isExpanded;
+    if (!next) {
+      setIsFocused(false);
+    } else {
+      setIsFocused(true);
+    }
+
+    if (toggleExpansion) {
+      toggleExpansion(callId);
+    } else {
+      setLocalIsExpanded(next);
+    }
+  };
+
+  useMouseClick(toggleRef, handleToggle, {
+    isActive: isAlternateBuffer && !!diff,
+  });
 
   // 2. State-to-View Coordination
   const viewParts = useMemo((): ViewParts => {
@@ -342,11 +387,51 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
     originalDescription,
   ]);
 
-  const { description, summary, payload } = viewParts;
+  const { description, summary } = viewParts;
+
+  const showPayload = !isAlternateBuffer || !diff || isExpanded;
+
+  const diffLines = useMemo(() => {
+    if (!diff || !isExpanded || !isAlternateBuffer) return [];
+
+    const parsedLines = parseDiffWithLineNumbers(diff.fileDiff);
+    const isNewFileResult = isNewFile(parsedLines);
+
+    if (isNewFileResult) {
+      const addedContent = parsedLines
+        .filter((line) => line.type === 'add')
+        .map((line) => line.content)
+        .join('\n');
+      const fileExtension = diff.fileName?.split('.').pop() || null;
+      // We use colorizeCode with returnLines: true
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return colorizeCode({
+        code: addedContent,
+        language: fileExtension,
+        maxWidth: terminalWidth ? terminalWidth - 6 : 80,
+        settings,
+        disableColor: status === ToolCallStatus.Canceled,
+        returnLines: true,
+      }) as React.ReactNode[];
+    } else {
+      return renderDiffLines({
+        parsedLines,
+        filename: diff.fileName,
+        terminalWidth: terminalWidth ? terminalWidth - 6 : 80,
+        disableColor: status === ToolCallStatus.Canceled,
+      });
+    }
+  }, [diff, isExpanded, isAlternateBuffer, terminalWidth, settings, status]);
+
+  const keyExtractor = (item: React.ReactNode, index: number) =>
+    `diff-line-${index}`;
+  const renderItem = ({ item }: { item: React.ReactNode }) => (
+    <Box minHeight={1}>{item}</Box>
+  );
 
   // 3. Final Layout
   return (
-    <Box flexDirection="column" marginBottom={payload ? 1 : 0}>
+    <Box flexDirection="column" marginBottom={showPayload ? 1 : 0}>
       <Box marginLeft={3} flexDirection="row" flexWrap="wrap">
         <ToolStatusIndicator status={status} name={name} />
         <Box maxWidth={25} flexShrink={1} flexGrow={0}>
@@ -360,12 +445,48 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
           </Text>
         </Box>
         {summary && (
-          <Box marginLeft={1} flexGrow={1}>
+          <Box marginLeft={1} flexGrow={0}>
             {summary}
           </Box>
         )}
+        {isAlternateBuffer && diff && (
+          <Box ref={toggleRef} marginLeft={1} flexGrow={1}>
+            <Text color={theme.text.link} dimColor>
+              [{isExpanded ? 'Hide Diff' : 'Show Diff'}]
+            </Text>
+          </Box>
+        )}
       </Box>
-      {payload && <Box marginLeft={6}>{payload}</Box>}
+
+      {showPayload && isAlternateBuffer && diffLines.length > 0 && (
+        <Box
+          marginLeft={6}
+          paddingX={1}
+          flexDirection="column"
+          maxHeight={COMPLETED_SHELL_MAX_LINES + 2}
+          borderStyle="round"
+          borderColor={theme.border.default}
+          borderDimColor={true}
+          maxWidth={terminalWidth ? Math.min(124, terminalWidth - 6) : 124}
+        >
+          <ScrollableList
+            data={diffLines}
+            renderItem={renderItem}
+            keyExtractor={keyExtractor}
+            estimatedItemHeight={() => 1}
+            hasFocus={isFocused}
+            width={
+              // adjustment: 6 margin - 4 padding/border - 4 right-scroll-gutter
+              terminalWidth ? Math.min(120, terminalWidth - 6 - 4 - 4) : 70
+            }
+          />
+        </Box>
+      )}
+
+      {showPayload && (!isAlternateBuffer || !diff) && viewParts.payload && (
+        <Box marginLeft={6}>{viewParts.payload}</Box>
+      )}
+
       {outputFile && (
         <Box marginLeft={6}>
           <Text color={theme.text.secondary}>

@@ -31,6 +31,8 @@ interface ToolActionsContextValue {
   ) => Promise<void>;
   cancel: (callId: string) => Promise<void>;
   isDiffingEnabled: boolean;
+  isExpanded?: (callId: string) => boolean;
+  toggleExpansion?: (callId: string) => void;
 }
 
 const ToolActionsContext = createContext<ToolActionsContextValue | null>(null);
@@ -57,6 +59,26 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
   // Hoist IdeClient logic here to keep UI pure
   const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
   const [isDiffingEnabled, setIsDiffingEnabled] = useState(false);
+  const [expandedToolCallIds, setExpandedToolCallIds] = useState<Set<string>>(
+    new Set(),
+  );
+
+  const isExpanded = useCallback(
+    (callId: string) => expandedToolCallIds.has(callId),
+    [expandedToolCallIds],
+  );
+
+  const toggleExpansion = useCallback((callId: string) => {
+    setExpandedToolCallIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(callId)) {
+        next.delete(callId);
+      } else {
+        next.add(callId);
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -153,7 +175,9 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
   );
 
   return (
-    <ToolActionsContext.Provider value={{ confirm, cancel, isDiffingEnabled }}>
+    <ToolActionsContext.Provider
+      value={{ confirm, cancel, isDiffingEnabled, isExpanded, toggleExpansion }}
+    >
       {children}
     </ToolActionsContext.Provider>
   );
