@@ -15,6 +15,7 @@ const mockWrite = vi.fn();
 const mockSubscribe = vi.fn();
 const mockUnsubscribe = vi.fn();
 const mockHandleThemeSelect = vi.fn();
+const mockQueryTerminalBackground = vi.fn();
 
 vi.mock('ink', async () => ({
   useStdout: () => ({
@@ -28,6 +29,7 @@ vi.mock('../contexts/TerminalContext.js', () => ({
   useTerminalContext: () => ({
     subscribe: mockSubscribe,
     unsubscribe: mockUnsubscribe,
+    queryTerminalBackground: mockQueryTerminalBackground,
   }),
 }));
 
@@ -52,6 +54,7 @@ vi.mock('../themes/theme-manager.js', async () => {
     themeManager: {
       isDefaultTheme: (name: string) =>
         name === 'default' || name === 'default-light',
+      setTerminalBackground: vi.fn(),
     },
     DEFAULT_THEME: { name: 'default' },
   };
@@ -78,6 +81,7 @@ describe('useTerminalTheme', () => {
     mockSubscribe.mockClear();
     mockUnsubscribe.mockClear();
     mockHandleThemeSelect.mockClear();
+    mockQueryTerminalBackground.mockClear();
     // Reset any settings modifications
     mockSettings.merged.ui.autoThemeSwitching = true;
     mockSettings.merged.ui.theme = 'default';
@@ -89,37 +93,37 @@ describe('useTerminalTheme', () => {
   });
 
   it('should subscribe to terminal background events on mount', () => {
-    renderHook(() => useTerminalTheme(mockHandleThemeSelect, config));
+    renderHook(() => useTerminalTheme(mockHandleThemeSelect, config, vi.fn()));
     expect(mockSubscribe).toHaveBeenCalled();
   });
 
   it('should unsubscribe on unmount', () => {
     const { unmount } = renderHook(() =>
-      useTerminalTheme(mockHandleThemeSelect, config),
+      useTerminalTheme(mockHandleThemeSelect, config, vi.fn()),
     );
     unmount();
     expect(mockUnsubscribe).toHaveBeenCalled();
   });
 
   it('should poll for terminal background', () => {
-    renderHook(() => useTerminalTheme(mockHandleThemeSelect, config));
+    renderHook(() => useTerminalTheme(mockHandleThemeSelect, config, vi.fn()));
 
     // Fast-forward time (1 minute)
     vi.advanceTimersByTime(60000);
-    expect(mockWrite).toHaveBeenCalledWith('\x1b]11;?\x1b\\');
+    expect(mockQueryTerminalBackground).toHaveBeenCalled();
   });
 
   it('should not poll if terminal background is undefined at startup', () => {
     config.getTerminalBackground = vi.fn().mockReturnValue(undefined);
-    renderHook(() => useTerminalTheme(mockHandleThemeSelect, config));
+    renderHook(() => useTerminalTheme(mockHandleThemeSelect, config, vi.fn()));
 
     // Poll should not happen
     vi.advanceTimersByTime(60000);
-    expect(mockWrite).not.toHaveBeenCalled();
+    expect(mockQueryTerminalBackground).not.toHaveBeenCalled();
   });
 
   it('should switch to light theme when background is light', () => {
-    renderHook(() => useTerminalTheme(mockHandleThemeSelect, config));
+    renderHook(() => useTerminalTheme(mockHandleThemeSelect, config, vi.fn()));
 
     const handler = mockSubscribe.mock.calls[0][0];
 
@@ -137,7 +141,7 @@ describe('useTerminalTheme', () => {
     // Start with light theme
     mockSettings.merged.ui.theme = 'default-light';
 
-    renderHook(() => useTerminalTheme(mockHandleThemeSelect, config));
+    renderHook(() => useTerminalTheme(mockHandleThemeSelect, config, vi.fn()));
 
     const handler = mockSubscribe.mock.calls[0][0];
 
@@ -156,11 +160,11 @@ describe('useTerminalTheme', () => {
 
   it('should not switch theme if autoThemeSwitching is disabled', () => {
     mockSettings.merged.ui.autoThemeSwitching = false;
-    renderHook(() => useTerminalTheme(mockHandleThemeSelect, config));
+    renderHook(() => useTerminalTheme(mockHandleThemeSelect, config, vi.fn()));
 
     // Poll should not happen
     vi.advanceTimersByTime(60000);
-    expect(mockWrite).not.toHaveBeenCalled();
+    expect(mockQueryTerminalBackground).not.toHaveBeenCalled();
 
     mockSettings.merged.ui.autoThemeSwitching = true;
   });

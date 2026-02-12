@@ -59,6 +59,7 @@ describe('ThemeManager', () => {
     // Reset themeManager state
     themeManager.loadCustomThemes({});
     themeManager.setActiveTheme(DEFAULT_THEME.name);
+    themeManager.setTerminalBackground(undefined);
   });
 
   afterEach(() => {
@@ -236,6 +237,116 @@ describe('ThemeManager', () => {
 
       expect(themeManager.isCustomTheme('ExtensionTheme (Ext)')).toBe(true);
       expect(themeManager.isCustomTheme('SettingsTheme')).toBe(true);
+    });
+  });
+
+  describe('terminalBackground override', () => {
+    it('should store and retrieve terminal background', () => {
+      themeManager.setTerminalBackground('#123456');
+      expect(themeManager.getTerminalBackground()).toBe('#123456');
+      themeManager.setTerminalBackground(undefined);
+      expect(themeManager.getTerminalBackground()).toBeUndefined();
+    });
+
+    it('should override background.primary in semantic colors when terminal background is set', () => {
+      const color = '#1a1a1a';
+      themeManager.setTerminalBackground(color);
+      const semanticColors = themeManager.getSemanticColors();
+      expect(semanticColors.background.primary).toBe(color);
+    });
+
+    it('should override Background in colors when terminal background is set', () => {
+      const color = '#1a1a1a';
+      themeManager.setTerminalBackground(color);
+      const colors = themeManager.getColors();
+      expect(colors.Background).toBe(color);
+    });
+
+    it('should re-calculate dependent semantic colors when terminal background is set', () => {
+      themeManager.setTerminalBackground('#000000');
+      const semanticColors = themeManager.getSemanticColors();
+
+      // border.default should be interpolated from background (#000000) and Gray
+      // ui.dark should be interpolated from Gray and background (#000000)
+      expect(semanticColors.border.default).toBeDefined();
+      expect(semanticColors.ui.dark).toBeDefined();
+      expect(semanticColors.border.default).not.toBe(
+        DEFAULT_THEME.semanticColors.border.default,
+      );
+    });
+
+    it('should return original semantic colors when terminal background is NOT set', () => {
+      themeManager.setTerminalBackground(undefined);
+      const semanticColors = themeManager.getSemanticColors();
+      expect(semanticColors).toEqual(DEFAULT_THEME.semanticColors);
+    });
+
+    it('should NOT override background when theme is incompatible (Light theme on Dark terminal)', () => {
+      themeManager.setActiveTheme('Default Light');
+      const darkTerminalBg = '#000000';
+      themeManager.setTerminalBackground(darkTerminalBg);
+
+      const semanticColors = themeManager.getSemanticColors();
+      expect(semanticColors.background.primary).toBe(
+        themeManager.getTheme('Default Light')!.colors.Background,
+      );
+
+      const colors = themeManager.getColors();
+      expect(colors.Background).toBe(
+        themeManager.getTheme('Default Light')!.colors.Background,
+      );
+    });
+
+    it('should NOT override background when theme is incompatible (Dark theme on Light terminal)', () => {
+      themeManager.setActiveTheme('Default');
+      const lightTerminalBg = '#FFFFFF';
+      themeManager.setTerminalBackground(lightTerminalBg);
+
+      const semanticColors = themeManager.getSemanticColors();
+      expect(semanticColors.background.primary).toBe(
+        themeManager.getTheme('Default')!.colors.Background,
+      );
+
+      const colors = themeManager.getColors();
+      expect(colors.Background).toBe(
+        themeManager.getTheme('Default')!.colors.Background,
+      );
+    });
+
+    it('should override background for custom theme when compatible', () => {
+      themeManager.loadCustomThemes({
+        MyDark: {
+          name: 'MyDark',
+          type: 'custom',
+          Background: '#000000',
+          Foreground: '#ffffff',
+        },
+      });
+      themeManager.setActiveTheme('MyDark');
+
+      const darkTerminalBg = '#1a1a1a';
+      themeManager.setTerminalBackground(darkTerminalBg);
+
+      const semanticColors = themeManager.getSemanticColors();
+      expect(semanticColors.background.primary).toBe(darkTerminalBg);
+    });
+
+    it('should NOT override background for custom theme when incompatible', () => {
+      themeManager.loadCustomThemes({
+        MyLight: {
+          name: 'MyLight',
+          type: 'custom',
+          Background: '#ffffff',
+          Foreground: '#000000',
+        },
+      });
+      themeManager.setActiveTheme('MyLight');
+
+      const darkTerminalBg = '#000000';
+      themeManager.setTerminalBackground(darkTerminalBg);
+
+      const semanticColors = themeManager.getSemanticColors();
+      expect(semanticColors.background.primary).toBe('#ffffff');
     });
   });
 });
