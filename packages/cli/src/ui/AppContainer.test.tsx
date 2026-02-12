@@ -2126,8 +2126,12 @@ describe('AppContainer State Management', () => {
     beforeEach(() => {
       mockedUseKeypress = vi.spyOn(useKeypressModule, 'useKeypress') as Mock;
       mockedUseKeypress.mockImplementation(
-        (callback: (key: Key) => boolean) => {
-          handleGlobalKeypress = callback;
+        (callback: (key: Key) => boolean, options: { isActive: boolean }) => {
+          // AppContainer registers multiple keypress handlers; capture only
+          // active handlers so inactive copy-mode handler doesn't override.
+          if (options?.isActive) {
+            handleGlobalKeypress = callback;
+          }
         },
       );
       vi.useFakeTimers();
