@@ -12,7 +12,14 @@ import {
   useRef,
   useLayoutEffect,
 } from 'react';
-import { type DOMElement, measureElement } from 'ink';
+import {
+  type DOMElement,
+  measureElement,
+  useApp,
+  useStdout,
+  useStdin,
+  type AppProps,
+} from 'ink';
 import { App } from './App.js';
 import { AppContext } from './contexts/AppContext.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
@@ -87,7 +94,6 @@ import { useVimMode } from './contexts/VimModeContext.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
-import { useApp, useStdout, useStdin } from 'ink';
 import { calculateMainAreaWidth } from './utils/ui-sizing.js';
 import ansiEscapes from 'ansi-escapes';
 import { basename } from 'node:path';
@@ -146,8 +152,8 @@ import { NewAgentsChoice } from './components/NewAgentsNotification.js';
 import { isSlashCommand } from './utils/commandUtils.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useTimedMessage } from './hooks/useTimedMessage.js';
-import { isITerm2 } from './utils/terminalUtils.js';
 import { shouldDismissShortcutsHelpOnHotkey } from './utils/shortcutsHelp.js';
+import { useSuspend } from './hooks/useSuspend.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -201,6 +207,7 @@ export const AppContainer = (props: AppContainerProps) => {
   useMemoryMonitor(historyManager);
   const isAlternateBuffer = useAlternateBuffer();
   const [corgiMode, setCorgiMode] = useState(false);
+  const [forceRerenderKey, setForceRerenderKey] = useState(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [quittingMessages, setQuittingMessages] = useState<
     HistoryItem[] | null
@@ -347,7 +354,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const { columns: terminalWidth, rows: terminalHeight } = useTerminalSize();
   const { stdin, setRawMode } = useStdin();
   const { stdout } = useStdout();
-  const app = useApp();
+  const app: AppProps = useApp();
 
   // Additional hooks moved from App.tsx
   const { stats: sessionStats } = useSessionStats();
@@ -536,10 +543,13 @@ export const AppContainer = (props: AppContainerProps) => {
     setHistoryRemountKey((prev) => prev + 1);
   }, [setHistoryRemountKey, isAlternateBuffer, stdout]);
 
+  const shouldUseAlternateScreen = shouldEnterAlternateScreen(
+    isAlternateBuffer,
+    config.getScreenReader(),
+  );
+
   const handleEditorClose = useCallback(() => {
-    if (
-      shouldEnterAlternateScreen(isAlternateBuffer, config.getScreenReader())
-    ) {
+    if (shouldUseAlternateScreen) {
       // The editor may have exited alternate buffer mode so we need to
       // enter it again to be safe.
       enterAlternateScreen();
@@ -549,7 +559,7 @@ export const AppContainer = (props: AppContainerProps) => {
     }
     terminalCapabilityManager.enableSupportedModes();
     refreshStatic();
-  }, [refreshStatic, isAlternateBuffer, app, config]);
+  }, [refreshStatic, shouldUseAlternateScreen, app]);
 
   const [editorError, setEditorError] = useState<string | null>(null);
   const {
@@ -1370,6 +1380,24 @@ Logging in with Google... Restarting Gemini CLI to continue.
     };
   }, [showTransientMessage]);
 
+  const handleWarning = useCallback(
+    (message: string) => {
+      showTransientMessage({
+        text: message,
+        type: TransientMessageType.Warning,
+      });
+    },
+    [showTransientMessage],
+  );
+
+  const { handleSuspend } = useSuspend({
+    handleWarning,
+    setRawMode,
+    refreshStatic,
+    setForceRerenderKey,
+    shouldUseAlternateScreen,
+  });
+
   useEffect(() => {
     if (ideNeedsRestart) {
       // IDE trust changed, force a restart.
@@ -1510,6 +1538,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       } else if (keyMatchers[Command.EXIT](key)) {
         setCtrlDPressCount((prev) => prev + 1);
         return true;
+      } else if (keyMatchers[Command.SUSPEND_APP](key)) {
+        handleSuspend();
+        return true;
       }
 
       let enteringConstrainHeightMode = false;
@@ -1534,15 +1565,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
         } else {
           setShowErrorDetails((prev) => !prev);
         }
-        return true;
-      } else if (keyMatchers[Command.SUSPEND_APP](key)) {
-        const undoMessage = isITerm2()
-          ? 'Undo has been moved to Option + Z'
-          : 'Undo has been moved to Alt/Option + Z or Cmd + Z';
-        showTransientMessage({
-          text: undoMessage,
-          type: TransientMessageType.Warning,
-        });
         return true;
       } else if (keyMatchers[Command.SHOW_FULL_TODOS](key)) {
         setShowFullTodos((prev) => !prev);
@@ -1652,10 +1674,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleSlashCommand,
       cancelOngoingRequest,
       activePtyId,
+      handleSuspend,
       embeddedShellFocused,
       settings.merged.general.debugKeystrokeLogging,
       refreshStatic,
       setCopyModeEnabled,
+      tabFocusTimeoutRef,
       isAlternateBuffer,
       shortcutsHelpVisible,
       backgroundCurrentShell,
@@ -1664,7 +1688,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isBackgroundShellVisible,
       setIsBackgroundShellListOpen,
       lastOutputTimeRef,
-      tabFocusTimeoutRef,
       showTransientMessage,
       settings.merged.general.devtools,
       showErrorDetails,
@@ -2276,7 +2299,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           >
             <ToolActionsProvider config={config} toolCalls={allToolCalls}>
               <ShellFocusContext.Provider value={isFocused}>
-                <App />
+                <App key={`app-${forceRerenderKey}`} />
               </ShellFocusContext.Provider>
             </ToolActionsProvider>
           </AppContext.Provider>
