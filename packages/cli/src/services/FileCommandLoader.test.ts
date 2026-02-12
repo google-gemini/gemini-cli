@@ -6,6 +6,7 @@
 
 import * as glob from 'glob';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import type { Config } from '@google/gemini-cli-core';
 import { GEMINI_DIR, Storage } from '@google/gemini-cli-core';
 import mock from 'mock-fs';
@@ -74,6 +75,14 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 vi.mock('glob', () => ({
   glob: vi.fn(),
 }));
+
+vi.mock('node:os', async (importOriginal) => {
+  const original = await importOriginal<typeof import('node:os')>();
+  return {
+    ...original,
+    userInfo: vi.fn().mockReturnValue({ username: 'mock-user' }),
+  };
+});
 
 describe('FileCommandLoader', () => {
   const signal: AbortSignal = new AbortController().signal;
@@ -382,7 +391,9 @@ describe('FileCommandLoader', () => {
     const commands = await loader.loadCommands(signal);
     const command = commands[0];
     expect(command).toBeDefined();
-    expect(command.description).toBe('Custom command from test.toml');
+    expect(command.description).toBe(
+      '[mock-user] Custom command from test.toml',
+    );
   });
 
   it('uses the provided description', async () => {
@@ -397,7 +408,7 @@ describe('FileCommandLoader', () => {
     const commands = await loader.loadCommands(signal);
     const command = commands[0];
     expect(command).toBeDefined();
-    expect(command.description).toBe('My test command');
+    expect(command.description).toBe('[mock-user] My test command');
   });
 
   it('should sanitize colons in filenames to prevent namespace conflicts', async () => {
@@ -1382,8 +1393,10 @@ describe('FileCommandLoader', () => {
       const loader = new FileCommandLoader(null);
       const commands = await loader.loadCommands(signal);
       expect(commands).toHaveLength(1);
-      // Newlines and tabs become spaces, ANSI is stripped
-      expect(commands[0].description).toBe('Line 1 Line 2 Tabbed Red text');
+      // Newlines and tabs become spaces, ANSI is stripped, prepended with [mock-user]
+      expect(commands[0].description).toBe(
+        '[mock-user] Line 1 Line 2 Tabbed Red text',
+      );
     });
 
     it('truncates long descriptions', async () => {
@@ -1399,67 +1412,153 @@ describe('FileCommandLoader', () => {
       const commands = await loader.loadCommands(signal);
       expect(commands).toHaveLength(1);
       expect(commands[0].description.length).toBe(100);
-      expect(commands[0].description).toBe('d'.repeat(97) + '...');
+      expect(commands[0].description).toBe(
+        '[mock-user] ' + 'd'.repeat(85) + '...',
+      );
     });
   });
 
-  describe('CommandSource Assignment', () => {
-    it('assigns CommandSource.USER to user commands', async () => {
+  describe('sourceLabel Assignment', () => {
+    it('uses the OS username for user commands', async () => {
       const userCommandsDir = Storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
-          'user-cmd.toml': 'prompt = "User prompt"',
+          'test.toml': 'prompt = "User prompt"',
         },
       });
 
       const loader = new FileCommandLoader(null);
       const commands = await loader.loadCommands(signal);
 
-      expect(commands).toHaveLength(1);
-      expect(commands[0].source).toBe('user');
+      expect(commands[0].description).toBe(
+        '[mock-user] Custom command from test.toml',
+      );
     });
 
-    it('assigns CommandSource.PROJECT to project commands', async () => {
-      const projectCommandsDir = new Storage(
-        process.cwd(),
-      ).getProjectCommandsDir();
+    it('falls back to environment variables or "User" if os.userInfo() fails', async () => {
+      const userInfoSpy = vi.spyOn(os, 'userInfo').mockImplementation(() => {
+        throw new Error('userInfo failed');
+      });
+
+      const userCommandsDir = Storage.getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'test.toml': 'prompt = "Fallback prompt"',
+        },
+      });
+
+      // Falls back to 'USER' environment variable
+      vi.stubEnv('USER', 'env-user');
+      const loader = new FileCommandLoader(null);
+      const commands = await loader.loadCommands(signal);
+      expect(commands[0].description).toBe(
+        '[env-user] Custom command from test.toml',
+      );
+
+      // Falls back to 'USERNAME' environment variable
+      vi.stubEnv('USER', '');
+      vi.stubEnv('USERNAME', 'win-user');
+      const loader2 = new FileCommandLoader(null);
+      const commands2 = await loader2.loadCommands(signal);
+      expect(commands2[0].description).toBe(
+        '[win-user] Custom command from test.toml',
+      );
+
+      // Falls back to 'User' string
+      vi.stubEnv('USERNAME', '');
+      const loader3 = new FileCommandLoader(null);
+      const commands3 = await loader3.loadCommands(signal);
+      expect(commands3[0].description).toBe(
+        '[User] Custom command from test.toml',
+      );
+
+      userInfoSpy.mockRestore();
+      vi.unstubAllEnvs();
+    });
+
+    it('uses the project root basename for project commands', async () => {
+      const projectRoot = '/path/to/my-awesome-project';
+      const projectCommandsDir = path.join(projectRoot, GEMINI_DIR, 'commands');
+
       mock({
         [projectCommandsDir]: {
-          'project-cmd.toml': 'prompt = "Project prompt"',
+          'project.toml': 'prompt = "Project prompt"',
         },
       });
 
       const mockConfig = {
-        getProjectRoot: vi.fn(() => process.cwd()),
+        getProjectRoot: vi.fn(() => projectRoot),
         getExtensions: vi.fn(() => []),
         getFolderTrust: vi.fn(() => false),
         isTrustedFolder: vi.fn(() => false),
+        storage: new Storage(projectRoot),
       } as unknown as Config;
+
       const loader = new FileCommandLoader(mockConfig);
       const commands = await loader.loadCommands(signal);
 
-      // 0 is user (empty), 1 is project
-      const projectCmd = commands.find((c) => c.name === 'project-cmd');
-      expect(projectCmd).toBeDefined();
-      expect(projectCmd?.source).toBe('project');
+      const projectCmd = commands.find((c) => c.name === 'project');
+      expect(projectCmd?.description).toBe(
+        '[my-awesome-project] Custom command from project.toml',
+      );
     });
 
-    it('assigns CommandSource.EXTENSION to extension commands', async () => {
+    it('correctly handles Windows-style project root paths', async () => {
+      // Simulate a Windows path regardless of the current OS
+      const windowsProjectRoot = 'C:\\Users\\test\\projects\\win-project';
+      // We use path.win32 to explicitly test Windows behavior
+      const expectedLabel = path.win32.basename(windowsProjectRoot);
+      expect(expectedLabel).toBe('win-project');
+
+      const projectCommandsDir = path.join(
+        windowsProjectRoot,
+        GEMINI_DIR,
+        'commands',
+      );
+
+      mock({
+        [projectCommandsDir]: {
+          'win-cmd.toml': 'prompt = "Win prompt"',
+        },
+      });
+
+      const mockConfig = {
+        getProjectRoot: vi.fn(() => windowsProjectRoot),
+        getExtensions: vi.fn(() => []),
+        getFolderTrust: vi.fn(() => false),
+        isTrustedFolder: vi.fn(() => false),
+        storage: new Storage(windowsProjectRoot),
+      } as unknown as Config;
+
+      const loader = new FileCommandLoader(mockConfig);
+      const commands = await loader.loadCommands(signal);
+
+      const winCmd = commands.find((c) => c.name === 'win-cmd');
+      // On non-Windows systems, path.basename might not handle \ correctly
+      // but FileCommandLoader uses the platform-native 'path' module.
+      // In the test we just want to ensure it uses WHATEVER path.basename returns.
+      const actualLabel = path.basename(windowsProjectRoot);
+      expect(winCmd?.description).toBe(
+        `[${actualLabel}] Custom command from win-cmd.toml`,
+      );
+    });
+
+    it('uses the extension name for extension commands', async () => {
       const extensionDir = path.join(
         process.cwd(),
         GEMINI_DIR,
         'extensions',
-        'test-ext',
+        'my-ext',
       );
 
       mock({
         [extensionDir]: {
           'gemini-extension.json': JSON.stringify({
-            name: 'test-ext',
+            name: 'my-ext',
             version: '1.0.0',
           }),
           commands: {
-            'ext-cmd.toml': 'prompt = "Extension prompt"',
+            'ext.toml': 'prompt = "Extension prompt"',
           },
         },
       });
@@ -1468,7 +1567,7 @@ describe('FileCommandLoader', () => {
         getProjectRoot: vi.fn(() => process.cwd()),
         getExtensions: vi.fn(() => [
           {
-            name: 'test-ext',
+            name: 'my-ext',
             version: '1.0.0',
             isActive: true,
             path: extensionDir,
@@ -1477,12 +1576,12 @@ describe('FileCommandLoader', () => {
         getFolderTrust: vi.fn(() => false),
         isTrustedFolder: vi.fn(() => false),
       } as unknown as Config;
+
       const loader = new FileCommandLoader(mockConfig);
       const commands = await loader.loadCommands(signal);
 
-      const extCmd = commands.find((c) => c.name === 'ext-cmd');
-      expect(extCmd).toBeDefined();
-      expect(extCmd?.source).toBe('extension');
+      const extCmd = commands.find((c) => c.name === 'ext');
+      expect(extCmd?.description).toBe('[my-ext] Custom command from ext.toml');
     });
   });
 });

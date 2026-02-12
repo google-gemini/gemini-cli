@@ -7,7 +7,7 @@
 import { render } from '../../test-utils/render.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { describe, it, expect } from 'vitest';
-import { CommandKind, CommandSource } from '../commands/types.js';
+import { CommandKind } from '../commands/types.js';
 
 describe('SuggestionsDisplay', () => {
   const mockSuggestions = [
@@ -111,42 +111,6 @@ describe('SuggestionsDisplay', () => {
     const { lastFrame } = render(
       <SuggestionsDisplay
         suggestions={mcpSuggestions}
-        activeIndex={0}
-        isLoading={false}
-        width={80}
-        scrollOffset={0}
-        userInput=""
-        mode="reverse"
-      />,
-    );
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders source tags for file commands', () => {
-    const sourcedSuggestions = [
-      {
-        label: 'User Cmd',
-        value: 'user-cmd',
-        commandKind: CommandKind.FILE,
-        source: CommandSource.USER,
-      },
-      {
-        label: 'Project Cmd',
-        value: 'project-cmd',
-        commandKind: CommandKind.FILE,
-        source: CommandSource.PROJECT,
-      },
-      {
-        label: 'Ext Cmd',
-        value: 'ext-cmd',
-        commandKind: CommandKind.FILE,
-        source: CommandSource.EXTENSION,
-      },
-    ];
-
-    const { lastFrame } = render(
-      <SuggestionsDisplay
-        suggestions={sourcedSuggestions}
         activeIndex={0}
         isLoading={false}
         width={80}
