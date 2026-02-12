@@ -42,7 +42,10 @@ export class MessageBus extends EventEmitter {
 
   async publish(message: Message): Promise<void> {
     if (this.debug) {
-      debugLogger.debug(`[MESSAGE_BUS] publish: ${safeJsonStringify(message)}`);
+      const json = safeJsonStringify(message);
+      debugLogger.debug(
+        `[MESSAGE_BUS] publish: ${json.length > 500 ? json.substring(0, 500) + '...' : json}`,
+      );
     }
     try {
       if (!this.isValidMessage(message)) {
