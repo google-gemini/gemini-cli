@@ -443,15 +443,42 @@ export class AgentHarness {
     calls: ToolCallRequestInfo[],
     signal: AbortSignal,
   ): Promise<Array<{ name: string; part: Part }>> {
-    const completedCalls = await scheduleAgentTools(this.config, calls, {
-      schedulerId: this.agentId,
-      toolRegistry: this.toolRegistry,
-      signal,
-    });
+    const taskCompleteCalls = calls.filter(
+      (c) => c.name === TASK_COMPLETE_TOOL_NAME,
+    );
+    const otherCalls = calls.filter((c) => c.name !== TASK_COMPLETE_TOOL_NAME);
 
-    return completedCalls.map((call) => ({
+    let completedCalls: Array<{
+      request: ToolCallRequestInfo;
+      response: { responseParts: Part[] };
+    }> = [];
+
+    if (otherCalls.length > 0) {
+      completedCalls = await scheduleAgentTools(this.config, otherCalls, {
+        schedulerId: this.agentId,
+        toolRegistry: this.toolRegistry,
+        signal,
+      });
+    }
+
+    const results = completedCalls.map((call) => ({
       name: call.request.name,
       part: call.response.responseParts[0],
     }));
+
+    for (const call of taskCompleteCalls) {
+      results.push({
+        name: TASK_COMPLETE_TOOL_NAME,
+        part: {
+          functionResponse: {
+            name: TASK_COMPLETE_TOOL_NAME,
+            response: { result: 'Task completed locally' },
+            id: call.callId,
+          },
+        },
+      });
+    }
+
+    return results;
   }
 }
