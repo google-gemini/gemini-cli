@@ -29,6 +29,7 @@ import { debugLogger, SimpleExtensionLoader } from '@google/gemini-cli-core';
 import type { Command, CommandArgument } from '../commands/types.js';
 import { GitService } from '@google/gemini-cli-core';
 import { getA2UIAgentExtension } from '../a2ui/a2ui-extension.js';
+import { createChatBridgeRoutes } from '../chat-bridge/routes.js';
 
 type CommandResponse = {
   name: string;
@@ -304,6 +305,22 @@ export async function createApp() {
         res.status(500).send({ error: errorMessage });
       }
     });
+
+    // Mount Google Chat bridge routes if configured
+    const chatBridgeUrl =
+      process.env['CHAT_BRIDGE_A2A_URL'] || process.env['CODER_AGENT_PORT']
+        ? `http://localhost:${process.env['CODER_AGENT_PORT'] || '8080'}`
+        : undefined;
+    if (chatBridgeUrl) {
+      const chatRoutes = createChatBridgeRoutes({
+        a2aServerUrl: chatBridgeUrl,
+        debug: process.env['CHAT_BRIDGE_DEBUG'] === 'true',
+      });
+      expressApp.use(chatRoutes);
+      logger.info(
+        `[CoreAgent] Google Chat bridge enabled at /chat/webhook (A2A: ${chatBridgeUrl})`,
+      );
+    }
 
     expressApp.get('/tasks/:taskId/metadata', async (req, res) => {
       const taskId = req.params.taskId;
