@@ -18,6 +18,23 @@ import { parseColor } from '../themes/color-utils.js';
 
 export type TerminalBackgroundColor = string | undefined;
 
+const TERMINAL_CLEANUP_SEQUENCE = '\x1b[<u\x1b[>4;0m\x1b[?2004l';
+
+export function cleanupTerminalOnExit() {
+  try {
+    if (process.stdout?.fd !== undefined) {
+      fs.writeSync(process.stdout.fd, TERMINAL_CLEANUP_SEQUENCE);
+      return;
+    }
+  } catch (e) {
+    debugLogger.warn('Failed to synchronously cleanup terminal modes:', e);
+  }
+
+  disableKittyKeyboardProtocol();
+  disableModifyOtherKeys();
+  disableBracketedPasteMode();
+}
+
 export class TerminalCapabilityManager {
   private static instance: TerminalCapabilityManager | undefined;
 
@@ -64,14 +81,6 @@ export class TerminalCapabilityManager {
     this.instance = undefined;
   }
 
-  private static cleanupOnExit(): void {
-    // don't bother catching errors since if one write
-    // fails, the other probably will too
-    disableKittyKeyboardProtocol();
-    disableModifyOtherKeys();
-    disableBracketedPasteMode();
-  }
-
   /**
    * Detects terminal capabilities (Kitty protocol support, terminal name,
    * background color).
@@ -85,12 +94,12 @@ export class TerminalCapabilityManager {
       return;
     }
 
-    process.off('exit', TerminalCapabilityManager.cleanupOnExit);
-    process.off('SIGTERM', TerminalCapabilityManager.cleanupOnExit);
-    process.off('SIGINT', TerminalCapabilityManager.cleanupOnExit);
-    process.on('exit', TerminalCapabilityManager.cleanupOnExit);
-    process.on('SIGTERM', TerminalCapabilityManager.cleanupOnExit);
-    process.on('SIGINT', TerminalCapabilityManager.cleanupOnExit);
+    process.off('exit', cleanupTerminalOnExit);
+    process.off('SIGTERM', cleanupTerminalOnExit);
+    process.off('SIGINT', cleanupTerminalOnExit);
+    process.on('exit', cleanupTerminalOnExit);
+    process.on('SIGTERM', cleanupTerminalOnExit);
+    process.on('SIGINT', cleanupTerminalOnExit);
 
     return new Promise((resolve) => {
       const originalRawMode = process.stdin.isRaw;
