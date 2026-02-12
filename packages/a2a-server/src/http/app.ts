@@ -314,6 +314,7 @@ export async function createApp() {
     if (chatBridgeUrl) {
       const chatRoutes = createChatBridgeRoutes({
         a2aServerUrl: chatBridgeUrl,
+        projectNumber: process.env['CHAT_PROJECT_NUMBER'],
         debug: process.env['CHAT_BRIDGE_DEBUG'] === 'true',
       });
       expressApp.use(chatRoutes);
