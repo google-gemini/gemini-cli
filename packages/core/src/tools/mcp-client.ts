@@ -67,6 +67,10 @@ import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from '../services/environmentSanitization.js';
+import {
+  GEMINI_CLI_IDENTIFICATION_ENV_VAR,
+  GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
+} from '../services/shellExecutionService.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -1897,10 +1901,11 @@ export async function createTransport(
     let transport: Transport = new StdioClientTransport({
       command: mcpServerConfig.command,
       args: mcpServerConfig.args || [],
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       env: {
         ...sanitizeEnvironment(process.env, sanitizationConfig),
         ...(mcpServerConfig.env || {}),
+        [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
+          GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
       } as Record<string, string>,
       cwd: mcpServerConfig.cwd,
       stderr: 'pipe',
