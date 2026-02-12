@@ -18,6 +18,7 @@ import type { Config } from '../config/config.js';
 import { fileExists } from '../utils/fileUtils.js';
 import { Storage } from '../config/storage.js';
 import { GREP_TOOL_NAME } from './tool-names.js';
+import { GREP_DEFINITION } from './definitions/coreTools.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
   FileExclusions,
@@ -559,7 +560,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
     super(
       RipGrepTool.Name,
       'SearchText',
-      'FAST regular expression search. This is the **primary discovery tool** for locating code. Use context parameters (`context`, `after`, `before`) to read code surrounding matches in a single turn, often eliminating the need for a separate `read_file` call. (max 100 matches).',
+      GREP_DEFINITION.base.description,
       Kind.Search,
       {
         properties: {

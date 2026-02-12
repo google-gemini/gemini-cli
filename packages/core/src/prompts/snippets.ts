@@ -572,20 +572,20 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
   }
 
   const validationClause = options.enableGrep
-    ? ` Use ${grepName} with context or ${readFileName} with precise ranges to validate all assumptions.`
-    : ` Use ${readFileName} to validate all assumptions.`;
+    ? `Use ${grepName} with context or ${readFileName} with precise ranges to validate all assumptions.`
+    : `Use ${readFileName} to validate all assumptions.`;
 
   if (options.enableCodebaseInvestigator) {
     let subAgentSearch = '';
     if (searchTools.length > 0) {
       const toolsStr = searchTools.join(' or ');
-      subAgentSearch = ` For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use ${toolsStr} directly in parallel.`;
+      subAgentSearch = `For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use ${toolsStr} directly in parallel. `;
     }
 
-    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**.${subAgentSearch}${validationClause} **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**. ${subAgentSearch}${validationClause} **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
   }
 
-  return `1. **Research:** Systematically map the codebase and validate assumptions.${searchSentence}${validationClause} **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+  return `1. **Research:** Systematically map the codebase and validate assumptions.${searchSentence} ${validationClause} **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
 }
 
 function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {

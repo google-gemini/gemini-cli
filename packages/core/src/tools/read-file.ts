@@ -14,6 +14,7 @@ import type { FunctionDeclaration, PartUnion } from '@google/genai';
 import {
   processSingleFileContent,
   getSpecificMimeType,
+  DEFAULT_MAX_LINES_TEXT_FILE,
 } from '../utils/fileUtils.js';
 import type { Config } from '../config/config.js';
 import { FileOperation } from '../telemetry/metrics.js';
@@ -264,7 +265,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
     return {
       name: this.name,
       description: isGemini3
-        ? `Reads a specific range of a file (up to 2,000 lines). **Important:** For high token efficiency, avoid reading large files in their entirety. Use 'grep_search' to find symbols or 'run_shell_command' with 'sed' for surgical block extraction instead of broad file reads. Handles text, images, audio, and PDF files.`
+        ? `Reads a specific range of a file (up to ${DEFAULT_MAX_LINES_TEXT_FILE} lines). **Important:** For high token efficiency, avoid reading large files in their entirety. Use 'grep_search' to find symbols or 'run_shell_command' with 'sed' for surgical block extraction instead of broad file reads. Handles text, images, audio, and PDF files.`
         : `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images, audio, and PDF files. For text files, it can read specific line ranges.`,
       parametersJsonSchema: {
         properties,
