@@ -222,7 +222,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     terminalWidth,
     activePtyId,
     history,
-    terminalBackgroundColor,
     backgroundShells,
     backgroundShellHeight,
     shortcutsHelpVisible,
@@ -1352,7 +1351,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const useBackgroundColor = config.getUseBackgroundColor();
   const isLowColor = isLowColorDepth();
-  const terminalBg = terminalBackgroundColor || 'black';
+  const terminalBg = theme.background.primary || 'black';
 
   // We should fallback to lines if the background color is disabled OR if it is
   // enabled but we are in a low color depth terminal where we don't have a safe

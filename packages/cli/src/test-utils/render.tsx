@@ -33,6 +33,9 @@ import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
 import { AppContext, type AppState } from '../ui/contexts/AppContext.js';
 import { createMockSettings } from './settings.js';
+import { themeManager, DEFAULT_THEME } from '../ui/themes/theme-manager.js';
+import { DefaultLight } from '../ui/themes/default-light.js';
+import { pickDefaultThemeName } from '../ui/themes/theme.js';
 
 export const persistentStateMock = new FakePersistentState();
 
@@ -150,8 +153,8 @@ const baseMockUiState = {
   terminalWidth: 120,
   terminalHeight: 40,
   currentModel: 'gemini-pro',
+  terminalBackgroundColor: 'black',
   cleanUiDetailsVisible: false,
-  terminalBackgroundColor: undefined,
   activePtyId: undefined,
   backgroundShells: new Map(),
   backgroundShellHeight: 0,
@@ -297,6 +300,15 @@ export const renderWithProviders = (
     terminalWidth,
     mainAreaWidth,
   };
+
+  themeManager.setTerminalBackground(baseState.terminalBackgroundColor);
+  const themeName = pickDefaultThemeName(
+    baseState.terminalBackgroundColor,
+    themeManager.getAllThemes(),
+    DEFAULT_THEME.name,
+    DefaultLight.name,
+  );
+  themeManager.setActiveTheme(themeName);
 
   const finalUIActions = { ...mockUIActions, ...uiActions };
 
