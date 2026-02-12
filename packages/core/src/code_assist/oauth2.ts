@@ -45,6 +45,7 @@ import {
   exitAlternateScreen,
 } from '../utils/terminal.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
+import { getConsentForOauth } from '../utils/authConsent.js';
 
 export const authEvents = new EventEmitter();
 
@@ -114,6 +115,7 @@ async function initOauthClient(
 
   if (
     credentials &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     (credentials as { type?: string }).type ===
       'external_account_authorized_user'
   ) {
@@ -269,7 +271,7 @@ async function initOauthClient(
 
     await triggerPostAuthCallbacks(client.credentials);
   } else {
-    const userConsent = await getConsentForOauth();
+    const userConsent = await getConsentForOauth('Code Assist login required.');
     if (!userConsent) {
       throw new FatalCancellationError('Authentication cancelled by user.');
     }
@@ -375,53 +377,6 @@ async function initOauthClient(
   }
 
   return client;
-}
-
-export async function getConsentForOauth(): Promise<boolean> {
-  const prompt =
-    'Code Assist login required. Opening authentication page in your browser. ';
-
-  if (coreEvents.listenerCount(CoreEvent.ConsentRequest) === 0) {
-    if (!process.stdin.isTTY) {
-      throw new FatalAuthenticationError(
-        'Code Assist login required, but interactive consent could not be obtained.\n' +
-          'Please run Gemini CLI in an interactive terminal to authenticate, or use NO_BROWSER=true for manual authentication.',
-      );
-    }
-    return getOauthConsentNonInteractive(prompt);
-  }
-
-  return getOauthConsentInteractive(prompt);
-}
-
-async function getOauthConsentNonInteractive(prompt: string) {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: createWorkingStdio().stdout,
-    terminal: true,
-  });
-
-  const fullPrompt = prompt + 'Do you want to continue? [Y/n]: ';
-  writeToStdout(`\n${fullPrompt}`);
-
-  return new Promise<boolean>((resolve) => {
-    rl.on('line', (answer) => {
-      rl.close();
-      resolve(['y', ''].includes(answer.trim().toLowerCase()));
-    });
-  });
-}
-
-async function getOauthConsentInteractive(prompt: string) {
-  const fullPrompt = prompt + '\n\nDo you want to continue?';
-  return new Promise<boolean>((resolve) => {
-    coreEvents.emitConsentRequest({
-      prompt: fullPrompt,
-      onConfirm: (confirmed: boolean) => {
-        resolve(confirmed);
-      },
-    });
-  });
 }
 
 export async function getOauthClient(
@@ -648,6 +603,7 @@ export function getAvailablePort(): Promise<number> {
       }
       const server = net.createServer();
       server.listen(0, () => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const address = server.address()! as net.AddressInfo;
         port = address.port;
       });

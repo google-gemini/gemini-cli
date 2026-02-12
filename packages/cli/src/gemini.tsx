@@ -57,8 +57,8 @@ import {
   writeToStderr,
   disableMouseEvents,
   enableMouseEvents,
-  enterAlternateScreen,
   disableLineWrapping,
+  enableLineWrapping,
   shouldEnterAlternateScreen,
   startupProfiler,
   ExitCodes,
@@ -67,7 +67,7 @@ import {
   getVersion,
   ValidationCancelledError,
   ValidationRequiredError,
-  type FetchAdminControlsResponse,
+  type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -89,6 +89,7 @@ import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
 import { KeypressProvider } from './ui/contexts/KeypressContext.js';
 import { useKittyKeyboardProtocol } from './ui/hooks/useKittyKeyboardProtocol.js';
+import { useTerminalSize } from './ui/hooks/useTerminalSize.js';
 import {
   relaunchAppInChildProcess,
   relaunchOnExitCode,
@@ -214,9 +215,13 @@ export async function startInteractiveUI(
 
   const { stdout: inkStdout, stderr: inkStderr } = createWorkingStdio();
 
+  const isShpool = !!process.env['SHPOOL_SESSION_NAME'];
+
   // Create wrapper component to use hooks inside render
   const AppWrapper = () => {
     useKittyKeyboardProtocol();
+    const { columns, rows } = useTerminalSize();
+
     return (
       <SettingsContext.Provider value={settings}>
         <KeypressProvider
@@ -234,6 +239,7 @@ export async function startInteractiveUI(
                 <SessionStatsProvider>
                   <VimModeProvider settings={settings}>
                     <AppContainer
+                      key={`${columns}-${rows}`}
                       config={config}
                       startupWarnings={startupWarnings}
                       version={version}
@@ -249,6 +255,17 @@ export async function startInteractiveUI(
       </SettingsContext.Provider>
     );
   };
+
+  if (isShpool) {
+    // Wait a moment for shpool to stabilize terminal size and state.
+    // shpool is a persistence tool that restores terminal state by replaying it.
+    // This delay gives shpool time to finish its restoration replay and send
+    // the actual terminal size (often via an immediate SIGWINCH) before we
+    // render the first TUI frame. Without this, the first frame may be
+    // garbled or rendered at an incorrect size, which disabling incremental
+    // rendering alone cannot fix for the initial frame.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
 
   const instance = render(
     process.env['DEBUG'] ? (
@@ -273,9 +290,18 @@ export async function startInteractiveUI(
       patchConsole: false,
       alternateBuffer: useAlternateBuffer,
       incrementalRendering:
-        settings.merged.ui.incrementalRendering !== false && useAlternateBuffer,
+        settings.merged.ui.incrementalRendering !== false &&
+        useAlternateBuffer &&
+        !isShpool,
     },
   );
+
+  if (useAlternateBuffer) {
+    disableLineWrapping();
+    registerCleanup(() => {
+      enableLineWrapping();
+    });
+  }
 
   checkForUpdates(settings)
     .then((info) => {
@@ -334,6 +360,26 @@ export async function main() {
   const parseArgsHandle = startupProfiler.start('parse_arguments');
   const argv = await parseArguments(settings.merged);
   parseArgsHandle?.end();
+
+  if (
+    (argv.allowedTools && argv.allowedTools.length > 0) ||
+    (settings.merged.tools?.allowed && settings.merged.tools.allowed.length > 0)
+  ) {
+    coreEvents.emitFeedback(
+      'warning',
+      'Warning: --allowed-tools cli argument and tools.allowed in settings.json are deprecated and will be removed in 1.0: Migrate to Policy Engine: https://geminicli.com/docs/core/policy-engine/',
+    );
+  }
+
+  if (
+    settings.merged.tools?.exclude &&
+    settings.merged.tools.exclude.length > 0
+  ) {
+    coreEvents.emitFeedback(
+      'warning',
+      'Warning: tools.exclude in settings.json is deprecated and will be removed in 1.0. Migrate to Policy Engine: https://geminicli.com/docs/core/policy-engine/',
+    );
+  }
 
   if (argv.startupMessages) {
     argv.startupMessages.forEach((msg) => {
@@ -510,13 +556,19 @@ export async function main() {
       projectHooks: settings.workspace.settings.hooks,
     });
     loadConfigHandle?.end();
+
+    // Initialize storage immediately after loading config to ensure that
+    // storage-related operations (like listing or resuming sessions) have
+    // access to the project identifier.
+    await config.storage.initialize();
+
     adminControlsListner.setConfig(config);
 
-    if (config.isInteractive() && config.storage && config.getDebugMode()) {
-      const { registerActivityLogger } = await import(
-        './utils/activityLogger.js'
+    if (config.isInteractive() && settings.merged.general.devtools) {
+      const { setupInitialActivityLogger } = await import(
+        './utils/devtoolsService.js'
       );
-      registerActivityLogger(config);
+      await setupInitialActivityLogger(config);
     }
 
     // Register config for telemetry shutdown
@@ -583,18 +635,6 @@ export async function main() {
       // Set this as early as possible to avoid spurious characters from
       // input showing up in the output.
       process.stdin.setRawMode(true);
-
-      if (
-        shouldEnterAlternateScreen(
-          isAlternateBufferEnabled(settings),
-          config.getScreenReader(),
-        )
-      ) {
-        enterAlternateScreen();
-        disableLineWrapping();
-
-        // Ink will cleanup so there is no need for us to manually cleanup.
-      }
 
       // This cleanup isn't strictly needed but may help in certain situations.
       process.on('SIGTERM', () => {
@@ -809,13 +849,14 @@ export function initializeOutputListenersAndFlush() {
 }
 
 function setupAdminControlsListener() {
-  let pendingSettings: FetchAdminControlsResponse | undefined;
+  let pendingSettings: AdminControlsSettings | undefined;
   let config: Config | undefined;
 
   const messageHandler = (msg: unknown) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const message = msg as {
       type?: string;
-      settings?: FetchAdminControlsResponse;
+      settings?: AdminControlsSettings;
     };
     if (message?.type === 'admin-settings' && message.settings) {
       if (config) {

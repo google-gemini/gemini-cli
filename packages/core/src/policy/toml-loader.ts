@@ -12,7 +12,7 @@ import {
   type SafetyCheckerRule,
   InProcessCheckerType,
 } from './types.js';
-import { buildArgsPatterns } from './utils.js';
+import { buildArgsPatterns, isSafeRegExp } from './utils.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import toml from '@iarna/toml';
@@ -234,6 +234,7 @@ export async function loadPoliciesFromToml(
         .filter((entry) => entry.isFile() && entry.name.endsWith('.toml'))
         .map((entry) => entry.name);
     } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as NodeJS.ErrnoException;
       if (error.code === 'ENOENT') {
         // Directory doesn't exist, skip it (not an error)
@@ -262,6 +263,7 @@ export async function loadPoliciesFromToml(
         try {
           parsed = toml.parse(fileContent);
         } catch (e) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const error = e as Error;
           errors.push({
             filePath,
@@ -354,8 +356,9 @@ export async function loadPoliciesFromToml(
                 // Compile regex pattern
                 if (argsPattern) {
                   try {
-                    policyRule.argsPattern = new RegExp(argsPattern);
+                    new RegExp(argsPattern);
                   } catch (e) {
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                     const error = e as Error;
                     errors.push({
                       filePath,
@@ -367,9 +370,24 @@ export async function loadPoliciesFromToml(
                       suggestion:
                         'Check regex syntax for errors like unmatched brackets or invalid escape sequences',
                     });
-                    // Skip this rule if regex compilation fails
                     return null;
                   }
+
+                  if (!isSafeRegExp(argsPattern)) {
+                    errors.push({
+                      filePath,
+                      fileName: file,
+                      tier: tierName,
+                      errorType: 'regex_compilation',
+                      message: 'Unsafe regex pattern (potential ReDoS)',
+                      details: `Pattern: ${argsPattern}`,
+                      suggestion:
+                        'Avoid nested quantifiers or extremely long patterns',
+                    });
+                    return null;
+                  }
+
+                  policyRule.argsPattern = new RegExp(argsPattern);
                 }
 
                 return policyRule;
@@ -411,14 +429,16 @@ export async function loadPoliciesFromToml(
                 const safetyCheckerRule: SafetyCheckerRule = {
                   toolName: effectiveToolName,
                   priority: checker.priority,
+                  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                   checker: checker.checker as SafetyCheckerConfig,
                   modes: checker.modes,
                 };
 
                 if (argsPattern) {
                   try {
-                    safetyCheckerRule.argsPattern = new RegExp(argsPattern);
+                    new RegExp(argsPattern);
                   } catch (e) {
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                     const error = e as Error;
                     errors.push({
                       filePath,
@@ -430,6 +450,21 @@ export async function loadPoliciesFromToml(
                     });
                     return null;
                   }
+
+                  if (!isSafeRegExp(argsPattern)) {
+                    errors.push({
+                      filePath,
+                      fileName: file,
+                      tier: tierName,
+                      errorType: 'regex_compilation',
+                      message:
+                        'Unsafe regex pattern in safety checker (potential ReDoS)',
+                      details: `Pattern: ${argsPattern}`,
+                    });
+                    return null;
+                  }
+
+                  safetyCheckerRule.argsPattern = new RegExp(argsPattern);
                 }
 
                 return safetyCheckerRule;
@@ -440,6 +475,7 @@ export async function loadPoliciesFromToml(
 
         checkers.push(...parsedCheckers);
       } catch (e) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const error = e as NodeJS.ErrnoException;
         // Catch-all for unexpected errors
         if (error.code !== 'ENOENT') {

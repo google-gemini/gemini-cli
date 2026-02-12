@@ -62,6 +62,7 @@ export async function runZedIntegration(
 ) {
   const { stdout: workingStdout } = createWorkingStdio();
   const stdout = Writable.toWeb(workingStdout) as WritableStream;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
 
   const stream = acp.ndJsonStream(stdout, stdin);
@@ -482,10 +483,7 @@ export class Session {
       const functionCalls: FunctionCall[] = [];
 
       try {
-        const model = resolveModel(
-          this.config.getModel(),
-          this.config.getPreviewFeatures(),
-        );
+        const model = resolveModel(this.config.getModel());
         const responseStream = await chat.sendMessageStream(
           { model },
           nextMessage?.parts ?? [],

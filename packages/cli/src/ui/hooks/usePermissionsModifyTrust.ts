@@ -88,15 +88,16 @@ export const usePermissionsModifyTrust = (
   );
   const [needsRestart, setNeedsRestart] = useState(false);
 
-  const isFolderTrustEnabled = !!settings.merged.security.folderTrust.enabled;
+  const isFolderTrustEnabled =
+    settings.merged.security.folderTrust.enabled ?? true;
 
   const updateTrustLevel = useCallback(
-    (trustLevel: TrustLevel) => {
+    async (trustLevel: TrustLevel) => {
       // If we are not editing the current workspace, the logic is simple:
       // just save the setting and exit. No restart or warnings are needed.
       if (!isCurrentWorkspace) {
         const folders = loadTrustedFolders();
-        folders.setValue(cwd, trustLevel);
+        await folders.setValue(cwd, trustLevel);
         onExit();
         return;
       }
@@ -139,7 +140,7 @@ export const usePermissionsModifyTrust = (
       } else {
         const folders = loadTrustedFolders();
         try {
-          folders.setValue(cwd, trustLevel);
+          await folders.setValue(cwd, trustLevel);
         } catch (_e) {
           coreEvents.emitFeedback(
             'error',
@@ -152,11 +153,11 @@ export const usePermissionsModifyTrust = (
     [cwd, settings.merged, onExit, addItem, isCurrentWorkspace],
   );
 
-  const commitTrustLevelChange = useCallback(() => {
+  const commitTrustLevelChange = useCallback(async () => {
     if (pendingTrustLevel) {
       const folders = loadTrustedFolders();
       try {
-        folders.setValue(cwd, pendingTrustLevel);
+        await folders.setValue(cwd, pendingTrustLevel);
         return true;
       } catch (_e) {
         coreEvents.emitFeedback(

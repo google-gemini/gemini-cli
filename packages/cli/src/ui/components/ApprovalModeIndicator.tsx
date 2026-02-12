@@ -11,10 +11,12 @@ import { ApprovalMode } from '@google/gemini-cli-core';
 
 interface ApprovalModeIndicatorProps {
   approvalMode: ApprovalMode;
+  isPlanEnabled?: boolean;
 }
 
 export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
   approvalMode,
+  isPlanEnabled,
 }) => {
   let textColor = '';
   let textContent = '';
@@ -23,29 +25,39 @@ export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
   switch (approvalMode) {
     case ApprovalMode.AUTO_EDIT:
       textColor = theme.status.warning;
-      textContent = 'accepting edits';
-      subText = ' (shift + tab to cycle)';
+      textContent = 'auto-accept edits';
+      subText = 'shift+tab to manual';
       break;
     case ApprovalMode.PLAN:
       textColor = theme.status.success;
-      textContent = 'plan mode';
-      subText = ' (shift + tab to cycle)';
+      textContent = 'plan';
+      subText = 'shift+tab to accept edits';
       break;
     case ApprovalMode.YOLO:
       textColor = theme.status.error;
-      textContent = 'YOLO mode';
-      subText = ' (ctrl + y to toggle)';
+      textContent = 'YOLO';
+      subText = 'ctrl+y';
       break;
     case ApprovalMode.DEFAULT:
     default:
+      textColor = theme.text.accent;
+      textContent = '';
+      subText = isPlanEnabled
+        ? 'shift+tab to plan'
+        : 'shift+tab to accept edits';
       break;
   }
 
   return (
     <Box>
       <Text color={textColor}>
-        {textContent}
-        {subText && <Text color={theme.text.secondary}>{subText}</Text>}
+        {textContent ? textContent : null}
+        {subText ? (
+          <Text color={theme.text.secondary}>
+            {textContent ? ' ' : ''}
+            {subText}
+          </Text>
+        ) : null}
       </Text>
     </Box>
   );

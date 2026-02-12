@@ -112,7 +112,7 @@ describe('SkillManager Alias', () => {
     // @ts-expect-error accessing private method for testing
     vi.spyOn(service, 'discoverBuiltinSkills').mockResolvedValue(undefined);
 
-    await service.discoverSkills(storage, []);
+    await service.discoverSkills(storage, [], true);
 
     const skills = service.getSkills();
     expect(skills).toHaveLength(4);
@@ -169,7 +169,7 @@ describe('SkillManager Alias', () => {
     // @ts-expect-error accessing private method for testing
     vi.spyOn(service, 'discoverBuiltinSkills').mockResolvedValue(undefined);
 
-    await service.discoverSkills(storage, []);
+    await service.discoverSkills(storage, [], true);
 
     const skills = service.getSkills();
     expect(skills).toHaveLength(1);

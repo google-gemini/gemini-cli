@@ -247,6 +247,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     override readonly parameterSchema: unknown,
     messageBus: MessageBus,
     readonly trust?: boolean,
+    readonly isReadOnly?: boolean,
     nameOverride?: string,
     private readonly cliConfig?: Config,
     override readonly extensionName?: string,
@@ -283,6 +284,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.parameterSchema,
       this.messageBus,
       this.trust,
+      this.isReadOnly,
       this.getFullyQualifiedName(),
       this.cliConfig,
       this.extensionName,
@@ -371,6 +373,7 @@ function transformResourceLinkBlock(block: McpResourceLinkBlock): Part {
  */
 function transformMcpContentToParts(sdkResponse: Part[]): Part[] {
   const funcResponse = sdkResponse?.[0]?.functionResponse;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const mcpContent = funcResponse?.response?.['content'] as McpContentBlock[];
   const toolName = funcResponse?.name || 'unknown tool';
 
@@ -408,6 +411,7 @@ function transformMcpContentToParts(sdkResponse: Part[]): Part[] {
  * @returns A formatted string representing the tool's output.
  */
 function getStringifiedResultForDisplay(rawResponse: Part[]): string {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const mcpContent = rawResponse?.[0]?.functionResponse?.response?.[
     'content'
   ] as McpContentBlock[];

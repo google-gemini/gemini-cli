@@ -569,75 +569,67 @@ export async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-const MAX_TRUNCATED_LINE_WIDTH = 1000;
-const MAX_TRUNCATED_CHARS = 4000;
+/**
+ * Sanitizes a string for use as a filename part by removing path traversal
+ * characters and other non-alphanumeric characters.
+ */
+export function sanitizeFilenamePart(part: string): string {
+  return part.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
 
 /**
- * Formats a truncated message for tool output, handling multi-line and single-line (elephant) cases.
+ * Formats a truncated message for tool output.
+ * Shows the first 20% and last 80% of the allowed characters with a marker in between.
  */
 export function formatTruncatedToolOutput(
   contentStr: string,
   outputFile: string,
-  truncateLines: number = 30,
+  maxChars: number,
 ): string {
-  const physicalLines = contentStr.split('\n');
-  const totalPhysicalLines = physicalLines.length;
+  if (contentStr.length <= maxChars) return contentStr;
 
-  if (totalPhysicalLines > 1) {
-    // Multi-line case: show last N lines, but protect against "elephant" lines.
-    const lastLines = physicalLines.slice(-truncateLines);
-    let someLinesTruncatedInWidth = false;
-    const processedLines = lastLines.map((line) => {
-      if (line.length > MAX_TRUNCATED_LINE_WIDTH) {
-        someLinesTruncatedInWidth = true;
-        return (
-          line.substring(0, MAX_TRUNCATED_LINE_WIDTH) +
-          '... [LINE WIDTH TRUNCATED]'
-        );
-      }
-      return line;
-    });
+  const headChars = Math.floor(maxChars * 0.2);
+  const tailChars = maxChars - headChars;
 
-    const widthWarning = someLinesTruncatedInWidth
-      ? ' (some long lines truncated)'
-      : '';
-    return `Output too large. Showing the last ${processedLines.length} of ${totalPhysicalLines} lines${widthWarning}. For full output see: ${outputFile}
-...
-${processedLines.join('\n')}`;
-  } else {
-    // Single massive line case: use character-based truncation description.
-    const snippet = contentStr.slice(-MAX_TRUNCATED_CHARS);
-    return `Output too large. Showing the last ${MAX_TRUNCATED_CHARS.toLocaleString()} characters of the output. For full output see: ${outputFile}
-...${snippet}`;
-  }
+  const head = contentStr.slice(0, headChars);
+  const tail = contentStr.slice(-tailChars);
+  const omittedChars = contentStr.length - headChars - tailChars;
+
+  return `Output too large. Showing first ${headChars.toLocaleString()} and last ${tailChars.toLocaleString()} characters. For full output see: ${outputFile}
+${head}
+
+... [${omittedChars.toLocaleString()} characters omitted] ...
+
+${tail}`;
 }
 
 /**
  * Saves tool output to a temporary file for later retrieval.
  */
-export const TOOL_OUTPUT_DIR = 'tool_output';
+export const TOOL_OUTPUTS_DIR = 'tool-outputs';
 
 export async function saveTruncatedToolOutput(
   content: string,
   toolName: string,
   id: string | number, // Accept string (callId) or number (truncationId)
   projectTempDir: string,
-): Promise<{ outputFile: string; totalLines: number }> {
-  const safeToolName = toolName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-  const safeId = id
-    .toString()
-    .replace(/[^a-z0-9]/gi, '_')
-    .toLowerCase();
-  const fileName = `${safeToolName}_${safeId}.txt`;
-  const toolOutputDir = path.join(projectTempDir, TOOL_OUTPUT_DIR);
+  sessionId?: string,
+): Promise<{ outputFile: string }> {
+  const safeToolName = sanitizeFilenamePart(toolName).toLowerCase();
+  const safeId = sanitizeFilenamePart(id.toString()).toLowerCase();
+  const fileName = safeId.startsWith(safeToolName)
+    ? `${safeId}.txt`
+    : `${safeToolName}_${safeId}.txt`;
+
+  let toolOutputDir = path.join(projectTempDir, TOOL_OUTPUTS_DIR);
+  if (sessionId) {
+    const safeSessionId = sanitizeFilenamePart(sessionId);
+    toolOutputDir = path.join(toolOutputDir, `session-${safeSessionId}`);
+  }
   const outputFile = path.join(toolOutputDir, fileName);
 
   await fsPromises.mkdir(toolOutputDir, { recursive: true });
   await fsPromises.writeFile(outputFile, content);
 
-  const lines = content.split('\n');
-  return {
-    outputFile,
-    totalLines: lines.length,
-  };
+  return { outputFile };
 }

@@ -98,16 +98,23 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `general`
 
-- **`general.previewFeatures`** (boolean):
-  - **Description:** Enable preview features (e.g., preview models).
-  - **Default:** `false`
-
 - **`general.preferredEditor`** (string):
   - **Description:** The preferred editor to open files in.
   - **Default:** `undefined`
 
 - **`general.vimMode`** (boolean):
   - **Description:** Enable Vim keybindings
+  - **Default:** `false`
+
+- **`general.defaultApprovalMode`** (enum):
+  - **Description:** The default approval mode for tool execution. 'default'
+    prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is
+    read-only mode. 'yolo' is not supported yet.
+  - **Default:** `"default"`
+  - **Values:** `"default"`, `"auto_edit"`, `"plan"`
+
+- **`general.devtools`** (boolean):
+  - **Description:** Enable DevTools inspector on launch.
   - **Default:** `false`
 
 - **`general.enableAutoUpdate`** (boolean):
@@ -188,6 +195,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`ui.inlineThinkingMode`** (enum):
+  - **Description:** Display model thinking inline: off or full.
+  - **Default:** `"off"`
+  - **Values:** `"off"`, `"full"`
+
 - **`ui.showStatusInTitle`** (boolean):
   - **Description:** Show Gemini CLI model thoughts in the terminal window title
     during the working phase
@@ -207,6 +219,10 @@ their corresponding top-level category object in your `settings.json` file.
 - **`ui.hideTips`** (boolean):
   - **Description:** Hide helpful tips in the UI
   - **Default:** `false`
+
+- **`ui.showShortcutsHint`** (boolean):
+  - **Description:** Show the "? for shortcuts" hint above the input.
+  - **Default:** `true`
 
 - **`ui.hideBanner`** (boolean):
   - **Description:** Hide the application banner
@@ -431,6 +447,12 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-2.5-flash"
         }
       },
+      "gemini-3-flash-base": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-3-flash-preview"
+        }
+      },
       "classifier": {
         "extends": "base",
         "modelConfig": {
@@ -486,7 +508,7 @@ their corresponding top-level category object in your `settings.json` file.
         }
       },
       "web-search": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {
           "generateContentConfig": {
             "tools": [
@@ -498,7 +520,7 @@ their corresponding top-level category object in your `settings.json` file.
         }
       },
       "web-fetch": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {
           "generateContentConfig": {
             "tools": [
@@ -510,25 +532,25 @@ their corresponding top-level category object in your `settings.json` file.
         }
       },
       "web-fetch-fallback": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {}
       },
       "loop-detection": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {}
       },
       "loop-detection-double-check": {
         "extends": "base",
         "modelConfig": {
-          "model": "gemini-2.5-pro"
+          "model": "gemini-3-pro-preview"
         }
       },
       "llm-edit-fixer": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {}
       },
       "next-speaker-checker": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {}
       },
       "chat-compression-3-pro": {
@@ -558,7 +580,7 @@ their corresponding top-level category object in your `settings.json` file.
       },
       "chat-compression-default": {
         "modelConfig": {
-          "model": "gemini-2.5-pro"
+          "model": "gemini-3-pro-preview"
         }
       }
     }
@@ -676,13 +698,6 @@ their corresponding top-level category object in your `settings.json` file.
     performance.
   - **Default:** `true`
 
-- **`tools.approvalMode`** (enum):
-  - **Description:** The default approval mode for tool execution. 'default'
-    prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is
-    read-only mode. 'yolo' is not supported yet.
-  - **Default:** `"default"`
-  - **Values:** `"default"`, `"auto_edit"`, `"plan"`
-
 - **`tools.core`** (array):
   - **Description:** Restrict the set of built-in tools with an allowlist. Match
     semantics mirror tools.allowed; see the built-in tools documentation for
@@ -720,20 +735,10 @@ their corresponding top-level category object in your `settings.json` file.
     implementation. Provides faster search performance.
   - **Default:** `true`
 
-- **`tools.enableToolOutputTruncation`** (boolean):
-  - **Description:** Enable truncation of large tool outputs.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
 - **`tools.truncateToolOutputThreshold`** (number):
-  - **Description:** Truncate tool output if it is larger than this many
-    characters. Set to -1 to disable.
-  - **Default:** `4000000`
-  - **Requires restart:** Yes
-
-- **`tools.truncateToolOutputLines`** (number):
-  - **Description:** The number of lines to keep when truncating tool output.
-  - **Default:** `1000`
+  - **Description:** Maximum characters to show when truncating large tool
+    outputs. Set to 0 or negative to disable truncation.
+  - **Default:** `40000`
   - **Requires restart:** Yes
 
 - **`tools.disableLLMCorrection`** (boolean):
@@ -792,7 +797,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`security.folderTrust.enabled`** (boolean):
   - **Description:** Setting to track whether Folder trust is enabled.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`security.environmentVariableRedaction.allowed`** (array):
@@ -853,6 +858,28 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `experimental`
 
+- **`experimental.toolOutputMasking.enabled`** (boolean):
+  - **Description:** Enables tool output masking to save tokens.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`experimental.toolOutputMasking.toolProtectionThreshold`** (number):
+  - **Description:** Minimum number of tokens to protect from masking (most
+    recent tool outputs).
+  - **Default:** `50000`
+  - **Requires restart:** Yes
+
+- **`experimental.toolOutputMasking.minPrunableTokensThreshold`** (number):
+  - **Description:** Minimum prunable tokens required to trigger a masking pass.
+  - **Default:** `30000`
+  - **Requires restart:** Yes
+
+- **`experimental.toolOutputMasking.protectLatestTurn`** (boolean):
+  - **Description:** Ensures the absolute latest turn is never masked,
+    regardless of token count.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
 - **`experimental.enableAgents`** (boolean):
   - **Description:** Enable local and remote subagents. Warning: Experimental
     feature, uses YOLO mode for subagents
@@ -866,12 +893,12 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.extensionConfig`** (boolean):
   - **Description:** Enable requesting and fetching of extension settings.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`experimental.enableEventDrivenScheduler`** (boolean):
-  - **Description:** Enables event-driven scheduler within the CLI session.
-  - **Default:** `true`
+- **`experimental.extensionRegistry`** (boolean):
+  - **Description:** Enable extension registry explore UI.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`experimental.extensionReloading`** (boolean):
@@ -994,6 +1021,10 @@ their corresponding top-level category object in your `settings.json` file.
 - **`admin.mcp.enabled`** (boolean):
   - **Description:** If false, disallows MCP servers from being used.
   - **Default:** `true`
+
+- **`admin.mcp.config`** (object):
+  - **Description:** Admin-configured MCP servers.
+  - **Default:** `{}`
 
 - **`admin.skills.enabled`** (boolean):
   - **Description:** If false, disallows agent skills from being used.
@@ -1176,6 +1207,13 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Specifies the default Gemini model to use.
   - Overrides the hardcoded default
   - Example: `export GEMINI_MODEL="gemini-3-flash-preview"`
+- **`GEMINI_CLI_HOME`**:
+  - Specifies the root directory for Gemini CLI's user-level configuration and
+    storage.
+  - By default, this is the user's system home directory. The CLI will create a
+    `.gemini` folder inside this directory.
+  - Useful for shared compute environments or keeping CLI state isolated.
+  - Example: `export GEMINI_CLI_HOME="/path/to/user/config"`
 - **`GOOGLE_API_KEY`**:
   - Your Google Cloud API key.
   - Required for using Vertex AI in express mode.

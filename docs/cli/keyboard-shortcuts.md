@@ -106,16 +106,18 @@ available combinations.
 | Toggle YOLO (auto-approval) mode for tool calls.                                                      | `Ctrl + Y`                 |
 | Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). | `Shift + Tab`              |
 | Expand a height-constrained response to show additional lines when not in alternate buffer mode.      | `Ctrl + O`<br />`Ctrl + S` |
-| Ctrl+B                                                                                                | `Ctrl + B`                 |
-| Ctrl+L                                                                                                | `Ctrl + L`                 |
-| Ctrl+K                                                                                                | `Ctrl + K`                 |
-| Enter                                                                                                 | `Enter`                    |
-| Esc                                                                                                   | `Esc`                      |
-| Shift+Tab                                                                                             | `Shift + Tab`              |
-| Tab                                                                                                   | `Tab (no Shift)`           |
-| Tab                                                                                                   | `Tab (no Shift)`           |
-| Focus the shell input from the gemini input.                                                          | `Tab (no Shift)`           |
-| Focus the Gemini input from the shell input.                                                          | `Tab`                      |
+| Expand or collapse a paste placeholder when cursor is over placeholder.                               | `Ctrl + O`                 |
+| Toggle current background shell visibility.                                                           | `Ctrl + B`                 |
+| Toggle background shell list.                                                                         | `Ctrl + L`                 |
+| Kill the active background shell.                                                                     | `Ctrl + K`                 |
+| Confirm selection in background shell list.                                                           | `Enter`                    |
+| Dismiss background shell list.                                                                        | `Esc`                      |
+| Move focus from background shell to Gemini.                                                           | `Shift + Tab`              |
+| Move focus from background shell list to Gemini.                                                      | `Tab (no Shift)`           |
+| Show warning when trying to unfocus background shell via Tab.                                         | `Tab (no Shift)`           |
+| Show warning when trying to unfocus shell input via Tab.                                              | `Tab (no Shift)`           |
+| Move focus from Gemini to the active shell.                                                           | `Tab (no Shift)`           |
+| Move focus from the shell back to Gemini.                                                             | `Shift + Tab`              |
 | Clear the terminal screen and redraw the UI.                                                          | `Ctrl + L`                 |
 | Restart the application.                                                                              | `R`                        |
 | Suspend the application (not yet implemented).                                                        | `Ctrl + Z`                 |
@@ -127,6 +129,10 @@ available combinations.
 - `Option+B/F/M` (macOS only): Are interpreted as `Cmd+B/F/M` even if your
   terminal isn't configured to send Meta with Option.
 - `!` on an empty prompt: Enter or exit shell mode.
+- `?` on an empty prompt: Toggle the shortcuts panel above the input. Press
+  `Esc`, `Backspace`, or any printable key to close it. Press `?` again to close
+  the panel and insert a `?` into the prompt. You can hide only the hint text
+  via `ui.showShortcutsHint`, without changing this keyboard behavior.
 - `\` (at end of a line) + `Enter`: Insert a newline without leaving single-line
   mode.
 - `Esc` pressed twice quickly: Clear the input prompt if it is not empty,
@@ -135,6 +141,7 @@ available combinations.
   single-line input, navigate backward or forward through prompt history.
 - `Number keys (1-9, multi-digit)` inside selection dialogs: Jump directly to
   the numbered radio option and confirm when the full number is entered.
-- `Double-click` on a paste placeholder (`[Pasted Text: X lines]`) in alternate
-  buffer mode: Expand to view full content inline. Double-click again to
-  collapse.
+- `Ctrl + O`: Expand or collapse paste placeholders (`[Pasted Text: X lines]`)
+  inline when the cursor is over the placeholder.
+- `Double-click` on a paste placeholder (alternate buffer mode only): Expand to
+  view full content inline. Double-click again to collapse.
