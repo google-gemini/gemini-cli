@@ -1347,32 +1347,29 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const [showFullTodos, setShowFullTodos] = useState<boolean>(false);
   const [renderMarkdown, setRenderMarkdown] = useState<boolean>(true);
 
+  const handleExitRepeat = useCallback(
+    (count: number) => {
+      if (count > 2) {
+        recordExitFail(config);
+      }
+      if (count > 1) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        handleSlashCommand('/quit', undefined, undefined, false);
+      }
+    },
+    [config, handleSlashCommand],
+  );
+
   const { pressCount: ctrlCPressCount, handlePress: handleCtrlCPress } =
     useRepeatedKeyPress({
       windowMs: WARNING_PROMPT_DURATION_MS,
-      onRepeat: (count) => {
-        if (count > 2) {
-          recordExitFail(config);
-        }
-        if (count > 1) {
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          handleSlashCommand('/quit', undefined, undefined, false);
-        }
-      },
+      onRepeat: handleExitRepeat,
     });
 
   const { pressCount: ctrlDPressCount, handlePress: handleCtrlDPress } =
     useRepeatedKeyPress({
       windowMs: WARNING_PROMPT_DURATION_MS,
-      onRepeat: (count) => {
-        if (count > 2) {
-          recordExitFail(config);
-        }
-        if (count > 1) {
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          handleSlashCommand('/quit', undefined, undefined, false);
-        }
-      },
+      onRepeat: handleExitRepeat,
     });
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [ideContextState, setIdeContextState] = useState<

@@ -233,29 +233,26 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       windowMs: DOUBLE_TAB_CLEAN_UI_TOGGLE_WINDOW_MS,
     });
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
-  const {
-    pressCount: escPressCount,
-    handlePress: handleEscPress,
-    resetCount: resetEscapeState,
-  } = useRepeatedKeyPress({
-    windowMs: 500,
-    onRepeat: (count) => {
-      if (count === 1) {
-        setShowEscapePrompt(true);
-      } else if (count === 2) {
-        resetEscapeState();
-        if (buffer.text.length > 0) {
-          buffer.setText('');
-          resetCompletionState();
-        } else if (history.length > 0) {
-          onSubmit('/rewind');
-        } else {
-          coreEvents.emitFeedback('info', 'Nothing to rewind to');
+  const { handlePress: handleEscPress, resetCount: resetEscapeState } =
+    useRepeatedKeyPress({
+      windowMs: 500,
+      onRepeat: (count) => {
+        if (count === 1) {
+          setShowEscapePrompt(true);
+        } else if (count === 2) {
+          resetEscapeState();
+          if (buffer.text.length > 0) {
+            buffer.setText('');
+            resetCompletionState();
+          } else if (history.length > 0) {
+            onSubmit('/rewind');
+          } else {
+            coreEvents.emitFeedback('info', 'Nothing to rewind to');
+          }
         }
-      }
-    },
-    onReset: () => setShowEscapePrompt(false),
-  });
+      },
+      onReset: () => setShowEscapePrompt(false),
+    });
   const [recentUnsafePasteTime, setRecentUnsafePasteTime] = useState<
     number | null
   >(null);
@@ -739,9 +736,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // Reset ESC count and hide prompt on any non-ESC key
       if (key.name !== 'escape') {
-        if (escPressCount > 0 || showEscapePrompt) {
-          resetEscapeState();
-        }
+        resetEscapeState();
       }
 
       // Ctrl+O to expand/collapse paste placeholders
@@ -1177,7 +1172,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       reverseSearchCompletion,
       handleClipboardPaste,
       resetCompletionState,
-      showEscapePrompt,
       resetEscapeState,
       vimHandleInput,
       reverseSearchActive,
@@ -1196,7 +1190,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       backgroundShells.size,
       backgroundShellHeight,
       streamingState,
-      escPressCount,
       handleEscPress,
       registerPlainTabPress,
       resetPlainTabPress,

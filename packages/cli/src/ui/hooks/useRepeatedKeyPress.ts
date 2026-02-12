@@ -26,9 +26,11 @@ export function useRepeatedKeyPress(options: UseRepeatedKeyPressOptions) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    pressCountRef.current = 0;
-    setPressCount(0);
-    optionsRef.current.onReset?.();
+    if (pressCountRef.current > 0) {
+      pressCountRef.current = 0;
+      setPressCount(0);
+      optionsRef.current.onReset?.();
+    }
   }, []);
 
   const handlePress = useCallback((): number => {
