@@ -81,10 +81,13 @@ export function renderResponse(
     responseTexts.push(`_${thought.subject}_: ${thought.description}`);
   }
 
-  // Add agent response text (from A2UI surfaces)
-  for (const agentResponse of agentResponses) {
-    if (agentResponse.text) {
-      responseTexts.push(agentResponse.text);
+  // Add agent response text (from A2UI surfaces).
+  // Use only the last non-empty response since later updates supersede earlier
+  // ones for the same surface (history contains multiple status-update messages).
+  for (let i = agentResponses.length - 1; i >= 0; i--) {
+    if (agentResponses[i].text) {
+      responseTexts.push(agentResponses[i].text);
+      break;
     }
   }
 
