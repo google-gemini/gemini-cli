@@ -47,6 +47,7 @@ import {
   logAgentFinish,
   logRecoveryAttempt,
 } from '../telemetry/loggers.js';
+import { LlmRole } from '../telemetry/types.js';
 import {
   AgentStartEvent,
   AgentFinishEvent,
@@ -1407,6 +1408,7 @@ describe('LocalAgentExecutor', () => {
         expect.any(Array),
         expect.any(String),
         expect.any(AbortSignal),
+        LlmRole.SUBAGENT,
       );
     });
 
@@ -1452,6 +1454,7 @@ describe('LocalAgentExecutor', () => {
         expect.any(Array),
         expect.any(String),
         expect.any(AbortSignal),
+        LlmRole.SUBAGENT,
       );
     });
   });

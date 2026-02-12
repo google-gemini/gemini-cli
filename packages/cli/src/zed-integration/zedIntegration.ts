@@ -34,6 +34,7 @@ import {
   startupProfiler,
   Kind,
   partListUnionToString,
+  LlmRole,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -489,6 +490,7 @@ export class Session {
           nextMessage?.parts ?? [],
           promptId,
           pendingSend.signal,
+          LlmRole.MAIN,
         );
         nextMessage = null;
 
