@@ -4296,6 +4296,30 @@ describe('InputPrompt', () => {
   });
 
   describe('shortcuts help visibility', () => {
+    it('opens shortcuts help with ? on empty prompt even when showShortcutsHint is false', async () => {
+      const setShortcutsHelpVisible = vi.fn();
+      const settings = createMockSettings({
+        ui: { showShortcutsHint: false },
+      });
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          settings,
+          uiActions: { setShortcutsHelpVisible },
+        },
+      );
+
+      await act(async () => {
+        stdin.write('?');
+      });
+
+      await waitFor(() => {
+        expect(setShortcutsHelpVisible).toHaveBeenCalledWith(true);
+      });
+      unmount();
+    });
+
     it.each([
       {
         name: 'terminal paste event occurs',
@@ -4317,6 +4341,18 @@ describe('InputPrompt', () => {
           vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
           vi.mocked(clipboardy.read).mockResolvedValue('clipboard text');
         },
+      },
+      {
+        name: 'Ctrl+R hotkey is pressed',
+        input: '\x12',
+      },
+      {
+        name: 'Ctrl+X hotkey is pressed',
+        input: '\x18',
+      },
+      {
+        name: 'F12 hotkey is pressed',
+        input: '\x1b[24~',
       },
     ])(
       'should close shortcuts help when a $name',

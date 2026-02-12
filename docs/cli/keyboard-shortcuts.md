@@ -120,7 +120,7 @@ available combinations.
 | Move focus from the shell back to Gemini.                                                             | `Shift + Tab`              |
 | Clear the terminal screen and redraw the UI.                                                          | `Ctrl + L`                 |
 | Restart the application.                                                                              | `R`                        |
-| Suspend the application (not yet implemented).                                                        | `Ctrl + Z`                 |
+| Suspend the CLI and move it to the background.                                                        | `Ctrl + Z`                 |
 
 <!-- KEYBINDINGS-AUTOGEN:END -->
 
@@ -130,8 +130,10 @@ available combinations.
   terminal isn't configured to send Meta with Option.
 - `!` on an empty prompt: Enter or exit shell mode.
 - `?` on an empty prompt: Toggle the shortcuts panel above the input. Press
-  `Esc`, `Backspace`, or any printable key to close it. Press `?` again to close
-  the panel and insert a `?` into the prompt.
+  `Esc`, `Backspace`, any printable key, or a registered app hotkey to close it.
+  The panel also auto-hides while the agent is running/streaming or when
+  action-required dialogs are shown. Press `?` again to close the panel and
+  insert a `?` into the prompt.
 - `\` (at end of a line) + `Enter`: Insert a newline without leaving single-line
   mode.
 - `Esc` pressed twice quickly: Clear the input prompt if it is not empty,

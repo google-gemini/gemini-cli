@@ -50,76 +50,6 @@ exports[`<ToolGroupMessage /> > Border Color Logic > uses yellow border for shel
 ╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`<ToolGroupMessage /> > Border Color Logic > uses yellow border when tools are pending 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────╮
-│ o  test-tool A tool for testing                                          │
-│                                                                          │
-│ Test result                                                              │
-╰──────────────────────────────────────────────────────────────────────────╯"
-`;
-
-exports[`<ToolGroupMessage /> > Confirmation Handling > renders confirmation with permanent approval disabled 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────╮
-│ ?  confirm-tool A tool for testing                                     ← │
-│                                                                          │
-│ Test result                                                              │
-│ Do you want to proceed?                                                  │
-│ Do you want to proceed?                                                  │
-│                                                                          │
-│ ● 1. Allow once                                                          │
-│   2. Allow for this session                                              │
-│   3. No, suggest changes (esc)                                           │
-│                                                                          │
-╰──────────────────────────────────────────────────────────────────────────╯"
-`;
-
-exports[`<ToolGroupMessage /> > Confirmation Handling > renders confirmation with permanent approval enabled 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────╮
-│ ?  confirm-tool A tool for testing                                     ← │
-│                                                                          │
-│ Test result                                                              │
-│ Do you want to proceed?                                                  │
-│ Do you want to proceed?                                                  │
-│                                                                          │
-│ ● 1. Allow once                                                          │
-│   2. Allow for this session                                              │
-│   3. Allow for all future sessions                                       │
-│   4. No, suggest changes (esc)                                           │
-│                                                                          │
-╰──────────────────────────────────────────────────────────────────────────╯"
-`;
-
-exports[`<ToolGroupMessage /> > Confirmation Handling > shows confirmation dialog for first confirming tool only 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────╮
-│ ?  first-confirm A tool for testing                                    ← │
-│                                                                          │
-│ Test result                                                              │
-│ Confirm first tool                                                       │
-│ Do you want to proceed?                                                  │
-│                                                                          │
-│ ● 1. Allow once                                                          │
-│   2. Allow for this session                                              │
-│   3. No, suggest changes (esc)                                           │
-│                                                                          │
-│                                                                          │
-│ ?  second-confirm A tool for testing                                     │
-│                                                                          │
-│ Test result                                                              │
-╰──────────────────────────────────────────────────────────────────────────╯"
-`;
-
-exports[`<ToolGroupMessage /> > Event-Driven Scheduler > hides confirming tools when event-driven scheduler is enabled 1`] = `""`;
-
-exports[`<ToolGroupMessage /> > Event-Driven Scheduler > renders nothing when only tool is in-progress AskUser with borderBottom=false 1`] = `""`;
-
-exports[`<ToolGroupMessage /> > Event-Driven Scheduler > shows only successful tools when mixed with confirming tools 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────╮
-│ ✓  success-tool A tool for testing                                       │
-│                                                                          │
-│ Test result                                                              │
-╰──────────────────────────────────────────────────────────────────────────╯"
-`;
-
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders empty tool calls array 1`] = `""`;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 1`] = `
@@ -144,32 +74,16 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls incl
 │ ⊷  run_shell_command Run command                                         │
 │                                                                          │
 │ Test result                                                              │
-│                                                                          │
-│ o  write_file Write to file                                              │
-│                                                                          │
-│ Test result                                                              │
 ╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`<ToolGroupMessage /> > Golden Snapshots > renders multiple tool calls with different statuses 1`] = `
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders multiple tool calls with different statuses (only visible ones) 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  successful-tool This tool succeeded                                   │
 │                                                                          │
 │ Test result                                                              │
 │                                                                          │
-│ o  pending-tool This tool is pending                                     │
-│                                                                          │
-│ Test result                                                              │
-│                                                                          │
 │ x  error-tool This tool failed                                           │
-│                                                                          │
-│ Test result                                                              │
-╰──────────────────────────────────────────────────────────────────────────╯"
-`;
-
-exports[`<ToolGroupMessage /> > Golden Snapshots > renders shell command with yellow border 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────╮
-│ ✓  run_shell_command Execute shell command                               │
 │                                                                          │
 │ Test result                                                              │
 ╰──────────────────────────────────────────────────────────────────────────╯"
@@ -180,21 +94,6 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders single successful too
 │ ✓  test-tool A tool for testing                                          │
 │                                                                          │
 │ Test result                                                              │
-╰──────────────────────────────────────────────────────────────────────────╯"
-`;
-
-exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call awaiting confirmation 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────╮
-│ ?  confirmation-tool This tool needs confirmation                      ← │
-│                                                                          │
-│ Test result                                                              │
-│ Are you sure you want to proceed?                                        │
-│ Do you want to proceed?                                                  │
-│                                                                          │
-│ ● 1. Allow once                                                          │
-│   2. Allow for this session                                              │
-│   3. No, suggest changes (esc)                                           │
-│                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
@@ -214,14 +113,6 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders two tool groups where
 │                                                                          │                                           ▄
 │ line1                                                                    │                                           █
 ╰──────────────────────────────────────────────────────────────────────────╯                                           █"
-`;
-
-exports[`<ToolGroupMessage /> > Golden Snapshots > renders when not focused 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────╮
-│ ✓  test-tool A tool for testing                                          │
-│                                                                          │
-│ Test result                                                              │
-╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders with limited terminal height 1`] = `

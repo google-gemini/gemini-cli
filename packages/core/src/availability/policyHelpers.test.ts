@@ -115,6 +115,19 @@ describe('policyHelpers', () => {
       expect(chain[0]?.model).toBe('gemini-2.5-flash');
       expect(chain[1]?.model).toBe('gemini-2.5-pro');
     });
+
+    it('proactively returns Gemini 2.5 chain if Gemini 3 requested but user lacks access', () => {
+      const config = createMockConfig({
+        getModel: () => 'auto-gemini-3',
+        getHasAccessToPreviewModel: () => false,
+      });
+      const chain = resolvePolicyChain(config);
+
+      // Should downgrade to [Pro 2.5, Flash 2.5]
+      expect(chain).toHaveLength(2);
+      expect(chain[0]?.model).toBe('gemini-2.5-pro');
+      expect(chain[1]?.model).toBe('gemini-2.5-flash');
+    });
   });
 
   describe('buildFallbackPolicyContext', () => {

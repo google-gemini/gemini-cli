@@ -304,6 +304,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
         const diffStat = fileDiff.diffStat;
         if (diffStat) {
           this.metadata = {
+            ...this.metadata,
             model_added_lines: diffStat.model_added_lines,
             model_removed_lines: diffStat.model_removed_lines,
             model_added_chars: diffStat.model_added_chars,
@@ -314,6 +315,10 @@ export class ToolCallEvent implements BaseTelemetryEvent {
             user_removed_chars: diffStat.user_removed_chars,
           };
         }
+      }
+
+      if (call.status === 'success' && call.response.data) {
+        this.metadata = { ...this.metadata, ...call.response.data };
       }
     } else {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

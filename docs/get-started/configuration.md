@@ -220,6 +220,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hide helpful tips in the UI
   - **Default:** `false`
 
+- **`ui.showShortcutsHint`** (boolean):
+  - **Description:** Show the "? for shortcuts" hint above the input.
+  - **Default:** `true`
+
 - **`ui.hideBanner`** (boolean):
   - **Description:** Hide the application banner
   - **Default:** `false`
@@ -443,6 +447,12 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-2.5-flash"
         }
       },
+      "gemini-3-flash-base": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-3-flash-preview"
+        }
+      },
       "classifier": {
         "extends": "base",
         "modelConfig": {
@@ -498,7 +508,7 @@ their corresponding top-level category object in your `settings.json` file.
         }
       },
       "web-search": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {
           "generateContentConfig": {
             "tools": [
@@ -510,7 +520,7 @@ their corresponding top-level category object in your `settings.json` file.
         }
       },
       "web-fetch": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {
           "generateContentConfig": {
             "tools": [
@@ -522,25 +532,25 @@ their corresponding top-level category object in your `settings.json` file.
         }
       },
       "web-fetch-fallback": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {}
       },
       "loop-detection": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {}
       },
       "loop-detection-double-check": {
         "extends": "base",
         "modelConfig": {
-          "model": "gemini-2.5-pro"
+          "model": "gemini-3-pro-preview"
         }
       },
       "llm-edit-fixer": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {}
       },
       "next-speaker-checker": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {}
       },
       "chat-compression-3-pro": {
@@ -570,7 +580,7 @@ their corresponding top-level category object in your `settings.json` file.
       },
       "chat-compression-default": {
         "modelConfig": {
-          "model": "gemini-2.5-pro"
+          "model": "gemini-3-pro-preview"
         }
       }
     }
@@ -847,6 +857,28 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
 
 #### `experimental`
+
+- **`experimental.toolOutputMasking.enabled`** (boolean):
+  - **Description:** Enables tool output masking to save tokens.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`experimental.toolOutputMasking.toolProtectionThreshold`** (number):
+  - **Description:** Minimum number of tokens to protect from masking (most
+    recent tool outputs).
+  - **Default:** `50000`
+  - **Requires restart:** Yes
+
+- **`experimental.toolOutputMasking.minPrunableTokensThreshold`** (number):
+  - **Description:** Minimum prunable tokens required to trigger a masking pass.
+  - **Default:** `30000`
+  - **Requires restart:** Yes
+
+- **`experimental.toolOutputMasking.protectLatestTurn`** (boolean):
+  - **Description:** Ensures the absolute latest turn is never masked,
+    regardless of token count.
+  - **Default:** `true`
+  - **Requires restart:** Yes
 
 - **`experimental.enableAgents`** (boolean):
   - **Description:** Enable local and remote subagents. Warning: Experimental
@@ -1258,7 +1290,10 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
     few other folders, see
     `packages/cli/src/utils/sandbox-macos-permissive-open.sb`) but allows other
     operations.
-  - `strict`: Uses a strict profile that declines operations by default.
+  - `restrictive-open`: Declines operations by default, allows network.
+  - `strict-open`: Restricts both reads and writes to the working directory,
+    allows network.
+  - `strict-proxied`: Same as `strict-open` but routes network through proxy.
   - `<profile_name>`: Uses a custom profile. To define a custom profile, create
     a file named `sandbox-macos-<profile_name>.sb` in your project's `.gemini/`
     directory (e.g., `my-project/.gemini/sandbox-macos-custom.sb`).

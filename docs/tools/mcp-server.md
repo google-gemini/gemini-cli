@@ -799,12 +799,9 @@ The MCP integration tracks several states:
   [Security and environment sanitization](#security-and-environment-sanitization)
   for details on how Gemini CLI protects your credentials.
 - **Sandbox compatibility:** When using sandboxing, ensure MCP servers are
-  available within the sandbox environment.
+  available within the sandbox environment
 - **Private data:** Using broadly scoped personal access tokens can lead to
   information leakage between repositories.
-- **Untrusted servers:** Be extremely cautious when adding MCP servers from
-  untrusted or third-party sources. Malicious servers could attempt to
-  exfiltrate data or perform unauthorized actions through the tools they expose.
 
 ### Performance and resource management
 

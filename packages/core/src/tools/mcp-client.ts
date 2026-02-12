@@ -34,11 +34,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { ApprovalMode, PolicyDecision } from '../policy/types.js';
 import { parse } from 'shell-quote';
-import type {
-  Config,
-  GeminiCLIExtension,
-  MCPServerConfig,
-} from '../config/config.js';
+import type { Config, MCPServerConfig } from '../config/config.js';
 import { AuthProviderType } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
@@ -72,6 +68,10 @@ import {
   type EnvironmentSanitizationConfig,
 } from '../services/environmentSanitization.js';
 import { expandEnvVars } from '../utils/envExpansion.js';
+import {
+  GEMINI_CLI_IDENTIFICATION_ENV_VAR,
+  GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
+} from '../services/shellExecutionService.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -1912,17 +1912,13 @@ export async function createTransport(
       enableEnvironmentVariableRedaction: true,
     });
 
-    const finalEnv: Record<string, string> = {};
+    const finalEnv: Record<string, string> = {
+      [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
+          GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE };
     for (const [key, value] of Object.entries(sanitizedEnv)) {
       if (value !== undefined) {
         finalEnv[key] = value;
       }
-    }
-
-    // Expand and merge environment variables from the extension.
-    const extensionEnv = getExtensionEnvironment(mcpServerConfig.extension);
-    for (const [key, value] of Object.entries(extensionEnv)) {
-      finalEnv[key] = expandEnvVars(value, process.env);
     }
 
     // Expand and merge explicit environment variables from the MCP configuration.
@@ -2009,18 +2005,4 @@ export function isEnabled(
       (tool) => tool === funcDecl.name || tool.startsWith(`${funcDecl.name}(`),
     )
   );
-}
-
-function getExtensionEnvironment(
-  extension?: GeminiCLIExtension,
-): Record<string, string> {
-  const env: Record<string, string> = {};
-  if (extension?.resolvedSettings) {
-    for (const setting of extension.resolvedSettings) {
-      if (setting.value) {
-        env[setting.envVar] = setting.value;
-      }
-    }
-  }
-  return env;
 }
