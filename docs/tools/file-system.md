@@ -46,34 +46,69 @@ if not.
 Finds files matching specific glob patterns across the workspace.
 
 - **Tool name:** `glob`
-- **Arguments:**
-  - `pattern` (string, required): Glob pattern (for example, `src/**/*.ts`).
-  - `dir_path` (string, optional): Directory to search within.
+- **Display name:** FindFiles
+- **File:** `glob.ts`
+- **Parameters:**
+  - `pattern` (string, required): The glob pattern to match against (e.g.,
+    `"*.py"`, `"src/**/*.js"`).
+  - `path` (string, optional): The absolute path to the directory to search
+    within. If omitted, searches the tool's root directory.
+  - `case_sensitive` (boolean, optional): Whether the search should be
+    case-sensitive. Defaults to `false`.
+  - `respect_git_ignore` (boolean, optional): Whether to respect .gitignore
+    patterns when finding files. Defaults to `true`.
+- **Behavior:**
+  - Searches for files matching the glob pattern within the specified directory.
+  - Returns a list of absolute paths, sorted with the most recently modified
+    files first.
+  - Ignores common nuisance directories like `node_modules` and `.git` by
+    default.
+- **Output (`llmContent`):** A message like:
+  `Found 5 file(s) matching "*.ts" within src, sorted by modification time (newest first):\nsrc/file1.ts\nsrc/subdir/file2.ts...`
+- **Confirmation:** No.
 
-### `search_file_content` (SearchText)
+## 5. `grep_search` (SearchText)
 
-Searches for regular expression patterns within file contents using `ripgrep` or
-system grep.
+`grep_search` searches for a regular expression pattern within the content of
+files in a specified directory. Can filter files by a glob pattern. Returns the
+lines containing matches, along with their file paths and line numbers.
 
-- **Tool name:** `search_file_content`
-- **Arguments:**
-  - `pattern` (string, required): Regex to search for.
-  - `dir_path` (string, optional): Directory to search.
-  - `include` (string, optional): Glob pattern to filter files.
+- **Tool name:** `grep_search`
+- **Display name:** SearchText
+- **File:** `grep.ts`
+- **Parameters:**
+  - `pattern` (string, required): The regular expression (regex) to search for
+    (e.g., `"function\s+myFunction"`).
+  - `path` (string, optional): The absolute path to the directory to search
+    within. Defaults to the current working directory.
+  - `include` (string, optional): A glob pattern to filter which files are
+    searched (e.g., `"*.js"`, `"src/**/*.{ts,tsx}"`). If omitted, searches most
+    files (respecting common ignores).
+- **Behavior:**
+  - Uses `git grep` if available in a Git repository for speed; otherwise, falls
+    back to system `grep` or a JavaScript-based search.
+  - Returns a list of matching lines, each prefixed with its file path (relative
+    to the search directory) and line number.
+- **Output (`llmContent`):** A formatted string of matches, e.g.:
+  ```
+  Found 3 matches for pattern "myFunction" in path "." (filter: "*.ts"):
+  ---
+  File: src/utils.ts
+  L15: export function myFunction() {
+  L22:   myFunction.call();
+  ---
+  File: src/index.ts
+  L5: import { myFunction } from './utils';
+  ---
+  ```
+- **Confirmation:** No.
 
-### `read_many_files` (ReadManyFiles)
+## 6. `replace` (Edit)
 
-Reads and concatenates multiple files matching include/exclude patterns.
-
-- **Tool name:** `read_many_files`
-- **Arguments:**
-  - `include` (array, required): Patterns or paths to include.
-  - `exclude` (array, optional): Patterns to ignore.
-
-### `replace` (Edit)
-
-Performs precise text replacement within a file based on literal string matching
-and context.
+`replace` replaces text within a file. By default, replaces a single occurrence,
+but can replace multiple occurrences when `expected_replacements` is specified.
+This tool is designed for precise, targeted changes and requires significant
+context around the `old_string` to ensure it modifies the correct location.
 
 - **Tool name:** `replace`
 - **Arguments:**

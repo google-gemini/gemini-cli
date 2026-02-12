@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import {
   GLOB_TOOL_NAME,
@@ -17,9 +17,24 @@ import { makeFakeConfig } from '../test-utils/config.js';
 
 describe('CodebaseInvestigatorAgent', () => {
   const config = makeFakeConfig();
-  const agent = CodebaseInvestigatorAgent(config);
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const mockPlatform = (platform: string) => {
+    vi.stubGlobal(
+      'process',
+      Object.create(process, {
+        platform: {
+          get: () => platform,
+        },
+      }),
+    );
+  };
 
   it('should have the correct agent definition', () => {
+    const agent = CodebaseInvestigatorAgent(config);
     expect(agent.name).toBe('codebase_investigator');
     expect(agent.displayName).toBe('Codebase Investigator Agent');
     expect(agent.description).toBeDefined();
@@ -39,6 +54,7 @@ describe('CodebaseInvestigatorAgent', () => {
   });
 
   it('should process output to a formatted JSON string', () => {
+    const agent = CodebaseInvestigatorAgent(config);
     const report = {
       SummaryOfFindings: 'summary',
       ExplorationTrace: ['trace'],
@@ -46,5 +62,19 @@ describe('CodebaseInvestigatorAgent', () => {
     };
     const processed = agent.processOutput?.(report);
     expect(processed).toBe(JSON.stringify(report, null, 2));
+  });
+
+  it('should include Windows-specific list command in system prompt when on Windows', () => {
+    mockPlatform('win32');
+    const agent = CodebaseInvestigatorAgent(config);
+    expect(agent.promptConfig.systemPrompt).toContain(
+      '`dir /s` (CMD) or `Get-ChildItem -Recurse` (PowerShell)',
+    );
+  });
+
+  it('should include generic list command in system prompt when on non-Windows', () => {
+    mockPlatform('linux');
+    const agent = CodebaseInvestigatorAgent(config);
+    expect(agent.promptConfig.systemPrompt).toContain('`ls -R`');
   });
 });

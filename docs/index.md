@@ -92,6 +92,8 @@ Technical reference documentation for each capability of Gemini CLI.
   lookup for CLI features.
 - **[Memory (tool)](./tools/memory.md):** Storage details for persistent facts.
 - **[Model routing](./cli/model-routing.md):** Automatic fallback resilience.
+- **[Plan mode (experimental)](./plan-mode.md):** Use a safe, read-only mode for
+  planning complex changes.
 - **[Sandboxing](./cli/sandbox.md):** Isolate tool execution.
 - **[Shell (tool)](./tools/shell.md):** Detailed system execution parameters.
 - **[Telemetry](./cli/telemetry.md):** Usage and performance metric details.

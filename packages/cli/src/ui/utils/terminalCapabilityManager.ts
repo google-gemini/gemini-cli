@@ -14,8 +14,26 @@ import {
   enableBracketedPasteMode,
   disableBracketedPasteMode,
 } from '@google/gemini-cli-core';
+import { parseColor } from '../themes/color-utils.js';
 
 export type TerminalBackgroundColor = string | undefined;
+
+const TERMINAL_CLEANUP_SEQUENCE = '\x1b[<u\x1b[>4;0m\x1b[?2004l';
+
+export function cleanupTerminalOnExit() {
+  try {
+    if (process.stdout?.fd !== undefined) {
+      fs.writeSync(process.stdout.fd, TERMINAL_CLEANUP_SEQUENCE);
+      return;
+    }
+  } catch (e) {
+    debugLogger.warn('Failed to synchronously cleanup terminal modes:', e);
+  }
+
+  disableKittyKeyboardProtocol();
+  disableModifyOtherKeys();
+  disableBracketedPasteMode();
+}
 
 export class TerminalCapabilityManager {
   private static instance: TerminalCapabilityManager | undefined;
@@ -25,6 +43,16 @@ export class TerminalCapabilityManager {
   private static readonly TERMINAL_NAME_QUERY = '\x1b[>q';
   private static readonly DEVICE_ATTRIBUTES_QUERY = '\x1b[c';
   private static readonly MODIFY_OTHER_KEYS_QUERY = '\x1b[>4;?m';
+
+  /**
+   * Triggers a terminal background color query.
+   * @param stdout The stdout stream to write to.
+   */
+  static queryBackgroundColor(stdout: {
+    write: (data: string) => void | boolean;
+  }): void {
+    stdout.write(TerminalCapabilityManager.OSC_11_QUERY);
+  }
 
   // Kitty keyboard flags: CSI ? flags u
   // eslint-disable-next-line no-control-regex
@@ -36,9 +64,9 @@ export class TerminalCapabilityManager {
   // eslint-disable-next-line no-control-regex
   private static readonly DEVICE_ATTRIBUTES_REGEX = /\x1b\[\?(\d+)(;\d+)*c/;
   // OSC 11 response: OSC 11 ; rgb:rrrr/gggg/bbbb ST (or BEL)
-  private static readonly OSC_11_REGEX =
+  static readonly OSC_11_REGEX =
     // eslint-disable-next-line no-control-regex
-    /\x1b\]11;rgb:([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})(\x1b\\|\x07)?/;
+    /\x1b\]11;rgb:([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})(\x1b\\|\x07)/;
   // modifyOtherKeys response: CSI > 4 ; level m
   // eslint-disable-next-line no-control-regex
   private static readonly MODIFY_OTHER_KEYS_REGEX = /\x1b\[>4;(\d+)m/;
@@ -76,16 +104,12 @@ export class TerminalCapabilityManager {
       return;
     }
 
-    const cleanupOnExit = () => {
-      // don't bother catching errors since if one write
-      // fails, the other probably will too
-      disableKittyKeyboardProtocol();
-      disableModifyOtherKeys();
-      disableBracketedPasteMode();
-    };
-    process.on('exit', cleanupOnExit);
-    process.on('SIGTERM', cleanupOnExit);
-    process.on('SIGINT', cleanupOnExit);
+    process.off('exit', cleanupTerminalOnExit);
+    process.off('SIGTERM', cleanupTerminalOnExit);
+    process.off('SIGINT', cleanupTerminalOnExit);
+    process.on('exit', cleanupTerminalOnExit);
+    process.on('SIGTERM', cleanupTerminalOnExit);
+    process.on('SIGINT', cleanupTerminalOnExit);
 
     return new Promise((resolve) => {
       const originalRawMode = process.stdin.isRaw;
@@ -129,7 +153,7 @@ export class TerminalCapabilityManager {
           const match = buffer.match(TerminalCapabilityManager.OSC_11_REGEX);
           if (match) {
             bgReceived = true;
-            this.terminalBackgroundColor = this.parseColor(
+            this.terminalBackgroundColor = parseColor(
               match[1],
               match[2],
               match[3],
@@ -233,24 +257,6 @@ export class TerminalCapabilityManager {
 
   isKittyProtocolEnabled(): boolean {
     return this.kittyEnabled;
-  }
-
-  private parseColor(rHex: string, gHex: string, bHex: string): string {
-    const parseComponent = (hex: string) => {
-      const val = parseInt(hex, 16);
-      if (hex.length === 1) return (val / 15) * 255;
-      if (hex.length === 2) return val;
-      if (hex.length === 3) return (val / 4095) * 255;
-      if (hex.length === 4) return (val / 65535) * 255;
-      return val;
-    };
-
-    const r = parseComponent(rHex);
-    const g = parseComponent(gHex);
-    const b = parseComponent(bHex);
-
-    const toHex = (c: number) => Math.round(c).toString(16).padStart(2, '0');
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
   }
 }
 

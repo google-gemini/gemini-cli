@@ -21,15 +21,65 @@ import type { SelectionListItem } from '../hooks/useSelectionList.js';
 import { TabHeader, type Tab } from './shared/TabHeader.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
-import { checkExhaustive } from '../../utils/checks.js';
+import { checkExhaustive } from '@google/gemini-cli-core';
 import { TextInput } from './shared/TextInput.js';
 import { useTextBuffer } from './shared/text-buffer.js';
 import { getCachedStringWidth } from '../utils/textUtils.js';
 import { useTabbedNavigation } from '../hooks/useTabbedNavigation.js';
 import { DialogFooter } from './shared/DialogFooter.js';
+import { MarkdownDisplay } from '../utils/MarkdownDisplay.js';
+import { RenderInline } from '../utils/InlineMarkdownRenderer.js';
 import { MaxSizedBox } from './shared/MaxSizedBox.js';
 import { UIStateContext } from '../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+
+/** Padding for dialog content to prevent text from touching edges. */
+const DIALOG_PADDING = 4;
+
+/**
+ * Checks if text is a single line without markdown identifiers.
+ */
+function isPlainSingleLine(text: string): boolean {
+  // Must be a single line (no newlines)
+  if (text.includes('\n') || text.includes('\r')) {
+    return false;
+  }
+
+  // Check for common markdown identifiers
+  const markdownPatterns = [
+    /^#{1,6}\s/, // Headers
+    /^[`~]{3,}/, // Code fences
+    /^[-*+]\s/, // Unordered lists
+    /^\d+\.\s/, // Ordered lists
+    /^[-*_]{3,}$/, // Horizontal rules
+    /\|/, // Tables
+    /\*\*|__/, // Bold
+    /(?<!\*)\*(?!\*)/, // Italic (single asterisk not part of bold)
+    /(?<!_)_(?!_)/, // Italic (single underscore not part of bold)
+    /`[^`]+`/, // Inline code
+    /\[.*?\]\(.*?\)/, // Links
+    /!\[/, // Images
+  ];
+
+  for (const pattern of markdownPatterns) {
+    if (pattern.test(text)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Auto-bolds plain single-line text by wrapping in **.
+ * Returns the text unchanged if it already contains markdown.
+ */
+function autoBoldIfPlain(text: string): string {
+  if (isPlainSingleLine(text)) {
+    return `**${text}**`;
+  }
+  return text;
+}
 
 interface AskUserDialogState {
   answers: { [key: string]: string };
@@ -43,6 +93,7 @@ type AskUserDialogAction =
       payload: {
         index: number;
         answer: string;
+        submit?: boolean;
       };
     }
   | { type: 'SET_EDITING_CUSTOM'; payload: { isEditing: boolean } }
@@ -64,7 +115,7 @@ function askUserDialogReducerLogic(
 
   switch (action.type) {
     case 'SET_ANSWER': {
-      const { index, answer } = action.payload;
+      const { index, answer, submit } = action.payload;
       const hasAnswer =
         answer !== undefined && answer !== null && answer.trim() !== '';
       const newAnswers = { ...state.answers };
@@ -78,6 +129,7 @@ function askUserDialogReducerLogic(
       return {
         ...state,
         answers: newAnswers,
+        submitted: submit ? true : state.submitted,
       };
     }
     case 'SET_EDITING_CUSTOM': {
@@ -233,9 +285,8 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
 
   const buffer = useTextBuffer({
     initialText: initialAnswer,
-    viewport: { width: Math.max(1, bufferWidth), height: 1 },
-    singleLine: true,
-    isValidPath: () => false,
+    viewport: { width: Math.max(1, bufferWidth), height: 3 },
+    singleLine: false,
   });
 
   const { text: textValue } = buffer;
@@ -268,9 +319,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
 
   const handleSubmit = useCallback(
     (val: string) => {
-      if (val.trim()) {
-        onAnswer(val.trim());
-      }
+      onAnswer(val.trim());
     },
     [onAnswer],
   );
@@ -303,14 +352,16 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
           maxWidth={availableWidth}
           overflowDirection="bottom"
         >
-          <Text bold color={theme.text.primary}>
-            {question.question}
-          </Text>
+          <MarkdownDisplay
+            text={autoBoldIfPlain(question.question)}
+            terminalWidth={availableWidth - DIALOG_PADDING}
+            isPending={false}
+          />
         </MaxSizedBox>
       </Box>
 
       <Box flexDirection="row" marginBottom={1}>
-        <Text color={theme.text.accent}>{'> '}</Text>
+        <Text color={theme.status.success}>{'> '}</Text>
         <TextInput
           buffer={buffer}
           placeholder={placeholder}
@@ -510,9 +561,8 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
   const customBuffer = useTextBuffer({
     initialText: initialCustomText,
-    viewport: { width: Math.max(1, bufferWidth), height: 1 },
-    singleLine: true,
-    isValidPath: () => false,
+    viewport: { width: Math.max(1, bufferWidth), height: 3 },
+    singleLine: false,
   });
 
   const customOptionText = customBuffer.text;
@@ -734,7 +784,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     : undefined;
   const questionHeight =
     listHeight && !isAlternateBuffer
-      ? Math.min(15, Math.max(1, listHeight - 4))
+      ? Math.min(15, Math.max(1, listHeight - DIALOG_PADDING))
       : undefined;
   const maxItemsToShow =
     listHeight && questionHeight
@@ -750,15 +800,18 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
           maxWidth={availableWidth}
           overflowDirection="bottom"
         >
-          <Text bold color={theme.text.primary}>
-            {question.question}
+          <Box flexDirection="column">
+            <MarkdownDisplay
+              text={autoBoldIfPlain(question.question)}
+              terminalWidth={availableWidth - DIALOG_PADDING}
+              isPending={false}
+            />
             {question.multiSelect && (
               <Text color={theme.text.secondary} italic>
-                {' '}
                 (Select all that apply)
               </Text>
             )}
-          </Text>
+          </Box>
         </MaxSizedBox>
       </Box>
 
@@ -785,7 +838,9 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
               <Box flexDirection="row">
                 {showCheck && (
                   <Text
-                    color={isChecked ? theme.text.accent : theme.text.secondary}
+                    color={
+                      isChecked ? theme.status.success : theme.text.secondary
+                    }
                   >
                     [{isChecked ? 'x' : ' '}]
                   </Text>
@@ -795,9 +850,22 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
                   buffer={customBuffer}
                   placeholder={placeholder}
                   focus={context.isSelected}
-                  onSubmit={() => handleSelect(optionItem)}
+                  onSubmit={(val) => {
+                    if (question.multiSelect) {
+                      const fullAnswer = buildAnswerString(
+                        selectedIndices,
+                        true,
+                        val,
+                      );
+                      if (fullAnswer) {
+                        onAnswer(fullAnswer);
+                      }
+                    } else if (val.trim()) {
+                      onAnswer(val.trim());
+                    }
+                  }}
                 />
-                {isChecked && !question.multiSelect && (
+                {isChecked && !question.multiSelect && !context.isSelected && (
                   <Text color={theme.status.success}> ✓</Text>
                 )}
               </Box>
@@ -817,7 +885,9 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
               <Box flexDirection="row">
                 {showCheck && (
                   <Text
-                    color={isChecked ? theme.text.accent : theme.text.secondary}
+                    color={
+                      isChecked ? theme.status.success : theme.text.secondary
+                    }
                   >
                     [{isChecked ? 'x' : ' '}]
                   </Text>
@@ -833,7 +903,10 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
               {optionItem.description && (
                 <Text color={theme.text.secondary} wrap="wrap">
                   {' '}
-                  {optionItem.description}
+                  <RenderInline
+                    text={optionItem.description}
+                    defaultColor={theme.text.secondary}
+                  />
                 </Text>
               )}
             </Box>
@@ -952,21 +1025,27 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
     (answer: string) => {
       if (submitted) return;
 
-      dispatch({
-        type: 'SET_ANSWER',
-        payload: {
-          index: currentQuestionIndex,
-          answer,
-        },
-      });
-
       if (questions.length > 1) {
+        dispatch({
+          type: 'SET_ANSWER',
+          payload: {
+            index: currentQuestionIndex,
+            answer,
+          },
+        });
         goToNextTab();
       } else {
-        dispatch({ type: 'SUBMIT' });
+        dispatch({
+          type: 'SET_ANSWER',
+          payload: {
+            index: currentQuestionIndex,
+            answer,
+            submit: true,
+          },
+        });
       }
     },
-    [currentQuestionIndex, questions.length, submitted, goToNextTab],
+    [currentQuestionIndex, questions, submitted, goToNextTab],
   );
 
   const handleReviewSubmit = useCallback(() => {

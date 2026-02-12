@@ -12,6 +12,8 @@ import type { PolicySettings } from './types.js';
 import { ApprovalMode, PolicyDecision, InProcessCheckerType } from './types.js';
 import { isDirectorySecure } from '../utils/security.js';
 
+vi.unmock('../config/storage.js');
+
 vi.mock('../utils/security.js', () => ({
   isDirectorySecure: vi.fn().mockResolvedValue({ secure: true }),
 }));
@@ -315,8 +317,8 @@ describe('createPolicyEngineConfig', () => {
       (r) => r.decision === PolicyDecision.ALLOW && !r.toolName,
     );
     expect(rule).toBeDefined();
-    // Priority 999 in default tier → 1.999
-    expect(rule?.priority).toBeCloseTo(1.999, 5);
+    // Priority 998 in default tier → 1.998 (999 reserved for ask_user exception)
+    expect(rule?.priority).toBeCloseTo(1.998, 5);
   });
 
   it('should allow edit tool in AUTO_EDIT mode', async () => {
@@ -327,7 +329,10 @@ describe('createPolicyEngineConfig', () => {
       ApprovalMode.AUTO_EDIT,
     );
     const rule = config.rules?.find(
-      (r) => r.toolName === 'replace' && r.decision === PolicyDecision.ALLOW,
+      (r) =>
+        r.toolName === 'replace' &&
+        r.decision === PolicyDecision.ALLOW &&
+        r.modes?.includes(ApprovalMode.AUTO_EDIT),
     );
     expect(rule).toBeDefined();
     // Priority 15 in default tier → 1.015
@@ -577,8 +582,8 @@ describe('createPolicyEngineConfig', () => {
       (r) => !r.toolName && r.decision === PolicyDecision.ALLOW,
     );
     expect(wildcardRule).toBeDefined();
-    // Priority 999 in default tier → 1.999
-    expect(wildcardRule?.priority).toBeCloseTo(1.999, 5);
+    // Priority 998 in default tier → 1.998 (999 reserved for ask_user exception)
+    expect(wildcardRule?.priority).toBeCloseTo(1.998, 5);
 
     // Write tool ASK_USER rules are present (from write.toml)
     const writeToolRules = config.rules?.filter(
@@ -943,6 +948,109 @@ name = "invalid-name"
     );
     expect(rule).toBeDefined();
     expect(rule?.priority).toBeCloseTo(2.3, 5); // Command line allow
+
+    vi.doUnmock('node:fs/promises');
+  });
+
+  it('should allow overriding Plan Mode deny with user policy', async () => {
+    const actualFs =
+      await vi.importActual<typeof import('node:fs/promises')>(
+        'node:fs/promises',
+      );
+
+    const mockReaddir = vi.fn(
+      async (
+        path: string | Buffer | URL,
+        options?: Parameters<typeof actualFs.readdir>[1],
+      ) => {
+        const normalizedPath = nodePath.normalize(path.toString());
+        if (normalizedPath.includes(nodePath.normalize('.gemini/policies'))) {
+          return [
+            {
+              name: 'user-plan.toml',
+              isFile: () => true,
+              isDirectory: () => false,
+            },
+          ] as unknown as Awaited<ReturnType<typeof actualFs.readdir>>;
+        }
+        return actualFs.readdir(
+          path,
+          options as Parameters<typeof actualFs.readdir>[1],
+        );
+      },
+    );
+
+    const mockReadFile = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.readFile>[0],
+        options: Parameters<typeof actualFs.readFile>[1],
+      ) => {
+        const normalizedPath = nodePath.normalize(path.toString());
+        if (normalizedPath.includes('user-plan.toml')) {
+          return `
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = ["git status", "git diff"]
+decision = "allow"
+priority = 100
+modes = ["plan"]
+
+[[rule]]
+toolName = "codebase_investigator"
+decision = "allow"
+priority = 100
+modes = ["plan"]
+`;
+        }
+        return actualFs.readFile(path, options);
+      },
+    );
+
+    vi.doMock('node:fs/promises', () => ({
+      ...actualFs,
+      default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+      readFile: mockReadFile,
+      readdir: mockReaddir,
+    }));
+
+    vi.resetModules();
+    const { createPolicyEngineConfig } = await import('./config.js');
+
+    const settings: PolicySettings = {};
+    const config = await createPolicyEngineConfig(
+      settings,
+      ApprovalMode.PLAN,
+      nodePath.join(__dirname, 'policies'),
+    );
+
+    const shellRules = config.rules?.filter(
+      (r) =>
+        r.toolName === 'run_shell_command' &&
+        r.decision === PolicyDecision.ALLOW &&
+        r.modes?.includes(ApprovalMode.PLAN) &&
+        r.argsPattern,
+    );
+    expect(shellRules).toHaveLength(2);
+    expect(
+      shellRules?.some((r) => r.argsPattern?.test('{"command":"git status"}')),
+    ).toBe(true);
+    expect(
+      shellRules?.some((r) => r.argsPattern?.test('{"command":"git diff"}')),
+    ).toBe(true);
+    expect(
+      shellRules?.every(
+        (r) => !r.argsPattern?.test('{"command":"git commit"}'),
+      ),
+    ).toBe(true);
+
+    const subagentRule = config.rules?.find(
+      (r) =>
+        r.toolName === 'codebase_investigator' &&
+        r.decision === PolicyDecision.ALLOW &&
+        r.modes?.includes(ApprovalMode.PLAN),
+    );
+    expect(subagentRule).toBeDefined();
+    expect(subagentRule?.priority).toBeCloseTo(2.1, 5);
 
     vi.doUnmock('node:fs/promises');
   });

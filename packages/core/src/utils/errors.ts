@@ -15,11 +15,12 @@ export function isNodeError(error: unknown): error is NodeJS.ErrnoException {
 }
 
 export function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
+  const friendlyError = toFriendlyError(error);
+  if (friendlyError instanceof Error) {
+    return friendlyError.message;
   }
   try {
-    return String(error);
+    return String(friendlyError);
   } catch {
     return 'Failed to get error details';
   }
@@ -97,6 +98,7 @@ interface ResponseData {
 
 export function toFriendlyError(error: unknown): unknown {
   if (error && typeof error === 'object' && 'response' in error) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const gaxiosError = error as GaxiosError;
     const data = parseResponseData(gaxiosError);
     if (data && data.error && data.error.message && data.error.code) {
@@ -121,11 +123,13 @@ function parseResponseData(error: GaxiosError): ResponseData | undefined {
   // Inexplicably, Gaxios sometimes doesn't JSONify the response data.
   if (typeof error.response?.data === 'string') {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(error.response?.data) as ResponseData;
     } catch {
       return undefined;
     }
   }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return error.response?.data as ResponseData | undefined;
 }
 

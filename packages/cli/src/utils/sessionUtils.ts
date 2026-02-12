@@ -4,20 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  Config,
-  ConversationRecord,
-  MessageRecord,
-} from '@google/gemini-cli-core';
 import {
+  checkExhaustive,
   partListUnionToString,
   SESSION_FILE_PREFIX,
+  type Config,
+  type ConversationRecord,
+  type MessageRecord,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { stripUnsafeCharacters } from '../ui/utils/textUtils.js';
 import type { Part } from '@google/genai';
-import { checkExhaustive } from './checks.js';
 import {
   MessageType,
   ToolCallStatus,
@@ -619,7 +617,8 @@ export function convertSessionToHistoryFormats(
       clientHistory.push({
         role: 'user',
         parts: Array.isArray(msg.content)
-          ? (msg.content as Part[])
+          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            (msg.content as Part[])
           : [{ text: contentString }],
       });
     } else if (msg.type === 'gemini') {
@@ -672,6 +671,7 @@ export function convertSessionToHistoryFormats(
             } else if (Array.isArray(toolCall.result)) {
               // toolCall.result is an array containing properly formatted
               // function responses
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               functionResponseParts.push(...(toolCall.result as Part[]));
               continue;
             } else {

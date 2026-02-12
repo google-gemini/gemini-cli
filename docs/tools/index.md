@@ -100,4 +100,4 @@ Always review confirmation prompts carefully before allowing a tool to execute.
 - Learn how to [Provide context](../cli/gemini-md.md) to guide tool use.
 - Explore the [Command reference](../cli/commands.md) for tool-related slash
   commands.
-- Read the [Headless mode](../cli/headless.md) guide for using tools in scripts.
+  

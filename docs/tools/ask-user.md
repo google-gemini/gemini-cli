@@ -1,42 +1,95 @@
-# Ask user tool (`ask_user`)
+# Ask User Tool
 
-The `ask_user` tool allows the Gemini agent to request clarification or missing
-information from you during complex tasks.
+The `ask_user` tool allows the agent to ask you one or more questions to gather
+preferences, clarify requirements, or make decisions. It supports multiple
+question types including multiple-choice, free-form text, and Yes/No
+confirmation.
 
-## Description
+## `ask_user` (Ask User)
 
-The agent uses this tool when it identifies that it cannot proceed without user
-input. It presents questions or options via an interactive dialog in the CLI.
+- **Tool name:** `ask_user`
+- **Display name:** Ask User
+- **File:** `ask-user.ts`
+- **Parameters:**
+  - `questions` (array of objects, required): A list of 1 to 4 questions to ask.
+    Each question object has the following properties:
+    - `question` (string, required): The complete question text.
+    - `header` (string, required): A short label (max 16 chars) displayed as a
+      chip/tag (e.g., "Auth", "Database").
+    - `type` (string, optional): The type of question. Defaults to `'choice'`.
+      - `'choice'`: Multiple-choice with options (supports multi-select).
+      - `'text'`: Free-form text input.
+      - `'yesno'`: Yes/No confirmation.
+    - `options` (array of objects, optional): Required for `'choice'` type. 2-4
+      selectable options.
+      - `label` (string, required): Display text (1-5 words).
+      - `description` (string, required): Brief explanation.
+    - `multiSelect` (boolean, optional): For `'choice'` type, allows selecting
+      multiple options.
+    - `placeholder` (string, optional): Hint text for input fields.
 
-## How to use
+- **Behavior:**
+  - Presents an interactive dialog to the user with the specified questions.
+  - Pauses execution until the user provides answers or dismisses the dialog.
+  - Returns the user's answers to the model.
 
-This tool is used exclusively by the Gemini agent. It cannot be invoked
-manually.
+- **Output (`llmContent`):** A JSON string containing the user's answers,
+  indexed by question position (e.g.,
+  `{"answers":{"0": "Option A", "1": "Some text"}}`).
 
-### Arguments
+- **Confirmation:** Yes. The tool inherently involves user interaction.
 
-- `questions` (array of objects, required): A list of questions to ask. Each
-  object includes:
-  - `question` (string, required): The question text.
-  - `header` (string, required): A short label (max 12 chars).
-  - `type` (enum, optional): `choice`, `text`, or `yesno`.
-  - `options` (array, optional): Selectable options for `choice` type.
-  - `placeholder` (string, optional): Hint text for `text` type.
-  - `multiSelect` (boolean, optional): Whether to allow multiple selections.
+## Usage Examples
 
-## Technical behavior
+### Multiple Choice Question
 
-- **Interface:** Triggers a modal-style dialog above the input prompt.
-- **Execution:** Pauses agent logic until the user submits a response.
-- **Response:** Returns the user's answers to the model as a tool result.
+```json
+{
+  "questions": [
+    {
+      "header": "Database",
+      "question": "Which database would you like to use?",
+      "type": "choice",
+      "options": [
+        {
+          "label": "PostgreSQL",
+          "description": "Powerful, open source object-relational database system."
+        },
+        {
+          "label": "SQLite",
+          "description": "C-library that implements a SQL database engine."
+        }
+      ]
+    }
+  ]
+}
+```
 
-## Use cases
+### Text Input Question
 
-- Clarifying ambiguous user requests.
-- Selecting between multiple possible implementation paths.
-- Requesting missing configuration values or credentials.
+```json
+{
+  "questions": [
+    {
+      "header": "Project Name",
+      "question": "What is the name of your new project?",
+      "type": "text",
+      "placeholder": "e.g., my-awesome-app"
+    }
+  ]
+}
+```
 
-## Next steps
+### Yes/No Question
 
-- Learn about [Memory management](../cli/tutorials/memory-management.md) to
-  reduce the need for clarification.
+```json
+{
+  "questions": [
+    {
+      "header": "Deploy",
+      "question": "Do you want to deploy the application now?",
+      "type": "yesno"
+    }
+  ]
+}
+```

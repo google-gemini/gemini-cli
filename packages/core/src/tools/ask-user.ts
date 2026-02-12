@@ -13,6 +13,7 @@ import {
   type ToolConfirmationPayload,
   ToolConfirmationOutcome,
 } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { QuestionType, type Question } from '../confirmation-bus/types.js';
 import { ASK_USER_TOOL_NAME, ASK_USER_DISPLAY_NAME } from './tool-names.js';
@@ -50,9 +51,9 @@ export class AskUserTool extends BaseDeclarativeTool<
                 },
                 header: {
                   type: 'string',
-                  maxLength: 12,
+                  maxLength: 16,
                   description:
-                    'Very short label displayed as a chip/tag (max 12 chars). Examples: "Auth method", "Library", "Approach".',
+                    'MUST be 16 characters or fewer or the call will fail. Very short label displayed as a chip/tag. Use abbreviations: "Auth" not "Authentication", "Config" not "Configuration". Examples: "Auth method", "Library", "Approach", "Database".',
                 },
                 type: {
                   type: 'string',
@@ -154,6 +155,23 @@ export class AskUserTool extends BaseDeclarativeTool<
   ): AskUserInvocation {
     return new AskUserInvocation(params, messageBus, toolName, toolDisplayName);
   }
+
+  override async validateBuildAndExecute(
+    params: AskUserParams,
+    abortSignal: AbortSignal,
+  ): Promise<ToolResult> {
+    const result = await super.validateBuildAndExecute(params, abortSignal);
+    if (
+      result.error &&
+      result.error.type === ToolErrorType.INVALID_TOOL_PARAMS
+    ) {
+      return {
+        ...result,
+        returnDisplay: '',
+      };
+    }
+    return result;
+  }
 }
 
 export class AskUserInvocation extends BaseToolInvocation<
@@ -192,22 +210,45 @@ export class AskUserInvocation extends BaseToolInvocation<
   }
 
   async execute(_signal: AbortSignal): Promise<ToolResult> {
+    const questionTypes = this.params.questions.map(
+      (q) => q.type ?? QuestionType.CHOICE,
+    );
+
     if (this.confirmationOutcome === ToolConfirmationOutcome.Cancel) {
       return {
         llmContent: 'User dismissed ask_user dialog without answering.',
         returnDisplay: 'User dismissed dialog',
+        data: {
+          ask_user: {
+            question_types: questionTypes,
+            dismissed: true,
+          },
+        },
       };
     }
 
     const answerEntries = Object.entries(this.userAnswers);
     const hasAnswers = answerEntries.length > 0;
 
+    const metrics: Record<string, unknown> = {
+      ask_user: {
+        question_types: questionTypes,
+        dismissed: false,
+        empty_submission: !hasAnswers,
+        answer_count: answerEntries.length,
+      },
+    };
+
     const returnDisplay = hasAnswers
       ? `**User answered:**\n${answerEntries
           .map(([index, answer]) => {
             const question = this.params.questions[parseInt(index, 10)];
             const category = question?.header ?? `Q${index}`;
-            return `  ${category} → ${answer}`;
+            const prefix = `  ${category} → `;
+            const indent = ' '.repeat(prefix.length);
+
+            const lines = answer.split('\n');
+            return prefix + lines.join('\n' + indent);
           })
           .join('\n')}`
       : 'User submitted without answering questions.';
@@ -215,6 +256,49 @@ export class AskUserInvocation extends BaseToolInvocation<
     return {
       llmContent: JSON.stringify({ answers: this.userAnswers }),
       returnDisplay,
+      data: metrics,
     };
   }
+}
+
+/**
+ * Determines if an 'Ask User' tool call should be hidden from the standard tool history UI.
+ *
+ * We hide Ask User tools in two cases:
+ * 1. They are in progress because they are displayed using a specialized UI (AskUserDialog).
+ * 2. They have errored without a result display (e.g. validation errors), in which case
+ *    the agent self-corrects and we don't want to clutter the UI.
+ *
+ * NOTE: The 'status' parameter values are intended to match the CLI's ToolCallStatus enum.
+ */
+export function shouldHideAskUserTool(
+  name: string,
+  status: string,
+  hasResultDisplay: boolean,
+): boolean {
+  if (name !== ASK_USER_DISPLAY_NAME) {
+    return false;
+  }
+
+  // Case 1: In-progress tools (Pending, Executing, Confirming)
+  if (['Pending', 'Executing', 'Confirming'].includes(status)) {
+    return true;
+  }
+
+  // Case 2: Error without result display
+  if (status === 'Error' && !hasResultDisplay) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Returns true if the tool name and status correspond to a completed 'Ask User' tool call.
+ */
+export function isCompletedAskUserTool(name: string, status: string): boolean {
+  return (
+    name === ASK_USER_DISPLAY_NAME &&
+    ['Success', 'Error', 'Canceled'].includes(status)
+  );
 }
