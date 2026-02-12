@@ -60,9 +60,8 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   const config = useConfig();
   const { constrainHeight } = useUIState();
 
-  // If Event-Driven Scheduler is enabled, we HIDE tools that are still in
-  // pre-execution states (Confirming, Pending) from the History log.
-  // They live in the Global Queue or wait for their turn.
+  // We HIDE tools that are still in pre-execution states (Confirming, Pending)
+  // from the History log. They live in the Global Queue or wait for their turn.
   // Only show tools that are actually running or finished.
   // We explicitly exclude Pending and Confirming to ensure they only
   // appear in the Global Queue until they are approved and start executing.
@@ -103,8 +102,8 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
 
-  // If all tools are filtered out (e.g., in-progress AskUser tools, confirming tools
-  // in event-driven mode), only render if we need to close a border from previous
+  // If all tools are filtered out (e.g., in-progress AskUser tools, confirming tools),
+  // only render if we need to close a border from previous
   // tool groups. borderBottomOverride=true means we must render the closing border;
   // undefined or false means there's nothing to display.
   if (visibleToolCalls.length === 0 && borderBottomOverride !== true) {

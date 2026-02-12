@@ -22,8 +22,6 @@ exports[`<ToolGroupMessage /> > Ask User Filtering > filters out ask_user when s
 
 exports[`<ToolGroupMessage /> > Ask User Filtering > filters out ask_user when status is Pending 1`] = `""`;
 
-exports[`<ToolGroupMessage /> > Ask User Filtering > renders nothing when only tool is in-progress AskUser with borderBottom=false 1`] = `""`;
-
 exports[`<ToolGroupMessage /> > Ask User Filtering > shows other tools when ask_user is filtered out 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  other-tool A tool for testing                                         │
@@ -51,8 +49,6 @@ exports[`<ToolGroupMessage /> > Border Color Logic > uses yellow border for shel
 │ Test result                                                              │
 ╰──────────────────────────────────────────────────────────────────────────╯"
 `;
-
-exports[`<ToolGroupMessage /> > Golden Snapshots > hides confirming tools (standard behavior) 1`] = `""`;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders empty tool calls array 1`] = `""`;
 
@@ -117,14 +113,6 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders two tool groups where
 │                                                                          │                                           ▄
 │ line1                                                                    │                                           █
 ╰──────────────────────────────────────────────────────────────────────────╯                                           █"
-`;
-
-exports[`<ToolGroupMessage /> > Golden Snapshots > renders when not focused 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────╮
-│ ✓  test-tool A tool for testing                                          │
-│                                                                          │
-│ Test result                                                              │
-╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders with limited terminal height 1`] = `

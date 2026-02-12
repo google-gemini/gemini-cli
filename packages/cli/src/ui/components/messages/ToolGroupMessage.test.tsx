@@ -82,7 +82,6 @@ describe('<ToolGroupMessage />', () => {
 
       // Should render nothing because all tools in the group are confirming
       expect(lastFrame()).toBe('');
-      expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
 
@@ -188,21 +187,6 @@ describe('<ToolGroupMessage />', () => {
           toolCalls={toolCalls}
           availableTerminalHeight={10}
         />,
-        {
-          config: baseMockConfig,
-          uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
-          },
-        },
-      );
-      expect(lastFrame()).toMatchSnapshot();
-      unmount();
-    });
-
-    it('renders when not focused', () => {
-      const toolCalls = [createToolCall()];
-      const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
           uiState: {
@@ -512,7 +496,6 @@ describe('<ToolGroupMessage />', () => {
       );
       // AskUser tools in progress are rendered by AskUserDialog, so we expect nothing.
       expect(lastFrame()).toBe('');
-      expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
   });
