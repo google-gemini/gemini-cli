@@ -14,6 +14,7 @@ export const LS_TOOL_NAME = 'list_directory';
 export const READ_FILE_TOOL_NAME = 'read_file';
 export const SHELL_TOOL_NAME = 'run_shell_command';
 export const WRITE_FILE_TOOL_NAME = 'write_file';
+export const WEB_FETCH_TOOL_NAME = 'web_fetch';
 
 // ============================================================================
 // READ_FILE TOOL
@@ -122,6 +123,29 @@ export const GREP_DEFINITION: ToolDefinition = {
         },
       },
       required: ['pattern'],
+    },
+  },
+};
+
+// ============================================================================
+// WEB_FETCH TOOL
+// ============================================================================
+
+export const WEB_FETCH_DEFINITION: ToolDefinition = {
+  base: {
+    name: WEB_FETCH_TOOL_NAME,
+    description:
+      "Processes content from URL(s), including local and private network addresses (e.g., localhost), embedded in a prompt. Include up to 20 URLs and instructions (e.g., summarize, extract specific data) directly in the 'prompt' parameter.",
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        prompt: {
+          description:
+            'A comprehensive prompt that includes the URL(s) (up to 20) to fetch and specific instructions on how to process their content (e.g., "Summarize https://example.com/article and extract key points from https://another.com/data"). All URLs to be fetched must be valid and complete, starting with "http://" or "https://", and be fully-formed with a valid hostname (e.g., a domain name like "example.com" or an IP address). For example, "https://example.com" is valid, but "example.com" is not.',
+          type: 'string',
+        },
+      },
+      required: ['prompt'],
     },
   },
 };

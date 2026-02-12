@@ -23,6 +23,7 @@ import {
   GLOB_DEFINITION,
   LS_DEFINITION,
   getShellDefinition,
+  WEB_FETCH_DEFINITION,
 } from './coreTools.js';
 
 describe('coreTools snapshots for specific models', () => {
@@ -58,6 +59,7 @@ describe('coreTools snapshots for specific models', () => {
       name: 'run_shell_command',
       definition: getShellDefinition(true, true),
     },
+    { name: 'web_fetch', definition: WEB_FETCH_DEFINITION },
   ];
 
   for (const modelId of modelIds) {

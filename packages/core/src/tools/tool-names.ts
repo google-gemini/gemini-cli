@@ -10,6 +10,7 @@ import {
   LS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   SHELL_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
 } from './definitions/coreTools.js';
 
@@ -23,12 +24,12 @@ export {
   LS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   SHELL_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
 };
 
 export const WRITE_TODOS_TOOL_NAME = 'write_todos';
 export const WEB_SEARCH_TOOL_NAME = 'google_web_search';
-export const WEB_FETCH_TOOL_NAME = 'web_fetch';
 export const EDIT_TOOL_NAME = 'replace';
 export const READ_MANY_FILES_TOOL_NAME = 'read_many_files';
 export const LS_TOOL_NAME_LEGACY = 'list_directory'; // Just to be safe if anything used the old exported name directly
