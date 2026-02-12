@@ -5,6 +5,7 @@
  */
 
 import {
+  EDIT_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
@@ -18,6 +19,7 @@ import {
 // need to reference a tool's name without importing the tool's implementation.
 
 export {
+  EDIT_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
@@ -29,7 +31,6 @@ export {
 export const WRITE_TODOS_TOOL_NAME = 'write_todos';
 export const WEB_SEARCH_TOOL_NAME = 'google_web_search';
 export const WEB_FETCH_TOOL_NAME = 'web_fetch';
-export const EDIT_TOOL_NAME = 'replace';
 export const READ_MANY_FILES_TOOL_NAME = 'read_many_files';
 export const LS_TOOL_NAME_LEGACY = 'list_directory'; // Just to be safe if anything used the old exported name directly
 
