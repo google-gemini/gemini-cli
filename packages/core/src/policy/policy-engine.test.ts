@@ -2031,6 +2031,156 @@ describe('PolicyEngine', () => {
     });
   });
 
+  describe('getExcludedTools', () => {
+    interface TestCase {
+      name: string;
+      rules: PolicyRule[];
+      approvalMode?: ApprovalMode;
+      nonInteractive?: boolean;
+      expected: string[];
+    }
+
+    const testCases: TestCase[] = [
+      {
+        name: 'should return empty set when no rules provided',
+        rules: [],
+        expected: [],
+      },
+      {
+        name: 'should include tools with DENY decision',
+        rules: [
+          { toolName: 'tool1', decision: PolicyDecision.DENY },
+          { toolName: 'tool2', decision: PolicyDecision.ALLOW },
+        ],
+        expected: ['tool1'],
+      },
+      {
+        name: 'should respect priority and ignore lower priority rules (DENY wins)',
+        rules: [
+          { toolName: 'tool1', decision: PolicyDecision.DENY, priority: 100 },
+          { toolName: 'tool1', decision: PolicyDecision.ALLOW, priority: 10 },
+        ],
+        expected: ['tool1'],
+      },
+      {
+        name: 'should respect priority and ignore lower priority rules (ALLOW wins)',
+        rules: [
+          { toolName: 'tool1', decision: PolicyDecision.ALLOW, priority: 100 },
+          { toolName: 'tool1', decision: PolicyDecision.DENY, priority: 10 },
+        ],
+        expected: [],
+      },
+      {
+        name: 'should NOT include ASK_USER tools even in non-interactive mode',
+        rules: [{ toolName: 'tool1', decision: PolicyDecision.ASK_USER }],
+        nonInteractive: true,
+        expected: [],
+      },
+      {
+        name: 'should ignore rules with argsPattern',
+        rules: [
+          {
+            toolName: 'tool1',
+            decision: PolicyDecision.DENY,
+            argsPattern: /something/,
+          },
+        ],
+        expected: [],
+      },
+      {
+        name: 'should respect approval mode (PLAN mode)',
+        rules: [
+          {
+            toolName: 'tool1',
+            decision: PolicyDecision.DENY,
+            modes: [ApprovalMode.PLAN],
+          },
+        ],
+        approvalMode: ApprovalMode.PLAN,
+        expected: ['tool1'],
+      },
+      {
+        name: 'should respect approval mode (DEFAULT mode)',
+        rules: [
+          {
+            toolName: 'tool1',
+            decision: PolicyDecision.DENY,
+            modes: [ApprovalMode.PLAN],
+          },
+        ],
+        approvalMode: ApprovalMode.DEFAULT,
+        expected: [],
+      },
+      {
+        name: 'should respect wildcard ALLOW rules (e.g. YOLO mode)',
+        rules: [
+          {
+            decision: PolicyDecision.ALLOW,
+            priority: 999,
+            modes: [ApprovalMode.YOLO],
+          },
+          {
+            toolName: 'dangerous-tool',
+            decision: PolicyDecision.DENY,
+            priority: 10,
+          },
+        ],
+        approvalMode: ApprovalMode.YOLO,
+        expected: [],
+      },
+      {
+        name: 'should respect server wildcard DENY',
+        rules: [{ toolName: 'server__*', decision: PolicyDecision.DENY }],
+        expected: ['server__*'],
+      },
+      {
+        name: 'should expand server wildcard for specific tools if already processed',
+        rules: [
+          {
+            toolName: 'server__*',
+            decision: PolicyDecision.DENY,
+            priority: 100,
+          },
+          {
+            toolName: 'server__tool1',
+            decision: PolicyDecision.DENY,
+            priority: 10,
+          },
+        ],
+        expected: ['server__*', 'server__tool1'],
+      },
+      {
+        name: 'should NOT exclude tool if covered by a higher priority wildcard ALLOW',
+        rules: [
+          {
+            toolName: 'server__*',
+            decision: PolicyDecision.ALLOW,
+            priority: 100,
+          },
+          {
+            toolName: 'server__tool1',
+            decision: PolicyDecision.DENY,
+            priority: 10,
+          },
+        ],
+        expected: [],
+      },
+    ];
+
+    it.each(testCases)(
+      '$name',
+      ({ rules, approvalMode, nonInteractive, expected }) => {
+        engine = new PolicyEngine({
+          rules,
+          approvalMode: approvalMode ?? ApprovalMode.DEFAULT,
+          nonInteractive: nonInteractive ?? false,
+        });
+        const excluded = engine.getExcludedTools();
+        expect(Array.from(excluded).sort()).toEqual(expected.sort());
+      },
+    );
+  });
+
   describe('YOLO mode with ask_user tool', () => {
     it('should return ASK_USER for ask_user tool even in YOLO mode', async () => {
       const rules: PolicyRule[] = [
