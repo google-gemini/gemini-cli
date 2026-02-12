@@ -528,8 +528,9 @@ console.log(JSON.stringify({
         },
       });
 
-      // Use node -e to avoid file system and PTY overhead
-      const nodeCmd = `node -e "console.log(JSON.stringify(${toolConfigJson.replace(/"/g, '\\"')}))"`;
+      // Use file-based hook to avoid quoting issues
+      const hookScript = `console.log(JSON.stringify(${toolConfigJson}));`;
+      const hookFilename = 'before_tool_selection_hook.js';
 
       rig.setup('BeforeToolSelection Hooks', {
         fakeResponsesPath: join(
@@ -545,7 +546,7 @@ console.log(JSON.stringify({
                 hooks: [
                   {
                     type: 'command',
-                    command: nodeCmd,
+                    command: `node ${hookFilename}`,
                     timeout: 60000,
                   },
                 ],
@@ -554,6 +555,9 @@ console.log(JSON.stringify({
           },
         },
       });
+
+      // Create the hook script after setup
+      rig.createScript(hookFilename, hookScript);
 
       // Create a test file
       rig.createFile('new_file_data.txt', 'test data');
@@ -1773,9 +1777,12 @@ console.log(JSON.stringify({
         reason: disabledMsg,
       });
 
-      // Use node -e to avoid file system and PTY overhead
-      const enabledCmd = `node -e "console.log(JSON.stringify(${enabledJson.replace(/"/g, '\\"')}))"`;
-      const disabledCmd = `node -e "console.log(JSON.stringify(${disabledJson.replace(/"/g, '\\"')}))"`;
+      const enabledScript = `console.log(JSON.stringify(${enabledJson}));`;
+      const disabledScript = `console.log(JSON.stringify(${disabledJson}));`;
+      const enabledFilename = 'enabled_hook.js';
+      const disabledFilename = 'disabled_hook.js';
+      const enabledCmd = `node ${enabledFilename}`;
+      const disabledCmd = `node ${disabledFilename}`;
 
       // 3. Final setup with full settings
       rig.setup('Hook Disabling', {
@@ -1806,6 +1813,9 @@ console.log(JSON.stringify({
           },
         },
       });
+
+      rig.createScript(enabledFilename, enabledScript);
+      rig.createScript(disabledFilename, disabledScript);
 
       await rig.run({
         args: 'Create a file called disabled-test.txt with content "test"',
@@ -1841,9 +1851,12 @@ console.log(JSON.stringify({
         reason: disabledMsg,
       });
 
-      // Use node -e to avoid file system and PTY overhead
-      const activeCmd = `node -e "console.log(JSON.stringify(${activeJson.replace(/"/g, '\\"')}))"`;
-      const disabledCmd = `node -e "console.log(JSON.stringify(${disabledJson.replace(/"/g, '\\"')}))"`;
+      const activeScript = `console.log(JSON.stringify(${activeJson}));`;
+      const disabledScript = `console.log(JSON.stringify(${disabledJson}));`;
+      const activeFilename = 'active_hook.js';
+      const disabledFilename = 'disabled_hook.js';
+      const activeCmd = `node ${activeFilename}`;
+      const disabledCmd = `node ${disabledFilename}`;
 
       // 3. Final setup with full settings
       rig.setup('Hook Disabling', {
@@ -1870,6 +1883,9 @@ console.log(JSON.stringify({
           },
         },
       });
+
+      rig.createScript(activeFilename, activeScript);
+      rig.createScript(disabledFilename, disabledScript);
 
       // First run - only active hook should execute
       await rig.run({
