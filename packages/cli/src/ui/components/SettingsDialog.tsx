@@ -164,7 +164,6 @@ export function SettingsDialog({
     });
   }, [settingKeys, selectedScope, settings, modifiedSettings, pendingSettings]);
 
-  // Use fuzzy search hook
   const { filteredItems, searchBuffer, maxLabelWidth } = useFuzzyList({
     items,
   });
