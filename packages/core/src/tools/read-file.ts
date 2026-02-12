@@ -39,16 +39,6 @@ export interface ReadFileToolParams {
   file_path: string;
 
   /**
-   * The line number to start reading from (optional, 0-based)
-   */
-  offset?: number;
-
-  /**
-   * The number of lines to read (optional)
-   */
-  limit?: number;
-
-  /**
    * The line number to start reading from (optional, 1-based)
    */
   start_line?: number;
@@ -90,7 +80,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     return [
       {
         path: this.resolvedPath,
-        line: this.params.start_line ?? this.params.offset,
+        line: this.params.start_line,
       },
     ];
   }
@@ -120,8 +110,6 @@ class ReadFileToolInvocation extends BaseToolInvocation<
       this.resolvedPath,
       this.config.getTargetDir(),
       this.config.getFileSystemService(),
-      isGemini3 ? undefined : this.params.offset,
-      isGemini3 ? undefined : this.params.limit,
       this.params.start_line,
       this.params.end_line,
     );
@@ -154,13 +142,10 @@ Action:
 --- FILE CONTENT (truncated) ---
 ${result.llmContent}`;
       } else {
-        const nextOffset = this.params.offset
-          ? this.params.offset + end - start + 1
-          : end;
         llmContent = `
 IMPORTANT: The file content has been truncated.
 Status: Showing lines ${start}-${end} of ${total} total lines.
-Action: To read more of the file, you can use the 'offset' and 'limit' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use offset: ${nextOffset}.
+Action: To read more of the file, you can use the 'start_line' and 'end_line' parameters in a subsequent 'read_file' call.
 
 --- FILE CONTENT (truncated) ---
 ${result.llmContent}`;
@@ -237,36 +222,22 @@ export class ReadFileTool extends BaseDeclarativeTool<
         description: 'The path to the file to read.',
         type: 'string',
       },
-    };
-
-    if (isGemini3) {
-      properties['start_line'] = {
+      start_line: {
         description: 'Optional: The 1-based line number to start reading from.',
         type: 'number',
-      };
-      properties['end_line'] = {
+      },
+      end_line: {
         description:
           'Optional: The 1-based line number to end reading at (inclusive).',
         type: 'number',
-      };
-    } else {
-      properties['offset'] = {
-        description:
-          "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
-        type: 'number',
-      };
-      properties['limit'] = {
-        description:
-          "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
-        type: 'number',
-      };
-    }
+      },
+    };
 
     return {
       name: this.name,
       description: isGemini3
-        ? `Reads a specific range of a file (up to ${DEFAULT_MAX_LINES_TEXT_FILE} lines). **Important:** For high token efficiency, avoid reading large files in their entirety. Use 'grep_search' to find symbols or 'run_shell_command' with 'sed' for surgical block extraction instead of broad file reads. Handles text, images, audio, and PDF files.`
-        : `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images, audio, and PDF files. For text files, it can read specific line ranges.`,
+        ? `Reads a specific range of a file (up to ${DEFAULT_MAX_LINES_TEXT_FILE} lines). **Important:** For high token efficiency, avoid reading large files in their entirety. Use 'grep_search' to find symbols or 'run_shell_command' with 'sed' for surgical block extraction instead of broad file reads. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files.`
+        : `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'start_line' and 'end_line' parameters. Handles text, images, audio, and PDF files. For text files, it can read specific line ranges.`,
       parametersJsonSchema: {
         properties,
         required: ['file_path'],
@@ -295,12 +266,6 @@ export class ReadFileTool extends BaseDeclarativeTool<
       return validationError;
     }
 
-    if (params.offset !== undefined && params.offset < 0) {
-      return 'Offset must be a non-negative number';
-    }
-    if (params.limit !== undefined && params.limit <= 0) {
-      return 'Limit must be a positive number';
-    }
     if (params.start_line !== undefined && params.start_line < 1) {
       return 'start_line must be at least 1';
     }

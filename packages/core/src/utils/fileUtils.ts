@@ -400,8 +400,6 @@ export interface ProcessedFileReadResult {
  * @param filePath Absolute path to the file.
  * @param rootDirectory Absolute path to the project root for relative path display.
  * @param _fileSystemService Placeholder for backward compatibility.
- * @param offset Optional offset for text files (0-based line number).
- * @param limit Optional limit for text files (number of lines to read).
  * @param startLine Optional 1-based line number to start reading from.
  * @param endLine Optional 1-based line number to end reading at (inclusive).
  * @returns ProcessedFileReadResult object.
@@ -411,8 +409,6 @@ export async function processSingleFileContent(
   rootDirectory: string,
   // TODO: remove unused vars from other areas
   _fileSystemService?: FileSystemService,
-  offset?: number,
-  limit?: number,
   startLine?: number,
   endLine?: number,
 ): Promise<ProcessedFileReadResult> {
@@ -488,11 +484,6 @@ export async function processSingleFileContent(
           sliceEnd = endLine
             ? Math.min(endLine, originalLineCount)
             : originalLineCount;
-        } else if (offset !== undefined || limit !== undefined) {
-          sliceStart = offset || 0;
-          const effectiveLimit =
-            limit === undefined ? DEFAULT_MAX_LINES_TEXT_FILE : limit;
-          sliceEnd = Math.min(sliceStart + effectiveLimit, originalLineCount);
         } else {
           sliceEnd = Math.min(DEFAULT_MAX_LINES_TEXT_FILE, originalLineCount);
         }

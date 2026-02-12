@@ -79,25 +79,9 @@ describe('ReadFileTool', () => {
   });
 
   describe('schema', () => {
-    it('should include pagination parameters for Gemini 2.5', () => {
+    it('should include line range parameters for all models', () => {
       vi.mocked(tool['config'].getActiveModel).mockReturnValue(
         'gemini-2.5-pro',
-      );
-      const schema = tool.schema;
-      const properties = (
-        schema.parametersJsonSchema as {
-          properties: Record<string, unknown>;
-        }
-      ).properties;
-      expect(properties).toHaveProperty('offset');
-      expect(properties).toHaveProperty('limit');
-      expect(schema.description).toContain('offset');
-      expect(schema.description).toContain('limit');
-    });
-
-    it('should include line range parameters for Gemini 3', () => {
-      vi.mocked(tool['config'].getActiveModel).mockReturnValue(
-        'gemini-3-pro-preview',
       );
       const schema = tool.schema;
       const properties = (
@@ -109,6 +93,13 @@ describe('ReadFileTool', () => {
       expect(properties).toHaveProperty('end_line');
       expect(properties).not.toHaveProperty('offset');
       expect(properties).not.toHaveProperty('limit');
+    });
+
+    it('should include surgical guidance in description for Gemini 3', () => {
+      vi.mocked(tool['config'].getActiveModel).mockReturnValue(
+        'gemini-3-pro-preview',
+      );
+      const schema = tool.schema;
       expect(schema.description).toContain('grep_search');
       expect(schema.description).toContain('sed');
     });
@@ -164,26 +155,6 @@ describe('ReadFileTool', () => {
       };
       expect(() => tool.build(params)).toThrow(
         /The 'file_path' parameter must be non-empty./,
-      );
-    });
-
-    it('should throw error if offset is negative', () => {
-      const params: ReadFileToolParams = {
-        file_path: path.join(tempRootDir, 'test.txt'),
-        offset: -1,
-      };
-      expect(() => tool.build(params)).toThrow(
-        'Offset must be a non-negative number',
-      );
-    });
-
-    it('should throw error if limit is zero or negative', () => {
-      const params: ReadFileToolParams = {
-        file_path: path.join(tempRootDir, 'test.txt'),
-        limit: 0,
-      };
-      expect(() => tool.build(params)).toThrow(
-        'Limit must be a positive number',
       );
     });
 
@@ -457,34 +428,6 @@ describe('ReadFileTool', () => {
       expect(result.returnDisplay).toBe('');
     });
 
-    it('should support offset and limit for text files', async () => {
-      const filePath = path.join(tempRootDir, 'paginated.txt');
-      const lines = Array.from({ length: 20 }, (_, i) => `Line ${i + 1}`);
-      const fileContent = lines.join('\n');
-      await fsp.writeFile(filePath, fileContent, 'utf-8');
-
-      const params: ReadFileToolParams = {
-        file_path: filePath,
-        offset: 5, // Start from line 6
-        limit: 3,
-      };
-      const invocation = tool.build(params);
-
-      const result = await invocation.execute(abortSignal);
-      expect(result.llmContent).toContain(
-        'IMPORTANT: The file content has been truncated',
-      );
-      expect(result.llmContent).toContain(
-        'Status: Showing lines 6-8 of 20 total lines',
-      );
-      expect(result.llmContent).toContain('Line 6');
-      expect(result.llmContent).toContain('Line 7');
-      expect(result.llmContent).toContain('Line 8');
-      expect(result.returnDisplay).toBe(
-        'Read lines 6-8 of 20 from paginated.txt',
-      );
-    });
-
     it('should support start_line and end_line for text files', async () => {
       const filePath = path.join(tempRootDir, 'lines.txt');
       const lines = Array.from({ length: 20 }, (_, i) => `Line ${i + 1}`);
@@ -520,8 +463,6 @@ describe('ReadFileTool', () => {
 
       const params: ReadFileToolParams = {
         file_path: filePath,
-        offset: 10, // Should be ignored
-        limit: 5, // Should be ignored
       };
       const invocation = tool.build(params);
 

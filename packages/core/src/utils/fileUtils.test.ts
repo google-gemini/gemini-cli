@@ -930,7 +930,7 @@ describe('fileUtils', () => {
       expect(result.returnDisplay).toContain('Path is a directory');
     });
 
-    it('should paginate text files correctly (offset and limit)', async () => {
+    it('should paginate text files correctly (start_line and end_line)', async () => {
       const lines = Array.from({ length: 20 }, (_, i) => `Line ${i + 1}`);
       actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
 
@@ -938,8 +938,8 @@ describe('fileUtils', () => {
         testTextFilePath,
         tempRootDir,
         new StandardFileSystemService(),
-        5,
-        5,
+        6,
+        10,
       ); // Read lines 6-10
       const expectedContent = lines.slice(5, 10).join('\n');
 
@@ -958,8 +958,6 @@ describe('fileUtils', () => {
         testTextFilePath,
         tempRootDir,
         new StandardFileSystemService(),
-        undefined,
-        undefined,
         5,
         10,
       ); // Read lines 5-10 (1-based)
@@ -976,13 +974,13 @@ describe('fileUtils', () => {
       const lines = Array.from({ length: 20 }, (_, i) => `Line ${i + 1}`);
       actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
 
-      // Read from line 11 to 20. The start is not 0, so it's truncated.
+      // Read from line 11 to 20. The start is not 1, so it's truncated.
       const result = await processSingleFileContent(
         testTextFilePath,
         tempRootDir,
         new StandardFileSystemService(),
-        10,
-        10,
+        11,
+        20,
       );
       const expectedContent = lines.slice(10, 20).join('\n');
 
