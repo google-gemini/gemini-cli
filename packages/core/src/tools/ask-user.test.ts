@@ -328,7 +328,13 @@ describe('AskUserTool', () => {
   describe('validateBuildAndExecute', () => {
     it('should hide validation errors from returnDisplay', async () => {
       const params = {
-        questions: [{ question: 'Test?', header: 'This is way too long' }],
+        questions: [
+          {
+            question: 'Test?',
+            header: 'This is way too long',
+            type: QuestionType.TEXT,
+          },
+        ],
       };
 
       const result = await tool.validateBuildAndExecute(
@@ -347,7 +353,9 @@ describe('AskUserTool', () => {
         .mockReturnValue(null);
 
       const params = {
-        questions: [{ question: 'Valid?', header: 'Valid' }],
+        questions: [
+          { question: 'Valid?', header: 'Valid', type: QuestionType.TEXT },
+        ],
       };
 
       const mockInvocation = {
