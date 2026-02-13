@@ -1,0 +1,30 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`UriSecurityWarning > should render a warning for a single homograph 1`] = `
+"
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                      │
+│ ⚠️  WARNING: Potential homograph attack detected in URI:                                                             │
+│                                                                                                                      │
+│ Original: https://täst.com                                                                                           │
+│ Actual Host (Punycode): https://xn--tst-qla.com/                                                                     │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`UriSecurityWarning > should render multiple warnings 1`] = `
+"
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                      │
+│ ⚠️  WARNING: Potential homograph attack detected in URI:                                                             │
+│                                                                                                                      │
+│ Original: https://täst.com                                                                                           │
+│ Actual Host (Punycode): https://xn--tst-qla.com/                                                                     │
+│                                                                                                                      │
+│ Original: https://еxample.com                                                                                        │
+│ Actual Host (Punycode): https://xn--xample-2of.com/                                                                  │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;

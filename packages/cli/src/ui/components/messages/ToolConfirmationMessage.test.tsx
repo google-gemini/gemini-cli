@@ -85,6 +85,33 @@ describe('ToolConfirmationMessage', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
+  it('should display UriSecurityWarning for homograph URLs in info type', () => {
+    const confirmationDetails: ToolCallConfirmationDetails = {
+      type: 'info',
+      title: 'Confirm Web Fetch',
+      prompt: 'https://täst.com',
+      urls: ['https://täst.com'],
+      onConfirm: vi.fn(),
+    };
+
+    const { lastFrame } = renderWithProviders(
+      <ToolConfirmationMessage
+        callId="test-call-id"
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
+    );
+
+    const output = lastFrame();
+    expect(output).toContain('Potential homograph attack detected');
+    expect(output).toContain('Original: https://täst.com');
+    expect(output).toContain(
+      'Actual Host (Punycode): https://xn--tst-qla.com/',
+    );
+  });
+
   it('should display multiple commands for exec type when provided', () => {
     const confirmationDetails: ToolCallConfirmationDetails = {
       type: 'exec',

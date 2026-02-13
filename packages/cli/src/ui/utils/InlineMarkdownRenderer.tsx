@@ -10,6 +10,7 @@ import { theme } from '../semantic-colors.js';
 import stringWidth from 'string-width';
 import { debugLogger } from '@google/gemini-cli-core';
 import { stripUnsafeCharacters } from './textUtils.js';
+import { detectHomograph } from './urlSecurityUtils.js';
 
 // Constants for Markdown parsing
 const BOLD_MARKER_LENGTH = 2; // For "**"
@@ -118,10 +119,16 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
         if (linkMatch) {
           const linkText = linkMatch[1];
           const url = linkMatch[2];
+          const isHomograph = !!detectHomograph(url);
           renderedNode = (
             <Text key={key} color={baseColor}>
               {linkText}
-              <Text color={theme.text.link}> ({url})</Text>
+              <Text
+                color={isHomograph ? theme.status.warning : theme.text.link}
+              >
+                {' '}
+                ({url}){isHomograph && ' (potential homograph)'}
+              </Text>
             </Text>
           );
         }
@@ -140,9 +147,14 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
           </Text>
         );
       } else if (fullMatch.match(/^https?:\/\//)) {
+        const isHomograph = !!detectHomograph(fullMatch);
         renderedNode = (
-          <Text key={key} color={theme.text.link}>
+          <Text
+            key={key}
+            color={isHomograph ? theme.status.warning : theme.text.link}
+          >
             {fullMatch}
+            {isHomograph && ' (potential homograph)'}
           </Text>
         );
       }

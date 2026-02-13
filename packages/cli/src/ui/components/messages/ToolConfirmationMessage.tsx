@@ -38,6 +38,11 @@ import {
 } from '../../textConstants.js';
 import { AskUserDialog } from '../AskUserDialog.js';
 import { ExitPlanModeDialog } from '../ExitPlanModeDialog.js';
+import { UriSecurityWarning } from '../shared/UriSecurityWarning.js';
+import {
+  detectHomograph,
+  type HomographResult,
+} from '../../utils/urlSecurityUtils.js';
 
 export interface ToolConfirmationMessageProps {
   callId: string;
@@ -424,6 +429,16 @@ export const ToolConfirmationMessage: React.FC<
           infoProps.urls.length === 1 && infoProps.urls[0] === infoProps.prompt
         );
 
+      const homographWarnings: HomographResult[] = [];
+      if (infoProps.urls) {
+        for (const url of infoProps.urls) {
+          const warning = detectHomograph(url);
+          if (warning) {
+            homographWarnings.push(warning);
+          }
+        }
+      }
+
       bodyContent = (
         <Box flexDirection="column">
           <Text color={theme.text.link}>
@@ -443,6 +458,7 @@ export const ToolConfirmationMessage: React.FC<
               ))}
             </Box>
           )}
+          <UriSecurityWarning warnings={homographWarnings} />
         </Box>
       );
     } else if (confirmationDetails.type === 'mcp') {
