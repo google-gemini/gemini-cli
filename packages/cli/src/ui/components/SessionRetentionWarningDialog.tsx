@@ -66,6 +66,13 @@ export const SessionRetentionWarningDialog = ({
           initialIndex={1}
         />
       </Box>
+
+      <Box marginTop={1}>
+        <Text color={theme.text.secondary}>
+          Set a custom limit <Text color={theme.text.primary}>/settings</Text>{' '}
+          and change &quot;Keep chat history&quot;.
+        </Text>
+      </Box>
     </Box>
   );
 };

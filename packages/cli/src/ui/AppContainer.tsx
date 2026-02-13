@@ -1333,10 +1333,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
 
   const handleAutoEnableRetention = useCallback(() => {
+    const userSettings = settings.forScope(SettingScope.User).settings;
+    const currentRetention = userSettings.general?.sessionRetention ?? {};
+
     settings.setValue(SettingScope.User, 'general.sessionRetention', {
-      ...(settings.merged.general.sessionRetention ?? {}),
+      ...currentRetention,
       enabled: true,
       maxAge: '30d',
+      warningAcknowledged: true,
     });
   }, [settings]);
 
