@@ -440,7 +440,7 @@ describe('readPathFromWorkspace', () => {
   );
 
   it('should return an error string for files exceeding the size limit', async () => {
-    // Mock a file slightly larger than the 20MB limit defined in fileUtils.ts
+    // Mock a file slightly larger than the 100MB limit defined in fileUtils.ts
     const largeContent = 'a'.repeat(101 * 1024 * 1024); // 101MB
     mock({
       [CWD]: {

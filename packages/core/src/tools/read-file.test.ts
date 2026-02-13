@@ -270,7 +270,7 @@ describe('ReadFileTool', () => {
 
     it('should return error for a file that is too large', async () => {
       const filePath = path.join(tempRootDir, 'largefile.txt');
-      // 21MB of content exceeds 20MB limit
+      // 101MB of content exceeds 100MB limit
       const largeContent = 'x'.repeat(101 * 1024 * 1024);
       await fsp.writeFile(filePath, largeContent, 'utf-8');
       const params: ReadFileToolParams = { file_path: filePath };
