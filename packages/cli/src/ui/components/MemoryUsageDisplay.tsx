@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { useEffect, useState } from 'react';
-import { Box, Text } from 'ink';
+import { Text, Box } from 'ink';
 import { theme } from '../semantic-colors.js';
 import process from 'node:process';
 import { formatBytes } from '../utils/formatters.js';
@@ -34,7 +34,6 @@ export const MemoryUsageDisplay: React.FC = () => {
 
   return (
     <Box>
-      <Text color={theme.text.secondary}> | </Text>
       <Text color={memoryUsageColor}>{memoryUsage}</Text>
     </Box>
   );

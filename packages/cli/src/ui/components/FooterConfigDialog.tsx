@@ -31,37 +31,53 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
 
   // Initialize orderedIds and selectedIds
   const [orderedIds, setOrderedIds] = useState<string[]>(() => {
+    const validIds = new Set(ALL_ITEMS.map((i) => i.id));
+
     if (settings.merged.ui?.footer?.items) {
       // Start with saved items in their saved order
-      const savedItems = settings.merged.ui.footer.items;
+      const savedItems = settings.merged.ui.footer.items.filter((id) =>
+        validIds.has(id),
+      );
       // Then add any items from DEFAULT_ORDER that aren't in savedItems
       const others = DEFAULT_ORDER.filter((id) => !savedItems.includes(id));
       return [...savedItems, ...others];
     }
     // Fallback to legacy settings derivation
-    const derived = deriveItemsFromLegacySettings(settings.merged);
+    const derived = deriveItemsFromLegacySettings(settings.merged).filter(
+      (id) => validIds.has(id),
+    );
     const others = DEFAULT_ORDER.filter((id) => !derived.includes(id));
     return [...derived, ...others];
   });
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
+    const validIds = new Set(ALL_ITEMS.map((i) => i.id));
     if (settings.merged.ui?.footer?.items) {
-      return new Set(settings.merged.ui.footer.items);
+      return new Set(
+        settings.merged.ui.footer.items.filter((id) => validIds.has(id)),
+      );
     }
-    return new Set(deriveItemsFromLegacySettings(settings.merged));
+    return new Set(
+      deriveItemsFromLegacySettings(settings.merged).filter((id) =>
+        validIds.has(id),
+      ),
+    );
   });
 
   // Prepare items for fuzzy list
   const listItems = useMemo(
     () =>
-      orderedIds.map((id) => {
-        const item = ALL_ITEMS.find((i) => i.id === id)!;
-        return {
-          key: id,
-          label: item.id,
-          description: item.description,
-        };
-      }),
+      orderedIds
+        .map((id) => {
+          const item = ALL_ITEMS.find((i) => i.id === id);
+          if (!item) return null;
+          return {
+            key: id,
+            label: item.id,
+            description: item.description,
+          };
+        })
+        .filter((i): i is NonNullable<typeof i> => i !== null),
     [orderedIds],
   );
 
@@ -197,35 +213,44 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
     scrollOffset + maxItemsToShow,
   );
 
+  const activeId = filteredItems[activeIndex]?.key;
+
   // Preview logic
   const previewText = useMemo(() => {
     const itemsToPreview = orderedIds.filter((id) => selectedIds.has(id));
     if (itemsToPreview.length === 0) return 'Empty Footer';
 
+    const getColor = (id: string, defaultColor?: string) =>
+      id === activeId ? 'white' : defaultColor || theme.text.secondary;
+
     // Mock values for preview
     const mockValues: Record<string, React.ReactNode> = {
-      cwd: <Text color={theme.text.secondary}>~/dev/gemini-cli</Text>,
-      'git-branch': <Text color={theme.text.secondary}>main*</Text>,
-      'sandbox-status': <Text color="green">macOS Seatbelt</Text>,
+      cwd: <Text color={getColor('cwd')}>~/dev/gemini-cli</Text>,
+      'git-branch': <Text color={getColor('git-branch')}>main*</Text>,
+      'sandbox-status': (
+        <Text color={getColor('sandbox-status', 'green')}>docker</Text>
+      ),
       'model-name': (
         <Box flexDirection="row">
-          <Text color={theme.text.secondary}>gemini-2.5-pro</Text>
+          <Text color={getColor('model-name')}>gemini-2.5-pro</Text>
         </Box>
       ),
-      'context-remaining': <Text color={theme.text.primary}>85%</Text>,
-      quota: <Text color={theme.text.primary}>1.2k left</Text>,
-      'memory-usage': <Text color={theme.text.primary}>124MB</Text>,
-      'error-count': <Text color={theme.status.error}>2 errors</Text>,
-      'session-id': <Text color={theme.text.secondary}>769992f9</Text>,
+      'context-remaining': (
+        <Text color={getColor('context-remaining')}>85%</Text>
+      ),
+      quota: <Text color={getColor('quota')}>1.2k left</Text>,
+      'memory-usage': <Text color={getColor('memory-usage')}>124MB</Text>,
+      'session-id': <Text color={getColor('session-id')}>769992f9</Text>,
       'code-changes': (
         <Box flexDirection="row">
-          <Text color={theme.status.success}>+12</Text>
-          <Text color={theme.text.primary}> </Text>
-          <Text color={theme.status.error}>-4</Text>
+          <Text color={getColor('code-changes', theme.status.success)}>
+            +12
+          </Text>
+          <Text color={getColor('code-changes')}> </Text>
+          <Text color={getColor('code-changes', theme.status.error)}>-4</Text>
         </Box>
       ),
-      'token-count': <Text color={theme.text.secondary}>tokens:1.5k</Text>,
-      corgi: <Text>🐶</Text>,
+      'token-count': <Text color={getColor('token-count')}>1.5k tokens</Text>,
     };
 
     const elements: React.ReactNode[] = [];
@@ -241,7 +266,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
     });
 
     return elements;
-  }, [orderedIds, selectedIds]);
+  }, [orderedIds, selectedIds, activeId]);
 
   return (
     <Box

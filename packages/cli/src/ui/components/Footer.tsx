@@ -171,7 +171,12 @@ export const Footer: React.FC = () => {
                   </>
                 )}
               </Text>
-              {showMemoryUsage && <MemoryUsageDisplay />}
+              {showMemoryUsage && (
+                <>
+                  <Text color={theme.text.secondary}> | </Text>
+                  <MemoryUsageDisplay />
+                </>
+              )}
             </Box>
             <Box alignItems="center">
               {corgiMode && (
@@ -309,12 +314,6 @@ export const Footer: React.FC = () => {
         addElement(id, <MemoryUsageDisplay />);
         break;
       }
-      case 'error-count': {
-        if (!showErrorDetails && errorCount > 0) {
-          addElement(id, <ConsoleSummaryDisplay errorCount={errorCount} />);
-        }
-        break;
-      }
       case 'session-id': {
         const idShort = uiState.sessionStats.sessionId.slice(0, 8);
         addElement(id, <Text color={theme.text.secondary}>{idShort}</Text>);
@@ -340,28 +339,19 @@ export const Footer: React.FC = () => {
           totalTokens += m.tokens.total;
         }
         if (totalTokens > 0) {
-          const formatted =
-            totalTokens > 1000
-              ? `${(totalTokens / 1000).toFixed(1)}k`
-              : totalTokens;
+          let formatted: string;
+          if (totalTokens >= 1_000_000_000) {
+            formatted = `${(totalTokens / 1_000_000_000).toFixed(1)}b`;
+          } else if (totalTokens >= 1_000_000) {
+            formatted = `${(totalTokens / 1_000_000).toFixed(1)}m`;
+          } else if (totalTokens >= 1000) {
+            formatted = `${(totalTokens / 1000).toFixed(1)}k`;
+          } else {
+            formatted = totalTokens.toString();
+          }
           addElement(
             id,
-            <Text color={theme.text.secondary}>tokens:{formatted}</Text>,
-          );
-        }
-        break;
-      }
-      case 'corgi': {
-        if (corgiMode) {
-          addElement(
-            id,
-            <Text>
-              <Text color={theme.status.error}>▼</Text>
-              <Text color={theme.text.primary}>(´</Text>
-              <Text color={theme.status.error}>ᴥ</Text>
-              <Text color={theme.text.primary}>`)</Text>
-              <Text color={theme.status.error}>▼</Text>
-            </Text>,
+            <Text color={theme.text.secondary}>{formatted} tokens</Text>,
           );
         }
         break;
@@ -369,6 +359,26 @@ export const Footer: React.FC = () => {
       default:
         break;
     }
+  }
+
+  if (corgiMode) {
+    addElement(
+      'corgi-transient',
+      <Text>
+        <Text color={theme.status.error}>▼</Text>
+        <Text color={theme.text.primary}>(´</Text>
+        <Text color={theme.status.error}>ᴥ</Text>
+        <Text color={theme.text.primary}>`)</Text>
+        <Text color={theme.status.error}>▼</Text>
+      </Text>,
+    );
+  }
+
+  if (!showErrorDetails && errorCount > 0) {
+    addElement(
+      'error-count-transient',
+      <ConsoleSummaryDisplay errorCount={errorCount} />,
+    );
   }
 
   return (

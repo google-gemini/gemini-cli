@@ -5,10 +5,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderWithProviders } from '../../../test-utils/render.js';
-import { waitFor } from '../../../test-utils/async.js';
-import { FooterConfigDialog } from '../FooterConfigDialog.js';
-import { createMockSettings } from '../../../test-utils/settings.js';
+import { renderWithProviders } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
+import { FooterConfigDialog } from './FooterConfigDialog.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import { act } from 'react';
 
 describe('<FooterConfigDialog />', () => {
@@ -121,6 +121,29 @@ describe('<FooterConfigDialog />', () => {
 
     await waitFor(() => {
       expect(mockOnClose).toHaveBeenCalled();
+    });
+  });
+
+  it('highlights the active item in the preview', async () => {
+    const settings = createMockSettings();
+    const { lastFrame, stdin } = renderWithProviders(
+      <FooterConfigDialog onClose={mockOnClose} />,
+      { settings },
+    );
+
+    // Initial state: 'cwd' is active.
+    // Verify 'cwd' content exists in the preview area
+    expect(lastFrame()).toContain('~/dev/gemini-cli');
+
+    // Move focus down to 'git-branch'
+    act(() => {
+      stdin.write('\u001b[B'); // Down arrow
+    });
+
+    await waitFor(() => {
+      const output = lastFrame();
+      // Verify 'git-branch' content exists in the preview area
+      expect(output).toContain('main*');
     });
   });
 });

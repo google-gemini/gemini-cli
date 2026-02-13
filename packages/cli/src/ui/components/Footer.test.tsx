@@ -615,3 +615,206 @@ describe('fallback mode display', () => {
     unmount();
   });
 });
+
+describe('Footer Token Formatting', () => {
+  const setup = (totalTokens: number) => {
+    const settings = createMockSettings();
+    settings.merged.ui.footer.items = ['token-count'];
+
+    const uiState: { sessionStats: Partial<SessionStatsState> } = {
+      sessionStats: {
+        lastPromptTokenCount: 0,
+        sessionId: 'test-session',
+        metrics: {
+          models: {
+            'gemini-pro': {
+              api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
+              tokens: {
+                total: totalTokens,
+                input: totalTokens / 2,
+                candidates: totalTokens / 2,
+                prompt: totalTokens / 2,
+                cached: 0,
+                thoughts: 0,
+                tool: 0,
+              },
+            },
+          },
+          tools: {
+            totalCalls: 0,
+            totalSuccess: 0,
+            totalFail: 0,
+            totalDurationMs: 0,
+            totalDecisions: { accept: 0, reject: 0, modify: 0, auto_accept: 0 },
+            byName: {},
+          },
+          files: { totalLinesAdded: 0, totalLinesRemoved: 0 },
+        },
+      },
+    };
+
+    return renderWithProviders(<Footer />, {
+      settings,
+      uiState,
+    });
+  };
+
+  it('formats thousands with k', () => {
+    const { lastFrame } = setup(12400);
+    expect(lastFrame()).toContain('12.4k tokens');
+  });
+
+  it('formats millions with m', () => {
+    const { lastFrame } = setup(1500000);
+    expect(lastFrame()).toContain('1.5m tokens');
+  });
+
+  it('formats billions with b', () => {
+    const { lastFrame } = setup(2700000000);
+    expect(lastFrame()).toContain('2.7b tokens');
+  });
+
+  it('formats small numbers without suffix', () => {
+    const { lastFrame } = setup(850);
+    expect(lastFrame()).toContain('850 tokens');
+  });
+});
+
+describe('Footer Custom Items', () => {
+  const customMockSessionStats: SessionStatsState = {
+    sessionId: 'test-session-id-12345',
+    sessionStartTime: new Date(),
+    lastPromptTokenCount: 0,
+    promptCount: 0,
+    metrics: {
+      models: {
+        'gemini-pro': {
+          api: { totalRequests: 0, totalErrors: 0, totalLatencyMs: 0 },
+          tokens: {
+            input: 100,
+            prompt: 0,
+            candidates: 50,
+            total: 150,
+            cached: 0,
+            thoughts: 0,
+            tool: 0,
+          },
+        },
+      },
+      tools: {
+        totalCalls: 0,
+        totalSuccess: 0,
+        totalFail: 0,
+        totalDurationMs: 0,
+        totalDecisions: {
+          accept: 0,
+          reject: 0,
+          modify: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
+        },
+        byName: {},
+      },
+      files: {
+        totalLinesAdded: 12,
+        totalLinesRemoved: 4,
+      },
+    },
+  };
+
+  it('renders items in the specified order', () => {
+    const { lastFrame } = renderWithProviders(<Footer />, {
+      width: 120,
+      uiState: {
+        currentModel: 'gemini-pro',
+        sessionStats: customMockSessionStats,
+      },
+      settings: createMockSettings({
+        ui: {
+          footer: {
+            items: ['session-id', 'code-changes', 'token-count'],
+          },
+        },
+      }),
+    });
+
+    const output = lastFrame();
+    expect(output).toBeDefined();
+    expect(output).toContain('test-ses');
+    expect(output).toContain('+12 -4');
+    expect(output).toContain('150 tokens');
+
+    // Check order
+    const idIdx = output!.indexOf('test-ses');
+    const codeIdx = output!.indexOf('+12 -4');
+    const tokenIdx = output!.indexOf('150 tokens');
+
+    expect(idIdx).toBeLessThan(codeIdx);
+    expect(codeIdx).toBeLessThan(tokenIdx);
+  });
+
+  it('renders all items with dividers', () => {
+    const { lastFrame } = renderWithProviders(<Footer />, {
+      width: 120,
+      uiState: {
+        currentModel: 'gemini-pro',
+        sessionStats: customMockSessionStats,
+        branchName: 'main',
+      },
+      settings: createMockSettings({
+        general: {
+          vimMode: true,
+        },
+        ui: {
+          footer: {
+            items: ['vim-mode', 'cwd', 'git-branch', 'model-name'],
+          },
+        },
+      }),
+    });
+
+    const output = lastFrame();
+    expect(output).toBeDefined();
+    expect(output).toContain('|');
+    expect(output!.split('|').length).toBe(4);
+  });
+
+  it('handles empty items array', () => {
+    const { lastFrame } = renderWithProviders(<Footer />, {
+      width: 120,
+      uiState: { sessionStats: customMockSessionStats },
+      settings: createMockSettings({
+        ui: {
+          footer: {
+            items: [],
+          },
+        },
+      }),
+    });
+
+    const output = lastFrame();
+    expect(output).toBeDefined();
+    expect(output!.trim()).toBe('');
+  });
+
+  it('does not render items that are conditionally hidden', () => {
+    const { lastFrame } = renderWithProviders(<Footer />, {
+      width: 120,
+      uiState: {
+        sessionStats: customMockSessionStats,
+        branchName: undefined, // No branch
+      },
+      settings: createMockSettings({
+        ui: {
+          footer: {
+            items: ['cwd', 'git-branch', 'model-name'],
+          },
+        },
+      }),
+    });
+
+    const output = lastFrame();
+    expect(output).toBeDefined();
+    expect(output).not.toContain('('); // Branch is usually in (branch*)
+    expect(output!.split('|').length).toBe(2); // Only cwd and model-name
+  });
+});

@@ -5,8 +5,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { deriveItemsFromLegacySettings } from '../footerItems.js';
-import { createMockSettings } from '../../test-utils/settings.js';
+import { deriveItemsFromLegacySettings } from './footerItems.js';
+import { createMockSettings } from '../test-utils/settings.js';
 
 describe('deriveItemsFromLegacySettings', () => {
   it('returns defaults when no legacy settings are customized', () => {
@@ -20,7 +20,6 @@ describe('deriveItemsFromLegacySettings', () => {
       'sandbox-status',
       'model-name',
       'quota',
-      'error-count',
     ]);
   });
 
@@ -85,7 +84,6 @@ describe('deriveItemsFromLegacySettings', () => {
     expect(items).toEqual([
       'git-branch',
       'sandbox-status',
-      'error-count',
       'context-remaining',
       'memory-usage',
     ]);

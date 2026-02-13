@@ -57,12 +57,6 @@ export const ALL_ITEMS: FooterItem[] = [
     defaultEnabled: false,
   },
   {
-    id: 'error-count',
-    label: 'error-count',
-    description: 'Console errors encountered',
-    defaultEnabled: true,
-  },
-  {
     id: 'session-id',
     label: 'session-id',
     description: 'Unique identifier for the current session',
@@ -80,12 +74,6 @@ export const ALL_ITEMS: FooterItem[] = [
     description: 'Total tokens used in the session',
     defaultEnabled: false,
   },
-  {
-    id: 'corgi',
-    label: 'corgi',
-    description: 'A friendly corgi companion',
-    defaultEnabled: false,
-  },
 ];
 
 export const DEFAULT_ORDER = [
@@ -96,11 +84,9 @@ export const DEFAULT_ORDER = [
   'context-remaining',
   'quota',
   'memory-usage',
-  'error-count',
   'session-id',
   'code-changes',
   'token-count',
-  'corgi',
 ];
 
 export function deriveItemsFromLegacySettings(
@@ -112,7 +98,6 @@ export function deriveItemsFromLegacySettings(
     'sandbox-status',
     'model-name',
     'quota',
-    'error-count',
   ];
   const items = [...defaults];
 
