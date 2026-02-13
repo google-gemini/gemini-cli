@@ -165,7 +165,8 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
 
 ## Context Efficiency & Research Decisiveness:
-  - **Primary Discovery:** Utilize \`grep_search\` as your primary investigative tool to pinpoint specific lines and anchor points before using \`read_file\`.
+  - **Primary Discovery:** Utilize \`grep_search\` as your primary investigative tool to pinpoint specific lines and anchor points before using \`read_file\`. Maintaining a lean, high-signal context window is best achieved by always applying precise scoping (\`include\`, \`max_matches_per_file\`,
+     \`names_only\`) and strictly limiting results (\`total_max_matches\`).
   - **Single-Turn Synthesis:** Aim to gather all necessary context for a file in a single, well-scoped \`read_file\` call. Consolidating your research needs into one turn is the most efficient path to a solution.
   - **Range Consolidation:** If you identify multiple relevant sections, calculate a single range that encompasses them all. Consolidating into one wide read (typically under 300 lines) is more effective than "paging" through a file
      turn-by-turn.
