@@ -19,7 +19,6 @@ import { useMemo, memo, useCallback, useEffect, useRef } from 'react';
 import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
-import { useConfig } from '../contexts/ConfigContext.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
@@ -31,12 +30,10 @@ const MemoizedAppHeader = memo(AppHeader);
 export const MainContent = () => {
   const { version } = useAppContext();
   const uiState = useUIState();
-  const config = useConfig();
   const isAlternateBuffer = useAlternateBuffer();
 
   const confirmingTool = useConfirmingTool();
-  const showConfirmationQueue =
-    config.isEventDrivenSchedulerEnabled() && confirmingTool !== null;
+  const showConfirmationQueue = confirmingTool !== null;
 
   const scrollableListRef = useRef<VirtualizedListRef<unknown>>(null);
 
@@ -51,7 +48,9 @@ export const MainContent = () => {
     mainAreaWidth,
     staticAreaMaxItemHeight,
     availableTerminalHeight,
+    cleanUiDetailsVisible,
   } = uiState;
+  const showHeaderDetails = cleanUiDetailsVisible;
 
   const historyItems = useMemo(
     () =>
@@ -91,7 +90,6 @@ export const MainContent = () => {
             terminalWidth={mainAreaWidth}
             item={{ ...item, id: 0 }}
             isPending={true}
-            isFocused={!uiState.isEditorDialogOpen}
             activeShellPtyId={uiState.activePtyId}
             embeddedShellFocused={uiState.embeddedShellFocused}
           />
@@ -107,7 +105,6 @@ export const MainContent = () => {
       isAlternateBuffer,
       availableTerminalHeight,
       mainAreaWidth,
-      uiState.isEditorDialogOpen,
       uiState.activePtyId,
       uiState.embeddedShellFocused,
       showConfirmationQueue,
@@ -129,7 +126,13 @@ export const MainContent = () => {
   const renderItem = useCallback(
     ({ item }: { item: (typeof virtualizedData)[number] }) => {
       if (item.type === 'header') {
-        return <MemoizedAppHeader key="app-header" version={version} />;
+        return (
+          <MemoizedAppHeader
+            key="app-header"
+            version={version}
+            showDetails={showHeaderDetails}
+          />
+        );
       } else if (item.type === 'history') {
         return (
           <MemoizedHistoryItemDisplay
@@ -146,7 +149,13 @@ export const MainContent = () => {
         return pendingItems;
       }
     },
-    [version, mainAreaWidth, uiState.slashCommands, pendingItems],
+    [
+      showHeaderDetails,
+      version,
+      mainAreaWidth,
+      uiState.slashCommands,
+      pendingItems,
+    ],
   );
 
   if (isAlternateBuffer) {

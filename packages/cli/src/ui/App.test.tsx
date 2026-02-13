@@ -66,6 +66,7 @@ describe('App', () => {
 
   const mockUIState: Partial<UIState> = {
     streamingState: StreamingState.Idle,
+    cleanUiDetailsVisible: true,
     quittingMessages: null,
     dialogsVisible: false,
     mainControlsRef: {
@@ -220,10 +221,6 @@ describe('App', () => {
     } as UIState;
 
     const configWithExperiment = makeFakeConfig();
-    vi.spyOn(
-      configWithExperiment,
-      'isEventDrivenSchedulerEnabled',
-    ).mockReturnValue(true);
     vi.spyOn(configWithExperiment, 'isTrustedFolder').mockReturnValue(true);
     vi.spyOn(configWithExperiment, 'getIdeMode').mockReturnValue(false);
 

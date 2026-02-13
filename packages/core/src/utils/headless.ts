@@ -28,18 +28,22 @@ export interface HeadlessModeOptions {
  * @returns true if the environment is considered headless.
  */
 export function isHeadlessMode(options?: HeadlessModeOptions): boolean {
-  if (process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true') {
-    return (
-      !!options?.prompt ||
-      (!!process.stdin && !process.stdin.isTTY) ||
-      (!!process.stdout && !process.stdout.isTTY)
-    );
+  if (process.env['GEMINI_CLI_INTEGRATION_TEST'] !== 'true') {
+    const isCI =
+      process.env['CI'] === 'true' || process.env['GITHUB_ACTIONS'] === 'true';
+    if (isCI) {
+      return true;
+    }
   }
-  return (
-    process.env['CI'] === 'true' ||
-    process.env['GITHUB_ACTIONS'] === 'true' ||
-    !!options?.prompt ||
+
+  const isNotTTY =
     (!!process.stdin && !process.stdin.isTTY) ||
-    (!!process.stdout && !process.stdout.isTTY)
-  );
+    (!!process.stdout && !process.stdout.isTTY);
+
+  if (isNotTTY || !!options?.prompt || !!options?.query) {
+    return true;
+  }
+
+  // Fallback: check process.argv for flags that imply headless mode.
+  return process.argv.some((arg) => arg === '-p' || arg === '--prompt');
 }
