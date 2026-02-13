@@ -409,35 +409,41 @@ describe('<ToolGroupMessage />', () => {
 
   describe('Ask User Filtering', () => {
     it.each([
-      ToolCallStatus.Pending,
-      ToolCallStatus.Executing,
-      ToolCallStatus.Confirming,
-    ])('filters out ask_user when status is %s', (status) => {
-      const toolCalls = [
-        createToolCall({
-          callId: `ask-user-${status}`,
-          name: ASK_USER_DISPLAY_NAME,
-          status,
-        }),
-      ];
-
-      const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-        { config: baseMockConfig },
-      );
-
-      expect(lastFrame()).toMatchSnapshot();
-      unmount();
-    });
-
-    it.each([ToolCallStatus.Success, ToolCallStatus.Error])(
-      'does NOT filter out ask_user when status is %s',
-      (status) => {
+      {
+        status: ToolCallStatus.Pending,
+        resultDisplay: 'test result',
+        shouldHide: true,
+      },
+      {
+        status: ToolCallStatus.Executing,
+        resultDisplay: 'test result',
+        shouldHide: true,
+      },
+      {
+        status: ToolCallStatus.Confirming,
+        resultDisplay: 'test result',
+        shouldHide: true,
+      },
+      {
+        status: ToolCallStatus.Success,
+        resultDisplay: 'test result',
+        shouldHide: false,
+      },
+      { status: ToolCallStatus.Error, resultDisplay: '', shouldHide: true },
+      {
+        status: ToolCallStatus.Error,
+        resultDisplay: 'error message',
+        shouldHide: false,
+      },
+    ])(
+      'filtering logic for status=$status and hasResult=$resultDisplay',
+      ({ status, resultDisplay, shouldHide }) => {
         const toolCalls = [
           createToolCall({
             callId: `ask-user-${status}`,
             name: ASK_USER_DISPLAY_NAME,
             status,
+            resultDisplay,
           }),
         ];
 
@@ -446,7 +452,11 @@ describe('<ToolGroupMessage />', () => {
           { config: baseMockConfig },
         );
 
-        expect(lastFrame()).toMatchSnapshot();
+        if (shouldHide) {
+          expect(lastFrame()).toBe('');
+        } else {
+          expect(lastFrame()).toMatchSnapshot();
+        }
         unmount();
       },
     );
