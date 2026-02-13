@@ -1,26 +1,20 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`<ToolGroupMessage /> > Ask User Filtering > does NOT filter out ask_user when status is Error 1`] = `
+exports[`<ToolGroupMessage /> > Ask User Filtering > filtering logic for status='Error' and hasResult='error message' 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────╮
 │ x  Ask User                                                              │
 │                                                                          │
-│ Test result                                                              │
+│ error message                                                            │
 ╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`<ToolGroupMessage /> > Ask User Filtering > does NOT filter out ask_user when status is Success 1`] = `
+exports[`<ToolGroupMessage /> > Ask User Filtering > filtering logic for status='Success' and hasResult='test result' 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  Ask User                                                              │
 │                                                                          │
-│ Test result                                                              │
+│ test result                                                              │
 ╰──────────────────────────────────────────────────────────────────────────╯"
 `;
-
-exports[`<ToolGroupMessage /> > Ask User Filtering > filters out ask_user when status is Confirming 1`] = `""`;
-
-exports[`<ToolGroupMessage /> > Ask User Filtering > filters out ask_user when status is Executing 1`] = `""`;
-
-exports[`<ToolGroupMessage /> > Ask User Filtering > filters out ask_user when status is Pending 1`] = `""`;
 
 exports[`<ToolGroupMessage /> > Ask User Filtering > shows other tools when ask_user is filtered out 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────╮

@@ -45,6 +45,10 @@
       { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
       { "label": "Custom commands", "slug": "docs/cli/custom-commands" },
       { "label": "Enterprise features", "slug": "docs/cli/enterprise" },
+      {
+        "label": "Enterprise admin controls",
+        "slug": "docs/admin/enterprise-controls"
+      },
       { "label": "Headless mode & scripting", "slug": "docs/cli/headless" },
       { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
       { "label": "System prompt override", "slug": "docs/cli/system-prompt" },
