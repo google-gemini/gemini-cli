@@ -62,7 +62,7 @@ export const DialogManager = ({
     sessionsToDeleteCount,
   } = uiState;
 
-  const handleKeep90Days = useCallback(() => {
+  const handleKeep120Days = useCallback(() => {
     settings.setValue(
       SettingScope.User,
       'general.sessionRetention.warningAcknowledged',
@@ -76,7 +76,7 @@ export const DialogManager = ({
     settings.setValue(
       SettingScope.User,
       'general.sessionRetention.maxAge',
-      '90d',
+      '120d',
     );
   }, [settings]);
 
@@ -101,7 +101,7 @@ export const DialogManager = ({
   if (shouldShowRetentionWarning && sessionsToDeleteCount !== undefined) {
     return (
       <SessionRetentionWarningDialog
-        onKeep90Days={handleKeep90Days}
+        onKeep120Days={handleKeep120Days}
         onKeep30Days={handleKeep30Days}
         sessionsToDeleteCount={sessionsToDeleteCount ?? 0}
       />

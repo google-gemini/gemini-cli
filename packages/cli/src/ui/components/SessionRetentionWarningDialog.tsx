@@ -12,13 +12,13 @@ import {
 } from './shared/RadioButtonSelect.js';
 
 interface SessionRetentionWarningDialogProps {
-  onKeep90Days: () => void;
+  onKeep120Days: () => void;
   onKeep30Days: () => void;
   sessionsToDeleteCount: number;
 }
 
 export const SessionRetentionWarningDialog = ({
-  onKeep90Days,
+  onKeep120Days,
   onKeep30Days,
   sessionsToDeleteCount,
 }: SessionRetentionWarningDialogProps) => {
@@ -32,9 +32,9 @@ export const SessionRetentionWarningDialog = ({
       } will be deleted`,
     },
     {
-      label: 'Keep for 90 days',
-      value: onKeep90Days,
-      key: '90days',
+      label: 'Keep for 120 days',
+      value: onKeep120Days,
+      key: '120days',
       sublabel: 'No sessions will be deleted at this time',
     },
   ];

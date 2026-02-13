@@ -27,7 +27,7 @@ describe('SessionRetentionWarningDialog', () => {
   it('renders correctly with warning message and session count', () => {
     const { lastFrame } = renderWithProviders(
       <SessionRetentionWarningDialog
-        onKeep90Days={vi.fn()}
+        onKeep120Days={vi.fn()}
         onKeep30Days={vi.fn()}
         sessionsToDeleteCount={42}
       />,
@@ -39,14 +39,14 @@ describe('SessionRetentionWarningDialog', () => {
     );
     expect(lastFrame()).toContain('Keep for 30 days (Recommended)');
     expect(lastFrame()).toContain('42 sessions will be deleted');
-    expect(lastFrame()).toContain('Keep for 90 days');
+    expect(lastFrame()).toContain('Keep for 120 days');
     expect(lastFrame()).toContain('No sessions will be deleted at this time');
   });
 
   it('handles pluralization correctly for 1 session', () => {
     const { lastFrame } = renderWithProviders(
       <SessionRetentionWarningDialog
-        onKeep90Days={vi.fn()}
+        onKeep120Days={vi.fn()}
         onKeep30Days={vi.fn()}
         sessionsToDeleteCount={1}
       />,
@@ -56,54 +56,54 @@ describe('SessionRetentionWarningDialog', () => {
     expect(lastFrame()).not.toContain('sessions will be deleted');
   });
 
-  it('defaults to "Keep for 90 days" when there are sessions to delete', async () => {
-    const onKeep90Days = vi.fn();
+  it('defaults to "Keep for 120 days" when there are sessions to delete', async () => {
+    const onKeep120Days = vi.fn();
     const onKeep30Days = vi.fn();
 
     const { stdin } = renderWithProviders(
       <SessionRetentionWarningDialog
-        onKeep90Days={onKeep90Days}
+        onKeep120Days={onKeep120Days}
         onKeep30Days={onKeep30Days}
         sessionsToDeleteCount={10}
       />,
     );
 
-    // Initial selection should be "Keep for 90 days" (index 1) because count > 0
+    // Initial selection should be "Keep for 120 days" (index 1) because count > 0
     // Pressing Enter immediately should select it.
     writeKey(stdin, '\r');
 
     await waitFor(() => {
-      expect(onKeep90Days).toHaveBeenCalled();
+      expect(onKeep120Days).toHaveBeenCalled();
       expect(onKeep30Days).not.toHaveBeenCalled();
     });
   });
 
-  it('calls onKeep30Days when "Keep for 30 days" is explicitly selected (from 90 days default)', async () => {
-    const onKeep90Days = vi.fn();
+  it('calls onKeep30Days when "Keep for 30 days" is explicitly selected (from 120 days default)', async () => {
+    const onKeep120Days = vi.fn();
     const onKeep30Days = vi.fn();
 
     const { stdin } = renderWithProviders(
       <SessionRetentionWarningDialog
-        onKeep90Days={onKeep90Days}
+        onKeep120Days={onKeep120Days}
         onKeep30Days={onKeep30Days}
         sessionsToDeleteCount={10}
       />,
     );
 
-    // Default is index 1 (90 days). Move UP to index 0 (30 days).
+    // Default is index 1 (120 days). Move UP to index 0 (30 days).
     writeKey(stdin, '\x1b[A'); // Up arrow
     writeKey(stdin, '\r');
 
     await waitFor(() => {
       expect(onKeep30Days).toHaveBeenCalled();
-      expect(onKeep90Days).not.toHaveBeenCalled();
+      expect(onKeep120Days).not.toHaveBeenCalled();
     });
   });
 
   it('should match snapshot', async () => {
     const { lastFrame } = renderWithProviders(
       <SessionRetentionWarningDialog
-        onKeep90Days={vi.fn()}
+        onKeep120Days={vi.fn()}
         onKeep30Days={vi.fn()}
         sessionsToDeleteCount={123}
       />,
