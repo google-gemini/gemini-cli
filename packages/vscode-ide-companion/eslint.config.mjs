@@ -10,8 +10,6 @@ import tsParser from '@typescript-eslint/parser';
 export default [
   {
     files: ['**/*.ts'],
-  },
-  {
     plugins: {
       '@typescript-eslint': typescriptEslint,
     },
@@ -40,6 +38,13 @@ export default [
       'no-throw-literal': 'warn',
       semi: 'warn',
       '@typescript-eslint/no-floating-promises': ['error'],
+      '@typescript-eslint/no-unsafe-type-assertion': 'error',
+    },
+  },
+  {
+    files: ['**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-type-assertion': 'off',
     },
   },
 ];
