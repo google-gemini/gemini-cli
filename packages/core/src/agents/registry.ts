@@ -11,6 +11,7 @@ import type { AgentDefinition, LocalAgentDefinition } from './types.js';
 import { loadAgentsFromDirectory } from './agentLoader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
+import { DeepWorkReadinessAgent } from './deep-work-readiness-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import { ADCHandler } from './remote-invocation.js';
@@ -201,6 +202,9 @@ export class AgentRegistry {
     this.registerLocalAgent(CodebaseInvestigatorAgent(this.config));
     this.registerLocalAgent(CliHelpAgent(this.config));
     this.registerLocalAgent(GeneralistAgent(this.config));
+    if (this.config.isDeepWorkEnabled?.() ?? false) {
+      this.registerLocalAgent(DeepWorkReadinessAgent(this.config));
+    }
   }
 
   private async refreshAgents(): Promise<void> {

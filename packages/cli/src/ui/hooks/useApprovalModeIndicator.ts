@@ -70,13 +70,24 @@ export function useApprovalModeIndicator({
             : ApprovalMode.YOLO;
       } else if (keyMatchers[Command.CYCLE_APPROVAL_MODE](key)) {
         const currentMode = config.getApprovalMode();
+        const deepWorkEnabled =
+          typeof config.isDeepWorkEnabled === 'function'
+            ? config.isDeepWorkEnabled()
+            : false;
         switch (currentMode) {
           case ApprovalMode.DEFAULT:
             nextApprovalMode = config.isPlanEnabled()
               ? ApprovalMode.PLAN
-              : ApprovalMode.AUTO_EDIT;
+              : deepWorkEnabled
+                ? ApprovalMode.DEEP_WORK
+                : ApprovalMode.AUTO_EDIT;
             break;
           case ApprovalMode.PLAN:
+            nextApprovalMode = deepWorkEnabled
+              ? ApprovalMode.DEEP_WORK
+              : ApprovalMode.AUTO_EDIT;
+            break;
+          case ApprovalMode.DEEP_WORK:
             nextApprovalMode = ApprovalMode.AUTO_EDIT;
             break;
           case ApprovalMode.AUTO_EDIT:

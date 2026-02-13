@@ -367,6 +367,10 @@ Ask the user for specific feedback on how to improve the plan.`,
         ApprovalMode.DEFAULT,
         'Default mode (edits will require confirmation)',
       );
+      await testMode(
+        ApprovalMode.DEEP_WORK,
+        'Deep Work mode (iterative execution with readiness checks)',
+      );
     });
 
     it('should throw for invalid post-planning modes', async () => {

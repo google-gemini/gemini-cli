@@ -390,6 +390,19 @@ describe('SettingsSchema', () => {
       );
     });
 
+    it('should have deepWork setting in schema', () => {
+      const setting = getSettingsSchema().experimental.properties.deepWork;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Experimental');
+      expect(setting.default).toBe(false);
+      expect(setting.requiresRestart).toBe(true);
+      expect(setting.showInDialog).toBe(true);
+      expect(setting.description).toBe(
+        'Enable Deep Work mode (iterative execution mode and tools).',
+      );
+    });
+
     it('should have hooksConfig.notifications setting in schema', () => {
       const setting = getSettingsSchema().hooksConfig?.properties.notifications;
       expect(setting).toBeDefined();

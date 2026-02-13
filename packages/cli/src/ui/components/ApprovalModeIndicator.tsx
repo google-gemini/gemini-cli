@@ -12,11 +12,13 @@ import { ApprovalMode } from '@google/gemini-cli-core';
 interface ApprovalModeIndicatorProps {
   approvalMode: ApprovalMode;
   isPlanEnabled?: boolean;
+  isDeepWorkEnabled?: boolean;
 }
 
 export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
   approvalMode,
   isPlanEnabled,
+  isDeepWorkEnabled,
 }) => {
   let textColor = '';
   let textContent = '';
@@ -31,6 +33,13 @@ export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
     case ApprovalMode.PLAN:
       textColor = theme.status.success;
       textContent = 'plan';
+      subText = isDeepWorkEnabled
+        ? 'shift+tab to deep work'
+        : 'shift+tab to accept edits';
+      break;
+    case ApprovalMode.DEEP_WORK:
+      textColor = theme.status.success;
+      textContent = 'deep work';
       subText = 'shift+tab to accept edits';
       break;
     case ApprovalMode.YOLO:
@@ -44,7 +53,9 @@ export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
       textContent = '';
       subText = isPlanEnabled
         ? 'shift+tab to plan'
-        : 'shift+tab to accept edits';
+        : isDeepWorkEnabled
+          ? 'shift+tab to deep work'
+          : 'shift+tab to accept edits';
       break;
   }
 

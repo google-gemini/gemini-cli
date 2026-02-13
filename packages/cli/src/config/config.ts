@@ -155,9 +155,9 @@ export async function parseArguments(
         .option('approval-mode', {
           type: 'string',
           nargs: 1,
-          choices: ['default', 'auto_edit', 'yolo', 'plan'],
+          choices: ['default', 'auto_edit', 'yolo', 'plan', 'deep_work'],
           description:
-            'Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools), plan (read-only mode)',
+            'Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools), plan (read-only mode), deep_work (iterative execution mode)',
         })
         .option('policy', {
           type: 'array',
@@ -560,12 +560,20 @@ export async function loadCliConfig(
         }
         approvalMode = ApprovalMode.PLAN;
         break;
+      case 'deep_work':
+        if (!(settings.experimental?.deepWork ?? false)) {
+          throw new Error(
+            'Approval mode "deep_work" is only available when experimental.deepWork is enabled.',
+          );
+        }
+        approvalMode = ApprovalMode.DEEP_WORK;
+        break;
       case 'default':
         approvalMode = ApprovalMode.DEFAULT;
         break;
       default:
         throw new Error(
-          `Invalid approval mode: ${rawApprovalMode}. Valid values are: yolo, auto_edit, plan, default`,
+          `Invalid approval mode: ${rawApprovalMode}. Valid values are: yolo, auto_edit, plan, deep_work, default`,
         );
     }
   } else {
@@ -653,6 +661,10 @@ export async function loadCliConfig(
       case ApprovalMode.PLAN:
         // In plan non-interactive mode, all tools that require approval are excluded.
         // TODO(#16625): Replace this default exclusion logic with specific rules for plan mode.
+        extraExcludes.push(...defaultExcludes.filter(toolExclusionFilter));
+        break;
+      case ApprovalMode.DEEP_WORK:
+        // Deep Work still requires interactive confirmation for mutating tools.
         extraExcludes.push(...defaultExcludes.filter(toolExclusionFilter));
         break;
       case ApprovalMode.DEFAULT:
@@ -810,6 +822,7 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
+    deepWork: settings.experimental?.deepWork,
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,

@@ -281,6 +281,9 @@ export const ToolConfirmationMessage: React.FC<
       bodyContent = (
         <ExitPlanModeDialog
           planPath={confirmationDetails.planPath}
+          recommendedApprovalMode={confirmationDetails.recommendedApprovalMode}
+          recommendationReason={confirmationDetails.recommendationReason}
+          deepWorkEnabled={confirmationDetails.deepWorkEnabled}
           onApprove={(approvalMode) => {
             handleConfirm(ToolConfirmationOutcome.ProceedOnce, {
               approved: true,

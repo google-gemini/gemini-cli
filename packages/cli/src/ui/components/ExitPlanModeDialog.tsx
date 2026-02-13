@@ -21,6 +21,9 @@ import { AskUserDialog } from './AskUserDialog.js';
 
 export interface ExitPlanModeDialogProps {
   planPath: string;
+  recommendedApprovalMode?: ApprovalMode;
+  recommendationReason?: string;
+  deepWorkEnabled?: boolean;
   onApprove: (approvalMode: ApprovalMode) => void;
   onFeedback: (feedback: string) => void;
   onCancel: () => void;
@@ -41,8 +44,51 @@ interface PlanContentState {
 }
 
 enum ApprovalOption {
+  DeepWork = 'Yes, start Deep Work execution',
   Auto = 'Yes, automatically accept edits',
   Manual = 'Yes, manually accept edits',
+}
+
+const DEEP_WORK_SIGNALS = [
+  'iterate',
+  'iteration',
+  'loop',
+  'phases',
+  'phase',
+  'refactor',
+  'migrate',
+  'end-to-end',
+  'e2e',
+  'comprehensive',
+  'cross-cutting',
+  'multi-step',
+  'verification',
+  'test suite',
+];
+
+function recommendApprovalModeFromPlan(
+  planContent: string,
+  deepWorkEnabled: boolean,
+): ApprovalMode {
+  if (!deepWorkEnabled) {
+    return ApprovalMode.AUTO_EDIT;
+  }
+
+  const normalized = planContent.toLowerCase();
+  const stepCount = (normalized.match(/^\s*\d+\.\s+/gm) ?? []).length;
+  const signalCount = DEEP_WORK_SIGNALS.filter((signal) =>
+    normalized.includes(signal),
+  ).length;
+
+  if (
+    stepCount >= 6 ||
+    (stepCount >= 4 && signalCount >= 2) ||
+    signalCount >= 4
+  ) {
+    return ApprovalMode.DEEP_WORK;
+  }
+
+  return ApprovalMode.AUTO_EDIT;
 }
 
 /**
@@ -127,6 +173,9 @@ function usePlanContent(planPath: string, config: Config): PlanContentState {
 
 export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
   planPath,
+  recommendedApprovalMode,
+  recommendationReason,
+  deepWorkEnabled = false,
   onApprove,
   onFeedback,
   onCancel,
@@ -183,6 +232,72 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
     );
   }
 
+  const computedRecommendation = recommendApprovalModeFromPlan(
+    planContent,
+    deepWorkEnabled,
+  );
+  const effectiveRecommendation =
+    recommendedApprovalMode === ApprovalMode.DEEP_WORK && deepWorkEnabled
+      ? ApprovalMode.DEEP_WORK
+      : recommendedApprovalMode === ApprovalMode.AUTO_EDIT
+        ? ApprovalMode.AUTO_EDIT
+        : computedRecommendation;
+
+  const approvalOptions = deepWorkEnabled
+    ? effectiveRecommendation === ApprovalMode.DEEP_WORK
+      ? [
+          {
+            label: `${ApprovalOption.DeepWork} (Recommended)`,
+            description:
+              'Approves plan and uses iterative Deep Work execution with readiness checks.',
+          },
+          {
+            label: ApprovalOption.Auto,
+            description:
+              'Approves plan and runs regular implementation with automatic edits.',
+          },
+          {
+            label: ApprovalOption.Manual,
+            description:
+              'Approves plan but requires confirmation before each tool call.',
+          },
+        ]
+      : [
+          {
+            label: `${ApprovalOption.Auto} (Recommended)`,
+            description:
+              'Approves plan and runs regular implementation with automatic edits.',
+          },
+          {
+            label: ApprovalOption.DeepWork,
+            description:
+              'Approves plan and uses iterative Deep Work execution with readiness checks.',
+          },
+          {
+            label: ApprovalOption.Manual,
+            description:
+              'Approves plan but requires confirmation before each tool call.',
+          },
+        ]
+    : [
+        {
+          label: ApprovalOption.Auto,
+          description: 'Approves plan and allows tools to run automatically.',
+        },
+        {
+          label: ApprovalOption.Manual,
+          description: 'Approves plan but requires confirmation for each tool.',
+        },
+      ];
+
+  const recommendationText =
+    recommendationReason && recommendationReason.trim().length > 0
+      ? recommendationReason.trim()
+      : effectiveRecommendation === ApprovalMode.DEEP_WORK
+        ? 'Recommendation: Deep Work execution for iterative implementation.'
+        : 'Recommendation: Regular execution.';
+  const promptWithRecommendation = `${recommendationText}\n\n${planContent}`;
+
   return (
     <Box flexDirection="column" width={width}>
       <AskUserDialog
@@ -190,28 +305,19 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
           {
             type: QuestionType.CHOICE,
             header: 'Approval',
-            question: planContent,
-            options: [
-              {
-                label: ApprovalOption.Auto,
-                description:
-                  'Approves plan and allows tools to run automatically',
-              },
-              {
-                label: ApprovalOption.Manual,
-                description:
-                  'Approves plan but requires confirmation for each tool',
-              },
-            ],
+            question: promptWithRecommendation,
+            options: approvalOptions,
             placeholder: 'Type your feedback...',
             multiSelect: false,
           },
         ]}
         onSubmit={(answers) => {
           const answer = answers['0'];
-          if (answer === ApprovalOption.Auto) {
+          if (answer?.startsWith(ApprovalOption.DeepWork)) {
+            onApprove(ApprovalMode.DEEP_WORK);
+          } else if (answer?.startsWith(ApprovalOption.Auto)) {
             onApprove(ApprovalMode.AUTO_EDIT);
-          } else if (answer === ApprovalOption.Manual) {
+          } else if (answer?.startsWith(ApprovalOption.Manual)) {
             onApprove(ApprovalMode.DEFAULT);
           } else if (answer) {
             onFeedback(answer);

@@ -773,6 +773,9 @@ export interface ToolExitPlanModeConfirmationDetails {
   type: 'exit_plan_mode';
   title: string;
   planPath: string;
+  recommendedApprovalMode?: ApprovalMode;
+  recommendationReason?: string;
+  deepWorkEnabled?: boolean;
   onConfirm: (
     outcome: ToolConfirmationOutcome,
     payload?: ToolConfirmationPayload,

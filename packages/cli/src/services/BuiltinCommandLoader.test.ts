@@ -111,6 +111,16 @@ vi.mock('../ui/commands/planCommand.js', async () => {
     },
   };
 });
+vi.mock('../ui/commands/deepworkCommand.js', async () => {
+  const { CommandKind } = await import('../ui/commands/types.js');
+  return {
+    deepworkCommand: {
+      name: 'deepwork',
+      description: 'Deep Work command',
+      kind: CommandKind.BUILT_IN,
+    },
+  };
+});
 
 vi.mock('../ui/commands/mcpCommand.js', () => ({
   mcpCommand: {
@@ -130,6 +140,7 @@ describe('BuiltinCommandLoader', () => {
     mockConfig = {
       getFolderTrust: vi.fn().mockReturnValue(true),
       isPlanEnabled: vi.fn().mockReturnValue(false),
+      isDeepWorkEnabled: vi.fn().mockReturnValue(false),
       getEnableExtensionReloading: () => false,
       getEnableHooks: () => false,
       getEnableHooksUI: () => false,
@@ -247,6 +258,22 @@ describe('BuiltinCommandLoader', () => {
     expect(planCmd).toBeUndefined();
   });
 
+  it('should include deepwork command when deep work mode is enabled', async () => {
+    (mockConfig.isDeepWorkEnabled as Mock).mockReturnValue(true);
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const deepworkCmd = commands.find((c) => c.name === 'deepwork');
+    expect(deepworkCmd).toBeDefined();
+  });
+
+  it('should exclude deepwork command when deep work mode is disabled', async () => {
+    (mockConfig.isDeepWorkEnabled as Mock).mockReturnValue(false);
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const deepworkCmd = commands.find((c) => c.name === 'deepwork');
+    expect(deepworkCmd).toBeUndefined();
+  });
+
   it('should exclude agents command when agents are disabled', async () => {
     mockConfig.isAgentsEnabled = vi.fn().mockReturnValue(false);
     const loader = new BuiltinCommandLoader(mockConfig);
@@ -288,6 +315,7 @@ describe('BuiltinCommandLoader profile', () => {
     mockConfig = {
       getFolderTrust: vi.fn().mockReturnValue(false),
       isPlanEnabled: vi.fn().mockReturnValue(false),
+      isDeepWorkEnabled: vi.fn().mockReturnValue(false),
       getCheckpointingEnabled: () => false,
       getEnableExtensionReloading: () => false,
       getEnableHooks: () => false,

@@ -586,6 +586,7 @@ describe('Composer', () => {
       [ApprovalMode.DEFAULT],
       [ApprovalMode.AUTO_EDIT],
       [ApprovalMode.PLAN],
+      [ApprovalMode.DEEP_WORK],
       [ApprovalMode.YOLO],
     ])(
       'shows ApprovalModeIndicator when approval mode is %s and shell mode is inactive',
@@ -634,6 +635,7 @@ describe('Composer', () => {
     it.each([
       [ApprovalMode.YOLO, 'YOLO'],
       [ApprovalMode.PLAN, 'plan'],
+      [ApprovalMode.DEEP_WORK, 'deep work'],
       [ApprovalMode.AUTO_EDIT, 'auto edit'],
     ])(
       'shows minimal mode badge "%s" when clean UI details are hidden',

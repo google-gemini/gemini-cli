@@ -41,6 +41,7 @@ interface MockConfigInstanceShape {
   setApprovalMode: Mock<(value: ApprovalMode) => void>;
   isYoloModeDisabled: Mock<() => boolean>;
   isPlanEnabled: Mock<() => boolean>;
+  isDeepWorkEnabled?: Mock<() => boolean>;
   isTrustedFolder: Mock<() => boolean>;
   getCoreTools: Mock<() => string[]>;
   getToolDiscoveryCommand: Mock<() => string | undefined>;
@@ -87,6 +88,7 @@ describe('useApprovalModeIndicator', () => {
         >,
         isYoloModeDisabled: vi.fn().mockReturnValue(false),
         isPlanEnabled: vi.fn().mockReturnValue(false),
+        isDeepWorkEnabled: vi.fn().mockReturnValue(false),
         isTrustedFolder: vi.fn().mockReturnValue(true) as Mock<() => boolean>,
         getCoreTools: vi.fn().mockReturnValue([]) as Mock<() => string[]>,
         getToolDiscoveryCommand: vi.fn().mockReturnValue(undefined) as Mock<
@@ -268,6 +270,32 @@ describe('useApprovalModeIndicator', () => {
     });
     expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
       ApprovalMode.DEFAULT,
+    );
+  });
+
+  it('should cycle through DEFAULT -> DEEP_WORK -> AUTO_EDIT when deep work is enabled and plan is disabled', () => {
+    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+    mockConfigInstance.isPlanEnabled.mockReturnValue(false);
+    mockConfigInstance.isDeepWorkEnabled?.mockReturnValue(true);
+    renderHook(() =>
+      useApprovalModeIndicator({
+        config: mockConfigInstance as unknown as ActualConfigType,
+        addItem: vi.fn(),
+      }),
+    );
+
+    act(() => {
+      capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
+    });
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.DEEP_WORK,
+    );
+
+    act(() => {
+      capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
+    });
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.AUTO_EDIT,
     );
   });
 

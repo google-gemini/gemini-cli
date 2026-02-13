@@ -117,9 +117,11 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       ? { text: 'YOLO', color: theme.status.error }
       : showApprovalModeIndicator === ApprovalMode.PLAN
         ? { text: 'plan', color: theme.status.success }
-        : showApprovalModeIndicator === ApprovalMode.AUTO_EDIT
-          ? { text: 'auto edit', color: theme.status.warning }
-          : null;
+        : showApprovalModeIndicator === ApprovalMode.DEEP_WORK
+          ? { text: 'deep work', color: theme.status.success }
+          : showApprovalModeIndicator === ApprovalMode.AUTO_EDIT
+            ? { text: 'auto edit', color: theme.status.warning }
+            : null;
   const hideMinimalModeHintWhileBusy =
     !showUiDetails && (showLoadingIndicator || hasPendingActionRequired);
   const minimalModeBleedThrough = hideMinimalModeHintWhileBusy
@@ -335,6 +337,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                       <ApprovalModeIndicator
                         approvalMode={showApprovalModeIndicator}
                         isPlanEnabled={config.isPlanEnabled()}
+                        isDeepWorkEnabled={
+                          config.isDeepWorkEnabled?.() ?? false
+                        }
                       />
                     )}
                     {uiState.shellModeActive && (

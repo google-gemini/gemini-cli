@@ -5,6 +5,7 @@
  */
 
 import { type FunctionCall } from '@google/genai';
+import type { ApprovalMode } from '../policy/types.js';
 import type {
   ToolConfirmationOutcome,
   ToolConfirmationPayload,
@@ -105,6 +106,9 @@ export type SerializableConfirmationDetails =
       type: 'exit_plan_mode';
       title: string;
       planPath: string;
+      recommendedApprovalMode?: ApprovalMode;
+      recommendationReason?: string;
+      deepWorkEnabled?: boolean;
     };
 
 export interface UpdatePolicy {

@@ -7,6 +7,7 @@
 import {
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
+  CONFIGURE_DEEP_WORK_RUN_TOOL_NAME,
   EDIT_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
@@ -15,6 +16,9 @@ import {
   MEMORY_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   SHELL_TOOL_NAME,
+  START_DEEP_WORK_RUN_TOOL_NAME,
+  STOP_DEEP_WORK_RUN_TOOL_NAME,
+  VALIDATE_DEEP_WORK_READINESS_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
 } from '../tools/tool-names.js';
@@ -31,6 +35,7 @@ export interface SystemPromptOptions {
   hookContext?: boolean;
   primaryWorkflows?: PrimaryWorkflowsOptions;
   planningWorkflow?: PlanningWorkflowOptions;
+  deepWorkWorkflow?: DeepWorkWorkflowOptions;
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
   interactiveYoloMode?: boolean;
@@ -77,6 +82,10 @@ export interface PlanningWorkflowOptions {
   approvedPlanPath?: string;
 }
 
+export interface DeepWorkWorkflowOptions {
+  approvedPlanPath?: string;
+}
+
 export interface AgentSkillOptions {
   name: string;
   description: string;
@@ -109,7 +118,9 @@ ${renderHookContext(options.hookContext)}
 ${
   options.planningWorkflow
     ? renderPlanningWorkflow(options.planningWorkflow)
-    : renderPrimaryWorkflows(options.primaryWorkflows)
+    : options.deepWorkWorkflow
+      ? renderDeepWorkWorkflow(options.deepWorkWorkflow)
+      : renderPrimaryWorkflows(options.primaryWorkflows)
 }
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
@@ -450,6 +461,31 @@ When writing the plan file, you MUST include the following structure:
 2. **Consult:** Present a concise summary of the identified approaches (including pros/cons and your recommendation) to the user via ${formatToolName(ASK_USER_TOOL_NAME)} and wait for their selection. For simple or canonical tasks, you may skip this and proceed to drafting.
 3. **Draft:** Write the detailed implementation plan for the selected approach to the plans directory using ${formatToolName(WRITE_FILE_TOOL_NAME)}.
 4. **Review & Approval:** Present a brief summary of the drafted plan in your chat response and concurrently call the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to formally request approval. If rejected, iterate.
+
+${renderApprovedPlanSection(options.approvedPlanPath)}`.trim();
+}
+
+export function renderDeepWorkWorkflow(
+  options?: DeepWorkWorkflowOptions,
+): string {
+  if (!options) return '';
+  return `
+# Active Approval Mode: Deep Work
+
+You are operating in **Deep Work Mode** for iterative execution. This mode is best for multi-step implementation that benefits from repeated refinement loops.
+
+## Deep Work Orchestration
+- Start by configuring run state with ${formatToolName(CONFIGURE_DEEP_WORK_RUN_TOOL_NAME)}.
+- Use required questions for missing context; mark them answered before proceeding.
+- Validate readiness with ${formatToolName(VALIDATE_DEEP_WORK_READINESS_TOOL_NAME)} before each run.
+- If readiness verdict is \`reject\` due single-shot scope, switch to regular execution mode and proceed without Deep Work.
+- Start/resume the loop with ${formatToolName(START_DEEP_WORK_RUN_TOOL_NAME)}.
+- Pause/stop/complete with ${formatToolName(STOP_DEEP_WORK_RUN_TOOL_NAME)}.
+
+## Iteration Rules
+- Every iteration must preserve plan context and completion criteria.
+- Keep each iteration scoped, verify outcomes, and only continue when unresolved work remains.
+- If blockers require clarification, collect answers and re-run readiness validation before continuing.
 
 ${renderApprovedPlanSection(options.approvedPlanPath)}`.trim();
 }

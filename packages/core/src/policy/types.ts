@@ -49,6 +49,7 @@ export enum ApprovalMode {
   AUTO_EDIT = 'autoEdit',
   YOLO = 'yolo',
   PLAN = 'plan',
+  DEEP_WORK = 'deepWork',
 }
 
 /**

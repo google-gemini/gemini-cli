@@ -52,6 +52,7 @@ export class PromptProvider {
     const interactiveMode = interactiveOverride ?? config.isInteractive();
     const approvalMode = config.getApprovalMode?.() ?? ApprovalMode.DEFAULT;
     const isPlanMode = approvalMode === ApprovalMode.PLAN;
+    const isDeepWorkMode = approvalMode === ApprovalMode.DEEP_WORK;
     const isYoloMode = approvalMode === ApprovalMode.YOLO;
     const skills = config.getSkillManager().getSkills();
     const toolNames = config.getToolRegistry().getAllToolNames();
@@ -167,7 +168,7 @@ export class PromptProvider {
               ? { path: approvedPlanPath }
               : undefined,
           }),
-          !isPlanMode,
+          !isPlanMode && !isDeepWorkMode,
         ),
         planningWorkflow: this.withSection(
           'planningWorkflow',
@@ -177,6 +178,13 @@ export class PromptProvider {
             approvedPlanPath: config.getApprovedPlanPath(),
           }),
           isPlanMode,
+        ),
+        deepWorkWorkflow: this.withSection(
+          'deepWorkWorkflow',
+          () => ({
+            approvedPlanPath: config.getApprovedPlanPath(),
+          }),
+          isDeepWorkMode,
         ),
         operationalGuidelines: this.withSection(
           'operationalGuidelines',

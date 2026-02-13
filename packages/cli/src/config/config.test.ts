@@ -1251,6 +1251,31 @@ describe('Approval mode tool exclusion logic', () => {
     expect(excludedTools).toContain(ASK_USER_TOOL_NAME);
   });
 
+  it('should exclude all interactive tools in non-interactive mode with deep work approval mode', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--approval-mode',
+      'deep_work',
+      '-p',
+      'test',
+    ];
+    const settings = createTestMergedSettings({
+      experimental: {
+        deepWork: true,
+      },
+    });
+    const argv = await parseArguments(createTestMergedSettings());
+
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    const excludedTools = config.getExcludeTools();
+    expect(excludedTools).toContain(SHELL_TOOL_NAME);
+    expect(excludedTools).toContain(EDIT_TOOL_NAME);
+    expect(excludedTools).toContain(WRITE_FILE_TOOL_NAME);
+    expect(excludedTools).toContain(ASK_USER_TOOL_NAME);
+  });
+
   it('should exclude only ask_user in non-interactive mode with legacy yolo flag', async () => {
     process.argv = ['node', 'script.js', '--yolo', '-p', 'test'];
     const argv = await parseArguments(createTestMergedSettings());
@@ -1341,7 +1366,7 @@ describe('Approval mode tool exclusion logic', () => {
     await expect(
       loadCliConfig(settings, 'test-session', invalidArgv as CliArgs),
     ).rejects.toThrow(
-      'Invalid approval mode: invalid_mode. Valid values are: yolo, auto_edit, plan, default',
+      'Invalid approval mode: invalid_mode. Valid values are: yolo, auto_edit, plan, deep_work, default',
     );
   });
 });
@@ -2534,6 +2559,18 @@ describe('loadCliConfig approval mode', () => {
     expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.PLAN);
   });
 
+  it('should set Deep Work approval mode when --approval-mode=deep_work is used and experimental.deepWork is enabled', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'deep_work'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      experimental: {
+        deepWork: true,
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEEP_WORK);
+  });
+
   it('should ignore "yolo" in settings.tools.approvalMode and fall back to DEFAULT', async () => {
     process.argv = ['node', 'script.js'];
     const settings = createTestMergedSettings({
@@ -2568,6 +2605,20 @@ describe('loadCliConfig approval mode', () => {
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
       'Approval mode "plan" is only available when experimental.plan is enabled.',
+    );
+  });
+
+  it('should throw error when --approval-mode=deep_work is used but experimental.deepWork is disabled', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'deep_work'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      experimental: {
+        deepWork: false,
+      },
+    });
+
+    await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
+      'Approval mode "deep_work" is only available when experimental.deepWork is enabled.',
     );
   });
 
@@ -2671,6 +2722,19 @@ describe('loadCliConfig approval mode', () => {
       expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.PLAN);
     });
 
+    it('should respect deep work mode from settings when experimental.deepWork is enabled', async () => {
+      process.argv = ['node', 'script.js'];
+      const settings = createTestMergedSettings({
+        general: { defaultApprovalMode: 'deep_work' },
+        experimental: { deepWork: true },
+      });
+      const argv = await parseArguments(settings);
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getApprovalMode()).toBe(
+        ServerConfig.ApprovalMode.DEEP_WORK,
+      );
+    });
+
     it('should throw error if plan mode is in settings but experimental.plan is disabled', async () => {
       process.argv = ['node', 'script.js'];
       const settings = createTestMergedSettings({
@@ -2682,6 +2746,20 @@ describe('loadCliConfig approval mode', () => {
         loadCliConfig(settings, 'test-session', argv),
       ).rejects.toThrow(
         'Approval mode "plan" is only available when experimental.plan is enabled.',
+      );
+    });
+
+    it('should throw error if deep work mode is in settings but experimental.deepWork is disabled', async () => {
+      process.argv = ['node', 'script.js'];
+      const settings = createTestMergedSettings({
+        general: { defaultApprovalMode: 'deep_work' },
+        experimental: { deepWork: false },
+      });
+      const argv = await parseArguments(settings);
+      await expect(
+        loadCliConfig(settings, 'test-session', argv),
+      ).rejects.toThrow(
+        'Approval mode "deep_work" is only available when experimental.deepWork is enabled.',
       );
     });
   });

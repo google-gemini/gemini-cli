@@ -1,0 +1,21 @@
+# Priority system for policy rules:
+# - Higher priority numbers win over lower priority numbers
+# - When multiple rules match, the highest priority rule is applied
+# - Rules are evaluated in order of priority (highest first)
+#
+# Priority bands (tiers):
+# - Default policies (TOML): 1 + priority/1000 (e.g., priority 100 → 1.100)
+# - User policies (TOML): 2 + priority/1000 (e.g., priority 100 → 2.100)
+# - Admin policies (TOML): 3 + priority/1000 (e.g., priority 100 → 3.100)
+
+# Deep Work orchestration tools should be runnable without extra friction.
+[[rule]]
+toolName = [
+  "configure_deep_work_run",
+  "validate_deep_work_readiness",
+  "start_deep_work_run",
+  "stop_deep_work_run"
+]
+decision = "allow"
+priority = 70
+modes = ["deepWork"]

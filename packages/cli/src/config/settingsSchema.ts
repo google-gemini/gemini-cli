@@ -200,13 +200,15 @@ const SETTINGS_SCHEMA = {
         description: oneLine`
           The default approval mode for tool execution.
           'default' prompts for approval, 'auto_edit' auto-approves edit tools,
-          and 'plan' is read-only mode. 'yolo' is not supported yet.
+          'plan' is read-only mode, and 'deep_work' is iterative execution mode.
+          'yolo' is not supported yet.
         `,
         showInDialog: true,
         options: [
           { value: 'default', label: 'Default' },
           { value: 'auto_edit', label: 'Auto Edit' },
           { value: 'plan', label: 'Plan' },
+          { value: 'deep_work', label: 'Deep Work' },
         ],
       },
       devtools: {
@@ -1603,6 +1605,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Enable planning features (Plan Mode and tools).',
+        showInDialog: true,
+      },
+      deepWork: {
+        type: 'boolean',
+        label: 'Deep Work',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable Deep Work mode (iterative execution mode and tools).',
         showInDialog: true,
       },
     },

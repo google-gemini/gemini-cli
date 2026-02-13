@@ -8,6 +8,7 @@ import type { HierarchicalMemory } from '../config/memory.js';
 import {
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
+  CONFIGURE_DEEP_WORK_RUN_TOOL_NAME,
   EDIT_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
@@ -16,6 +17,9 @@ import {
   MEMORY_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   SHELL_TOOL_NAME,
+  START_DEEP_WORK_RUN_TOOL_NAME,
+  STOP_DEEP_WORK_RUN_TOOL_NAME,
+  VALIDATE_DEEP_WORK_READINESS_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
 } from '../tools/tool-names.js';
@@ -30,6 +34,7 @@ export interface SystemPromptOptions {
   hookContext?: boolean;
   primaryWorkflows?: PrimaryWorkflowsOptions;
   planningWorkflow?: PlanningWorkflowOptions;
+  deepWorkWorkflow?: DeepWorkWorkflowOptions;
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
   interactiveYoloMode?: boolean;
@@ -79,6 +84,10 @@ export interface PlanningWorkflowOptions {
   approvedPlanPath?: string;
 }
 
+export interface DeepWorkWorkflowOptions {
+  approvedPlanPath?: string;
+}
+
 export interface AgentSkillOptions {
   name: string;
   description: string;
@@ -110,7 +119,9 @@ ${renderHookContext(options.hookContext)}
 ${
   options.planningWorkflow
     ? renderPlanningWorkflow(options.planningWorkflow)
-    : renderPrimaryWorkflows(options.primaryWorkflows)
+    : options.deepWorkWorkflow
+      ? renderDeepWorkWorkflow(options.deepWorkWorkflow)
+      : renderPrimaryWorkflows(options.primaryWorkflows)
 }
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
@@ -442,6 +453,30 @@ ${renderApprovedPlanSection(options.approvedPlanPath)}
 - You may ONLY use the read-only tools listed above
 - You MUST NOT modify source code, configs, or any files
 - If asked to modify code, explain you are in Plan Mode and suggest exiting Plan Mode to enable edits`.trim();
+}
+
+export function renderDeepWorkWorkflow(
+  options?: DeepWorkWorkflowOptions,
+): string {
+  if (!options) return '';
+  return `
+# Active Approval Mode: Deep Work
+
+You are operating in **Deep Work Mode** for iterative execution.
+
+## Required Flow
+- Configure run goals and required questions using \`${CONFIGURE_DEEP_WORK_RUN_TOOL_NAME}\`.
+- Validate readiness with \`${VALIDATE_DEEP_WORK_READINESS_TOOL_NAME}\`.
+- If verdict is \`reject\` for a simple one-shot task, switch to regular execution mode.
+- Start or resume iteration with \`${START_DEEP_WORK_RUN_TOOL_NAME}\`.
+- Pause, stop, or complete with \`${STOP_DEEP_WORK_RUN_TOOL_NAME}\`.
+
+## Iteration Guardrails
+- Preserve approved plan context for every iteration.
+- Keep each iteration focused and verify progress before continuing.
+- Re-run readiness checks whenever requirements or answers change.
+
+${renderApprovedPlanSection(options.approvedPlanPath)}`.trim();
 }
 
 function renderApprovedPlanSection(approvedPlanPath?: string): string {

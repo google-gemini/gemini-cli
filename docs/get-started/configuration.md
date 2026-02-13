@@ -115,10 +115,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`general.defaultApprovalMode`** (enum):
   - **Description:** The default approval mode for tool execution. 'default'
-    prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is
-    read-only mode. 'yolo' is not supported yet.
+    prompts for approval, 'auto_edit' auto-approves edit tools, 'plan' is
+    read-only mode, and 'deep_work' is iterative execution mode. 'yolo' is not
+    supported yet.
   - **Default:** `"default"`
-  - **Values:** `"default"`, `"auto_edit"`, `"plan"`
+  - **Values:** `"default"`, `"auto_edit"`, `"plan"`, `"deep_work"`
 
 - **`general.devtools`** (boolean):
   - **Description:** Enable DevTools inspector on launch.
@@ -925,6 +926,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.plan`** (boolean):
   - **Description:** Enable planning features (Plan Mode and tools).
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.deepWork`** (boolean):
+  - **Description:** Enable Deep Work mode (iterative execution mode and tools).
   - **Default:** `false`
   - **Requires restart:** Yes
 

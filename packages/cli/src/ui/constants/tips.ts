@@ -90,7 +90,7 @@ export const INFORMATIVE_TIPS = [
   'Toggle the todo list display with Ctrl+T…',
   'See full, untruncated responses with Ctrl+O…',
   'Toggle auto-approval (YOLO mode) for all tools with Ctrl+Y…',
-  'Cycle through approval modes (Default, Auto-Edit, Plan) with Shift+Tab…',
+  'Cycle through approval modes (Default, Auto-Edit, Plan, Deep Work) with Shift+Tab…',
   'Toggle Markdown rendering (raw markdown mode) with Alt+M…',
   'Toggle shell mode by typing ! in an empty prompt…',
   'Insert a newline with a backslash (\\) followed by Enter…',

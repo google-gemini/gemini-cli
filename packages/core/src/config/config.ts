@@ -36,6 +36,12 @@ import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
+import {
+  ConfigureDeepWorkRunTool,
+  StartDeepWorkRunTool,
+  StopDeepWorkRunTool,
+  ValidateDeepWorkReadinessTool,
+} from '../tools/deep-work-tools.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
@@ -480,6 +486,7 @@ export interface ConfigParameters {
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
   plan?: boolean;
+  deepWork?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
@@ -667,6 +674,7 @@ export class Config {
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
+  private readonly deepWorkEnabled: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
@@ -755,6 +763,7 @@ export class Config {
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
+    this.deepWorkEnabled = params.deepWork ?? false;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];
@@ -1710,8 +1719,15 @@ export class Config {
     const isPlanModeTransition =
       currentMode !== mode &&
       (currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN);
+    const isDeepWorkModeTransition =
+      currentMode !== mode &&
+      (currentMode === ApprovalMode.DEEP_WORK ||
+        mode === ApprovalMode.DEEP_WORK);
     if (isPlanModeTransition) {
       this.syncPlanModeTools();
+    }
+
+    if (isPlanModeTransition || isDeepWorkModeTransition) {
       this.updateSystemInstructionIfInitialized();
     }
   }
@@ -1967,6 +1983,10 @@ export class Config {
 
   isPlanEnabled(): boolean {
     return this.planEnabled;
+  }
+
+  isDeepWorkEnabled(): boolean {
+    return this.deepWorkEnabled;
   }
 
   getApprovedPlanPath(): string | undefined {
@@ -2438,6 +2458,24 @@ export class Config {
     maybeRegister(AskUserTool, () =>
       registry.registerTool(new AskUserTool(this.messageBus)),
     );
+    if (this.isDeepWorkEnabled()) {
+      maybeRegister(ConfigureDeepWorkRunTool, () =>
+        registry.registerTool(
+          new ConfigureDeepWorkRunTool(this, this.messageBus),
+        ),
+      );
+      maybeRegister(ValidateDeepWorkReadinessTool, () =>
+        registry.registerTool(
+          new ValidateDeepWorkReadinessTool(this, this.messageBus),
+        ),
+      );
+      maybeRegister(StartDeepWorkRunTool, () =>
+        registry.registerTool(new StartDeepWorkRunTool(this, this.messageBus)),
+      );
+      maybeRegister(StopDeepWorkRunTool, () =>
+        registry.registerTool(new StopDeepWorkRunTool(this, this.messageBus)),
+      );
+    }
     if (this.getUseWriteTodos()) {
       maybeRegister(WriteTodosTool, () =>
         registry.registerTool(new WriteTodosTool(this.messageBus)),

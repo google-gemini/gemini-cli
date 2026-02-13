@@ -43,6 +43,11 @@ export const ASK_USER_TOOL_NAME = 'ask_user';
 export const ASK_USER_DISPLAY_NAME = 'Ask User';
 export const EXIT_PLAN_MODE_TOOL_NAME = 'exit_plan_mode';
 export const ENTER_PLAN_MODE_TOOL_NAME = 'enter_plan_mode';
+export const CONFIGURE_DEEP_WORK_RUN_TOOL_NAME = 'configure_deep_work_run';
+export const VALIDATE_DEEP_WORK_READINESS_TOOL_NAME =
+  'validate_deep_work_readiness';
+export const START_DEEP_WORK_RUN_TOOL_NAME = 'start_deep_work_run';
+export const STOP_DEEP_WORK_RUN_TOOL_NAME = 'stop_deep_work_run';
 
 /**
  * Mapping of legacy tool names to their current names.
@@ -96,6 +101,10 @@ export const ALL_BUILTIN_TOOL_NAMES = [
   MEMORY_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
+  CONFIGURE_DEEP_WORK_RUN_TOOL_NAME,
+  VALIDATE_DEEP_WORK_READINESS_TOOL_NAME,
+  START_DEEP_WORK_RUN_TOOL_NAME,
+  STOP_DEEP_WORK_RUN_TOOL_NAME,
 ] as const;
 
 /**

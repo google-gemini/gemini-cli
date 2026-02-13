@@ -15,6 +15,7 @@ import {
   ToolConfirmationOutcome,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { Config } from '../config/config.js';
 import { EXIT_PLAN_MODE_TOOL_NAME } from './tool-names.js';
@@ -32,6 +33,8 @@ function getApprovalModeDescription(mode: ApprovalMode): string {
   switch (mode) {
     case ApprovalMode.AUTO_EDIT:
       return 'Auto-Edit mode (edits will be applied automatically)';
+    case ApprovalMode.DEEP_WORK:
+      return 'Deep Work mode (iterative execution with readiness checks)';
     case ApprovalMode.DEFAULT:
       return 'Default mode (edits will require confirmation)';
     case ApprovalMode.YOLO:
@@ -41,6 +44,58 @@ function getApprovalModeDescription(mode: ApprovalMode): string {
     default:
       checkExhaustive(mode);
   }
+}
+
+interface PlanExecutionRecommendation {
+  approvalMode: ApprovalMode;
+  reason: string;
+}
+
+const DEEP_WORK_SIGNALS = [
+  'iterate',
+  'iteration',
+  'loop',
+  'phases',
+  'phase',
+  'refactor',
+  'migrate',
+  'end-to-end',
+  'e2e',
+  'comprehensive',
+  'cross-cutting',
+  'multi-step',
+  'verification',
+  'test suite',
+];
+
+function recommendExecutionModeFromPlan(
+  planContent: string,
+  deepWorkEnabled: boolean,
+): PlanExecutionRecommendation {
+  const normalized = planContent.toLowerCase();
+  const implementationStepMatches = normalized.match(/^\s*\d+\.\s+/gm) ?? [];
+  const implementationStepCount = implementationStepMatches.length;
+  const signalCount = DEEP_WORK_SIGNALS.filter((signal) =>
+    normalized.includes(signal),
+  ).length;
+
+  if (
+    deepWorkEnabled &&
+    (implementationStepCount >= 6 ||
+      (implementationStepCount >= 4 && signalCount >= 2) ||
+      signalCount >= 4)
+  ) {
+    return {
+      approvalMode: ApprovalMode.DEEP_WORK,
+      reason:
+        'Plan looks iterative and complex, so Deep Work is recommended for controlled multi-run execution.',
+    };
+  }
+
+  return {
+    approvalMode: ApprovalMode.AUTO_EDIT,
+    reason: 'Plan appears straightforward enough for regular execution.',
+  };
 }
 
 export interface ExitPlanModeParams {
@@ -124,6 +179,10 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
   private confirmationOutcome: ToolConfirmationOutcome | null = null;
   private approvalPayload: ToolExitPlanModeConfirmationPayload | null = null;
   private planValidationError: string | null = null;
+  private recommendation: PlanExecutionRecommendation = {
+    approvalMode: ApprovalMode.AUTO_EDIT,
+    reason: 'Plan appears straightforward enough for regular execution.',
+  };
 
   constructor(
     params: ExitPlanModeParams,
@@ -155,6 +214,17 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
       this.planValidationError = contentError;
       return false;
     }
+    let planContent: string;
+    try {
+      planContent = await fs.readFile(resolvedPlanPath, 'utf-8');
+    } catch (error) {
+      this.planValidationError = `Unable to read plan file: ${String(error)}`;
+      return false;
+    }
+    this.recommendation = recommendExecutionModeFromPlan(
+      planContent,
+      this.config.isDeepWorkEnabled?.() ?? false,
+    );
 
     const decision = await this.getMessageBusDecision(abortSignal);
     if (decision === 'DENY') {
@@ -170,7 +240,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
       this.confirmationOutcome = ToolConfirmationOutcome.ProceedOnce;
       this.approvalPayload = {
         approved: true,
-        approvalMode: ApprovalMode.DEFAULT,
+        approvalMode: this.recommendation.approvalMode,
       };
       return false;
     }
@@ -180,6 +250,9 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
       type: 'exit_plan_mode',
       title: 'Plan Approval',
       planPath: resolvedPlanPath,
+      recommendedApprovalMode: this.recommendation.approvalMode,
+      recommendationReason: this.recommendation.reason,
+      deepWorkEnabled: this.config.isDeepWorkEnabled?.() ?? false,
       onConfirm: async (
         outcome: ToolConfirmationOutcome,
         payload?: ToolConfirmationPayload,

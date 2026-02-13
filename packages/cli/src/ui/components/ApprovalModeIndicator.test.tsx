@@ -40,6 +40,27 @@ describe('ApprovalModeIndicator', () => {
     expect(output).toContain('shift+tab to accept edits');
   });
 
+  it('renders correctly for PLAN mode with deep work enabled', () => {
+    const { lastFrame } = render(
+      <ApprovalModeIndicator
+        approvalMode={ApprovalMode.PLAN}
+        isDeepWorkEnabled={true}
+      />,
+    );
+    const output = lastFrame();
+    expect(output).toContain('plan');
+    expect(output).toContain('shift+tab to deep work');
+  });
+
+  it('renders correctly for DEEP_WORK mode', () => {
+    const { lastFrame } = render(
+      <ApprovalModeIndicator approvalMode={ApprovalMode.DEEP_WORK} />,
+    );
+    const output = lastFrame();
+    expect(output).toContain('deep work');
+    expect(output).toContain('shift+tab to accept edits');
+  });
+
   it('renders correctly for YOLO mode', () => {
     const { lastFrame } = render(
       <ApprovalModeIndicator approvalMode={ApprovalMode.YOLO} />,
@@ -66,5 +87,16 @@ describe('ApprovalModeIndicator', () => {
     );
     const output = lastFrame();
     expect(output).toContain('shift+tab to plan');
+  });
+
+  it('renders correctly for DEFAULT mode with deep work enabled', () => {
+    const { lastFrame } = render(
+      <ApprovalModeIndicator
+        approvalMode={ApprovalMode.DEFAULT}
+        isDeepWorkEnabled={true}
+      />,
+    );
+    const output = lastFrame();
+    expect(output).toContain('shift+tab to deep work');
   });
 });

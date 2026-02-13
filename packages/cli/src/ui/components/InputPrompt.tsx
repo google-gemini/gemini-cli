@@ -1378,6 +1378,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     !shellModeActive && approvalMode === ApprovalMode.YOLO;
   const showPlanStyling =
     !shellModeActive && approvalMode === ApprovalMode.PLAN;
+  const showDeepWorkStyling =
+    !shellModeActive && approvalMode === ApprovalMode.DEEP_WORK;
 
   let statusColor: string | undefined;
   let statusText = '';
@@ -1390,6 +1392,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   } else if (showPlanStyling) {
     statusColor = theme.status.success;
     statusText = 'Plan mode';
+  } else if (showDeepWorkStyling) {
+    statusColor = theme.status.success;
+    statusText = 'Deep Work mode';
   } else if (showAutoAcceptStyling) {
     statusColor = theme.status.warning;
     statusText = 'Accepting edits';

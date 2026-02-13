@@ -55,12 +55,14 @@ exports[`ToolConfirmationQueue > renders ExitPlanMode tool confirmation with Suc
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ Ready to start implementation?                                               │
 │                                                                              │
+│ Recommendation: Regular execution.                                           │
+│                                                                              │
 │ Plan content goes here                                                       │
 │                                                                              │
 │ ● 1.  Yes, automatically accept edits                                        │
-│       Approves plan and allows tools to run automatically                    │
+│       Approves plan and allows tools to run automatically.                   │
 │   2.  Yes, manually accept edits                                             │
-│       Approves plan but requires confirmation for each tool                  │
+│       Approves plan but requires confirmation for each tool.                 │
 │   3.  Type your feedback...                                                  │
 │                                                                              │
 │ Enter to select · ↑/↓ to navigate · Esc to cancel                            │

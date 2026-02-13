@@ -496,7 +496,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.TOGGLE_COPY_MODE]: 'Toggle copy mode when in alternate buffer mode.',
   [Command.TOGGLE_YOLO]: 'Toggle YOLO (auto-approval) mode for tool calls.',
   [Command.CYCLE_APPROVAL_MODE]:
-    'Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only).',
+    'Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), plan (read-only), and deep_work (iterative; when enabled).',
   [Command.SHOW_MORE_LINES]:
     'Expand and collapse blocks of content when not in alternate buffer mode.',
   [Command.EXPAND_PASTE]:

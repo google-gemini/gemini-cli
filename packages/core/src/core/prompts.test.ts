@@ -417,6 +417,17 @@ describe('Core System Prompt (prompts.ts)', () => {
       expect(prompt).toMatchSnapshot();
     });
 
+    it('should include DEEP_WORK mode instructions', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
+        ApprovalMode.DEEP_WORK,
+      );
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain('# Active Approval Mode: Deep Work');
+      expect(prompt).toContain('configure_deep_work_run');
+      expect(prompt).toContain('start_deep_work_run');
+      expect(prompt).toMatchSnapshot();
+    });
+
     it('should NOT include approval mode instructions for DEFAULT mode', () => {
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
         ApprovalMode.DEFAULT,

@@ -137,10 +137,16 @@ Implement a comprehensive authentication system with multiple providers.
     vi.restoreAllMocks();
   });
 
-  const renderDialog = (options?: { useAlternateBuffer?: boolean }) =>
+  const renderDialog = (options?: {
+    useAlternateBuffer?: boolean;
+    deepWorkEnabled?: boolean;
+    recommendedApprovalMode?: ApprovalMode;
+  }) =>
     renderWithProviders(
       <ExitPlanModeDialog
         planPath={mockPlanFullPath}
+        deepWorkEnabled={options?.deepWorkEnabled}
+        recommendedApprovalMode={options?.recommendedApprovalMode}
         onApprove={onApprove}
         onFeedback={onFeedback}
         onCancel={onCancel}
@@ -205,6 +211,29 @@ Implement a comprehensive authentication system with multiple providers.
 
         await waitFor(() => {
           expect(onApprove).toHaveBeenCalledWith(ApprovalMode.AUTO_EDIT);
+        });
+      });
+
+      it('calls onApprove with DEEP_WORK when deep work is recommended and selected first', async () => {
+        const { stdin, lastFrame } = renderDialog({
+          useAlternateBuffer,
+          deepWorkEnabled: true,
+          recommendedApprovalMode: ApprovalMode.DEEP_WORK,
+        });
+
+        await act(async () => {
+          vi.runAllTimers();
+        });
+
+        await waitFor(() => {
+          expect(lastFrame()).toContain('Add user authentication');
+          expect(lastFrame()).toContain('Deep Work');
+        });
+
+        writeKey(stdin, '\r');
+
+        await waitFor(() => {
+          expect(onApprove).toHaveBeenCalledWith(ApprovalMode.DEEP_WORK);
         });
       });
 
