@@ -17,10 +17,10 @@ import {
   COMMON_IGNORE_PATTERNS,
   GEMINI_IGNORE_FILE_NAME,
   // DEFAULT_FILE_EXCLUDES,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import * as core from '@google/gemini-cli-core';
 import * as os from 'node:os';
-import { ToolCallStatus } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
@@ -212,7 +212,9 @@ describe('handleAtCommand', () => {
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'tool_group',
-        tools: [expect.objectContaining({ status: ToolCallStatus.Success })],
+        tools: [
+          expect.objectContaining({ status: CoreToolCallStatus.Success }),
+        ],
       }),
       125,
     );
@@ -314,7 +316,9 @@ describe('handleAtCommand', () => {
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'tool_group',
-        tools: [expect.objectContaining({ status: ToolCallStatus.Success })],
+        tools: [
+          expect.objectContaining({ status: CoreToolCallStatus.Success }),
+        ],
       }),
       125,
     );
@@ -1431,7 +1435,7 @@ describe('handleAtCommand', () => {
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'tool_group',
-        tools: [expect.objectContaining({ status: ToolCallStatus.Error })],
+        tools: [expect.objectContaining({ status: CoreToolCallStatus.Error })],
       }),
       134,
     );
