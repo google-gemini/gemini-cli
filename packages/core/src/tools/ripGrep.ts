@@ -633,7 +633,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
             minimum: 1,
           },
         },
-        required: ['pattern'],
+        required: ['pattern', 'total_max_matches'],
         type: 'object',
       },
       messageBus,
