@@ -6,9 +6,6 @@
 
 import http from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import { WebSocketServer, type WebSocket } from 'ws';
 import type {
@@ -16,19 +13,13 @@ import type {
   ConsoleLogPayload,
   InspectorConsoleLog,
 } from './types.js';
+import { INDEX_HTML, CLIENT_JS } from './_client-assets.js';
 
 export type {
   NetworkLog,
   ConsoleLogPayload,
   InspectorConsoleLog,
 } from './types.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const indexHtml = readFileSync(
-  join(__dirname, '../../client/index.html'),
-  'utf-8',
-);
-const mainJs = readFileSync(join(__dirname, '../client/main.js'), 'utf-8');
 
 interface IncomingNetworkPayload extends Partial<NetworkLog> {
   chunk?: {
@@ -211,10 +202,10 @@ export class DevTools extends EventEmitter {
           });
         } else if (req.url === '/' || req.url === '/index.html') {
           res.writeHead(200, { 'Content-Type': 'text/html' });
-          res.end(indexHtml);
+          res.end(INDEX_HTML);
         } else if (req.url === '/assets/main.js') {
           res.writeHead(200, { 'Content-Type': 'application/javascript' });
-          res.end(mainJs);
+          res.end(CLIENT_JS);
         } else {
           res.writeHead(404);
           res.end('Not Found');
