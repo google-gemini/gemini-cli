@@ -277,8 +277,8 @@ export function makeRelative(
  */
 export function escapePath(filePath: string): string {
   if (process.platform === 'win32') {
-    // Windows: Double quote if it contains space or special chars
-    if (/[\s()[\]{};|&^$!@%`'~]/.test(filePath)) {
+    // Windows: Double quote if it contains special chars
+    if (/[\s&()[\]{}^=;!'+,`~%$@#]/.test(filePath)) {
       return `"${filePath}"`;
     }
     return filePath;
