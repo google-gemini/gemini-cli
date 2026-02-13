@@ -243,49 +243,44 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
         ? ApprovalMode.AUTO_EDIT
         : computedRecommendation;
 
+  const autoOptionLabel =
+    effectiveRecommendation === ApprovalMode.AUTO_EDIT
+      ? `${ApprovalOption.Auto} (Recommended)`
+      : ApprovalOption.Auto;
+  const deepWorkOptionLabel =
+    effectiveRecommendation === ApprovalMode.DEEP_WORK
+      ? `${ApprovalOption.DeepWork} (Recommended)`
+      : ApprovalOption.DeepWork;
+  const manualOptionLabel =
+    effectiveRecommendation === ApprovalMode.DEFAULT
+      ? `${ApprovalOption.Manual} (Recommended)`
+      : ApprovalOption.Manual;
+
   const approvalOptions = deepWorkEnabled
-    ? effectiveRecommendation === ApprovalMode.DEEP_WORK
-      ? [
-          {
-            label: `${ApprovalOption.DeepWork} (Recommended)`,
-            description:
-              'Approves plan and uses iterative Deep Work execution with readiness checks.',
-          },
-          {
-            label: ApprovalOption.Auto,
-            description:
-              'Approves plan and runs regular implementation with automatic edits.',
-          },
-          {
-            label: ApprovalOption.Manual,
-            description:
-              'Approves plan but requires confirmation before each tool call.',
-          },
-        ]
-      : [
-          {
-            label: `${ApprovalOption.Auto} (Recommended)`,
-            description:
-              'Approves plan and runs regular implementation with automatic edits.',
-          },
-          {
-            label: ApprovalOption.DeepWork,
-            description:
-              'Approves plan and uses iterative Deep Work execution with readiness checks.',
-          },
-          {
-            label: ApprovalOption.Manual,
-            description:
-              'Approves plan but requires confirmation before each tool call.',
-          },
-        ]
+    ? [
+        {
+          label: autoOptionLabel,
+          description:
+            'Approves plan and runs regular implementation with automatic edits.',
+        },
+        {
+          label: deepWorkOptionLabel,
+          description:
+            'Approves plan and uses iterative Deep Work execution with readiness checks.',
+        },
+        {
+          label: manualOptionLabel,
+          description:
+            'Approves plan but requires confirmation before each tool call.',
+        },
+      ]
     : [
         {
-          label: ApprovalOption.Auto,
+          label: autoOptionLabel,
           description: 'Approves plan and allows tools to run automatically.',
         },
         {
-          label: ApprovalOption.Manual,
+          label: manualOptionLabel,
           description: 'Approves plan but requires confirmation for each tool.',
         },
       ];

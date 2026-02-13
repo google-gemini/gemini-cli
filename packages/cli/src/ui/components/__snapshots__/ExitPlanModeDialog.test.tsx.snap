@@ -17,7 +17,7 @@ Implementation Steps
 Files to Modify
 ... last 3 lines hidden ...
 
-  1.  Yes, automatically accept edits
+  1.  Yes, automatically accept edits (Recommended)
       Approves plan and allows tools to run automatically.
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool.
@@ -43,7 +43,7 @@ Implementation Steps
 Files to Modify
 ... last 3 lines hidden ...
 
-  1.  Yes, automatically accept edits
+  1.  Yes, automatically accept edits (Recommended)
       Approves plan and allows tools to run automatically.
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool.
@@ -71,7 +71,7 @@ Implementation Steps
  6. Add LDAP provider support in src/auth/providers/LDAPProvider.ts
 ... last 24 lines hidden ...
 
-● 1.  Yes, automatically accept edits
+● 1.  Yes, automatically accept edits (Recommended)
       Approves plan and allows tools to run automatically.
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool.
@@ -97,7 +97,7 @@ Implementation Steps
 Files to Modify
 ... last 3 lines hidden ...
 
-● 1.  Yes, automatically accept edits
+● 1.  Yes, automatically accept edits (Recommended)
       Approves plan and allows tools to run automatically.
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool.
@@ -125,7 +125,7 @@ Files to Modify
  - src/index.ts - Add auth middleware
  - src/config.ts - Add auth configuration options
 
-  1.  Yes, automatically accept edits
+  1.  Yes, automatically accept edits (Recommended)
       Approves plan and allows tools to run automatically.
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool.
@@ -153,7 +153,7 @@ Files to Modify
  - src/index.ts - Add auth middleware
  - src/config.ts - Add auth configuration options
 
-  1.  Yes, automatically accept edits
+  1.  Yes, automatically accept edits (Recommended)
       Approves plan and allows tools to run automatically.
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool.
@@ -204,7 +204,7 @@ Testing Strategy
  - Security penetration testing
  - Load testing for session management
 
-● 1.  Yes, automatically accept edits
+● 1.  Yes, automatically accept edits (Recommended)
       Approves plan and allows tools to run automatically.
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool.
@@ -232,7 +232,7 @@ Files to Modify
  - src/index.ts - Add auth middleware
  - src/config.ts - Add auth configuration options
 
-● 1.  Yes, automatically accept edits
+● 1.  Yes, automatically accept edits (Recommended)
       Approves plan and allows tools to run automatically.
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool.

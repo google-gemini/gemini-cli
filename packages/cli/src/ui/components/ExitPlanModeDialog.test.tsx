@@ -214,7 +214,7 @@ Implement a comprehensive authentication system with multiple providers.
         });
       });
 
-      it('calls onApprove with DEEP_WORK when deep work is recommended and selected first', async () => {
+      it('calls onApprove with DEEP_WORK when deep work is recommended and selected', async () => {
         const { stdin, lastFrame } = renderDialog({
           useAlternateBuffer,
           deepWorkEnabled: true,
@@ -228,8 +228,12 @@ Implement a comprehensive authentication system with multiple providers.
         await waitFor(() => {
           expect(lastFrame()).toContain('Add user authentication');
           expect(lastFrame()).toContain('Deep Work');
+          expect(lastFrame()).toContain(
+            'Yes, start Deep Work execution (Recommended)',
+          );
         });
 
+        writeKey(stdin, '\x1b[B'); // Down arrow to Deep Work
         writeKey(stdin, '\r');
 
         await waitFor(() => {
