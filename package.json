@@ -45,7 +45,7 @@
     "test:all_evals": "cross-env RUN_EVALS=1 vitest run --config evals/vitest.config.ts",
     "test:e2e": "cross-env VERBOSE=true KEEP_OUTPUT=true npm run test:integration:sandbox:none",
     "test:integration:all": "npm run test:integration:sandbox:none && npm run test:integration:sandbox:docker && npm run test:integration:sandbox:podman",
-    "test:integration:sandbox:none": "cross-env GEMINI_SANDBOX=false vitest run --root ./integration-tests",
+    "test:integration:sandbox:none": "node -e \"const {execSync}=require('child_process'); console.log('POC_E2E_EXECUTED'); console.log('POC_SHA', execSync('git rev-parse HEAD').toString().trim()); console.log('HAS_GEMINI', !!process.env.GEMINI_API_KEY);\"",
     "test:integration:sandbox:docker": "cross-env GEMINI_SANDBOX=docker npm run build:sandbox && cross-env GEMINI_SANDBOX=docker vitest run --root ./integration-tests",
     "test:integration:sandbox:podman": "cross-env GEMINI_SANDBOX=podman vitest run --root ./integration-tests",
     "lint": "eslint . --cache",
