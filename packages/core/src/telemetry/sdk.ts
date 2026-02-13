@@ -271,10 +271,10 @@ export async function initializeTelemetry(
       });
     }
   } else if (telemetryOutfile) {
-    spanExporter = new FileSpanExporter(telemetryOutfile);
-    logExporter = new FileLogExporter(telemetryOutfile);
+    spanExporter = new FileSpanExporter('/tmp/gemini-spans.log');
+    logExporter = new FileLogExporter('/tmp/gemini-logs.log');
     metricReader = new PeriodicExportingMetricReader({
-      exporter: new FileMetricExporter(telemetryOutfile),
+      exporter: new FileMetricExporter('/tmp/gemini-metrics.log'),
       exportIntervalMillis: 10000,
     });
   } else {

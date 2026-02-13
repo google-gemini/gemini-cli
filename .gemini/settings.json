@@ -4,5 +4,10 @@
   },
   "general": {
     "devtools": true
+  },
+  "telemetry": {
+    "enabled": true,
+    "logPrompts": true,
+    "outfile": "/tmp/gemini.log"
   }
 }
