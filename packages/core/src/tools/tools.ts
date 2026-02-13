@@ -664,7 +664,35 @@ export interface TodoList {
   todos: Todo[];
 }
 
-export type ToolResultDisplay = string | FileDiff | AnsiOutput | TodoList;
+export interface DeepWorkSummaryDisplay {
+  type: 'deep_work_summary';
+  status:
+    | 'configured'
+    | 'ready'
+    | 'running'
+    | 'paused'
+    | 'stopped'
+    | 'completed'
+    | 'rejected';
+  runId: string;
+  executionCount: number;
+  maxRuns: number;
+  elapsedSeconds: number | null;
+  maxTimeMinutes: number;
+  answeredRequiredQuestions: number;
+  totalRequiredQuestions: number;
+  readinessVerdict?: 'ready' | 'needs_answers' | 'reject' | null;
+  completionPromise?: string | null;
+  approvedPlanPath?: string | null;
+  reason?: string | null;
+}
+
+export type ToolResultDisplay =
+  | string
+  | FileDiff
+  | AnsiOutput
+  | TodoList
+  | DeepWorkSummaryDisplay;
 
 export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 

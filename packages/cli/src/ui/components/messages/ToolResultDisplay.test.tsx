@@ -190,6 +190,43 @@ describe('ToolResultDisplay', () => {
     expect(output).toMatchSnapshot();
   });
 
+  it('renders detailed deep work summary display', () => {
+    const deepWorkSummary = {
+      type: 'deep_work_summary' as const,
+      status: 'completed' as const,
+      runId: 'deep-work-run-42',
+      executionCount: 4,
+      maxRuns: 8,
+      elapsedSeconds: 372,
+      maxTimeMinutes: 90,
+      answeredRequiredQuestions: 3,
+      totalRequiredQuestions: 4,
+      readinessVerdict: 'ready' as const,
+      completionPromise: 'MIGRATION_DONE',
+      approvedPlanPath: '/tmp/plans/deep-work-auth.md',
+      reason: 'All acceptance criteria completed.',
+    };
+    const { lastFrame } = render(
+      <ToolResultDisplay
+        resultDisplay={deepWorkSummary}
+        terminalWidth={100}
+        availableTerminalHeight={24}
+      />,
+    );
+    const output = lastFrame() || '';
+
+    expect(output).toContain('Deep Work Summary');
+    expect(output).toContain('COMPLETED');
+    expect(output).toContain('Executions: 4/8');
+    expect(output).toContain('Runtime: 6m 12s / 90m');
+    expect(output).toContain('Required Context: 3/4');
+    expect(output).toContain('Readiness: ready');
+    expect(output).toContain('Completion Signal: MIGRATION_DONE');
+    expect(output).toContain('Plan Context: /tmp/plans/deep-work-auth.md');
+    expect(output).toContain('Reason: All acceptance criteria completed.');
+    expect(output).toContain('Run ID: deep-work-run-42');
+  });
+
   it('does not fall back to plain text if availableHeight is set and not in alternate buffer', () => {
     mockUseAlternateBuffer.mockReturnValue(false);
     // availableHeight calculation: 20 - 1 - 5 = 14 > 3

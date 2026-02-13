@@ -11,7 +11,11 @@ import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { AnsiOutputText, AnsiLineText } from '../AnsiOutput.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { theme } from '../../semantic-colors.js';
-import type { AnsiOutput, AnsiLine } from '@google/gemini-cli-core';
+import type {
+  AnsiOutput,
+  AnsiLine,
+  DeepWorkSummaryDisplay,
+} from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { tryParseJSON } from '../../../utils/jsonoutput.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
@@ -40,6 +44,49 @@ export interface ToolResultDisplayProps {
 interface FileDiffResult {
   fileDiff: string;
   fileName: string;
+}
+
+function isDeepWorkSummaryDisplay(
+  value: unknown,
+): value is DeepWorkSummaryDisplay {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'type' in value &&
+    value.type === 'deep_work_summary'
+  );
+}
+
+function formatDuration(seconds: number | null): string {
+  if (seconds === null) {
+    return 'n/a';
+  }
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${remainingSeconds}s`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+  return `${remainingSeconds}s`;
+}
+
+function getDeepWorkStatusColor(
+  status: DeepWorkSummaryDisplay['status'],
+): string {
+  switch (status) {
+    case 'completed':
+      return theme.status.success;
+    case 'rejected':
+      return theme.status.error;
+    case 'paused':
+    case 'stopped':
+      return theme.status.warning;
+    default:
+      return theme.text.accent;
+  }
 }
 
 export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
@@ -113,6 +160,81 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   ) {
     // display nothing, as the TodoTray will handle rendering todos
     return null;
+  }
+
+  if (
+    typeof truncatedResultDisplay === 'object' &&
+    isDeepWorkSummaryDisplay(truncatedResultDisplay)
+  ) {
+    const summary = truncatedResultDisplay;
+    const executionBudgetUsed =
+      summary.maxRuns > 0
+        ? Math.min(
+            100,
+            Math.round((summary.executionCount / summary.maxRuns) * 100),
+          )
+        : 0;
+
+    return (
+      <Box width={childWidth} flexDirection="column">
+        <Text color={theme.text.accent} bold>
+          Deep Work Summary
+        </Text>
+        <Text>
+          <Text color={theme.text.secondary}>Status: </Text>
+          <Text color={getDeepWorkStatusColor(summary.status)} bold>
+            {summary.status.toUpperCase()}
+          </Text>
+        </Text>
+        <Text>
+          <Text color={theme.text.secondary}>Executions: </Text>
+          <Text color={theme.text.primary}>
+            {summary.executionCount}/{summary.maxRuns} ({executionBudgetUsed}%
+            budget used)
+          </Text>
+        </Text>
+        <Text>
+          <Text color={theme.text.secondary}>Runtime: </Text>
+          <Text color={theme.text.primary}>
+            {formatDuration(summary.elapsedSeconds)} / {summary.maxTimeMinutes}m
+          </Text>
+        </Text>
+        <Text>
+          <Text color={theme.text.secondary}>Required Context: </Text>
+          <Text color={theme.text.primary}>
+            {summary.answeredRequiredQuestions}/{summary.totalRequiredQuestions}
+          </Text>
+        </Text>
+        <Text>
+          <Text color={theme.text.secondary}>Readiness: </Text>
+          <Text color={theme.text.primary}>
+            {summary.readinessVerdict ?? 'n/a'}
+          </Text>
+        </Text>
+        {summary.completionPromise && (
+          <Text>
+            <Text color={theme.text.secondary}>Completion Signal: </Text>
+            <Text color={theme.text.primary}>{summary.completionPromise}</Text>
+          </Text>
+        )}
+        {summary.approvedPlanPath && (
+          <Text wrap="wrap">
+            <Text color={theme.text.secondary}>Plan Context: </Text>
+            <Text color={theme.text.primary}>{summary.approvedPlanPath}</Text>
+          </Text>
+        )}
+        {summary.reason && (
+          <Text wrap="wrap">
+            <Text color={theme.text.secondary}>Reason: </Text>
+            <Text color={theme.text.primary}>{summary.reason}</Text>
+          </Text>
+        )}
+        <Text>
+          <Text color={theme.text.secondary}>Run ID: </Text>
+          <Text color={theme.text.primary}>{summary.runId}</Text>
+        </Text>
+      </Box>
+    );
   }
 
   // 2. High-performance path: Virtualized ANSI in interactive mode

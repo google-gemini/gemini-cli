@@ -8,7 +8,9 @@ import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
+  type DeepWorkSummaryDisplay,
   type ToolResult,
+  type ToolResultDisplay,
   type ToolInvocation,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -64,7 +66,7 @@ export interface StopDeepWorkRunParams {
 
 function createSuccessResult(
   llmContent: string,
-  returnDisplay: string,
+  returnDisplay: ToolResultDisplay,
   data?: Record<string, unknown>,
 ): ToolResult {
   return {
@@ -72,6 +74,23 @@ function createSuccessResult(
     returnDisplay,
     data,
   };
+}
+
+function getElapsedSeconds(
+  startedAt: string | null,
+  endedAt: string,
+): number | null {
+  if (!startedAt) {
+    return null;
+  }
+
+  const startMs = Date.parse(startedAt);
+  const endMs = Date.parse(endedAt);
+  if (Number.isNaN(startMs) || Number.isNaN(endMs)) {
+    return null;
+  }
+
+  return Math.max(0, Math.round((endMs - startMs) / 1000));
 }
 
 function createErrorResult(message: string, type: ToolErrorType): ToolResult {
@@ -100,6 +119,35 @@ function summarizeState(state: DeepWorkState): Record<string, unknown> {
       (q) => q.required && q.answer.trim().length > 0,
     ).length,
     readinessVerdict: state.readinessReport?.verdict,
+  };
+}
+
+function buildDeepWorkSummaryDisplay(
+  state: DeepWorkState,
+  reason?: string,
+): DeepWorkSummaryDisplay {
+  const endedAt = new Date().toISOString();
+  const totalRequiredQuestions = state.requiredQuestions.filter(
+    (q) => q.required,
+  ).length;
+  const answeredRequiredQuestions = state.requiredQuestions.filter(
+    (q) => q.required && q.answer.trim().length > 0,
+  ).length;
+
+  return {
+    type: 'deep_work_summary',
+    status: state.status,
+    runId: state.runId,
+    executionCount: state.iteration,
+    maxRuns: state.maxRuns,
+    elapsedSeconds: getElapsedSeconds(state.startedAt, endedAt),
+    maxTimeMinutes: state.maxTimeMinutes,
+    answeredRequiredQuestions,
+    totalRequiredQuestions,
+    readinessVerdict: state.readinessReport?.verdict ?? null,
+    completionPromise: state.completionPromise,
+    approvedPlanPath: state.approvedPlanPath,
+    reason: reason ?? null,
   };
 }
 
@@ -617,16 +665,18 @@ class StopDeepWorkRunInvocation extends BaseToolInvocation<
         break;
     }
 
-    if (this.params.reason?.trim()) {
-      state.rejectionReason = this.params.reason.trim();
+    const reason = this.params.reason?.trim();
+    if (reason) {
+      state.rejectionReason = reason;
     }
 
     await saveDeepWorkState(this.config, state);
+    const summary = buildDeepWorkSummaryDisplay(state, reason);
 
     return createSuccessResult(
-      JSON.stringify({ state: summarizeState(state) }),
-      `Deep Work status set to ${state.status}.`,
-      { state },
+      JSON.stringify({ state: summarizeState(state), summary }),
+      summary,
+      { state, summary },
     );
   }
 }

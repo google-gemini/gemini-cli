@@ -12,7 +12,10 @@ import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { saveDeepWorkState } from '../services/deepWorkState.js';
-import { StartDeepWorkRunTool } from './deep-work-tools.js';
+import {
+  StartDeepWorkRunTool,
+  StopDeepWorkRunTool,
+} from './deep-work-tools.js';
 
 describe('StartDeepWorkRunTool', () => {
   let tempRootDir: string;
@@ -83,5 +86,85 @@ describe('StartDeepWorkRunTool', () => {
     expect(result.returnDisplay).toContain(
       `Plan context: ${persistedPlanPath}.`,
     );
+  });
+
+  it('returns detailed Deep Work summary stats when run is completed', async () => {
+    const now = new Date();
+    const startedAt = new Date(now.getTime() - 125_000).toISOString();
+    await saveDeepWorkState(mockConfig as Config, {
+      runId: 'deep-work-run-2',
+      status: 'running',
+      prompt: 'Implement and verify multi-step auth migration.',
+      approvedPlanPath: '/tmp/deep-plan.md',
+      maxRuns: 8,
+      maxTimeMinutes: 90,
+      completionPromise: 'AUTH_MIGRATION_DONE',
+      requiredQuestions: [
+        {
+          id: 'scope',
+          question: 'What is the migration scope?',
+          required: true,
+          answer: 'Auth + session layer',
+          done: true,
+          updatedAt: startedAt,
+        },
+        {
+          id: 'fallback',
+          question: 'Rollback strategy?',
+          required: true,
+          answer: '',
+          done: false,
+          updatedAt: startedAt,
+        },
+      ],
+      iteration: 3,
+      createdAt: startedAt,
+      startedAt,
+      lastUpdatedAt: startedAt,
+      rejectionReason: null,
+      readinessReport: {
+        verdict: 'ready',
+        missingRequiredQuestionIds: [],
+        followUpQuestions: [],
+        blockingReasons: [],
+        singleShotRecommendation: false,
+        reviewer: 'heuristic',
+        generatedAt: startedAt,
+      },
+    });
+
+    const tool = new StopDeepWorkRunTool(
+      mockConfig as Config,
+      mockMessageBus as unknown as MessageBus,
+    );
+
+    const result = await tool
+      .build({ mode: 'completed' })
+      .execute(new AbortController().signal);
+
+    expect(typeof result.returnDisplay).toBe('object');
+    if (
+      typeof result.returnDisplay !== 'object' ||
+      !result.returnDisplay ||
+      !('type' in result.returnDisplay) ||
+      result.returnDisplay.type !== 'deep_work_summary'
+    ) {
+      return;
+    }
+
+    expect(result.returnDisplay).toMatchObject({
+      type: 'deep_work_summary',
+      status: 'completed',
+      runId: 'deep-work-run-2',
+      executionCount: 3,
+      maxRuns: 8,
+      maxTimeMinutes: 90,
+      answeredRequiredQuestions: 1,
+      totalRequiredQuestions: 2,
+      readinessVerdict: 'ready',
+      completionPromise: 'AUTH_MIGRATION_DONE',
+      approvedPlanPath: '/tmp/deep-plan.md',
+    });
+    expect(result.returnDisplay.elapsedSeconds).toBeGreaterThan(0);
   });
 });

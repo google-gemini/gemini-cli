@@ -1167,6 +1167,27 @@ function toToolCallContent(toolResult: ToolResult): acp.ToolCallContent | null {
           newText: toolResult.returnDisplay.newContent,
         };
       }
+      if (
+        'type' in toolResult.returnDisplay &&
+        toolResult.returnDisplay.type === 'deep_work_summary'
+      ) {
+        const summary = toolResult.returnDisplay;
+        const elapsed =
+          typeof summary.elapsedSeconds === 'number'
+            ? `${summary.elapsedSeconds}s`
+            : 'n/a';
+        const text = [
+          `Deep Work summary (${summary.status})`,
+          `Executions: ${summary.executionCount}/${summary.maxRuns}`,
+          `Required context: ${summary.answeredRequiredQuestions}/${summary.totalRequiredQuestions}`,
+          `Elapsed: ${elapsed} / ${summary.maxTimeMinutes}m`,
+          `Readiness: ${summary.readinessVerdict ?? 'n/a'}`,
+        ].join('\n');
+        return {
+          type: 'content',
+          content: { type: 'text', text },
+        };
+      }
       return null;
     }
   } else {
