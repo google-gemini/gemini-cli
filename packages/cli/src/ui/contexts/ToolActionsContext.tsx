@@ -18,7 +18,6 @@ import {
   MessageBusType,
   type Config,
   type ToolConfirmationPayload,
-  type ToolCallConfirmationDetails,
   debugLogger,
 } from '@google/gemini-cli-core';
 import type { IndividualToolCallDisplay } from '../types.js';
@@ -113,8 +112,7 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
         await ideClient?.resolveDiffFromCli(details.filePath, cliOutcome);
       }
 
-      // 2. Dispatch
-      // PATH A: Event Bus (Modern)
+      // 2. Dispatch via Event Bus
       if (tool.correlationId) {
         await config.getMessageBus().publish({
           type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
@@ -127,20 +125,7 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
         return;
       }
 
-      // PATH B: Legacy Callback (Adapter or Old Scheduler)
-      if (
-        details &&
-        'onConfirm' in details &&
-        typeof details.onConfirm === 'function'
-      ) {
-        await (details as ToolCallConfirmationDetails).onConfirm(
-          outcome,
-          payload,
-        );
-        return;
-      }
-
-      debugLogger.warn(`ToolActions: No confirmation mechanism for ${callId}`);
+      debugLogger.warn(`ToolActions: No correlationId for ${callId}`);
     },
     [config, ideClient, toolCalls, isDiffingEnabled],
   );
