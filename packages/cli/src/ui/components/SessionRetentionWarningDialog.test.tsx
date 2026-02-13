@@ -43,16 +43,17 @@ describe('SessionRetentionWarningDialog', () => {
     expect(lastFrame()).toContain('No sessions will be deleted at this time');
   });
 
-  it('renders correctly with 0 sessions to delete', () => {
+  it('handles pluralization correctly for 1 session', () => {
     const { lastFrame } = renderWithProviders(
       <SessionRetentionWarningDialog
         onKeep90Days={vi.fn()}
         onKeep30Days={vi.fn()}
-        sessionsToDeleteCount={0}
+        sessionsToDeleteCount={1}
       />,
     );
 
-    expect(lastFrame()).toContain('No sessions will be deleted immediately');
+    expect(lastFrame()).toContain('1 session will be deleted immediately');
+    expect(lastFrame()).not.toContain('sessions will be deleted immediately');
   });
 
   it('defaults to "Keep for 90 days" when there are sessions to delete', async () => {
@@ -74,28 +75,6 @@ describe('SessionRetentionWarningDialog', () => {
     await waitFor(() => {
       expect(onKeep90Days).toHaveBeenCalled();
       expect(onKeep30Days).not.toHaveBeenCalled();
-    });
-  });
-
-  it('defaults to "Keep for 30 days" when there are NO sessions to delete', async () => {
-    const onKeep90Days = vi.fn();
-    const onKeep30Days = vi.fn();
-
-    const { stdin } = renderWithProviders(
-      <SessionRetentionWarningDialog
-        onKeep90Days={onKeep90Days}
-        onKeep30Days={onKeep30Days}
-        sessionsToDeleteCount={0}
-      />,
-    );
-
-    // Initial selection should be "Keep for 30 days" (index 0) because count === 0
-    // Pressing Enter immediately should select it.
-    writeKey(stdin, '\r');
-
-    await waitFor(() => {
-      expect(onKeep30Days).toHaveBeenCalled();
-      expect(onKeep90Days).not.toHaveBeenCalled();
     });
   });
 

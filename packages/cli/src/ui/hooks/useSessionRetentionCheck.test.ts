@@ -40,6 +40,32 @@ describe('useSessionRetentionCheck', () => {
     vi.restoreAllMocks();
   });
 
+  it('should show warning if enabled is true but maxAge is undefined', async () => {
+    const settings = {
+      general: {
+        sessionRetention: {
+          enabled: true,
+          maxAge: undefined,
+          warningAcknowledged: false,
+        },
+      },
+    } as unknown as Settings;
+
+    mockGetAllSessionFiles.mockResolvedValue(['session1.json']);
+    mockIdentifySessionsToDelete.mockResolvedValue(['session1.json']);
+
+    const { result } = renderHook(() =>
+      useSessionRetentionCheck(mockConfig, settings),
+    );
+
+    await waitFor(() => {
+      expect(result.current.checkComplete).toBe(true);
+      expect(result.current.shouldShowWarning).toBe(true);
+      expect(mockGetAllSessionFiles).toHaveBeenCalled();
+      expect(mockIdentifySessionsToDelete).toHaveBeenCalled();
+    });
+  });
+
   it('should not show warning if warningAcknowledged is true', async () => {
     const settings = {
       general: {
@@ -109,6 +135,32 @@ describe('useSessionRetentionCheck', () => {
       expect(result.current.sessionsToDeleteCount).toBe(1);
       expect(mockGetAllSessionFiles).toHaveBeenCalled();
       expect(mockIdentifySessionsToDelete).toHaveBeenCalled();
+    });
+  });
+
+  it('should call onAutoEnable if no sessions to delete and currently disabled', async () => {
+    const settings = {
+      general: {
+        sessionRetention: {
+          enabled: false,
+          warningAcknowledged: false,
+        },
+      },
+    } as unknown as Settings;
+
+    mockGetAllSessionFiles.mockResolvedValue(['session1.json']);
+    mockIdentifySessionsToDelete.mockResolvedValue([]); // 0 sessions to delete
+
+    const onAutoEnable = vi.fn();
+
+    const { result } = renderHook(() =>
+      useSessionRetentionCheck(mockConfig, settings, onAutoEnable),
+    );
+
+    await waitFor(() => {
+      expect(result.current.checkComplete).toBe(true);
+      expect(result.current.shouldShowWarning).toBe(false);
+      expect(onAutoEnable).toHaveBeenCalled();
     });
   });
 

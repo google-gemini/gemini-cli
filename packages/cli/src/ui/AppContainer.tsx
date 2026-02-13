@@ -1332,11 +1332,23 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
 
+  const handleAutoEnableRetention = useCallback(() => {
+    settings.setValue(SettingScope.User, 'general.sessionRetention', {
+      ...(settings.merged.general.sessionRetention ?? {}),
+      enabled: true,
+      maxAge: '60d',
+    });
+  }, [settings]);
+
   const {
     shouldShowWarning: shouldShowRetentionWarning,
     checkComplete: retentionCheckComplete,
     sessionsToDeleteCount,
-  } = useSessionRetentionCheck(config, settings.merged);
+  } = useSessionRetentionCheck(
+    config,
+    settings.merged,
+    handleAutoEnableRetention,
+  );
 
   const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 

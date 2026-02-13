@@ -11,7 +11,11 @@ import { getAllSessionFiles } from '../../utils/sessionUtils.js';
 import { identifySessionsToDelete } from '../../utils/sessionCleanup.js';
 import path from 'node:path';
 
-export function useSessionRetentionCheck(config: Config, settings: Settings) {
+export function useSessionRetentionCheck(
+  config: Config,
+  settings: Settings,
+  onAutoEnable?: () => void,
+) {
   const [shouldShowWarning, setShouldShowWarning] = useState(false);
   const [sessionsToDeleteCount, setSessionsToDeleteCount] = useState(0);
   const [checkComplete, setCheckComplete] = useState(false);
@@ -20,7 +24,8 @@ export function useSessionRetentionCheck(config: Config, settings: Settings) {
     // If warning already acknowledged or retention already enabled, skip check
     if (
       settings.general?.sessionRetention?.warningAcknowledged ||
-      settings.general?.sessionRetention?.enabled
+      (settings.general?.sessionRetention?.enabled &&
+        settings.general?.sessionRetention?.maxAge !== undefined)
     ) {
       setShouldShowWarning(false);
       setCheckComplete(true);
@@ -46,6 +51,13 @@ export function useSessionRetentionCheck(config: Config, settings: Settings) {
           setShouldShowWarning(true);
         } else {
           setShouldShowWarning(false);
+          // If no sessions to delete, safe to auto-enable retention
+          if (
+            !settings.general?.sessionRetention?.enabled ||
+            settings.general?.sessionRetention?.maxAge === undefined
+          ) {
+            onAutoEnable?.();
+          }
         }
       } catch {
         // If we can't check sessions, default to not showing the warning to be safe
@@ -57,7 +69,7 @@ export function useSessionRetentionCheck(config: Config, settings: Settings) {
 
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     checkSessions();
-  }, [config, settings.general?.sessionRetention]);
+  }, [config, settings.general?.sessionRetention, onAutoEnable]);
 
   return { shouldShowWarning, checkComplete, sessionsToDeleteCount };
 }

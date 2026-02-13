@@ -98,7 +98,7 @@ export const DialogManager = ({
     );
   }, [settings]);
 
-  if (shouldShowRetentionWarning) {
+  if (shouldShowRetentionWarning && sessionsToDeleteCount !== undefined) {
     return (
       <SessionRetentionWarningDialog
         onKeep90Days={handleKeep90Days}
