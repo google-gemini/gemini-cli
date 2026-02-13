@@ -19,7 +19,9 @@ export function useRepeatedKeyPress(options: UseRepeatedKeyPressOptions) {
 
   // To avoid stale closures
   const optionsRef = useRef(options);
-  optionsRef.current = options;
+  useEffect(() => {
+    optionsRef.current = options;
+  }, [options]);
 
   const resetCount = useCallback(() => {
     if (timerRef.current) {
@@ -38,8 +40,6 @@ export function useRepeatedKeyPress(options: UseRepeatedKeyPressOptions) {
     pressCountRef.current = newCount;
     setPressCount(newCount);
 
-    optionsRef.current.onRepeat?.(newCount);
-
     if (timerRef.current) {
       clearTimeout(timerRef.current);
     }
@@ -50,6 +50,8 @@ export function useRepeatedKeyPress(options: UseRepeatedKeyPressOptions) {
       timerRef.current = null;
       optionsRef.current.onReset?.();
     }, optionsRef.current.windowMs);
+
+    optionsRef.current.onRepeat?.(newCount);
 
     return newCount;
   }, []);

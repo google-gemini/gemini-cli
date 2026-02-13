@@ -43,10 +43,12 @@ export function useVisibilityToggle() {
 
   const toggleCleanUiDetailsVisible = useCallback(() => {
     clearModeRevealTimeout();
-    const nextVisible = !cleanUiDetailsPinnedRef.current;
-    cleanUiDetailsPinnedRef.current = nextVisible;
-    persistFocusUiPreference(nextVisible);
-    setCleanUiDetailsVisibleState(nextVisible);
+    setCleanUiDetailsVisibleState((visible) => {
+      const nextVisible = !visible;
+      cleanUiDetailsPinnedRef.current = nextVisible;
+      persistFocusUiPreference(nextVisible);
+      return nextVisible;
+    });
   }, [clearModeRevealTimeout, persistFocusUiPreference]);
 
   const revealCleanUiDetailsTemporarily = useCallback(

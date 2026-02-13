@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
-import { ApprovalMode, CoreToolCallStatus } from '@google/gemini-cli-core';
+import { ApprovalMode, checkExhaustive, CoreToolCallStatus } from '@google/gemini-cli-core';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StatusDisplay } from './StatusDisplay.js';
 import { ToastDisplay, shouldShowToast } from './ToastDisplay.js';
@@ -122,7 +122,11 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     case ApprovalMode.AUTO_EDIT:
       modeBleedThrough = { text: 'auto edit', color: theme.status.warning };
       break;
+    case ApprovalMode.DEFAULT:
+      modeBleedThrough = null;
+      break;
     default:
+      checkExhaustive(showApprovalModeIndicator);
       modeBleedThrough = null;
       break;
   }

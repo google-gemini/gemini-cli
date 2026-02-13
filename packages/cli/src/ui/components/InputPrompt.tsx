@@ -313,7 +313,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     }
   }, [showEscapePrompt, onEscapePromptChange]);
 
-  // Clear escape prompt timer on unmount
+  // Clear paste timeout on unmount
   useEffect(
     () => () => {
       if (pasteTimeoutRef.current) {
