@@ -1516,9 +1516,15 @@ function JsonViewer({ content, t }: { content: string; t: ThemeColors }) {
   const safeContent = content || '';
   if (safeContent.includes('data:')) {
     const chunks = safeContent
-      .split('\n')
-      .filter((l) => l.trim().startsWith('data:'))
-      .map((l, i) => ({ index: i + 1, jsonStr: l.trim().substring(5).trim() }))
+      .split(/\n\s*\n/)
+      .map((eventBlock, i) => ({
+        index: i + 1,
+        jsonStr: eventBlock
+          .split('\n')
+          .filter((line) => line.trim().startsWith('data:'))
+          .map((line) => line.trim().substring(5).trim())
+          .join(''),
+      }))
       .filter((c) => c.jsonStr);
     if (chunks.length > 0) {
       return (
