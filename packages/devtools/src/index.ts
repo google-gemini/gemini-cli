@@ -54,6 +54,8 @@ export class DevTools extends EventEmitter {
 
   private constructor() {
     super();
+    // Each SSE client adds 3 listeners; raise the limit to avoid warnings
+    this.setMaxListeners(50);
   }
 
   static getInstance(): DevTools {
@@ -157,13 +159,22 @@ export class DevTools extends EventEmitter {
   }
 
   start(): Promise<string> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       if (this.server) {
         resolve(this.getUrl());
         return;
       }
       this.server = http.createServer((req, res) => {
-        res.setHeader('Access-Control-Allow-Origin', '*');
+        // Only allow same-origin requests — the client is served from this
+        // server so cross-origin access is unnecessary and would let arbitrary
+        // websites exfiltrate logs (which may contain API keys/headers).
+        const origin = req.headers.origin;
+        if (origin) {
+          const allowed = `http://127.0.0.1:${this.port}`;
+          if (origin === allowed) {
+            res.setHeader('Access-Control-Allow-Origin', allowed);
+          }
+        }
 
         // API routes
         if (req.url === '/events') {
@@ -219,6 +230,11 @@ export class DevTools extends EventEmitter {
           e.code === 'EADDRINUSE'
         ) {
           if (this.port - DevTools.DEFAULT_PORT >= DevTools.MAX_PORT_RETRIES) {
+            reject(
+              new Error(
+                `DevTools: all ports ${DevTools.DEFAULT_PORT}–${this.port} in use`,
+              ),
+            );
             return;
           }
           this.port++;
