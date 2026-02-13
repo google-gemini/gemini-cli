@@ -132,6 +132,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable update notification prompts.
   - **Default:** `true`
 
+- **`general.enableMacOsNotifications`** (boolean):
+  - **Description:** Enable macOS native notifications for action-required
+    prompts and session completion. macOS only.
+  - **Default:** `true`
+
 - **`general.checkpointing.enabled`** (boolean):
   - **Description:** Enable session checkpointing for recovery
   - **Default:** `false`

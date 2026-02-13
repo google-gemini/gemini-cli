@@ -20,6 +20,7 @@ import { cleanup } from 'ink-testing-library';
 import { act, useContext, type ReactElement } from 'react';
 import { AppContainer } from './AppContainer.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
+import { ToolCallStatus } from './types.js';
 import { type TrackedToolCall } from './hooks/useToolScheduler.js';
 import {
   type Config,
@@ -48,6 +49,14 @@ const mockIdeClient = vi.hoisted(() => ({
 // Mock stdout
 const mocks = vi.hoisted(() => ({
   mockStdout: { write: vi.fn() },
+}));
+const macOsNotificationsMocks = vi.hoisted(() => ({
+  notifyMacOs: vi.fn().mockResolvedValue(true),
+  buildMacNotificationContent: vi.fn((event) => ({
+    title: 'Mock Notification',
+    subtitle: 'Mock Subtitle',
+    body: JSON.stringify(event),
+  })),
 }));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -165,6 +174,10 @@ vi.mock('./hooks/useShellInactivityStatus.js', () => ({
     inactivityStatus: 'none',
   })),
 }));
+vi.mock('../utils/macosNotifications.js', () => ({
+  notifyMacOs: macOsNotificationsMocks.notifyMacOs,
+  buildMacNotificationContent: macOsNotificationsMocks.buildMacNotificationContent,
+}));
 vi.mock('./hooks/useTerminalTheme.js', () => ({
   useTerminalTheme: vi.fn(),
 }));
@@ -172,6 +185,7 @@ vi.mock('./hooks/useTerminalTheme.js', () => ({
 import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
+import { useFocus } from './hooks/useFocus.js';
 
 // Mock external utilities
 vi.mock('../utils/events.js');
@@ -280,6 +294,7 @@ describe('AppContainer State Management', () => {
   const mockedUseHookDisplayState = useHookDisplayState as Mock;
   const mockedUseTerminalTheme = useTerminalTheme as Mock;
   const mockedUseShellInactivityStatus = useShellInactivityStatus as Mock;
+  const mockedUseFocus = useFocus as Mock;
 
   const DEFAULT_GEMINI_STREAM_MOCK = {
     streamingState: 'idle',
@@ -417,6 +432,7 @@ describe('AppContainer State Management', () => {
       shouldShowFocusHint: false,
       inactivityStatus: 'none',
     });
+    mockedUseFocus.mockReturnValue(true);
 
     // Mock Config
     mockConfig = makeFakeConfig();
@@ -525,6 +541,95 @@ describe('AppContainer State Management', () => {
   });
 
   describe('State Initialization', () => {
+    it('sends a macOS notification when confirmation is pending and terminal is unfocused', async () => {
+      mockedUseFocus.mockReturnValue(false);
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        pendingHistoryItems: [
+          {
+            type: 'tool_group',
+            tools: [
+              {
+                callId: 'call-1',
+                name: 'run_shell_command',
+                description: 'Run command',
+                resultDisplay: undefined,
+                status: ToolCallStatus.Confirming,
+                confirmationDetails: {
+                  type: 'exec',
+                  title: 'Run shell command',
+                  command: 'ls',
+                  rootCommand: 'ls',
+                  rootCommands: ['ls'],
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      let unmount: (() => void) | undefined;
+      await act(async () => {
+        const rendered = renderAppContainer();
+        unmount = rendered.unmount;
+      });
+
+      await waitFor(() =>
+        expect(macOsNotificationsMocks.notifyMacOs).toHaveBeenCalled(),
+      );
+      expect(
+        macOsNotificationsMocks.buildMacNotificationContent,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'attention',
+        }),
+      );
+
+      await act(async () => {
+        unmount?.();
+      });
+    });
+
+    it('does not send attention notification when terminal is focused', async () => {
+      mockedUseFocus.mockReturnValue(true);
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        pendingHistoryItems: [
+          {
+            type: 'tool_group',
+            tools: [
+              {
+                callId: 'call-2',
+                name: 'run_shell_command',
+                description: 'Run command',
+                resultDisplay: undefined,
+                status: ToolCallStatus.Confirming,
+                confirmationDetails: {
+                  type: 'exec',
+                  title: 'Run shell command',
+                  command: 'ls',
+                  rootCommand: 'ls',
+                  rootCommands: ['ls'],
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      let unmount: (() => void) | undefined;
+      await act(async () => {
+        const rendered = renderAppContainer();
+        unmount = rendered.unmount;
+      });
+
+      expect(macOsNotificationsMocks.notifyMacOs).not.toHaveBeenCalled();
+
+      await act(async () => {
+        unmount?.();
+      });
+    });
+
     it('initializes with theme error from initialization result', async () => {
       const initResultWithError = {
         ...mockInitResult,

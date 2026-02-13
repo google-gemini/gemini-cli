@@ -56,6 +56,19 @@ vi.mock('./nonInteractiveCli.js', () => ({
   runNonInteractive: runNonInteractiveSpy,
 }));
 
+const macOsNotificationMocks = vi.hoisted(() => ({
+  notifyMacOs: vi.fn().mockResolvedValue(true),
+  buildMacNotificationContent: vi.fn(() => ({
+    title: 'Session complete',
+    body: 'done',
+    subtitle: 'Run finished',
+  })),
+}));
+vi.mock('./utils/macosNotifications.js', () => ({
+  notifyMacOs: macOsNotificationMocks.notifyMacOs,
+  buildMacNotificationContent: macOsNotificationMocks.buildMacNotificationContent,
+}));
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
@@ -837,6 +850,10 @@ describe('gemini.tsx main function kitty protocol', () => {
     expect(runNonInteractive).toHaveBeenCalled();
     const callArgs = vi.mocked(runNonInteractive).mock.calls[0][0];
     expect(callArgs.input).toBe('stdin-data\n\ntest-question');
+    expect(macOsNotificationMocks.buildMacNotificationContent).toHaveBeenCalledWith(
+      { type: 'session_complete' },
+    );
+    expect(macOsNotificationMocks.notifyMacOs).toHaveBeenCalled();
     expect(processExitSpy).toHaveBeenCalledWith(0);
     processExitSpy.mockRestore();
   });
