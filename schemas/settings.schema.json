@@ -84,8 +84,8 @@
         "enableMacOsNotifications": {
           "title": "Enable macOS Notifications",
           "description": "Enable macOS native notifications for action-required prompts and session completion. macOS only.",
-          "markdownDescription": "Enable macOS native notifications for action-required prompts and session completion. macOS only.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
-          "default": true,
+          "markdownDescription": "Enable macOS native notifications for action-required prompts and session completion. macOS only.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
           "type": "boolean"
         },
         "checkpointing": {

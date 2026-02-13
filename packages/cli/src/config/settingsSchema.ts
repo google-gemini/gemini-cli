@@ -241,7 +241,7 @@ const SETTINGS_SCHEMA = {
         label: 'Enable macOS Notifications',
         category: 'General',
         requiresRestart: false,
-        default: true,
+        default: false,
         description:
           'Enable macOS native notifications for action-required prompts and session completion. macOS only.',
         showInDialog: true,

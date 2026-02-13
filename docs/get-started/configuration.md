@@ -135,7 +135,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`general.enableMacOsNotifications`** (boolean):
   - **Description:** Enable macOS native notifications for action-required
     prompts and session completion. macOS only.
-  - **Default:** `true`
+  - **Default:** `false`
 
 - **`general.checkpointing.enabled`** (boolean):
   - **Description:** Enable session checkpointing for recovery

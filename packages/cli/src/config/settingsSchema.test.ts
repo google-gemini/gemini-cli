@@ -359,7 +359,7 @@ describe('SettingsSchema', () => {
       expect(setting).toBeDefined();
       expect(setting.type).toBe('boolean');
       expect(setting.category).toBe('General');
-      expect(setting.default).toBe(true);
+      expect(setting.default).toBe(false);
       expect(setting.requiresRestart).toBe(false);
       expect(setting.showInDialog).toBe(true);
     });

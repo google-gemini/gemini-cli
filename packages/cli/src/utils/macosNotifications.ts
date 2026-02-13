@@ -100,7 +100,7 @@ export function buildMacNotificationContent(
 export function isMacOsNotificationEnabled(settings: LoadedSettings): boolean {
   return (
     process.platform === 'darwin' &&
-    settings.merged.general.enableMacOsNotifications !== false
+    settings.merged.general.enableMacOsNotifications === true
   );
 }
 
