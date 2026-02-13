@@ -5,6 +5,7 @@
  */
 
 import { spawn } from 'node:child_process';
+import os from 'node:os';
 import { RELAUNCH_EXIT_CODE } from './processUtils.js';
 import {
   writeToStderr,
@@ -12,6 +13,11 @@ import {
 } from '@google/gemini-cli-core';
 
 export async function relaunchOnExitCode(runner: () => Promise<number>) {
+  if (os.platform() === 'android') {
+    const exitCode = await runner();
+    process.exit(exitCode);
+  }
+
   while (true) {
     try {
       const exitCode = await runner();

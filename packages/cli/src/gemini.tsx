@@ -268,10 +268,10 @@ export async function startInteractiveUI(
   const instance = render(
     process.env['DEBUG'] ? (
       <React.StrictMode>
-        <AppWrapper />
+        <AppWrapper key={os.platform() === 'android' ? 'android-root' : undefined} />
       </React.StrictMode>
     ) : (
-      <AppWrapper />
+      <AppWrapper key={os.platform() === 'android' ? 'android-root' : undefined} />
     ),
     {
       stdout: inkStdout,

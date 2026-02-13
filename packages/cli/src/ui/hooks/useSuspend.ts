@@ -113,7 +113,9 @@ export function useSuspend({
           // Give a tick for resize to process, then trigger remount
           setImmediate(() => {
             refreshStatic();
-            setForceRerenderKey((prev) => prev + 1);
+            if (process.platform !== 'android') {
+              setForceRerenderKey((prev) => prev + 1);
+            }
           });
         } finally {
           if (onResumeHandlerRef.current === onResume) {
