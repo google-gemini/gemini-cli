@@ -40,6 +40,33 @@ exports[`ToolConfirmationQueue > does not render expansion hint when constrainHe
 ╰──────────────────────────────────────────────────────────────────────────────╯"
 `;
 
+exports[`ToolConfirmationQueue > renders AskUser tool confirmation with Success color 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ Answer Questions                                                             │
+│                                                                              │
+│ Review your answers:                                                         │
+│                                                                              │
+│                                                                              │
+│ Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel              │
+╰──────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`ToolConfirmationQueue > renders ExitPlanMode tool confirmation with Success color 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ Ready to start implementation?                                               │
+│                                                                              │
+│ Plan content goes here                                                       │
+│                                                                              │
+│ ● 1.  Yes, automatically accept edits                                        │
+│       Approves plan and allows tools to run automatically                    │
+│   2.  Yes, manually accept edits                                             │
+│       Approves plan but requires confirmation for each tool                  │
+│   3.  Type your feedback...                                                  │
+│                                                                              │
+│ Enter to select · ↑/↓ to navigate · Esc to cancel                            │
+╰──────────────────────────────────────────────────────────────────────────────╯"
+`;
+
 exports[`ToolConfirmationQueue > renders expansion hint when content is long and constrained 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ Action Required                                                              │

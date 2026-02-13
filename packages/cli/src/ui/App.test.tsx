@@ -66,6 +66,7 @@ describe('App', () => {
 
   const mockUIState: Partial<UIState> = {
     streamingState: StreamingState.Idle,
+    cleanUiDetailsVisible: true,
     quittingMessages: null,
     dialogsVisible: false,
     mainControlsRef: {

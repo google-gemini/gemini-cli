@@ -14,7 +14,7 @@ import { ShellToolMessage } from './ShellToolMessage.js';
 import { theme } from '../../semantic-colors.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
 import { isShellTool, isThisShellFocused } from './ToolShared.js';
-import { ASK_USER_DISPLAY_NAME } from '@google/gemini-cli-core';
+import { shouldHideAskUserTool } from '@google/gemini-cli-core';
 import { ShowMoreLines } from '../ShowMoreLines.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
 
@@ -30,15 +30,6 @@ interface ToolGroupMessageProps {
   borderBottom?: boolean;
 }
 
-// Helper to identify Ask User tools that are in progress (have their own dialog UI)
-const isAskUserInProgress = (t: IndividualToolCallDisplay): boolean =>
-  t.name === ASK_USER_DISPLAY_NAME &&
-  [
-    ToolCallStatus.Pending,
-    ToolCallStatus.Executing,
-    ToolCallStatus.Confirming,
-  ].includes(t.status);
-
 // Main component renders the border and maps the tools using ToolMessage
 const TOOL_MESSAGE_HORIZONTAL_MARGIN = 4;
 
@@ -51,9 +42,12 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   borderTop: borderTopOverride,
   borderBottom: borderBottomOverride,
 }) => {
-  // Filter out in-progress Ask User tools (they have their own AskUserDialog UI)
+  // Filter out Ask User tools that should be hidden (e.g. in-progress or errors without result)
   const toolCalls = useMemo(
-    () => allToolCalls.filter((t) => !isAskUserInProgress(t)),
+    () =>
+      allToolCalls.filter(
+        (t) => !shouldHideAskUserTool(t.name, t.status, !!t.resultDisplay),
+      ),
     [allToolCalls],
   );
 
