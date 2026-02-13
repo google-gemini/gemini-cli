@@ -496,6 +496,7 @@ export class CoreToolScheduler {
         );
       }
       const requestsToProcess = Array.isArray(request) ? request : [request];
+      const currentApprovalMode = this.config.getApprovalMode();
       this.completedToolCallsForBatch = [];
 
       const newToolCalls: ToolCall[] = requestsToProcess.map(
@@ -518,6 +519,7 @@ export class CoreToolScheduler {
                 ToolErrorType.TOOL_NOT_REGISTERED,
               ),
               durationMs: 0,
+              approvalMode: currentApprovalMode,
             };
           }
 
@@ -536,6 +538,7 @@ export class CoreToolScheduler {
                 ToolErrorType.INVALID_TOOL_PARAMS,
               ),
               durationMs: 0,
+              approvalMode: currentApprovalMode,
             };
           }
 
@@ -545,6 +548,7 @@ export class CoreToolScheduler {
             tool: toolInstance,
             invocation: invocationOrError,
             startTime: Date.now(),
+            approvalMode: currentApprovalMode,
           };
         },
       );
