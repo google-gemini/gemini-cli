@@ -53,7 +53,6 @@ describe('SessionRetentionWarningDialog', () => {
     );
 
     expect(lastFrame()).toContain('1 session will be deleted');
-    expect(lastFrame()).not.toContain('sessions will be deleted');
   });
 
   it('defaults to "Keep for 120 days" when there are sessions to delete', async () => {

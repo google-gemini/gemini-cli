@@ -297,7 +297,7 @@ const SETTINGS_SCHEMA = {
             requiresRestart: false,
             default: undefined as string | undefined,
             description:
-              'Maximum age of sessions to keep (e.g., "30d", "7d", "24h", "1w")',
+              'Automatically delete chats older than this time period (e.g., "30d", "7d", "24h", "1w")',
             showInDialog: true,
           },
           maxCount: {

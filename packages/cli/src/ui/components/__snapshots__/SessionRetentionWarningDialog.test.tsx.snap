@@ -10,8 +10,8 @@ exports[`SessionRetentionWarningDialog > should match snapshot 1`] = `
 │                                                                                                                      │
 │                                                                                                                      │
 │   1. Keep for 30 days (Recommended)                                                                                  │
-│      123 sessions will be deleted immediately                                                                        │
-│ ● 2. Keep for 90 days                                                                                                │
+│      123 sessions will be deleted                                                                                    │
+│ ● 2. Keep for 120 days                                                                                               │
 │      No sessions will be deleted at this time                                                                        │
 │                                                                                                                      │
 │ Set a custom limit /settings and change "Keep chat history".                                                         │
