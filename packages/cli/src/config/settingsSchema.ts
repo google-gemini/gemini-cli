@@ -571,6 +571,17 @@ const SETTINGS_SCHEMA = {
         description: 'Settings for the footer.',
         showInDialog: false,
         properties: {
+          items: {
+            type: 'array',
+            label: 'Footer Items',
+            category: 'UI',
+            requiresRestart: false,
+            default: undefined as string[] | undefined,
+            description:
+              'List of item IDs to display in the footer. Rendered in order',
+            showInDialog: false,
+            items: { type: 'string' },
+          },
           hideCWD: {
             type: 'boolean',
             label: 'Hide CWD',
