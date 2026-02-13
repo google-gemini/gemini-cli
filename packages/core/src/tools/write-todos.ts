@@ -14,6 +14,8 @@ import {
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { WRITE_TODOS_TOOL_NAME } from './tool-names.js';
+import { WRITE_TODOS_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 const TODO_STATUSES = [
   'pending',
@@ -149,41 +151,17 @@ export class WriteTodosTool extends BaseDeclarativeTool<
     super(
       WriteTodosTool.Name,
       'WriteTodos',
-      WRITE_TODOS_DESCRIPTION,
+      WRITE_TODOS_DEFINITION.base.description!,
       Kind.Other,
-      {
-        type: 'object',
-        properties: {
-          todos: {
-            type: 'array',
-            description:
-              'The complete list of todo items. This will replace the existing list.',
-            items: {
-              type: 'object',
-              description: 'A single todo item.',
-              properties: {
-                description: {
-                  type: 'string',
-                  description: 'The description of the task.',
-                },
-                status: {
-                  type: 'string',
-                  description: 'The current status of the task.',
-                  enum: TODO_STATUSES,
-                },
-              },
-              required: ['description', 'status'],
-              additionalProperties: false,
-            },
-          },
-        },
-        required: ['todos'],
-        additionalProperties: false,
-      },
+      WRITE_TODOS_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
     );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(WRITE_TODOS_DEFINITION, modelId);
   }
 
   override get schema() {

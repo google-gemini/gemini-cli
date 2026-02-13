@@ -19,6 +19,9 @@ export const WEB_SEARCH_TOOL_NAME = 'google_web_search';
 export const WEB_FETCH_TOOL_NAME = 'web_fetch';
 export const READ_MANY_FILES_TOOL_NAME = 'read_many_files';
 export const MEMORY_TOOL_NAME = 'save_memory';
+export const WRITE_TODOS_TOOL_NAME = 'write_todos';
+export const GET_INTERNAL_DOCS_TOOL_NAME = 'get_internal_docs';
+export const ASK_USER_TOOL_NAME = 'ask_user';
 
 // ============================================================================
 // READ_FILE TOOL
@@ -240,6 +243,72 @@ export const WEB_SEARCH_DEFINITION: ToolDefinition = {
 };
 
 // ============================================================================
+// EDIT TOOL
+// ============================================================================
+
+export const EDIT_DEFINITION: ToolDefinition = {
+  base: {
+    name: EDIT_TOOL_NAME,
+    description: `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool to examine the file's current content before attempting a text replacement.
+      
+      The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
+      
+      Expectation for required parameters:
+      1. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
+      2. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic and that \`old_string\` and \`new_string\` are different.
+      3. \`instruction\` is the detailed instruction of what needs to be changed. It is important to Make it specific and detailed so developers or large language models can understand what needs to be changed and perform the changes on their own if necessary. 
+      4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
+      **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.
+      5. Prefer to break down complex and long changes into multiple smaller atomic calls to this tool. Always check the content of the file after changes or not finding a string to match.
+      **Multiple replacements:** Set \`expected_replacements\` to the number of occurrences you want to replace. The tool will replace ALL occurrences that match \`old_string\` exactly. Ensure the number of replacements matches your expectation.`,
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        file_path: {
+          description: 'The path to the file to modify.',
+          type: 'string',
+        },
+        instruction: {
+          description: `A clear, semantic instruction for the code change, acting as a high-quality prompt for an expert LLM assistant. It must be self-contained and explain the goal of the change.
+
+A good instruction should concisely answer:
+1.  WHY is the change needed? (e.g., "To fix a bug where users can be null...")
+2.  WHERE should the change happen? (e.g., "...in the 'renderUserProfile' function...")
+3.  WHAT is the high-level change? (e.g., "...add a null check for the 'user' object...")
+4.  WHAT is the desired outcome? (e.g., "...so that it displays a loading spinner instead of crashing.")
+
+**GOOD Example:** "In the 'calculateTotal' function, correct the sales tax calculation by updating the 'taxRate' constant from 0.05 to 0.075 to reflect the new regional tax laws."
+
+**BAD Examples:**
+- "Change the text." (Too vague)
+- "Fix the bug." (Doesn't explain the bug or the fix)
+- "Replace the line with this new line." (Brittle, just repeats the other parameters)
+`,
+          type: 'string',
+        },
+        old_string: {
+          description:
+            'The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
+          type: 'string',
+        },
+        new_string: {
+          description:
+            'The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
+          type: 'string',
+        },
+        expected_replacements: {
+          type: 'number',
+          description:
+            'Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.',
+          minimum: 1,
+        },
+      },
+      required: ['file_path', 'instruction', 'old_string', 'new_string'],
+    },
+  },
+};
+
+// ============================================================================
 // WEB_FETCH TOOL
 // ============================================================================
 
@@ -338,72 +407,6 @@ Use this tool when the user's query implies needing the content of several files
 };
 
 // ============================================================================
-// EDIT TOOL
-// ============================================================================
-
-export const EDIT_DEFINITION: ToolDefinition = {
-  base: {
-    name: EDIT_TOOL_NAME,
-    description: `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool to examine the file's current content before attempting a text replacement.
-      
-      The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
-      
-      Expectation for required parameters:
-      1. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
-      2. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic and that \`old_string\` and \`new_string\` are different.
-      3. \`instruction\` is the detailed instruction of what needs to be changed. It is important to Make it specific and detailed so developers or large language models can understand what needs to be changed and perform the changes on their own if necessary. 
-      4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
-      **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.
-      5. Prefer to break down complex and long changes into multiple smaller atomic calls to this tool. Always check the content of the file after changes or not finding a string to match.
-      **Multiple replacements:** Set \`expected_replacements\` to the number of occurrences you want to replace. The tool will replace ALL occurrences that match \`old_string\` exactly. Ensure the number of replacements matches your expectation.`,
-    parametersJsonSchema: {
-      type: 'object',
-      properties: {
-        file_path: {
-          description: 'The path to the file to modify.',
-          type: 'string',
-        },
-        instruction: {
-          description: `A clear, semantic instruction for the code change, acting as a high-quality prompt for an expert LLM assistant. It must be self-contained and explain the goal of the change.
-
-A good instruction should concisely answer:
-1.  WHY is the change needed? (e.g., "To fix a bug where users can be null...")
-2.  WHERE should the change happen? (e.g., "...in the 'renderUserProfile' function...")
-3.  WHAT is the high-level change? (e.g., "...add a null check for the 'user' object...")
-4.  WHAT is the desired outcome? (e.g., "...so that it displays a loading spinner instead of crashing.")
-
-**GOOD Example:** "In the 'calculateTotal' function, correct the sales tax calculation by updating the 'taxRate' constant from 0.05 to 0.075 to reflect the new regional tax laws."
-
-**BAD Examples:**
-- "Change the text." (Too vague)
-- "Fix the bug." (Doesn't explain the bug or the fix)
-- "Replace the line with this new line." (Brittle, just repeats the other parameters)
-`,
-          type: 'string',
-        },
-        old_string: {
-          description:
-            'The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
-          type: 'string',
-        },
-        new_string: {
-          description:
-            'The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
-          type: 'string',
-        },
-        expected_replacements: {
-          type: 'number',
-          description:
-            'Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.',
-          minimum: 1,
-        },
-      },
-      required: ['file_path', 'instruction', 'old_string', 'new_string'],
-    },
-  },
-};
-
-// ============================================================================
 // MEMORY TOOL
 // ============================================================================
 
@@ -428,6 +431,208 @@ NEVER save workspace-specific context, local paths, or commands (e.g. "The entry
       },
       required: ['fact'],
       additionalProperties: false,
+    },
+  },
+};
+
+// ============================================================================
+// WRITE_TODOS TOOL
+// ============================================================================
+
+export const WRITE_TODOS_DEFINITION: ToolDefinition = {
+  base: {
+    name: WRITE_TODOS_TOOL_NAME,
+    description: `This tool can help you list out the current subtasks that are required to be completed for a given user request. The list of subtasks helps you keep track of the current task, organize complex queries and help ensure that you don't miss any steps. With this list, the user can also see the current progress you are making in executing a given task.
+
+Depending on the task complexity, you should first divide a given task into subtasks and then use this tool to list out the subtasks that are required to be completed for a given user request.
+Each of the subtasks should be clear and distinct. 
+
+Use this tool for complex queries that require multiple steps. If you find that the request is actually complex after you have started executing the user task, create a todo list and use it. If execution of the user task requires multiple steps, planning and generally is higher complexity than a simple Q&A, use this tool.
+
+DO NOT use this tool for simple tasks that can be completed in less than 2 steps. If the user query is simple and straightforward, do not use the tool. If you can respond with an answer in a single turn then this tool is not required.
+
+## Task state definitions
+
+- pending: Work has not begun on a given subtask.
+- in_progress: Marked just prior to beginning work on a given subtask. You should only have one subtask as in_progress at a time.
+- completed: Subtask was successfully completed with no errors or issues. If the subtask required more steps to complete, update the todo list with the subtasks. All steps should be identified as completed only when they are completed.
+- cancelled: As you update the todo list, some tasks are not required anymore due to the dynamic nature of the task. In this case, mark the subtasks as cancelled.
+
+
+## Methodology for using this tool
+1. Use this todo list as soon as you receive a user request based on the complexity of the task.
+2. Keep track of every subtask that you update the list with.
+3. Mark a subtask as in_progress before you begin working on it. You should only have one subtask as in_progress at a time.
+4. Update the subtask list as you proceed in executing the task. The subtask list is not static and should reflect your progress and current plans, which may evolve as you acquire new information.
+5. Mark a subtask as completed when you have completed it.
+6. Mark a subtask as cancelled if the subtask is no longer needed.
+7. You must update the todo list as soon as you start, stop or cancel a subtask. Don't batch or wait to update the todo list.
+
+
+## Examples of When to Use the Todo List
+
+<example>
+User request: Create a website with a React for creating fancy logos using gemini-2.5-flash-image
+
+ToDo list created by the agent:
+1. Initialize a new React project environment (e.g., using Vite).
+2. Design and build the core UI components: a text input (prompt field) for the logo description, selection controls for style parameters (if the API supports them), and an image preview area.
+3. Implement state management (e.g., React Context or Zustand) to manage the user's input prompt, the API loading status (pending, success, error), and the resulting image data.
+4. Create an API service module within the React app (using "fetch" or "axios") to securely format and send the prompt data via an HTTP POST request to the specified "gemini-2.5-flash-image" (Gemini model) endpoint.
+5. Implement asynchronous logic to handle the API call: show a loading indicator while the request is pending, retrieve the generated image (e.g., as a URL or base64 string) upon success, and display any errors.
+6. Display the returned "fancy logo" from the API response in the preview area component.
+7. Add functionality (e.g., a "Download" button) to allow the user to save the generated image file.
+8. Deploy the application to a web server or hosting platform.
+
+<reasoning>
+The agent used the todo list to break the task into distinct, manageable steps:
+1. Building an entire interactive web application from scratch is a highly complex, multi-stage process involving setup, UI development, logic integration, and deployment.
+2. The agent inferred the core functionality required for a "logo creator," such as UI controls for customization (Task 3) and an export feature (Task 7), which must be tracked as distinct goals.
+3. The agent rightly inferred the requirement of an API service model for interacting with the image model endpoint.
+</reasoning>
+</example>
+
+
+## Examples of When NOT to Use the Todo List
+
+<example>
+User request: Ensure that the test <test file> passes.
+
+Agent:
+<Goes into a loop of running the test, identifying errors, and updating the code until the test passes.>
+
+<reasoning>
+The agent did not use the todo list because this task could be completed by a tight loop of execute test->edit->execute test.
+</reasoning>
+</example>`,
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        todos: {
+          type: 'array',
+          description:
+            'The complete list of todo items. This will replace the existing list.',
+          items: {
+            type: 'object',
+            description: 'A single todo item.',
+            properties: {
+              description: {
+                type: 'string',
+                description: 'The description of the task.',
+              },
+              status: {
+                type: 'string',
+                description: 'The current status of the task.',
+                enum: ['pending', 'in_progress', 'completed', 'cancelled'],
+              },
+            },
+            required: ['description', 'status'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['todos'],
+      additionalProperties: false,
+    },
+  },
+};
+
+// ============================================================================
+// GET_INTERNAL_DOCS TOOL
+// ============================================================================
+
+export const GET_INTERNAL_DOCS_DEFINITION: ToolDefinition = {
+  base: {
+    name: GET_INTERNAL_DOCS_TOOL_NAME,
+    description:
+      'Returns the content of Gemini CLI internal documentation files. If no path is provided, returns a list of all available documentation paths.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        path: {
+          description:
+            "The relative path to the documentation file (e.g., 'cli/commands.md'). If omitted, lists all available documentation.",
+          type: 'string',
+        },
+      },
+    },
+  },
+};
+
+// ============================================================================
+// ASK_USER TOOL
+// ============================================================================
+
+export const ASK_USER_DEFINITION: ToolDefinition = {
+  base: {
+    name: ASK_USER_TOOL_NAME,
+    description:
+      'Ask the user one or more questions to gather preferences, clarify requirements, or make decisions.',
+    parametersJsonSchema: {
+      type: 'object',
+      required: ['questions'],
+      properties: {
+        questions: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 4,
+          items: {
+            type: 'object',
+            required: ['question', 'header'],
+            properties: {
+              question: {
+                type: 'string',
+                description:
+                  'The complete question to ask the user. Should be clear, specific, and end with a question mark.',
+              },
+              header: {
+                type: 'string',
+                maxLength: 16,
+                description:
+                  'MUST be 16 characters or fewer or the call will fail. Very short label displayed as a chip/tag. Use abbreviations: "Auth" not "Authentication", "Config" not "Configuration". Examples: "Auth method", "Library", "Approach", "Database".',
+              },
+              type: {
+                type: 'string',
+                enum: ['choice', 'text', 'yesno'],
+                default: 'choice',
+                description:
+                  "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation.",
+              },
+              options: {
+                type: 'array',
+                description:
+                  "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added. Not needed for 'text' or 'yesno' types.",
+                items: {
+                  type: 'object',
+                  required: ['label', 'description'],
+                  properties: {
+                    label: {
+                      type: 'string',
+                      description:
+                        'The display text for this option (1-5 words). Example: "OAuth 2.0"',
+                    },
+                    description: {
+                      type: 'string',
+                      description:
+                        'Brief explanation of this option. Example: "Industry standard, supports SSO"',
+                    },
+                  },
+                },
+              },
+              multiSelect: {
+                type: 'boolean',
+                description:
+                  "Only applies when type='choice'. Set to true to allow selecting multiple options.",
+              },
+              placeholder: {
+                type: 'string',
+                description:
+                  "Hint text shown in the input field. For type='text', shown in the main input. For type='choice', shown in the 'Other' custom input.",
+              },
+            },
+          },
+        },
+      },
     },
   },
 };

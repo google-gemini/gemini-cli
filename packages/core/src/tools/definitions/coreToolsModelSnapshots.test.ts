@@ -29,6 +29,9 @@ import {
   WEB_FETCH_DEFINITION,
   READ_MANY_FILES_DEFINITION,
   MEMORY_DEFINITION,
+  WRITE_TODOS_DEFINITION,
+  GET_INTERNAL_DOCS_DEFINITION,
+  ASK_USER_DEFINITION,
 } from './coreTools.js';
 
 describe('coreTools snapshots for specific models', () => {
@@ -70,6 +73,9 @@ describe('coreTools snapshots for specific models', () => {
     { name: 'web_fetch', definition: WEB_FETCH_DEFINITION },
     { name: 'read_many_files', definition: READ_MANY_FILES_DEFINITION },
     { name: 'save_memory', definition: MEMORY_DEFINITION },
+    { name: 'write_todos', definition: WRITE_TODOS_DEFINITION },
+    { name: 'get_internal_docs', definition: GET_INTERNAL_DOCS_DEFINITION },
+    { name: 'ask_user', definition: ASK_USER_DEFINITION },
   ];
 
   for (const modelId of modelIds) {
