@@ -2340,9 +2340,10 @@ describe('CoreToolScheduler Sequential Execution', () => {
       expect(awaitingCall.approvalMode).toBe(ApprovalMode.PLAN);
 
       // Act - Confirm
-      await awaitingCall.confirmationDetails.onConfirm(
-        ToolConfirmationOutcome.ProceedOnce,
-      );
+       
+      await (
+        awaitingCall.confirmationDetails as ToolCallConfirmationDetails
+      ).onConfirm(ToolConfirmationOutcome.ProceedOnce);
 
       // Wait for completion
       await schedulePromise;
