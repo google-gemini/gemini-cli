@@ -66,6 +66,8 @@ export interface UIState {
   history: HistoryItem[];
   historyManager: UseHistoryManagerReturn;
   isThemeDialogOpen: boolean;
+  shouldShowRetentionWarning: boolean;
+  sessionsToDeleteCount: number;
   themeError: string | null;
   isAuthenticating: boolean;
   isConfigInitialized: boolean;

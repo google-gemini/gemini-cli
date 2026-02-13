@@ -157,8 +157,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`general.sessionRetention.maxAge`** (string):
-  - **Description:** Maximum age of sessions to keep (e.g., "30d", "7d", "24h",
-    "1w")
+  - **Description:** Automatically delete chats older than this time period
+    (e.g., "30d", "7d", "24h", "1w")
   - **Default:** `undefined`
 
 - **`general.sessionRetention.maxCount`** (number):
@@ -169,6 +169,11 @@ their corresponding top-level category object in your `settings.json` file.
 - **`general.sessionRetention.minRetention`** (string):
   - **Description:** Minimum retention period (safety limit, defaults to "1d")
   - **Default:** `"1d"`
+
+- **`general.sessionRetention.warningAcknowledged`** (boolean):
+  - **Description:** INTERNAL: Whether the user has acknowledged the session
+    retention warning
+  - **Default:** `false`
 
 #### `output`
 
