@@ -122,6 +122,53 @@ export interface PolicyLoadResult {
   errors: PolicyFileError[];
 }
 
+export interface PolicyFile {
+  path: string;
+  content: string;
+}
+
+/**
+ * Reads policy files from a directory or a single file.
+ *
+ * @param policyPath Path to a directory or a .toml file.
+ * @returns Array of PolicyFile objects.
+ */
+export async function readPolicyFiles(
+  policyPath: string,
+): Promise<PolicyFile[]> {
+  let filesToLoad: string[] = [];
+  let baseDir = '';
+
+  try {
+    const stats = await fs.stat(policyPath);
+    if (stats.isDirectory()) {
+      baseDir = policyPath;
+      const dirEntries = await fs.readdir(policyPath, { withFileTypes: true });
+      filesToLoad = dirEntries
+        .filter((entry) => entry.isFile() && entry.name.endsWith('.toml'))
+        .map((entry) => entry.name);
+    } else if (stats.isFile() && policyPath.endsWith('.toml')) {
+      baseDir = path.dirname(policyPath);
+      filesToLoad = [path.basename(policyPath)];
+    }
+  } catch (e) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const error = e as NodeJS.ErrnoException;
+    if (error.code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
+
+  const results: PolicyFile[] = [];
+  for (const file of filesToLoad) {
+    const filePath = path.join(baseDir, file);
+    const content = await fs.readFile(filePath, 'utf-8');
+    results.push({ path: filePath, content });
+  }
+  return results;
+}
+
 /**
  * Converts a tier number to a human-readable tier name.
  */
@@ -227,30 +274,13 @@ export async function loadPoliciesFromToml(
     const tier = getPolicyTier(p);
     const tierName = getTierName(tier);
 
-    let filesToLoad: string[] = [];
-    let baseDir = '';
+    let policyFiles: PolicyFile[] = [];
 
     try {
-      const stats = await fs.stat(p);
-      if (stats.isDirectory()) {
-        baseDir = p;
-        const dirEntries = await fs.readdir(p, { withFileTypes: true });
-        filesToLoad = dirEntries
-          .filter((entry) => entry.isFile() && entry.name.endsWith('.toml'))
-          .map((entry) => entry.name);
-      } else if (stats.isFile() && p.endsWith('.toml')) {
-        baseDir = path.dirname(p);
-        filesToLoad = [path.basename(p)];
-      }
-      // Other file types or non-.toml files are silently ignored
-      // for consistency with directory scanning behavior.
+      policyFiles = await readPolicyFiles(p);
     } catch (e) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as NodeJS.ErrnoException;
-      if (error.code === 'ENOENT') {
-        // Path doesn't exist, skip it (not an error)
-        continue;
-      }
       errors.push({
         filePath: p,
         fileName: path.basename(p),
@@ -262,13 +292,10 @@ export async function loadPoliciesFromToml(
       continue;
     }
 
-    for (const file of filesToLoad) {
-      const filePath = path.join(baseDir, file);
+    for (const { path: filePath, content: fileContent } of policyFiles) {
+      const file = path.basename(filePath);
 
       try {
-        // Read file
-        const fileContent = await fs.readFile(filePath, 'utf-8');
-
         // Parse TOML
         let parsed: unknown;
         try {

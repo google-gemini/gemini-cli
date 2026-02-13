@@ -374,6 +374,13 @@ export interface McpEnablementCallbacks {
   isFileEnabled: (serverId: string) => Promise<boolean>;
 }
 
+export interface PolicyUpdateConfirmationRequest {
+  scope: string;
+  identifier: string;
+  policyDir: string;
+  newHash: string;
+}
+
 export interface ConfigParameters {
   sessionId: string;
   clientVersion?: string;
@@ -454,6 +461,7 @@ export interface ConfigParameters {
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
+  policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
   output?: OutputSettings;
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
@@ -631,6 +639,9 @@ export class Config {
   private readonly useWriteTodos: boolean;
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
+  private readonly policyUpdateConfirmationRequest:
+    | PolicyUpdateConfirmationRequest
+    | undefined;
   private readonly outputSettings: OutputSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
@@ -846,6 +857,8 @@ export class Config {
       approvalMode:
         params.approvalMode ?? params.policyEngineConfig?.approvalMode,
     });
+    this.policyUpdateConfirmationRequest =
+      params.policyUpdateConfirmationRequest;
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
     this.acknowledgedAgentsService = new AcknowledgedAgentsService();
     this.skillManager = new SkillManager();
@@ -1712,6 +1725,12 @@ export class Config {
 
   getApprovalMode(): ApprovalMode {
     return this.policyEngine.getApprovalMode();
+  }
+
+  getPolicyUpdateConfirmationRequest():
+    | PolicyUpdateConfirmationRequest
+    | undefined {
+    return this.policyUpdateConfirmationRequest;
   }
 
   setApprovalMode(mode: ApprovalMode): void {

@@ -37,6 +37,7 @@ import { AgentConfigDialog } from './AgentConfigDialog.js';
 import { SessionRetentionWarningDialog } from './SessionRetentionWarningDialog.js';
 import { useCallback } from 'react';
 import { SettingScope } from '../../config/settings.js';
+import { PolicyUpdateDialog } from './PolicyUpdateDialog.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -163,6 +164,19 @@ export const DialogManager = ({
       <FolderTrustDialog
         onSelect={uiActions.handleFolderTrustSelect}
         isRestarting={uiState.isRestarting}
+      />
+    );
+  }
+  if (
+    uiState.isPolicyUpdateDialogOpen &&
+    uiState.policyUpdateConfirmationRequest
+  ) {
+    return (
+      <PolicyUpdateDialog
+        onSelect={uiActions.handlePolicyUpdateSelect}
+        scope={uiState.policyUpdateConfirmationRequest.scope}
+        identifier={uiState.policyUpdateConfirmationRequest.policyDir}
+        isRestarting={uiState.isRestartingPolicyUpdate}
       />
     );
   }
