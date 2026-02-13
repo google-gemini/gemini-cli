@@ -96,7 +96,31 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
     setScrollOffset(0);
   }, [searchQuery]);
 
+  // The reset action lives one index past the filtered item list
+  const isResetFocused = activeIndex === filteredItems.length;
+
+  const handleResetToDefaults = useCallback(() => {
+    // Clear the custom items setting so the legacy footer path is used
+    setSetting(SettingScope.User, 'ui.footer.items', undefined);
+
+    // Reset local state to reflect legacy-derived items
+    const validIds = new Set(ALL_ITEMS.map((i) => i.id));
+    const derived = deriveItemsFromLegacySettings(settings.merged).filter(
+      (id) => validIds.has(id),
+    );
+    const others = DEFAULT_ORDER.filter((id) => !derived.includes(id));
+    setOrderedIds([...derived, ...others]);
+    setSelectedIds(new Set(derived));
+    setActiveIndex(0);
+    setScrollOffset(0);
+  }, [setSetting, settings.merged]);
+
   const handleConfirm = useCallback(async () => {
+    if (isResetFocused) {
+      handleResetToDefaults();
+      return;
+    }
+
     const item = filteredItems[activeIndex];
     if (!item) return;
 
@@ -111,7 +135,15 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
     // Save immediately on toggle
     const finalItems = orderedIds.filter((id) => next.has(id));
     setSetting(SettingScope.User, 'ui.footer.items', finalItems);
-  }, [filteredItems, activeIndex, orderedIds, setSetting, selectedIds]);
+  }, [
+    filteredItems,
+    activeIndex,
+    orderedIds,
+    setSetting,
+    selectedIds,
+    isResetFocused,
+    handleResetToDefaults,
+  ]);
 
   const handleReorder = useCallback(
     (direction: number) => {
@@ -165,24 +197,31 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
       }
 
       if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
-        const newIndex =
-          activeIndex > 0 ? activeIndex - 1 : filteredItems.length - 1;
+        // Navigation wraps: items 0..filteredItems.length-1, then reset row at filteredItems.length
+        const totalSlots = filteredItems.length + 1;
+        const newIndex = activeIndex > 0 ? activeIndex - 1 : totalSlots - 1;
         setActiveIndex(newIndex);
-        if (newIndex === filteredItems.length - 1) {
-          setScrollOffset(Math.max(0, filteredItems.length - maxItemsToShow));
-        } else if (newIndex < scrollOffset) {
-          setScrollOffset(newIndex);
+        // Only adjust scroll when within the item list
+        if (newIndex < filteredItems.length) {
+          if (newIndex === filteredItems.length - 1) {
+            setScrollOffset(Math.max(0, filteredItems.length - maxItemsToShow));
+          } else if (newIndex < scrollOffset) {
+            setScrollOffset(newIndex);
+          }
         }
         return true;
       }
 
       if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
-        const newIndex =
-          activeIndex < filteredItems.length - 1 ? activeIndex + 1 : 0;
+        const totalSlots = filteredItems.length + 1;
+        const newIndex = activeIndex < totalSlots - 1 ? activeIndex + 1 : 0;
         setActiveIndex(newIndex);
         if (newIndex === 0) {
           setScrollOffset(0);
-        } else if (newIndex >= scrollOffset + maxItemsToShow) {
+        } else if (
+          newIndex < filteredItems.length &&
+          newIndex >= scrollOffset + maxItemsToShow
+        ) {
           setScrollOffset(newIndex - maxItemsToShow + 1);
         }
         return true;
@@ -217,15 +256,23 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
 
   // Preview logic
   const previewText = useMemo(() => {
+    if (isResetFocused) {
+      return (
+        <Text color={theme.text.secondary} italic>
+          Default footer (uses legacy settings)
+        </Text>
+      );
+    }
+
     const itemsToPreview = orderedIds.filter((id) => selectedIds.has(id));
-    if (itemsToPreview.length === 0) return 'Empty Footer';
+    if (itemsToPreview.length === 0) return null;
 
     const getColor = (id: string, defaultColor?: string) =>
       id === activeId ? 'white' : defaultColor || theme.text.secondary;
 
     // Mock values for preview
     const mockValues: Record<string, React.ReactNode> = {
-      cwd: <Text color={getColor('cwd')}>~/dev/gemini-cli</Text>,
+      cwd: <Text color={getColor('cwd')}>~/project/path</Text>,
       'git-branch': <Text color={getColor('git-branch')}>main*</Text>,
       'sandbox-status': (
         <Text color={getColor('sandbox-status', 'green')}>docker</Text>
@@ -236,9 +283,9 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
         </Box>
       ),
       'context-remaining': (
-        <Text color={getColor('context-remaining')}>85%</Text>
+        <Text color={getColor('context-remaining')}>85% context left</Text>
       ),
-      quota: <Text color={getColor('quota')}>1.2k left</Text>,
+      quota: <Text color={getColor('quota')}>daily 97%</Text>,
       'memory-usage': <Text color={getColor('memory-usage')}>124MB</Text>,
       'session-id': <Text color={getColor('session-id')}>769992f9</Text>,
       'code-changes': (
@@ -266,7 +313,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
     });
 
     return elements;
-  }, [orderedIds, selectedIds, activeId]);
+  }, [orderedIds, selectedIds, activeId, isResetFocused]);
 
   return (
     <Box
@@ -319,6 +366,15 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
             );
           })
         )}
+      </Box>
+
+      <Box marginTop={1}>
+        <Text
+          color={isResetFocused ? theme.status.warning : theme.text.secondary}
+        >
+          {isResetFocused ? '> ' : '  '}
+          Reset to default footer
+        </Text>
       </Box>
 
       <Box marginTop={1} flexDirection="column">

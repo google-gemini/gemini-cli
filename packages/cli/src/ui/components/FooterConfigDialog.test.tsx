@@ -133,7 +133,7 @@ describe('<FooterConfigDialog />', () => {
 
     // Initial state: 'cwd' is active.
     // Verify 'cwd' content exists in the preview area
-    expect(lastFrame()).toContain('~/dev/gemini-cli');
+    expect(lastFrame()).toContain('~/project/path');
 
     // Move focus down to 'git-branch'
     act(() => {
@@ -144,6 +144,36 @@ describe('<FooterConfigDialog />', () => {
       const output = lastFrame();
       // Verify 'git-branch' content exists in the preview area
       expect(output).toContain('main*');
+    });
+  });
+
+  it('shows an empty preview when all items are deselected', async () => {
+    const settings = createMockSettings();
+    const { lastFrame, stdin } = renderWithProviders(
+      <FooterConfigDialog onClose={mockOnClose} />,
+      { settings },
+    );
+
+    // Deselect all items (assuming we know which ones are selected by default)
+    // By default: cwd, git-branch, sandbox-status, model-name, quota are selected.
+    // They are at indices 0, 1, 2, 3, 4.
+    for (let i = 0; i < 5; i++) {
+      act(() => {
+        stdin.write('\r'); // Toggle (deselect)
+        stdin.write('\u001b[B'); // Down arrow
+      });
+    }
+
+    await waitFor(() => {
+      const output = lastFrame();
+      expect(output).toBeDefined();
+      expect(output).toContain('Preview:');
+      // The preview area should not contain any of the mock values
+      expect(output).not.toContain('~/project/path');
+      expect(output).not.toContain('main*');
+      expect(output).not.toContain('docker');
+      expect(output).not.toContain('gemini-2.5-pro');
+      expect(output).not.toContain('1.2k left');
     });
   });
 });

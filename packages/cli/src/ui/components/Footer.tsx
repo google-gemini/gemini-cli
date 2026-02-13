@@ -17,6 +17,11 @@ import process from 'node:process';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { QuotaDisplay } from './QuotaDisplay.js';
+import {
+  getStatusColor,
+  QUOTA_THRESHOLD_HIGH,
+  QUOTA_THRESHOLD_MEDIUM,
+} from '../utils/displayUtils.js';
 import { DebugProfiler } from './DebugProfiler.js';
 import { isDevelopment } from '../../utils/installationInfo.js';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -55,10 +60,16 @@ const CwdIndicator: React.FC<CwdIndicatorProps> = ({
 
 interface BranchIndicatorProps {
   branchName: string;
+  showParentheses?: boolean;
 }
 
-const BranchIndicator: React.FC<BranchIndicatorProps> = ({ branchName }) => (
-  <Text color={theme.text.secondary}>({branchName}*)</Text>
+const BranchIndicator: React.FC<BranchIndicatorProps> = ({
+  branchName,
+  showParentheses = true,
+}) => (
+  <Text color={theme.text.secondary}>
+    {showParentheses ? `(${branchName}*)` : `${branchName}*`}
+  </Text>
 );
 
 interface SandboxIndicatorProps {
@@ -322,7 +333,10 @@ export const Footer: React.FC = () => {
       }
       case 'git-branch': {
         if (branchName) {
-          addElement(id, <BranchIndicator branchName={branchName} />);
+          addElement(
+            id,
+            <BranchIndicator branchName={branchName} showParentheses={false} />,
+          );
         }
         break;
       }
@@ -355,16 +369,21 @@ export const Footer: React.FC = () => {
         break;
       }
       case 'quota': {
-        if (quotaStats) {
-          addElement(
-            id,
-            <QuotaDisplay
-              remaining={quotaStats.remaining}
-              limit={quotaStats.limit}
-              resetTime={quotaStats.resetTime}
-              terse={true}
-            />,
-          );
+        if (
+          quotaStats &&
+          quotaStats.remaining !== undefined &&
+          quotaStats.limit
+        ) {
+          const percentage = (quotaStats.remaining / quotaStats.limit) * 100;
+          const color = getStatusColor(percentage, {
+            green: QUOTA_THRESHOLD_HIGH,
+            yellow: QUOTA_THRESHOLD_MEDIUM,
+          });
+          const text =
+            quotaStats.remaining === 0
+              ? 'limit reached'
+              : `daily ${percentage.toFixed(0)}%`;
+          addElement(id, <Text color={color}>{text}</Text>);
         }
         break;
       }

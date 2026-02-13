@@ -47,7 +47,7 @@ export const ALL_ITEMS: FooterItem[] = [
   {
     id: 'quota',
     label: 'quota',
-    description: 'Remaining quota and reset time',
+    description: 'Remaining usage on daily limit',
     defaultEnabled: true,
   },
   {
