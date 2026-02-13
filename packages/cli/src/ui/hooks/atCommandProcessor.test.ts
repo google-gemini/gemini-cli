@@ -285,6 +285,16 @@ describe('handleAtCommand', () => {
   });
 
   it('should correctly unescape paths with escaped spaces', async () => {
+    // Mock platform to linux so unescapePath handles backslash escapes
+    vi.stubGlobal(
+      'process',
+      Object.create(process, {
+        platform: {
+          get: () => 'linux',
+        },
+      }),
+    );
+
     const fileContent = 'This is the file content.';
     const filePath = await createTestFile(
       path.join(testRootDir, 'path', 'to', 'my file.txt'),
@@ -955,6 +965,16 @@ describe('handleAtCommand', () => {
     });
 
     it('should still handle escaped spaces in paths before punctuation', async () => {
+      // Mock platform to linux so unescapePath handles backslash escapes
+      vi.stubGlobal(
+        'process',
+        Object.create(process, {
+          platform: {
+            get: () => 'linux',
+          },
+        }),
+      );
+
       const fileContent = 'Spaced file content';
       const filePath = await createTestFile(
         path.join(testRootDir, 'spaced file.txt'),
