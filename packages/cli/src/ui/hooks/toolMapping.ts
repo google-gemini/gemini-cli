@@ -95,6 +95,7 @@ export function mapToDisplay(
       outputFile,
       ptyId,
       correlationId,
+      approvalMode: call.approvalMode,
     };
   });
 

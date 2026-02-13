@@ -14,7 +14,7 @@ import { shortenPath, makeRelative } from '../utils/paths.js';
 import { type Config } from '../config/config.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { ToolErrorType } from './tool-error.js';
-import { GLOB_TOOL_NAME } from './tool-names.js';
+import { GLOB_TOOL_NAME, GLOB_DISPLAY_NAME } from './tool-names.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { GLOB_DEFINITION } from './definitions/coreTools.js';
@@ -271,7 +271,7 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
   ) {
     super(
       GlobTool.Name,
-      'FindFiles',
+      GLOB_DISPLAY_NAME,
       GLOB_DEFINITION.base.description!,
       Kind.Search,
       GLOB_DEFINITION.base.parametersJsonSchema,

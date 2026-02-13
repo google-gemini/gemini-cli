@@ -10,9 +10,14 @@ import { ToolGroupMessage } from './ToolGroupMessage.js';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { Scrollable } from '../shared/Scrollable.js';
 import {
-  ASK_USER_DISPLAY_NAME,
   makeFakeConfig,
   CoreToolCallStatus,
+  ApprovalMode,
+  ASK_USER_DISPLAY_NAME,
+  WRITE_FILE_DISPLAY_NAME,
+  EDIT_DISPLAY_NAME,
+  READ_FILE_DISPLAY_NAME,
+  GLOB_DISPLAY_NAME,
 } from '@google/gemini-cli-core';
 import os from 'node:os';
 
@@ -508,6 +513,44 @@ describe('<ToolGroupMessage />', () => {
       );
       // AskUser tools in progress are rendered by AskUserDialog, so we expect nothing.
       expect(lastFrame()).toBe('');
+      unmount();
+    });
+  });
+
+  describe('Plan Mode Filtering', () => {
+    it.each([
+      {
+        name: WRITE_FILE_DISPLAY_NAME,
+        mode: ApprovalMode.PLAN,
+        visible: false,
+      },
+      { name: EDIT_DISPLAY_NAME, mode: ApprovalMode.PLAN, visible: false },
+      {
+        name: WRITE_FILE_DISPLAY_NAME,
+        mode: ApprovalMode.DEFAULT,
+        visible: true,
+      },
+      { name: READ_FILE_DISPLAY_NAME, mode: ApprovalMode.PLAN, visible: true },
+      { name: GLOB_DISPLAY_NAME, mode: ApprovalMode.PLAN, visible: true },
+    ])('filtering logic for $name in $mode mode', ({ name, mode, visible }) => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'test-call',
+          name,
+          approvalMode: mode,
+        }),
+      ];
+
+      const { lastFrame, unmount } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        { config: baseMockConfig },
+      );
+
+      if (visible) {
+        expect(lastFrame()).toContain(name);
+      } else {
+        expect(lastFrame()).toBe('');
+      }
       unmount();
     });
   });
