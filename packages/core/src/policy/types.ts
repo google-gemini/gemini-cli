@@ -272,6 +272,7 @@ export interface PolicySettings {
     allowed?: string[];
   };
   mcpServers?: Record<string, { trust?: boolean }>;
+  policyPaths?: string[];
 }
 
 export interface CheckResult {
