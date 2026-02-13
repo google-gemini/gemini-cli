@@ -5,6 +5,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
   "description": "Activates a specialized agent skill by name (Available: 'skill1', 'skill2'). Returns the skill's instructions wrapped in \`<activated_skill>\` tags. These provide specialized guidance for the current task. Use this when you identify a task that matches a skill's description. ONLY use names exactly as they appear in the \`<available_skills>\` section.",
   "name": "activate_skill",
   "parametersJsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
     "additionalProperties": false,
     "properties": {
       "name": {
@@ -29,6 +30,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
   "description": "Activates a specialized agent skill by name. Returns the skill's instructions wrapped in \`<activated_skill>\` tags. These provide specialized guidance for the current task. Use this when you identify a task that matches a skill's description. ONLY use names exactly as they appear in the \`<available_skills>\` section.",
   "name": "activate_skill",
   "parametersJsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
     "additionalProperties": false,
     "properties": {
       "name": {
@@ -49,6 +51,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
   "description": "Activates a specialized agent skill by name (Available: 'skill1'). Returns the skill's instructions wrapped in \`<activated_skill>\` tags. These provide specialized guidance for the current task. Use this when you identify a task that matches a skill's description. ONLY use names exactly as they appear in the \`<available_skills>\` section.",
   "name": "activate_skill",
   "parametersJsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
     "additionalProperties": false,
     "properties": {
       "name": {
@@ -790,6 +793,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
   "description": "Activates a specialized agent skill by name (Available: 'skill1', 'skill2'). Returns the skill's instructions wrapped in \`<activated_skill>\` tags. These provide specialized guidance for the current task. Use this when you identify a task that matches a skill's description. ONLY use names exactly as they appear in the \`<available_skills>\` section.",
   "name": "activate_skill",
   "parametersJsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
     "additionalProperties": false,
     "properties": {
       "name": {
@@ -814,6 +818,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
   "description": "Activates a specialized agent skill by name. Returns the skill's instructions wrapped in \`<activated_skill>\` tags. These provide specialized guidance for the current task. Use this when you identify a task that matches a skill's description. ONLY use names exactly as they appear in the \`<available_skills>\` section.",
   "name": "activate_skill",
   "parametersJsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
     "additionalProperties": false,
     "properties": {
       "name": {
@@ -834,6 +839,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
   "description": "Activates a specialized agent skill by name (Available: 'skill1'). Returns the skill's instructions wrapped in \`<activated_skill>\` tags. These provide specialized guidance for the current task. Use this when you identify a task that matches a skill's description. ONLY use names exactly as they appear in the \`<available_skills>\` section.",
   "name": "activate_skill",
   "parametersJsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
     "additionalProperties": false,
     "properties": {
       "name": {
