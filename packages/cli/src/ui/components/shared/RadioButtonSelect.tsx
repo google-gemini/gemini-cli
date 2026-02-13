@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Text } from 'ink';
+import { Text, Box } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import {
   BaseSelectionList,
@@ -19,6 +19,7 @@ import type { SelectionListItem } from '../../hooks/useSelectionList.js';
  */
 export interface RadioSelectItem<T> extends SelectionListItem<T> {
   label: string;
+  sublabel?: string;
   themeNameDisplay?: string;
   themeTypeDisplay?: string;
 }
@@ -98,9 +99,16 @@ export function RadioButtonSelect<T>({
           }
           // Regular label display
           return (
-            <Text color={titleColor} wrap="truncate">
-              {item.label}
-            </Text>
+            <Box flexDirection="column">
+              <Text color={titleColor} wrap="truncate">
+                {item.label}
+              </Text>
+              {item.sublabel && (
+                <Text color={theme.text.secondary} wrap="truncate">
+                  {item.sublabel}
+                </Text>
+              )}
+            </Box>
           );
         })
       }
