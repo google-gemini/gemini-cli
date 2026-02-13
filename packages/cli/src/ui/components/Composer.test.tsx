@@ -24,9 +24,13 @@ vi.mock('../contexts/VimModeContext.js', () => ({
     vimMode: 'INSERT',
   })),
 }));
-import { ApprovalMode, tokenLimit } from '@google/gemini-cli-core';
+import {
+  ApprovalMode,
+  tokenLimit,
+  CoreToolCallStatus,
+} from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
-import { StreamingState, ToolCallStatus } from '../types.js';
+import { StreamingState } from '../types.js';
 import { TransientMessageType } from '../../utils/events.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { SessionMetrics } from '../contexts/SessionContext.js';
@@ -426,7 +430,7 @@ describe('Composer', () => {
                 callId: 'call-1',
                 name: 'edit',
                 description: 'edit file',
-                status: ToolCallStatus.Confirming,
+                status: CoreToolCallStatus.AwaitingApproval,
                 resultDisplay: undefined,
                 confirmationDetails: undefined,
               },

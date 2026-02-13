@@ -6,12 +6,13 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
-import { type HistoryItem, ToolCallStatus } from '../types.js';
+import { type HistoryItem } from '../types.js';
 import { MessageType } from '../types.js';
 import { SessionStatsProvider } from '../contexts/SessionContext.js';
-import type {
-  Config,
-  ToolExecuteConfirmationDetails,
+import {
+  type Config,
+  type ToolExecuteConfirmationDetails,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 import { renderWithProviders } from '../../test-utils/render.js';
@@ -203,7 +204,7 @@ describe('<HistoryItemDisplay />', () => {
           name: 'run_shell_command',
           description: 'Run a shell command',
           resultDisplay: 'blank',
-          status: ToolCallStatus.Confirming,
+          status: CoreToolCallStatus.AwaitingApproval,
           confirmationDetails: {
             type: 'exec',
             title: 'Run Shell Command',

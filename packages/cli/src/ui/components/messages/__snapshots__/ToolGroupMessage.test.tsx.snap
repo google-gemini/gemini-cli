@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`<ToolGroupMessage /> > Ask User Filtering > filtering logic for status='Error' and hasResult='error message' 1`] = `
+exports[`<ToolGroupMessage /> > Ask User Filtering > filtering logic for status='error' and hasResult='error message' 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────╮
 │ x  Ask User                                                              │
 │                                                                          │
@@ -8,7 +8,7 @@ exports[`<ToolGroupMessage /> > Ask User Filtering > filtering logic for status=
 ╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`<ToolGroupMessage /> > Ask User Filtering > filtering logic for status='Success' and hasResult='test result' 1`] = `
+exports[`<ToolGroupMessage /> > Ask User Filtering > filtering logic for status='success' and hasResult='test result' 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  Ask User                                                              │
 │                                                                          │

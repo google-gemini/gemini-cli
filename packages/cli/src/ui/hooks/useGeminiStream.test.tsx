@@ -43,7 +43,7 @@ import {
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import type { SlashCommandProcessorResult } from '../types.js';
-import { MessageType, StreamingState, ToolCallStatus } from '../types.js';
+import { MessageType, StreamingState } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 
 // --- MOCKS ---
@@ -2380,7 +2380,7 @@ describe('useGeminiStream', () => {
                 callId: 'client-read-123',
                 name: 'read_file',
                 description: toolExecutionMessage,
-                status: ToolCallStatus.Success,
+                status: CoreToolCallStatus.Success,
                 resultDisplay: toolExecutionMessage,
                 confirmationDetails: undefined,
               },
@@ -2434,7 +2434,7 @@ describe('useGeminiStream', () => {
           tools: expect.arrayContaining([
             expect.objectContaining({
               name: 'read_file',
-              status: ToolCallStatus.Success,
+              status: CoreToolCallStatus.Success,
             }),
           ]),
         }),

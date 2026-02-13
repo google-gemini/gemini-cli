@@ -11,13 +11,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Box, Text } from 'ink';
 import { act, useState, type JSX } from 'react';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
-import { ToolCallStatus } from '../types.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
 import {
   UIStateContext,
   useUIState,
   type UIState,
 } from '../contexts/UIStateContext.js';
+import { CoreToolCallStatus } from '@google/gemini-cli-core';
 
 // Mock dependencies
 vi.mock('../contexts/SettingsContext.js', async () => {
@@ -264,7 +264,7 @@ describe('MainContent', () => {
                 {
                   callId: 'call_1',
                   name: SHELL_COMMAND_NAME,
-                  status: ToolCallStatus.Executing,
+                  status: CoreToolCallStatus.Executing,
                   description: 'Running a long command...',
                   // 20 lines of output.
                   // Default max is 15, so Line 1-5 will be truncated/scrolled out if not expanded.
