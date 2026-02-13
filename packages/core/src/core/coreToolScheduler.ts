@@ -217,6 +217,7 @@ export class CoreToolScheduler {
       const invocation = currentCall.invocation;
 
       const outcome = currentCall.outcome;
+      const approvalMode = currentCall.approvalMode;
 
       switch (newStatus) {
         case CoreToolCallStatus.Success: {
@@ -232,6 +233,7 @@ export class CoreToolScheduler {
             response: auxiliaryData as ToolCallResponseInfo,
             durationMs,
             outcome,
+            approvalMode,
           } as SuccessfulToolCall;
         }
         case CoreToolCallStatus.Error: {
@@ -246,6 +248,7 @@ export class CoreToolScheduler {
             response: auxiliaryData as ToolCallResponseInfo,
             durationMs,
             outcome,
+            approvalMode,
           } as ErroredToolCall;
         }
         case CoreToolCallStatus.AwaitingApproval:
@@ -259,6 +262,7 @@ export class CoreToolScheduler {
             startTime: existingStartTime,
             outcome,
             invocation,
+            approvalMode,
           } as WaitingToolCall;
         case CoreToolCallStatus.Scheduled:
           return {
@@ -268,6 +272,7 @@ export class CoreToolScheduler {
             startTime: existingStartTime,
             outcome,
             invocation,
+            approvalMode,
           } as ScheduledToolCall;
         case CoreToolCallStatus.Cancelled: {
           const durationMs = existingStartTime
@@ -316,6 +321,7 @@ export class CoreToolScheduler {
             },
             durationMs,
             outcome,
+            approvalMode,
           } as CancelledToolCall;
         }
         case CoreToolCallStatus.Validating:
@@ -326,6 +332,7 @@ export class CoreToolScheduler {
             startTime: existingStartTime,
             outcome,
             invocation,
+            approvalMode,
           } as ValidatingToolCall;
         case CoreToolCallStatus.Executing:
           return {
@@ -335,6 +342,7 @@ export class CoreToolScheduler {
             startTime: existingStartTime,
             outcome,
             invocation,
+            approvalMode,
           } as ExecutingToolCall;
         default: {
           const exhaustiveCheck: never = newStatus;
@@ -373,6 +381,7 @@ export class CoreToolScheduler {
           status: CoreToolCallStatus.Error,
           tool: call.tool,
           response,
+          approvalMode: call.approvalMode,
         } as ErroredToolCall;
       }
 
@@ -1053,6 +1062,7 @@ export class CoreToolScheduler {
         },
         durationMs,
         outcome: ToolConfirmationOutcome.Cancel,
+        approvalMode: queuedCall.approvalMode,
       });
     }
   }
