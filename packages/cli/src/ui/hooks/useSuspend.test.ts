@@ -82,7 +82,6 @@ describe('useSuspend', () => {
     const handleWarning = vi.fn();
     const setRawMode = vi.fn();
     const refreshStatic = vi.fn();
-    const setForceRerenderKey = vi.fn();
     const enableSupportedModes =
       terminalCapabilityManager.enableSupportedModes as unknown as Mock;
 
@@ -91,7 +90,6 @@ describe('useSuspend', () => {
         handleWarning,
         setRawMode,
         refreshStatic,
-        setForceRerenderKey,
         shouldUseAlternateScreen: true,
       }),
     );
@@ -126,7 +124,6 @@ describe('useSuspend', () => {
     expect(enableMouseEvents).toHaveBeenCalledTimes(1);
     expect(setRawMode).toHaveBeenCalledWith(true);
     expect(refreshStatic).toHaveBeenCalledTimes(1);
-    expect(setForceRerenderKey).toHaveBeenCalledTimes(1);
 
     unmount();
   });
@@ -135,14 +132,12 @@ describe('useSuspend', () => {
     const handleWarning = vi.fn();
     const setRawMode = vi.fn();
     const refreshStatic = vi.fn();
-    const setForceRerenderKey = vi.fn();
 
     const { result, unmount } = renderHook(() =>
       useSuspend({
         handleWarning,
         setRawMode,
         refreshStatic,
-        setForceRerenderKey,
         shouldUseAlternateScreen: false,
       }),
     );
@@ -169,14 +164,12 @@ describe('useSuspend', () => {
     const handleWarning = vi.fn();
     const setRawMode = vi.fn();
     const refreshStatic = vi.fn();
-    const setForceRerenderKey = vi.fn();
 
     const { result, unmount } = renderHook(() =>
       useSuspend({
         handleWarning,
         setRawMode,
         refreshStatic,
-        setForceRerenderKey,
         shouldUseAlternateScreen: true,
       }),
     );
