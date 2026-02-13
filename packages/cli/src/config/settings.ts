@@ -20,8 +20,8 @@ import {
   type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
-import { DefaultLight } from '../ui/themes/default-light.js';
-import { DefaultDark } from '../ui/themes/default.js';
+import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
+import { DefaultDark } from '../ui/themes/builtin/dark/default.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import {
   type Settings,
@@ -724,14 +724,26 @@ export function loadSettings(
   workspaceSettings = resolveEnvVarsInObject(workspaceResult.settings);
 
   // Support legacy theme names
-  if (userSettings.ui?.theme === 'VS') {
+  if (
+    userSettings.ui?.theme === 'VS' ||
+    userSettings.ui?.theme === 'default-light'
+  ) {
     userSettings.ui.theme = DefaultLight.name;
-  } else if (userSettings.ui?.theme === 'VS2015') {
+  } else if (
+    userSettings.ui?.theme === 'VS2015' ||
+    userSettings.ui?.theme === 'default'
+  ) {
     userSettings.ui.theme = DefaultDark.name;
   }
-  if (workspaceSettings.ui?.theme === 'VS') {
+  if (
+    workspaceSettings.ui?.theme === 'VS' ||
+    workspaceSettings.ui?.theme === 'default-light'
+  ) {
     workspaceSettings.ui.theme = DefaultLight.name;
-  } else if (workspaceSettings.ui?.theme === 'VS2015') {
+  } else if (
+    workspaceSettings.ui?.theme === 'VS2015' ||
+    workspaceSettings.ui?.theme === 'default'
+  ) {
     workspaceSettings.ui.theme = DefaultDark.name;
   }
 

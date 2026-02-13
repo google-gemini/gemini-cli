@@ -8,8 +8,8 @@
  * Shades of Purple Theme — for Highlight.js.
  * @author Ahmad Awais <https://twitter.com/mrahmadawais/>
  */
-import { type ColorsTheme, Theme } from './theme.js';
-import { interpolateColor } from './color-utils.js';
+import { type ColorsTheme, Theme } from '../../theme.js';
+import { interpolateColor } from '../../color-utils.js';
 
 const shadesOfPurpleColors: ColorsTheme = {
   type: 'dark',

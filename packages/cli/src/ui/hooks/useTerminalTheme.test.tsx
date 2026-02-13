@@ -56,12 +56,12 @@ vi.mock('../themes/theme-manager.js', async () => {
         name === 'default' || name === 'default-light',
       setTerminalBackground: vi.fn(),
     },
-    DEFAULT_THEME: { name: 'default' },
+    DEFAULT_THEME: { name: 'Default' },
   };
 });
 
-vi.mock('../themes/default-light.js', () => ({
-  DefaultLight: { name: 'default-light' },
+vi.mock('../themes/builtin/light/default-light.js', () => ({
+  DefaultLight: { name: 'Default Light' },
 }));
 
 describe('useTerminalTheme', () => {
@@ -84,7 +84,7 @@ describe('useTerminalTheme', () => {
     mockQueryTerminalBackground.mockClear();
     // Reset any settings modifications
     mockSettings.merged.ui.autoThemeSwitching = true;
-    mockSettings.merged.ui.theme = 'default';
+    mockSettings.merged.ui.theme = 'Default';
   });
 
   afterEach(() => {
@@ -132,14 +132,14 @@ describe('useTerminalTheme', () => {
 
     expect(config.setTerminalBackground).toHaveBeenCalledWith('#ffffff');
     expect(mockHandleThemeSelect).toHaveBeenCalledWith(
-      'default-light',
+      'Default Light',
       expect.anything(),
     );
   });
 
   it('should switch to dark theme when background is dark', () => {
     // Start with light theme
-    mockSettings.merged.ui.theme = 'default-light';
+    mockSettings.merged.ui.theme = 'Default Light';
 
     renderHook(() => useTerminalTheme(mockHandleThemeSelect, config, vi.fn()));
 
@@ -150,12 +150,12 @@ describe('useTerminalTheme', () => {
 
     expect(config.setTerminalBackground).toHaveBeenCalledWith('#000000');
     expect(mockHandleThemeSelect).toHaveBeenCalledWith(
-      'default',
+      'Default',
       expect.anything(),
     );
 
     // Reset theme
-    mockSettings.merged.ui.theme = 'default';
+    mockSettings.merged.ui.theme = 'Default';
   });
 
   it('should not switch theme if autoThemeSwitching is disabled', () => {
