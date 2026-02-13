@@ -1502,6 +1502,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       return;
     }
 
+    if (!isAlternateBuffer) {
+      return;
+    }
+
     const handler = setTimeout(() => {
       refreshStatic();
     }, 300);
@@ -1509,7 +1513,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     return () => {
       clearTimeout(handler);
     };
-  }, [terminalWidth, refreshStatic]);
+  }, [terminalWidth, terminalHeight, isAlternateBuffer, refreshStatic]);
 
   useEffect(() => {
     const unsubscribe = ideContextStore.subscribe(setIdeContextState);
