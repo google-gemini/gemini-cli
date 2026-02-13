@@ -1,6 +1,7 @@
 This file contains third-party software notices and license terms.
 
 ============================================================
+@modelcontextprotocol/sdk@1.26.0
 @modelcontextprotocol/sdk@1.24.0
 (git+https://github.com/modelcontextprotocol/typescript-sdk.git)
 
@@ -17,6 +18,33 @@ furnished to do so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+============================================================
+@hono/node-server@1.19.9
+(https://github.com/honojs/node-server.git)
+
+MIT License
+
+Copyright (c) 2021-present Yusuke Wada and contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -487,7 +515,7 @@ SOFTWARE.
 
 
 ============================================================
-express@4.21.2
+express@4.22.1
 (No repository found)
 
 (The MIT License)
@@ -546,7 +574,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-mime-types@3.0.1
+mime-types@3.0.2
 (No repository found)
 
 (The MIT License)
@@ -661,7 +689,7 @@ THE SOFTWARE.
 
 
 ============================================================
-body-parser@1.20.3
+body-parser@1.20.4
 (No repository found)
 
 (The MIT License)
@@ -1066,7 +1094,7 @@ THE SOFTWARE.
 
 
 ============================================================
-qs@6.13.0
+qs@6.14.1
 (https://github.com/ljharb/qs.git)
 
 BSD 3-Clause License
@@ -1586,7 +1614,7 @@ SOFTWARE.
 
 
 ============================================================
-raw-body@3.0.0
+raw-body@3.0.2
 (No repository found)
 
 The MIT License (MIT)
@@ -2272,7 +2300,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-express-rate-limit@7.5.1
+express-rate-limit@8.2.1
 (git+https://github.com/express-rate-limit/express-rate-limit.git)
 
 ﻿# MIT License
@@ -2298,6 +2326,56 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
+ip-address@10.0.1
+(git://github.com/beaugunderson/ip-address.git)
+
+Copyright (C) 2011 by Beau Gunderson
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+hono@4.11.7
+(git+https://github.com/honojs/hono.git)
+
+MIT License
+
+Copyright (c) 2021 - present, Yusuke Wada and Hono contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
 jose@6.1.3
 (No repository found)
 
@@ -2325,6 +2403,68 @@ SOFTWARE.
 
 
 ============================================================
+json-schema-typed@8.0.2
+(https://github.com/RemyRylan/json-schema-typed.git)
+
+BSD 2-Clause License
+
+Original source code is copyright (c) 2019-2025 Remy Rylan
+<https://github.com/RemyRylan>
+
+All JSON Schema documentation and descriptions are copyright (c):
+
+2009 [draft-0] IETF Trust <https://www.ietf.org/>, Kris Zyp <kris@sitepen.com>,
+and SitePen (USA) <https://www.sitepen.com/>.
+
+2009 [draft-1] IETF Trust <https://www.ietf.org/>, Kris Zyp <kris@sitepen.com>,
+and SitePen (USA) <https://www.sitepen.com/>.
+
+2010 [draft-2] IETF Trust <https://www.ietf.org/>, Kris Zyp <kris@sitepen.com>,
+and SitePen (USA) <https://www.sitepen.com/>.
+
+2010 [draft-3] IETF Trust <https://www.ietf.org/>, Kris Zyp <kris@sitepen.com>,
+Gary Court <gary.court@gmail.com>, and SitePen (USA) <https://www.sitepen.com/>.
+
+2013 [draft-4] IETF Trust <https://www.ietf.org/>), Francis Galiegue
+<fgaliegue@gmail.com>, Kris Zyp <kris@sitepen.com>, Gary Court
+<gary.court@gmail.com>, and SitePen (USA) <https://www.sitepen.com/>.
+
+2018 [draft-7] IETF Trust <https://www.ietf.org/>, Austin Wright <aaa@bzfx.net>,
+Henry Andrews <henry@cloudflare.com>, Geraint Luff <luffgd@gmail.com>, and
+Cloudflare, Inc. <https://www.cloudflare.com/>.
+
+2019 [draft-2019-09] IETF Trust <https://www.ietf.org/>, Austin Wright
+<aaa@bzfx.net>, Henry Andrews <andrews_henry@yahoo.com>, Ben Hutton
+<bh7@sanger.ac.uk>, and Greg Dennis <gregsdennis@yahoo.com>.
+
+2020 [draft-2020-12] IETF Trust <https://www.ietf.org/>, Austin Wright
+<aaa@bzfx.net>, Henry Andrews <andrews_henry@yahoo.com>, Ben Hutton
+<ben@jsonschema.dev>, and Greg Dennis <gregsdennis@yahoo.com>.
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
 pkce-challenge@5.0.0
 (git+https://github.com/crouchcd/pkce-challenge.git)
 
@@ -2379,6 +2519,7 @@ SOFTWARE.
 
 
 ============================================================
+zod-to-json-schema@3.25.1
 zod-to-json-schema@3.25.0
 (https://github.com/StefanTerdell/zod-to-json-schema)
 

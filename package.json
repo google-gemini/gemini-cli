@@ -2,7 +2,7 @@
   "name": "@google/gemini-cli",
   "version": "0.19.0-nightly.20251125.f6d97d448",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.18.1"
   },
   "type": "module",
   "workspaces": [
@@ -66,7 +66,12 @@
     "wrap-ansi": "9.0.2",
     "cliui": {
       "wrap-ansi": "7.0.0"
-    }
+    },
+    "qs": "6.14.1",
+    "body-parser": "2.2.2",
+    "undici": "7.20.0",
+    "lodash": "4.17.23",
+    "@isaacs/brace-expansion": "5.0.1"
   },
   "bin": {
     "gemini": "bundle/gemini.js"
