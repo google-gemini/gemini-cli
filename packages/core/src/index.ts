@@ -140,6 +140,7 @@ export * from './prompts/mcp-prompts.js';
 export * from './agents/types.js';
 export * from './agents/agentLoader.js';
 export * from './agents/local-executor.js';
+export * from './agents/agent-scheduler.js';
 
 // Export specific tool logic
 export * from './tools/read-file.js';
@@ -157,6 +158,7 @@ export * from './tools/read-many-files.js';
 export * from './tools/mcp-client.js';
 export * from './tools/mcp-tool.js';
 export * from './tools/write-todos.js';
+export * from './tools/ask-user.js';
 
 // MCP OAuth
 export { MCPOAuthProvider } from './mcp/oauth-provider.js';
@@ -190,3 +192,6 @@ export * from './agents/types.js';
 // Export stdio utils
 export * from './utils/stdio.js';
 export * from './utils/terminal.js';
+
+// Export types from @google/genai
+export type { Content, Part, FunctionCall } from '@google/genai';
