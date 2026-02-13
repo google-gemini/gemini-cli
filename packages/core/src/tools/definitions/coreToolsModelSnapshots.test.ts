@@ -20,9 +20,12 @@ import {
   READ_FILE_DEFINITION,
   WRITE_FILE_DEFINITION,
   GREP_DEFINITION,
+  RIP_GREP_DEFINITION,
   GLOB_DEFINITION,
   LS_DEFINITION,
   getShellDefinition,
+  EDIT_DEFINITION,
+  WEB_SEARCH_DEFINITION,
 } from './coreTools.js';
 
 describe('coreTools snapshots for specific models', () => {
@@ -52,12 +55,15 @@ describe('coreTools snapshots for specific models', () => {
     { name: 'read_file', definition: READ_FILE_DEFINITION },
     { name: 'write_file', definition: WRITE_FILE_DEFINITION },
     { name: 'grep_search', definition: GREP_DEFINITION },
+    { name: 'grep_search_ripgrep', definition: RIP_GREP_DEFINITION },
     { name: 'glob', definition: GLOB_DEFINITION },
     { name: 'list_directory', definition: LS_DEFINITION },
     {
       name: 'run_shell_command',
       definition: getShellDefinition(true, true),
     },
+    { name: 'replace', definition: EDIT_DEFINITION },
+    { name: 'google_web_search', definition: WEB_SEARCH_DEFINITION },
   ];
 
   for (const modelId of modelIds) {
