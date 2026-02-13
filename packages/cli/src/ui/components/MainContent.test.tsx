@@ -217,6 +217,7 @@ describe('MainContent', () => {
         ...defaultMockUiState.history,
         { id: 3, type: 'gemini_content', text: '' },
         { id: 4, type: 'gemini_content', text: 'Non-empty content' },
+        { id: 5, type: 'gemini_content', text: '' },
       ],
     };
 
