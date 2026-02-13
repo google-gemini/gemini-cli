@@ -18,6 +18,19 @@ import type { SerializableConfirmationDetails } from '../confirmation-bus/types.
 
 export const ROOT_SCHEDULER_ID = 'root';
 
+/**
+ * Internal core statuses for the tool call state machine.
+ */
+export enum CoreToolCallStatus {
+  Validating = 'validating',
+  Scheduled = 'scheduled',
+  Error = 'error',
+  Success = 'success',
+  Executing = 'executing',
+  Cancelled = 'cancelled',
+  AwaitingApproval = 'awaiting_approval',
+}
+
 export interface ToolCallRequestInfo {
   callId: string;
   name: string;
@@ -45,7 +58,7 @@ export interface ToolCallResponseInfo {
 }
 
 export type ValidatingToolCall = {
-  status: 'validating';
+  status: CoreToolCallStatus.Validating;
   request: ToolCallRequestInfo;
   tool: AnyDeclarativeTool;
   invocation: AnyToolInvocation;
@@ -55,7 +68,7 @@ export type ValidatingToolCall = {
 };
 
 export type ScheduledToolCall = {
-  status: 'scheduled';
+  status: CoreToolCallStatus.Scheduled;
   request: ToolCallRequestInfo;
   tool: AnyDeclarativeTool;
   invocation: AnyToolInvocation;
@@ -65,7 +78,7 @@ export type ScheduledToolCall = {
 };
 
 export type ErroredToolCall = {
-  status: 'error';
+  status: CoreToolCallStatus.Error;
   request: ToolCallRequestInfo;
   response: ToolCallResponseInfo;
   tool?: AnyDeclarativeTool;
@@ -75,7 +88,7 @@ export type ErroredToolCall = {
 };
 
 export type SuccessfulToolCall = {
-  status: 'success';
+  status: CoreToolCallStatus.Success;
   request: ToolCallRequestInfo;
   tool: AnyDeclarativeTool;
   response: ToolCallResponseInfo;
@@ -86,7 +99,7 @@ export type SuccessfulToolCall = {
 };
 
 export type ExecutingToolCall = {
-  status: 'executing';
+  status: CoreToolCallStatus.Executing;
   request: ToolCallRequestInfo;
   tool: AnyDeclarativeTool;
   invocation: AnyToolInvocation;
@@ -98,7 +111,7 @@ export type ExecutingToolCall = {
 };
 
 export type CancelledToolCall = {
-  status: 'cancelled';
+  status: CoreToolCallStatus.Cancelled;
   request: ToolCallRequestInfo;
   response: ToolCallResponseInfo;
   tool: AnyDeclarativeTool;
@@ -109,7 +122,7 @@ export type CancelledToolCall = {
 };
 
 export type WaitingToolCall = {
-  status: 'awaiting_approval';
+  status: CoreToolCallStatus.AwaitingApproval;
   request: ToolCallRequestInfo;
   tool: AnyDeclarativeTool;
   invocation: AnyToolInvocation;

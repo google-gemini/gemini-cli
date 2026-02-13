@@ -7,7 +7,7 @@
 import { expect, describe, it } from 'vitest';
 import { doesToolInvocationMatch, getToolSuggestion } from './tool-utils.js';
 import type { AnyToolInvocation, Config } from '../index.js';
-import { ReadFileTool } from '../tools/read-file.js';
+import { ReadFileTool } from '../index.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 describe('getToolSuggestion', () => {

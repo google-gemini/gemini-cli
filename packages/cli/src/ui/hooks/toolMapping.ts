@@ -10,6 +10,8 @@ import {
   type SerializableConfirmationDetails,
   type ToolResultDisplay,
   debugLogger,
+  CoreToolCallStatus,
+  checkExhaustive,
 } from '@google/gemini-cli-core';
 import {
   ToolCallStatus,
@@ -17,25 +19,23 @@ import {
   type IndividualToolCallDisplay,
 } from '../types.js';
 
-import { checkExhaustive } from '@google/gemini-cli-core';
-
 export function mapCoreStatusToDisplayStatus(
   coreStatus: CoreStatus,
 ): ToolCallStatus {
   switch (coreStatus) {
-    case 'validating':
+    case CoreToolCallStatus.Validating:
       return ToolCallStatus.Pending;
-    case 'awaiting_approval':
+    case CoreToolCallStatus.AwaitingApproval:
       return ToolCallStatus.Confirming;
-    case 'executing':
+    case CoreToolCallStatus.Executing:
       return ToolCallStatus.Executing;
-    case 'success':
+    case CoreToolCallStatus.Success:
       return ToolCallStatus.Success;
-    case 'cancelled':
+    case CoreToolCallStatus.Cancelled:
       return ToolCallStatus.Canceled;
-    case 'error':
+    case CoreToolCallStatus.Error:
       return ToolCallStatus.Error;
-    case 'scheduled':
+    case CoreToolCallStatus.Scheduled:
       return ToolCallStatus.Pending;
     default:
       return checkExhaustive(coreStatus);
@@ -60,7 +60,7 @@ export function mapToDisplay(
 
     const displayName = call.tool?.displayName ?? call.request.name;
 
-    if (call.status === 'error') {
+    if (call.status === CoreToolCallStatus.Error) {
       description = JSON.stringify(call.request.args);
     } else {
       description = call.invocation.getDescription();
@@ -82,25 +82,25 @@ export function mapToDisplay(
     let correlationId: string | undefined = undefined;
 
     switch (call.status) {
-      case 'success':
+      case CoreToolCallStatus.Success:
         resultDisplay = call.response.resultDisplay;
         outputFile = call.response.outputFile;
         break;
-      case 'error':
-      case 'cancelled':
+      case CoreToolCallStatus.Error:
+      case CoreToolCallStatus.Cancelled:
         resultDisplay = call.response.resultDisplay;
         break;
-      case 'awaiting_approval':
+      case CoreToolCallStatus.AwaitingApproval:
         correlationId = call.correlationId;
         // Pass through details. Context handles dispatch (callback vs bus).
         confirmationDetails = call.confirmationDetails;
         break;
-      case 'executing':
+      case CoreToolCallStatus.Executing:
         resultDisplay = call.liveOutput;
         ptyId = call.pid;
         break;
-      case 'scheduled':
-      case 'validating':
+      case CoreToolCallStatus.Scheduled:
+      case CoreToolCallStatus.Validating:
         break;
       default: {
         const exhaustiveCheck: never = call;

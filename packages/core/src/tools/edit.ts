@@ -27,6 +27,7 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
+import { CoreToolCallStatus } from '../scheduler/types.js';
 
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
 import {
@@ -505,7 +506,7 @@ class EditToolInvocation
       };
     }
 
-    const event = new EditCorrectionEvent('success');
+    const event = new EditCorrectionEvent(CoreToolCallStatus.Success);
     logEditCorrectionEvent(this.config, event);
 
     return {
