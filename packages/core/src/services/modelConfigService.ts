@@ -26,6 +26,10 @@ export interface ModelConfigKey {
   // This allows overrides to specify different settings (e.g., higher temperature)
   // specifically for retry scenarios.
   isRetry?: boolean;
+
+  // Indicates whether this request originates from the primary interactive chat model.
+  // Enables the default fallback configuration to `chat-base` when unknown.
+  isChatModel?: boolean;
 }
 
 export interface ModelConfig {
@@ -122,6 +126,7 @@ export class ModelConfigService {
     const { aliasChain, baseModel, resolvedConfig } = this.resolveAliasChain(
       context.model,
       allAliases,
+      context.isChatModel,
     );
 
     const modelToLevel = this.buildModelLevelMap(aliasChain, baseModel);
@@ -159,6 +164,7 @@ export class ModelConfigService {
   private resolveAliasChain(
     requestedModel: string,
     allAliases: Record<string, ModelConfigAlias>,
+    isChatModel?: boolean,
   ): {
     aliasChain: string[];
     baseModel: string | undefined;
@@ -204,6 +210,21 @@ export class ModelConfigService {
         baseModel: resolvedConfig.model,
         resolvedConfig: resolvedConfig.generateContentConfig ?? {},
       };
+    }
+
+    if (isChatModel) {
+      const fallbackAlias = 'chat-base';
+      if (allAliases[fallbackAlias]) {
+        const fallbackResolution = this.resolveAliasChain(
+          fallbackAlias,
+          allAliases,
+        );
+        return {
+          aliasChain: [...fallbackResolution.aliasChain, requestedModel],
+          baseModel: requestedModel,
+          resolvedConfig: fallbackResolution.resolvedConfig,
+        };
+      }
     }
 
     return {
