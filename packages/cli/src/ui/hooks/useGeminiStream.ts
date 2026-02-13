@@ -1612,54 +1612,60 @@ export const useGeminiStream = (
 
   useEffect(() => {
     const saveRestorableToolCalls = async () => {
-      if (!config.getCheckpointingEnabled()) {
-        return;
-      }
-      const restorableToolCalls = toolCalls.filter(
-        (toolCall) =>
-          EDIT_TOOL_NAMES.has(toolCall.request.name) &&
-          toolCall.status === 'awaiting_approval',
-      );
-
-      if (restorableToolCalls.length > 0) {
-        if (!gitService) {
-          onDebugMessage(
-            'Checkpointing is enabled but Git service is not available. Failed to create snapshot. Ensure Git is installed and working properly.',
-          );
+      try {
+        if (!config.getCheckpointingEnabled()) {
           return;
         }
-
-        const { checkpointsToWrite, errors } = await processRestorableToolCalls<
-          HistoryItem[]
-        >(
-          restorableToolCalls.map((call) => call.request),
-          gitService,
-          geminiClient,
-          history,
+        const restorableToolCalls = toolCalls.filter(
+          (toolCall) =>
+            EDIT_TOOL_NAMES.has(toolCall.request.name) &&
+            toolCall.status === 'awaiting_approval',
         );
 
-        if (errors.length > 0) {
-          errors.forEach(onDebugMessage);
-        }
-
-        if (checkpointsToWrite.size > 0) {
-          const checkpointDir = storage.getProjectTempCheckpointsDir();
-          try {
-            await fs.mkdir(checkpointDir, { recursive: true });
-            for (const [fileName, content] of checkpointsToWrite) {
-              const filePath = path.join(checkpointDir, fileName);
-              await fs.writeFile(filePath, content);
-            }
-          } catch (error) {
+        if (restorableToolCalls.length > 0) {
+          if (!gitService) {
             onDebugMessage(
-              `Failed to write checkpoint file: ${getErrorMessage(error)}`,
+              'Checkpointing is enabled but Git service is not available. Failed to create snapshot. Ensure Git is installed and working properly.',
             );
+            return;
+          }
+
+          const { checkpointsToWrite, errors } =
+            await processRestorableToolCalls<HistoryItem[]>(
+              restorableToolCalls.map((call) => call.request),
+              gitService,
+              geminiClient,
+              history,
+            );
+
+          if (errors.length > 0) {
+            errors.forEach(onDebugMessage);
+          }
+
+          if (checkpointsToWrite.size > 0) {
+            const checkpointDir = storage.getProjectTempCheckpointsDir();
+            try {
+              await fs.mkdir(checkpointDir, { recursive: true });
+              for (const [fileName, content] of checkpointsToWrite) {
+                const filePath = path.join(checkpointDir, fileName);
+                await fs.writeFile(filePath, content);
+              }
+            } catch (error) {
+              onDebugMessage(
+                `Failed to write checkpoint file: ${getErrorMessage(error)}`,
+              );
+            }
           }
         }
+      } catch (error) {
+        debugLogger.error(
+          'Error in saveRestorableToolCalls background task:',
+          error,
+        );
+        onDebugMessage(`Failed to save checkpoints: ${getErrorMessage(error)}`);
       }
     };
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    saveRestorableToolCalls();
+    void saveRestorableToolCalls();
   }, [
     toolCalls,
     config,
