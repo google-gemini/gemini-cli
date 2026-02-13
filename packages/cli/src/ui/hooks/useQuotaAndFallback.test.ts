@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -157,7 +157,7 @@ describe('useQuotaAndFallback', () => {
         const message = request!.message;
         expect(message).toContain('Usage limit reached for gemini-pro.');
         expect(message).toContain('Access resets at'); // From getResetTimeMessage
-        expect(message).toContain('/stats for usage details');
+        expect(message).toContain('/stats model for usage details');
         expect(message).toContain('/auth to switch to API key.');
 
         expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
@@ -328,8 +328,7 @@ describe('useQuotaAndFallback', () => {
         const message = request!.message;
         expect(message).toBe(
           `It seems like you don't have access to gemini-3-pro-preview.
-Learn more at https://goo.gle/enable-preview-features
-To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
+Your admin might have disabled the access. Contact them to enable the Preview Release Channel.`,
         );
 
         // Simulate the user choosing to switch

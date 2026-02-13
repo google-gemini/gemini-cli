@@ -69,13 +69,14 @@ export function PermissionsModifyTrustDialog({
         return true;
       }
       if (needsRestart && key.name === 'r') {
-        const success = commitTrustLevelChange();
-        if (success) {
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          relaunchApp();
-        } else {
-          onExit();
-        }
+        void (async () => {
+          const success = await commitTrustLevelChange();
+          if (success) {
+            void relaunchApp();
+          } else {
+            onExit();
+          }
+        })();
         return true;
       }
       return false;

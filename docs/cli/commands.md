@@ -113,9 +113,15 @@ Slash commands provide meta-level control over the CLI itself.
   - **Description:** Lists all active extensions in the current Gemini CLI
     session. See [Gemini CLI Extensions](../extensions/index.md).
 
-- **`/help`** (or **`/?`**)
+- **`/help`**
   - **Description:** Display help information about Gemini CLI, including
     available commands and their usage.
+
+- **`/shortcuts`**
+  - **Description:** Toggle the shortcuts panel above the input.
+  - **Shortcut:** Press `?` when the prompt is empty.
+  - **Note:** This is separate from the clean UI detail toggle on double-`Tab`,
+    which switches between minimal and full UI chrome.
 
 - **`/hooks`**
   - **Description:** Manage hooks, which allow you to intercept and customize
@@ -343,11 +349,11 @@ please see the dedicated [Custom Commands documentation](./custom-commands.md).
 These shortcuts apply directly to the input prompt for text manipulation.
 
 - **Undo:**
-  - **Keyboard shortcut:** Press **Cmd+z** or **Alt+z** to undo the last action
+  - **Keyboard shortcut:** Press **Alt+z** or **Cmd+z** to undo the last action
     in the input prompt.
 
 - **Redo:**
-  - **Keyboard shortcut:** Press **Shift+Cmd+Z** or **Shift+Alt+Z** to redo the
+  - **Keyboard shortcut:** Press **Shift+Alt+Z** or **Shift+Cmd+Z** to redo the
     last undone action in the input prompt.
 
 ## At commands (`@`)

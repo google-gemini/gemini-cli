@@ -45,6 +45,14 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
     try {
       rig.setup(evalCase.name, evalCase.params);
 
+      // Symlink node modules to reduce the amount of time needed to
+      // bootstrap test projects.
+      const rootNodeModules = path.join(process.cwd(), 'node_modules');
+      const testNodeModules = path.join(rig.testDir || '', 'node_modules');
+      if (fs.existsSync(rootNodeModules) && !fs.existsSync(testNodeModules)) {
+        fs.symlinkSync(rootNodeModules, testNodeModules, 'dir');
+      }
+
       if (evalCase.files) {
         const acknowledgedAgents: Record<string, Record<string, string>> = {};
         const projectRoot = fs.realpathSync(rig.testDir!);
@@ -117,7 +125,7 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         approvalMode: evalCase.approvalMode ?? 'yolo',
         timeout: evalCase.timeout,
         env: {
-          GEMINI_CLI_ACTIVITY_LOG_FILE: activityLogFile,
+          GEMINI_CLI_ACTIVITY_LOG_TARGET: activityLogFile,
         },
       });
 
@@ -154,7 +162,7 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
   if (policy === 'USUALLY_PASSES' && !process.env['RUN_EVALS']) {
     it.skip(evalCase.name, fn);
   } else {
-    it(evalCase.name, fn);
+    it(evalCase.name, fn, evalCase.timeout);
   }
 }
 

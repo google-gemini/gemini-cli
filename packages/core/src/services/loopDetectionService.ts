@@ -379,7 +379,30 @@ export class LoopDetectionService {
     const averageDistance = totalDistance / (CONTENT_LOOP_THRESHOLD - 1);
     const maxAllowedDistance = CONTENT_CHUNK_SIZE * 5;
 
-    return averageDistance <= maxAllowedDistance;
+    if (averageDistance > maxAllowedDistance) {
+      return false;
+    }
+
+    // Verify that the sequence is actually repeating, not just sharing a common prefix.
+    // For a true loop, the text between occurrences of the chunk (the period) should be highly repetitive.
+    const periods = new Set<string>();
+    for (let i = 0; i < recentIndices.length - 1; i++) {
+      periods.add(
+        this.streamContentHistory.substring(
+          recentIndices[i],
+          recentIndices[i + 1],
+        ),
+      );
+    }
+
+    // If the periods are mostly unique, it's a list of distinct items with a shared prefix.
+    // A true loop will have a small number of unique periods (usually 1, sometimes 2 or 3).
+    // We use Math.floor(CONTENT_LOOP_THRESHOLD / 2) as a safe threshold.
+    if (periods.size > Math.floor(CONTENT_LOOP_THRESHOLD / 2)) {
+      return false;
+    }
+
+    return true;
   }
 
   /**
@@ -449,6 +472,7 @@ export class LoopDetectionService {
       return false;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const flashConfidence = flashResult[
       'unproductive_state_confidence'
     ] as number;
@@ -490,7 +514,8 @@ export class LoopDetectionService {
     );
 
     const mainModelConfidence = mainModelResult
-      ? (mainModelResult['unproductive_state_confidence'] as number)
+      ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (mainModelResult['unproductive_state_confidence'] as number)
       : 0;
 
     logLlmLoopCheck(

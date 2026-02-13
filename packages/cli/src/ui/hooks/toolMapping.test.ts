@@ -18,19 +18,9 @@ import {
   type ExecutingToolCall,
   type WaitingToolCall,
   type CancelledToolCall,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { ToolCallStatus } from '../types.js';
-
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
-  return {
-    ...actual,
-    debugLogger: {
-      warn: vi.fn(),
-    },
-  };
-});
 
 describe('toolMapping', () => {
   beforeEach(() => {
@@ -39,13 +29,13 @@ describe('toolMapping', () => {
 
   describe('mapCoreStatusToDisplayStatus', () => {
     it.each([
-      ['validating', ToolCallStatus.Pending],
-      ['awaiting_approval', ToolCallStatus.Confirming],
-      ['executing', ToolCallStatus.Executing],
-      ['success', ToolCallStatus.Success],
-      ['cancelled', ToolCallStatus.Canceled],
-      ['error', ToolCallStatus.Error],
-      ['scheduled', ToolCallStatus.Pending],
+      [CoreToolCallStatus.Validating, ToolCallStatus.Pending],
+      [CoreToolCallStatus.AwaitingApproval, ToolCallStatus.Confirming],
+      [CoreToolCallStatus.Executing, ToolCallStatus.Executing],
+      [CoreToolCallStatus.Success, ToolCallStatus.Success],
+      [CoreToolCallStatus.Cancelled, ToolCallStatus.Canceled],
+      [CoreToolCallStatus.Error, ToolCallStatus.Error],
+      [CoreToolCallStatus.Scheduled, ToolCallStatus.Pending],
     ] as const)('maps %s to %s', (coreStatus, expectedDisplayStatus) => {
       expect(mapCoreStatusToDisplayStatus(coreStatus)).toBe(
         expectedDisplayStatus,
@@ -88,7 +78,7 @@ describe('toolMapping', () => {
 
     it('handles a single tool call input', () => {
       const toolCall: ScheduledToolCall = {
-        status: 'scheduled',
+        status: CoreToolCallStatus.Scheduled,
         request: mockRequest,
         tool: mockTool,
         invocation: mockInvocation,
@@ -102,13 +92,13 @@ describe('toolMapping', () => {
 
     it('handles an array of tool calls', () => {
       const toolCall1: ScheduledToolCall = {
-        status: 'scheduled',
+        status: CoreToolCallStatus.Scheduled,
         request: mockRequest,
         tool: mockTool,
         invocation: mockInvocation,
       };
       const toolCall2: ScheduledToolCall = {
-        status: 'scheduled',
+        status: CoreToolCallStatus.Scheduled,
         request: { ...mockRequest, callId: 'call-2' },
         tool: mockTool,
         invocation: mockInvocation,
@@ -122,7 +112,7 @@ describe('toolMapping', () => {
 
     it('maps successful tool call properties correctly', () => {
       const toolCall: SuccessfulToolCall = {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: mockRequest,
         tool: mockTool,
         invocation: mockInvocation,
@@ -150,7 +140,7 @@ describe('toolMapping', () => {
 
     it('maps executing tool call properties correctly with live output and ptyId', () => {
       const toolCall: ExecutingToolCall = {
-        status: 'executing',
+        status: CoreToolCallStatus.Executing,
         request: mockRequest,
         tool: mockTool,
         invocation: mockInvocation,
@@ -177,7 +167,7 @@ describe('toolMapping', () => {
       };
 
       const toolCall: WaitingToolCall = {
-        status: 'awaiting_approval',
+        status: CoreToolCallStatus.AwaitingApproval,
         request: mockRequest,
         tool: mockTool,
         invocation: mockInvocation,
@@ -204,7 +194,7 @@ describe('toolMapping', () => {
       };
 
       const toolCall: WaitingToolCall = {
-        status: 'awaiting_approval',
+        status: CoreToolCallStatus.AwaitingApproval,
         request: mockRequest,
         tool: mockTool,
         invocation: mockInvocation,
@@ -222,7 +212,7 @@ describe('toolMapping', () => {
     it('maps error tool call missing tool definition', () => {
       // e.g. "TOOL_NOT_REGISTERED" errors
       const toolCall: ToolCall = {
-        status: 'error',
+        status: CoreToolCallStatus.Error,
         request: mockRequest, // name: 'test_tool'
         response: { ...mockResponse, resultDisplay: 'Tool not found' },
         // notice: no `tool` or `invocation` defined here
@@ -240,7 +230,7 @@ describe('toolMapping', () => {
 
     it('maps cancelled tool call properties correctly', () => {
       const toolCall: CancelledToolCall = {
-        status: 'cancelled',
+        status: CoreToolCallStatus.Cancelled,
         request: mockRequest,
         tool: mockTool,
         invocation: mockInvocation,
@@ -255,6 +245,35 @@ describe('toolMapping', () => {
 
       expect(displayTool.status).toBe(ToolCallStatus.Canceled);
       expect(displayTool.resultDisplay).toBe('User cancelled');
+    });
+
+    it('propagates borderTop and borderBottom options correctly', () => {
+      const toolCall: ScheduledToolCall = {
+        status: CoreToolCallStatus.Scheduled,
+        request: mockRequest,
+        tool: mockTool,
+        invocation: mockInvocation,
+      };
+
+      const result = mapToDisplay(toolCall, {
+        borderTop: true,
+        borderBottom: false,
+      });
+      expect(result.borderTop).toBe(true);
+      expect(result.borderBottom).toBe(false);
+    });
+
+    it('sets resultDisplay to undefined for pre-execution statuses', () => {
+      const toolCall: ScheduledToolCall = {
+        status: CoreToolCallStatus.Scheduled,
+        request: mockRequest,
+        tool: mockTool,
+        invocation: mockInvocation,
+      };
+
+      const result = mapToDisplay(toolCall);
+      expect(result.tools[0].resultDisplay).toBeUndefined();
+      expect(result.tools[0].status).toBe(ToolCallStatus.Pending);
     });
   });
 });

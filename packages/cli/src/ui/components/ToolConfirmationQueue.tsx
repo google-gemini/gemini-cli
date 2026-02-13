@@ -70,10 +70,11 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
       ? Math.max(maxHeight - 6, 4)
       : undefined;
 
-  const borderColor = theme.status.warning;
-  const hideToolIdentity =
+  const isRoutine =
     tool.confirmationDetails?.type === 'ask_user' ||
     tool.confirmationDetails?.type === 'exit_plan_mode';
+  const borderColor = isRoutine ? theme.status.success : theme.status.warning;
+  const hideToolIdentity = isRoutine;
 
   return (
     <OverflowProvider>
@@ -90,7 +91,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
               marginBottom={hideToolIdentity ? 0 : 1}
               justifyContent="space-between"
             >
-              <Text color={theme.status.warning} bold>
+              <Text color={borderColor} bold>
                 {getConfirmationHeader(tool.confirmationDetails)}
               </Text>
               {total > 1 && (
@@ -140,7 +141,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           />
         </Box>
         <Box
-          height={0}
+          height={1}
           width={mainAreaWidth}
           borderLeft={true}
           borderRight={true}
@@ -150,9 +151,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           borderStyle="round"
         />
       </Box>
-      <Box paddingX={2} marginBottom={1}>
-        <ShowMoreLines constrainHeight={constrainHeight} />
-      </Box>
+      <ShowMoreLines constrainHeight={constrainHeight} />
     </OverflowProvider>
   );
 };

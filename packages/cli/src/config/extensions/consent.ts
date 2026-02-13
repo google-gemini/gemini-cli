@@ -28,14 +28,19 @@ export async function skillsConsentString(
   skills: SkillDefinition[],
   source: string,
   targetDir?: string,
+  isLink = false,
 ): Promise<string> {
+  const action = isLink ? 'Linking' : 'Installing';
   const output: string[] = [];
-  output.push(`Installing agent skill(s) from "${source}".`);
-  output.push('\nThe following agent skill(s) will be installed:\n');
+  output.push(`${action} agent skill(s) from "${source}".`);
+  output.push(
+    `\nThe following agent skill(s) will be ${action.toLowerCase()}:\n`,
+  );
   output.push(...(await renderSkillsList(skills)));
 
   if (targetDir) {
-    output.push(`Install Destination: ${targetDir}`);
+    const destLabel = isLink ? 'Link' : 'Install';
+    output.push(`${destLabel} Destination: ${targetDir}`);
   }
   output.push('\n' + SKILLS_WARNING_MESSAGE);
 

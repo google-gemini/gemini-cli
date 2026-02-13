@@ -14,7 +14,18 @@ import type { ExtensionUpdateAction } from '../state/extensions.js';
  */
 export function createNonInteractiveUI(): CommandContext['ui'] {
   return {
-    addItem: (_item, _timestamp) => 0,
+    addItem: (item, _timestamp) => {
+      if ('text' in item && item.text) {
+        if (item.type === 'error') {
+          process.stderr.write(`Error: ${item.text}\n`);
+        } else if (item.type === 'warning') {
+          process.stderr.write(`Warning: ${item.text}\n`);
+        } else if (item.type === 'info') {
+          process.stdout.write(`${item.text}\n`);
+        }
+      }
+      return 0;
+    },
     clear: () => {},
     setDebugMessage: (_message) => {},
     loadHistory: (_newHistory) => {},
@@ -28,7 +39,9 @@ export function createNonInteractiveUI(): CommandContext['ui'] {
     extensionsUpdateState: new Map(),
     dispatchExtensionStateUpdate: (_action: ExtensionUpdateAction) => {},
     addConfirmUpdateExtensionRequest: (_request) => {},
+    setConfirmationRequest: (_request) => {},
     removeComponent: () => {},
     toggleBackgroundShell: () => {},
+    toggleShortcutsHelp: () => {},
   };
 }

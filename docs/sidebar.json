@@ -20,6 +20,7 @@
       { "label": "Project context (GEMINI.md)", "slug": "docs/cli/gemini-md" },
       { "label": "Shell commands", "slug": "docs/tools/shell" },
       { "label": "Session management", "slug": "docs/cli/session-management" },
+      { "label": "Plan mode (experimental)", "slug": "docs/cli/plan-mode" },
       { "label": "Todos", "slug": "docs/tools/todos" },
       { "label": "Web search and fetch", "slug": "docs/tools/web-search" }
     ]
@@ -44,6 +45,10 @@
       { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
       { "label": "Custom commands", "slug": "docs/cli/custom-commands" },
       { "label": "Enterprise features", "slug": "docs/cli/enterprise" },
+      {
+        "label": "Enterprise admin controls",
+        "slug": "docs/admin/enterprise-controls"
+      },
       { "label": "Headless mode & scripting", "slug": "docs/cli/headless" },
       { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
       { "label": "System prompt override", "slug": "docs/cli/system-prompt" },
@@ -123,14 +128,6 @@
     "items": [
       { "label": "FAQ", "slug": "docs/faq" },
       { "label": "Quota and pricing", "slug": "docs/quota-and-pricing" },
-      {
-        "label": "Releases",
-        "items": [
-          { "label": "Release notes", "slug": "docs/changelogs/" },
-          { "label": "Stable release", "slug": "docs/changelogs/latest" },
-          { "label": "Preview release", "slug": "docs/changelogs/preview" }
-        ]
-      },
       { "label": "Terms and privacy", "slug": "docs/tos-privacy" },
       { "label": "Troubleshooting", "slug": "docs/troubleshooting" },
       { "label": "Uninstall", "slug": "docs/cli/uninstall" }
@@ -147,6 +144,14 @@
       },
       { "label": "Local development", "slug": "docs/local-development" },
       { "label": "NPM package structure", "slug": "docs/npm" }
+    ]
+  },
+  {
+    "label": "Releases",
+    "items": [
+      { "label": "Release notes", "slug": "docs/changelogs/" },
+      { "label": "Stable release", "slug": "docs/changelogs/latest" },
+      { "label": "Preview release", "slug": "docs/changelogs/preview" }
     ]
   }
 ]

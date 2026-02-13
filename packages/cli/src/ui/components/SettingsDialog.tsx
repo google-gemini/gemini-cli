@@ -7,7 +7,6 @@
 import type React from 'react';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Text } from 'ink';
-import { AsyncFzf } from 'fzf';
 import type { Key } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
 import type {
@@ -32,27 +31,17 @@ import {
   getEffectiveValue,
 } from '../../utils/settingsUtils.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
-import { getCachedStringWidth } from '../utils/textUtils.js';
 import {
   type SettingsValue,
   TOGGLE_TYPES,
 } from '../../config/settingsSchema.js';
 import { coreEvents, debugLogger } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
-import { useUIState } from '../contexts/UIStateContext.js';
-import { useTextBuffer } from './shared/text-buffer.js';
 import {
-  BaseSettingsDialog,
   type SettingsDialogItem,
+  BaseSettingsDialog,
 } from './shared/BaseSettingsDialog.js';
-
-interface FzfResult {
-  item: string;
-  start: number;
-  end: number;
-  score: number;
-  positions?: number[];
-}
+import { useFuzzyList } from '../hooks/useFuzzyList.js';
 
 interface SettingsDialogProps {
   settings: LoadedSettings;
@@ -80,60 +69,6 @@ export function SettingsDialog({
   );
 
   const [showRestartPrompt, setShowRestartPrompt] = useState(false);
-
-  // Search state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filteredKeys, setFilteredKeys] = useState<string[]>(() =>
-    getDialogSettingKeys(),
-  );
-  const { fzfInstance, searchMap } = useMemo(() => {
-    const keys = getDialogSettingKeys();
-    const map = new Map<string, string>();
-    const searchItems: string[] = [];
-
-    keys.forEach((key) => {
-      const def = getSettingDefinition(key);
-      if (def?.label) {
-        searchItems.push(def.label);
-        map.set(def.label.toLowerCase(), key);
-      }
-    });
-
-    const fzf = new AsyncFzf(searchItems, {
-      fuzzy: 'v2',
-      casing: 'case-insensitive',
-    });
-    return { fzfInstance: fzf, searchMap: map };
-  }, []);
-
-  // Perform search
-  useEffect(() => {
-    let active = true;
-    if (!searchQuery.trim() || !fzfInstance) {
-      setFilteredKeys(getDialogSettingKeys());
-      return;
-    }
-
-    const doSearch = async () => {
-      const results = await fzfInstance.find(searchQuery);
-
-      if (!active) return;
-
-      const matchedKeys = new Set<string>();
-      results.forEach((res: FzfResult) => {
-        const key = searchMap.get(res.item.toLowerCase());
-        if (key) matchedKeys.add(key);
-      });
-      setFilteredKeys(Array.from(matchedKeys));
-    };
-
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    doSearch();
-
-    return () => {
-      active = false;
-    };
-  }, [searchQuery, fzfInstance, searchMap]);
 
   // Local pending settings state for the selected scope
   const [pendingSettings, setPendingSettings] = useState<Settings>(() =>
@@ -182,50 +117,8 @@ export function SettingsDialog({
     setShowRestartPrompt(newRestartRequired.size > 0);
   }, [selectedScope, settings, globalPendingChanges]);
 
-  // Calculate max width for the left column (Label/Description) to keep values aligned or close
-  const maxLabelOrDescriptionWidth = useMemo(() => {
-    const allKeys = getDialogSettingKeys();
-    let max = 0;
-    for (const key of allKeys) {
-      const def = getSettingDefinition(key);
-      if (!def) continue;
-
-      const scopeMessage = getScopeMessageForSetting(
-        key,
-        selectedScope,
-        settings,
-      );
-      const label = def.label || key;
-      const labelFull = label + (scopeMessage ? ` ${scopeMessage}` : '');
-      const lWidth = getCachedStringWidth(labelFull);
-      const dWidth = def.description
-        ? getCachedStringWidth(def.description)
-        : 0;
-
-      max = Math.max(max, lWidth, dWidth);
-    }
-    return max;
-  }, [selectedScope, settings]);
-
-  // Get mainAreaWidth for search buffer viewport
-  const { mainAreaWidth } = useUIState();
-  const viewportWidth = mainAreaWidth - 8;
-
-  // Search input buffer
-  const searchBuffer = useTextBuffer({
-    initialText: '',
-    initialCursorOffset: 0,
-    viewport: {
-      width: viewportWidth,
-      height: 1,
-    },
-    isValidPath: () => false,
-    singleLine: true,
-    onChange: (text) => setSearchQuery(text),
-  });
-
-  // Generate items for BaseSettingsDialog
-  const settingKeys = searchQuery ? filteredKeys : getDialogSettingKeys();
+  // Generate items for SearchableList
+  const settingKeys = useMemo(() => getDialogSettingKeys(), []);
   const items: SettingsDialogItem[] = useMemo(() => {
     const scopeSettings = settings.forScope(selectedScope).settings;
     const mergedSettings = settings.merged;
@@ -260,14 +153,20 @@ export function SettingsDialog({
         key,
         label: definition?.label || key,
         description: definition?.description,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         type: type as 'boolean' | 'number' | 'string' | 'enum',
         displayValue,
         isGreyedOut,
         scopeMessage,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         rawValue: rawValue as string | number | boolean | undefined,
       };
     });
   }, [settingKeys, selectedScope, settings, modifiedSettings, pendingSettings]);
+
+  const { filteredItems, searchBuffer, maxLabelWidth } = useFuzzyList({
+    items,
+  });
 
   // Scope selection handler
   const handleScopeChange = useCallback((scope: LoadableSettingScope) => {
@@ -284,8 +183,10 @@ export function SettingsDialog({
       const currentValue = getEffectiveValue(key, pendingSettings, {});
       let newValue: SettingsValue;
       if (definition?.type === 'boolean') {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         newValue = !(currentValue as boolean);
         setPendingSettings((prev) =>
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           setPendingSettingValue(key, newValue as boolean, prev),
         );
       } else if (definition?.type === 'enum' && definition.options) {
@@ -355,10 +256,6 @@ export function SettingsDialog({
           next.delete(key);
           return next;
         });
-
-        if (key === 'general.previewFeatures') {
-          config?.setPreviewFeatures(newValue as boolean);
-        }
       } else {
         // For restart-required settings, track as modified
         setModifiedSettings((prev) => {
@@ -382,19 +279,13 @@ export function SettingsDialog({
         // Record pending change globally
         setGlobalPendingChanges((prev) => {
           const next = new Map(prev);
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           next.set(key, newValue as PendingValue);
           return next;
         });
       }
     },
-    [
-      pendingSettings,
-      settings,
-      selectedScope,
-      vimEnabled,
-      toggleVimEnabled,
-      config,
-    ],
+    [pendingSettings, settings, selectedScope, vimEnabled, toggleVimEnabled],
   );
 
   // Edit commit handler
@@ -521,12 +412,6 @@ export function SettingsDialog({
               );
             });
           }
-        }
-
-        if (key === 'general.previewFeatures') {
-          const booleanDefaultValue =
-            typeof defaultValue === 'boolean' ? defaultValue : false;
-          config?.setPreviewFeatures(booleanDefaultValue);
         }
       }
 
@@ -709,12 +594,12 @@ export function SettingsDialog({
       borderColor={showRestartPrompt ? theme.status.warning : undefined}
       searchEnabled={showSearch}
       searchBuffer={searchBuffer}
-      items={items}
+      items={filteredItems}
       showScopeSelector={showScopeSelection}
       selectedScope={selectedScope}
       onScopeChange={handleScopeChange}
       maxItemsToShow={effectiveMaxItemsToShow}
-      maxLabelWidth={maxLabelOrDescriptionWidth}
+      maxLabelWidth={maxLabelWidth}
       onItemToggle={handleItemToggle}
       onEditCommit={handleEditCommit}
       onItemClear={handleItemClear}
