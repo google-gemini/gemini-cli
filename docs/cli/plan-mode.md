@@ -68,7 +68,7 @@ You can enter Plan Mode in three ways:
 
 ### The Planning Workflow
 
-1.  **Requirements:** The agent clarifies goals using `ask_user`.
+1.  **Requirements:** The agent clarifies goals using [`ask_user`].
 2.  **Exploration:** The agent uses read-only tools (like [`read_file`]) to map
     the codebase and validate assumptions.
 3.  **Design:** The agent proposes alternative approaches with a recommended
@@ -95,11 +95,11 @@ These are the only allowed tools:
 
 - **FileSystem (Read):** [`read_file`], [`list_directory`], [`glob`]
 - **Search:** [`grep_search`], [`google_web_search`]
-- **Interaction:** `ask_user`
+- **Interaction:** [`ask_user`]
 - **MCP Tools (Read):** Read-only [MCP tools] (e.g., `github_read_issue`,
   `postgres_read_schema`) are allowed.
 - **Planning (Write):** [`write_file`] and [`replace`] ONLY allowed for `.md`
-  files in the `~/.gemini/tmp/<project>/plans/` directory.
+  files in the `~/.gemini/tmp/<project>/<session-id>/plans/` directory.
 - **Skills:** [`activate_skill`] (allows loading specialized instructions and
   resources in a read-only manner)
 
@@ -183,3 +183,4 @@ Guide].
 [Policy Engine Guide]: /docs/core/policy-engine.md
 [`enter_plan_mode`]: /docs/tools/planning.md#1-enter_plan_mode-enterplanmode
 [`exit_plan_mode`]: /docs/tools/planning.md#2-exit_plan_mode-exitplanmode
+[`ask_user`]: /docs/tools/ask-user.md
