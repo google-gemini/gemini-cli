@@ -2,6 +2,7 @@ This file contains third-party software notices and license terms.
 
 ============================================================
 @modelcontextprotocol/sdk@1.26.0
+@modelcontextprotocol/sdk@1.24.0
 (git+https://github.com/modelcontextprotocol/typescript-sdk.git)
 
 MIT License
@@ -2349,7 +2350,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 
-============================================================
 hono@4.11.7
 (git+https://github.com/honojs/hono.git)
 
@@ -2376,7 +2376,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 
-============================================================
 jose@6.1.3
 (No repository found)
 
@@ -2466,7 +2465,6 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-============================================================
 pkce-challenge@5.0.0
 (git+https://github.com/crouchcd/pkce-challenge.git)
 
@@ -2522,6 +2520,7 @@ SOFTWARE.
 
 ============================================================
 zod-to-json-schema@3.25.1
+zod-to-json-schema@3.25.0
 (https://github.com/StefanTerdell/zod-to-json-schema)
 
 ISC License
