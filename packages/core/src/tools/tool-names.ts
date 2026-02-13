@@ -5,8 +5,11 @@
  */
 
 import {
+  ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   EDIT_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
   GET_INTERNAL_DOCS_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
@@ -26,8 +29,11 @@ import {
 // need to reference a tool's name without importing the tool's implementation.
 
 export {
+  ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   EDIT_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
   GET_INTERNAL_DOCS_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
@@ -44,11 +50,8 @@ export {
 
 export const LS_TOOL_NAME_LEGACY = 'list_directory'; // Just to be safe if anything used the old exported name directly
 
-export const ACTIVATE_SKILL_TOOL_NAME = 'activate_skill';
 export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
 export const ASK_USER_DISPLAY_NAME = 'Ask User';
-export const EXIT_PLAN_MODE_TOOL_NAME = 'exit_plan_mode';
-export const ENTER_PLAN_MODE_TOOL_NAME = 'enter_plan_mode';
 
 /**
  * Mapping of legacy tool names to their current names.

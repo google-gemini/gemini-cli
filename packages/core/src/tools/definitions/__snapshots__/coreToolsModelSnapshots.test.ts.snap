@@ -1,5 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+<<<<<<< HEAD
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: ask_user 1`] = `
 {
   "description": "Ask the user one or more questions to gather preferences, clarify requirements, or make decisions.",
@@ -71,12 +72,32 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
     },
     "required": [
       "questions",
+=======
+exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: activate_skill 1`] = `
+{
+  "description": "Activates a specialized agent skill by name (Available: 'skill1', 'skill2'). Returns the skill's instructions wrapped in \`<activated_skill>\` tags. These provide specialized guidance for the current task. Use this when you identify a task that matches a skill's description. ONLY use names exactly as they appear in the \`<available_skills>\` section.",
+  "name": "activate_skill",
+  "parametersJsonSchema": {
+    "properties": {
+      "name": {
+        "description": "The name of the skill to activate.",
+        "enum": [
+          "skill1",
+          "skill2",
+        ],
+        "type": "string",
+      },
+    },
+    "required": [
+      "name",
+>>>>>>> refactor-tools-group-4
     ],
     "type": "object",
   },
 }
 `;
 
+<<<<<<< HEAD
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: get_internal_docs 1`] = `
 {
   "description": "Returns the content of Gemini CLI internal documentation files. If no path is provided, returns a list of all available documentation paths.",
@@ -85,6 +106,16 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
     "properties": {
       "path": {
         "description": "The relative path to the documentation file (e.g., 'cli/commands.md'). If omitted, lists all available documentation.",
+=======
+exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: enter_plan_mode 1`] = `
+{
+  "description": "Switch to Plan Mode to safely research, design, and plan complex changes using read-only tools.",
+  "name": "enter_plan_mode",
+  "parametersJsonSchema": {
+    "properties": {
+      "reason": {
+        "description": "Short reason explaining why you are entering plan mode.",
+>>>>>>> refactor-tools-group-4
         "type": "string",
       },
     },
@@ -93,6 +124,28 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 }
 `;
 
+<<<<<<< HEAD
+=======
+exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: exit_plan_mode 1`] = `
+{
+  "description": "Signals that the planning phase is complete and requests user approval to start implementation.",
+  "name": "exit_plan_mode",
+  "parametersJsonSchema": {
+    "properties": {
+      "plan_path": {
+        "description": "The file path to the finalized plan (e.g., "/mock/plans/feature-x.md"). This path MUST be within the designated plans directory: /mock/plans/",
+        "type": "string",
+      },
+    },
+    "required": [
+      "plan_path",
+    ],
+    "type": "object",
+  },
+}
+`;
+
+>>>>>>> refactor-tools-group-4
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: glob 1`] = `
 {
   "description": "Efficiently finds files matching specific glob patterns (e.g., \`src/**/*.ts\`, \`**/*.md\`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.",
@@ -575,6 +628,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 }
 `;
 
+<<<<<<< HEAD
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: write_todos 1`] = `
 {
   "description": "This tool can help you list out the current subtasks that are required to be completed for a given user request. The list of subtasks helps you keep track of the current task, organize complex queries and help ensure that you don't miss any steps. With this list, the user can also see the current progress you are making in executing a given task.
@@ -676,12 +730,32 @@ The agent did not use the todo list because this task could be completed by a ti
     },
     "required": [
       "todos",
+=======
+exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: activate_skill 1`] = `
+{
+  "description": "Activates a specialized agent skill by name (Available: 'skill1', 'skill2'). Returns the skill's instructions wrapped in \`<activated_skill>\` tags. These provide specialized guidance for the current task. Use this when you identify a task that matches a skill's description. ONLY use names exactly as they appear in the \`<available_skills>\` section.",
+  "name": "activate_skill",
+  "parametersJsonSchema": {
+    "properties": {
+      "name": {
+        "description": "The name of the skill to activate.",
+        "enum": [
+          "skill1",
+          "skill2",
+        ],
+        "type": "string",
+      },
+    },
+    "required": [
+      "name",
+>>>>>>> refactor-tools-group-4
     ],
     "type": "object",
   },
 }
 `;
 
+<<<<<<< HEAD
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: ask_user 1`] = `
 {
   "description": "Ask the user one or more questions to gather preferences, clarify requirements, or make decisions.",
@@ -767,6 +841,16 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
     "properties": {
       "path": {
         "description": "The relative path to the documentation file (e.g., 'cli/commands.md'). If omitted, lists all available documentation.",
+=======
+exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: enter_plan_mode 1`] = `
+{
+  "description": "Switch to Plan Mode to safely research, design, and plan complex changes using read-only tools.",
+  "name": "enter_plan_mode",
+  "parametersJsonSchema": {
+    "properties": {
+      "reason": {
+        "description": "Short reason explaining why you are entering plan mode.",
+>>>>>>> refactor-tools-group-4
         "type": "string",
       },
     },
@@ -775,6 +859,28 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 }
 `;
 
+<<<<<<< HEAD
+=======
+exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: exit_plan_mode 1`] = `
+{
+  "description": "Signals that the planning phase is complete and requests user approval to start implementation.",
+  "name": "exit_plan_mode",
+  "parametersJsonSchema": {
+    "properties": {
+      "plan_path": {
+        "description": "The file path to the finalized plan (e.g., "/mock/plans/feature-x.md"). This path MUST be within the designated plans directory: /mock/plans/",
+        "type": "string",
+      },
+    },
+    "required": [
+      "plan_path",
+    ],
+    "type": "object",
+  },
+}
+`;
+
+>>>>>>> refactor-tools-group-4
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: glob 1`] = `
 {
   "description": "Efficiently finds files matching specific glob patterns (e.g., \`src/**/*.ts\`, \`**/*.md\`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.",

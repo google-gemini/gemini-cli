@@ -22,6 +22,9 @@ export const MEMORY_TOOL_NAME = 'save_memory';
 export const WRITE_TODOS_TOOL_NAME = 'write_todos';
 export const GET_INTERNAL_DOCS_TOOL_NAME = 'get_internal_docs';
 export const ASK_USER_TOOL_NAME = 'ask_user';
+export const ACTIVATE_SKILL_TOOL_NAME = 'activate_skill';
+export const EXIT_PLAN_MODE_TOOL_NAME = 'exit_plan_mode';
+export const ENTER_PLAN_MODE_TOOL_NAME = 'enter_plan_mode';
 
 // ============================================================================
 // READ_FILE TOOL
@@ -636,6 +639,90 @@ export const ASK_USER_DEFINITION: ToolDefinition = {
     },
   },
 };
+
+// ============================================================================
+// PLAN_MODE TOOLS
+// ============================================================================
+
+export const ENTER_PLAN_MODE_DEFINITION: ToolDefinition = {
+  base: {
+    name: ENTER_PLAN_MODE_TOOL_NAME,
+    description:
+      'Switch to Plan Mode to safely research, design, and plan complex changes using read-only tools.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        reason: {
+          type: 'string',
+          description:
+            'Short reason explaining why you are entering plan mode.',
+        },
+      },
+    },
+  },
+};
+
+/**
+ * Returns the tool definition for exiting plan mode.
+ */
+export function getExitPlanModeDefinition(plansDir: string): ToolDefinition {
+  return {
+    base: {
+      name: EXIT_PLAN_MODE_TOOL_NAME,
+      description:
+        'Signals that the planning phase is complete and requests user approval to start implementation.',
+      parametersJsonSchema: {
+        type: 'object',
+        required: ['plan_path'],
+        properties: {
+          plan_path: {
+            type: 'string',
+            description: `The file path to the finalized plan (e.g., "${plansDir}/feature-x.md"). This path MUST be within the designated plans directory: ${plansDir}/`,
+          },
+        },
+      },
+    },
+  };
+}
+
+// ============================================================================
+// ACTIVATE_SKILL TOOL
+// ============================================================================
+
+/**
+ * Returns the tool definition for activating a skill.
+ */
+export function getActivateSkillDefinition(
+  skillNames: string[],
+): ToolDefinition {
+  const availableSkillsHint =
+    skillNames.length > 0
+      ? ` (Available: ${skillNames.map((n) => `'${n}'`).join(', ')})`
+      : '';
+
+  const schema: ToolDefinition['base']['parametersJsonSchema'] = {
+    type: 'object',
+    properties: {
+      name: {
+        type: 'string',
+        description: 'The name of the skill to activate.',
+      },
+    },
+    required: ['name'],
+  };
+
+  if (skillNames.length > 0 && schema?.properties?.['name']) {
+    schema.properties['name'].enum = skillNames;
+  }
+
+  return {
+    base: {
+      name: ACTIVATE_SKILL_TOOL_NAME,
+      description: `Activates a specialized agent skill by name${availableSkillsHint}. Returns the skill's instructions wrapped in \`<activated_skill>\` tags. These provide specialized guidance for the current task. Use this when you identify a task that matches a skill's description. ONLY use names exactly as they appear in the \`<available_skills>\` section.`,
+      parametersJsonSchema: schema,
+    },
+  };
+}
 
 // ============================================================================
 // GLOB TOOL
