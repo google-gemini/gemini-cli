@@ -107,7 +107,14 @@ describe('createPolicyUpdater', () => {
     createPolicyUpdater(policyEngine, messageBus);
     vi.mocked(fs.readFile).mockRejectedValue({ code: 'ENOENT' });
     vi.mocked(fs.mkdir).mockResolvedValue(undefined);
-    vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.mocked(fs.open).mockResolvedValue(
+      mockFileHandle as unknown as fs.FileHandle,
+    );
     vi.mocked(fs.rename).mockResolvedValue(undefined);
 
     await messageBus.publish({
@@ -120,8 +127,8 @@ describe('createPolicyUpdater', () => {
     // Wait for the async listener to complete
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(fs.writeFile).toHaveBeenCalled();
-    const [_path, content] = vi.mocked(fs.writeFile).mock.calls[0] as [
+    expect(fs.open).toHaveBeenCalled();
+    const [content] = mockFileHandle.writeFile.mock.calls[0] as [
       string,
       string,
     ];
@@ -129,6 +136,19 @@ describe('createPolicyUpdater', () => {
 
     expect(parsed.rule).toHaveLength(1);
     expect(parsed.rule![0].commandPrefix).toEqual(['echo', 'ls']);
+  });
+
+  it('should reject unsafe regex patterns', async () => {
+    createPolicyUpdater(policyEngine, messageBus);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      argsPattern: '(a+)+',
+      persist: false,
+    });
+
+    expect(policyEngine.addRule).not.toHaveBeenCalled();
   });
 });
 
