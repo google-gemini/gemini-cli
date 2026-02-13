@@ -132,8 +132,6 @@ export function useSuspend({
     ctrlZPressCount,
     handleWarning,
     setRawMode,
-    refreshStatic,
-    setForceRerenderKey,
     shouldUseAlternateScreen,
   ]);
 
