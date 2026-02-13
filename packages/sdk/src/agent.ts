@@ -24,8 +24,12 @@ import { SdkAgentFilesystem } from './fs.js';
 import { SdkAgentShell } from './shell.js';
 import type { SessionContext } from './types.js';
 
+export type SystemInstructions =
+  | string
+  | ((context: SessionContext) => string | Promise<string>);
+
 export interface GeminiCliAgentOptions {
-  instructions: string;
+  instructions: SystemInstructions;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tools?: Array<Tool<any>>;
   model?: string;
@@ -39,10 +43,16 @@ export class GeminiCliAgent {
   private config: Config;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private tools: Array<Tool<any>>;
+  private readonly instructions: SystemInstructions;
+  private instructionsLoaded = false;
 
   constructor(options: GeminiCliAgentOptions) {
+    this.instructions = options.instructions;
     const cwd = options.cwd || process.cwd();
     this.tools = options.tools || [];
+
+    const initialMemory =
+      typeof this.instructions === 'string' ? this.instructions : '';
 
     const configParams: ConfigParameters = {
       sessionId: `sdk-${Date.now()}`,
@@ -50,7 +60,7 @@ export class GeminiCliAgent {
       cwd,
       debugMode: options.debug ?? false,
       model: options.model || PREVIEW_GEMINI_MODEL_AUTO,
-      userMemory: options.instructions,
+      userMemory: initialMemory,
       // Minimal config
       enableHooks: false,
       mcpEnabled: false,
@@ -93,6 +103,30 @@ export class GeminiCliAgent {
     let request: Parameters<GeminiClient['sendMessageStream']>[0] = [
       { text: prompt },
     ];
+
+    if (!this.instructionsLoaded && typeof this.instructions === 'function') {
+      const context: SessionContext = {
+        sessionId,
+        transcript: client.getHistory(),
+        cwd: this.config.getWorkingDir(),
+        timestamp: new Date().toISOString(),
+        fs,
+        shell,
+        agent: this,
+      };
+      try {
+        const newInstructions = await this.instructions(context);
+        this.config.setUserMemory(newInstructions);
+        client.updateSystemInstruction();
+        this.instructionsLoaded = true;
+      } catch (e) {
+        const error =
+          e instanceof Error
+            ? e
+            : new Error(`Error resolving dynamic instructions: ${String(e)}`);
+        throw error;
+      }
+    }
 
     while (true) {
       // sendMessageStream returns AsyncGenerator<ServerGeminiStreamEvent, Turn>
