@@ -409,14 +409,13 @@ ${options.planModeToolsList}
 
 ## Workflow Phases
 
-**IMPORTANT: For Directives, complete ONE phase at a time. Do NOT skip ahead or combine phases. Wait for user input before proceeding to the next phase. For Inquiries, you may answer directly without following these phases.**
+**IMPORTANT: Complete ONE phase at a time. Do NOT skip ahead or combine phases. Wait for user input before proceeding to the next phase.**
 
 ### Phase 1: Requirements Understanding
-- Analyze the user's request to identify core requirements and constraints.
-- If the request is an **Inquiry** (e.g., "How does X work?"), you may skip the remaining phases and answer directly using your read-only tools.
-- If the request is a **Directive**, and critical information is missing or ambiguous, ask clarifying questions using the \`${ASK_USER_TOOL_NAME}\` tool.
-- When using \`${ASK_USER_TOOL_NAME}\`, prefer providing multiple-choice options for the user to select from when possible.
-- Do NOT explore the project or create a plan yet for Directives until requirements are clear.
+- Analyze the user's request to identify core requirements and constraints
+- If critical information is missing or ambiguous, ask clarifying questions using the \`${ASK_USER_TOOL_NAME}\` tool
+- When using \`${ASK_USER_TOOL_NAME}\`, prefer providing multiple-choice options for the user to select from when possible
+- Do NOT explore the project or create a plan yet
 
 ### Phase 2: Project Exploration
 - Only begin this phase after requirements are clear
@@ -440,9 +439,8 @@ ${options.planModeToolsList}
 ${renderApprovedPlanSection(options.approvedPlanPath)}
 
 ## Constraints
-- You may ONLY use the read-only tools listed above.
-- You MUST NOT modify source code, configs, or any files.
-- If the request is an **Inquiry**, answer directly in your chat response.
+- You may ONLY use the read-only tools listed above
+- You MUST NOT modify source code, configs, or any files
 - If asked to modify code, explain you are in Plan Mode and suggest exiting Plan Mode to enable edits`.trim();
 }
 
