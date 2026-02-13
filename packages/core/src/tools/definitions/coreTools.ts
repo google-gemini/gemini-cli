@@ -416,7 +416,8 @@ Use this tool when the user's query implies needing the content of several files
 export const MEMORY_DEFINITION: ToolDefinition = {
   base: {
     name: MEMORY_TOOL_NAME,
-    description: `Saves concise global user context (preferences, facts) for use across ALL workspaces.
+    description: `
+Saves concise global user context (preferences, facts) for use across ALL workspaces.
 
 ### CRITICAL: GLOBAL CONTEXT ONLY
 NEVER save workspace-specific context, local paths, or commands (e.g. "The entry point is src/index.js", "The test command is npm test"). These are local to the current workspace and must NOT be saved globally. EXCLUSIVELY for context relevant across ALL workspaces.
@@ -705,10 +706,14 @@ export function getActivateSkillDefinition(
     properties: {
       name: {
         type: 'string',
-        description: 'The name of the skill to activate.',
+        description:
+          skillNames.length > 0
+            ? 'The name of the skill to activate.'
+            : 'No skills are currently available.',
       },
     },
     required: ['name'],
+    additionalProperties: false,
   };
 
   if (skillNames.length > 0 && schema?.properties?.['name']) {

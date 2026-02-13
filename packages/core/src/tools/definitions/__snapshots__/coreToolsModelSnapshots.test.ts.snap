@@ -23,6 +23,47 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 }
 `;
 
+exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: activate_skill_empty 1`] = `
+{
+  "description": "Activates a specialized agent skill by name. Returns the skill's instructions wrapped in \`<activated_skill>\` tags. These provide specialized guidance for the current task. Use this when you identify a task that matches a skill's description. ONLY use names exactly as they appear in the \`<available_skills>\` section.",
+  "name": "activate_skill",
+  "parametersJsonSchema": {
+    "properties": {
+      "name": {
+        "description": "No skills are currently available.",
+        "type": "string",
+      },
+    },
+    "required": [
+      "name",
+    ],
+    "type": "object",
+  },
+}
+`;
+
+exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: activate_skill_single 1`] = `
+{
+  "description": "Activates a specialized agent skill by name (Available: 'skill1'). Returns the skill's instructions wrapped in \`<activated_skill>\` tags. These provide specialized guidance for the current task. Use this when you identify a task that matches a skill's description. ONLY use names exactly as they appear in the \`<available_skills>\` section.",
+  "name": "activate_skill",
+  "parametersJsonSchema": {
+    "properties": {
+      "name": {
+        "description": "The name of the skill to activate.",
+        "enum": [
+          "skill1",
+        ],
+        "type": "string",
+      },
+    },
+    "required": [
+      "name",
+    ],
+    "type": "object",
+  },
+}
+`;
+
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: ask_user 1`] = `
 {
   "description": "Ask the user one or more questions to gather preferences, clarify requirements, or make decisions.",
@@ -564,7 +605,8 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: save_memory 1`] = `
 {
-  "description": "Saves concise global user context (preferences, facts) for use across ALL workspaces.
+  "description": "
+Saves concise global user context (preferences, facts) for use across ALL workspaces.
 
 ### CRITICAL: GLOBAL CONTEXT ONLY
 NEVER save workspace-specific context, local paths, or commands (e.g. "The entry point is src/index.js", "The test command is npm test"). These are local to the current workspace and must NOT be saved globally. EXCLUSIVELY for context relevant across ALL workspaces.
@@ -751,6 +793,47 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
         "enum": [
           "skill1",
           "skill2",
+        ],
+        "type": "string",
+      },
+    },
+    "required": [
+      "name",
+    ],
+    "type": "object",
+  },
+}
+`;
+
+exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: activate_skill_empty 1`] = `
+{
+  "description": "Activates a specialized agent skill by name. Returns the skill's instructions wrapped in \`<activated_skill>\` tags. These provide specialized guidance for the current task. Use this when you identify a task that matches a skill's description. ONLY use names exactly as they appear in the \`<available_skills>\` section.",
+  "name": "activate_skill",
+  "parametersJsonSchema": {
+    "properties": {
+      "name": {
+        "description": "No skills are currently available.",
+        "type": "string",
+      },
+    },
+    "required": [
+      "name",
+    ],
+    "type": "object",
+  },
+}
+`;
+
+exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: activate_skill_single 1`] = `
+{
+  "description": "Activates a specialized agent skill by name (Available: 'skill1'). Returns the skill's instructions wrapped in \`<activated_skill>\` tags. These provide specialized guidance for the current task. Use this when you identify a task that matches a skill's description. ONLY use names exactly as they appear in the \`<available_skills>\` section.",
+  "name": "activate_skill",
+  "parametersJsonSchema": {
+    "properties": {
+      "name": {
+        "description": "The name of the skill to activate.",
+        "enum": [
+          "skill1",
         ],
         "type": "string",
       },
@@ -1304,7 +1387,8 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: save_memory 1`] = `
 {
-  "description": "Saves concise global user context (preferences, facts) for use across ALL workspaces.
+  "description": "
+Saves concise global user context (preferences, facts) for use across ALL workspaces.
 
 ### CRITICAL: GLOBAL CONTEXT ONLY
 NEVER save workspace-specific context, local paths, or commands (e.g. "The entry point is src/index.js", "The test command is npm test"). These are local to the current workspace and must NOT be saved globally. EXCLUSIVELY for context relevant across ALL workspaces.

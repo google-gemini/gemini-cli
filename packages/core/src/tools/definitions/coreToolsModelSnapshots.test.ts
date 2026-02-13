@@ -88,6 +88,14 @@ describe('coreTools snapshots for specific models', () => {
       name: 'activate_skill',
       definition: getActivateSkillDefinition(['skill1', 'skill2']),
     },
+    {
+      name: 'activate_skill_empty',
+      definition: getActivateSkillDefinition([]),
+    },
+    {
+      name: 'activate_skill_single',
+      definition: getActivateSkillDefinition(['skill1']),
+    },
   ];
 
   for (const modelId of modelIds) {
