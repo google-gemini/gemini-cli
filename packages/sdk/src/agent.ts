@@ -43,7 +43,7 @@ export class GeminiCliAgent {
   private config: Config;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private tools: Array<Tool<any>>;
-  private instructions: SystemInstructions;
+  private readonly instructions: SystemInstructions;
   private instructionsLoaded = false;
 
   constructor(options: GeminiCliAgentOptions) {
