@@ -44,10 +44,20 @@ describe('Project-Level Policies', () => {
         'node:fs/promises',
       );
 
+    const mockStat = vi.fn(async (path: string) => {
+      if (typeof path === 'string' && path.startsWith('/mock/')) {
+        return {
+          isDirectory: () => true,
+          isFile: () => false,
+        } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+      }
+      return actualFs.stat(path);
+    });
+
     // Mock readdir to return a policy file for each tier
     const mockReaddir = vi.fn(async (path: string) => {
       const normalizedPath = nodePath.normalize(path);
-      if (normalizedPath.includes('default'))
+      if (normalizedPath.endsWith('default/policies'))
         return [
           {
             name: 'default.toml',
@@ -55,11 +65,11 @@ describe('Project-Level Policies', () => {
             isDirectory: () => false,
           },
         ] as unknown as Awaited<ReturnType<typeof actualFs.readdir>>;
-      if (normalizedPath.includes('user'))
+      if (normalizedPath.endsWith('user/policies'))
         return [
           { name: 'user.toml', isFile: () => true, isDirectory: () => false },
         ] as unknown as Awaited<ReturnType<typeof actualFs.readdir>>;
-      if (normalizedPath.includes('project'))
+      if (normalizedPath.endsWith('project/policies'))
         return [
           {
             name: 'project.toml',
@@ -67,7 +77,7 @@ describe('Project-Level Policies', () => {
             isDirectory: () => false,
           },
         ] as unknown as Awaited<ReturnType<typeof actualFs.readdir>>;
-      if (normalizedPath.includes('system'))
+      if (normalizedPath.endsWith('system/policies'))
         return [
           { name: 'admin.toml', isFile: () => true, isDirectory: () => false },
         ] as unknown as Awaited<ReturnType<typeof actualFs.readdir>>;
@@ -109,9 +119,15 @@ priority = 10
 
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readdir: mockReaddir, readFile: mockReadFile },
+      default: {
+        ...actualFs,
+        readdir: mockReaddir,
+        readFile: mockReadFile,
+        stat: mockStat,
+      },
       readdir: mockReaddir,
       readFile: mockReadFile,
+      stat: mockStat,
     }));
 
     const { createPolicyEngineConfig } = await import('./config.js');
@@ -152,8 +168,20 @@ priority = 10
       await vi.importActual<typeof import('node:fs/promises')>(
         'node:fs/promises',
       );
+
+    const mockStat = vi.fn(async (path: string) => {
+      if (typeof path === 'string' && path.startsWith('/mock/')) {
+        return {
+          isDirectory: () => true,
+          isFile: () => false,
+        } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+      }
+      return actualFs.stat(path);
+    });
+
     const mockReaddir = vi.fn(async (path: string) => {
-      if (path.includes('default'))
+      const normalizedPath = nodePath.normalize(path);
+      if (normalizedPath.endsWith('default/policies'))
         return [
           {
             name: 'default.toml',
@@ -172,9 +200,15 @@ priority=10`,
 
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readdir: mockReaddir, readFile: mockReadFile },
+      default: {
+        ...actualFs,
+        readdir: mockReaddir,
+        readFile: mockReadFile,
+        stat: mockStat,
+      },
       readdir: mockReaddir,
       readFile: mockReadFile,
+      stat: mockStat,
     }));
 
     const { createPolicyEngineConfig } = await import('./config.js');
@@ -200,8 +234,20 @@ priority=10`,
       await vi.importActual<typeof import('node:fs/promises')>(
         'node:fs/promises',
       );
+
+    const mockStat = vi.fn(async (path: string) => {
+      if (typeof path === 'string' && path.startsWith('/mock/')) {
+        return {
+          isDirectory: () => true,
+          isFile: () => false,
+        } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+      }
+      return actualFs.stat(path);
+    });
+
     const mockReaddir = vi.fn(async (path: string) => {
-      if (path.includes('project'))
+      const normalizedPath = nodePath.normalize(path);
+      if (normalizedPath.endsWith('project/policies'))
         return [
           {
             name: 'project.toml',
@@ -220,9 +266,15 @@ priority=500`,
 
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readdir: mockReaddir, readFile: mockReadFile },
+      default: {
+        ...actualFs,
+        readdir: mockReaddir,
+        readFile: mockReadFile,
+        stat: mockStat,
+      },
       readdir: mockReaddir,
       readFile: mockReadFile,
+      stat: mockStat,
     }));
 
     const { createPolicyEngineConfig } = await import('./config.js');

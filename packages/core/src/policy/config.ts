@@ -67,7 +67,7 @@ export function getPolicyDirectories(
   } else {
     dirs.push(Storage.getUserPoliciesDir());
   }
-  
+
   // Project Tier (third highest)
   if (projectPoliciesDir) {
     dirs.push(projectPoliciesDir);
