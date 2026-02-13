@@ -6,14 +6,7 @@
 
 import type { MergedSettings } from './settings.js';
 
-export interface FooterItem {
-  id: string;
-  label: string;
-  description: string;
-  defaultEnabled: boolean;
-}
-
-export const ALL_ITEMS: FooterItem[] = [
+export const ALL_ITEMS = [
   {
     id: 'cwd',
     label: 'cwd',
@@ -74,7 +67,16 @@ export const ALL_ITEMS: FooterItem[] = [
     description: 'Total tokens used in the session',
     defaultEnabled: false,
   },
-];
+] as const;
+
+export type FooterItemId = (typeof ALL_ITEMS)[number]['id'];
+
+export interface FooterItem {
+  id: string;
+  label: string;
+  description: string;
+  defaultEnabled: boolean;
+}
 
 export const DEFAULT_ORDER = [
   'cwd',

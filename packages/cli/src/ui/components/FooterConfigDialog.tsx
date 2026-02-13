@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useCallback, useMemo, useState, useEffect } from 'react';
+import { useCallback, useMemo, useReducer, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { useSettingsStore } from '../contexts/SettingsContext.js';
@@ -24,57 +24,165 @@ interface FooterConfigDialogProps {
   onClose?: () => void;
 }
 
+interface FooterConfigState {
+  orderedIds: string[];
+  selectedIds: Set<string>;
+  activeIndex: number;
+  scrollOffset: number;
+}
+
+type FooterConfigAction =
+  | { type: 'MOVE_UP'; filteredCount: number; maxToShow: number }
+  | { type: 'MOVE_DOWN'; filteredCount: number; maxToShow: number }
+  | {
+      type: 'MOVE_LEFT';
+      searchQuery: string;
+      filteredItems: Array<{ key: string }>;
+    }
+  | {
+      type: 'MOVE_RIGHT';
+      searchQuery: string;
+      filteredItems: Array<{ key: string }>;
+    }
+  | { type: 'TOGGLE_ITEM'; filteredItems: Array<{ key: string }> }
+  | { type: 'SET_STATE'; payload: Partial<FooterConfigState> }
+  | { type: 'RESET_INDEX' };
+
+function footerConfigReducer(
+  state: FooterConfigState,
+  action: FooterConfigAction,
+): FooterConfigState {
+  switch (action.type) {
+    case 'MOVE_UP': {
+      const { filteredCount, maxToShow } = action;
+      const totalSlots = filteredCount + 1;
+      const newIndex =
+        state.activeIndex > 0 ? state.activeIndex - 1 : totalSlots - 1;
+      let newOffset = state.scrollOffset;
+
+      if (newIndex < filteredCount) {
+        if (newIndex === filteredCount - 1) {
+          newOffset = Math.max(0, filteredCount - maxToShow);
+        } else if (newIndex < state.scrollOffset) {
+          newOffset = newIndex;
+        }
+      }
+      return { ...state, activeIndex: newIndex, scrollOffset: newOffset };
+    }
+    case 'MOVE_DOWN': {
+      const { filteredCount, maxToShow } = action;
+      const totalSlots = filteredCount + 1;
+      const newIndex =
+        state.activeIndex < totalSlots - 1 ? state.activeIndex + 1 : 0;
+      let newOffset = state.scrollOffset;
+
+      if (newIndex === 0) {
+        newOffset = 0;
+      } else if (
+        newIndex < filteredCount &&
+        newIndex >= state.scrollOffset + maxToShow
+      ) {
+        newOffset = newIndex - maxToShow + 1;
+      }
+      return { ...state, activeIndex: newIndex, scrollOffset: newOffset };
+    }
+    case 'MOVE_LEFT':
+    case 'MOVE_RIGHT': {
+      if (action.searchQuery) return state;
+      const direction = action.type === 'MOVE_LEFT' ? -1 : 1;
+      const currentItem = action.filteredItems[state.activeIndex];
+      if (!currentItem) return state;
+
+      const currentId = currentItem.key;
+      const currentIndex = state.orderedIds.indexOf(currentId);
+      const newIndex = currentIndex + direction;
+
+      if (newIndex < 0 || newIndex >= state.orderedIds.length) return state;
+
+      const newOrderedIds = [...state.orderedIds];
+      [newOrderedIds[currentIndex], newOrderedIds[newIndex]] = [
+        newOrderedIds[newIndex],
+        newOrderedIds[currentIndex],
+      ];
+
+      return { ...state, orderedIds: newOrderedIds, activeIndex: newIndex };
+    }
+    case 'TOGGLE_ITEM': {
+      const isResetFocused = state.activeIndex === action.filteredItems.length;
+      if (isResetFocused) return state; // Handled by separate effect/callback if needed, or we can add a RESET_DEFAULTS action
+
+      const item = action.filteredItems[state.activeIndex];
+      if (!item) return state;
+
+      const nextSelected = new Set(state.selectedIds);
+      if (nextSelected.has(item.key)) {
+        nextSelected.delete(item.key);
+      } else {
+        nextSelected.add(item.key);
+      }
+      return { ...state, selectedIds: nextSelected };
+    }
+    case 'SET_STATE':
+      return { ...state, ...action.payload };
+    case 'RESET_INDEX':
+      return { ...state, activeIndex: 0, scrollOffset: 0 };
+    default:
+      return state;
+  }
+}
+
 export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
   onClose,
 }) => {
   const { settings, setSetting } = useSettingsStore();
+  const maxItemsToShow = 10;
 
-  // Initialize orderedIds and selectedIds
-  const [orderedIds, setOrderedIds] = useState<string[]>(() => {
-    const validIds = new Set(ALL_ITEMS.map((i) => i.id));
+  const [state, dispatch] = useReducer(footerConfigReducer, undefined, () => {
+    const validIds = new Set(ALL_ITEMS.map((i: { id: string }) => i.id));
+    let ordered: string[];
+    let selected: Set<string>;
 
     if (settings.merged.ui?.footer?.items) {
-      // Start with saved items in their saved order
-      const savedItems = settings.merged.ui.footer.items.filter((id) =>
+      const savedItems = settings.merged.ui.footer.items.filter((id: string) =>
         validIds.has(id),
       );
-      // Then add any items from DEFAULT_ORDER that aren't in savedItems
-      const others = DEFAULT_ORDER.filter((id) => !savedItems.includes(id));
-      return [...savedItems, ...others];
+      const others = DEFAULT_ORDER.filter(
+        (id: string) => !savedItems.includes(id),
+      );
+      ordered = [...savedItems, ...others];
+      selected = new Set(savedItems);
+    } else {
+      const derived = deriveItemsFromLegacySettings(settings.merged).filter(
+        (id: string) => validIds.has(id),
+      );
+      const others = DEFAULT_ORDER.filter(
+        (id: string) => !derived.includes(id),
+      );
+      ordered = [...derived, ...others];
+      selected = new Set(derived);
     }
-    // Fallback to legacy settings derivation
-    const derived = deriveItemsFromLegacySettings(settings.merged).filter(
-      (id) => validIds.has(id),
-    );
-    const others = DEFAULT_ORDER.filter((id) => !derived.includes(id));
-    return [...derived, ...others];
+
+    return {
+      orderedIds: ordered,
+      selectedIds: selected,
+      activeIndex: 0,
+      scrollOffset: 0,
+    };
   });
 
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
-    const validIds = new Set(ALL_ITEMS.map((i) => i.id));
-    if (settings.merged.ui?.footer?.items) {
-      return new Set(
-        settings.merged.ui.footer.items.filter((id) => validIds.has(id)),
-      );
-    }
-    return new Set(
-      deriveItemsFromLegacySettings(settings.merged).filter((id) =>
-        validIds.has(id),
-      ),
-    );
-  });
+  const { orderedIds, selectedIds, activeIndex, scrollOffset } = state;
 
   // Prepare items for fuzzy list
   const listItems = useMemo(
     () =>
       orderedIds
-        .map((id) => {
+        .map((id: string) => {
           const item = ALL_ITEMS.find((i) => i.id === id);
           if (!item) return null;
           return {
             key: id,
-            label: item.id,
-            description: item.description,
+            label: item.id as string,
+            description: item.description as string,
           };
         })
         .filter((i): i is NonNullable<typeof i> => i !== null),
@@ -86,108 +194,42 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
       items: listItems,
     });
 
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [scrollOffset, setScrollOffset] = useState(0);
-  const maxItemsToShow = 10;
+  // Save settings when orderedIds or selectedIds change
+  useEffect(() => {
+    const finalItems = orderedIds.filter((id: string) => selectedIds.has(id));
+    // Only save if it's different from current setting to avoid loops
+    const currentSetting = settings.merged.ui?.footer?.items;
+    if (JSON.stringify(finalItems) !== JSON.stringify(currentSetting)) {
+      setSetting(SettingScope.User, 'ui.footer.items', finalItems);
+    }
+  }, [orderedIds, selectedIds, setSetting, settings.merged.ui?.footer?.items]);
 
   // Reset index when search changes
   useEffect(() => {
-    setActiveIndex(0);
-    setScrollOffset(0);
+    dispatch({ type: 'RESET_INDEX' });
   }, [searchQuery]);
 
-  // The reset action lives one index past the filtered item list
   const isResetFocused = activeIndex === filteredItems.length;
 
   const handleResetToDefaults = useCallback(() => {
-    // Clear the custom items setting so the legacy footer path is used
     setSetting(SettingScope.User, 'ui.footer.items', undefined);
 
-    // Reset local state to reflect legacy-derived items
-    const validIds = new Set(ALL_ITEMS.map((i) => i.id));
+    const validIds = new Set(ALL_ITEMS.map((i: { id: string }) => i.id));
     const derived = deriveItemsFromLegacySettings(settings.merged).filter(
-      (id) => validIds.has(id),
+      (id: string) => validIds.has(id),
     );
-    const others = DEFAULT_ORDER.filter((id) => !derived.includes(id));
-    setOrderedIds([...derived, ...others]);
-    setSelectedIds(new Set(derived));
-    setActiveIndex(0);
-    setScrollOffset(0);
+    const others = DEFAULT_ORDER.filter((id: string) => !derived.includes(id));
+
+    dispatch({
+      type: 'SET_STATE',
+      payload: {
+        orderedIds: [...derived, ...others],
+        selectedIds: new Set(derived),
+        activeIndex: 0,
+        scrollOffset: 0,
+      },
+    });
   }, [setSetting, settings.merged]);
-
-  const handleConfirm = useCallback(async () => {
-    if (isResetFocused) {
-      handleResetToDefaults();
-      return;
-    }
-
-    const item = filteredItems[activeIndex];
-    if (!item) return;
-
-    const next = new Set(selectedIds);
-    if (next.has(item.key)) {
-      next.delete(item.key);
-    } else {
-      next.add(item.key);
-    }
-    setSelectedIds(next);
-
-    // Save immediately on toggle
-    const finalItems = orderedIds.filter((id) => next.has(id));
-    setSetting(SettingScope.User, 'ui.footer.items', finalItems);
-  }, [
-    filteredItems,
-    activeIndex,
-    orderedIds,
-    setSetting,
-    selectedIds,
-    isResetFocused,
-    handleResetToDefaults,
-  ]);
-
-  const handleReorder = useCallback(
-    (direction: number) => {
-      if (searchQuery) return; // Reorder disabled when searching
-
-      const currentItem = filteredItems[activeIndex];
-      if (!currentItem) return;
-
-      const currentId = currentItem.key;
-      const currentIndex = orderedIds.indexOf(currentId);
-      const newIndex = currentIndex + direction;
-
-      if (newIndex < 0 || newIndex >= orderedIds.length) return;
-
-      const newOrderedIds = [...orderedIds];
-      [newOrderedIds[currentIndex], newOrderedIds[newIndex]] = [
-        newOrderedIds[newIndex],
-        newOrderedIds[currentIndex],
-      ];
-      setOrderedIds(newOrderedIds);
-      setActiveIndex(newIndex);
-
-      // Save immediately on reorder
-      const finalItems = newOrderedIds.filter((id) => selectedIds.has(id));
-      setSetting(SettingScope.User, 'ui.footer.items', finalItems);
-
-      // Adjust scroll offset if needed
-      if (newIndex < scrollOffset) {
-        setScrollOffset(newIndex);
-      } else if (newIndex >= scrollOffset + maxItemsToShow) {
-        setScrollOffset(newIndex - maxItemsToShow + 1);
-      }
-    },
-    [
-      searchQuery,
-      filteredItems,
-      activeIndex,
-      orderedIds,
-      scrollOffset,
-      maxItemsToShow,
-      selectedIds,
-      setSetting,
-    ],
-  );
 
   useKeypress(
     (key: Key) => {
@@ -197,48 +239,39 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
       }
 
       if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
-        // Navigation wraps: items 0..filteredItems.length-1, then reset row at filteredItems.length
-        const totalSlots = filteredItems.length + 1;
-        const newIndex = activeIndex > 0 ? activeIndex - 1 : totalSlots - 1;
-        setActiveIndex(newIndex);
-        // Only adjust scroll when within the item list
-        if (newIndex < filteredItems.length) {
-          if (newIndex === filteredItems.length - 1) {
-            setScrollOffset(Math.max(0, filteredItems.length - maxItemsToShow));
-          } else if (newIndex < scrollOffset) {
-            setScrollOffset(newIndex);
-          }
-        }
+        dispatch({
+          type: 'MOVE_UP',
+          filteredCount: filteredItems.length,
+          maxToShow: maxItemsToShow,
+        });
         return true;
       }
 
       if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
-        const totalSlots = filteredItems.length + 1;
-        const newIndex = activeIndex < totalSlots - 1 ? activeIndex + 1 : 0;
-        setActiveIndex(newIndex);
-        if (newIndex === 0) {
-          setScrollOffset(0);
-        } else if (
-          newIndex < filteredItems.length &&
-          newIndex >= scrollOffset + maxItemsToShow
-        ) {
-          setScrollOffset(newIndex - maxItemsToShow + 1);
-        }
+        dispatch({
+          type: 'MOVE_DOWN',
+          filteredCount: filteredItems.length,
+          maxToShow: maxItemsToShow,
+        });
         return true;
       }
 
       if (keyMatchers[Command.MOVE_LEFT](key)) {
-        handleReorder(-1);
+        dispatch({ type: 'MOVE_LEFT', searchQuery, filteredItems });
         return true;
       }
 
       if (keyMatchers[Command.MOVE_RIGHT](key)) {
-        handleReorder(1);
+        dispatch({ type: 'MOVE_RIGHT', searchQuery, filteredItems });
         return true;
       }
 
       if (keyMatchers[Command.RETURN](key)) {
-        void handleConfirm();
+        if (isResetFocused) {
+          handleResetToDefaults();
+        } else {
+          dispatch({ type: 'TOGGLE_ITEM', filteredItems });
+        }
         return true;
       }
 
@@ -264,7 +297,9 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
       );
     }
 
-    const itemsToPreview = orderedIds.filter((id) => selectedIds.has(id));
+    const itemsToPreview = orderedIds.filter((id: string) =>
+      selectedIds.has(id),
+    );
     if (itemsToPreview.length === 0) return null;
 
     const getColor = (id: string, defaultColor?: string) =>
@@ -301,7 +336,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
     };
 
     const elements: React.ReactNode[] = [];
-    itemsToPreview.forEach((id, idx) => {
+    itemsToPreview.forEach((id: string, idx: number) => {
       if (idx > 0) {
         elements.push(
           <Text key={`sep-${id}`} color={theme.text.secondary}>

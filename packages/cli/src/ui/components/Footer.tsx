@@ -11,6 +11,7 @@ import {
   shortenPath,
   tildeifyPath,
   getDisplayString,
+  checkExhaustive,
 } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
@@ -28,6 +29,7 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
+import { ALL_ITEMS, type FooterItemId } from '../../config/footerItems.js';
 
 interface CwdIndicatorProps {
   targetDir: string;
@@ -135,6 +137,10 @@ const ErrorIndicator: React.FC<ErrorIndicatorProps> = ({ errorCount }) => (
     <ConsoleSummaryDisplay errorCount={errorCount} />
   </Box>
 );
+
+function isFooterItemId(id: string): id is FooterItemId {
+  return ALL_ITEMS.some((i) => i.id === id);
+}
 
 export const Footer: React.FC = () => {
   const uiState = useUIState();
@@ -317,6 +323,10 @@ export const Footer: React.FC = () => {
   }
 
   for (const id of items) {
+    if (!isFooterItemId(id)) {
+      continue;
+    }
+
     switch (id) {
       case 'cwd': {
         addElement(
@@ -434,6 +444,7 @@ export const Footer: React.FC = () => {
         break;
       }
       default:
+        checkExhaustive(id);
         break;
     }
   }

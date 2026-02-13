@@ -14,7 +14,7 @@ import { FooterConfigDialog } from '../components/FooterConfigDialog.js';
 
 export const footerCommand: SlashCommand = {
   name: 'footer',
-  altNames: ['statusline', 'status-line', 'status'],
+  altNames: ['statusline'],
   description: 'Configure which items appear in the footer (statusline)',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
