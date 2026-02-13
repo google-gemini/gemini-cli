@@ -59,20 +59,28 @@ export const DialogManager = ({
     staticExtraHeight,
     terminalWidth: uiTerminalWidth,
     shouldShowRetentionWarning,
+    sessionsToDeleteCount,
   } = uiState;
 
-  const handleCleanUpNow = useCallback(() => {
+  const handleKeep90Days = useCallback(() => {
     settings.setValue(
       SettingScope.User,
       'general.sessionRetention.warningAcknowledged',
       true,
+    );
+    settings.setValue(
+      SettingScope.User,
+      'general.sessionRetention.enabled',
+      true,
+    );
+    settings.setValue(
+      SettingScope.User,
+      'general.sessionRetention.maxAge',
+      '90d',
     );
   }, [settings]);
 
-  const handleCleanUpIn30Days = useCallback(() => {
-    const in30Days = new Date();
-    in30Days.setDate(in30Days.getDate() + 30);
-
+  const handleKeep30Days = useCallback(() => {
     settings.setValue(
       SettingScope.User,
       'general.sessionRetention.warningAcknowledged',
@@ -80,16 +88,22 @@ export const DialogManager = ({
     );
     settings.setValue(
       SettingScope.User,
-      'general.sessionRetention.retentionEnforcementDate',
-      in30Days.toISOString(),
+      'general.sessionRetention.enabled',
+      true,
+    );
+    settings.setValue(
+      SettingScope.User,
+      'general.sessionRetention.maxAge',
+      '30d',
     );
   }, [settings]);
 
   if (shouldShowRetentionWarning) {
     return (
       <SessionRetentionWarningDialog
-        onCleanUpNow={handleCleanUpNow}
-        onCleanUpIn30Days={handleCleanUpIn30Days}
+        onKeep90Days={handleKeep90Days}
+        onKeep30Days={handleKeep30Days}
+        sessionsToDeleteCount={sessionsToDeleteCount ?? 0}
       />
     );
   }

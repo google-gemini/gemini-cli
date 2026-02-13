@@ -12,24 +12,31 @@ import {
 } from './shared/RadioButtonSelect.js';
 
 interface SessionRetentionWarningDialogProps {
-  onCleanUpNow: () => void;
-  onCleanUpIn30Days: () => void;
+  onKeep90Days: () => void;
+  onKeep30Days: () => void;
+  sessionsToDeleteCount: number;
 }
 
 export const SessionRetentionWarningDialog = ({
-  onCleanUpNow,
-  onCleanUpIn30Days,
+  onKeep90Days,
+  onKeep30Days,
+  sessionsToDeleteCount,
 }: SessionRetentionWarningDialogProps) => {
   const options: Array<RadioSelectItem<() => void>> = [
     {
-      label: 'Defer cleanup for 30 days',
-      value: onCleanUpIn30Days,
-      key: 'defer',
+      label: 'Keep for 30 days (Recommended)',
+      value: onKeep30Days,
+      key: '30days',
+      sublabel:
+        sessionsToDeleteCount > 0
+          ? `${sessionsToDeleteCount} sessions will be deleted immediately`
+          : 'No sessions will be deleted immediately',
     },
     {
-      label: 'Clean up old sessions now',
-      value: onCleanUpNow,
-      key: 'now',
+      label: 'Keep for 90 days',
+      value: onKeep90Days,
+      key: '90days',
+      sublabel: 'No sessions will be deleted at this time',
     },
   ];
 
@@ -42,21 +49,23 @@ export const SessionRetentionWarningDialog = ({
       padding={1}
     >
       <Box marginBottom={1} justifyContent="center" width="100%">
-        <Text bold>Session Retention Policy Update</Text>
+        <Text bold>Keep chat history</Text>
       </Box>
 
-      <Box flexDirection="column" gap={1}>
+      <Box flexDirection="column" gap={1} marginBottom={1}>
         <Text>
-          We&apos;re introducing a 60-day default session retention policy to
-          keep your workspace clean.
-        </Text>
-        <Text>
-          Existing session data will be affected. Choose how to proceed:
+          To keep your workspace clean, we are introducing a limit on how long
+          chat sessions are stored. Please choose a retention period for your
+          existing chats:
         </Text>
       </Box>
 
       <Box marginTop={1}>
-        <RadioButtonSelect items={options} onSelect={(action) => action()} />
+        <RadioButtonSelect
+          items={options}
+          onSelect={(action) => action()}
+          initialIndex={1}
+        />
       </Box>
 
       <Box marginTop={1} justifyContent="center">

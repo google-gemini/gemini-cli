@@ -184,9 +184,6 @@ export interface SessionRetentionSettings {
 
   /** INTERNAL: Whether the user has acknowledged the session retention warning */
   warningAcknowledged?: boolean;
-
-  /** INTERNAL: Date when session retention enforcement begins (ISO string) */
-  retentionEnforcementDate?: string;
 }
 
 export interface SettingsError {

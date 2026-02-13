@@ -1335,6 +1335,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const {
     shouldShowWarning: shouldShowRetentionWarning,
     checkComplete: retentionCheckComplete,
+    sessionsToDeleteCount,
   } = useSessionRetentionCheck(config, settings.merged);
 
   const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1863,6 +1864,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isThemeDialogOpen,
       shouldShowRetentionWarning:
         shouldShowRetentionWarning && retentionCheckComplete,
+      sessionsToDeleteCount: sessionsToDeleteCount ?? 0,
       themeError,
       isAuthenticating,
       isConfigInitialized,
@@ -1977,6 +1979,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isThemeDialogOpen,
       shouldShowRetentionWarning,
       retentionCheckComplete,
+      sessionsToDeleteCount,
       themeError,
       isAuthenticating,
       isConfigInitialized,

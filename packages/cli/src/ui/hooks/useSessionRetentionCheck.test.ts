@@ -11,10 +11,17 @@ import { type Config } from '@google/gemini-cli-core';
 import type { Settings } from '../../config/settingsSchema.js';
 import { waitFor } from '../../test-utils/async.js';
 
-// Mock getAllSessionFiles
+// Mock utils
 const mockGetAllSessionFiles = vi.fn();
+const mockIdentifySessionsToDelete = vi.fn();
+
 vi.mock('../../utils/sessionUtils.js', () => ({
   getAllSessionFiles: () => mockGetAllSessionFiles(),
+}));
+
+vi.mock('../../utils/sessionCleanup.js', () => ({
+  identifySessionsToDelete: () => mockIdentifySessionsToDelete(),
+  DEFAULT_MIN_RETENTION: '30d',
 }));
 
 describe('useSessionRetentionCheck', () => {
@@ -50,6 +57,7 @@ describe('useSessionRetentionCheck', () => {
       expect(result.current.checkComplete).toBe(true);
       expect(result.current.shouldShowWarning).toBe(false);
       expect(mockGetAllSessionFiles).not.toHaveBeenCalled();
+      expect(mockIdentifySessionsToDelete).not.toHaveBeenCalled();
     });
   });
 
@@ -58,6 +66,7 @@ describe('useSessionRetentionCheck', () => {
       general: {
         sessionRetention: {
           enabled: true,
+          maxAge: '30d', // Explicitly enabled with non-default
         },
       },
     } as unknown as Settings;
@@ -70,10 +79,11 @@ describe('useSessionRetentionCheck', () => {
       expect(result.current.checkComplete).toBe(true);
       expect(result.current.shouldShowWarning).toBe(false);
       expect(mockGetAllSessionFiles).not.toHaveBeenCalled();
+      expect(mockIdentifySessionsToDelete).not.toHaveBeenCalled();
     });
   });
 
-  it('should show warning if sessions exist and not acknowledged/enabled', async () => {
+  it('should show warning if sessions to delete exist', async () => {
     const settings = {
       general: {
         sessionRetention: {
@@ -87,6 +97,7 @@ describe('useSessionRetentionCheck', () => {
       'session1.json',
       'session2.json',
     ]);
+    mockIdentifySessionsToDelete.mockResolvedValue(['session1.json']); // 1 session to delete
 
     const { result } = renderHook(() =>
       useSessionRetentionCheck(mockConfig, settings),
@@ -95,11 +106,13 @@ describe('useSessionRetentionCheck', () => {
     await waitFor(() => {
       expect(result.current.checkComplete).toBe(true);
       expect(result.current.shouldShowWarning).toBe(true);
+      expect(result.current.sessionsToDeleteCount).toBe(1);
       expect(mockGetAllSessionFiles).toHaveBeenCalled();
+      expect(mockIdentifySessionsToDelete).toHaveBeenCalled();
     });
   });
 
-  it('should not show warning if no sessions exist', async () => {
+  it('should not show warning if no sessions to delete', async () => {
     const settings = {
       general: {
         sessionRetention: {
@@ -109,7 +122,11 @@ describe('useSessionRetentionCheck', () => {
       },
     } as unknown as Settings;
 
-    mockGetAllSessionFiles.mockResolvedValue([]);
+    mockGetAllSessionFiles.mockResolvedValue([
+      'session1.json',
+      'session2.json',
+    ]);
+    mockIdentifySessionsToDelete.mockResolvedValue([]); // 0 sessions to delete
 
     const { result } = renderHook(() =>
       useSessionRetentionCheck(mockConfig, settings),
@@ -118,7 +135,9 @@ describe('useSessionRetentionCheck', () => {
     await waitFor(() => {
       expect(result.current.checkComplete).toBe(true);
       expect(result.current.shouldShowWarning).toBe(false);
+      expect(result.current.sessionsToDeleteCount).toBe(0);
       expect(mockGetAllSessionFiles).toHaveBeenCalled();
+      expect(mockIdentifySessionsToDelete).toHaveBeenCalled();
     });
   });
 

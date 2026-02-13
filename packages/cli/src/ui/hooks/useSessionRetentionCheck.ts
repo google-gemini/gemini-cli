@@ -7,32 +7,57 @@
 import { useState, useEffect } from 'react';
 import { type Config } from '@google/gemini-cli-core';
 import { type Settings } from '../../config/settings.js';
+import { getAllSessionFiles } from '../../utils/sessionUtils.js';
+import { identifySessionsToDelete } from '../../utils/sessionCleanup.js';
+import path from 'node:path';
 
 export function useSessionRetentionCheck(config: Config, settings: Settings) {
   const [shouldShowWarning, setShouldShowWarning] = useState(false);
+  const [sessionsToDeleteCount, setSessionsToDeleteCount] = useState(0);
   const [checkComplete, setCheckComplete] = useState(false);
 
   useEffect(() => {
-    // If warning already acknowledged, skip check
-    if (settings.general?.sessionRetention?.warningAcknowledged) {
-      setShouldShowWarning(false);
-      setCheckComplete(true);
-      return;
-    }
-
-    // If user has manually enabled retention, we skip the warning
+    // If warning already acknowledged or retention already enabled, skip check
     if (
-      settings.general?.sessionRetention?.enabled &&
-      settings.general?.sessionRetention?.maxAge !== '60d'
+      settings.general?.sessionRetention?.warningAcknowledged ||
+      settings.general?.sessionRetention?.enabled
     ) {
       setShouldShowWarning(false);
       setCheckComplete(true);
       return;
     }
 
-    setShouldShowWarning(true);
-    setCheckComplete(true);
-  }, [settings.general?.sessionRetention]);
+    const checkSessions = async () => {
+      try {
+        const chatsDir = path.join(config.storage.getProjectTempDir(), 'chats');
+        const allFiles = await getAllSessionFiles(
+          chatsDir,
+          config.getSessionId(),
+        );
 
-  return { shouldShowWarning, checkComplete };
+        // Calculate how many sessions would be deleted if we applied a 30-day retention
+        const sessionsToDelete = await identifySessionsToDelete(allFiles, {
+          enabled: true,
+          maxAge: '30d',
+        });
+
+        if (sessionsToDelete.length > 0) {
+          setSessionsToDeleteCount(sessionsToDelete.length);
+          setShouldShowWarning(true);
+        } else {
+          setShouldShowWarning(false);
+        }
+      } catch {
+        // If we can't check sessions, default to not showing the warning to be safe
+        setShouldShowWarning(false);
+      } finally {
+        setCheckComplete(true);
+      }
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    checkSessions();
+  }, [config, settings.general?.sessionRetention]);
+
+  return { shouldShowWarning, checkComplete, sessionsToDeleteCount };
 }
