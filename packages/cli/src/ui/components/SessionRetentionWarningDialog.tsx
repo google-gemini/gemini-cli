@@ -29,7 +29,7 @@ export const SessionRetentionWarningDialog = ({
       key: '30days',
       sublabel: `${sessionsToDeleteCount} session${
         sessionsToDeleteCount === 1 ? '' : 's'
-      } will be deleted immediately`,
+      } will be deleted`,
     },
     {
       label: 'Keep for 90 days',

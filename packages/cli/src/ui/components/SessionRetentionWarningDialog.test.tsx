@@ -38,7 +38,7 @@ describe('SessionRetentionWarningDialog', () => {
       'introducing a limit on how long chat sessions are stored',
     );
     expect(lastFrame()).toContain('Keep for 30 days (Recommended)');
-    expect(lastFrame()).toContain('42 sessions will be deleted immediately');
+    expect(lastFrame()).toContain('42 sessions will be deleted');
     expect(lastFrame()).toContain('Keep for 90 days');
     expect(lastFrame()).toContain('No sessions will be deleted at this time');
   });
@@ -52,8 +52,8 @@ describe('SessionRetentionWarningDialog', () => {
       />,
     );
 
-    expect(lastFrame()).toContain('1 session will be deleted immediately');
-    expect(lastFrame()).not.toContain('sessions will be deleted immediately');
+    expect(lastFrame()).toContain('1 session will be deleted');
+    expect(lastFrame()).not.toContain('sessions will be deleted');
   });
 
   it('defaults to "Keep for 90 days" when there are sessions to delete', async () => {
