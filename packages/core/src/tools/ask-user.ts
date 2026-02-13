@@ -260,38 +260,6 @@ export class AskUserInvocation extends BaseToolInvocation<
 }
 
 /**
- * Determines if an 'Ask User' tool call should be hidden from the standard tool history UI.
- *
- * We hide Ask User tools in two cases:
- * 1. They are in progress because they are displayed using a specialized UI (AskUserDialog).
- * 2. They have errored without a result display (e.g. validation errors), in which case
- *    the agent self-corrects and we don't want to clutter the UI.
- *
- * NOTE: The 'status' parameter values are intended to match the CLI's ToolCallStatus enum.
- */
-export function shouldHideAskUserTool(
-  name: string,
-  status: string,
-  hasResultDisplay: boolean,
-): boolean {
-  if (name !== ASK_USER_DISPLAY_NAME) {
-    return false;
-  }
-
-  // Case 1: In-progress tools (Pending, Executing, Confirming)
-  if (['Pending', 'Executing', 'Confirming'].includes(status)) {
-    return true;
-  }
-
-  // Case 2: Error without result display
-  if (status === 'Error' && !hasResultDisplay) {
-    return true;
-  }
-
-  return false;
-}
-
-/**
  * Returns true if the tool name and status correspond to a completed 'Ask User' tool call.
  */
 export function isCompletedAskUserTool(name: string, status: string): boolean {

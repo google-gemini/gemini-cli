@@ -14,6 +14,7 @@ import {
   type RetrieveUserQuotaResponse,
   type SkillDefinition,
   type AgentDefinition,
+  type ApprovalMode,
   CoreToolCallStatus,
   checkExhaustive,
 } from '@google/gemini-cli-core';
@@ -106,6 +107,7 @@ export interface IndividualToolCallDisplay {
   ptyId?: number;
   outputFile?: string;
   correlationId?: string;
+  approvalMode?: ApprovalMode;
 }
 
 export interface CompressionProps {

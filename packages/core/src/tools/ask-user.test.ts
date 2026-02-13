@@ -5,11 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import {
-  AskUserTool,
-  shouldHideAskUserTool,
-  isCompletedAskUserTool,
-} from './ask-user.js';
+import { AskUserTool, isCompletedAskUserTool } from './ask-user.js';
 import { QuestionType, type Question } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolConfirmationOutcome } from './tools.js';
@@ -17,54 +13,6 @@ import { ToolErrorType } from './tool-error.js';
 import { ASK_USER_DISPLAY_NAME } from './tool-names.js';
 
 describe('AskUserTool Helpers', () => {
-  describe('shouldHideAskUserTool', () => {
-    it('returns false for non-AskUser tools', () => {
-      expect(shouldHideAskUserTool('other-tool', 'Success', true)).toBe(false);
-    });
-
-    it('hides Pending AskUser tool', () => {
-      expect(
-        shouldHideAskUserTool(ASK_USER_DISPLAY_NAME, 'Pending', false),
-      ).toBe(true);
-    });
-
-    it('hides Executing AskUser tool', () => {
-      expect(
-        shouldHideAskUserTool(ASK_USER_DISPLAY_NAME, 'Executing', false),
-      ).toBe(true);
-    });
-
-    it('hides Confirming AskUser tool', () => {
-      expect(
-        shouldHideAskUserTool(ASK_USER_DISPLAY_NAME, 'Confirming', false),
-      ).toBe(true);
-    });
-
-    it('shows Success AskUser tool', () => {
-      expect(
-        shouldHideAskUserTool(ASK_USER_DISPLAY_NAME, 'Success', true),
-      ).toBe(false);
-    });
-
-    it('shows Canceled AskUser tool', () => {
-      expect(
-        shouldHideAskUserTool(ASK_USER_DISPLAY_NAME, 'Canceled', true),
-      ).toBe(false);
-    });
-
-    it('hides Error AskUser tool without result display', () => {
-      expect(shouldHideAskUserTool(ASK_USER_DISPLAY_NAME, 'Error', false)).toBe(
-        true,
-      );
-    });
-
-    it('shows Error AskUser tool with result display', () => {
-      expect(shouldHideAskUserTool(ASK_USER_DISPLAY_NAME, 'Error', true)).toBe(
-        false,
-      );
-    });
-  });
-
   describe('isCompletedAskUserTool', () => {
     it('returns false for non-AskUser tools', () => {
       expect(isCompletedAskUserTool('other-tool', 'Success')).toBe(false);
