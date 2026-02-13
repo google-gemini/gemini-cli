@@ -5,13 +5,16 @@
  */
 
 import {
+  EDIT_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
+  MEMORY_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   READ_MANY_FILES_TOOL_NAME,
   SHELL_TOOL_NAME,
   WEB_FETCH_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
 } from './definitions/coreTools.js';
 
@@ -20,23 +23,22 @@ import {
 // need to reference a tool's name without importing the tool's implementation.
 
 export {
+  EDIT_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
+  MEMORY_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   READ_MANY_FILES_TOOL_NAME,
   SHELL_TOOL_NAME,
   WEB_FETCH_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
 };
 
 export const WRITE_TODOS_TOOL_NAME = 'write_todos';
-export const WEB_SEARCH_TOOL_NAME = 'google_web_search';
-export const EDIT_TOOL_NAME = 'replace';
-export const LS_TOOL_NAME_LEGACY = 'list_directory';
-// Just to be safe if anything used the old exported name directly
+export const LS_TOOL_NAME_LEGACY = 'list_directory'; // Just to be safe if anything used the old exported name directly
 
-export const MEMORY_TOOL_NAME = 'save_memory';
 export const GET_INTERNAL_DOCS_TOOL_NAME = 'get_internal_docs';
 export const ACTIVATE_SKILL_TOOL_NAME = 'activate_skill';
 export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
