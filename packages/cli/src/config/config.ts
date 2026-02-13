@@ -44,6 +44,9 @@ import {
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
+  PolicyIntegrityManager,
+  IntegrityStatus,
+  type PolicyUpdateConfirmationRequest,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -95,6 +98,7 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
+  acceptChangedPolicies: boolean | undefined;
 }
 
 export async function parseArguments(
@@ -286,6 +290,11 @@ export async function parseArguments(
         .option('accept-raw-output-risk', {
           type: 'boolean',
           description: 'Suppress the security warning when using --raw-output.',
+        })
+        .option('accept-changed-policies', {
+          type: 'boolean',
+          description:
+            'Automatically accept changed project policies (use with caution).',
         }),
     )
     // Register MCP subcommands
@@ -694,8 +703,54 @@ export async function loadCliConfig(
   };
 
   let projectPoliciesDir: string | undefined;
+  let policyUpdateConfirmationRequest:
+    | PolicyUpdateConfirmationRequest
+    | undefined;
+
   if (trustedFolder) {
-    projectPoliciesDir = new Storage(cwd).getProjectPoliciesDir();
+    const potentialProjectPoliciesDir = new Storage(
+      cwd,
+    ).getProjectPoliciesDir();
+    const integrityManager = new PolicyIntegrityManager();
+    const integrityResult = await integrityManager.checkIntegrity(
+      'project',
+      cwd,
+      potentialProjectPoliciesDir,
+    );
+
+    if (integrityResult.status === IntegrityStatus.MATCH) {
+      projectPoliciesDir = potentialProjectPoliciesDir;
+    } else if (
+      integrityResult.status === IntegrityStatus.NEW &&
+      integrityResult.fileCount === 0
+    ) {
+      // No project policies found
+      projectPoliciesDir = undefined;
+    } else {
+      // Policies changed or are new
+      if (argv.acceptChangedPolicies) {
+        debugLogger.warn(
+          'WARNING: Project policies changed or are new. Auto-accepting due to --accept-changed-policies flag.',
+        );
+        await integrityManager.acceptIntegrity(
+          'project',
+          cwd,
+          integrityResult.hash,
+        );
+        projectPoliciesDir = potentialProjectPoliciesDir;
+      } else if (interactive) {
+        policyUpdateConfirmationRequest = {
+          scope: 'project',
+          identifier: cwd,
+          policyDir: potentialProjectPoliciesDir,
+          newHash: integrityResult.hash,
+        };
+      } else {
+        debugLogger.warn(
+          'WARNING: Project policies changed or are new. Loading default policies only. Use --accept-changed-policies to accept.',
+        );
+      }
+    }
   }
 
   const policyEngineConfig = await createPolicyEngineConfig(
@@ -765,6 +820,7 @@ export async function loadCliConfig(
     coreTools: settings.tools?.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
     policyEngineConfig,
+    policyUpdateConfirmationRequest,
     excludeTools,
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
