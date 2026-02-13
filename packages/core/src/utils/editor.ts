@@ -324,14 +324,19 @@ export async function openDiff(
     });
 
     childProcess.on('close', (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`${editor} exited with code ${code}`));
+      coreEvents.emit(CoreEvent.ExternalEditorClosed);
+      // For GUI editors, non-zero exit codes are common and don't necessarily
+      // indicate errors (e.g., Zed exits with code 1 in some scenarios).
+      // We log a debug message but still resolve to avoid unhandled rejections.
+      if (code !== 0) {
+        debugLogger.debug(`${editor} exited with code ${code}`);
       }
+      resolve();
     });
 
     childProcess.on('error', (error) => {
+      // Note: Node.js guarantees 'close' will be emitted after 'error',
+      // so ExternalEditorClosed event is emitted in the 'close' handler.
       reject(error);
     });
   });
