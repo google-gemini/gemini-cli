@@ -8,6 +8,7 @@ import { z } from 'zod';
 import type { Config } from '../config/config.js';
 import { getCoreSystemPrompt } from '../core/prompts.js';
 import type { LocalAgentDefinition } from './types.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 
 const GeneralistAgentSchema = z.object({
   response: z.string().describe('The final response from the agent.'),
@@ -48,7 +49,15 @@ export const GeneralistAgent = (
     model: 'inherit',
   },
   get toolConfig() {
-    const tools = config.getToolRegistry().getAllToolNames();
+    const tools = config
+      .getToolRegistry()
+      .getAllTools()
+      .map((tool) => {
+        if (tool instanceof DiscoveredMCPTool) {
+          return tool.getFullyQualifiedName();
+        }
+        return tool.name;
+      });
     return {
       tools,
     };
