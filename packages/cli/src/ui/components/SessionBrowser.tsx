@@ -7,6 +7,7 @@
 import type React from 'react';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Box, Text } from 'ink';
+import path from 'node:path';
 import { Colors } from '../colors.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -419,6 +420,18 @@ const formatTimestamp = (timestamp: string): string => {
   return parsed.toLocaleString();
 };
 
+const isSessionFromCurrentFolder = (projectRoot?: string): boolean => {
+  if (!projectRoot) {
+    return false;
+  }
+
+  try {
+    return path.resolve(projectRoot) === path.resolve(process.cwd());
+  } catch {
+    return false;
+  }
+};
+
 const SessionDetailsPanel = ({
   session,
 }: {
@@ -505,11 +518,13 @@ const SessionItem = ({
     state.startIndex + state.visibleSessions.indexOf(session);
   const isActive = originalIndex === state.activeIndex;
   const isDisabled = session.isCurrentSession;
+  const isCurrentFolder = isSessionFromCurrentFolder(session.projectRoot);
+  const activeColor = isCurrentFolder ? Colors.AccentCyan : Colors.AccentPurple;
   const textColor = (c: string = Colors.Foreground) => {
     if (isDisabled) {
       return Colors.Gray;
     }
-    return isActive ? Colors.AccentPurple : c;
+    return isActive ? activeColor : c;
   };
 
   const prefix = isActive ? '❯ ' : '  ';
