@@ -52,12 +52,7 @@ export function useSessionRetentionCheck(
         } else {
           setShouldShowWarning(false);
           // If no sessions to delete, safe to auto-enable retention
-          if (
-            !settings.general?.sessionRetention?.enabled ||
-            settings.general?.sessionRetention?.maxAge === undefined
-          ) {
-            onAutoEnable?.();
-          }
+          onAutoEnable?.();
         }
       } catch {
         // If we can't check sessions, default to not showing the warning to be safe

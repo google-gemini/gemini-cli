@@ -1336,7 +1336,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     settings.setValue(SettingScope.User, 'general.sessionRetention', {
       ...(settings.merged.general.sessionRetention ?? {}),
       enabled: true,
-      maxAge: '60d',
+      maxAge: '30d',
     });
   }, [settings]);
 
