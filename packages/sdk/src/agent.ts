@@ -7,29 +7,38 @@
 import {
   Config,
   type ConfigParameters,
+  AuthType,
   PREVIEW_GEMINI_MODEL_AUTO,
   GeminiEventType,
   type ToolCallRequestInfo,
   type ServerGeminiStreamEvent,
   type GeminiClient,
+  type Content,
   scheduleAgentTools,
   getAuthTypeFromEnv,
-  AuthType,
+  type ToolRegistry,
 } from '@google/gemini-cli-core';
 
-import { type Tool, SdkTool, type z } from './tool.js';
+import { type Tool, SdkTool } from './tool.js';
+import { SdkAgentFilesystem } from './fs.js';
+import { SdkAgentShell } from './shell.js';
+import type { SessionContext } from './types.js';
 
 export interface GeminiCliAgentOptions {
   instructions: string;
-  tools?: Array<Tool<z.ZodType>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tools?: Array<Tool<any>>;
   model?: string;
   cwd?: string;
   debug?: boolean;
+  recordResponses?: string;
+  fakeResponses?: string;
 }
 
 export class GeminiCliAgent {
-  private readonly config: Config;
-  private readonly tools: Array<Tool<z.ZodType>>;
+  private config: Config;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private tools: Array<Tool<any>>;
 
   constructor(options: GeminiCliAgentOptions) {
     const cwd = options.cwd || process.cwd();
@@ -46,6 +55,8 @@ export class GeminiCliAgent {
       enableHooks: false,
       mcpEnabled: false,
       extensionsEnabled: false,
+      recordResponses: options.recordResponses,
+      fakeResponses: options.fakeResponses,
     };
 
     this.config = new Config(configParams);
@@ -67,18 +78,21 @@ export class GeminiCliAgent {
       const messageBus = this.config.getMessageBus();
 
       for (const toolDef of this.tools) {
-        const sdkTool = new SdkTool(toolDef, messageBus);
+        const sdkTool = new SdkTool(toolDef, messageBus, this);
         registry.registerTool(sdkTool);
       }
     }
 
     const client = this.config.getGeminiClient();
+    const abortSignal = signal ?? new AbortController().signal;
+    const sessionId = this.config.getSessionId();
+
+    const fs = new SdkAgentFilesystem(this.config);
+    const shell = new SdkAgentShell(this.config);
 
     let request: Parameters<GeminiClient['sendMessageStream']>[0] = [
       { text: prompt },
     ];
-    const abortSignal = signal ?? new AbortController().signal;
-    const sessionId = this.config.getSessionId();
 
     while (true) {
       // sendMessageStream returns AsyncGenerator<ServerGeminiStreamEvent, Turn>
@@ -107,12 +121,35 @@ export class GeminiCliAgent {
         break;
       }
 
+      // Prepare SessionContext
+      const transcript: Content[] = client.getHistory();
+      const context: SessionContext = {
+        sessionId,
+        transcript,
+        cwd: this.config.getWorkingDir(),
+        timestamp: new Date().toISOString(),
+        fs,
+        shell,
+        agent: this,
+      };
+
+      // Create a scoped registry for this turn to bind context safely
+      const originalRegistry = this.config.getToolRegistry();
+      const scopedRegistry: ToolRegistry = Object.create(originalRegistry);
+      scopedRegistry.getTool = (name: string) => {
+        const tool = originalRegistry.getTool(name);
+        if (tool instanceof SdkTool) {
+          return tool.bindContext(context);
+        }
+        return tool;
+      };
+
       const completedCalls = await scheduleAgentTools(
         this.config,
         toolCallsToSchedule,
         {
           schedulerId: sessionId,
-          toolRegistry: this.config.getToolRegistry(),
+          toolRegistry: scopedRegistry,
           signal: abortSignal,
         },
       );
