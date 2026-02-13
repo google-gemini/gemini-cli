@@ -13,16 +13,11 @@ import {
 } from '@google/gemini-cli-core';
 
 export async function relaunchOnExitCode(runner: () => Promise<number>) {
-  if (os.platform() === 'android') {
-    const exitCode = await runner();
-    process.exit(exitCode);
-  }
-
   while (true) {
     try {
       const exitCode = await runner();
 
-      if (exitCode !== RELAUNCH_EXIT_CODE) {
+      if (os.platform() === 'android' || exitCode !== RELAUNCH_EXIT_CODE) {
         process.exit(exitCode);
       }
     } catch (error) {
