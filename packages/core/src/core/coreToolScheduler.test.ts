@@ -2274,4 +2274,86 @@ describe('CoreToolScheduler Sequential Execution', () => {
       );
     });
   });
+
+  describe('ApprovalMode Preservation', () => {
+    it('should preserve approvalMode throughout tool lifecycle', async () => {
+      // Arrange
+      const executeFn = vi.fn().mockResolvedValue({
+        llmContent: 'Tool executed',
+        returnDisplay: 'Tool executed',
+      });
+      const mockTool = new MockTool({
+        name: 'mockTool',
+        execute: executeFn,
+        shouldConfirmExecute: MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+      });
+
+      const mockToolRegistry = {
+        getTool: () => mockTool,
+        getAllToolNames: () => ['mockTool'],
+      } as unknown as ToolRegistry;
+
+      const onAllToolCallsComplete = vi.fn();
+      const onToolCallsUpdate = vi.fn();
+
+      // Set approval mode to PLAN
+      const mockConfig = createMockConfig({
+        getToolRegistry: () => mockToolRegistry,
+        getApprovalMode: () => ApprovalMode.PLAN,
+        // Ensure policy engine returns ASK_USER to trigger AwaitingApproval state
+        getPolicyEngine: () =>
+          ({
+            check: async () => ({ decision: PolicyDecision.ASK_USER }),
+          }) as unknown as PolicyEngine,
+      });
+      mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
+
+      const scheduler = new CoreToolScheduler({
+        config: mockConfig,
+        onAllToolCallsComplete,
+        onToolCallsUpdate,
+        getPreferredEditor: () => 'vscode',
+      });
+
+      const abortController = new AbortController();
+      const request = {
+        callId: '1',
+        name: 'mockTool',
+        args: { param: 'value' },
+        isClientInitiated: false,
+        prompt_id: 'test-prompt',
+      };
+
+      // Act - Schedule
+      const schedulePromise = scheduler.schedule(
+        request,
+        abortController.signal,
+      );
+
+      // Assert - Check AwaitingApproval state
+      const awaitingCall = (await waitForStatus(
+        onToolCallsUpdate,
+        CoreToolCallStatus.AwaitingApproval,
+      )) as WaitingToolCall;
+
+      expect(awaitingCall).toBeDefined();
+      expect(awaitingCall.approvalMode).toBe(ApprovalMode.PLAN);
+
+      // Act - Confirm
+      await awaitingCall.confirmationDetails.onConfirm(
+        ToolConfirmationOutcome.ProceedOnce,
+      );
+
+      // Wait for completion
+      await schedulePromise;
+
+      // Assert - Check Success state
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+      const completedCalls = onAllToolCallsComplete.mock
+        .calls[0][0] as ToolCall[];
+      expect(completedCalls).toHaveLength(1);
+      expect(completedCalls[0].status).toBe(CoreToolCallStatus.Success);
+      expect(completedCalls[0].approvalMode).toBe(ApprovalMode.PLAN);
+    });
+  });
 });

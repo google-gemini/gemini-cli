@@ -933,7 +933,7 @@ export class CoreToolScheduler {
 
         this.toolCalls = this.toolCalls.map((tc) =>
           tc.request.callId === completedCall.request.callId
-            ? completedCall
+            ? { ...completedCall, approvalMode: tc.approvalMode }
             : tc,
         );
         this.notifyToolCallsUpdate();
