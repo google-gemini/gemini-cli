@@ -14,6 +14,8 @@ export const LS_TOOL_NAME = 'list_directory';
 export const READ_FILE_TOOL_NAME = 'read_file';
 export const SHELL_TOOL_NAME = 'run_shell_command';
 export const WRITE_FILE_TOOL_NAME = 'write_file';
+export const EDIT_TOOL_NAME = 'replace';
+export const WEB_SEARCH_TOOL_NAME = 'google_web_search';
 
 // ============================================================================
 // READ_FILE TOOL
@@ -98,8 +100,204 @@ export const GREP_DEFINITION: ToolDefinition = {
           description: `Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).`,
           type: 'string',
         },
+        exclude_pattern: {
+          description:
+            'Optional: A regular expression pattern to exclude from the search results. If a line matches both the pattern and the exclude_pattern, it will be omitted.',
+          type: 'string',
+        },
+        names_only: {
+          description:
+            'Optional: If true, only the file paths of the matches will be returned, without the line content or line numbers. This is useful for gathering a list of files.',
+          type: 'boolean',
+        },
+        max_matches_per_file: {
+          description:
+            'Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.',
+          type: 'integer',
+          minimum: 1,
+        },
+        total_max_matches: {
+          description:
+            'Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.',
+          type: 'integer',
+          minimum: 1,
+        },
       },
       required: ['pattern'],
+    },
+  },
+};
+
+// ============================================================================
+// RIP_GREP TOOL
+// ============================================================================
+
+export const RIP_GREP_DEFINITION: ToolDefinition = {
+  base: {
+    name: GREP_TOOL_NAME,
+    description:
+      'Searches for a regular expression pattern within file contents.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        pattern: {
+          description: `The pattern to search for. By default, treated as a Rust-flavored regular expression. Use '\\b' for precise symbol matching (e.g., '\\bMatchMe\\b').`,
+          type: 'string',
+        },
+        dir_path: {
+          description:
+            "Directory or file to search. Directories are searched recursively. Relative paths are resolved against current working directory. Defaults to current working directory ('.') if omitted.",
+          type: 'string',
+        },
+        include: {
+          description:
+            "Glob pattern to filter files (e.g., '*.ts', 'src/**'). Recommended for large repositories to reduce noise. Defaults to all files if omitted.",
+          type: 'string',
+        },
+        exclude_pattern: {
+          description:
+            'Optional: A regular expression pattern to exclude from the search results. If a line matches both the pattern and the exclude_pattern, it will be omitted.',
+          type: 'string',
+        },
+        names_only: {
+          description:
+            'Optional: If true, only the file paths of the matches will be returned, without the line content or line numbers. This is useful for gathering a list of files.',
+          type: 'boolean',
+        },
+        case_sensitive: {
+          description:
+            'If true, search is case-sensitive. Defaults to false (ignore case) if omitted.',
+          type: 'boolean',
+        },
+        fixed_strings: {
+          description:
+            'If true, treats the `pattern` as a literal string instead of a regular expression. Defaults to false (basic regex) if omitted.',
+          type: 'boolean',
+        },
+        context: {
+          description:
+            'Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.',
+          type: 'integer',
+        },
+        after: {
+          description:
+            'Show this many lines after each match (equivalent to grep -A). Defaults to 0 if omitted.',
+          type: 'integer',
+          minimum: 0,
+        },
+        before: {
+          description:
+            'Show this many lines before each match (equivalent to grep -B). Defaults to 0 if omitted.',
+          type: 'integer',
+          minimum: 0,
+        },
+        no_ignore: {
+          description:
+            'If true, searches all files including those usually ignored (like in .gitignore, build/, dist/, etc). Defaults to false if omitted.',
+          type: 'boolean',
+        },
+        max_matches_per_file: {
+          description:
+            'Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.',
+          type: 'integer',
+          minimum: 1,
+        },
+        total_max_matches: {
+          description:
+            'Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.',
+          type: 'integer',
+          minimum: 1,
+        },
+      },
+      required: ['pattern'],
+    },
+  },
+};
+
+// ============================================================================
+// WEB_SEARCH TOOL
+// ============================================================================
+
+export const WEB_SEARCH_DEFINITION: ToolDefinition = {
+  base: {
+    name: WEB_SEARCH_TOOL_NAME,
+    description:
+      'Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based on a query.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'The search query to find information on the web.',
+        },
+      },
+      required: ['query'],
+    },
+  },
+};
+
+// ============================================================================
+// EDIT TOOL
+// ============================================================================
+
+export const EDIT_DEFINITION: ToolDefinition = {
+  base: {
+    name: EDIT_TOOL_NAME,
+    description: `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool to examine the file's current content before attempting a text replacement.
+      
+      The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
+      
+      Expectation for required parameters:
+      1. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
+      2. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic and that \`old_string\` and \`new_string\` are different.
+      3. \`instruction\` is the detailed instruction of what needs to be changed. It is important to Make it specific and detailed so developers or large language models can understand what needs to be changed and perform the changes on their own if necessary. 
+      4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
+      **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.
+      5. Prefer to break down complex and long changes into multiple smaller atomic calls to this tool. Always check the content of the file after changes or not finding a string to match.
+      **Multiple replacements:** Set \`expected_replacements\` to the number of occurrences you want to replace. The tool will replace ALL occurrences that match \`old_string\` exactly. Ensure the number of replacements matches your expectation.`,
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        file_path: {
+          description: 'The path to the file to modify.',
+          type: 'string',
+        },
+        instruction: {
+          description: `A clear, semantic instruction for the code change, acting as a high-quality prompt for an expert LLM assistant. It must be self-contained and explain the goal of the change.
+
+A good instruction should concisely answer:
+1.  WHY is the change needed? (e.g., "To fix a bug where users can be null...")
+2.  WHERE should the change happen? (e.g., "...in the 'renderUserProfile' function...")
+3.  WHAT is the high-level change? (e.g., "...add a null check for the 'user' object...")
+4.  WHAT is the desired outcome? (e.g., "...so that it displays a loading spinner instead of crashing.")
+
+**GOOD Example:** "In the 'calculateTotal' function, correct the sales tax calculation by updating the 'taxRate' constant from 0.05 to 0.075 to reflect the new regional tax laws."
+
+**BAD Examples:**
+- "Change the text." (Too vague)
+- "Fix the bug." (Doesn't explain the bug or the fix)
+- "Replace the line with this new line." (Brittle, just repeats the other parameters)
+`,
+          type: 'string',
+        },
+        old_string: {
+          description:
+            'The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
+          type: 'string',
+        },
+        new_string: {
+          description:
+            'The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
+          type: 'string',
+        },
+        expected_replacements: {
+          type: 'number',
+          description:
+            'Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.',
+          minimum: 1,
+        },
+      },
+      required: ['file_path', 'instruction', 'old_string', 'new_string'],
     },
   },
 };
