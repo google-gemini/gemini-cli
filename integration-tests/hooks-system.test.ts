@@ -534,7 +534,11 @@ console.log(JSON.stringify({
 
   describe('BeforeToolSelection Hooks - Tool Configuration', () => {
     it('should modify tool selection with BeforeToolSelection hooks', async () => {
+      // 1. Initial setup to establish test directory
+      rig.setup('BeforeToolSelection Hooks');
+
       const toolConfigJson = JSON.stringify({
+        decision: 'allow',
         hookSpecificOutput: {
           hookEventName: 'BeforeToolSelection',
           toolConfig: {
@@ -547,7 +551,9 @@ console.log(JSON.stringify({
       // Use file-based hook to avoid quoting issues
       const hookScript = `console.log(JSON.stringify(${toolConfigJson}));`;
       const hookFilename = 'before_tool_selection_hook.js';
+      const scriptPath = rig.createScript(hookFilename, hookScript);
 
+      // 2. Final setup with script path
       rig.setup('BeforeToolSelection Hooks', {
         fakeResponsesPath: join(
           import.meta.dirname,
@@ -564,7 +570,7 @@ console.log(JSON.stringify({
                 hooks: [
                   {
                     type: 'command',
-                    command: `node ${hookFilename}`,
+                    command: normalizePath(`node "${scriptPath}"`),
                     timeout: 60000,
                   },
                 ],
@@ -573,9 +579,6 @@ console.log(JSON.stringify({
           },
         },
       });
-
-      // Create the hook script after setup
-      rig.createScript(hookFilename, hookScript);
 
       // Create a test file
       rig.createFile('new_file_data.txt', 'test data');
