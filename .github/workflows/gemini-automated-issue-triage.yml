@@ -306,6 +306,34 @@ jobs:
             });
             core.info(`Successfully added labels for #${issueNumber}: ${labelsToAdd.join(', ')}`);
 
+      - name: 'Post Triage Success Comment'
+        if: success()
+        env:
+          ISSUE_NUMBER: '${{ github.event.issue.number || github.event.inputs.issue_number }}'
+          LABELS_OUTPUT: '${{ steps.gemini_issue_analysis.outputs.summary }}'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
+          script: |
+            const rawOutput = process.env.LABELS_OUTPUT;
+            let labelsApplied = [];
+            try {
+              const parsed = JSON.parse(rawOutput);
+              labelsApplied = parsed.labels_to_set || [];
+            } catch (e) {
+              const jsonMatch = rawOutput.match(/```json\s*([\s\S]*?)\s*```/);
+              if (jsonMatch && jsonMatch[1]) {
+                labelsApplied = JSON.parse(jsonMatch[1].trim()).labels_to_set || [];
+              }
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt(process.env.ISSUE_NUMBER),
+              body: `🤖 **Triage complete!** Applied labels: \`${labelsApplied.join('\`, \`')}\``
+            });
+
       - name: 'Post Issue Analysis Failure Comment'
         if: |-
           ${{ failure() && steps.gemini_issue_analysis.outcome == 'failure' }}
