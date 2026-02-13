@@ -223,6 +223,58 @@ describe('ToolConfirmationQueue', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
+  it('provides more height for ask_user by subtracting less overhead', async () => {
+    const confirmingTool = {
+      tool: {
+        callId: 'call-1',
+        name: 'ask_user',
+        description: 'ask user',
+        status: ToolCallStatus.Confirming,
+        confirmationDetails: {
+          type: 'ask_user' as const,
+          questions: [
+            {
+              type: 'choice',
+              header: 'Height Test',
+              question: 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6',
+              options: [{ label: 'Option 1', description: 'Desc' }],
+            },
+          ],
+        },
+      },
+      index: 1,
+      total: 1,
+    };
+
+    const { lastFrame } = renderWithProviders(
+      <ToolConfirmationQueue
+        confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+      />,
+      {
+        config: mockConfig,
+        uiState: {
+          terminalWidth: 80,
+          terminalHeight: 40,
+          availableTerminalHeight: 20,
+          constrainHeight: true,
+          streamingState: StreamingState.WaitingForConfirmation,
+        },
+      },
+    );
+
+    // Calculation:
+    // availableTerminalHeight: 20 -> maxHeight: 19 (20-1)
+    // hideToolIdentity is true for ask_user -> subtracts 4 instead of 6
+    // availableContentHeight = 19 - 4 = 15
+    // ToolConfirmationMessage handlesOwnUI=true -> returns full 15
+    // AskUserDialog uses 15 lines to render its multi-line question and options.
+    await waitFor(() => {
+      expect(lastFrame()).toContain('Line 6');
+      expect(lastFrame()).not.toContain('lines hidden');
+    });
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
   it('does not render expansion hint when constrainHeight is false', () => {
     const longDiff = 'line\n'.repeat(50);
     const confirmingTool = {
