@@ -133,7 +133,6 @@ interface ErrorIndicatorProps {
 
 const ErrorIndicator: React.FC<ErrorIndicatorProps> = ({ errorCount }) => (
   <Box flexDirection="row">
-    <Text color={theme.ui.comment}>| </Text>
     <ConsoleSummaryDisplay errorCount={errorCount} />
   </Box>
 );
@@ -287,7 +286,8 @@ export const Footer: React.FC = () => {
                 </Box>
               )}
               {!showErrorDetails && errorCount > 0 && (
-                <Box paddingLeft={1}>
+                <Box paddingLeft={1} flexDirection="row">
+                  <Text color={theme.ui.comment}>| </Text>
                   <ErrorIndicator errorCount={errorCount} />
                 </Box>
               )}
@@ -426,16 +426,11 @@ export const Footer: React.FC = () => {
           totalTokens += m.tokens.total;
         }
         if (totalTokens > 0) {
-          let formatted: string;
-          if (totalTokens >= 1_000_000_000) {
-            formatted = `${(totalTokens / 1_000_000_000).toFixed(1)}b`;
-          } else if (totalTokens >= 1_000_000) {
-            formatted = `${(totalTokens / 1_000_000).toFixed(1)}m`;
-          } else if (totalTokens >= 1000) {
-            formatted = `${(totalTokens / 1000).toFixed(1)}k`;
-          } else {
-            formatted = totalTokens.toString();
-          }
+          const formatter = new Intl.NumberFormat('en-US', {
+            notation: 'compact',
+            maximumFractionDigits: 1,
+          });
+          const formatted = formatter.format(totalTokens).toLowerCase();
           addElement(
             id,
             <Text color={theme.text.secondary}>{formatted} tokens</Text>,
