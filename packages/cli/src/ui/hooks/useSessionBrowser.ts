@@ -7,15 +7,17 @@
 import { useState, useCallback } from 'react';
 import type { HistoryItemWithoutId } from '../types.js';
 import * as fs from 'node:fs/promises';
-import path from 'node:path';
 import type {
   Config,
-  ConversationRecord,
   ResumedSessionData,
 } from '@google/gemini-cli-core';
 import { coreEvents } from '@google/gemini-cli-core';
 import type { SessionInfo } from '../../utils/sessionUtils.js';
-import { convertSessionToHistoryFormats } from '../../utils/sessionUtils.js';
+import {
+  convertSessionToHistoryFormats,
+  deleteSessionArtifacts,
+  renameSession,
+} from '../../utils/sessionUtils.js';
 import type { Part } from '@google/genai';
 
 export { convertSessionToHistoryFormats };
@@ -47,18 +49,9 @@ export const useSessionBrowser = (
     handleResumeSession: useCallback(
       async (session: SessionInfo) => {
         try {
-          const chatsDir = path.join(
-            config.storage.getProjectTempDir(),
-            'chats',
-          );
-
-          const fileName = session.fileName;
-
-          const originalFilePath = path.join(chatsDir, fileName);
-
           // Load up the conversation.
-          const conversation: ConversationRecord = JSON.parse(
-            await fs.readFile(originalFilePath, 'utf8'),
+          const conversation = JSON.parse(
+            await fs.readFile(session.sessionPath, 'utf8'),
           );
 
           // Use the old session's ID to continue it.
@@ -67,7 +60,7 @@ export const useSessionBrowser = (
 
           const resumedSessionData = {
             conversation,
-            filePath: originalFilePath,
+            filePath: session.sessionPath,
           };
 
           // We've loaded it; tell the UI about it.
@@ -89,27 +82,31 @@ export const useSessionBrowser = (
     ),
 
     /**
-     * Deletes a session by ID using the ChatRecordingService.
+     * Deletes a session and related tool output artifacts.
      */
     handleDeleteSession: useCallback(
-      (session: SessionInfo) => {
-        // Note: Chat sessions are stored on disk using a filename derived from
-        // the session, e.g. "session-<timestamp>-<sessionIdPrefix>.json".
-        // The ChatRecordingService.deleteSession API expects this file basename
-        // (without the ".json" extension), not the full session UUID.
+      async (session: SessionInfo): Promise<void> => {
         try {
-          const chatRecordingService = config
-            .getGeminiClient()
-            ?.getChatRecordingService();
-          if (chatRecordingService) {
-            chatRecordingService.deleteSession(session.file);
-          }
+          await deleteSessionArtifacts(session);
         } catch (error) {
           coreEvents.emitFeedback('error', 'Error deleting session:', error);
           throw error;
         }
       },
-      [config],
+      [],
+    ),
+
+    handleRenameSession: useCallback(
+      async (session: SessionInfo, newNameBase: string): Promise<SessionInfo> => {
+        try {
+          const result = await renameSession(session, newNameBase);
+          return result.sessionInfo;
+        } catch (error) {
+          coreEvents.emitFeedback('error', 'Error renaming session:', error);
+          throw error;
+        }
+      },
+      [],
     ),
   };
 };

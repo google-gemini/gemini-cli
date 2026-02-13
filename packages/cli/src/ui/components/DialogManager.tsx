@@ -299,6 +299,7 @@ export const DialogManager = ({
         config={config}
         onResumeSession={uiActions.handleResumeSession}
         onDeleteSession={uiActions.handleDeleteSession}
+        onRenameSession={uiActions.handleRenameSession}
         onExit={uiActions.closeSessionBrowser}
       />
     );

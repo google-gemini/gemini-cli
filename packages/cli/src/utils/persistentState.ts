@@ -15,6 +15,14 @@ interface PersistentStateData {
   tipsShown?: number;
   hasSeenScreenReaderNudge?: boolean;
   focusUiEnabled?: boolean;
+  sessionRecovery?: {
+    sessionId: string;
+    sessionName: string;
+    sessionPath: string;
+    projectRoot: string;
+    dirtyExit: boolean;
+    updatedAt: string;
+  };
   // Add other persistent state keys here as needed
 }
 

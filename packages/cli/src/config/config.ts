@@ -224,7 +224,7 @@ export async function parseArguments(
           // one, and not being passed at all.
           skipValidation: true,
           description:
-            'Resume a previous session. Use "latest" for most recent or index number (e.g. --resume 5)',
+            'Resume a previous session by name, index, UUID, or "latest" (e.g. --resume my-chat-abc12)',
           coerce: (value: string): string => {
             // When --resume passed with a value (`gemini --resume 123`): value = "123" (string)
             // When --resume passed without a value (`gemini --resume`): value = "" (string)
@@ -238,13 +238,12 @@ export async function parseArguments(
         })
         .option('list-sessions', {
           type: 'boolean',
-          description:
-            'List available sessions for the current project and exit.',
+          description: 'List available sessions across all projects and exit.',
         })
         .option('delete-session', {
           type: 'string',
           description:
-            'Delete a session by index number (use --list-sessions to see available sessions).',
+            'Delete a session by name, index, or UUID (use --list-sessions to see available sessions).',
         })
         .option('include-directories', {
           type: 'array',

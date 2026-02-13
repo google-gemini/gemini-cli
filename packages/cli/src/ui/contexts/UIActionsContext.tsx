@@ -65,6 +65,10 @@ export interface UIActions {
   closeSessionBrowser: () => void;
   handleResumeSession: (session: SessionInfo) => Promise<void>;
   handleDeleteSession: (session: SessionInfo) => Promise<void>;
+  handleRenameSession: (
+    session: SessionInfo,
+    newNameBase: string,
+  ) => Promise<SessionInfo>;
   setQueueErrorMessage: (message: string | null) => void;
   popAllMessages: () => string | undefined;
   handleApiKeySubmit: (apiKey: string) => Promise<void>;

@@ -1,740 +1,192 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Config } from '@google/gemini-cli-core';
-import { ChatRecordingService } from '@google/gemini-cli-core';
 import { listSessions, deleteSession } from './sessions.js';
-import { SessionSelector, type SessionInfo } from './sessionUtils.js';
+import {
+  SessionSelector,
+  SessionError,
+  type SessionInfo,
+} from './sessionUtils.js';
 
 const mocks = vi.hoisted(() => ({
   writeToStdout: vi.fn(),
   writeToStderr: vi.fn(),
+  generateSummary: vi.fn().mockResolvedValue(undefined),
+  listSessions: vi.fn(),
+  findSession: vi.fn(),
+  deleteSessionArtifacts: vi.fn(),
 }));
 
-// Mock the SessionSelector and ChatRecordingService
-vi.mock('./sessionUtils.js', () => ({
-  SessionSelector: vi.fn(),
-  formatRelativeTime: vi.fn(() => 'some time ago'),
-}));
+vi.mock('./sessionUtils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./sessionUtils.js')>();
+  return {
+    ...actual,
+    SessionSelector: vi.fn(),
+    formatRelativeTime: vi.fn(() => 'some time ago'),
+    deleteSessionArtifacts: mocks.deleteSessionArtifacts,
+  };
+});
 
 vi.mock('@google/gemini-cli-core', async () => {
   const actual = await vi.importActual('@google/gemini-cli-core');
   return {
     ...actual,
-    ChatRecordingService: vi.fn(),
-    generateSummary: vi.fn().mockResolvedValue(undefined),
+    generateSummary: mocks.generateSummary,
     writeToStdout: mocks.writeToStdout,
     writeToStderr: mocks.writeToStderr,
   };
 });
 
-describe('listSessions', () => {
-  let mockConfig: Config;
-  let mockListSessions: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    // Create mock config
-    mockConfig = {
-      storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/tmp/test-project'),
-      },
-      getSessionId: vi.fn().mockReturnValue('current-session-id'),
-    } as unknown as Config;
-
-    // Create mock listSessions method
-    mockListSessions = vi.fn();
-
-    // Mock SessionSelector constructor to return object with listSessions method
-    vi.mocked(SessionSelector).mockImplementation(
-      () =>
-        ({
-          listSessions: mockListSessions,
-        }) as unknown as InstanceType<typeof SessionSelector>,
-    );
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
-    mocks.writeToStdout.mockClear();
-    mocks.writeToStderr.mockClear();
-  });
-
-  it('should display message when no previous sessions were found', async () => {
-    // Arrange: Return empty array from listSessions
-    mockListSessions.mockResolvedValue([]);
-
-    // Act
-    await listSessions(mockConfig);
-
-    // Assert
-    expect(mockListSessions).toHaveBeenCalledOnce();
-    expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      'No previous sessions found for this project.',
-    );
-  });
-
-  it('should list sessions when sessions are found', async () => {
-    // Arrange: Create test sessions
-    const now = new Date('2025-01-20T12:00:00.000Z');
-    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-    const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
-
-    const mockSessions: SessionInfo[] = [
-      {
-        id: 'session-1',
-        file: 'session-2025-01-18T12-00-00-session-1',
-        fileName: 'session-2025-01-18T12-00-00-session-1.json',
-        startTime: twoDaysAgo.toISOString(),
-        lastUpdated: twoDaysAgo.toISOString(),
-        messageCount: 5,
-        displayName: 'First user message',
-        firstUserMessage: 'First user message',
-        isCurrentSession: false,
-        index: 1,
-      },
-      {
-        id: 'session-2',
-        file: 'session-2025-01-20T11-00-00-session-2',
-        fileName: 'session-2025-01-20T11-00-00-session-2.json',
-        startTime: oneHourAgo.toISOString(),
-        lastUpdated: oneHourAgo.toISOString(),
-        messageCount: 10,
-        displayName: 'Second user message',
-        firstUserMessage: 'Second user message',
-        isCurrentSession: false,
-        index: 2,
-      },
-      {
-        id: 'current-session-id',
-        file: 'session-2025-01-20T12-00-00-current-s',
-        fileName: 'session-2025-01-20T12-00-00-current-s.json',
-        startTime: now.toISOString(),
-        lastUpdated: now.toISOString(),
-        messageCount: 3,
-        displayName: 'Current session',
-        firstUserMessage: 'Current session',
-        isCurrentSession: true,
-        index: 3,
-      },
-    ];
-
-    mockListSessions.mockResolvedValue(mockSessions);
-
-    // Act
-    await listSessions(mockConfig);
-
-    // Assert
-    expect(mockListSessions).toHaveBeenCalledOnce();
-
-    // Check that the header was displayed
-    expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      '\nAvailable sessions for this project (3):\n',
-    );
-
-    // Check that each session was logged
-    expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      expect.stringContaining('1. First user message'),
-    );
-    expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      expect.stringContaining('[session-1]'),
-    );
-
-    expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      expect.stringContaining('2. Second user message'),
-    );
-    expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      expect.stringContaining('[session-2]'),
-    );
-
-    expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      expect.stringContaining('3. Current session'),
-    );
-    expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      expect.stringContaining(', current)'),
-    );
-    expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      expect.stringContaining('[current-session-id]'),
-    );
-  });
-
-  it('should sort sessions by start time (oldest first)', async () => {
-    // Arrange: Create sessions in non-chronological order
-    const session1Time = new Date('2025-01-18T12:00:00.000Z');
-    const session2Time = new Date('2025-01-19T12:00:00.000Z');
-    const session3Time = new Date('2025-01-20T12:00:00.000Z');
-
-    const mockSessions: SessionInfo[] = [
-      {
-        id: 'session-2',
-        file: 'session-2',
-        fileName: 'session-2.json',
-        startTime: session2Time.toISOString(), // Middle
-        lastUpdated: session2Time.toISOString(),
-        messageCount: 5,
-        displayName: 'Middle session',
-        firstUserMessage: 'Middle session',
-        isCurrentSession: false,
-        index: 2,
-      },
-      {
-        id: 'session-1',
-        file: 'session-1',
-        fileName: 'session-1.json',
-        startTime: session1Time.toISOString(), // Oldest
-        lastUpdated: session1Time.toISOString(),
-        messageCount: 5,
-        displayName: 'Oldest session',
-        firstUserMessage: 'Oldest session',
-        isCurrentSession: false,
-        index: 1,
-      },
-      {
-        id: 'session-3',
-        file: 'session-3',
-        fileName: 'session-3.json',
-        startTime: session3Time.toISOString(), // Newest
-        lastUpdated: session3Time.toISOString(),
-        messageCount: 5,
-        displayName: 'Newest session',
-        firstUserMessage: 'Newest session',
-        isCurrentSession: false,
-        index: 3,
-      },
-    ];
-
-    mockListSessions.mockResolvedValue(mockSessions);
-
-    // Act
-    await listSessions(mockConfig);
-
-    // Assert
-    // Get all the session log calls (skip the header)
-    const sessionCalls = mocks.writeToStdout.mock.calls.filter(
-      (call): call is [string] =>
-        typeof call[0] === 'string' &&
-        call[0].includes('[session-') &&
-        !call[0].includes('Available sessions'),
-    );
-
-    // Verify they are sorted by start time (oldest first)
-    expect(sessionCalls[0][0]).toContain('1. Oldest session');
-    expect(sessionCalls[1][0]).toContain('2. Middle session');
-    expect(sessionCalls[2][0]).toContain('3. Newest session');
-  });
-
-  it('should format session output with relative time and session ID', async () => {
-    // Arrange
-    const now = new Date('2025-01-20T12:00:00.000Z');
-    const mockSessions: SessionInfo[] = [
-      {
-        id: 'abc123def456',
-        file: 'session-file',
-        fileName: 'session-file.json',
-        startTime: now.toISOString(),
-        lastUpdated: now.toISOString(),
-        messageCount: 5,
-        displayName: 'Test message',
-        firstUserMessage: 'Test message',
-        isCurrentSession: false,
-        index: 1,
-      },
-    ];
-
-    mockListSessions.mockResolvedValue(mockSessions);
-
-    // Act
-    await listSessions(mockConfig);
-
-    // Assert
-    expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      expect.stringContaining('1. Test message'),
-    );
-    expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      expect.stringContaining('some time ago'),
-    );
-    expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      expect.stringContaining('[abc123def456]'),
-    );
-  });
-
-  it('should handle single session', async () => {
-    // Arrange
-    const now = new Date('2025-01-20T12:00:00.000Z');
-    const mockSessions: SessionInfo[] = [
-      {
-        id: 'single-session',
-        file: 'session-file',
-        fileName: 'session-file.json',
-        startTime: now.toISOString(),
-        lastUpdated: now.toISOString(),
-        messageCount: 5,
-        displayName: 'Only session',
-        firstUserMessage: 'Only session',
-        isCurrentSession: true,
-        index: 1,
-      },
-    ];
-
-    mockListSessions.mockResolvedValue(mockSessions);
-
-    // Act
-    await listSessions(mockConfig);
-
-    // Assert
-    expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      '\nAvailable sessions for this project (1):\n',
-    );
-    expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      expect.stringContaining('1. Only session'),
-    );
-    expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      expect.stringContaining(', current)'),
-    );
-  });
-
-  it('should display summary as title when available instead of first user message', async () => {
-    // Arrange
-    const now = new Date('2025-01-20T12:00:00.000Z');
-    const mockSessions: SessionInfo[] = [
-      {
-        id: 'session-with-summary',
-        file: 'session-file',
-        fileName: 'session-file.json',
-        startTime: now.toISOString(),
-        lastUpdated: now.toISOString(),
-        messageCount: 10,
-        displayName: 'Add dark mode to the app', // Summary
-        firstUserMessage:
-          'How do I add dark mode to my React application with CSS variables?',
-        isCurrentSession: false,
-        index: 1,
-        summary: 'Add dark mode to the app',
-      },
-    ];
-
-    mockListSessions.mockResolvedValue(mockSessions);
-
-    // Act
-    await listSessions(mockConfig);
-
-    // Assert: Should show the summary (displayName), not the first user message
-    expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      expect.stringContaining('1. Add dark mode to the app'),
-    );
-    expect(mocks.writeToStdout).not.toHaveBeenCalledWith(
-      expect.stringContaining('How do I add dark mode to my React application'),
-    );
-  });
+const createSession = (overrides: Partial<SessionInfo> = {}): SessionInfo => ({
+  id: 'session-id',
+  file: 'session-file',
+  fileName: 'session-file.json',
+  sessionPath: '/tmp/project/chats/session-file.json',
+  projectTempDir: '/tmp/project',
+  projectId: 'project',
+  projectRoot: '/workspace/project',
+  startTime: '2025-01-20T12:00:00.000Z',
+  lastUpdated: '2025-01-20T12:00:00.000Z',
+  messageCount: 5,
+  displayName: 'Display title',
+  sessionName: 'display-title-abc12',
+  sessionNameBase: 'display-title',
+  sessionNameSuffix: 'abc12',
+  firstUserMessage: 'First user message',
+  isCurrentSession: false,
+  index: 1,
+  ...overrides,
 });
 
-describe('deleteSession', () => {
-  let mockConfig: Config;
-  let mockListSessions: ReturnType<typeof vi.fn>;
-  let mockDeleteSession: ReturnType<typeof vi.fn>;
+describe('sessions utils', () => {
+  const mockConfig = {} as Config;
 
   beforeEach(() => {
-    // Create mock config
-    mockConfig = {
-      storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/tmp/test-project'),
-      },
-      getSessionId: vi.fn().mockReturnValue('current-session-id'),
-    } as unknown as Config;
-
-    // Create mock methods
-    mockListSessions = vi.fn();
-    mockDeleteSession = vi.fn();
-
-    // Mock SessionSelector constructor
+    vi.clearAllMocks();
     vi.mocked(SessionSelector).mockImplementation(
       () =>
         ({
-          listSessions: mockListSessions,
-        }) as unknown as InstanceType<typeof SessionSelector>,
-    );
-
-    // Mock ChatRecordingService
-    vi.mocked(ChatRecordingService).mockImplementation(
-      () =>
-        ({
-          deleteSession: mockDeleteSession,
-        }) as unknown as InstanceType<typeof ChatRecordingService>,
+          listSessions: mocks.listSessions,
+          findSession: mocks.findSession,
+        }) as unknown as SessionSelector,
     );
   });
 
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
+  describe('listSessions', () => {
+    it('prints empty message when no sessions exist', async () => {
+      mocks.listSessions.mockResolvedValue([]);
 
-  it('should display error when no sessions are found', async () => {
-    // Arrange
-    mockListSessions.mockResolvedValue([]);
+      await listSessions(mockConfig);
 
-    // Act
-    await deleteSession(mockConfig, '1');
-
-    // Assert
-    expect(mockListSessions).toHaveBeenCalledOnce();
-    expect(mocks.writeToStderr).toHaveBeenCalledWith(
-      'No sessions found for this project.',
-    );
-    expect(mockDeleteSession).not.toHaveBeenCalled();
-  });
-
-  it('should delete session by UUID', async () => {
-    // Arrange
-    const now = new Date('2025-01-20T12:00:00.000Z');
-    const mockSessions: SessionInfo[] = [
-      {
-        id: 'session-uuid-123',
-        file: 'session-file-123',
-        fileName: 'session-file-123.json',
-        startTime: now.toISOString(),
-        lastUpdated: now.toISOString(),
-        messageCount: 5,
-        displayName: 'Test session',
-        firstUserMessage: 'Test session',
-        isCurrentSession: false,
-        index: 1,
-      },
-    ];
-
-    mockListSessions.mockResolvedValue(mockSessions);
-    mockDeleteSession.mockImplementation(() => {});
-
-    // Act
-    await deleteSession(mockConfig, 'session-uuid-123');
-
-    // Assert
-    expect(mockListSessions).toHaveBeenCalledOnce();
-    expect(mockDeleteSession).toHaveBeenCalledWith('session-file-123');
-    expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      'Deleted session 1: Test session (some time ago)',
-    );
-    expect(mocks.writeToStderr).not.toHaveBeenCalled();
-  });
-
-  it('should delete session by index', async () => {
-    // Arrange
-    const now = new Date('2025-01-20T12:00:00.000Z');
-    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-
-    const mockSessions: SessionInfo[] = [
-      {
-        id: 'session-1',
-        file: 'session-file-1',
-        fileName: 'session-file-1.json',
-        startTime: oneHourAgo.toISOString(),
-        lastUpdated: oneHourAgo.toISOString(),
-        messageCount: 5,
-        displayName: 'First session',
-        firstUserMessage: 'First session',
-        isCurrentSession: false,
-        index: 1,
-      },
-      {
-        id: 'session-2',
-        file: 'session-file-2',
-        fileName: 'session-file-2.json',
-        startTime: now.toISOString(),
-        lastUpdated: now.toISOString(),
-        messageCount: 10,
-        displayName: 'Second session',
-        firstUserMessage: 'Second session',
-        isCurrentSession: false,
-        index: 2,
-      },
-    ];
-
-    mockListSessions.mockResolvedValue(mockSessions);
-    mockDeleteSession.mockImplementation(() => {});
-
-    // Act
-    await deleteSession(mockConfig, '2');
-
-    // Assert
-    expect(mockListSessions).toHaveBeenCalledOnce();
-    expect(mockDeleteSession).toHaveBeenCalledWith('session-file-2');
-    expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      'Deleted session 2: Second session (some time ago)',
-    );
-  });
-
-  it('should display error for invalid session identifier (non-numeric)', async () => {
-    // Arrange
-    const now = new Date('2025-01-20T12:00:00.000Z');
-    const mockSessions: SessionInfo[] = [
-      {
-        id: 'session-1',
-        file: 'session-file-1',
-        fileName: 'session-file-1.json',
-        startTime: now.toISOString(),
-        lastUpdated: now.toISOString(),
-        messageCount: 5,
-        displayName: 'Test session',
-        firstUserMessage: 'Test session',
-        isCurrentSession: false,
-        index: 1,
-      },
-    ];
-
-    mockListSessions.mockResolvedValue(mockSessions);
-
-    // Act
-    await deleteSession(mockConfig, 'invalid-id');
-
-    // Assert
-    expect(mocks.writeToStderr).toHaveBeenCalledWith(
-      'Invalid session identifier "invalid-id". Use --list-sessions to see available sessions.',
-    );
-    expect(mockDeleteSession).not.toHaveBeenCalled();
-  });
-
-  it('should display error for invalid session identifier (out of range)', async () => {
-    // Arrange
-    const now = new Date('2025-01-20T12:00:00.000Z');
-    const mockSessions: SessionInfo[] = [
-      {
-        id: 'session-1',
-        file: 'session-file-1',
-        fileName: 'session-file-1.json',
-        startTime: now.toISOString(),
-        lastUpdated: now.toISOString(),
-        messageCount: 5,
-        displayName: 'Test session',
-        firstUserMessage: 'Test session',
-        isCurrentSession: false,
-        index: 1,
-      },
-    ];
-
-    mockListSessions.mockResolvedValue(mockSessions);
-
-    // Act
-    await deleteSession(mockConfig, '999');
-
-    // Assert
-    expect(mocks.writeToStderr).toHaveBeenCalledWith(
-      'Invalid session identifier "999". Use --list-sessions to see available sessions.',
-    );
-    expect(mockDeleteSession).not.toHaveBeenCalled();
-  });
-
-  it('should display error for invalid session identifier (zero)', async () => {
-    // Arrange
-    const now = new Date('2025-01-20T12:00:00.000Z');
-    const mockSessions: SessionInfo[] = [
-      {
-        id: 'session-1',
-        file: 'session-file-1',
-        fileName: 'session-file-1.json',
-        startTime: now.toISOString(),
-        lastUpdated: now.toISOString(),
-        messageCount: 5,
-        displayName: 'Test session',
-        firstUserMessage: 'Test session',
-        isCurrentSession: false,
-        index: 1,
-      },
-    ];
-
-    mockListSessions.mockResolvedValue(mockSessions);
-
-    // Act
-    await deleteSession(mockConfig, '0');
-
-    // Assert
-    expect(mocks.writeToStderr).toHaveBeenCalledWith(
-      'Invalid session identifier "0". Use --list-sessions to see available sessions.',
-    );
-    expect(mockDeleteSession).not.toHaveBeenCalled();
-  });
-
-  it('should prevent deletion of current session', async () => {
-    // Arrange
-    const now = new Date('2025-01-20T12:00:00.000Z');
-    const mockSessions: SessionInfo[] = [
-      {
-        id: 'current-session-id',
-        file: 'current-session-file',
-        fileName: 'current-session-file.json',
-        startTime: now.toISOString(),
-        lastUpdated: now.toISOString(),
-        messageCount: 5,
-        displayName: 'Current session',
-        firstUserMessage: 'Current session',
-        isCurrentSession: true,
-        index: 1,
-      },
-    ];
-
-    mockListSessions.mockResolvedValue(mockSessions);
-
-    // Act - try to delete by index
-    await deleteSession(mockConfig, '1');
-
-    // Assert
-    expect(mocks.writeToStderr).toHaveBeenCalledWith(
-      'Cannot delete the current active session.',
-    );
-    expect(mockDeleteSession).not.toHaveBeenCalled();
-  });
-
-  it('should prevent deletion of current session by UUID', async () => {
-    // Arrange
-    const now = new Date('2025-01-20T12:00:00.000Z');
-    const mockSessions: SessionInfo[] = [
-      {
-        id: 'current-session-id',
-        file: 'current-session-file',
-        fileName: 'current-session-file.json',
-        startTime: now.toISOString(),
-        lastUpdated: now.toISOString(),
-        messageCount: 5,
-        displayName: 'Current session',
-        firstUserMessage: 'Current session',
-        isCurrentSession: true,
-        index: 1,
-      },
-    ];
-
-    mockListSessions.mockResolvedValue(mockSessions);
-
-    // Act - try to delete by UUID
-    await deleteSession(mockConfig, 'current-session-id');
-
-    // Assert
-    expect(mocks.writeToStderr).toHaveBeenCalledWith(
-      'Cannot delete the current active session.',
-    );
-    expect(mockDeleteSession).not.toHaveBeenCalled();
-  });
-
-  it('should handle deletion errors gracefully', async () => {
-    // Arrange
-    const now = new Date('2025-01-20T12:00:00.000Z');
-    const mockSessions: SessionInfo[] = [
-      {
-        id: 'session-1',
-        file: 'session-file-1',
-        fileName: 'session-file-1.json',
-        startTime: now.toISOString(),
-        lastUpdated: now.toISOString(),
-        messageCount: 5,
-        displayName: 'Test session',
-        firstUserMessage: 'Test session',
-        isCurrentSession: false,
-        index: 1,
-      },
-    ];
-
-    mockListSessions.mockResolvedValue(mockSessions);
-    mockDeleteSession.mockImplementation(() => {
-      throw new Error('File deletion failed');
+      expect(mocks.writeToStdout).toHaveBeenCalledWith(
+        'No previous sessions found.',
+      );
     });
 
-    // Act
-    await deleteSession(mockConfig, '1');
+    it('prints global session list with name and project root', async () => {
+      mocks.listSessions.mockResolvedValue([
+        createSession({
+          id: 'older',
+          sessionName: 'older-chat-aaaaa',
+          startTime: '2025-01-19T12:00:00.000Z',
+          projectRoot: '/workspace/older',
+        }),
+        createSession({
+          id: 'newer',
+          sessionName: 'newer-chat-bbbbb',
+          startTime: '2025-01-20T12:00:00.000Z',
+          projectRoot: '/workspace/newer',
+          isCurrentSession: true,
+        }),
+      ]);
 
-    // Assert
-    expect(mockDeleteSession).toHaveBeenCalledWith('session-file-1');
-    expect(mocks.writeToStderr).toHaveBeenCalledWith(
-      'Failed to delete session: File deletion failed',
-    );
+      await listSessions(mockConfig);
+
+      expect(mocks.writeToStdout).toHaveBeenCalledWith(
+        '\nAvailable sessions (2):\n',
+      );
+      expect(mocks.writeToStdout).toHaveBeenCalledWith(
+        expect.stringContaining('1. older-chat-aaaaa'),
+      );
+      expect(mocks.writeToStdout).toHaveBeenCalledWith(
+        expect.stringContaining('/workspace/older'),
+      );
+      expect(mocks.writeToStdout).toHaveBeenCalledWith(
+        expect.stringContaining(', current)'),
+      );
+    });
   });
 
-  it('should handle non-Error deletion failures', async () => {
-    // Arrange
-    const now = new Date('2025-01-20T12:00:00.000Z');
-    const mockSessions: SessionInfo[] = [
-      {
-        id: 'session-1',
-        file: 'session-file-1',
-        fileName: 'session-file-1.json',
-        startTime: now.toISOString(),
-        lastUpdated: now.toISOString(),
-        messageCount: 5,
-        displayName: 'Test session',
-        firstUserMessage: 'Test session',
-        isCurrentSession: false,
-        index: 1,
-      },
-    ];
+  describe('deleteSession', () => {
+    it('prints empty message when no sessions exist', async () => {
+      mocks.listSessions.mockResolvedValue([]);
 
-    mockListSessions.mockResolvedValue(mockSessions);
-    mockDeleteSession.mockImplementation(() => {
-      // eslint-disable-next-line no-restricted-syntax
-      throw 'Unknown error type';
+      await deleteSession(mockConfig, '1');
+
+      expect(mocks.writeToStderr).toHaveBeenCalledWith('No sessions found.');
+      expect(mocks.deleteSessionArtifacts).not.toHaveBeenCalled();
     });
 
-    // Act
-    await deleteSession(mockConfig, '1');
+    it('deletes a selected session and prints confirmation', async () => {
+      const target = createSession({ sessionName: 'target-chat-ccccc' });
+      mocks.listSessions.mockResolvedValue([target]);
+      mocks.findSession.mockResolvedValue(target);
 
-    // Assert
-    expect(mocks.writeToStderr).toHaveBeenCalledWith(
-      'Failed to delete session: Unknown error',
-    );
-  });
+      await deleteSession(mockConfig, 'target-chat-ccccc');
 
-  it('should sort sessions before finding by index', async () => {
-    // Arrange: Create sessions in non-chronological order
-    const session1Time = new Date('2025-01-18T12:00:00.000Z');
-    const session2Time = new Date('2025-01-19T12:00:00.000Z');
-    const session3Time = new Date('2025-01-20T12:00:00.000Z');
+      expect(mocks.findSession).toHaveBeenCalledWith('target-chat-ccccc');
+      expect(mocks.deleteSessionArtifacts).toHaveBeenCalledWith(target);
+      expect(mocks.writeToStdout).toHaveBeenCalledWith(
+        'Deleted session: target-chat-ccccc (some time ago)',
+      );
+    });
 
-    const mockSessions: SessionInfo[] = [
-      {
-        id: 'session-3',
-        file: 'session-file-3',
-        fileName: 'session-file-3.json',
-        startTime: session3Time.toISOString(), // Newest
-        lastUpdated: session3Time.toISOString(),
-        messageCount: 5,
-        displayName: 'Newest session',
-        firstUserMessage: 'Newest session',
-        isCurrentSession: false,
-        index: 3,
-      },
-      {
-        id: 'session-1',
-        file: 'session-file-1',
-        fileName: 'session-file-1.json',
-        startTime: session1Time.toISOString(), // Oldest
-        lastUpdated: session1Time.toISOString(),
-        messageCount: 5,
-        displayName: 'Oldest session',
-        firstUserMessage: 'Oldest session',
-        isCurrentSession: false,
-        index: 1,
-      },
-      {
-        id: 'session-2',
-        file: 'session-file-2',
-        fileName: 'session-file-2.json',
-        startTime: session2Time.toISOString(), // Middle
-        lastUpdated: session2Time.toISOString(),
-        messageCount: 5,
-        displayName: 'Middle session',
-        firstUserMessage: 'Middle session',
-        isCurrentSession: false,
-        index: 2,
-      },
-    ];
+    it('shows SessionError messages for invalid identifiers', async () => {
+      mocks.listSessions.mockResolvedValue([createSession()]);
+      mocks.findSession.mockRejectedValue(
+        SessionError.invalidSessionIdentifier('bad'),
+      );
 
-    mockListSessions.mockResolvedValue(mockSessions);
-    mockDeleteSession.mockImplementation(() => {});
+      await deleteSession(mockConfig, 'bad');
 
-    // Act - delete index 1 (should be oldest session after sorting)
-    await deleteSession(mockConfig, '1');
+      expect(mocks.writeToStderr).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid session identifier "bad".'),
+      );
+      expect(mocks.deleteSessionArtifacts).not.toHaveBeenCalled();
+    });
 
-    // Assert
-    expect(mockDeleteSession).toHaveBeenCalledWith('session-file-1');
-    expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      expect.stringContaining('Oldest session'),
-    );
+    it('prevents deleting the current session', async () => {
+      const current = createSession({
+        id: 'current-session-id',
+        isCurrentSession: true,
+      });
+      mocks.listSessions.mockResolvedValue([current]);
+      mocks.findSession.mockResolvedValue(current);
+
+      await deleteSession(mockConfig, 'current-session-id');
+
+      expect(mocks.writeToStderr).toHaveBeenCalledWith(
+        'Cannot delete the current active session.',
+      );
+      expect(mocks.deleteSessionArtifacts).not.toHaveBeenCalled();
+    });
+
+    it('handles deletion failures', async () => {
+      const target = createSession({ sessionName: 'broken-chat-ddddd' });
+      mocks.listSessions.mockResolvedValue([target]);
+      mocks.findSession.mockResolvedValue(target);
+      mocks.deleteSessionArtifacts.mockRejectedValue(new Error('disk failure'));
+
+      await deleteSession(mockConfig, 'broken-chat-ddddd');
+
+      expect(mocks.writeToStderr).toHaveBeenCalledWith(
+        'Failed to delete session: disk failure',
+      );
+    });
   });
 });

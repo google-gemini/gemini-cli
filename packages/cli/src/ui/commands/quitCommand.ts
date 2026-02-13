@@ -6,6 +6,7 @@
 
 import { formatDuration } from '../utils/formatters.js';
 import { CommandKind, type SlashCommand } from './types.js';
+import { getConversationSessionName } from '../../utils/sessionUtils.js';
 
 export const quitCommand: SlashCommand = {
   name: 'quit',
@@ -17,6 +18,16 @@ export const quitCommand: SlashCommand = {
     const now = Date.now();
     const { sessionStartTime } = context.session.stats;
     const wallDuration = now - sessionStartTime.getTime();
+    const conversation = context.services.config
+      ?.getGeminiClient()
+      ?.getChatRecordingService()
+      ?.getConversation();
+    const sessionName = conversation
+      ? getConversationSessionName(conversation)
+      : undefined;
+    const resumeCommandHint = sessionName
+      ? `gemini --resume ${sessionName}`
+      : undefined;
 
     return {
       type: 'quit',
@@ -29,6 +40,8 @@ export const quitCommand: SlashCommand = {
         {
           type: 'quit',
           duration: formatDuration(wallDuration),
+          ...(sessionName ? { sessionName } : {}),
+          ...(resumeCommandHint ? { resumeCommandHint } : {}),
           id: now,
         },
       ],

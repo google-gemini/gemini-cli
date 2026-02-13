@@ -6,6 +6,8 @@
 
 import { type Config } from '../config/config.js';
 import { type Status } from '../core/coreToolScheduler.js';
+import { partListUnionToString } from '../core/geminiRequest.js';
+import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { getProjectHash } from '../utils/paths.js';
 import { sanitizeFilenamePart } from '../utils/fileUtils.js';
@@ -20,6 +22,13 @@ import type {
 } from '@google/genai';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ToolResultDisplay } from '../tools/tools.js';
+import {
+  ensureSessionNameBase,
+  generateSessionNameBase,
+  getDefaultSessionNameBase,
+  getSessionNameSuffix,
+  normalizeSessionNameBase,
+} from './sessionNamingService.js';
 
 export const SESSION_FILE_PREFIX = 'session-';
 
@@ -99,6 +108,10 @@ export interface ConversationRecord {
   startTime: string;
   lastUpdated: string;
   messages: MessageRecord[];
+  /** User-defined or AI-generated session name base (suffix stored separately). */
+  sessionNameBase?: string;
+  /** Immutable session name suffix derived from sessionId. */
+  sessionNameSuffix?: string;
   summary?: string;
   /** Workspace directories added during the session via /dir add */
   directories?: string[];
@@ -131,11 +144,16 @@ export class ChatRecordingService {
   private queuedThoughts: Array<ThoughtSummary & { timestamp: string }> = [];
   private queuedTokens: TokensSummary | null = null;
   private config: Config;
+  private sessionNameSuffix: string;
+  private fallbackSessionNameBase: string;
+  private sessionNameGenerationStarted = false;
 
   constructor(config: Config) {
     this.config = config;
     this.sessionId = config.getSessionId();
     this.projectHash = getProjectHash(config.getProjectRoot());
+    this.sessionNameSuffix = getSessionNameSuffix(this.sessionId);
+    this.fallbackSessionNameBase = getDefaultSessionNameBase();
   }
 
   /**
@@ -148,15 +166,22 @@ export class ChatRecordingService {
         // Resume from existing session
         this.conversationFile = resumedSessionData.filePath;
         this.sessionId = resumedSessionData.conversation.sessionId;
+        this.sessionNameSuffix = getSessionNameSuffix(this.sessionId);
+        this.fallbackSessionNameBase = getDefaultSessionNameBase(
+          new Date(resumedSessionData.conversation.startTime || Date.now()),
+        );
+        this.sessionNameGenerationStarted = true;
 
         // Update the session ID in the existing file
         this.updateConversation((conversation) => {
           conversation.sessionId = this.sessionId;
+          this.ensureSessionNaming(conversation);
         });
 
         // Clear any cached data to force fresh reads
         this.cachedLastConvData = null;
       } else {
+        this.sessionNameGenerationStarted = false;
         // Create new session
         const chatsDir = path.join(
           this.config.storage.getProjectTempDir(),
@@ -179,6 +204,8 @@ export class ChatRecordingService {
           projectHash: this.projectHash,
           startTime: new Date().toISOString(),
           lastUpdated: new Date().toISOString(),
+          sessionNameBase: this.fallbackSessionNameBase,
+          sessionNameSuffix: this.sessionNameSuffix,
           messages: [],
         });
       }
@@ -234,8 +261,13 @@ export class ChatRecordingService {
   }): void {
     if (!this.conversationFile) return;
 
+    let firstUserMessage: string | null = null;
+    let expectedSessionNameBase: string | null = null;
+
     try {
       this.updateConversation((conversation) => {
+        this.ensureSessionNaming(conversation);
+
         const msg = this.newMessage(
           message.type,
           message.content,
@@ -254,8 +286,24 @@ export class ChatRecordingService {
         } else {
           // Or else just add it.
           conversation.messages.push(msg);
+
+          const meaningfulUserMessage = this.getMeaningfulUserMessage(
+            message.content,
+          );
+          if (meaningfulUserMessage && !this.sessionNameGenerationStarted) {
+            this.sessionNameGenerationStarted = true;
+            firstUserMessage = meaningfulUserMessage;
+            expectedSessionNameBase = conversation.sessionNameBase ?? null;
+          }
         }
       });
+
+      if (firstUserMessage && expectedSessionNameBase) {
+        void this.generateAndSaveSessionName(
+          firstUserMessage,
+          expectedSessionNameBase,
+        );
+      }
     } catch (error) {
       debugLogger.error('Error saving message to chat history.', error);
       throw error;
@@ -433,6 +481,8 @@ export class ChatRecordingService {
         projectHash: this.projectHash,
         startTime: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
+        sessionNameBase: this.fallbackSessionNameBase,
+        sessionNameSuffix: this.sessionNameSuffix,
         messages: [],
       };
     }
@@ -484,6 +534,68 @@ export class ChatRecordingService {
     const conversation = this.readConversation();
     updateFn(conversation);
     this.writeConversation(conversation);
+  }
+
+  private ensureSessionNaming(conversation: ConversationRecord): void {
+    conversation.sessionNameSuffix =
+      conversation.sessionNameSuffix || this.sessionNameSuffix;
+    conversation.sessionNameBase = ensureSessionNameBase(
+      conversation.sessionNameBase || this.fallbackSessionNameBase,
+    );
+  }
+
+  private getMeaningfulUserMessage(content: PartListUnion): string | null {
+    const text = partListUnionToString(content).trim();
+    if (!text) {
+      return null;
+    }
+    if (text.startsWith('/') || text.startsWith('?')) {
+      return null;
+    }
+    return text;
+  }
+
+  private async generateAndSaveSessionName(
+    firstUserRequest: string,
+    expectedSessionNameBase: string,
+  ): Promise<void> {
+    if (!this.conversationFile) {
+      return;
+    }
+
+    try {
+      const contentGenerator = this.config.getContentGenerator();
+      if (!contentGenerator) {
+        return;
+      }
+
+      const baseLlmClient = new BaseLlmClient(contentGenerator, this.config);
+      const generatedBase = await generateSessionNameBase({
+        baseLlmClient,
+        firstUserRequest,
+      });
+      if (!generatedBase) {
+        return;
+      }
+
+      this.updateConversation((conversation) => {
+        this.ensureSessionNaming(conversation);
+
+        const currentBase = normalizeSessionNameBase(
+          conversation.sessionNameBase || '',
+        );
+        const expectedBase = normalizeSessionNameBase(expectedSessionNameBase);
+
+        // Avoid overwriting user-initiated renames while async generation was pending.
+        if (currentBase.length === 0 || currentBase === expectedBase) {
+          conversation.sessionNameBase = generatedBase;
+        }
+      });
+    } catch (error) {
+      debugLogger.debug(
+        `[SessionName] Failed to generate session name: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /**

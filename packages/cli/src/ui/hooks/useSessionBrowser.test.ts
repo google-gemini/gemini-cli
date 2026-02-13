@@ -12,8 +12,7 @@ import {
   convertSessionToHistoryFormats,
 } from './useSessionBrowser.js';
 import * as fs from 'node:fs/promises';
-import path from 'node:path';
-import { getSessionFiles, type SessionInfo } from '../../utils/sessionUtils.js';
+import type { SessionInfo } from '../../utils/sessionUtils.js';
 import type {
   Config,
   ConversationRecord,
@@ -23,25 +22,13 @@ import { coreEvents } from '@google/gemini-cli-core';
 
 // Mock modules
 vi.mock('fs/promises');
-vi.mock('path');
-vi.mock('../../utils/sessionUtils.js', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../../utils/sessionUtils.js')>();
-  return {
-    ...actual,
-    getSessionFiles: vi.fn(),
-  };
-});
 
 const MOCKED_PROJECT_TEMP_DIR = '/test/project/temp';
-const MOCKED_CHATS_DIR = '/test/project/temp/chats';
 const MOCKED_SESSION_ID = 'test-session-123';
 const MOCKED_CURRENT_SESSION_ID = 'current-session-id';
 
 describe('useSessionBrowser', () => {
   const mockedFs = vi.mocked(fs);
-  const mockedPath = vi.mocked(path);
-  const mockedGetSessionFiles = vi.mocked(getSessionFiles);
 
   const mockConfig = {
     storage: {
@@ -61,7 +48,6 @@ describe('useSessionBrowser', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.spyOn(coreEvents, 'emitFeedback').mockImplementation(() => {});
-    mockedPath.join.mockImplementation((...args) => args.join('/'));
     vi.mocked(mockConfig.storage.getProjectTempDir).mockReturnValue(
       MOCKED_PROJECT_TEMP_DIR,
     );
@@ -77,11 +63,23 @@ describe('useSessionBrowser', () => {
       messages: [{ type: 'user', content: 'Hello' } as MessageRecord],
     } as ConversationRecord;
 
-    const mockSession = {
+    const mockSession: SessionInfo = {
       id: MOCKED_SESSION_ID,
+      file: MOCKED_FILENAME.replace('.json', ''),
       fileName: MOCKED_FILENAME,
-    } as SessionInfo;
-    mockedGetSessionFiles.mockResolvedValue([mockSession]);
+      sessionPath: `/test/sessions/${MOCKED_FILENAME}`,
+      projectTempDir: MOCKED_PROJECT_TEMP_DIR,
+      startTime: '2025-01-01T00:00:00Z',
+      lastUpdated: '2025-01-01T00:00:00Z',
+      messageCount: 1,
+      displayName: 'Test',
+      sessionName: 'test-session-abcde',
+      sessionNameBase: 'test-session',
+      sessionNameSuffix: 'abcde',
+      firstUserMessage: 'Test',
+      isCurrentSession: false,
+      index: 1,
+    };
     mockedFs.readFile.mockResolvedValue(JSON.stringify(mockConversation));
 
     const { result } = renderHook(() =>
@@ -92,7 +90,7 @@ describe('useSessionBrowser', () => {
       await result.current.handleResumeSession(mockSession);
     });
     expect(mockedFs.readFile).toHaveBeenCalledWith(
-      `${MOCKED_CHATS_DIR}/${MOCKED_FILENAME}`,
+      mockSession.sessionPath,
       'utf8',
     );
     expect(mockConfig.setSessionId).toHaveBeenCalledWith(
@@ -104,10 +102,23 @@ describe('useSessionBrowser', () => {
 
   it('should handle file read error', async () => {
     const MOCKED_FILENAME = 'session-2025-01-01-test-session-123.json';
-    const mockSession = {
+    const mockSession: SessionInfo = {
       id: MOCKED_SESSION_ID,
+      file: MOCKED_FILENAME.replace('.json', ''),
       fileName: MOCKED_FILENAME,
-    } as SessionInfo;
+      sessionPath: `/test/sessions/${MOCKED_FILENAME}`,
+      projectTempDir: MOCKED_PROJECT_TEMP_DIR,
+      startTime: '2025-01-01T00:00:00Z',
+      lastUpdated: '2025-01-01T00:00:00Z',
+      messageCount: 1,
+      displayName: 'Test',
+      sessionName: 'test-session-abcde',
+      sessionNameBase: 'test-session',
+      sessionNameSuffix: 'abcde',
+      firstUserMessage: 'Test',
+      isCurrentSession: false,
+      index: 1,
+    };
     mockedFs.readFile.mockRejectedValue(new Error('File not found'));
 
     const { result } = renderHook(() =>
@@ -128,10 +139,23 @@ describe('useSessionBrowser', () => {
 
   it('should handle JSON parse error', async () => {
     const MOCKED_FILENAME = 'invalid.json';
-    const mockSession = {
+    const mockSession: SessionInfo = {
       id: MOCKED_SESSION_ID,
+      file: MOCKED_FILENAME.replace('.json', ''),
       fileName: MOCKED_FILENAME,
-    } as SessionInfo;
+      sessionPath: `/test/sessions/${MOCKED_FILENAME}`,
+      projectTempDir: MOCKED_PROJECT_TEMP_DIR,
+      startTime: '2025-01-01T00:00:00Z',
+      lastUpdated: '2025-01-01T00:00:00Z',
+      messageCount: 1,
+      displayName: 'Test',
+      sessionName: 'test-session-abcde',
+      sessionNameBase: 'test-session',
+      sessionNameSuffix: 'abcde',
+      firstUserMessage: 'Test',
+      isCurrentSession: false,
+      index: 1,
+    };
     mockedFs.readFile.mockResolvedValue('invalid json');
 
     const { result } = renderHook(() =>

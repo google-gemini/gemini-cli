@@ -97,7 +97,7 @@ import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
 import { calculateMainAreaWidth } from './utils/ui-sizing.js';
 import ansiEscapes from 'ansi-escapes';
-import { basename } from 'node:path';
+import { basename, resolve } from 'node:path';
 import { computeTerminalTitle } from '../utils/windowTitle.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
@@ -120,7 +120,11 @@ import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
 import { RELAUNCH_EXIT_CODE } from '../utils/processUtils.js';
-import type { SessionInfo } from '../utils/sessionUtils.js';
+import {
+  getConversationSessionName,
+  getGlobalSessionFiles,
+  type SessionInfo,
+} from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useMcpStatus } from './hooks/useMcpStatus.js';
 import { useApprovalModeIndicator } from './hooks/useApprovalModeIndicator.js';
@@ -156,6 +160,7 @@ import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useTimedMessage } from './hooks/useTimedMessage.js';
 import { shouldDismissShortcutsHelpOnHotkey } from './utils/shortcutsHelp.js';
 import { useSuspend } from './hooks/useSuspend.js';
+import { CrashResumeDialog } from './components/CrashResumeDialog.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -227,6 +232,8 @@ export const AppContainer = (props: AppContainerProps) => {
   const [customDialog, setCustomDialog] = useState<React.ReactNode | null>(
     null,
   );
+  const crashRecoveryPromptHandledRef = useRef(false);
+  const [isCrashRecoveryChecked, setIsCrashRecoveryChecked] = useState(false);
   const [copyModeEnabled, setCopyModeEnabled] = useState(false);
   const [pendingRestorePrompt, setPendingRestorePrompt] = useState(false);
   const toggleBackgroundShellRef = useRef<() => void>(() => {});
@@ -666,16 +673,163 @@ export const AppContainer = (props: AppContainerProps) => {
     isSessionBrowserOpen,
     openSessionBrowser,
     closeSessionBrowser,
-    handleResumeSession,
+    handleResumeSession: handleResumeSessionBase,
     handleDeleteSession: handleDeleteSessionSync,
+    handleRenameSession: handleRenameSessionBase,
   } = useSessionBrowser(config, loadHistoryForResume);
   // Wrap handleDeleteSession to return a Promise for UIActions interface
   const handleDeleteSession = useCallback(
     async (session: SessionInfo): Promise<void> => {
-      handleDeleteSessionSync(session);
+      await handleDeleteSessionSync(session);
     },
     [handleDeleteSessionSync],
   );
+
+  const updateSessionRecoveryState = useCallback(
+    (dirtyExit: boolean) => {
+      const chatRecordingService = config
+        .getGeminiClient()
+        ?.getChatRecordingService();
+      const conversation = chatRecordingService?.getConversation();
+      const sessionPath = chatRecordingService?.getConversationFilePath();
+      if (!conversation || !sessionPath) {
+        return;
+      }
+
+      persistentState.set('sessionRecovery', {
+        sessionId: conversation.sessionId,
+        sessionName: getConversationSessionName(conversation),
+        sessionPath,
+        projectRoot: config.getProjectRoot(),
+        dirtyExit,
+        updatedAt: new Date().toISOString(),
+      });
+    },
+    [config],
+  );
+
+  const handleResumeSession = useCallback(
+    async (session: SessionInfo): Promise<void> => {
+      await handleResumeSessionBase(session);
+      updateSessionRecoveryState(true);
+    },
+    [handleResumeSessionBase, updateSessionRecoveryState],
+  );
+
+  const handleRenameSession = useCallback(
+    async (session: SessionInfo, newNameBase: string): Promise<SessionInfo> => {
+      const updated = await handleRenameSessionBase(session, newNameBase);
+      if (updated.isCurrentSession) {
+        updateSessionRecoveryState(true);
+      }
+      return updated;
+    },
+    [handleRenameSessionBase, updateSessionRecoveryState],
+  );
+
+  useEffect(() => {
+    if (!isConfigInitialized || !isCrashRecoveryChecked) {
+      return;
+    }
+
+    updateSessionRecoveryState(true);
+    registerCleanup(() => {
+      updateSessionRecoveryState(false);
+    });
+  }, [isConfigInitialized, isCrashRecoveryChecked, updateSessionRecoveryState]);
+
+  useEffect(() => {
+    if (!isConfigInitialized || crashRecoveryPromptHandledRef.current) {
+      return;
+    }
+    crashRecoveryPromptHandledRef.current = true;
+    const finishCrashCheck = () => {
+      setIsCrashRecoveryChecked(true);
+    };
+
+    if (resumedSessionData) {
+      finishCrashCheck();
+      return;
+    }
+
+    const recovery = persistentState.get('sessionRecovery');
+    if (!recovery || !recovery.dirtyExit) {
+      finishCrashCheck();
+      return;
+    }
+
+    if (resolve(recovery.projectRoot) !== resolve(config.getProjectRoot())) {
+      finishCrashCheck();
+      return;
+    }
+
+    const handleRecoveryChoice = async (
+      choice: 'resume' | 'dismiss' | 'browse',
+    ) => {
+      const latest = persistentState.get('sessionRecovery');
+      if (latest && latest.sessionId === recovery.sessionId) {
+        persistentState.set('sessionRecovery', {
+          ...latest,
+          dirtyExit: false,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+      finishCrashCheck();
+
+      setCustomDialog(null);
+
+      if (choice === 'browse') {
+        openSessionBrowser();
+        return;
+      }
+
+      if (choice === 'resume') {
+        try {
+          const sessions = await getGlobalSessionFiles(
+            config.getSessionId(),
+            config.getProjectRoot(),
+          );
+          const targetSession = sessions.find(
+            (session) =>
+              session.id === recovery.sessionId ||
+              session.sessionPath === recovery.sessionPath,
+          );
+
+          if (targetSession) {
+            await handleResumeSession(targetSession);
+          } else {
+            coreEvents.emitFeedback(
+              'warning',
+              'Last crashed session was not found. Opening session browser.',
+            );
+            openSessionBrowser();
+          }
+        } catch (error) {
+          coreEvents.emitFeedback(
+            'warning',
+            `Failed to resume crashed session: ${getErrorMessage(error)}`,
+          );
+        }
+      }
+    };
+
+    setCustomDialog(
+      <CrashResumeDialog
+        sessionName={recovery.sessionName}
+        projectRoot={recovery.projectRoot}
+        updatedAt={recovery.updatedAt}
+        onSelect={(choice) => {
+          void handleRecoveryChoice(choice);
+        }}
+      />,
+    );
+  }, [
+    config,
+    handleResumeSession,
+    isConfigInitialized,
+    openSessionBrowser,
+    resumedSessionData,
+  ]);
 
   // Create handleAuthSelect wrapper for backward compatibility
   const handleAuthSelect = useCallback(
@@ -2272,6 +2426,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       closeSessionBrowser,
       handleResumeSession,
       handleDeleteSession,
+      handleRenameSession,
       setQueueErrorMessage,
       popAllMessages,
       handleApiKeySubmit,
@@ -2352,6 +2507,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       closeSessionBrowser,
       handleResumeSession,
       handleDeleteSession,
+      handleRenameSession,
       setQueueErrorMessage,
       popAllMessages,
       handleApiKeySubmit,

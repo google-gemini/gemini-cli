@@ -52,6 +52,44 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
 }
 
 // Create test session data
+function createSessionInfo(overrides: Partial<SessionInfo>): SessionInfo {
+  const id = overrides.id ?? 'session';
+  const displayName = overrides.displayName ?? 'Session';
+  const normalizedDisplayName = displayName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  const sessionNameBase =
+    overrides.sessionNameBase ?? (normalizedDisplayName || 'session');
+  const defaultSuffix = id
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .slice(0, 5)
+    .padEnd(5, '0');
+  const sessionNameSuffix = overrides.sessionNameSuffix ?? defaultSuffix;
+
+  return {
+    id,
+    file: `${SESSION_FILE_PREFIX}${id}`,
+    fileName: `${SESSION_FILE_PREFIX}${id}.json`,
+    sessionPath: `/tmp/test-project/chats/${SESSION_FILE_PREFIX}${id}.json`,
+    projectTempDir: '/tmp/test-project',
+    projectRoot: '/workspace/test-project',
+    startTime: new Date().toISOString(),
+    lastUpdated: new Date().toISOString(),
+    messageCount: 1,
+    displayName,
+    sessionNameBase,
+    sessionNameSuffix,
+    sessionName:
+      overrides.sessionName || `${sessionNameBase}-${sessionNameSuffix}`,
+    firstUserMessage: displayName,
+    isCurrentSession: false,
+    index: 1,
+    ...overrides,
+  };
+}
+
 function createTestSessions(): SessionInfo[] {
   const now = new Date();
   const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -59,7 +97,7 @@ function createTestSessions(): SessionInfo[] {
   const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   return [
-    {
+    createSessionInfo({
       id: 'current123',
       file: `${SESSION_FILE_PREFIX}2025-01-20T10-30-00-current12`,
       fileName: `${SESSION_FILE_PREFIX}2025-01-20T10-30-00-current12.json`,
@@ -70,8 +108,8 @@ function createTestSessions(): SessionInfo[] {
       firstUserMessage: 'Current session',
       isCurrentSession: true,
       index: 1,
-    },
-    {
+    }),
+    createSessionInfo({
       id: 'recent456',
       file: `${SESSION_FILE_PREFIX}2025-01-18T15-45-00-recent45`,
       fileName: `${SESSION_FILE_PREFIX}2025-01-18T15-45-00-recent45.json`,
@@ -82,8 +120,8 @@ function createTestSessions(): SessionInfo[] {
       firstUserMessage: 'Recent session',
       isCurrentSession: false,
       index: 2,
-    },
-    {
+    }),
+    createSessionInfo({
       id: 'old789abc',
       file: `${SESSION_FILE_PREFIX}2025-01-10T09-15-00-old789ab`,
       fileName: `${SESSION_FILE_PREFIX}2025-01-10T09-15-00-old789ab.json`,
@@ -94,8 +132,8 @@ function createTestSessions(): SessionInfo[] {
       firstUserMessage: 'Old session',
       isCurrentSession: false,
       index: 3,
-    },
-    {
+    }),
+    createSessionInfo({
       id: 'ancient12',
       file: `${SESSION_FILE_PREFIX}2024-12-25T12-00-00-ancient1`,
       fileName: `${SESSION_FILE_PREFIX}2024-12-25T12-00-00-ancient1.json`,
@@ -106,7 +144,7 @@ function createTestSessions(): SessionInfo[] {
       firstUserMessage: 'Ancient session',
       isCurrentSession: false,
       index: 4,
-    },
+    }),
   ];
 }
 
@@ -444,7 +482,7 @@ describe('Session Cleanup', () => {
       const fifteenDaysAgo = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
 
       const testSessions: SessionInfo[] = [
-        {
+        createSessionInfo({
           id: 'current',
           file: `${SESSION_FILE_PREFIX}current`,
           fileName: `${SESSION_FILE_PREFIX}current.json`,
@@ -455,8 +493,8 @@ describe('Session Cleanup', () => {
           firstUserMessage: 'Current',
           isCurrentSession: true,
           index: 1,
-        },
-        {
+        }),
+        createSessionInfo({
           id: 'session5d',
           file: `${SESSION_FILE_PREFIX}5d`,
           fileName: `${SESSION_FILE_PREFIX}5d.json`,
@@ -467,8 +505,8 @@ describe('Session Cleanup', () => {
           firstUserMessage: '5 days',
           isCurrentSession: false,
           index: 2,
-        },
-        {
+        }),
+        createSessionInfo({
           id: 'session8d',
           file: `${SESSION_FILE_PREFIX}8d`,
           fileName: `${SESSION_FILE_PREFIX}8d.json`,
@@ -479,8 +517,8 @@ describe('Session Cleanup', () => {
           firstUserMessage: '8 days',
           isCurrentSession: false,
           index: 3,
-        },
-        {
+        }),
+        createSessionInfo({
           id: 'session15d',
           file: `${SESSION_FILE_PREFIX}15d`,
           fileName: `${SESSION_FILE_PREFIX}15d.json`,
@@ -491,7 +529,7 @@ describe('Session Cleanup', () => {
           firstUserMessage: '15 days',
           isCurrentSession: false,
           index: 4,
-        },
+        }),
       ];
 
       mockGetAllSessionFiles.mockResolvedValue(
@@ -566,7 +604,7 @@ describe('Session Cleanup', () => {
       );
 
       const testSessions: SessionInfo[] = [
-        {
+        createSessionInfo({
           id: 'current',
           file: `${SESSION_FILE_PREFIX}current`,
           fileName: `${SESSION_FILE_PREFIX}current.json`,
@@ -577,8 +615,8 @@ describe('Session Cleanup', () => {
           firstUserMessage: 'Current',
           isCurrentSession: true,
           index: 1,
-        },
-        {
+        }),
+        createSessionInfo({
           id: 'session1d',
           file: `${SESSION_FILE_PREFIX}1d`,
           fileName: `${SESSION_FILE_PREFIX}1d.json`,
@@ -589,8 +627,8 @@ describe('Session Cleanup', () => {
           firstUserMessage: '1 day',
           isCurrentSession: false,
           index: 2,
-        },
-        {
+        }),
+        createSessionInfo({
           id: 'session7d',
           file: `${SESSION_FILE_PREFIX}7d`,
           fileName: `${SESSION_FILE_PREFIX}7d.json`,
@@ -601,8 +639,8 @@ describe('Session Cleanup', () => {
           firstUserMessage: '7 days',
           isCurrentSession: false,
           index: 3,
-        },
-        {
+        }),
+        createSessionInfo({
           id: 'session13d',
           file: `${SESSION_FILE_PREFIX}13d`,
           fileName: `${SESSION_FILE_PREFIX}13d.json`,
@@ -613,7 +651,7 @@ describe('Session Cleanup', () => {
           firstUserMessage: '13 days',
           isCurrentSession: false,
           index: 4,
-        },
+        }),
       ];
 
       mockGetAllSessionFiles.mockResolvedValue(
@@ -662,7 +700,7 @@ describe('Session Cleanup', () => {
       // Create 6 sessions with different timestamps
       const now = new Date();
       const sessions: SessionInfo[] = [
-        {
+        createSessionInfo({
           id: 'current',
           file: `${SESSION_FILE_PREFIX}current`,
           fileName: `${SESSION_FILE_PREFIX}current.json`,
@@ -673,13 +711,13 @@ describe('Session Cleanup', () => {
           firstUserMessage: 'Current',
           isCurrentSession: true,
           index: 1,
-        },
+        }),
       ];
 
       // Add 5 more sessions with decreasing timestamps
       for (let i = 1; i <= 5; i++) {
         const daysAgo = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-        sessions.push({
+        sessions.push(createSessionInfo({
           id: `session${i}`,
           file: `${SESSION_FILE_PREFIX}${i}d`,
           fileName: `${SESSION_FILE_PREFIX}${i}d.json`,
@@ -690,7 +728,7 @@ describe('Session Cleanup', () => {
           firstUserMessage: `${i} days`,
           isCurrentSession: false,
           index: i + 1,
-        });
+        }));
       }
 
       mockGetAllSessionFiles.mockResolvedValue(
@@ -788,7 +826,7 @@ describe('Session Cleanup', () => {
       const twelveDaysAgo = new Date(now.getTime() - 12 * 24 * 60 * 60 * 1000);
 
       const testSessions: SessionInfo[] = [
-        {
+        createSessionInfo({
           id: 'current',
           file: `${SESSION_FILE_PREFIX}current`,
           fileName: `${SESSION_FILE_PREFIX}current.json`,
@@ -799,8 +837,8 @@ describe('Session Cleanup', () => {
           firstUserMessage: 'Current',
           isCurrentSession: true,
           index: 1,
-        },
-        {
+        }),
+        createSessionInfo({
           id: 'session3d',
           file: `${SESSION_FILE_PREFIX}3d`,
           fileName: `${SESSION_FILE_PREFIX}3d.json`,
@@ -811,8 +849,8 @@ describe('Session Cleanup', () => {
           firstUserMessage: '3 days',
           isCurrentSession: false,
           index: 2,
-        },
-        {
+        }),
+        createSessionInfo({
           id: 'session5d',
           file: `${SESSION_FILE_PREFIX}5d`,
           fileName: `${SESSION_FILE_PREFIX}5d.json`,
@@ -823,8 +861,8 @@ describe('Session Cleanup', () => {
           firstUserMessage: '5 days',
           isCurrentSession: false,
           index: 3,
-        },
-        {
+        }),
+        createSessionInfo({
           id: 'session7d',
           file: `${SESSION_FILE_PREFIX}7d`,
           fileName: `${SESSION_FILE_PREFIX}7d.json`,
@@ -835,8 +873,8 @@ describe('Session Cleanup', () => {
           firstUserMessage: '7 days',
           isCurrentSession: false,
           index: 4,
-        },
-        {
+        }),
+        createSessionInfo({
           id: 'session12d',
           file: `${SESSION_FILE_PREFIX}12d`,
           fileName: `${SESSION_FILE_PREFIX}12d.json`,
@@ -847,7 +885,7 @@ describe('Session Cleanup', () => {
           firstUserMessage: '12 days',
           isCurrentSession: false,
           index: 5,
-        },
+        }),
       ];
 
       mockGetAllSessionFiles.mockResolvedValue(

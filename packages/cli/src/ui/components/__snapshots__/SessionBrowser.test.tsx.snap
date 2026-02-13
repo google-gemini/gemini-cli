@@ -12,13 +12,18 @@ exports[`SessionBrowser component > enters search mode, filters sessions, and re
 
 exports[`SessionBrowser component > renders a list of sessions and marks current session as disabled 1`] = `
 " Chat Sessions (2 total)                                                        sorted by date desc
- Navigate: ↑/↓   Resume: Enter   Search: /   Delete: x   Quit: q
+ Navigate: ↑/↓   Resume: Enter   Search: /   Rename: n   Delete: x   Quit: q
  Sort: s         Reverse: r      First/Last: g/G
 
    Index │ Msgs │ Age  │ Name
- ❯ #1    │ 5    │ 10mo │ Second conversation about dogs (current)
-   #2    │ 2    │ 10mo │ First conversation about cats
- ▼"
+ ❯ #1    │ 5    │ 10mo │ test-session-abcde (current)
+   #2    │ 2    │ 10mo │ test-session-abcde
+ ▼
+
+ Selected: test-session-abcde
+ Project: /tmp/project-root
+ Started: 11/1/2025, 8:00:00 AM
+ Updated: 1/1/2025, 6:30:00 AM"
 `;
 
 exports[`SessionBrowser component > shows an error state when loading sessions fails 1`] = `

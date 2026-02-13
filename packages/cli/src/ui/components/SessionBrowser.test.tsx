@@ -61,6 +61,11 @@ vi.mock('./SessionBrowser.js', async (importOriginal) => {
         (async () => {
           // no-op delete handler for tests that don't care about deletion
         }),
+      props.onRenameSession ??
+        (async (session) => {
+          // no-op rename handler for tests that don't care about rename
+          return session;
+        }),
       props.onExit,
     );
 
@@ -126,10 +131,17 @@ const createSession = (overrides: Partial<SessionInfo>): SessionInfo => ({
   id: 'session-id',
   file: 'session-id',
   fileName: 'session-id.json',
+  sessionPath: '/tmp/chats/session-id.json',
+  projectTempDir: '/tmp/project',
+  projectId: 'project-id',
+  projectRoot: '/tmp/project-root',
   startTime: new Date().toISOString(),
   lastUpdated: new Date().toISOString(),
   messageCount: 1,
   displayName: 'Test Session',
+  sessionName: 'test-session-abcde',
+  sessionNameBase: 'test-session',
+  sessionNameSuffix: 'abcde',
   firstUserMessage: 'Test Session',
   isCurrentSession: false,
   index: 0,
@@ -153,6 +165,7 @@ describe('SessionBrowser component', () => {
     const config = createMockConfig();
     const onResumeSession = vi.fn();
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
+    const onRenameSession = vi.fn();
     const onExit = vi.fn();
 
     const { lastFrame } = render(
@@ -160,6 +173,7 @@ describe('SessionBrowser component', () => {
         config={config}
         onResumeSession={onResumeSession}
         onDeleteSession={onDeleteSession}
+        onRenameSession={onRenameSession}
         onExit={onExit}
         testSessions={[]}
       />,
@@ -190,6 +204,7 @@ describe('SessionBrowser component', () => {
     const config = createMockConfig();
     const onResumeSession = vi.fn();
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
+    const onRenameSession = vi.fn();
     const onExit = vi.fn();
 
     const { lastFrame } = render(
@@ -197,6 +212,7 @@ describe('SessionBrowser component', () => {
         config={config}
         onResumeSession={onResumeSession}
         onDeleteSession={onDeleteSession}
+        onRenameSession={onRenameSession}
         onExit={onExit}
         testSessions={[session1, session2]}
       />,
@@ -241,6 +257,7 @@ describe('SessionBrowser component', () => {
     const config = createMockConfig();
     const onResumeSession = vi.fn();
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
+    const onRenameSession = vi.fn();
     const onExit = vi.fn();
 
     const { lastFrame } = render(
@@ -248,6 +265,7 @@ describe('SessionBrowser component', () => {
         config={config}
         onResumeSession={onResumeSession}
         onDeleteSession={onDeleteSession}
+        onRenameSession={onRenameSession}
         onExit={onExit}
         testSessions={[searchSession, otherSession]}
       />,
@@ -298,6 +316,7 @@ describe('SessionBrowser component', () => {
     const config = createMockConfig();
     const onResumeSession = vi.fn();
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
+    const onRenameSession = vi.fn();
     const onExit = vi.fn();
 
     const { lastFrame } = render(
@@ -305,6 +324,7 @@ describe('SessionBrowser component', () => {
         config={config}
         onResumeSession={onResumeSession}
         onDeleteSession={onDeleteSession}
+        onRenameSession={onRenameSession}
         onExit={onExit}
         testSessions={[session1, session2]}
       />,
@@ -344,6 +364,7 @@ describe('SessionBrowser component', () => {
     const config = createMockConfig();
     const onResumeSession = vi.fn();
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
+    const onRenameSession = vi.fn();
     const onExit = vi.fn();
 
     render(
@@ -351,6 +372,7 @@ describe('SessionBrowser component', () => {
         config={config}
         onResumeSession={onResumeSession}
         onDeleteSession={onDeleteSession}
+        onRenameSession={onRenameSession}
         onExit={onExit}
         testSessions={[currentSession, otherSession]}
       />,
@@ -369,6 +391,7 @@ describe('SessionBrowser component', () => {
     const config = createMockConfig();
     const onResumeSession = vi.fn();
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
+    const onRenameSession = vi.fn();
     const onExit = vi.fn();
 
     const { lastFrame } = render(
@@ -376,6 +399,7 @@ describe('SessionBrowser component', () => {
         config={config}
         onResumeSession={onResumeSession}
         onDeleteSession={onDeleteSession}
+        onRenameSession={onRenameSession}
         onExit={onExit}
         testError="storage failure"
       />,

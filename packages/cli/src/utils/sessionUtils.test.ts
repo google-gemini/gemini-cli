@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   SessionSelector,
   extractFirstUserMessage,
@@ -13,7 +13,7 @@ import {
   SessionError,
 } from './sessionUtils.js';
 import type { Config, MessageRecord } from '@google/gemini-cli-core';
-import { SESSION_FILE_PREFIX } from '@google/gemini-cli-core';
+import { SESSION_FILE_PREFIX, Storage } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -21,22 +21,26 @@ import { randomUUID } from 'node:crypto';
 describe('SessionSelector', () => {
   let tmpDir: string;
   let config: Config;
+  const projectRoot = '/workspace/project-a';
 
   beforeEach(async () => {
     // Create a temporary directory for testing
     tmpDir = path.join(process.cwd(), '.tmp-test-sessions');
     await fs.mkdir(tmpDir, { recursive: true });
+    vi.spyOn(Storage, 'getGlobalTempDir').mockReturnValue(tmpDir);
 
     // Mock config
     config = {
       storage: {
-        getProjectTempDir: () => tmpDir,
+        getProjectTempDir: () => path.join(tmpDir, 'project-a'),
       },
       getSessionId: () => 'current-session-id',
+      getProjectRoot: () => projectRoot,
     } as Partial<Config> as Config;
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     // Clean up test files
     try {
       await fs.rm(tmpDir, { recursive: true, force: true });
@@ -45,13 +49,20 @@ describe('SessionSelector', () => {
     }
   });
 
+  const createChatsDir = async () => {
+    const projectDir = path.join(tmpDir, 'project-a');
+    const chatsDir = path.join(projectDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+    await fs.writeFile(path.join(projectDir, '.project_root'), projectRoot);
+    return chatsDir;
+  };
+
   it('should resolve session by UUID', async () => {
     const sessionId1 = randomUUID();
     const sessionId2 = randomUUID();
 
     // Create test session files
-    const chatsDir = path.join(tmpDir, 'chats');
-    await fs.mkdir(chatsDir, { recursive: true });
+    const chatsDir = await createChatsDir();
 
     const session1 = {
       sessionId: sessionId1,
@@ -116,8 +127,7 @@ describe('SessionSelector', () => {
     const sessionId2 = randomUUID();
 
     // Create test session files
-    const chatsDir = path.join(tmpDir, 'chats');
-    await fs.mkdir(chatsDir, { recursive: true });
+    const chatsDir = await createChatsDir();
 
     const session1 = {
       sessionId: sessionId1,
@@ -180,8 +190,7 @@ describe('SessionSelector', () => {
     const sessionId2 = randomUUID();
 
     // Create test session files
-    const chatsDir = path.join(tmpDir, 'chats');
-    await fs.mkdir(chatsDir, { recursive: true });
+    const chatsDir = await createChatsDir();
 
     const session1 = {
       sessionId: sessionId1,
@@ -240,8 +249,7 @@ describe('SessionSelector', () => {
     const sessionId = randomUUID();
 
     // Create test session files
-    const chatsDir = path.join(tmpDir, 'chats');
-    await fs.mkdir(chatsDir, { recursive: true });
+    const chatsDir = await createChatsDir();
 
     const sessionOriginal = {
       sessionId,
@@ -304,8 +312,7 @@ describe('SessionSelector', () => {
     const sessionId1 = randomUUID();
 
     // Create test session files
-    const chatsDir = path.join(tmpDir, 'chats');
-    await fs.mkdir(chatsDir, { recursive: true });
+    const chatsDir = await createChatsDir();
 
     const session1 = {
       sessionId: sessionId1,
@@ -346,8 +353,7 @@ describe('SessionSelector', () => {
     const sessionIdSystemOnly = randomUUID();
 
     // Create test session files
-    const chatsDir = path.join(tmpDir, 'chats');
-    await fs.mkdir(chatsDir, { recursive: true });
+    const chatsDir = await createChatsDir();
 
     // Session with user message - should be listed
     const sessionWithUser = {
@@ -415,8 +421,7 @@ describe('SessionSelector', () => {
     const sessionIdGeminiOnly = randomUUID();
 
     // Create test session files
-    const chatsDir = path.join(tmpDir, 'chats');
-    await fs.mkdir(chatsDir, { recursive: true });
+    const chatsDir = await createChatsDir();
 
     // Session with only gemini message - should be listed
     const sessionGeminiOnly = {

@@ -5,12 +5,19 @@
  */
 
 import {
+  buildSessionName,
   checkExhaustive,
+  ensureSessionNameBase,
+  getDefaultSessionNameBase,
   partListUnionToString,
+  sanitizeFilenamePart,
   SESSION_FILE_PREFIX,
+  Storage,
   type Config,
   type ConversationRecord,
   type MessageRecord,
+  getSessionNameSuffix,
+  normalizeSessionNameSuffix,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
@@ -54,7 +61,7 @@ export class SessionError extends Error {
   static noSessionsFound(): SessionError {
     return new SessionError(
       'NO_SESSIONS_FOUND',
-      'No previous sessions found for this project.',
+      'No previous sessions found.',
     );
   }
 
@@ -64,7 +71,7 @@ export class SessionError extends Error {
   static invalidSessionIdentifier(identifier: string): SessionError {
     return new SessionError(
       'INVALID_SESSION_IDENTIFIER',
-      `Invalid session identifier "${identifier}".\n  Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.`,
+      `Invalid session identifier "${identifier}".\n  Use --list-sessions to see available sessions, then use --resume {name}, --resume {number}, --resume {uuid}, or --resume latest.`,
     );
   }
 }
@@ -101,6 +108,12 @@ export interface SessionInfo {
   lastUpdated: string;
   /** Display name for the session (typically first user message) */
   displayName: string;
+  /** Shell-friendly resumable session name: <base>-<immutableSuffix> */
+  sessionName: string;
+  /** Mutable base segment of sessionName */
+  sessionNameBase: string;
+  /** Immutable 5-char suffix segment of sessionName */
+  sessionNameSuffix: string;
   /** Cleaned first user message content */
   firstUserMessage: string;
   /** Whether this is the currently active session */
@@ -109,6 +122,14 @@ export interface SessionInfo {
   index: number;
   /** AI-generated summary of the session (if available) */
   summary?: string;
+  /** Project root where this session was created (if known) */
+  projectRoot?: string;
+  /** Project identifier in ~/.gemini/tmp */
+  projectId?: string;
+  /** Absolute path to project temp directory */
+  projectTempDir: string;
+  /** Absolute path to the session json file */
+  sessionPath: string;
   /** Full concatenated content (only loaded when needed for search) */
   fullContent?: string;
   /** Processed messages with normalized roles (only loaded when needed) */
@@ -136,6 +157,27 @@ export interface SessionSelectionResult {
   sessionPath: string;
   sessionData: ConversationRecord;
   displayInfo: string;
+}
+
+export interface RenameSessionResult {
+  sessionInfo: SessionInfo;
+  conversation: ConversationRecord;
+}
+
+export function getConversationSessionName(
+  conversation: Pick<
+    ConversationRecord,
+    'sessionId' | 'startTime' | 'sessionNameBase' | 'sessionNameSuffix'
+  >,
+): string {
+  const base = ensureSessionNameBase(
+    conversation.sessionNameBase ||
+      getDefaultSessionNameBase(new Date(conversation.startTime || Date.now())),
+  );
+  const suffix = normalizeSessionNameSuffix(
+    conversation.sessionNameSuffix || getSessionNameSuffix(conversation.sessionId),
+  );
+  return buildSessionName(base, suffix);
 }
 
 /**
@@ -238,6 +280,13 @@ export interface GetSessionOptions {
   includeFullContent?: boolean;
 }
 
+export interface SessionFileContext {
+  projectRoot?: string;
+  projectId?: string;
+  projectTempDir: string;
+  isCurrentProject: boolean;
+}
+
 /**
  * Loads all session files (including corrupted ones) from the chats directory.
  * @returns Array of session file entries, with sessionInfo null for corrupted files
@@ -246,6 +295,10 @@ export const getAllSessionFiles = async (
   chatsDir: string,
   currentSessionId?: string,
   options: GetSessionOptions = {},
+  context: SessionFileContext = {
+    projectTempDir: path.dirname(chatsDir),
+    isCurrentProject: false,
+  },
 ): Promise<SessionFileEntry[]> => {
   try {
     const files = await fs.readdir(chatsDir);
@@ -279,9 +332,25 @@ export const getAllSessionFiles = async (
           }
 
           const firstUserMessage = extractFirstUserMessage(content.messages);
-          const isCurrentSession = currentSessionId
-            ? file.includes(currentSessionId.slice(0, 8))
-            : false;
+          const isCurrentSession = Boolean(
+            context.isCurrentProject &&
+              currentSessionId &&
+              content.sessionId === currentSessionId,
+          );
+
+          const sessionNameSuffix = content.sessionNameSuffix
+            ? content.sessionNameSuffix
+            : getSessionNameSuffix(content.sessionId);
+          const sessionNameBase = ensureSessionNameBase(
+            content.sessionNameBase ||
+              (content.summary
+                ? stripUnsafeCharacters(content.summary)
+                : firstUserMessage),
+          );
+          const sessionName = buildSessionName(
+            sessionNameBase,
+            sessionNameSuffix,
+          );
 
           let fullContent: string | undefined;
           let messages:
@@ -290,9 +359,9 @@ export const getAllSessionFiles = async (
 
           if (options.includeFullContent) {
             fullContent = content.messages
-              .map((msg) => partListUnionToString(msg.content))
+              .map((msg: MessageRecord) => partListUnionToString(msg.content))
               .join(' ');
-            messages = content.messages.map((msg) => ({
+            messages = content.messages.map((msg: MessageRecord) => ({
               role:
                 msg.type === 'user'
                   ? ('user' as const)
@@ -305,9 +374,16 @@ export const getAllSessionFiles = async (
             id: content.sessionId,
             file: file.replace('.json', ''),
             fileName: file,
+            sessionPath: filePath,
+            projectTempDir: context.projectTempDir,
+            projectRoot: context.projectRoot,
+            projectId: context.projectId,
             startTime: content.startTime,
             lastUpdated: content.lastUpdated,
             messageCount: content.messages.length,
+            sessionName,
+            sessionNameBase,
+            sessionNameSuffix,
             displayName: content.summary
               ? stripUnsafeCharacters(content.summary)
               : firstUserMessage,
@@ -351,6 +427,10 @@ export const getSessionFiles = async (
     chatsDir,
     currentSessionId,
     options,
+    {
+      projectTempDir: path.dirname(chatsDir),
+      isCurrentProject: true,
+    },
   );
 
   // Filter out corrupted files and extract SessionInfo
@@ -388,6 +468,170 @@ export const getSessionFiles = async (
   return uniqueSessions;
 };
 
+interface ProjectChatDirectory {
+  projectId: string;
+  projectTempDir: string;
+  chatsDir: string;
+  projectRoot?: string;
+}
+
+async function getProjectChatDirectories(): Promise<ProjectChatDirectory[]> {
+  const globalTempDir = Storage.getGlobalTempDir();
+  let entries: string[];
+  try {
+    entries = await fs.readdir(globalTempDir);
+  } catch {
+    return [];
+  }
+
+  const directories = await Promise.all(
+    entries.map(async (projectId): Promise<ProjectChatDirectory | null> => {
+      const projectTempDir = path.join(globalTempDir, projectId);
+      const chatsDir = path.join(projectTempDir, 'chats');
+
+      try {
+        const stat = await fs.stat(projectTempDir);
+        if (!stat.isDirectory()) {
+          return null;
+        }
+      } catch {
+        return null;
+      }
+
+      let projectRoot: string | undefined;
+      try {
+        projectRoot = (
+          await fs.readFile(path.join(projectTempDir, '.project_root'), 'utf8')
+        ).trim();
+      } catch {
+        projectRoot = undefined;
+      }
+
+      return { projectId, projectTempDir, chatsDir, projectRoot };
+    }),
+  );
+
+  return directories.filter((entry): entry is ProjectChatDirectory =>
+    Boolean(entry),
+  );
+}
+
+export async function getGlobalSessionFiles(
+  currentSessionId?: string,
+  currentProjectRoot?: string,
+  options: GetSessionOptions = {},
+): Promise<SessionInfo[]> {
+  const projectChatDirs = await getProjectChatDirectories();
+
+  const allEntries = await Promise.all(
+    projectChatDirs.map(async (projectDir) =>
+      getAllSessionFiles(projectDir.chatsDir, currentSessionId, options, {
+        projectRoot: projectDir.projectRoot,
+        projectId: projectDir.projectId,
+        projectTempDir: projectDir.projectTempDir,
+        isCurrentProject:
+          !!currentProjectRoot &&
+          !!projectDir.projectRoot &&
+          path.resolve(currentProjectRoot) === path.resolve(projectDir.projectRoot),
+      }),
+    ),
+  );
+
+  const flattened = allEntries.flat();
+  const validSessions = flattened
+    .filter(
+      (entry): entry is { fileName: string; sessionInfo: SessionInfo } =>
+        entry.sessionInfo !== null,
+    )
+    .map((entry) => entry.sessionInfo);
+
+  const uniqueSessionsMap = new Map<string, SessionInfo>();
+  for (const session of validSessions) {
+    if (
+      !uniqueSessionsMap.has(session.id) ||
+      new Date(session.lastUpdated).getTime() >
+        new Date(uniqueSessionsMap.get(session.id)!.lastUpdated).getTime()
+    ) {
+      uniqueSessionsMap.set(session.id, session);
+    }
+  }
+
+  const uniqueSessions = Array.from(uniqueSessionsMap.values());
+  uniqueSessions.sort(
+    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+  );
+  uniqueSessions.forEach((session, index) => {
+    session.index = index + 1;
+  });
+
+  return uniqueSessions;
+}
+
+export async function renameSession(
+  session: SessionInfo,
+  newNameBase: string,
+): Promise<RenameSessionResult> {
+  const conversation: ConversationRecord = JSON.parse(
+    await fs.readFile(session.sessionPath, 'utf8'),
+  );
+
+  const sessionNameBase = ensureSessionNameBase(newNameBase);
+  const existingSuffix =
+    conversation.sessionNameSuffix ||
+    session.sessionNameSuffix ||
+    getSessionNameSuffix(conversation.sessionId);
+  const sessionNameSuffix = normalizeSessionNameSuffix(existingSuffix);
+
+  conversation.sessionNameBase = sessionNameBase;
+  conversation.sessionNameSuffix = sessionNameSuffix;
+  conversation.lastUpdated = new Date().toISOString();
+
+  await fs.writeFile(session.sessionPath, JSON.stringify(conversation, null, 2));
+
+  return {
+    conversation,
+    sessionInfo: {
+      ...session,
+      lastUpdated: conversation.lastUpdated,
+      sessionNameBase,
+      sessionNameSuffix,
+      sessionName: buildSessionName(sessionNameBase, sessionNameSuffix),
+    },
+  };
+}
+
+export async function deleteSessionArtifacts(session: SessionInfo): Promise<void> {
+  try {
+    await fs.unlink(session.sessionPath);
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      !('code' in error) ||
+      error.code !== 'ENOENT'
+    ) {
+      throw error;
+    }
+  }
+
+  const safeSessionId = sanitizeFilenamePart(session.id);
+  const toolOutputsBase = path.join(session.projectTempDir, 'tool-outputs');
+  const toolOutputDir = path.join(
+    toolOutputsBase,
+    `session-${safeSessionId}`,
+  );
+  const resolvedBase = path.resolve(toolOutputsBase);
+  const resolvedTarget = path.resolve(toolOutputDir);
+
+  if (
+    resolvedTarget === resolvedBase ||
+    !resolvedTarget.startsWith(`${resolvedBase}${path.sep}`)
+  ) {
+    return;
+  }
+
+  await fs.rm(toolOutputDir, { recursive: true, force: true });
+}
+
 /**
  * Utility class for session discovery and selection.
  */
@@ -395,18 +639,17 @@ export class SessionSelector {
   constructor(private config: Config) {}
 
   /**
-   * Lists all available sessions for the current project.
+   * Lists all available sessions globally across projects.
    */
   async listSessions(): Promise<SessionInfo[]> {
-    const chatsDir = path.join(
-      this.config.storage.getProjectTempDir(),
-      'chats',
+    return getGlobalSessionFiles(
+      this.config.getSessionId(),
+      this.config.getProjectRoot(),
     );
-    return getSessionFiles(chatsDir, this.config.getSessionId());
   }
 
   /**
-   * Finds a session by identifier (UUID or numeric index).
+   * Finds a session by identifier (name, UUID or numeric index).
    *
    * @param identifier - Can be a full UUID or an index number (1-based)
    * @returns Promise resolving to the found SessionInfo
@@ -425,7 +668,15 @@ export class SessionSelector {
         new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
     );
 
-    // Try to find by UUID first
+    // Try to find by session name first.
+    const sessionByName = sortedSessions.find(
+      (session) => session.sessionName === identifier,
+    );
+    if (sessionByName) {
+      return sessionByName;
+    }
+
+    // Try to find by UUID.
     const sessionByUuid = sortedSessions.find(
       (session) => session.id === identifier,
     );
@@ -450,7 +701,7 @@ export class SessionSelector {
   /**
    * Resolves a resume argument to a specific session.
    *
-   * @param resumeArg - Can be "latest", a full UUID, or an index number (1-based)
+   * @param resumeArg - Can be "latest", a session name, a full UUID, or an index number (1-based)
    * @returns Promise resolving to session selection result
    */
   async resolveSession(resumeArg: string): Promise<SessionSelectionResult> {
@@ -460,7 +711,7 @@ export class SessionSelector {
       const sessions = await this.listSessions();
 
       if (sessions.length === 0) {
-        throw new Error('No previous sessions found for this project.');
+        throw new Error('No previous sessions found.');
       }
 
       // Sort by startTime (oldest first, so newest sessions get highest numbers)
@@ -494,11 +745,7 @@ export class SessionSelector {
   private async selectSession(
     sessionInfo: SessionInfo,
   ): Promise<SessionSelectionResult> {
-    const chatsDir = path.join(
-      this.config.storage.getProjectTempDir(),
-      'chats',
-    );
-    const sessionPath = path.join(chatsDir, sessionInfo.fileName);
+    const sessionPath = sessionInfo.sessionPath;
 
     try {
       const sessionData: ConversationRecord = JSON.parse(
@@ -508,7 +755,7 @@ export class SessionSelector {
       const displayInfo = `Session ${sessionInfo.index}: ${sessionInfo.firstUserMessage} (${sessionInfo.messageCount} messages, ${formatRelativeTime(sessionInfo.lastUpdated)})`;
 
       return {
-        sessionPath,
+        sessionPath: sessionInfo.sessionPath,
         sessionData,
         displayInfo,
       };
@@ -578,7 +825,7 @@ export function convertSessionToHistoryFormats(
     ) {
       uiHistory.push({
         type: 'tool_group',
-        tools: msg.toolCalls.map((tool) => ({
+        tools: msg.toolCalls.map((tool: NonNullable<typeof msg.toolCalls>[number]) => ({
           callId: tool.id,
           name: tool.displayName || tool.name,
           description: tool.description || '',

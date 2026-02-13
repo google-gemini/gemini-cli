@@ -5,18 +5,17 @@
  */
 
 import type React from 'react';
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import path from 'node:path';
 import type { Config } from '@google/gemini-cli-core';
 import type { SessionInfo, TextMatch } from '../../utils/sessionUtils.js';
 import {
   cleanMessage,
   formatRelativeTime,
-  getSessionFiles,
+  getGlobalSessionFiles,
 } from '../../utils/sessionUtils.js';
 
 /**
@@ -29,6 +28,11 @@ export interface SessionBrowserProps {
   onResumeSession: (session: SessionInfo) => void;
   /** Callback when user deletes a session */
   onDeleteSession: (session: SessionInfo) => Promise<void>;
+  /** Callback when user renames a session */
+  onRenameSession: (
+    session: SessionInfo,
+    newNameBase: string,
+  ) => Promise<SessionInfo>;
   /** Callback when user exits the session browser */
   onExit: () => void;
 }
@@ -63,6 +67,10 @@ export interface SessionBrowserState {
   isSearchMode: boolean;
   /** Whether full content has been loaded for search */
   hasLoadedFullContent: boolean;
+  /** Whether user is actively typing a rename */
+  isRenameMode: boolean;
+  /** Draft rename text */
+  renameQuery: string;
 
   // Sort state
   /** Current sort criteria */
@@ -95,6 +103,10 @@ export interface SessionBrowserState {
   setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
   /** Update search mode state */
   setIsSearchMode: React.Dispatch<React.SetStateAction<boolean>>;
+  /** Update rename mode state */
+  setIsRenameMode: React.Dispatch<React.SetStateAction<boolean>>;
+  /** Update rename query */
+  setRenameQuery: React.Dispatch<React.SetStateAction<string>>;
   /** Update sort order */
   setSortOrder: React.Dispatch<
     React.SetStateAction<'date' | 'messages' | 'name'>
@@ -170,7 +182,7 @@ const sortSessions = (
       case 'messages':
         return b.messageCount - a.messageCount;
       case 'name':
-        return a.displayName.localeCompare(b.displayName);
+        return a.sessionName.localeCompare(b.sessionName);
       default:
         return 0;
     }
@@ -249,7 +261,9 @@ const filterSessions = (
   return sessions.filter((session) => {
     const titleMatch =
       session.displayName.toLowerCase().includes(lowerQuery) ||
+      session.sessionName.toLowerCase().includes(lowerQuery) ||
       session.id.toLowerCase().includes(lowerQuery) ||
+      (session.projectRoot || '').toLowerCase().includes(lowerQuery) ||
       session.firstUserMessage.toLowerCase().includes(lowerQuery);
 
     const contentMatch = session.fullContent
@@ -284,6 +298,21 @@ const SearchModeDisplay = ({
 );
 
 /**
+ * Rename input display component.
+ */
+const RenameModeDisplay = ({
+  state,
+}: {
+  state: SessionBrowserState;
+}): React.JSX.Element => (
+  <Box marginTop={1}>
+    <Text color={Colors.Gray}>Rename: </Text>
+    <Text color={Colors.AccentPurple}>{state.renameQuery}</Text>
+    <Text color={Colors.Gray}> (Enter to save, Esc to cancel)</Text>
+  </Box>
+);
+
+/**
  * Header component showing session count and sort information.
  */
 const SessionListHeader = ({
@@ -313,6 +342,8 @@ const NavigationHelp = (): React.JSX.Element => (
       <Kbd name="Resume" shortcut="Enter" />
       {'   '}
       <Kbd name="Search" shortcut="/" />
+      {'   '}
+      <Kbd name="Rename" shortcut="n" />
       {'   '}
       <Kbd name="Delete" shortcut="x" />
       {'   '}
@@ -379,6 +410,48 @@ const NoResultsDisplay = ({
     </Text>
   </Box>
 );
+
+const formatTimestamp = (timestamp: string): string => {
+  const parsed = new Date(timestamp);
+  if (Number.isNaN(parsed.getTime())) {
+    return timestamp;
+  }
+  return parsed.toLocaleString();
+};
+
+const SessionDetailsPanel = ({
+  session,
+}: {
+  session: SessionInfo | undefined;
+}): React.JSX.Element | null => {
+  if (!session) {
+    return null;
+  }
+
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <Text color={Colors.Gray}>
+        Selected: <Text color={Colors.Foreground}>{session.sessionName}</Text>
+      </Text>
+      <Text color={Colors.Gray}>
+        Project:{' '}
+        <Text color={Colors.Foreground}>
+          {session.projectRoot || '(unknown)'}
+        </Text>
+      </Text>
+      <Text color={Colors.Gray}>
+        Started:{' '}
+        <Text color={Colors.Foreground}>{formatTimestamp(session.startTime)}</Text>
+      </Text>
+      <Text color={Colors.Gray}>
+        Updated:{' '}
+        <Text color={Colors.Foreground}>
+          {formatTimestamp(session.lastUpdated)}
+        </Text>
+      </Text>
+    </Box>
+  );
+};
 
 /**
  * Match snippet display component for search results.
@@ -472,14 +545,14 @@ const SessionItem = ({
 
   const truncatedMessage =
     matchDisplay ||
-    (session.displayName.length === 0 ? (
+    (session.sessionName.length === 0 ? (
       <Text color={textColor(Colors.Gray)} dimColor>
         (No messages)
       </Text>
-    ) : session.displayName.length > availableMessageWidth ? (
-      session.displayName.slice(0, availableMessageWidth - 1) + '…'
+    ) : session.sessionName.length > availableMessageWidth ? (
+      session.sessionName.slice(0, availableMessageWidth - 1) + '…'
     ) : (
-      session.displayName
+      session.sessionName
     ));
 
   return (
@@ -581,8 +654,9 @@ export const useSessionBrowserState = (
   const [sortReverse, setSortReverse] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchMode, setIsSearchMode] = useState(false);
+  const [isRenameMode, setIsRenameMode] = useState(false);
+  const [renameQuery, setRenameQuery] = useState('');
   const [hasLoadedFullContent, setHasLoadedFullContent] = useState(false);
-  const loadingFullContentRef = useRef(false);
 
   const filteredAndSortedSessions = useMemo(() => {
     const filtered = filterSessions(sessions, searchQuery);
@@ -593,7 +667,6 @@ export const useSessionBrowserState = (
   useEffect(() => {
     if (!searchQuery) {
       setHasLoadedFullContent(false);
-      loadingFullContentRef.current = false;
     }
   }, [searchQuery]);
 
@@ -617,6 +690,10 @@ export const useSessionBrowserState = (
     setSearchQuery,
     isSearchMode,
     setIsSearchMode,
+    isRenameMode,
+    setIsRenameMode,
+    renameQuery,
+    setRenameQuery,
     hasLoadedFullContent,
     setHasLoadedFullContent,
     sortOrder,
@@ -650,10 +727,9 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
   useEffect(() => {
     const loadSessions = async () => {
       try {
-        const chatsDir = path.join(config.storage.getProjectTempDir(), 'chats');
-        const sessionData = await getSessionFiles(
-          chatsDir,
+        const sessionData = await getGlobalSessionFiles(
           config.getSessionId(),
+          config.getProjectRoot(),
         );
         setSessions(sessionData);
         setLoading(false);
@@ -673,13 +749,9 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
     const loadFullContent = async () => {
       if (isSearchMode && !hasLoadedFullContent) {
         try {
-          const chatsDir = path.join(
-            config.storage.getProjectTempDir(),
-            'chats',
-          );
-          const sessionData = await getSessionFiles(
-            chatsDir,
+          const sessionData = await getGlobalSessionFiles(
             config.getSessionId(),
+            config.getProjectRoot(),
             { includeFullContent: true },
           );
           setSessions(sessionData);
@@ -764,10 +836,56 @@ export const useSessionBrowserInput = (
   cycleSortOrder: () => void,
   onResumeSession: (session: SessionInfo) => void,
   onDeleteSession: (session: SessionInfo) => Promise<void>,
+  onRenameSession: (session: SessionInfo, newNameBase: string) => Promise<SessionInfo>,
   onExit: () => void,
 ) => {
   useKeypress(
     (key) => {
+      const selectedSession = state.filteredAndSortedSessions[state.activeIndex];
+
+      if (state.isRenameMode) {
+        if (key.name === 'escape') {
+          state.setIsRenameMode(false);
+          state.setRenameQuery('');
+          return true;
+        }
+        if (key.name === 'backspace') {
+          state.setRenameQuery((prev) => prev.slice(0, -1));
+          return true;
+        }
+        if (key.name === 'return') {
+          if (selectedSession) {
+            onRenameSession(selectedSession, state.renameQuery)
+              .then((updatedSession) => {
+                state.setSessions((prev) =>
+                  prev.map((session) =>
+                    session.id === updatedSession.id ? updatedSession : session,
+                  ),
+                );
+                state.setIsRenameMode(false);
+                state.setRenameQuery('');
+              })
+              .catch((error) => {
+                state.setError(
+                  `Failed to rename session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                );
+              });
+          }
+          return true;
+        }
+        if (
+          key.sequence &&
+          key.sequence.length === 1 &&
+          !key.alt &&
+          !key.ctrl &&
+          !key.cmd
+        ) {
+          state.setRenameQuery((prev) => prev + key.sequence);
+          return true;
+        }
+        return false;
+      }
+
       if (state.isSearchMode) {
         // Search-specific input handling.  Only control/symbols here.
         if (key.name === 'escape') {
@@ -819,6 +937,12 @@ export const useSessionBrowserInput = (
         else if (key.sequence === '/') {
           state.setIsSearchMode(true);
           return true;
+        } else if (key.sequence === 'n' || key.sequence === 'N') {
+          if (selectedSession) {
+            state.setIsRenameMode(true);
+            state.setRenameQuery(selectedSession.sessionNameBase);
+          }
+          return true;
         } else if (
           key.sequence === 'q' ||
           key.sequence === 'Q' ||
@@ -829,8 +953,6 @@ export const useSessionBrowserInput = (
         }
         // Delete session control.
         else if (key.sequence === 'x' || key.sequence === 'X') {
-          const selectedSession =
-            state.filteredAndSortedSessions[state.activeIndex];
           if (selectedSession && !selectedSession.isCurrentSession) {
             onDeleteSession(selectedSession)
               .then(() => {
@@ -870,10 +992,9 @@ export const useSessionBrowserInput = (
       // Handling regardless of search mode.
       if (
         key.name === 'return' &&
-        state.filteredAndSortedSessions[state.activeIndex]
+        selectedSession &&
+        !state.isSearchMode
       ) {
-        const selectedSession =
-          state.filteredAndSortedSessions[state.activeIndex];
         // Don't allow resuming the current session
         if (!selectedSession.isCurrentSession) {
           onResumeSession(selectedSession);
@@ -914,17 +1035,23 @@ export function SessionBrowserView({
   if (state.sessions.length === 0) {
     return <SessionBrowserEmpty />;
   }
+
+  const selectedSession = state.filteredAndSortedSessions[state.activeIndex];
+
   return (
     <Box flexDirection="column" paddingX={1}>
       <SessionListHeader state={state} />
 
       {state.isSearchMode && <SearchModeDisplay state={state} />}
+      {state.isRenameMode && <RenameModeDisplay state={state} />}
 
       {state.totalSessions === 0 ? (
         <NoResultsDisplay state={state} />
       ) : (
         <SessionList state={state} formatRelativeTime={formatRelativeTime} />
       )}
+
+      {!state.isSearchMode && <SessionDetailsPanel session={selectedSession} />}
     </Box>
   );
 }
@@ -933,6 +1060,7 @@ export function SessionBrowser({
   config,
   onResumeSession,
   onDeleteSession,
+  onRenameSession,
   onExit,
 }: SessionBrowserProps): React.JSX.Element {
   // Use all our custom hooks
@@ -946,6 +1074,7 @@ export function SessionBrowser({
     cycleSortOrder,
     onResumeSession,
     onDeleteSession,
+    onRenameSession,
     onExit,
   );
 

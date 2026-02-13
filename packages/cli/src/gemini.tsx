@@ -79,7 +79,10 @@ import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
-import { SessionSelector } from './utils/sessionUtils.js';
+import {
+  getConversationSessionName,
+  SessionSelector,
+} from './utils/sessionUtils.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
 import { MouseProvider } from './ui/contexts/MouseContext.js';
 import { StreamingState } from './ui/types.js';
@@ -790,6 +793,17 @@ export async function main() {
       prompt_id,
       resumedSessionData,
     });
+
+    const conversation = config
+      .getGeminiClient()
+      ?.getChatRecordingService()
+      ?.getConversation();
+    if (conversation) {
+      const sessionName = getConversationSessionName(conversation);
+      writeToStdout(
+        `\nSession: ${sessionName}\nYou can resume your session by typing: gemini --resume ${sessionName}\n`,
+      );
+    }
     // Call cleanup before process.exit, which causes cleanup to not run
     await runExitCleanup();
     process.exit(ExitCodes.SUCCESS);

@@ -5,14 +5,15 @@
  */
 
 import {
-  ChatRecordingService,
   generateSummary,
   writeToStderr,
   writeToStdout,
   type Config,
 } from '@google/gemini-cli-core';
 import {
+  deleteSessionArtifacts,
   formatRelativeTime,
+  SessionError,
   SessionSelector,
   type SessionInfo,
 } from './sessionUtils.js';
@@ -25,13 +26,11 @@ export async function listSessions(config: Config): Promise<void> {
   const sessions = await sessionSelector.listSessions();
 
   if (sessions.length === 0) {
-    writeToStdout('No previous sessions found for this project.');
+    writeToStdout('No previous sessions found.');
     return;
   }
 
-  writeToStdout(
-    `\nAvailable sessions for this project (${sessions.length}):\n`,
-  );
+  writeToStdout(`\nAvailable sessions (${sessions.length}):\n`);
 
   sessions
     .sort(
@@ -41,13 +40,11 @@ export async function listSessions(config: Config): Promise<void> {
     .forEach((session, index) => {
       const current = session.isCurrentSession ? ', current' : '';
       const time = formatRelativeTime(session.lastUpdated);
-      const title =
-        session.displayName.length > 100
-          ? session.displayName.slice(0, 97) + '...'
-          : session.displayName;
+      const folder = session.projectRoot || '(unknown project)';
       writeToStdout(
-        `  ${index + 1}. ${title} (${time}${current}) [${session.id}]\n`,
+        `  ${index + 1}. ${session.sessionName} (${time}${current})\n`,
       );
+      writeToStdout(`     ${folder}\n`);
     });
 }
 
@@ -59,33 +56,18 @@ export async function deleteSession(
   const sessions = await sessionSelector.listSessions();
 
   if (sessions.length === 0) {
-    writeToStderr('No sessions found for this project.');
+    writeToStderr('No sessions found.');
     return;
   }
-
-  // Sort sessions by start time to match list-sessions ordering
-  const sortedSessions = sessions.sort(
-    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
-  );
-
   let sessionToDelete: SessionInfo;
-
-  // Try to find by UUID first
-  const sessionByUuid = sortedSessions.find(
-    (session) => session.id === sessionIndex,
-  );
-  if (sessionByUuid) {
-    sessionToDelete = sessionByUuid;
-  } else {
-    // Parse session index
-    const index = parseInt(sessionIndex, 10);
-    if (isNaN(index) || index < 1 || index > sessions.length) {
-      writeToStderr(
-        `Invalid session identifier "${sessionIndex}". Use --list-sessions to see available sessions.`,
-      );
+  try {
+    sessionToDelete = await sessionSelector.findSession(sessionIndex);
+  } catch (error) {
+    if (error instanceof SessionError) {
+      writeToStderr(error.message);
       return;
     }
-    sessionToDelete = sortedSessions[index - 1];
+    throw error;
   }
 
   // Prevent deleting the current session
@@ -95,13 +77,11 @@ export async function deleteSession(
   }
 
   try {
-    // Use ChatRecordingService to delete the session
-    const chatRecordingService = new ChatRecordingService(config);
-    chatRecordingService.deleteSession(sessionToDelete.file);
+    await deleteSessionArtifacts(sessionToDelete);
 
     const time = formatRelativeTime(sessionToDelete.lastUpdated);
     writeToStdout(
-      `Deleted session ${sessionToDelete.index}: ${sessionToDelete.firstUserMessage} (${time})`,
+      `Deleted session: ${sessionToDelete.sessionName} (${time})`,
     );
   } catch (error) {
     writeToStderr(
