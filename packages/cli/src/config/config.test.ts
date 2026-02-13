@@ -26,7 +26,9 @@ import * as ServerConfig from '@google/gemini-cli-core';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { ExtensionManager } from './extension-manager.js';
-import { RESUME_LATEST } from '../utils/sessionUtils.js';
+import {
+  RESUME_LAST_IN_CURRENT_FOLDER,
+} from '../utils/sessionUtils.js';
 
 vi.mock('./trustedFolders.js', () => ({
   isWorkspaceTrusted: vi.fn(() => ({ isTrusted: true, source: 'file' })), // Default to trusted
@@ -548,14 +550,27 @@ describe('parseArguments', () => {
     }
   });
 
-  it('should return RESUME_LATEST constant when --resume is passed without a value', async () => {
+  it('should return RESUME_LAST_IN_CURRENT_FOLDER when --resume is passed without a value', async () => {
     const originalIsTTY = process.stdin.isTTY;
     process.stdin.isTTY = true; // Make it interactive to avoid validation error
     process.argv = ['node', 'script.js', '--resume'];
 
     try {
       const argv = await parseArguments(createTestMergedSettings());
-      expect(argv.resume).toBe(RESUME_LATEST);
+      expect(argv.resume).toBe(RESUME_LAST_IN_CURRENT_FOLDER);
+      expect(argv.resume).toBe('__last_in_current_folder__');
+    } finally {
+      process.stdin.isTTY = originalIsTTY;
+    }
+  });
+
+  it('should keep explicit --resume latest unchanged', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', '--resume', 'latest'];
+
+    try {
+      const argv = await parseArguments(createTestMergedSettings());
       expect(argv.resume).toBe('latest');
     } finally {
       process.stdin.isTTY = originalIsTTY;

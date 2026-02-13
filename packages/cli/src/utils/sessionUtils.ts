@@ -31,9 +31,14 @@ import {
 
 /**
  * Constant for the resume "latest" identifier.
- * Used when --resume is passed without a value to select the most recent session.
+ * Used when --resume latest is passed to select the most recent session globally.
  */
 export const RESUME_LATEST = 'latest';
+/**
+ * Internal identifier used when --resume is passed without a value.
+ * Prefers the most recent session from the current folder, falling back to global latest.
+ */
+export const RESUME_LAST_IN_CURRENT_FOLDER = '__last_in_current_folder__';
 
 /**
  * Error codes for session-related errors.
@@ -157,6 +162,7 @@ export interface SessionSelectionResult {
   sessionPath: string;
   sessionData: ConversationRecord;
   displayInfo: string;
+  resumeNotice?: string;
 }
 
 export interface RenameSessionResult {
@@ -638,6 +644,35 @@ export async function deleteSessionArtifacts(session: SessionInfo): Promise<void
 export class SessionSelector {
   constructor(private config: Config) {}
 
+  private getLatestSession(sessions: SessionInfo[]): SessionInfo {
+    const sorted = [...sessions].sort(
+      (a, b) =>
+        new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+    );
+    return sorted[sorted.length - 1];
+  }
+
+  private getLatestSessionFromCurrentFolder(
+    sessions: SessionInfo[],
+  ): SessionInfo | undefined {
+    const currentProjectRoot = this.config.getProjectRoot();
+    const matchingSessions = sessions.filter(
+      (session) =>
+        session.projectRoot &&
+        path.resolve(session.projectRoot) === path.resolve(currentProjectRoot),
+    );
+
+    if (matchingSessions.length === 0) {
+      return undefined;
+    }
+
+    const sorted = [...matchingSessions].sort(
+      (a, b) =>
+        new Date(a.lastUpdated).getTime() - new Date(b.lastUpdated).getTime(),
+    );
+    return sorted[sorted.length - 1];
+  }
+
   /**
    * Lists all available sessions globally across projects.
    */
@@ -707,20 +742,31 @@ export class SessionSelector {
   async resolveSession(resumeArg: string): Promise<SessionSelectionResult> {
     let selectedSession: SessionInfo;
 
-    if (resumeArg === RESUME_LATEST) {
+    let resumeNotice: string | undefined;
+    if (resumeArg === RESUME_LAST_IN_CURRENT_FOLDER) {
       const sessions = await this.listSessions();
 
       if (sessions.length === 0) {
         throw new Error('No previous sessions found.');
       }
 
-      // Sort by startTime (oldest first, so newest sessions get highest numbers)
-      sessions.sort(
-        (a, b) =>
-          new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
-      );
+      const currentFolderSession =
+        this.getLatestSessionFromCurrentFolder(sessions);
+      if (currentFolderSession) {
+        selectedSession = currentFolderSession;
+        resumeNotice = `Resumed most recent session in this folder: ${selectedSession.sessionName}`;
+      } else {
+        selectedSession = this.getLatestSession(sessions);
+        resumeNotice = `No previous sessions found in this folder. Resumed latest global session: ${selectedSession.sessionName}`;
+      }
+    } else if (resumeArg === RESUME_LATEST) {
+      const sessions = await this.listSessions();
 
-      selectedSession = sessions[sessions.length - 1];
+      if (sessions.length === 0) {
+        throw new Error('No previous sessions found.');
+      }
+
+      selectedSession = this.getLatestSession(sessions);
     } else {
       try {
         selectedSession = await this.findSession(resumeArg);
@@ -736,7 +782,7 @@ export class SessionSelector {
       }
     }
 
-    return this.selectSession(selectedSession);
+    return this.selectSession(selectedSession, resumeNotice);
   }
 
   /**
@@ -744,6 +790,7 @@ export class SessionSelector {
    */
   private async selectSession(
     sessionInfo: SessionInfo,
+    resumeNotice?: string,
   ): Promise<SessionSelectionResult> {
     const sessionPath = sessionInfo.sessionPath;
 
@@ -758,6 +805,7 @@ export class SessionSelector {
         sessionPath: sessionInfo.sessionPath,
         sessionData,
         displayInfo,
+        resumeNotice,
       };
     } catch (error) {
       throw new Error(

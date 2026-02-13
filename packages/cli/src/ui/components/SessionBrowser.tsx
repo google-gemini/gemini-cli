@@ -88,6 +88,8 @@ export interface SessionBrowserState {
   endIndex: number;
   /** Sessions visible on current page */
   visibleSessions: SessionInfo[];
+  /** Latest session id in the current folder (if any) */
+  lastSessionInCurrentFolderId?: string;
 
   // State setters
   /** Update sessions array */
@@ -432,10 +434,35 @@ const isSessionFromCurrentFolder = (projectRoot?: string): boolean => {
   }
 };
 
+const parseTimestamp = (timestamp: string): number => {
+  const parsed = new Date(timestamp).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+const getLastSessionInCurrentFolderId = (
+  sessions: SessionInfo[],
+): string | undefined => {
+  const currentFolderSessions = sessions.filter((session) =>
+    isSessionFromCurrentFolder(session.projectRoot),
+  );
+  if (currentFolderSessions.length === 0) {
+    return undefined;
+  }
+
+  const latest = currentFolderSessions.reduce((best, candidate) =>
+    parseTimestamp(candidate.lastUpdated) > parseTimestamp(best.lastUpdated)
+      ? candidate
+      : best,
+  );
+  return latest.id;
+};
+
 const SessionDetailsPanel = ({
   session,
+  lastSessionInCurrentFolderId,
 }: {
   session: SessionInfo | undefined;
+  lastSessionInCurrentFolderId?: string;
 }): React.JSX.Element | null => {
   if (!session) {
     return null;
@@ -462,7 +489,35 @@ const SessionDetailsPanel = ({
           {formatTimestamp(session.lastUpdated)}
         </Text>
       </Text>
+      {session.id === lastSessionInCurrentFolderId && (
+        <Text color={Colors.AccentGreen}>
+          This is your latest session in this folder.
+        </Text>
+      )}
     </Box>
+  );
+};
+
+const CurrentFolderSessionHint = ({
+  state,
+}: {
+  state: SessionBrowserState;
+}): React.JSX.Element | null => {
+  if (!state.lastSessionInCurrentFolderId) {
+    return null;
+  }
+
+  const latestCurrentFolderSession = state.sessions.find(
+    (session) => session.id === state.lastSessionInCurrentFolderId,
+  );
+  if (!latestCurrentFolderSession) {
+    return null;
+  }
+
+  return (
+    <Text color={Colors.AccentGreen}>
+      Latest in this folder: {latestCurrentFolderSession.sessionName}
+    </Text>
   );
 };
 
@@ -518,6 +573,8 @@ const SessionItem = ({
     state.startIndex + state.visibleSessions.indexOf(session);
   const isActive = originalIndex === state.activeIndex;
   const isDisabled = session.isCurrentSession;
+  const isLastSessionInCurrentFolder =
+    session.id === state.lastSessionInCurrentFolderId;
   const isCurrentFolder = isSessionFromCurrentFolder(session.projectRoot);
   const activeColor = isCurrentFolder ? Colors.AccentCyan : Colors.AccentPurple;
   const textColor = (c: string = Colors.Foreground) => {
@@ -534,6 +591,9 @@ const SessionItem = ({
   // Add "(current)" label for the current session
   if (session.isCurrentSession) {
     additionalInfo = ' (current)';
+  }
+  if (isLastSessionInCurrentFolder) {
+    additionalInfo += ' [last in folder]';
   }
 
   // Show match snippets if searching and matches exist
@@ -606,7 +666,15 @@ const SessionItem = ({
         <Text color={textColor(Colors.Comment)} dimColor={isDisabled}>
           {truncatedMessage}
           {additionalInfo && (
-            <Text color={textColor(Colors.Gray)} dimColor bold={false}>
+            <Text
+              color={
+                isLastSessionInCurrentFolder && !isDisabled
+                  ? Colors.AccentGreen
+                  : textColor(Colors.Gray)
+              }
+              dimColor={isDisabled}
+              bold={false}
+            >
               {additionalInfo}
             </Text>
           )}
@@ -686,6 +754,10 @@ export const useSessionBrowserState = (
   }, [searchQuery]);
 
   const totalSessions = filteredAndSortedSessions.length;
+  const lastSessionInCurrentFolderId = useMemo(
+    () => getLastSessionInCurrentFolderId(sessions),
+    [sessions],
+  );
   const startIndex = scrollOffset;
   const endIndex = Math.min(scrollOffset + SESSIONS_PER_PAGE, totalSessions);
   const visibleSessions = filteredAndSortedSessions.slice(startIndex, endIndex);
@@ -718,6 +790,7 @@ export const useSessionBrowserState = (
     terminalWidth,
     filteredAndSortedSessions,
     totalSessions,
+    lastSessionInCurrentFolderId,
     startIndex,
     endIndex,
     visibleSessions,
@@ -734,6 +807,8 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
     setSessions,
     setLoading,
     setError,
+    setActiveIndex,
+    setScrollOffset,
     isSearchMode,
     hasLoadedFullContent,
     setHasLoadedFullContent,
@@ -747,6 +822,25 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
           config.getProjectRoot(),
         );
         setSessions(sessionData);
+        const latestCurrentFolderSessionId =
+          getLastSessionInCurrentFolderId(sessionData);
+        if (latestCurrentFolderSessionId) {
+          const sortedByDefault = sortSessions(sessionData, 'date', false);
+          const targetIndex = sortedByDefault.findIndex(
+            (session) => session.id === latestCurrentFolderSessionId,
+          );
+          if (targetIndex >= 0) {
+            setActiveIndex(targetIndex);
+            setScrollOffset(
+              Math.max(
+                0,
+                targetIndex >= SESSIONS_PER_PAGE
+                  ? targetIndex - SESSIONS_PER_PAGE + 1
+                  : 0,
+              ),
+            );
+          }
+        }
         setLoading(false);
       } catch (err) {
         setError(
@@ -758,7 +852,14 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
 
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     loadSessions();
-  }, [config, setSessions, setLoading, setError]);
+  }, [
+    config,
+    setSessions,
+    setLoading,
+    setError,
+    setActiveIndex,
+    setScrollOffset,
+  ]);
 
   useEffect(() => {
     const loadFullContent = async () => {
@@ -1056,6 +1157,7 @@ export function SessionBrowserView({
   return (
     <Box flexDirection="column" paddingX={1}>
       <SessionListHeader state={state} />
+      <CurrentFolderSessionHint state={state} />
 
       {state.isSearchMode && <SearchModeDisplay state={state} />}
       {state.isRenameMode && <RenameModeDisplay state={state} />}
@@ -1066,7 +1168,12 @@ export function SessionBrowserView({
         <SessionList state={state} formatRelativeTime={formatRelativeTime} />
       )}
 
-      {!state.isSearchMode && <SessionDetailsPanel session={selectedSession} />}
+      {!state.isSearchMode && (
+        <SessionDetailsPanel
+          session={selectedSession}
+          lastSessionInCurrentFolderId={state.lastSessionInCurrentFolderId}
+        />
+      )}
     </Box>
   );
 }

@@ -221,6 +221,52 @@ describe('SessionBrowser component', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
+  it('highlights the latest session in the current folder', () => {
+    const currentFolderLatest = createSession({
+      id: 'folder-latest',
+      sessionName: 'folder-latest-abcde',
+      projectRoot: process.cwd(),
+      lastUpdated: '2025-01-03T10:00:00Z',
+      index: 0,
+    });
+    const currentFolderOlder = createSession({
+      id: 'folder-older',
+      sessionName: 'folder-older-abcde',
+      projectRoot: process.cwd(),
+      lastUpdated: '2025-01-01T10:00:00Z',
+      index: 1,
+    });
+    const otherFolder = createSession({
+      id: 'other-folder',
+      sessionName: 'other-folder-abcde',
+      projectRoot: '/tmp/other-project',
+      lastUpdated: '2025-01-04T10:00:00Z',
+      index: 2,
+    });
+
+    const config = createMockConfig();
+    const onResumeSession = vi.fn();
+    const onDeleteSession = vi.fn().mockResolvedValue(undefined);
+    const onRenameSession = vi.fn();
+    const onExit = vi.fn();
+
+    const { lastFrame } = render(
+      <TestSessionBrowser
+        config={config}
+        onResumeSession={onResumeSession}
+        onDeleteSession={onDeleteSession}
+        onRenameSession={onRenameSession}
+        onExit={onExit}
+        testSessions={[currentFolderLatest, currentFolderOlder, otherFolder]}
+      />,
+    );
+
+    expect(lastFrame()).toContain(
+      'Latest in this folder: folder-latest-abcde',
+    );
+    expect(lastFrame()).toContain('[last in folder]');
+  });
+
   it('enters search mode, filters sessions, and renders match snippets', async () => {
     const searchSession = createSession({
       id: 'search1',

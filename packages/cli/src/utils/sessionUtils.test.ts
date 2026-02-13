@@ -6,6 +6,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
+  RESUME_LAST_IN_CURRENT_FOLDER,
   SessionSelector,
   extractFirstUserMessage,
   formatRelativeTime,
@@ -49,11 +50,14 @@ describe('SessionSelector', () => {
     }
   });
 
-  const createChatsDir = async () => {
-    const projectDir = path.join(tmpDir, 'project-a');
+  const createChatsDir = async (
+    projectId = 'project-a',
+    root = projectRoot,
+  ) => {
+    const projectDir = path.join(tmpDir, projectId);
     const chatsDir = path.join(projectDir, 'chats');
     await fs.mkdir(chatsDir, { recursive: true });
-    await fs.writeFile(path.join(projectDir, '.project_root'), projectRoot);
+    await fs.writeFile(path.join(projectDir, '.project_root'), root);
     return chatsDir;
   };
 
@@ -243,6 +247,146 @@ describe('SessionSelector', () => {
     // Test resolving latest
     const result = await sessionSelector.resolveSession('latest');
     expect(result.sessionData.messages[0].content).toBe('Latest session');
+  });
+
+  it('should resolve the latest session from the current folder for bare --resume', async () => {
+    const sessionInCurrentFolderOld = randomUUID();
+    const sessionInCurrentFolderLatest = randomUUID();
+    const sessionInOtherFolderLatest = randomUUID();
+
+    const projectAChatsDir = await createChatsDir('project-a', projectRoot);
+    const projectBChatsDir = await createChatsDir(
+      'project-b',
+      '/workspace/project-b',
+    );
+
+    await fs.writeFile(
+      path.join(
+        projectAChatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionInCurrentFolderOld.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(
+        {
+          sessionId: sessionInCurrentFolderOld,
+          projectHash: 'project-a-hash',
+          startTime: '2024-01-01T10:00:00.000Z',
+          lastUpdated: '2024-01-01T10:05:00.000Z',
+          messages: [
+            {
+              type: 'user',
+              content: 'old current-folder session',
+              id: 'msg1',
+              timestamp: '2024-01-01T10:00:00.000Z',
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+    );
+
+    await fs.writeFile(
+      path.join(
+        projectAChatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionInCurrentFolderLatest.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(
+        {
+          sessionId: sessionInCurrentFolderLatest,
+          projectHash: 'project-a-hash',
+          startTime: '2024-01-01T11:00:00.000Z',
+          lastUpdated: '2024-01-01T11:30:00.000Z',
+          messages: [
+            {
+              type: 'user',
+              content: 'latest current-folder session',
+              id: 'msg1',
+              timestamp: '2024-01-01T11:00:00.000Z',
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+    );
+
+    await fs.writeFile(
+      path.join(
+        projectBChatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T12-00-${sessionInOtherFolderLatest.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(
+        {
+          sessionId: sessionInOtherFolderLatest,
+          projectHash: 'project-b-hash',
+          startTime: '2024-01-01T12:00:00.000Z',
+          lastUpdated: '2024-01-01T12:30:00.000Z',
+          messages: [
+            {
+              type: 'user',
+              content: 'latest other-folder session',
+              id: 'msg1',
+              timestamp: '2024-01-01T12:00:00.000Z',
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+    );
+
+    const sessionSelector = new SessionSelector(config);
+    const result = await sessionSelector.resolveSession(
+      RESUME_LAST_IN_CURRENT_FOLDER,
+    );
+
+    expect(result.sessionData.sessionId).toBe(sessionInCurrentFolderLatest);
+    expect(result.resumeNotice).toContain(
+      'Resumed most recent session in this folder',
+    );
+  });
+
+  it('should fall back to global latest when current folder has no sessions for bare --resume', async () => {
+    const sessionInOtherFolderLatest = randomUUID();
+    const projectBChatsDir = await createChatsDir(
+      'project-b',
+      '/workspace/project-b',
+    );
+
+    await fs.writeFile(
+      path.join(
+        projectBChatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T12-00-${sessionInOtherFolderLatest.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(
+        {
+          sessionId: sessionInOtherFolderLatest,
+          projectHash: 'project-b-hash',
+          startTime: '2024-01-01T12:00:00.000Z',
+          lastUpdated: '2024-01-01T12:30:00.000Z',
+          messages: [
+            {
+              type: 'user',
+              content: 'latest other-folder session',
+              id: 'msg1',
+              timestamp: '2024-01-01T12:00:00.000Z',
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+    );
+
+    const sessionSelector = new SessionSelector(config);
+    const result = await sessionSelector.resolveSession(
+      RESUME_LAST_IN_CURRENT_FOLDER,
+    );
+
+    expect(result.sessionData.sessionId).toBe(sessionInOtherFolderLatest);
+    expect(result.resumeNotice).toContain(
+      'No previous sessions found in this folder',
+    );
   });
 
   it('should deduplicate sessions by ID', async () => {

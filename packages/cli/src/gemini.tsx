@@ -109,6 +109,9 @@ import { runDeferredCommand } from './deferred.js';
 import { SlashCommandConflictHandler } from './services/SlashCommandConflictHandler.js';
 
 const SLOW_RENDER_MS = 200;
+type ResumedSessionDataWithNotice = ResumedSessionData & {
+  resumeNotice?: string;
+};
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -677,17 +680,19 @@ export async function main() {
     ];
 
     // Handle --resume flag
-    let resumedSessionData: ResumedSessionData | undefined = undefined;
+    let resumedSessionData: ResumedSessionDataWithNotice | undefined = undefined;
     if (argv.resume) {
       const sessionSelector = new SessionSelector(config);
       try {
         const result = await sessionSelector.resolveSession(argv.resume);
-        resumedSessionData = {
+        const resolvedSessionData: ResumedSessionDataWithNotice = {
           conversation: result.sessionData,
           filePath: result.sessionPath,
+          resumeNotice: result.resumeNotice,
         };
+        resumedSessionData = resolvedSessionData;
         // Use the existing session ID to continue recording to the same session
-        config.setSessionId(resumedSessionData.conversation.sessionId);
+        config.setSessionId(resolvedSessionData.conversation.sessionId);
       } catch (error) {
         coreEvents.emitFeedback(
           'error',

@@ -11,9 +11,14 @@ import {
   type ResumedSessionData,
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
+import { MessageType } from '../types.js';
 import type { HistoryItemWithoutId } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { convertSessionToHistoryFormats } from './useSessionBrowser.js';
+
+type ResumedSessionDataWithNotice = ResumedSessionData & {
+  resumeNotice?: string;
+};
 
 interface UseSessionResumeParams {
   config: Config;
@@ -21,7 +26,7 @@ interface UseSessionResumeParams {
   refreshStatic: () => void;
   isGeminiClientInitialized: boolean;
   setQuittingMessages: (messages: null) => void;
-  resumedSessionData?: ResumedSessionData;
+  resumedSessionData?: ResumedSessionDataWithNotice;
   isAuthenticating: boolean;
 }
 
@@ -54,7 +59,7 @@ export function useSessionResume({
     async (
       uiHistory: HistoryItemWithoutId[],
       clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>,
-      resumedData: ResumedSessionData,
+      resumedData: ResumedSessionDataWithNotice,
     ) => {
       // Wait for the client.
       if (!isGeminiClientInitialized) {
@@ -84,6 +89,17 @@ export function useSessionResume({
 
         // Give the history to the Gemini client.
         await config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
+
+        if (resumedData.resumeNotice) {
+          historyManagerRef.current.addItem(
+            {
+              type: MessageType.INFO,
+              text: resumedData.resumeNotice,
+            },
+            Date.now(),
+            true,
+          );
+        }
       } catch (error) {
         coreEvents.emitFeedback(
           'error',

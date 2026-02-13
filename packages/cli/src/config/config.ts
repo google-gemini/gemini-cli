@@ -53,7 +53,10 @@ import {
 
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
-import { RESUME_LATEST } from '../utils/sessionUtils.js';
+import {
+  RESUME_LAST_IN_CURRENT_FOLDER,
+  RESUME_LATEST,
+} from '../utils/sessionUtils.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { createPolicyEngineConfig } from './policy.js';
@@ -81,7 +84,11 @@ export interface CliArgs {
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
-  resume: string | typeof RESUME_LATEST | undefined;
+  resume:
+    | string
+    | typeof RESUME_LATEST
+    | typeof RESUME_LAST_IN_CURRENT_FOLDER
+    | undefined;
   listSessions: boolean | undefined;
   deleteSession: string | undefined;
   includeDirectories: string[] | undefined;
@@ -224,14 +231,14 @@ export async function parseArguments(
           // one, and not being passed at all.
           skipValidation: true,
           description:
-            'Resume a previous session by name, index, UUID, or "latest" (e.g. --resume my-chat-abc12)',
+            'Resume a previous session by name, index, UUID, or "latest". If passed without a value, resumes the most recent session from the current folder when available.',
           coerce: (value: string): string => {
             // When --resume passed with a value (`gemini --resume 123`): value = "123" (string)
             // When --resume passed without a value (`gemini --resume`): value = "" (string)
             // When --resume not passed at all: this `coerce` function is not called at all, and
             //   `yargsInstance.argv.resume` is undefined.
             if (value === '') {
-              return RESUME_LATEST;
+              return RESUME_LAST_IN_CURRENT_FOLDER;
             }
             return value;
           },

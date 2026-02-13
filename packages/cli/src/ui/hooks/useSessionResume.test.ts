@@ -16,6 +16,11 @@ import type {
 } from '@google/gemini-cli-core';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import type { HistoryItemWithoutId } from '../types.js';
+import { MessageType } from '../types.js';
+
+type ResumedSessionDataWithNotice = ResumedSessionData & {
+  resumeNotice?: string;
+};
 
 describe('useSessionResume', () => {
   // Mock dependencies
@@ -75,7 +80,7 @@ describe('useSessionResume', () => {
         { role: 'model' as const, parts: [{ text: 'Hi there!' }] },
       ];
 
-      const resumedData: ResumedSessionData = {
+      const resumedData: ResumedSessionDataWithNotice = {
         conversation: {
           sessionId: 'test-123',
           projectHash: 'project-123',
@@ -130,7 +135,7 @@ describe('useSessionResume', () => {
       const clientHistory = [
         { role: 'user' as const, parts: [{ text: 'Hello' }] },
       ];
-      const resumedData: ResumedSessionData = {
+      const resumedData: ResumedSessionDataWithNotice = {
         conversation: {
           sessionId: 'test-123',
           projectHash: 'project-123',
@@ -157,7 +162,7 @@ describe('useSessionResume', () => {
     it('should handle empty history arrays', async () => {
       const { result } = renderHook(() => useSessionResume(getDefaultProps()));
 
-      const resumedData: ResumedSessionData = {
+      const resumedData: ResumedSessionDataWithNotice = {
         conversation: {
           sessionId: 'test-123',
           projectHash: 'project-123',
@@ -176,6 +181,35 @@ describe('useSessionResume', () => {
       expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
       expect(mockRefreshStatic).toHaveBeenCalledTimes(1);
       expect(mockGeminiClient.resumeChat).toHaveBeenCalledWith([], resumedData);
+    });
+
+    it('should add an info notice to history when resumeNotice is provided', async () => {
+      const { result } = renderHook(() => useSessionResume(getDefaultProps()));
+
+      const resumedData: ResumedSessionDataWithNotice = {
+        conversation: {
+          sessionId: 'test-123',
+          projectHash: 'project-123',
+          startTime: '2025-01-01T00:00:00Z',
+          lastUpdated: '2025-01-01T01:00:00Z',
+          messages: [] as MessageRecord[],
+        },
+        filePath: '/path/to/session.json',
+        resumeNotice: 'Resumed most recent session in this folder: test-session-abcde',
+      };
+
+      await act(async () => {
+        await result.current.loadHistoryForResume([], [], resumedData);
+      });
+
+      expect(mockHistoryManager.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: resumedData.resumeNotice,
+        },
+        expect.any(Number),
+        true,
+      );
     });
 
     it('should restore directories from resumed session data', async () => {
