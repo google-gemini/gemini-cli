@@ -2110,3 +2110,60 @@ export class HookCallEvent implements BaseTelemetryEvent {
     return `Hook call ${hookId} ${status} in ${this.duration_ms}ms`;
   }
 }
+
+export const EVENT_KEYCHAIN_AVAILABILITY = 'gemini_cli.keychain.availability';
+export class KeychainAvailabilityEvent implements BaseTelemetryEvent {
+  'event.name': 'keychain_availability';
+  'event.timestamp': string;
+  available: boolean;
+
+  constructor(available: boolean) {
+    this['event.name'] = 'keychain_availability';
+    this['event.timestamp'] = new Date().toISOString();
+    this.available = available;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_KEYCHAIN_AVAILABILITY,
+      'event.timestamp': this['event.timestamp'],
+      available: this.available,
+    };
+    return attributes;
+  }
+
+  toLogBody(): string {
+    return `Keychain availability: ${this.available}`;
+  }
+}
+
+export const EVENT_TOKEN_STORAGE_INITIALIZATION =
+  'gemini_cli.token_storage.initialization';
+export class TokenStorageInitializationEvent implements BaseTelemetryEvent {
+  'event.name': 'token_storage_initialization';
+  'event.timestamp': string;
+  type: string;
+  forced: boolean;
+
+  constructor(type: string, forced: boolean) {
+    this['event.name'] = 'token_storage_initialization';
+    this['event.timestamp'] = new Date().toISOString();
+    this.type = type;
+    this.forced = forced;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_TOKEN_STORAGE_INITIALIZATION,
+      'event.timestamp': this['event.timestamp'],
+      type: this.type,
+      forced: this.forced,
+    };
+  }
+
+  toLogBody(): string {
+    return `Token storage initialized. Type: ${this.type}. Forced: ${this.forced}`;
+  }
+}
