@@ -141,8 +141,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     settings.merged.ui.showShortcutsHint &&
     !hideShortcutsHintForSuggestions &&
     !hideMinimalModeHintWhileBusy &&
-    !hasPendingActionRequired &&
-    (!showUiDetails || !showLoadingIndicator);
+    !hasPendingActionRequired;
   const showMinimalModeBleedThrough =
     !hideUiDetailsForSuggestions && Boolean(minimalModeBleedThrough);
   const showMinimalInlineLoading = !showUiDetails && showLoadingIndicator;
@@ -189,7 +188,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             marginLeft={1}
             marginRight={isNarrow ? 0 : 1}
             flexDirection="row"
-            alignItems="center"
+            alignItems={isNarrow ? 'flex-start' : 'center'}
             flexGrow={1}
           >
             {showUiDetails && showLoadingIndicator && (
@@ -326,45 +325,51 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
               {hasToast ? (
                 <ToastDisplay />
               ) : (
-                !showLoadingIndicator && (
-                  <Box
-                    flexDirection={isNarrow ? 'column' : 'row'}
-                    alignItems={isNarrow ? 'flex-start' : 'center'}
-                  >
-                    {showApprovalIndicator && (
-                      <ApprovalModeIndicator
-                        approvalMode={showApprovalModeIndicator}
-                        isPlanEnabled={config.isPlanEnabled()}
-                      />
-                    )}
-                    {uiState.shellModeActive && (
-                      <Box
-                        marginLeft={showApprovalIndicator && !isNarrow ? 1 : 0}
-                        marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
-                      >
-                        <ShellModeIndicator />
-                      </Box>
-                    )}
-                    {showRawMarkdownIndicator && (
-                      <Box
-                        marginLeft={
-                          (showApprovalIndicator || uiState.shellModeActive) &&
-                          !isNarrow
-                            ? 1
-                            : 0
-                        }
-                        marginTop={
-                          (showApprovalIndicator || uiState.shellModeActive) &&
-                          isNarrow
-                            ? 1
-                            : 0
-                        }
-                      >
-                        <RawMarkdownIndicator />
-                      </Box>
-                    )}
-                  </Box>
-                )
+                <Box
+                  flexDirection={isNarrow ? 'column' : 'row'}
+                  alignItems={isNarrow ? 'flex-start' : 'center'}
+                >
+                  {showApprovalIndicator && (
+                    <ApprovalModeIndicator
+                      approvalMode={showApprovalModeIndicator}
+                      isPlanEnabled={config.isPlanEnabled()}
+                    />
+                  )}
+                  {!showLoadingIndicator && (
+                    <>
+                      {uiState.shellModeActive && (
+                        <Box
+                          marginLeft={
+                            showApprovalIndicator && !isNarrow ? 1 : 0
+                          }
+                          marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
+                        >
+                          <ShellModeIndicator />
+                        </Box>
+                      )}
+                      {showRawMarkdownIndicator && (
+                        <Box
+                          marginLeft={
+                            (showApprovalIndicator ||
+                              uiState.shellModeActive) &&
+                            !isNarrow
+                              ? 1
+                              : 0
+                          }
+                          marginTop={
+                            (showApprovalIndicator ||
+                              uiState.shellModeActive) &&
+                            isNarrow
+                              ? 1
+                              : 0
+                          }
+                        >
+                          <RawMarkdownIndicator />
+                        </Box>
+                      )}
+                    </>
+                  )}
+                </Box>
               )}
             </Box>
 
