@@ -145,6 +145,7 @@ describe('handleAtCommand', () => {
   afterEach(async () => {
     abortController.abort();
     await fsPromises.rm(testRootDir, { recursive: true, force: true });
+    vi.unstubAllGlobals();
   });
 
   it('should pass through query if no @ command is present', async () => {
@@ -318,6 +319,46 @@ describe('handleAtCommand', () => {
       125,
     );
   }, 10000);
+
+  it('should correctly handle double-quoted paths with spaces', async () => {
+    // Mock platform to win32 so unescapePath strips quotes
+    vi.stubGlobal(
+      'process',
+      Object.create(process, {
+        platform: {
+          get: () => 'win32',
+        },
+      }),
+    );
+
+    const fileContent = 'Content of file with spaces';
+    const filePath = await createTestFile(
+      path.join(testRootDir, 'my folder', 'my file.txt'),
+      fileContent,
+    );
+    // On Windows, the user might provide: @"path/to/my file.txt"
+    const query = `@"${filePath}"`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 126,
+      signal: abortController.signal,
+    });
+
+    const relativePath = getRelativePath(filePath);
+    expect(result).toEqual({
+      processedQuery: [
+        { text: `@${relativePath}` },
+        { text: '\n--- Content from referenced files ---' },
+        { text: `\nContent from @${relativePath}:\n` },
+        { text: fileContent },
+        { text: '\n--- End of content ---' },
+      ],
+    });
+  });
 
   it('should correctly handle file paths with narrow non-breaking space (NNBSP)', async () => {
     const nnbsp = '\u202F';
