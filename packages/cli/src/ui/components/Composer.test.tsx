@@ -954,4 +954,50 @@ describe('Composer', () => {
       expect(lastFrame()).not.toContain('ShortcutsHelp');
     });
   });
+
+  describe('Snapshots', () => {
+    it('matches snapshot in idle state', () => {
+      const uiState = createMockUIState();
+      const { lastFrame } = renderComposer(uiState);
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
+    it('matches snapshot while streaming', () => {
+      const uiState = createMockUIState({
+        streamingState: StreamingState.Responding,
+        thought: {
+          subject: 'Thinking',
+          description: 'Thinking about the meaning of life...',
+        },
+      });
+      const { lastFrame } = renderComposer(uiState);
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
+    it('matches snapshot in narrow view', () => {
+      const uiState = createMockUIState({
+        terminalWidth: 40,
+      });
+      const { lastFrame } = renderComposer(uiState);
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
+    it('matches snapshot in minimal UI mode', () => {
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+      });
+      const { lastFrame } = renderComposer(uiState);
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
+    it('matches snapshot in minimal UI mode while loading', () => {
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+        streamingState: StreamingState.Responding,
+        elapsedTime: 1000,
+      });
+      const { lastFrame } = renderComposer(uiState);
+      expect(lastFrame()).toMatchSnapshot();
+    });
+  });
 });

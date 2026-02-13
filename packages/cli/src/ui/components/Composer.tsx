@@ -141,8 +141,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     settings.merged.ui.showShortcutsHint &&
     !hideShortcutsHintForSuggestions &&
     !hideMinimalModeHintWhileBusy &&
-    !hasPendingActionRequired &&
-    (!showUiDetails || !showLoadingIndicator);
+    !hasPendingActionRequired;
   const showMinimalModeBleedThrough =
     !hideUiDetailsForSuggestions && Boolean(minimalModeBleedThrough);
   const showMinimalInlineLoading = !showUiDetails && showLoadingIndicator;
@@ -185,6 +184,35 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           alignItems={isNarrow ? 'flex-start' : 'center'}
           justifyContent={isNarrow ? 'flex-start' : 'space-between'}
         >
+          <Box
+            marginLeft={1}
+            marginRight={isNarrow ? 0 : 1}
+            flexDirection="row"
+            alignItems={isNarrow ? 'flex-start' : 'center'}
+            flexGrow={1}
+          >
+            {showUiDetails && showLoadingIndicator && (
+              <LoadingIndicator
+                inline
+                thought={
+                  uiState.streamingState ===
+                    StreamingState.WaitingForConfirmation ||
+                  config.getAccessibility()?.enableLoadingPhrases === false
+                    ? undefined
+                    : uiState.thought
+                }
+                currentLoadingPhrase={
+                  config.getAccessibility()?.enableLoadingPhrases === false
+                    ? undefined
+                    : uiState.currentLoadingPhrase
+                }
+                thoughtLabel={
+                  inlineThinkingMode === 'full' ? 'Thinking ...' : undefined
+                }
+                elapsedTime={uiState.elapsedTime}
+              />
+            )}
+          </Box>
           <Box
             marginTop={isNarrow ? 1 : 0}
             flexDirection="column"
@@ -275,29 +303,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           </Box>
         )}
         {showShortcutsHelp && <ShortcutsHelp />}
-        {showUiDetails && showLoadingIndicator && (
-          <Box marginLeft={1} marginBottom={1}>
-            <LoadingIndicator
-              inline
-              thought={
-                uiState.streamingState ===
-                  StreamingState.WaitingForConfirmation ||
-                config.getAccessibility()?.enableLoadingPhrases === false
-                  ? undefined
-                  : uiState.thought
-              }
-              currentLoadingPhrase={
-                config.getAccessibility()?.enableLoadingPhrases === false
-                  ? undefined
-                  : uiState.currentLoadingPhrase
-              }
-              thoughtLabel={
-                inlineThinkingMode === 'full' ? 'Thinking ...' : undefined
-              }
-              elapsedTime={uiState.elapsedTime}
-            />
-          </Box>
-        )}
         {showUiDetails && <HorizontalLine />}
         {showUiDetails && (
           <Box
