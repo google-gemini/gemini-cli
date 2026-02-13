@@ -13,9 +13,14 @@ import type {
   ToolResult,
   ToolCallConfirmationDetails,
   ToolInvocation,
-  ToolConfirmationOutcome,
 } from './tools.js';
-import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+  ToolConfirmationOutcome,
+  type PolicyUpdateOptions,
+} from './tools.js';
 import type { Config } from '../config/config.js';
 import { ACTIVATE_SKILL_TOOL_NAME } from './tool-names.js';
 import { ToolErrorType } from './tool-error.js';
@@ -53,6 +58,18 @@ class ActivateSkillToolInvocation extends BaseToolInvocation<
       return `"${skillName}": ${skill.description}`;
     }
     return `"${skillName}" (?) unknown skill`;
+  }
+
+  protected override getPolicyUpdateOptions(
+    outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    if (
+      outcome === ToolConfirmationOutcome.ProceedAlways ||
+      outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
+    ) {
+      return { skillName: this.params.name };
+    }
+    return undefined;
   }
 
   private async getOrFetchFolderStructure(

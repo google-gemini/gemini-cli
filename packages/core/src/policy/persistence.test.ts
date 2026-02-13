@@ -188,6 +188,43 @@ describe('createPolicyUpdater', () => {
     expect(writtenContent).toContain('priority = 200');
   });
 
+  it('should persist narrow policy for skill activation', async () => {
+    createPolicyUpdater(policyEngine, messageBus);
+
+    const userPoliciesDir = '/mock/user/policies';
+    vi.spyOn(Storage, 'getUserPoliciesDir').mockReturnValue(userPoliciesDir);
+    (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
+    (fs.readFile as unknown as Mock).mockRejectedValue(
+      new Error('File not found'),
+    );
+    (fs.writeFile as unknown as Mock).mockResolvedValue(undefined);
+    (fs.rename as unknown as Mock).mockResolvedValue(undefined);
+
+    const toolName = 'activate_skill';
+    const skillName = 'test-skill';
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName,
+      persist: true,
+      skillName,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Verify in-memory rule
+    const rules = policyEngine.getRules();
+    const addedRule = rules.find((r) => r.toolName === toolName);
+    expect(addedRule).toBeDefined();
+    expect(addedRule?.argsPattern).toEqual(new RegExp(`"name":"test-skill"`));
+
+    // Verify file written
+    const writeCall = (fs.writeFile as unknown as Mock).mock.calls[0];
+    const writtenContent = writeCall[1] as string;
+    expect(writtenContent).toContain(`toolName = "activate_skill"`);
+    expect(writtenContent).toContain(`argsPattern = "\\"name\\":\\"test-skill\\""`);
+  });
+
   it('should escape special characters in toolName and mcpName', async () => {
     createPolicyUpdater(policyEngine, messageBus);
 
