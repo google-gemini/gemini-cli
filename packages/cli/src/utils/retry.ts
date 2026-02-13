@@ -18,6 +18,10 @@ async function retryWithBackoff<T>(
 ): Promise<T> {
   let lastError: Error | undefined;
 
+  if (maxRetries <= 0) {
+    throw new Error('maxRetries must be a positive number.');
+  }
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       return await operation();
@@ -56,7 +60,7 @@ export async function removeDirectoryWithRetry(
 ): Promise<void> {
   await retryWithBackoff(
     async () => {
-      await fs.promises.rm(path, { recursive: true, force: true, ...options });
+      await fs.promises.rm(path, { ...options, recursive: true, force: true });
     },
     5,
     100,
