@@ -86,13 +86,16 @@ Gemini CLI's built-in tools can be broadly categorized as follows:
   information across sessions.
 - **[Todo Tool](./todos.md) (`write_todos`):** For managing subtasks of complex
   requests.
+- **[Planning Tools](./planning.md):** For entering and exiting Plan Mode.
+- **[Ask User Tool](./ask-user.md) (`ask_user`):** For gathering user input and
+  making decisions.
 
 Additionally, these tools incorporate:
 
 - **[MCP servers](./mcp-server.md)**: MCP servers act as a bridge between the
   Gemini model and your local environment or other services like APIs.
-- **[Agent Skills](../cli/skills.md)**: (Experimental) On-demand expertise
-  packages that are activated via the `activate_skill` tool to provide
-  specialized guidance and resources.
+- **[Agent Skills](../cli/skills.md)**: On-demand expertise packages that are
+  activated via the `activate_skill` tool to provide specialized guidance and
+  resources.
 - **[Sandboxing](../cli/sandbox.md)**: Sandboxing isolates the model and its
   changes from your environment to reduce potential risk.

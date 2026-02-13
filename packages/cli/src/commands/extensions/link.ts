@@ -5,6 +5,7 @@
  */
 
 import type { CommandModule } from 'yargs';
+import chalk from 'chalk';
 import {
   debugLogger,
   type ExtensionInstallMetadata,
@@ -49,7 +50,9 @@ export async function handleLink(args: InstallArgs) {
     const extension =
       await extensionManager.installOrUpdateExtension(installMetadata);
     debugLogger.log(
-      `Extension "${extension.name}" linked successfully and enabled.`,
+      chalk.green(
+        `Extension "${extension.name}" linked successfully and enabled.`,
+      ),
     );
   } catch (error) {
     debugLogger.error(getErrorMessage(error));
@@ -76,7 +79,9 @@ export const linkCommand: CommandModule = {
       .check((_) => true),
   handler: async (argv) => {
     await handleLink({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       path: argv['path'] as string,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       consent: argv['consent'] as boolean | undefined,
     });
     await exitCli();

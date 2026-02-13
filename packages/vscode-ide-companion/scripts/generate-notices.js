@@ -72,6 +72,7 @@ async function getDependencyLicense(depName, depVersion) {
     if (licenseFile) {
       try {
         licenseContent = await fs.readFile(licenseFile, 'utf-8');
+        licenseContent = licenseContent.replace(/\r\n/g, '\n');
       } catch (e) {
         console.warn(
           `Warning: Failed to read license file for ${depName}: ${e.message}`,

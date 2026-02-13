@@ -54,18 +54,17 @@ export async function setupTerminalAndTheme(
   }
 
   config.setTerminalBackground(terminalBackground);
+  themeManager.setTerminalBackground(terminalBackground);
 
   if (terminalBackground !== undefined) {
     const currentTheme = themeManager.getActiveTheme();
-    if (currentTheme.type !== 'ansi' && currentTheme.type !== 'custom') {
+    if (!themeManager.isThemeCompatible(currentTheme, terminalBackground)) {
       const backgroundType =
         getThemeTypeFromBackgroundColor(terminalBackground);
-      if (backgroundType && currentTheme.type !== backgroundType) {
-        coreEvents.emitFeedback(
-          'warning',
-          `Theme '${currentTheme.name}' (${currentTheme.type}) might look incorrect on your ${backgroundType} terminal background. Type /theme to change theme.`,
-        );
-      }
+      coreEvents.emitFeedback(
+        'warning',
+        `Theme '${currentTheme.name}' (${currentTheme.type}) might look incorrect on your ${backgroundType} terminal background. Type /theme to change theme.`,
+      );
     }
   }
 

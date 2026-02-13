@@ -23,14 +23,16 @@ overview of Gemini CLI, see the [main documentation page](../index.md).
 
 ## Advanced features
 
+- **[Plan mode (experimental)](./plan-mode.md):** Use a safe, read-only mode for
+  planning complex changes.
 - **[Checkpointing](./checkpointing.md):** Automatically save and restore
   snapshots of your session and files.
 - **[Enterprise configuration](./enterprise.md):** Deploy and manage Gemini CLI
   in an enterprise environment.
 - **[Sandboxing](./sandbox.md):** Isolate tool execution in a secure,
   containerized environment.
-- **[Agent Skills](./skills.md):** (Experimental) Extend the CLI with
-  specialized expertise and procedural workflows.
+- **[Agent Skills](./skills.md):** Extend the CLI with specialized expertise and
+  procedural workflows.
 - **[Telemetry](./telemetry.md):** Configure observability to monitor usage and
   performance.
 - **[Token caching](./token-caching.md):** Optimize API costs by caching tokens.

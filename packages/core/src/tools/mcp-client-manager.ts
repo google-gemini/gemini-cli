@@ -27,6 +27,8 @@ import { debugLogger } from '../utils/debugLogger.js';
  */
 export class McpClientManager {
   private clients: Map<string, McpClient> = new Map();
+  // Track all configured servers (including disabled ones) for UI display
+  private allServerConfigs: Map<string, MCPServerConfig> = new Map();
   private readonly clientVersion: string;
   private readonly toolRegistry: ToolRegistry;
   private readonly cliConfig: Config;
@@ -70,9 +72,21 @@ export class McpClientManager {
   async stopExtension(extension: GeminiCLIExtension) {
     debugLogger.log(`Unloading extension: ${extension.name}`);
     await Promise.all(
-      Object.keys(extension.mcpServers ?? {}).map((name) =>
-        this.disconnectClient(name, true),
-      ),
+      Object.keys(extension.mcpServers ?? {}).map((name) => {
+        const config = this.allServerConfigs.get(name);
+        if (config?.extension?.id === extension.id) {
+          this.allServerConfigs.delete(name);
+          // Also remove from blocked servers if present
+          const index = this.blockedMcpServers.findIndex(
+            (s) => s.name === name && s.extensionName === extension.name,
+          );
+          if (index !== -1) {
+            this.blockedMcpServers.splice(index, 1);
+          }
+          return this.disconnectClient(name, true);
+        }
+        return Promise.resolve();
+      }),
     );
     await this.cliConfig.refreshMcpContext();
   }
@@ -97,24 +111,44 @@ export class McpClientManager {
     await this.cliConfig.refreshMcpContext();
   }
 
-  private isAllowedMcpServer(name: string) {
+  /**
+   * Check if server is blocked by admin settings (allowlist/excludelist).
+   * Returns true if blocked, false if allowed.
+   */
+  private isBlockedBySettings(name: string): boolean {
     const allowedNames = this.cliConfig.getAllowedMcpServers();
     if (
       allowedNames &&
       allowedNames.length > 0 &&
-      allowedNames.indexOf(name) === -1
+      !allowedNames.includes(name)
     ) {
-      return false;
+      return true;
     }
     const blockedNames = this.cliConfig.getBlockedMcpServers();
     if (
       blockedNames &&
       blockedNames.length > 0 &&
-      blockedNames.indexOf(name) !== -1
+      blockedNames.includes(name)
     ) {
-      return false;
+      return true;
     }
-    return true;
+    return false;
+  }
+
+  /**
+   * Check if server is disabled by user (session or file-based).
+   */
+  private async isDisabledByUser(name: string): Promise<boolean> {
+    const callbacks = this.cliConfig.getMcpEnablementCallbacks();
+    if (callbacks) {
+      if (callbacks.isSessionDisabled(name)) {
+        return true;
+      }
+      if (!(await callbacks.isFileEnabled(name))) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private async disconnectClient(name: string, skipRefresh = false) {
@@ -138,16 +172,28 @@ export class McpClientManager {
     }
   }
 
-  maybeDiscoverMcpServer(
+  async maybeDiscoverMcpServer(
     name: string,
     config: MCPServerConfig,
-  ): Promise<void> | void {
-    if (!this.isAllowedMcpServer(name)) {
+  ): Promise<void> {
+    // Always track server config for UI display
+    this.allServerConfigs.set(name, config);
+
+    // Check if blocked by admin settings (allowlist/excludelist)
+    if (this.isBlockedBySettings(name)) {
       if (!this.blockedMcpServers.find((s) => s.name === name)) {
         this.blockedMcpServers?.push({
           name,
           extensionName: config.extension?.name ?? '',
         });
+      }
+      return;
+    }
+    // User-disabled servers: disconnect if running, don't start
+    if (await this.isDisabledByUser(name)) {
+      const existing = this.clients.get(name);
+      if (existing) {
+        await this.disconnectClient(name);
       }
       return;
     }
@@ -245,6 +291,7 @@ export class McpClientManager {
         if (currentPromise === this.discoveryPromise) {
           this.discoveryPromise = undefined;
           this.discoveryState = MCPDiscoveryState.COMPLETED;
+          this.eventEmitter?.emit('mcp-client-update', this.clients);
         }
       })
       .catch(() => {}); // Prevents unhandled rejection from the .finally branch
@@ -273,33 +320,51 @@ export class McpClientManager {
       this.cliConfig.getMcpServerCommand(),
     );
 
+    if (Object.keys(servers).length === 0) {
+      this.discoveryState = MCPDiscoveryState.COMPLETED;
+      this.eventEmitter?.emit('mcp-client-update', this.clients);
+      return;
+    }
+
+    // Set state synchronously before any await yields control
+    if (!this.discoveryPromise) {
+      this.discoveryState = MCPDiscoveryState.IN_PROGRESS;
+    }
+
     this.eventEmitter?.emit('mcp-client-update', this.clients);
     await Promise.all(
       Object.entries(servers).map(([name, config]) =>
         this.maybeDiscoverMcpServer(name, config),
       ),
     );
+
+    // If every configured server was skipped (for example because all are
+    // disabled by user settings), no discovery promise is created. In that
+    // case we must still mark discovery complete or the UI will wait forever.
+    if (this.discoveryState === MCPDiscoveryState.IN_PROGRESS) {
+      this.discoveryState = MCPDiscoveryState.COMPLETED;
+      this.eventEmitter?.emit('mcp-client-update', this.clients);
+    }
+
     await this.cliConfig.refreshMcpContext();
   }
 
   /**
-   * Restarts all active MCP Clients.
+   * Restarts all MCP servers (including newly enabled ones).
    */
   async restart(): Promise<void> {
     await Promise.all(
-      Array.from(this.clients.keys()).map(async (name) => {
-        const client = this.clients.get(name);
-        if (!client) {
-          return;
-        }
-        try {
-          await this.maybeDiscoverMcpServer(name, client.getServerConfig());
-        } catch (error) {
-          debugLogger.error(
-            `Error restarting client '${name}': ${getErrorMessage(error)}`,
-          );
-        }
-      }),
+      Array.from(this.allServerConfigs.entries()).map(
+        async ([name, config]) => {
+          try {
+            await this.maybeDiscoverMcpServer(name, config);
+          } catch (error) {
+            debugLogger.error(
+              `Error restarting client '${name}': ${getErrorMessage(error)}`,
+            );
+          }
+        },
+      ),
     );
     await this.cliConfig.refreshMcpContext();
   }
@@ -308,11 +373,11 @@ export class McpClientManager {
    * Restart a single MCP server by name.
    */
   async restartServer(name: string) {
-    const client = this.clients.get(name);
-    if (!client) {
+    const config = this.allServerConfigs.get(name);
+    if (!config) {
       throw new Error(`No MCP server registered with the name "${name}"`);
     }
-    await this.maybeDiscoverMcpServer(name, client.getServerConfig());
+    await this.maybeDiscoverMcpServer(name, config);
     await this.cliConfig.refreshMcpContext();
   }
 
@@ -344,12 +409,12 @@ export class McpClientManager {
   }
 
   /**
-   * All of the MCP server configurations currently loaded.
+   * All of the MCP server configurations (including disabled ones).
    */
   getMcpServers(): Record<string, MCPServerConfig> {
     const mcpServers: Record<string, MCPServerConfig> = {};
-    for (const [name, client] of this.clients.entries()) {
-      mcpServers[name] = client.getServerConfig();
+    for (const [name, config] of this.allServerConfigs.entries()) {
+      mcpServers[name] = config;
     }
     return mcpServers;
   }

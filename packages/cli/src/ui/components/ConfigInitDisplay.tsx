@@ -5,19 +5,27 @@
  */
 
 import { useEffect, useState } from 'react';
-import { AppEvent, appEvents } from './../../utils/events.js';
 import { Box, Text } from 'ink';
-import { type McpClient, MCPServerStatus } from '@google/gemini-cli-core';
+import {
+  CoreEvent,
+  coreEvents,
+  type McpClient,
+  MCPServerStatus,
+} from '@google/gemini-cli-core';
 import { GeminiSpinner } from './GeminiRespondingSpinner.js';
 import { theme } from '../semantic-colors.js';
 
-export const ConfigInitDisplay = () => {
-  const [message, setMessage] = useState('Initializing...');
+export const ConfigInitDisplay = ({
+  message: initialMessage = 'Initializing...',
+}: {
+  message?: string;
+}) => {
+  const [message, setMessage] = useState(initialMessage);
 
   useEffect(() => {
     const onChange = (clients?: Map<string, McpClient>) => {
       if (!clients || clients.size === 0) {
-        setMessage(`Initializing...`);
+        setMessage(initialMessage);
         return;
       }
       let connected = 0;
@@ -35,21 +43,27 @@ export const ConfigInitDisplay = () => {
         const displayedServers = connecting.slice(0, maxDisplay).join(', ');
         const remaining = connecting.length - maxDisplay;
         const suffix = remaining > 0 ? `, +${remaining} more` : '';
+        const mcpMessage = `Connecting to MCP servers... (${connected}/${clients.size}) - Waiting for: ${displayedServers}${suffix}`;
         setMessage(
-          `Connecting to MCP servers... (${connected}/${clients.size}) - Waiting for: ${displayedServers}${suffix}`,
+          initialMessage && initialMessage !== 'Initializing...'
+            ? `${initialMessage} (${mcpMessage})`
+            : mcpMessage,
         );
       } else {
+        const mcpMessage = `Connecting to MCP servers... (${connected}/${clients.size})`;
         setMessage(
-          `Connecting to MCP servers... (${connected}/${clients.size})`,
+          initialMessage && initialMessage !== 'Initializing...'
+            ? `${initialMessage} (${mcpMessage})`
+            : mcpMessage,
         );
       }
     };
 
-    appEvents.on(AppEvent.McpClientUpdate, onChange);
+    coreEvents.on(CoreEvent.McpClientUpdate, onChange);
     return () => {
-      appEvents.off(AppEvent.McpClientUpdate, onChange);
+      coreEvents.off(CoreEvent.McpClientUpdate, onChange);
     };
-  }, []);
+  }, [initialMessage]);
 
   return (
     <Box marginTop={1}>

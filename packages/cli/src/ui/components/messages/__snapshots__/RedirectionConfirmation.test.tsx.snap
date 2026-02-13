@@ -5,7 +5,6 @@ exports[`ToolConfirmationMessage Redirection > should display redirection warnin
 
 Note: Command contains redirection which can be undesirable.
 Tip:  Toggle auto-edit (Shift+Tab) to allow redirection in the future.
-
 Allow execution of: 'echo, redirection (>)'?
 
 ● 1. Allow once

@@ -10,6 +10,7 @@ import { LoginWithGoogleRestartDialog } from './LoginWithGoogleRestartDialog.js'
 import { useKeypress } from '../hooks/useKeypress.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
 import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
+import { type Config } from '@google/gemini-cli-core';
 
 // Mocks
 vi.mock('../hooks/useKeypress.js', () => ({
@@ -29,6 +30,10 @@ describe('LoginWithGoogleRestartDialog', () => {
     .spyOn(process, 'exit')
     .mockImplementation(() => undefined as never);
 
+  const mockConfig = {
+    getRemoteAdminSettings: vi.fn(),
+  } as unknown as Config;
+
   beforeEach(() => {
     vi.clearAllMocks();
     exitSpy.mockClear();
@@ -37,13 +42,21 @@ describe('LoginWithGoogleRestartDialog', () => {
 
   it('renders correctly', () => {
     const { lastFrame } = render(
-      <LoginWithGoogleRestartDialog onDismiss={onDismiss} />,
+      <LoginWithGoogleRestartDialog
+        onDismiss={onDismiss}
+        config={mockConfig}
+      />,
     );
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('calls onDismiss when escape is pressed', () => {
-    render(<LoginWithGoogleRestartDialog onDismiss={onDismiss} />);
+    render(
+      <LoginWithGoogleRestartDialog
+        onDismiss={onDismiss}
+        config={mockConfig}
+      />,
+    );
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
     keypressHandler({
@@ -62,7 +75,12 @@ describe('LoginWithGoogleRestartDialog', () => {
     async (keyName) => {
       vi.useFakeTimers();
 
-      render(<LoginWithGoogleRestartDialog onDismiss={onDismiss} />);
+      render(
+        <LoginWithGoogleRestartDialog
+          onDismiss={onDismiss}
+          config={mockConfig}
+        />,
+      );
       const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
       keypressHandler({

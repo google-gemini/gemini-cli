@@ -53,6 +53,7 @@ export interface LoadCodeAssistResponse {
   allowedTiers?: GeminiUserTier[] | null;
   ineligibleTiers?: IneligibleTier[] | null;
   cloudaicompanionProject?: string | null;
+  paidTier?: GeminiUserTier | null;
 }
 
 /**
@@ -82,6 +83,11 @@ export interface IneligibleTier {
   reasonMessage: string;
   tierId: UserTierId;
   tierName: string;
+  validationErrorMessage?: string;
+  validationUrl?: string;
+  validationUrlLinkText?: string;
+  validationLearnMoreUrl?: string;
+  validationLearnMoreLinkText?: string;
 }
 
 /**
@@ -98,18 +104,23 @@ export enum IneligibleTierReasonCode {
   UNKNOWN = 'UNKNOWN',
   UNKNOWN_LOCATION = 'UNKNOWN_LOCATION',
   UNSUPPORTED_LOCATION = 'UNSUPPORTED_LOCATION',
+  VALIDATION_REQUIRED = 'VALIDATION_REQUIRED',
   // go/keep-sorted end
 }
 /**
  * UserTierId represents IDs returned from the Cloud Code Private API representing a user's tier
  *
- * //depot/google3/cloud/developer_experience/cloudcode/pa/service/usertier.go;l=16
+ * http://google3/cloud/developer_experience/codeassist/shared/usertier/tiers.go
+ * This is a subset of all available tiers. Since the source list is frequently updated,
+ * only add a tierId here if specific client-side handling is required.
  */
-export enum UserTierId {
-  FREE = 'free-tier',
-  LEGACY = 'legacy-tier',
-  STANDARD = 'standard-tier',
-}
+export const UserTierId = {
+  FREE: 'free-tier',
+  LEGACY: 'legacy-tier',
+  STANDARD: 'standard-tier',
+} as const;
+
+export type UserTierId = (typeof UserTierId)[keyof typeof UserTierId] | string;
 
 /**
  * PrivacyNotice reflects the structure received from the CodeAssist in regards to a tier
@@ -302,16 +313,46 @@ const ExtensionsSettingSchema = z.object({
 
 const CliFeatureSettingSchema = z.object({
   extensionsSetting: ExtensionsSettingSchema.optional(),
-  advancedFeaturesEnabled: z.boolean().optional(),
+  unmanagedCapabilitiesEnabled: z.boolean().optional(),
 });
+
+const McpServerConfigSchema = z.object({
+  url: z.string().optional(),
+  type: z.enum(['sse', 'http']).optional(),
+  trust: z.boolean().optional(),
+  includeTools: z.array(z.string()).optional(),
+  excludeTools: z.array(z.string()).optional(),
+});
+
+export const McpConfigDefinitionSchema = z.object({
+  mcpServers: z.record(McpServerConfigSchema).optional(),
+});
+
+export type McpConfigDefinition = z.infer<typeof McpConfigDefinitionSchema>;
 
 const McpSettingSchema = z.object({
   mcpEnabled: z.boolean().optional(),
-  overrideMcpConfigJson: z.string().optional(),
+  mcpConfigJson: z.string().optional(),
 });
 
+// Schema for internal application use (parsed mcpConfig)
+export const AdminControlsSettingsSchema = z.object({
+  strictModeDisabled: z.boolean().optional(),
+  mcpSetting: z
+    .object({
+      mcpEnabled: z.boolean().optional(),
+      mcpConfig: McpConfigDefinitionSchema.optional(),
+    })
+    .optional(),
+  cliFeatureSetting: CliFeatureSettingSchema.optional(),
+});
+
+export type AdminControlsSettings = z.infer<typeof AdminControlsSettingsSchema>;
+
 export const FetchAdminControlsResponseSchema = z.object({
+  // TODO: deprecate once backend stops sending this field
   secureModeEnabled: z.boolean().optional(),
+  strictModeDisabled: z.boolean().optional(),
   mcpSetting: McpSettingSchema.optional(),
   cliFeatureSetting: CliFeatureSettingSchema.optional(),
 });

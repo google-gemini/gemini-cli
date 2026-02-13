@@ -24,7 +24,11 @@ export type MouseEventName =
   | 'scroll-down'
   | 'scroll-left'
   | 'scroll-right'
-  | 'move';
+  | 'move'
+  | 'double-click';
+
+export const DOUBLE_CLICK_THRESHOLD_MS = 400;
+export const DOUBLE_CLICK_DISTANCE_TOLERANCE = 2;
 
 export interface MouseEvent {
   name: MouseEventName;

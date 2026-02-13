@@ -195,6 +195,7 @@ export function parseGoogleApiError(error: unknown): GoogleApiError | null {
     if (Array.isArray(errorDetails)) {
       for (const detail of errorDetails) {
         if (detail && typeof detail === 'object') {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const detailObj = detail as Record<string, unknown>;
           const typeKey = Object.keys(detailObj).find(
             (key) => key.trim() === '@type',
@@ -205,6 +206,7 @@ export function parseGoogleApiError(error: unknown): GoogleApiError | null {
               delete detailObj[typeKey];
             }
             // We can just cast it; the consumer will have to switch on @type
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             details.push(detailObj as unknown as GoogleApiErrorDetail);
           }
         }
@@ -253,6 +255,7 @@ function fromGaxiosError(errorObj: object): ErrorShape | undefined {
 
     if (typeof data === 'object' && data !== null) {
       if ('error' in data) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         outerError = (data as { error: ErrorShape }).error;
       }
     }
@@ -309,6 +312,7 @@ function fromApiError(errorObj: object): ErrorShape | undefined {
 
     if (typeof data === 'object' && data !== null) {
       if ('error' in data) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         outerError = (data as { error: ErrorShape }).error;
       }
     }

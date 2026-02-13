@@ -36,9 +36,17 @@ const mockFs = vi.hoisted(() => ({
   writeSync: vi.fn(),
   constants: { W_OK: 2 },
 }));
-vi.mock('node:fs', () => ({
-  default: mockFs,
-}));
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    default: {
+      ...actual,
+      ...mockFs,
+    },
+    ...mockFs,
+  };
+});
 
 // Mock process.platform for platform-specific tests
 const mockProcess = vi.hoisted(() => ({

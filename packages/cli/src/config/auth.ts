@@ -8,7 +8,7 @@ import { AuthType } from '@google/gemini-cli-core';
 import { loadEnvironment, loadSettings } from './settings.js';
 
 export function validateAuthMethod(authMethod: string): string | null {
-  loadEnvironment(loadSettings().merged);
+  loadEnvironment(loadSettings().merged, process.cwd());
   if (
     authMethod === AuthType.LOGIN_WITH_GOOGLE ||
     authMethod === AuthType.COMPUTE_ADC

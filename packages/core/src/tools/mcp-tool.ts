@@ -23,6 +23,12 @@ import { ToolErrorType } from './tool-error.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
+/**
+ * The separator used to qualify MCP tool names with their server prefix.
+ * e.g. "server_name__tool_name"
+ */
+export const MCP_QUALIFIED_NAME_SEPARATOR = '__';
+
 type ToolParams = Record<string, unknown>;
 
 // Discriminated union for MCP Content Blocks to ensure type safety.
@@ -82,7 +88,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     super(
       params,
       messageBus,
-      `${serverName}__${serverToolName}`,
+      `${serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${serverToolName}`,
       displayName,
       serverName,
     );
@@ -241,6 +247,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     override readonly parameterSchema: unknown,
     messageBus: MessageBus,
     readonly trust?: boolean,
+    readonly isReadOnly?: boolean,
     nameOverride?: string,
     private readonly cliConfig?: Config,
     override readonly extensionName?: string,
@@ -261,7 +268,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
   }
 
   getFullyQualifiedPrefix(): string {
-    return `${this.serverName}__`;
+    return `${this.serverName}${MCP_QUALIFIED_NAME_SEPARATOR}`;
   }
 
   getFullyQualifiedName(): string {
@@ -277,6 +284,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.parameterSchema,
       this.messageBus,
       this.trust,
+      this.isReadOnly,
       this.getFullyQualifiedName(),
       this.cliConfig,
       this.extensionName,
@@ -365,6 +373,7 @@ function transformResourceLinkBlock(block: McpResourceLinkBlock): Part {
  */
 function transformMcpContentToParts(sdkResponse: Part[]): Part[] {
   const funcResponse = sdkResponse?.[0]?.functionResponse;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const mcpContent = funcResponse?.response?.['content'] as McpContentBlock[];
   const toolName = funcResponse?.name || 'unknown tool';
 
@@ -402,6 +411,7 @@ function transformMcpContentToParts(sdkResponse: Part[]): Part[] {
  * @returns A formatted string representing the tool's output.
  */
 function getStringifiedResultForDisplay(rawResponse: Part[]): string {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const mcpContent = rawResponse?.[0]?.functionResponse?.response?.[
     'content'
   ] as McpContentBlock[];

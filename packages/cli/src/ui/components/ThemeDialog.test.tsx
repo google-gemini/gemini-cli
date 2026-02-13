@@ -8,51 +8,9 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ThemeDialog } from './ThemeDialog.js';
-import { LoadedSettings } from '../../config/settings.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import { DEFAULT_THEME, themeManager } from '../themes/theme-manager.js';
 import { act } from 'react';
-
-const createMockSettings = (
-  userSettings = {},
-  workspaceSettings = {},
-  systemSettings = {},
-): LoadedSettings =>
-  new LoadedSettings(
-    {
-      settings: { ui: { customThemes: {} }, ...systemSettings },
-      originalSettings: { ui: { customThemes: {} }, ...systemSettings },
-      path: '/system/settings.json',
-    },
-    {
-      settings: {},
-      originalSettings: {},
-      path: '/system/system-defaults.json',
-    },
-    {
-      settings: {
-        ui: { customThemes: {} },
-        ...userSettings,
-      },
-      originalSettings: {
-        ui: { customThemes: {} },
-        ...userSettings,
-      },
-      path: '/user/settings.json',
-    },
-    {
-      settings: {
-        ui: { customThemes: {} },
-        ...workspaceSettings,
-      },
-      originalSettings: {
-        ui: { customThemes: {} },
-        ...workspaceSettings,
-      },
-      path: '/workspace/settings.json',
-    },
-    true,
-    [],
-  );
 
 describe('ThemeDialog Snapshots', () => {
   const baseProps = {

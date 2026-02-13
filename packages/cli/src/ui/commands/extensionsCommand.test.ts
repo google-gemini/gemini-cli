@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { type ReactElement } from 'react';
+
 import type {
   ExtensionLoader,
   GeminiCLIExtension,
@@ -15,7 +17,12 @@ import {
   completeExtensionsAndScopes,
   extensionsCommand,
 } from './extensionsCommand.js';
+import {
+  ConfigExtensionDialog,
+  type ConfigExtensionDialogProps,
+} from '../components/ConfigExtensionDialog.js';
 import { type CommandContext, type SlashCommand } from './types.js';
+
 import {
   describe,
   it,
@@ -51,6 +58,20 @@ vi.mock('open', () => ({
 
 vi.mock('node:fs/promises', () => ({
   stat: vi.fn(),
+}));
+
+vi.mock('../../config/extensions/extensionSettings.js', () => ({
+  ExtensionSettingScope: {
+    USER: 'user',
+    WORKSPACE: 'workspace',
+  },
+  getScopedEnvContents: vi.fn().mockResolvedValue({}),
+  promptForSetting: vi.fn(),
+  updateSetting: vi.fn(),
+}));
+
+vi.mock('prompts', () => ({
+  default: vi.fn(),
 }));
 
 vi.mock('../../config/extensions/update.js', () => ({
@@ -107,28 +128,41 @@ const allExt: GeminiCLIExtension = {
 describe('extensionsCommand', () => {
   let mockContext: CommandContext;
   const mockDispatchExtensionState = vi.fn();
+  let mockExtensionLoader: unknown;
+  let mockReloadSkills: MockedFunction<() => Promise<void>>;
+  let mockReloadAgents: MockedFunction<() => Promise<void>>;
 
   beforeEach(() => {
     vi.resetAllMocks();
 
+    mockExtensionLoader = Object.create(ExtensionManager.prototype);
+    Object.assign(mockExtensionLoader as object, {
+      enableExtension: mockEnableExtension,
+      disableExtension: mockDisableExtension,
+      installOrUpdateExtension: mockInstallExtension,
+      uninstallExtension: mockUninstallExtension,
+      getExtensions: mockGetExtensions,
+      loadExtensionConfig: vi.fn().mockResolvedValue({
+        name: 'test-ext',
+        settings: [{ name: 'setting1', envVar: 'SETTING1' }],
+      }),
+    });
+
     mockGetExtensions.mockReturnValue([inactiveExt, activeExt, allExt]);
     vi.mocked(open).mockClear();
+    mockReloadAgents = vi.fn().mockResolvedValue(undefined);
+    mockReloadSkills = vi.fn().mockResolvedValue(undefined);
+
     mockContext = createMockCommandContext({
       services: {
         config: {
           getExtensions: mockGetExtensions,
-          getExtensionLoader: vi.fn().mockImplementation(() => {
-            const actual = Object.create(ExtensionManager.prototype);
-            Object.assign(actual, {
-              enableExtension: mockEnableExtension,
-              disableExtension: mockDisableExtension,
-              installOrUpdateExtension: mockInstallExtension,
-              uninstallExtension: mockUninstallExtension,
-              getExtensions: mockGetExtensions,
-            });
-            return actual;
-          }),
+          getExtensionLoader: vi.fn().mockReturnValue(mockExtensionLoader),
           getWorkingDir: () => '/test/dir',
+          reloadSkills: mockReloadSkills,
+          getAgentRegistry: vi.fn().mockReturnValue({
+            reload: mockReloadAgents,
+          }),
         },
       },
       ui: {
@@ -867,6 +901,27 @@ describe('extensionsCommand', () => {
         type: 'RESTARTED',
         payload: { name: 'ext2' },
       });
+      expect(mockReloadSkills).toHaveBeenCalled();
+      expect(mockReloadAgents).toHaveBeenCalled();
+    });
+
+    it('handles errors during skill or agent reload', async () => {
+      const mockExtensions = [
+        { name: 'ext1', isActive: true },
+      ] as GeminiCLIExtension[];
+      mockGetExtensions.mockReturnValue(mockExtensions);
+      mockReloadSkills.mockRejectedValue(new Error('Failed to reload skills'));
+
+      await restartAction!(mockContext, '--all');
+
+      expect(mockRestartExtension).toHaveBeenCalledWith(mockExtensions[0]);
+      expect(mockReloadSkills).toHaveBeenCalled();
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Failed to reload skills or agents: Failed to reload skills',
+        }),
+      );
     });
 
     it('restarts only specified active extensions', async () => {
@@ -976,6 +1031,104 @@ describe('extensionsCommand', () => {
 
       const suggestions = completeExtensions(mockContext, 'ext');
       expect(suggestions).toEqual(['ext1']);
+    });
+  });
+
+  describe('config', () => {
+    let configAction: SlashCommand['action'];
+
+    beforeEach(async () => {
+      configAction = extensionsCommand(true).subCommands?.find(
+        (cmd) => cmd.name === 'config',
+      )?.action;
+
+      expect(configAction).not.toBeNull();
+      mockContext.invocation!.name = 'config';
+
+      const prompts = (await import('prompts')).default;
+      vi.mocked(prompts).mockResolvedValue({ overwrite: true });
+
+      const { getScopedEnvContents } = await import(
+        '../../config/extensions/extensionSettings.js'
+      );
+      vi.mocked(getScopedEnvContents).mockResolvedValue({});
+    });
+
+    it('should return dialog to configure all extensions if no args provided', async () => {
+      const result = await configAction!(mockContext, '');
+      if (result?.type !== 'custom_dialog') {
+        throw new Error('Expected custom_dialog');
+      }
+      const dialogResult = result;
+      const component =
+        dialogResult.component as ReactElement<ConfigExtensionDialogProps>;
+      expect(component.type).toBe(ConfigExtensionDialog);
+      expect(component.props.configureAll).toBe(true);
+      expect(component.props.extensionManager).toBeDefined();
+    });
+
+    it('should return dialog to configure specific extension', async () => {
+      const result = await configAction!(mockContext, 'ext-one');
+      if (result?.type !== 'custom_dialog') {
+        throw new Error('Expected custom_dialog');
+      }
+      const dialogResult = result;
+      const component =
+        dialogResult.component as ReactElement<ConfigExtensionDialogProps>;
+      expect(component.type).toBe(ConfigExtensionDialog);
+      expect(component.props.extensionName).toBe('ext-one');
+      expect(component.props.settingKey).toBeUndefined();
+      expect(component.props.configureAll).toBe(false);
+    });
+
+    it('should return dialog to configure specific setting for an extension', async () => {
+      const result = await configAction!(mockContext, 'ext-one SETTING1');
+      if (result?.type !== 'custom_dialog') {
+        throw new Error('Expected custom_dialog');
+      }
+      const dialogResult = result;
+      const component =
+        dialogResult.component as ReactElement<ConfigExtensionDialogProps>;
+      expect(component.type).toBe(ConfigExtensionDialog);
+      expect(component.props.extensionName).toBe('ext-one');
+      expect(component.props.settingKey).toBe('SETTING1');
+      expect(component.props.scope).toBe('user'); // Default scope
+    });
+
+    it('should respect scope argument passed to dialog', async () => {
+      const result = await configAction!(
+        mockContext,
+        'ext-one SETTING1 --scope=workspace',
+      );
+      if (result?.type !== 'custom_dialog') {
+        throw new Error('Expected custom_dialog');
+      }
+      const dialogResult = result;
+      const component =
+        dialogResult.component as ReactElement<ConfigExtensionDialogProps>;
+      expect(component.props.scope).toBe('workspace');
+    });
+
+    it('should show error for invalid extension name', async () => {
+      await configAction!(mockContext, '../invalid');
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.ERROR,
+        text: 'Invalid extension name. Names cannot contain path separators or "..".',
+      });
+    });
+
+    // "should inform if extension has no settings" - This check is now inside ConfigExtensionDialog logic.
+    // We can test that we still return a dialog, and the dialog will handle logical checks via utils.ts
+    // For unit testing extensionsCommand, we just ensure delegation.
+    it('should return dialog even if extension has no settings (dialog handles logic)', async () => {
+      const result = await configAction!(mockContext, 'ext-one');
+      if (result?.type !== 'custom_dialog') {
+        throw new Error('Expected custom_dialog');
+      }
+      const dialogResult = result;
+      const component =
+        dialogResult.component as ReactElement<ConfigExtensionDialogProps>;
+      expect(component.type).toBe(ConfigExtensionDialog);
     });
   });
 });

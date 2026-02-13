@@ -13,10 +13,14 @@ import type { CommandContext } from './types.js';
 import type { SubmitPromptActionReturn } from '@google/gemini-cli-core';
 
 // Mock the 'fs' module
-vi.mock('fs', () => ({
-  existsSync: vi.fn(),
-  writeFileSync: vi.fn(),
-}));
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    existsSync: vi.fn(),
+    writeFileSync: vi.fn(),
+  };
+});
 
 describe('initCommand', () => {
   let mockContext: CommandContext;

@@ -6,13 +6,13 @@
 
 import { z } from 'zod';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
-import { promptIdContext } from '../../utils/promptIdContext.js';
+import { getPromptIdWithFallback } from '../../utils/promptIdContext.js';
 import type {
   RoutingContext,
   RoutingDecision,
   RoutingStrategy,
 } from '../routingStrategy.js';
-import { resolveClassifierModel } from '../../config/models.js';
+import { resolveClassifierModel, isGemini3Model } from '../../config/models.js';
 import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
 import {
@@ -133,15 +133,15 @@ export class ClassifierStrategy implements RoutingStrategy {
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
     try {
-      let promptId = promptIdContext.getStore();
-      if (!promptId) {
-        promptId = `classifier-router-fallback-${Date.now()}-${Math.random()
-          .toString(16)
-          .slice(2)}`;
-        debugLogger.warn(
-          `Could not find promptId in context. This is unexpected. Using a fallback ID: ${promptId}`,
-        );
+      const model = context.requestedModel ?? config.getModel();
+      if (
+        (await config.getNumericalRoutingEnabled()) &&
+        isGemini3Model(model)
+      ) {
+        return null;
       }
+
+      const promptId = getPromptIdWithFallback('classifier-router');
 
       const historySlice = context.history.slice(-HISTORY_SEARCH_WINDOW);
 
@@ -168,9 +168,8 @@ export class ClassifierStrategy implements RoutingStrategy {
       const reasoning = routerResponse.reasoning;
       const latencyMs = Date.now() - startTime;
       const selectedModel = resolveClassifierModel(
-        context.requestedModel ?? config.getModel(),
+        model,
         routerResponse.model_choice,
-        config.getPreviewFeatures(),
       );
 
       return {

@@ -80,6 +80,7 @@ describe('useSelectionList', () => {
     initialIndex?: number;
     isFocused?: boolean;
     showNumbers?: boolean;
+    wrapAround?: boolean;
   }) => {
     let hookResult: ReturnType<typeof useSelectionList>;
     function TestComponent(props: typeof initialProps) {
@@ -283,6 +284,39 @@ describe('useSelectionList', () => {
       pressKey('down');
       expect(result.current.activeIndex).toBe(initialIndex);
       expect(mockOnHighlight).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Wrapping (wrapAround)', () => {
+    it('should wrap by default (wrapAround=true)', async () => {
+      const { result } = await renderSelectionListHook({
+        items,
+        initialIndex: items.length - 1,
+        onSelect: mockOnSelect,
+      });
+      expect(result.current.activeIndex).toBe(3);
+      pressKey('down');
+      expect(result.current.activeIndex).toBe(0);
+
+      pressKey('up');
+      expect(result.current.activeIndex).toBe(3);
+    });
+
+    it('should not wrap when wrapAround is false', async () => {
+      const { result } = await renderSelectionListHook({
+        items,
+        initialIndex: items.length - 1,
+        onSelect: mockOnSelect,
+        wrapAround: false,
+      });
+      expect(result.current.activeIndex).toBe(3);
+      pressKey('down');
+      expect(result.current.activeIndex).toBe(3); // Should stay at bottom
+
+      act(() => result.current.setActiveIndex(0));
+      expect(result.current.activeIndex).toBe(0);
+      pressKey('up');
+      expect(result.current.activeIndex).toBe(0); // Should stay at top
     });
   });
 

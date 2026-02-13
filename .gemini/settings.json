@@ -1,5 +1,8 @@
 {
   "experimental": {
-    "skills": true
+    "plan": true
+  },
+  "general": {
+    "devtools": true
   }
 }

@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -41,6 +41,7 @@ describe('useQuotaAndFallback', () => {
   let mockConfig: Config;
   let mockHistoryManager: UseHistoryManagerReturn;
   let mockSetModelSwitchedFromQuotaError: Mock;
+  let mockOnShowAuthSelection: Mock;
   let setFallbackHandlerSpy: SpyInstance;
   let mockGoogleApiError: GoogleApiError;
 
@@ -66,6 +67,7 @@ describe('useQuotaAndFallback', () => {
       loadHistory: vi.fn(),
     };
     mockSetModelSwitchedFromQuotaError = vi.fn();
+    mockOnShowAuthSelection = vi.fn();
 
     setFallbackHandlerSpy = vi.spyOn(mockConfig, 'setFallbackModelHandler');
     vi.spyOn(mockConfig, 'setQuotaErrorOccurred');
@@ -85,6 +87,7 @@ describe('useQuotaAndFallback', () => {
         historyManager: mockHistoryManager,
         userTier: UserTierId.FREE,
         setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+        onShowAuthSelection: mockOnShowAuthSelection,
       }),
     );
 
@@ -101,6 +104,7 @@ describe('useQuotaAndFallback', () => {
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
         }),
       );
       return setFallbackHandlerSpy.mock.calls[0][0] as FallbackModelHandler;
@@ -127,6 +131,7 @@ describe('useQuotaAndFallback', () => {
             historyManager: mockHistoryManager,
             userTier: UserTierId.FREE,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+            onShowAuthSelection: mockOnShowAuthSelection,
           }),
         );
 
@@ -152,7 +157,7 @@ describe('useQuotaAndFallback', () => {
         const message = request!.message;
         expect(message).toContain('Usage limit reached for gemini-pro.');
         expect(message).toContain('Access resets at'); // From getResetTimeMessage
-        expect(message).toContain('/stats for usage details');
+        expect(message).toContain('/stats model for usage details');
         expect(message).toContain('/auth to switch to API key.');
 
         expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
@@ -178,6 +183,7 @@ describe('useQuotaAndFallback', () => {
             historyManager: mockHistoryManager,
             userTier: UserTierId.FREE,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+            onShowAuthSelection: mockOnShowAuthSelection,
           }),
         );
 
@@ -243,6 +249,7 @@ describe('useQuotaAndFallback', () => {
               userTier: UserTierId.FREE,
               setModelSwitchedFromQuotaError:
                 mockSetModelSwitchedFromQuotaError,
+              onShowAuthSelection: mockOnShowAuthSelection,
             }),
           );
 
@@ -297,6 +304,7 @@ describe('useQuotaAndFallback', () => {
             historyManager: mockHistoryManager,
             userTier: UserTierId.FREE,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+            onShowAuthSelection: mockOnShowAuthSelection,
           }),
         );
 
@@ -320,8 +328,7 @@ describe('useQuotaAndFallback', () => {
         const message = request!.message;
         expect(message).toBe(
           `It seems like you don't have access to gemini-3-pro-preview.
-Learn more at https://goo.gle/enable-preview-features
-To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
+Your admin might have disabled the access. Contact them to enable the Preview Release Channel.`,
         );
 
         // Simulate the user choosing to switch
@@ -345,6 +352,7 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
         }),
       );
 
@@ -362,6 +370,7 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
         }),
       );
 
@@ -392,6 +401,7 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
         }),
       );
 
@@ -435,6 +445,7 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
         }),
       );
 
@@ -470,6 +481,7 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
         }),
       );
 
@@ -513,6 +525,7 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
         }),
       );
 
@@ -527,6 +540,7 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
         }),
       );
 
@@ -568,6 +582,7 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
         }),
       );
 
@@ -602,13 +617,14 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
       expect(result.current.validationRequest).toBeNull();
     });
 
-    it('should add info message when change_auth is chosen', async () => {
+    it('should call onShowAuthSelection when change_auth is chosen', async () => {
       const { result } = renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
         }),
       );
 
@@ -628,19 +644,17 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
       const intent = await promise!;
       expect(intent).toBe('change_auth');
 
-      expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);
-      const lastCall = (mockHistoryManager.addItem as Mock).mock.calls[0][0];
-      expect(lastCall.type).toBe(MessageType.INFO);
-      expect(lastCall.text).toBe('Use /auth to change authentication method.');
+      expect(mockOnShowAuthSelection).toHaveBeenCalledTimes(1);
     });
 
-    it('should not add info message when cancel is chosen', async () => {
+    it('should call onShowAuthSelection when cancel is chosen', async () => {
       const { result } = renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
         }),
       );
 
@@ -660,7 +674,7 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
       const intent = await promise!;
       expect(intent).toBe('cancel');
 
-      expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
+      expect(mockOnShowAuthSelection).toHaveBeenCalledTimes(1);
     });
 
     it('should do nothing if handleValidationChoice is called without pending request', () => {
@@ -670,6 +684,7 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
         }),
       );
 

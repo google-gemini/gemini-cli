@@ -49,6 +49,7 @@ export class CompositeStrategy implements TerminalStrategy {
       0,
       -1,
     ) as RoutingStrategy[];
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const terminalStrategy = this.strategies[
       this.strategies.length - 1
     ] as TerminalStrategy;

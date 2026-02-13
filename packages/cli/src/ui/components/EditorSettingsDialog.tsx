@@ -50,10 +50,13 @@ export function EditorSettingsDialog({
     (key) => {
       if (key.name === 'tab') {
         setFocusedSection((prev) => (prev === 'editor' ? 'scope' : 'editor'));
+        return true;
       }
       if (key.name === 'escape') {
         onExit();
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );
@@ -129,6 +132,7 @@ export function EditorSettingsDialog({
   ) {
     mergedEditorName =
       EDITOR_DISPLAY_NAMES[
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         settings.merged.general.preferredEditor as EditorType
       ];
   }

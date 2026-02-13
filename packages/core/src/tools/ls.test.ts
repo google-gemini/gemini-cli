@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import os from 'node:os';
 import { LSTool } from './ls.js';
 import type { Config } from '../config/config.js';
@@ -14,6 +15,7 @@ import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { ToolErrorType } from './tool-error.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 
 describe('LSTool', () => {
   let lsTool: LSTool;
@@ -29,6 +31,10 @@ describe('LSTool', () => {
       path.join(realTmp, 'ls-tool-secondary-'),
     );
 
+    const mockStorage = {
+      getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+    };
+
     mockConfig = {
       getTargetDir: () => tempRootDir,
       getWorkspaceContext: () =>
@@ -38,6 +44,25 @@ describe('LSTool', () => {
         respectGitIgnore: true,
         respectGeminiIgnore: true,
       }),
+      storage: mockStorage,
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
     } as unknown as Config;
 
     lsTool = new LSTool(mockConfig, createMockMessageBus());
@@ -70,7 +95,7 @@ describe('LSTool', () => {
 
     it('should reject paths outside workspace with clear error message', () => {
       expect(() => lsTool.build({ dir_path: '/etc/passwd' })).toThrow(
-        `Path must be within one of the workspace directories: ${tempRootDir}, ${tempSecondaryDir}`,
+        /Path not in workspace: Attempted path ".*" resolves outside the allowed workspace directories: .*/,
       );
     });
 
@@ -158,7 +183,10 @@ describe('LSTool', () => {
     it('should respect geminiignore patterns', async () => {
       await fs.writeFile(path.join(tempRootDir, 'file1.txt'), 'content1');
       await fs.writeFile(path.join(tempRootDir, 'file2.log'), 'content1');
-      await fs.writeFile(path.join(tempRootDir, '.geminiignore'), '*.log');
+      await fs.writeFile(
+        path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME),
+        '*.log',
+      );
       const invocation = lsTool.build({ dir_path: tempRootDir });
       const result = await invocation.execute(abortSignal);
 
@@ -297,7 +325,7 @@ describe('LSTool', () => {
     it('should reject paths outside all workspace directories', () => {
       const params = { dir_path: '/etc/passwd' };
       expect(() => lsTool.build(params)).toThrow(
-        'Path must be within one of the workspace directories',
+        /Path not in workspace: Attempted path ".*" resolves outside the allowed workspace directories: .*/,
       );
     });
 

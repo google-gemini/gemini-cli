@@ -52,7 +52,7 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
         const observer = new ResizeObserver((entries) => {
           const entry = entries[0];
           if (entry) {
-            setContentHeight(entry.contentRect.height);
+            setContentHeight(Math.round(entry.contentRect.height));
           }
         });
         observer.observe(node);
@@ -120,7 +120,12 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
           hidden ...
         </Text>
       )}
-      <Box flexDirection="column" overflow="hidden" flexGrow={1}>
+      <Box
+        flexDirection="column"
+        overflow="hidden"
+        flexGrow={0}
+        maxHeight={isOverflowing ? visibleContentHeight : undefined}
+      >
         <Box
           flexDirection="column"
           ref={onRefChange}

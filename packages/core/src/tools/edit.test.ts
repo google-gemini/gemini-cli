@@ -55,6 +55,7 @@ import {
   getMockMessageBusInstance,
 } from '../test-utils/mock-message-bus.js';
 import path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import { ApprovalMode } from '../policy/types.js';
@@ -122,6 +123,27 @@ describe('EditTool', () => {
       isInteractive: () => false,
       getDisableLLMCorrection: vi.fn(() => true),
       getExperiments: () => {},
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
     } as unknown as Config;
 
     (mockConfig.getApprovalMode as Mock).mockClear();
@@ -350,6 +372,43 @@ describe('EditTool', () => {
       expect(result.newContent).toBe(expectedContent);
       expect(result.occurrences).toBe(1);
     });
+
+    it('should NOT insert extra newlines when replacing a block preceded by a blank line (regression)', async () => {
+      const content = '\n  function oldFunc() {\n    // some code\n  }';
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.js',
+          instruction: 'test',
+          old_string: 'function  oldFunc() {\n    // some code\n  }', // Two spaces after function to trigger regex
+          new_string: 'function newFunc() {\n  // new code\n}', // Unindented
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      // The blank line at the start should be preserved as-is,
+      // and the discovered indentation (2 spaces) should be applied to each line.
+      const expectedContent = '\n  function newFunc() {\n    // new code\n  }';
+      expect(result.newContent).toBe(expectedContent);
+    });
+
+    it('should NOT insert extra newlines in flexible replacement when old_string starts with a blank line (regression)', async () => {
+      const content = '  // some comment\n\n  function oldFunc() {}';
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.js',
+          instruction: 'test',
+          old_string: '\nfunction oldFunc() {}',
+          new_string: '\n  function newFunc() {}', // Include desired indentation
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      // The blank line at the start is preserved, and the new block is inserted.
+      const expectedContent = '  // some comment\n\n  function newFunc() {}';
+      expect(result.newContent).toBe(expectedContent);
+    });
   });
 
   describe('validateToolParams', () => {
@@ -370,9 +429,7 @@ describe('EditTool', () => {
         old_string: 'old',
         new_string: 'new',
       };
-      expect(tool.validateToolParams(params)).toMatch(
-        /must be within one of the workspace directories/,
-      );
+      expect(tool.validateToolParams(params)).toMatch(/Path not in workspace/);
     });
   });
 

@@ -102,6 +102,7 @@ describe('Turn', () => {
         reqParts,
         'prompt-id-1',
         expect.any(AbortSignal),
+        undefined,
       );
 
       expect(events).toEqual([
@@ -167,7 +168,7 @@ describe('Turn', () => {
         }),
       );
       expect(event2.value.callId).toEqual(
-        expect.stringMatching(/^tool2-\d{13}-\w{10,}$/),
+        expect.stringMatching(/^tool2_\d{13}_\d+$/),
       );
       expect(turn.pendingToolCalls[1]).toEqual(event2.value);
       expect(turn.getDebugResponses().length).toBe(1);

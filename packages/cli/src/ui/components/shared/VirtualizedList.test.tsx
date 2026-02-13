@@ -16,6 +16,13 @@ import {
   useState,
 } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { UIState } from '../../contexts/UIStateContext.js';
+
+vi.mock('../../contexts/UIStateContext.js', () => ({
+  useUIState: vi.fn(() => ({
+    copyModeEnabled: false,
+  })),
+}));
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -323,5 +330,40 @@ describe('<VirtualizedList />', () => {
     });
 
     expect(ref.current?.getScrollState().scrollTop).toBe(4);
+  });
+
+  it('renders correctly in copyModeEnabled when scrolled', async () => {
+    const { useUIState } = await import('../../contexts/UIStateContext.js');
+    vi.mocked(useUIState).mockReturnValue({
+      copyModeEnabled: true,
+    } as Partial<UIState> as UIState);
+
+    const longData = Array.from({ length: 100 }, (_, i) => `Item ${i}`);
+    // Use copy mode
+    const { lastFrame } = render(
+      <Box height={10} width={100}>
+        <VirtualizedList
+          data={longData}
+          renderItem={({ item }) => (
+            <Box height={1}>
+              <Text>{item}</Text>
+            </Box>
+          )}
+          keyExtractor={(item) => item}
+          estimatedItemHeight={() => 1}
+          initialScrollIndex={50}
+        />
+      </Box>,
+    );
+    await act(async () => {
+      await delay(0);
+    });
+
+    // Item 50 should be visible
+    expect(lastFrame()).toContain('Item 50');
+    // And surrounding items
+    expect(lastFrame()).toContain('Item 59');
+    // But far away items should not be (ensures we are actually scrolled)
+    expect(lastFrame()).not.toContain('Item 0');
   });
 });

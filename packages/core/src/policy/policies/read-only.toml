@@ -31,7 +31,7 @@ decision = "allow"
 priority = 50
 
 [[rule]]
-toolName = "search_file_content"
+toolName = "grep_search"
 decision = "allow"
 priority = 50
 
@@ -47,10 +47,5 @@ priority = 50
 
 [[rule]]
 toolName = "google_web_search"
-decision = "allow"
-priority = 50
-
-[[rule]]
-toolName = "SubagentInvocation"
 decision = "allow"
 priority = 50

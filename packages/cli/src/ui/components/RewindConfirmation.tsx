@@ -62,7 +62,9 @@ export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
     (key) => {
       if (keyMatchers[Command.ESCAPE](key)) {
         onConfirm(RewindOutcome.Cancel);
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );

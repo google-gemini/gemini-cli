@@ -45,7 +45,7 @@ The process for contributing code is as follows:
     `🔒Maintainers only`, this means it is reserved for project maintainers. We
     will not accept pull requests related to these issues. In the near future,
     we will explicitly mark issues looking for contributions using the
-    `help  wanted` label. If you believe an issue is a good candidate for
+    `help-wanted` label. If you believe an issue is a good candidate for
     community contribution, please leave a comment on the issue. A maintainer
     will review it and apply the `help-wanted` label if appropriate. Only
     maintainers should attempt to add the `help-wanted` label to an issue.
@@ -408,12 +408,13 @@ On macOS, `gemini` uses Seatbelt (`sandbox-exec`) under a `permissive-open`
 profile (see `packages/cli/src/utils/sandbox-macos-permissive-open.sb`) that
 restricts writes to the project folder but otherwise allows all other operations
 and outbound network traffic ("open") by default. You can switch to a
-`restrictive-closed` profile (see
-`packages/cli/src/utils/sandbox-macos-restrictive-closed.sb`) that declines all
-operations and outbound network traffic ("closed") by default by setting
-`SEATBELT_PROFILE=restrictive-closed` in your environment or `.env` file.
-Available built-in profiles are `{permissive,restrictive}-{open,closed,proxied}`
-(see below for proxied networking). You can also switch to a custom profile
+`strict-open` profile (see
+`packages/cli/src/utils/sandbox-macos-strict-open.sb`) that restricts both reads
+and writes to the working directory while allowing outbound network traffic by
+setting `SEATBELT_PROFILE=strict-open` in your environment or `.env` file.
+Available built-in profiles are `permissive-{open,proxied}`,
+`restrictive-{open,proxied}`, and `strict-{open,proxied}` (see below for proxied
+networking). You can also switch to a custom profile
 `SEATBELT_PROFILE=<profile>` if you also create a file
 `.gemini/sandbox-macos-<profile>.sb` under your project settings directory
 `.gemini`.

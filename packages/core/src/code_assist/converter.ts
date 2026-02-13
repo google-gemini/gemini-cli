@@ -133,14 +133,18 @@ export function toGenerateContentRequest(
 export function fromGenerateContentResponse(
   res: CaGenerateContentResponse,
 ): GenerateContentResponse {
-  const inres = res.response;
   const out = new GenerateContentResponse();
-  out.candidates = inres.candidates;
+  out.responseId = res.traceId;
+  const inres = res.response;
+  if (!inres) {
+    out.candidates = [];
+    return out;
+  }
+  out.candidates = inres.candidates ?? [];
   out.automaticFunctionCallingHistory = inres.automaticFunctionCallingHistory;
   out.promptFeedback = inres.promptFeedback;
   out.usageMetadata = inres.usageMetadata;
   out.modelVersion = inres.modelVersion;
-  out.responseId = res.traceId;
   return out;
 }
 
@@ -204,6 +208,7 @@ function toContent(content: ContentUnion): Content {
   // it's a Part
   return {
     role: 'user',
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     parts: [toPart(content as Part)],
   };
 }

@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,7 +9,6 @@ import type {
   GeminiCLIExtension,
   MCPServerConfig,
   ThoughtSummary,
-  ToolCallConfirmationDetails,
   SerializableConfirmationDetails,
   ToolResultDisplay,
   RetrieveUserQuotaResponse,
@@ -64,10 +63,7 @@ export interface ToolCallEvent {
   name: string;
   args: Record<string, never>;
   resultDisplay: ToolResultDisplay | undefined;
-  confirmationDetails:
-    | ToolCallConfirmationDetails
-    | SerializableConfirmationDetails
-    | undefined;
+  confirmationDetails: SerializableConfirmationDetails | undefined;
   correlationId?: string;
 }
 
@@ -77,10 +73,7 @@ export interface IndividualToolCallDisplay {
   description: string;
   resultDisplay: ToolResultDisplay | undefined;
   status: ToolCallStatus;
-  confirmationDetails:
-    | ToolCallConfirmationDetails
-    | SerializableConfirmationDetails
-    | undefined;
+  confirmationDetails: SerializableConfirmationDetails | undefined;
   renderOutputAsMarkdown?: boolean;
   ptyId?: number;
   outputFile?: string;
@@ -145,6 +138,7 @@ export type HistoryItemAbout = HistoryItemBase & {
   gcpProject: string;
   ideClient: string;
   userEmail?: string;
+  tier?: string;
 };
 
 export type HistoryItemHelp = HistoryItemBase & {
@@ -152,13 +146,29 @@ export type HistoryItemHelp = HistoryItemBase & {
   timestamp: Date;
 };
 
-export type HistoryItemStats = HistoryItemBase & {
+export interface HistoryItemQuotaBase extends HistoryItemBase {
+  selectedAuthType?: string;
+  userEmail?: string;
+  tier?: string;
+  currentModel?: string;
+  pooledRemaining?: number;
+  pooledLimit?: number;
+  pooledResetTime?: string;
+}
+
+export interface QuotaStats {
+  remaining: number | undefined;
+  limit: number | undefined;
+  resetTime?: string;
+}
+
+export type HistoryItemStats = HistoryItemQuotaBase & {
   type: 'stats';
   duration: string;
   quotas?: RetrieveUserQuotaResponse;
 };
 
-export type HistoryItemModelStats = HistoryItemBase & {
+export type HistoryItemModelStats = HistoryItemQuotaBase & {
   type: 'model_stats';
 };
 
@@ -179,6 +189,8 @@ export type HistoryItemQuit = HistoryItemBase & {
 export type HistoryItemToolGroup = HistoryItemBase & {
   type: 'tool_group';
   tools: IndividualToolCallDisplay[];
+  borderTop?: boolean;
+  borderBottom?: boolean;
 };
 
 export type HistoryItemUserShell = HistoryItemBase & {
@@ -200,6 +212,11 @@ export interface ChatDetail {
   name: string;
   mtime: string;
 }
+
+export type HistoryItemThinking = HistoryItemBase & {
+  type: 'thinking';
+  thought: ThoughtSummary;
+};
 
 export type HistoryItemChatList = HistoryItemBase & {
   type: 'chat_list';
@@ -270,6 +287,14 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
     string,
     'authenticated' | 'expired' | 'unauthenticated' | 'not-configured'
   >;
+  enablementState: Record<
+    string,
+    {
+      enabled: boolean;
+      isSessionDisabled: boolean;
+      isPersistentDisabled: boolean;
+    }
+  >;
   blockedServers: Array<{ name: string; extensionName: string }>;
   discoveryInProgress: boolean;
   connectingServers: string[];
@@ -316,6 +341,7 @@ export type HistoryItemWithoutId =
   | HistoryItemAgentsList
   | HistoryItemMcpStatus
   | HistoryItemChatList
+  | HistoryItemThinking
   | HistoryItemHooksList;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
@@ -432,6 +458,11 @@ export interface ConfirmationRequest {
 
 export interface LoopDetectionConfirmationRequest {
   onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
+}
+
+export interface PermissionConfirmationRequest {
+  files: string[];
+  onComplete: (result: { allowed: boolean }) => void;
 }
 
 export interface ActiveHook {

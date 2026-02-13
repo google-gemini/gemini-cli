@@ -1,14 +1,12 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
-import {
-  renderWithProviders,
-  createMockSettings,
-} from '../../test-utils/render.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import { Footer } from './Footer.js';
 import { tildeifyPath, ToolCallDecision } from '@google/gemini-cli-core';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
@@ -130,7 +128,70 @@ describe('<Footer />', () => {
       }),
     });
     expect(lastFrame()).toContain(defaultProps.model);
-    expect(lastFrame()).toMatch(/\(\d+% context left\)/);
+    expect(lastFrame()).toMatch(/\d+% context left/);
+  });
+
+  it('displays the usage indicator when usage is low', () => {
+    const { lastFrame } = renderWithProviders(<Footer />, {
+      width: 120,
+      uiState: {
+        sessionStats: mockSessionStats,
+        quota: {
+          userTier: undefined,
+          stats: {
+            remaining: 15,
+            limit: 100,
+            resetTime: undefined,
+          },
+          proQuotaRequest: null,
+          validationRequest: null,
+        },
+      },
+    });
+    expect(lastFrame()).toContain('15%');
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('hides the usage indicator when usage is not near limit', () => {
+    const { lastFrame } = renderWithProviders(<Footer />, {
+      width: 120,
+      uiState: {
+        sessionStats: mockSessionStats,
+        quota: {
+          userTier: undefined,
+          stats: {
+            remaining: 85,
+            limit: 100,
+            resetTime: undefined,
+          },
+          proQuotaRequest: null,
+          validationRequest: null,
+        },
+      },
+    });
+    expect(lastFrame()).not.toContain('Usage remaining');
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('displays "Limit reached" message when remaining is 0', () => {
+    const { lastFrame } = renderWithProviders(<Footer />, {
+      width: 120,
+      uiState: {
+        sessionStats: mockSessionStats,
+        quota: {
+          userTier: undefined,
+          stats: {
+            remaining: 0,
+            limit: 100,
+            resetTime: undefined,
+          },
+          proQuotaRequest: null,
+          validationRequest: null,
+        },
+      },
+    });
+    expect(lastFrame()).toContain('Limit reached');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('displays the model name and abbreviated context percentage', () => {
@@ -146,7 +207,7 @@ describe('<Footer />', () => {
       }),
     });
     expect(lastFrame()).toContain(defaultProps.model);
-    expect(lastFrame()).toMatch(/\(\d+%\)/);
+    expect(lastFrame()).toMatch(/\d+%/);
   });
 
   describe('sandbox and trust info', () => {
@@ -291,9 +352,8 @@ describe('<Footer />', () => {
         }),
       });
       expect(lastFrame()).toContain(defaultProps.model);
-      expect(lastFrame()).not.toMatch(/\(\d+% context left\)/);
+      expect(lastFrame()).not.toMatch(/\d+% context left/);
     });
-
     it('shows the context percentage when hideContextPercentage is false', () => {
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 120,
@@ -307,9 +367,8 @@ describe('<Footer />', () => {
         }),
       });
       expect(lastFrame()).toContain(defaultProps.model);
-      expect(lastFrame()).toMatch(/\(\d+% context left\)/);
+      expect(lastFrame()).toMatch(/\d+% context left/);
     });
-
     it('renders complete footer in narrow terminal (baseline narrow)', () => {
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 79,

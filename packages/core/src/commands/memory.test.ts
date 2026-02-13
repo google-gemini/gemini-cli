@@ -121,7 +121,7 @@ describe('memory commands', () => {
   describe('refreshMemory', () => {
     it('should refresh memory and show success message', async () => {
       mockRefresh.mockResolvedValue({
-        memoryContent: 'refreshed content',
+        memoryContent: { project: 'refreshed content' },
         fileCount: 2,
         filePaths: [],
       });
@@ -136,14 +136,14 @@ describe('memory commands', () => {
       if (result.type === 'message') {
         expect(result.messageType).toBe('info');
         expect(result.content).toBe(
-          'Memory refreshed successfully. Loaded 17 characters from 2 file(s).',
+          'Memory refreshed successfully. Loaded 33 characters from 2 file(s).',
         );
       }
     });
 
     it('should show a message if no memory content is found after refresh', async () => {
       mockRefresh.mockResolvedValue({
-        memoryContent: '',
+        memoryContent: { project: '' },
         fileCount: 0,
         filePaths: [],
       });

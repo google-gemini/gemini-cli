@@ -18,7 +18,11 @@ import type {
 } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
 import { createUserContent, FinishReason } from '@google/genai';
-import { retryWithBackoff, isRetryableError } from '../utils/retry.js';
+import {
+  retryWithBackoff,
+  isRetryableError,
+  DEFAULT_MAX_ATTEMPTS,
+} from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import type { Config } from '../config/config.js';
 import {
@@ -243,6 +247,7 @@ export class GeminiChat {
     private tools: Tool[] = [],
     private history: Content[] = [],
     resumedSessionData?: ResumedSessionData,
+    private readonly onModelChanged?: (modelId: string) => Promise<Tool[]>,
   ) {
     validateHistory(history);
     this.chatRecordingService = new ChatRecordingService(config);
@@ -268,6 +273,7 @@ export class GeminiChat {
    * @param message - The list of messages to send.
    * @param prompt_id - The ID of the prompt.
    * @param signal - An abort signal for this message.
+   * @param displayContent - An optional user-friendly version of the message to record.
    * @return The model's response.
    *
    * @example
@@ -286,6 +292,7 @@ export class GeminiChat {
     message: PartListUnion,
     prompt_id: string,
     signal: AbortSignal,
+    displayContent?: PartListUnion,
   ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
 
@@ -302,12 +309,25 @@ export class GeminiChat {
     // Record user input - capture complete message with all parts (text, files, images, etc.)
     // but skip recording function responses (tool call results) as they should be stored in tool call records
     if (!isFunctionResponse(userContent)) {
-      const userMessage = Array.isArray(message) ? message : [message];
-      const userMessageContent = partListUnionToString(toParts(userMessage));
+      const userMessageParts = userContent.parts || [];
+      const userMessageContent = partListUnionToString(userMessageParts);
+
+      let finalDisplayContent: Part[] | undefined = undefined;
+      if (displayContent !== undefined) {
+        const displayParts = toParts(
+          Array.isArray(displayContent) ? displayContent : [displayContent],
+        );
+        const displayContentString = partListUnionToString(displayParts);
+        if (displayContentString !== userMessageContent) {
+          finalDisplayContent = displayParts;
+        }
+      }
+
       this.chatRecordingService.recordMessage({
         model,
         type: 'user',
-        content: userMessageContent,
+        content: userMessageParts,
+        displayContent: finalDisplayContent,
       });
     }
 
@@ -375,15 +395,22 @@ export class GeminiChat {
               return; // Stop the generator
             }
 
-            if (isConnectionPhase) {
-              throw error;
-            }
-            lastError = error;
-            const isContentError = error instanceof InvalidStreamError;
+            // Check if the error is retryable (e.g., transient SSL errors
+            // like ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC)
             const isRetryable = isRetryableError(
               error,
               this.config.getRetryFetchErrors(),
             );
+
+            // For connection phase errors, only retryable errors should continue
+            if (isConnectionPhase) {
+              if (!isRetryable || signal.aborted) {
+                throw error;
+              }
+              // Fall through to retry logic for retryable connection errors
+            }
+            lastError = error;
+            const isContentError = error instanceof InvalidStreamError;
 
             if (
               (isContentError && isGemini2Model(model)) ||
@@ -466,18 +493,12 @@ export class GeminiChat {
 
     const apiCall = async () => {
       // Default to the last used model (which respects arguments/availability selection)
-      let modelToUse = resolveModel(
-        lastModelToUse,
-        this.config.getPreviewFeatures(),
-      );
+      let modelToUse = resolveModel(lastModelToUse);
 
       // If the active model has changed (e.g. due to a fallback updating the config),
       // we switch to the new active model.
       if (this.config.getActiveModel() !== initialActiveModel) {
-        modelToUse = resolveModel(
-          this.config.getActiveModel(),
-          this.config.getPreviewFeatures(),
-        );
+        modelToUse = resolveModel(this.config.getActiveModel());
       }
 
       if (modelToUse !== lastModelToUse) {
@@ -539,6 +560,7 @@ export class GeminiChat {
           beforeModelResult.modifiedContents &&
           Array.isArray(beforeModelResult.modifiedContents)
         ) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           contentsToUse = beforeModelResult.modifiedContents as Content[];
         }
 
@@ -556,8 +578,13 @@ export class GeminiChat {
           toolSelectionResult.tools &&
           Array.isArray(toolSelectionResult.tools)
         ) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           config.tools = toolSelectionResult.tools as Tool[];
         }
+      }
+
+      if (this.onModelChanged) {
+        this.tools = await this.onModelChanged(modelToUse);
       }
 
       // Track final request parameters for AfterModel hooks
@@ -606,7 +633,7 @@ export class GeminiChat {
       onRetry: (attempt, error, delayMs) => {
         coreEvents.emitRetryAttempt({
           attempt,
-          maxAttempts: availabilityMaxAttempts ?? 10,
+          maxAttempts: availabilityMaxAttempts ?? DEFAULT_MAX_ATTEMPTS,
           delayMs,
           error: error instanceof Error ? error.message : String(error),
           model: lastModelToUse,
@@ -679,6 +706,7 @@ export class GeminiChat {
     this.lastPromptTokenCount = estimateTokenCountSync(
       this.history.flatMap((c) => c.parts || []),
     );
+    this.chatRecordingService.updateMessagesFromHistory(history);
   }
 
   stripThoughtsFromHistory(): void {
@@ -794,6 +822,7 @@ export class GeminiChat {
         (candidate) => candidate.finishReason,
       );
       if (candidateWithReason) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         finishReason = candidateWithReason.finishReason as FinishReason;
       }
 

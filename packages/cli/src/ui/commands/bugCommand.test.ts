@@ -11,7 +11,7 @@ import { bugCommand } from './bugCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { getVersion } from '@google/gemini-cli-core';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
-import { formatMemoryUsage } from '../utils/formatters.js';
+import { formatBytes } from '../utils/formatters.js';
 
 // Mock dependencies
 vi.mock('open');
@@ -68,7 +68,7 @@ vi.mock('../utils/terminalCapabilityManager.js', () => ({
 describe('bugCommand', () => {
   beforeEach(() => {
     vi.mocked(getVersion).mockResolvedValue('0.1.0');
-    vi.mocked(formatMemoryUsage).mockReturnValue('100 MB');
+    vi.mocked(formatBytes).mockReturnValue('100 MB');
     vi.stubEnv('SANDBOX', 'gemini-test');
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-01-01T00:00:00Z'));
@@ -92,6 +92,7 @@ describe('bugCommand', () => {
               getHistory: () => [],
             }),
           }),
+          getContentGeneratorConfig: () => ({ authType: 'oauth-personal' }),
         },
       },
     });
@@ -106,6 +107,7 @@ describe('bugCommand', () => {
 * **Operating System:** test-platform v20.0.0
 * **Sandbox Environment:** test
 * **Model Version:** gemini-pro
+* **Auth Type:** oauth-personal
 * **Memory Usage:** 100 MB
 * **Terminal Name:** Test Terminal
 * **Terminal Background:** #000000
@@ -133,6 +135,7 @@ describe('bugCommand', () => {
               getHistory: () => history,
             }),
           }),
+          getContentGeneratorConfig: () => ({ authType: 'vertex-ai' }),
           storage: {
             getProjectTempDir: () => '/tmp/gemini',
           },
@@ -178,6 +181,7 @@ describe('bugCommand', () => {
               getHistory: () => [],
             }),
           }),
+          getContentGeneratorConfig: () => ({ authType: 'vertex-ai' }),
         },
       },
     });
@@ -192,6 +196,7 @@ describe('bugCommand', () => {
 * **Operating System:** test-platform v20.0.0
 * **Sandbox Environment:** test
 * **Model Version:** gemini-pro
+* **Auth Type:** vertex-ai
 * **Memory Usage:** 100 MB
 * **Terminal Name:** Test Terminal
 * **Terminal Background:** #000000

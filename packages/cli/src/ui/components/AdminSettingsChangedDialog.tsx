@@ -17,7 +17,9 @@ export const AdminSettingsChangedDialog = () => {
     (key) => {
       if (keyMatchers[Command.RESTART_APP](key)) {
         handleRestart();
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );

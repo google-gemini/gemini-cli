@@ -96,6 +96,7 @@ export class Logger {
         await this._backupCorruptedLogFile('malformed_array');
         return [];
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return parsedLogs.filter(
         (entry) =>
           typeof entry.sessionId === 'string' &&
@@ -105,6 +106,7 @@ export class Logger {
           typeof entry.message === 'string',
       ) as LogEntry[];
     } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const nodeError = error as NodeJS.ErrnoException;
       if (nodeError.code === 'ENOENT') {
         return [];
@@ -141,6 +143,7 @@ export class Logger {
       return;
     }
 
+    await this.storage.initialize();
     this.geminiDir = this.storage.getProjectTempDir();
     this.logFilePath = path.join(this.geminiDir, LOG_FILE_NAME);
 
@@ -297,6 +300,7 @@ export class Logger {
       await fs.access(newPath);
       return newPath; // Found it, use the new path.
     } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const nodeError = error as NodeJS.ErrnoException;
       if (nodeError.code !== 'ENOENT') {
         throw error; // A real error occurred, rethrow it.
@@ -310,6 +314,7 @@ export class Logger {
       await fs.access(oldPath);
       return oldPath; // Found it, use the old path.
     } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const nodeError = error as NodeJS.ErrnoException;
       if (nodeError.code !== 'ENOENT') {
         throw error; // A real error occurred, rethrow it.
@@ -351,6 +356,7 @@ export class Logger {
 
       // Handle legacy format (just an array of Content)
       if (Array.isArray(parsedContent)) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         return { history: parsedContent as Content[] };
       }
 
@@ -359,6 +365,7 @@ export class Logger {
         parsedContent !== null &&
         'history' in parsedContent
       ) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         return parsedContent as Checkpoint;
       }
 
@@ -367,6 +374,7 @@ export class Logger {
       );
       return { history: [] };
     } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const nodeError = error as NodeJS.ErrnoException;
       if (nodeError.code === 'ENOENT') {
         // This is okay, it just means the checkpoint doesn't exist in either format.
@@ -396,6 +404,7 @@ export class Logger {
       await fs.unlink(newPath);
       deletedSomething = true;
     } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const nodeError = error as NodeJS.ErrnoException;
       if (nodeError.code !== 'ENOENT') {
         debugLogger.error(
@@ -414,6 +423,7 @@ export class Logger {
         await fs.unlink(oldPath);
         deletedSomething = true;
       } catch (error) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const nodeError = error as NodeJS.ErrnoException;
         if (nodeError.code !== 'ENOENT') {
           debugLogger.error(
@@ -443,6 +453,7 @@ export class Logger {
       await fs.access(filePath);
       return true;
     } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const nodeError = error as NodeJS.ErrnoException;
       if (nodeError.code === 'ENOENT') {
         return false; // It truly doesn't exist in either format.

@@ -162,8 +162,11 @@ export async function start_sandbox(
             process.kill(-proxyProcess.pid, 'SIGTERM');
           }
         };
+        process.off('exit', stopProxy);
         process.on('exit', stopProxy);
+        process.off('SIGINT', stopProxy);
         process.on('SIGINT', stopProxy);
+        process.off('SIGTERM', stopProxy);
         process.on('SIGTERM', stopProxy);
 
         // commented out as it disrupts ink rendering
@@ -460,6 +463,20 @@ export async function start_sandbox(
       args.push('--env', `GOOGLE_API_KEY=${process.env['GOOGLE_API_KEY']}`);
     }
 
+    // copy GOOGLE_GEMINI_BASE_URL and GOOGLE_VERTEX_BASE_URL
+    if (process.env['GOOGLE_GEMINI_BASE_URL']) {
+      args.push(
+        '--env',
+        `GOOGLE_GEMINI_BASE_URL=${process.env['GOOGLE_GEMINI_BASE_URL']}`,
+      );
+    }
+    if (process.env['GOOGLE_VERTEX_BASE_URL']) {
+      args.push(
+        '--env',
+        `GOOGLE_VERTEX_BASE_URL=${process.env['GOOGLE_VERTEX_BASE_URL']}`,
+      );
+    }
+
     // copy GOOGLE_GENAI_USE_VERTEXAI
     if (process.env['GOOGLE_GENAI_USE_VERTEXAI']) {
       args.push(
@@ -645,8 +662,11 @@ export async function start_sandbox(
         debugLogger.log('stopping proxy container ...');
         execSync(`${config.command} rm -f ${SANDBOX_PROXY_NAME}`);
       };
+      process.off('exit', stopProxy);
       process.on('exit', stopProxy);
+      process.off('SIGINT', stopProxy);
       process.on('SIGINT', stopProxy);
+      process.off('SIGTERM', stopProxy);
       process.on('SIGTERM', stopProxy);
 
       // commented out as it disrupts ink rendering

@@ -123,10 +123,15 @@ export class ToolExecutor {
           } else if (toolResult.error === undefined) {
             return await this.createSuccessResult(call, toolResult);
           } else {
+            const displayText =
+              typeof toolResult.returnDisplay === 'string'
+                ? toolResult.returnDisplay
+                : undefined;
             return this.createErrorResult(
               call,
               new Error(toolResult.error.message),
               toolResult.error.type,
+              displayText,
             );
           }
         } catch (executionError: unknown) {
@@ -199,26 +204,20 @@ export class ToolExecutor {
     const toolName = call.request.name;
     const callId = call.request.callId;
 
-    if (
-      typeof content === 'string' &&
-      toolName === SHELL_TOOL_NAME &&
-      this.config.getEnableToolOutputTruncation() &&
-      this.config.getTruncateToolOutputThreshold() > 0 &&
-      this.config.getTruncateToolOutputLines() > 0
-    ) {
-      const originalContentLength = content.length;
+    if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
       const threshold = this.config.getTruncateToolOutputThreshold();
-      const lines = this.config.getTruncateToolOutputLines();
 
-      if (content.length > threshold) {
+      if (threshold > 0 && content.length > threshold) {
+        const originalContentLength = content.length;
         const { outputFile: savedPath } = await saveTruncatedToolOutput(
           content,
           toolName,
           callId,
           this.config.storage.getProjectTempDir(),
+          this.config.getSessionId(),
         );
         outputFile = savedPath;
-        content = formatTruncatedToolOutput(content, outputFile, lines);
+        content = formatTruncatedToolOutput(content, outputFile, threshold);
 
         logToolOutputTruncated(
           this.config,
@@ -227,7 +226,6 @@ export class ToolExecutor {
             originalContentLength,
             truncatedContentLength: content.length,
             threshold,
-            lines,
           }),
         );
       }
@@ -248,6 +246,7 @@ export class ToolExecutor {
       errorType: undefined,
       outputFile,
       contentLength: typeof content === 'string' ? content.length : undefined,
+      data: toolResult.data,
     };
 
     const startTime = 'startTime' in call ? call.startTime : undefined;
@@ -271,8 +270,14 @@ export class ToolExecutor {
     call: ToolCall,
     error: Error,
     errorType?: ToolErrorType,
+    returnDisplay?: string,
   ): ErroredToolCall {
-    const response = this.createErrorResponse(call.request, error, errorType);
+    const response = this.createErrorResponse(
+      call.request,
+      error,
+      errorType,
+      returnDisplay,
+    );
     const startTime = 'startTime' in call ? call.startTime : undefined;
 
     return {
@@ -289,7 +294,9 @@ export class ToolExecutor {
     request: ToolCallRequestInfo,
     error: Error,
     errorType: ToolErrorType | undefined,
+    returnDisplay?: string,
   ): ToolCallResponseInfo {
+    const displayText = returnDisplay ?? error.message;
     return {
       callId: request.callId,
       error,
@@ -302,9 +309,9 @@ export class ToolExecutor {
           },
         },
       ],
-      resultDisplay: error.message,
+      resultDisplay: displayText,
       errorType,
-      contentLength: error.message.length,
+      contentLength: displayText.length,
     };
   }
 }

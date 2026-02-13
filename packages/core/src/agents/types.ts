@@ -13,6 +13,7 @@ import type { AnyDeclarativeTool } from '../tools/tools.js';
 import { type z } from 'zod';
 import type { ModelConfig } from '../services/modelConfigService.js';
 import type { AnySchema } from 'ajv';
+import type { A2AAuthConfig } from './auth-provider/types.js';
 
 /**
  * Describes the possible termination modes for an agent.
@@ -38,6 +39,16 @@ export interface OutputObject {
  * The default query string provided to an agent as input.
  */
 export const DEFAULT_QUERY_STRING = 'Get Started!';
+
+/**
+ * The default maximum number of conversational turns for an agent.
+ */
+export const DEFAULT_MAX_TURNS = 15;
+
+/**
+ * The default maximum execution time for an agent in minutes.
+ */
+export const DEFAULT_MAX_TIME_MINUTES = 5;
 
 /**
  * Represents the validated input parameters passed to an agent upon invocation.
@@ -74,6 +85,10 @@ export interface BaseAgentDefinition<
   experimental?: boolean;
   inputConfig: InputConfig;
   outputConfig?: OutputConfig<TOutput>;
+  metadata?: {
+    hash?: string;
+    filePath?: string;
+  };
 }
 
 export interface LocalAgentDefinition<
@@ -104,6 +119,12 @@ export interface RemoteAgentDefinition<
 > extends BaseAgentDefinition<TOutput> {
   kind: 'remote';
   agentCardUrl: string;
+  /**
+   * Optional authentication configuration for the remote agent.
+   * If not specified, the agent will try to use defaults based on the AgentCard's
+   * security requirements.
+   */
+  auth?: A2AAuthConfig;
 }
 
 export type AgentDefinition<TOutput extends z.ZodTypeAny = z.ZodUnknown> =
@@ -172,8 +193,14 @@ export interface OutputConfig<T extends z.ZodTypeAny> {
  * Configures the execution environment and constraints for the agent.
  */
 export interface RunConfig {
-  /** The maximum execution time for the agent in minutes. */
-  maxTimeMinutes: number;
-  /** The maximum number of conversational turns. */
+  /**
+   * The maximum execution time for the agent in minutes.
+   * If not specified, defaults to DEFAULT_MAX_TIME_MINUTES (5).
+   */
+  maxTimeMinutes?: number;
+  /**
+   * The maximum number of conversational turns.
+   * If not specified, defaults to DEFAULT_MAX_TURNS (15).
+   */
   maxTurns?: number;
 }

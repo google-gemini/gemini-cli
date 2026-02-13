@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import {
   GLOB_TOOL_NAME,
@@ -13,24 +13,39 @@ import {
   READ_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
+import { makeFakeConfig } from '../test-utils/config.js';
 
 describe('CodebaseInvestigatorAgent', () => {
-  it('should have the correct agent definition', () => {
-    expect(CodebaseInvestigatorAgent.name).toBe('codebase_investigator');
-    expect(CodebaseInvestigatorAgent.displayName).toBe(
-      'Codebase Investigator Agent',
+  const config = makeFakeConfig();
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const mockPlatform = (platform: string) => {
+    vi.stubGlobal(
+      'process',
+      Object.create(process, {
+        platform: {
+          get: () => platform,
+        },
+      }),
     );
-    expect(CodebaseInvestigatorAgent.description).toBeDefined();
+  };
+
+  it('should have the correct agent definition', () => {
+    const agent = CodebaseInvestigatorAgent(config);
+    expect(agent.name).toBe('codebase_investigator');
+    expect(agent.displayName).toBe('Codebase Investigator Agent');
+    expect(agent.description).toBeDefined();
     const inputSchema =
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      CodebaseInvestigatorAgent.inputConfig.inputSchema as any;
+      agent.inputConfig.inputSchema as any;
     expect(inputSchema.properties['objective']).toBeDefined();
     expect(inputSchema.required).toContain('objective');
-    expect(CodebaseInvestigatorAgent.outputConfig?.outputName).toBe('report');
-    expect(CodebaseInvestigatorAgent.modelConfig?.model).toBe(
-      DEFAULT_GEMINI_MODEL,
-    );
-    expect(CodebaseInvestigatorAgent.toolConfig?.tools).toEqual([
+    expect(agent.outputConfig?.outputName).toBe('report');
+    expect(agent.modelConfig?.model).toBe(DEFAULT_GEMINI_MODEL);
+    expect(agent.toolConfig?.tools).toEqual([
       LS_TOOL_NAME,
       READ_FILE_TOOL_NAME,
       GLOB_TOOL_NAME,
@@ -39,12 +54,27 @@ describe('CodebaseInvestigatorAgent', () => {
   });
 
   it('should process output to a formatted JSON string', () => {
+    const agent = CodebaseInvestigatorAgent(config);
     const report = {
       SummaryOfFindings: 'summary',
       ExplorationTrace: ['trace'],
       RelevantLocations: [],
     };
-    const processed = CodebaseInvestigatorAgent.processOutput?.(report);
+    const processed = agent.processOutput?.(report);
     expect(processed).toBe(JSON.stringify(report, null, 2));
+  });
+
+  it('should include Windows-specific list command in system prompt when on Windows', () => {
+    mockPlatform('win32');
+    const agent = CodebaseInvestigatorAgent(config);
+    expect(agent.promptConfig.systemPrompt).toContain(
+      '`dir /s` (CMD) or `Get-ChildItem -Recurse` (PowerShell)',
+    );
+  });
+
+  it('should include generic list command in system prompt when on non-Windows', () => {
+    mockPlatform('linux');
+    const agent = CodebaseInvestigatorAgent(config);
+    expect(agent.promptConfig.systemPrompt).toContain('`ls -R`');
   });
 });

@@ -16,7 +16,9 @@ import {
   MessageBusType,
   type ToolConfirmationRequest,
   type ToolConfirmationResponse,
+  type Question,
 } from '../confirmation-bus/types.js';
+import { type ApprovalMode } from '../policy/types.js';
 
 /**
  * Represents a validated and ready-to-execute tool call.
@@ -193,6 +195,7 @@ export abstract class BaseToolInvocation<
       correlationId,
       toolCall: {
         name: this._toolName,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         args: this.params as Record<string, unknown>,
       },
       serverName: this._serverName,
@@ -242,7 +245,7 @@ export abstract class BaseToolInvocation<
         }
       };
 
-      abortSignal.addEventListener('abort', abortHandler);
+      abortSignal.addEventListener('abort', abortHandler, { once: true });
 
       timeoutId = setTimeout(() => {
         cleanup();
@@ -310,8 +313,15 @@ export interface ToolBuilder<
 
   /**
    * Function declaration schema from @google/genai.
+   * @param modelId Optional model identifier to get a model-specific schema.
    */
-  schema: FunctionDeclaration;
+  getSchema(modelId?: string): FunctionDeclaration;
+
+  /**
+   * Function declaration schema for the default model.
+   * @deprecated Use getSchema(modelId) for model-specific schemas.
+   */
+  readonly schema: FunctionDeclaration;
 
   /**
    * Whether the tool's output should be rendered as markdown.
@@ -353,12 +363,16 @@ export abstract class DeclarativeTool<
     readonly extensionId?: string,
   ) {}
 
-  get schema(): FunctionDeclaration {
+  getSchema(_modelId?: string): FunctionDeclaration {
     return {
       name: this.name,
       description: this.description,
       parametersJsonSchema: this.parameterSchema,
     };
+  }
+
+  get schema(): FunctionDeclaration {
+    return this.getSchema();
   }
 
   /**
@@ -523,6 +537,7 @@ export function isTool(obj: unknown): obj is AnyDeclarativeTool {
     obj !== null &&
     'name' in obj &&
     'build' in obj &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     typeof (obj as AnyDeclarativeTool).build === 'function'
   );
 }
@@ -550,6 +565,11 @@ export interface ToolResult {
     message: string; // raw error message
     type?: ToolErrorType; // An optional machine-readable error type (e.g., 'FILE_NOT_FOUND').
   };
+
+  /**
+   * Optional data payload for passing structured information back to the caller.
+   */
+  data?: Record<string, unknown>;
 }
 
 /**
@@ -572,8 +592,10 @@ export function hasCycleInSchema(schema: object): boolean {
       ) {
         return null;
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       current = (current as Record<string, unknown>)[segment];
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return current as object;
   }
 
@@ -621,6 +643,7 @@ export function hasCycleInSchema(schema: object): boolean {
       if (Object.prototype.hasOwnProperty.call(node, key)) {
         if (
           traverse(
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             (node as Record<string, unknown>)[key],
             visitedRefs,
             pathRefs,
@@ -687,11 +710,27 @@ export interface ToolEditConfirmationDetails {
   ideConfirmation?: Promise<DiffUpdateResult>;
 }
 
-export interface ToolConfirmationPayload {
-  // used to override `modifiedProposedContent` for modifiable tools in the
-  // inline modify flow
+export interface ToolEditConfirmationPayload {
   newContent: string;
 }
+
+export interface ToolAskUserConfirmationPayload {
+  answers: { [questionIndex: string]: string };
+}
+
+export interface ToolExitPlanModeConfirmationPayload {
+  /** Whether the user approved the plan */
+  approved: boolean;
+  /** If approved, the approval mode to use for implementation */
+  approvalMode?: ApprovalMode;
+  /** If rejected, the user's feedback */
+  feedback?: string;
+}
+
+export type ToolConfirmationPayload =
+  | ToolEditConfirmationPayload
+  | ToolAskUserConfirmationPayload
+  | ToolExitPlanModeConfirmationPayload;
 
 export interface ToolExecuteConfirmationDetails {
   type: 'exec';
@@ -720,11 +759,33 @@ export interface ToolInfoConfirmationDetails {
   urls?: string[];
 }
 
+export interface ToolAskUserConfirmationDetails {
+  type: 'ask_user';
+  title: string;
+  questions: Question[];
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => Promise<void>;
+}
+
+export interface ToolExitPlanModeConfirmationDetails {
+  type: 'exit_plan_mode';
+  title: string;
+  planPath: string;
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => Promise<void>;
+}
+
 export type ToolCallConfirmationDetails =
   | ToolEditConfirmationDetails
   | ToolExecuteConfirmationDetails
   | ToolMcpConfirmationDetails
-  | ToolInfoConfirmationDetails;
+  | ToolInfoConfirmationDetails
+  | ToolAskUserConfirmationDetails
+  | ToolExitPlanModeConfirmationDetails;
 
 export enum ToolConfirmationOutcome {
   ProceedOnce = 'proceed_once',
@@ -745,6 +806,8 @@ export enum Kind {
   Execute = 'execute',
   Think = 'think',
   Fetch = 'fetch',
+  Communicate = 'communicate',
+  Plan = 'plan',
   Other = 'other',
 }
 

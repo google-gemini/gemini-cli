@@ -6,8 +6,10 @@
 
 // Export config
 export * from './config/config.js';
+export * from './config/memory.js';
 export * from './config/defaultModelConfigs.js';
 export * from './config/models.js';
+export * from './config/constants.js';
 export * from './output/types.js';
 export * from './output/json-formatter.js';
 export * from './output/stream-json-formatter.js';
@@ -39,7 +41,6 @@ export * from './core/coreToolScheduler.js';
 export * from './scheduler/scheduler.js';
 export * from './scheduler/types.js';
 export * from './scheduler/tool-executor.js';
-export * from './core/nonInteractiveToolExecutor.js';
 export * from './core/recordingContentGenerator.js';
 
 export * from './fallback/types.js';
@@ -47,13 +48,19 @@ export * from './fallback/types.js';
 export * from './code_assist/codeAssist.js';
 export * from './code_assist/oauth2.js';
 export * from './code_assist/server.js';
+export * from './code_assist/setup.js';
 export * from './code_assist/types.js';
 export * from './code_assist/telemetry.js';
+export * from './code_assist/admin/admin_controls.js';
+export * from './code_assist/admin/mcpUtils.js';
 export * from './core/apiKeyCredentialStorage.js';
 
 // Export utilities
+export * from './utils/fetch.js';
 export { homedir, tmpdir } from './utils/paths.js';
 export * from './utils/paths.js';
+export * from './utils/checks.js';
+export * from './utils/headless.js';
 export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
 export * from './utils/exitCodes.js';
@@ -65,8 +72,10 @@ export * from './utils/gitUtils.js';
 export * from './utils/editor.js';
 export * from './utils/quotaErrorDetection.js';
 export * from './utils/userAccountManager.js';
+export * from './utils/authConsent.js';
 export * from './utils/googleQuotaErrors.js';
 export * from './utils/fileUtils.js';
+export * from './utils/planUtils.js';
 export * from './utils/fileDiffUtils.js';
 export * from './utils/retry.js';
 export * from './utils/shell-utils.js';
@@ -94,6 +103,7 @@ export * from './utils/checkpointUtils.js';
 export * from './utils/secure-browser-launcher.js';
 export * from './utils/apiConversionUtils.js';
 export * from './utils/channel.js';
+export * from './utils/constants.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
@@ -130,6 +140,7 @@ export * from './prompts/mcp-prompts.js';
 export * from './agents/types.js';
 export * from './agents/agentLoader.js';
 export * from './agents/local-executor.js';
+export * from './agents/agent-scheduler.js';
 
 // Export specific tool logic
 export * from './tools/read-file.js';
@@ -147,6 +158,7 @@ export * from './tools/read-many-files.js';
 export * from './tools/mcp-client.js';
 export * from './tools/mcp-tool.js';
 export * from './tools/write-todos.js';
+export * from './tools/ask-user.js';
 
 // MCP OAuth
 export { MCPOAuthProvider } from './mcp/oauth-provider.js';

@@ -19,12 +19,34 @@ import {
 
 const mockIsBinary = vi.hoisted(() => vi.fn());
 const mockShellExecutionService = vi.hoisted(() => vi.fn());
+const mockShellKill = vi.hoisted(() => vi.fn());
+const mockShellBackground = vi.hoisted(() => vi.fn());
+const mockShellSubscribe = vi.hoisted(() =>
+  vi.fn<
+    (pid: number, listener: (event: ShellOutputEvent) => void) => () => void
+  >(() => vi.fn()),
+); // Returns unsubscribe
+const mockShellOnExit = vi.hoisted(() =>
+  vi.fn<
+    (
+      pid: number,
+      callback: (exitCode: number, signal?: number) => void,
+    ) => () => void
+  >(() => vi.fn()),
+);
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    ShellExecutionService: { execute: mockShellExecutionService },
+    ShellExecutionService: {
+      execute: mockShellExecutionService,
+      kill: mockShellKill,
+      background: mockShellBackground,
+      subscribe: mockShellSubscribe,
+      onExit: mockShellOnExit,
+    },
     isBinary: mockIsBinary,
   };
 });
@@ -43,7 +65,6 @@ vi.mock('node:os', async (importOriginal) => {
   };
 });
 vi.mock('node:crypto');
-vi.mock('../utils/textUtils.js');
 
 import {
   useShellCommandProcessor,
@@ -113,7 +134,13 @@ describe('useShellCommandProcessor', () => {
 
   const renderProcessorHook = () => {
     let hookResult: ReturnType<typeof useShellCommandProcessor>;
-    function TestComponent() {
+    let renderCount = 0;
+    function TestComponent({
+      isWaitingForConfirmation,
+    }: {
+      isWaitingForConfirmation?: boolean;
+    }) {
+      renderCount++;
       hookResult = useShellCommandProcessor(
         addItemToHistoryMock,
         setPendingHistoryItemMock,
@@ -122,16 +149,25 @@ describe('useShellCommandProcessor', () => {
         mockConfig,
         mockGeminiClient,
         setShellInputFocusedMock,
+        undefined,
+        undefined,
+        undefined,
+        isWaitingForConfirmation,
       );
       return null;
     }
-    render(<TestComponent />);
+    const { rerender } = render(<TestComponent />);
     return {
       result: {
         get current() {
           return hookResult;
         },
       },
+      getRenderCount: () => renderCount,
+      rerender: (isWaitingForConfirmation?: boolean) =>
+        rerender(
+          <TestComponent isWaitingForConfirmation={isWaitingForConfirmation} />,
+        ),
     };
   };
 
@@ -721,6 +757,405 @@ describe('useShellCommandProcessor', () => {
       await act(async () => {});
 
       expect(result.current.activeShellPtyId).toBeNull();
+    });
+  });
+
+  describe('Background Shell Management', () => {
+    it('should register a background shell and update count', async () => {
+      const { result } = renderProcessorHook();
+
+      act(() => {
+        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+      });
+
+      expect(result.current.backgroundShellCount).toBe(1);
+      const shell = result.current.backgroundShells.get(1001);
+      expect(shell).toEqual(
+        expect.objectContaining({
+          pid: 1001,
+          command: 'bg-cmd',
+          output: 'initial',
+        }),
+      );
+      expect(mockShellOnExit).toHaveBeenCalledWith(1001, expect.any(Function));
+      expect(mockShellSubscribe).toHaveBeenCalledWith(
+        1001,
+        expect.any(Function),
+      );
+    });
+
+    it('should toggle background shell visibility', async () => {
+      const { result } = renderProcessorHook();
+
+      act(() => {
+        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+      });
+
+      expect(result.current.isBackgroundShellVisible).toBe(false);
+
+      act(() => {
+        result.current.toggleBackgroundShell();
+      });
+
+      expect(result.current.isBackgroundShellVisible).toBe(true);
+
+      act(() => {
+        result.current.toggleBackgroundShell();
+      });
+
+      expect(result.current.isBackgroundShellVisible).toBe(false);
+    });
+
+    it('should show info message when toggling background shells if none are active', async () => {
+      const { result } = renderProcessorHook();
+
+      act(() => {
+        result.current.toggleBackgroundShell();
+      });
+
+      expect(addItemToHistoryMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'info',
+          text: 'No background shells are currently active.',
+        }),
+        expect.any(Number),
+      );
+      expect(result.current.isBackgroundShellVisible).toBe(false);
+    });
+
+    it('should dismiss a background shell and remove it from state', async () => {
+      const { result } = renderProcessorHook();
+
+      act(() => {
+        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+      });
+
+      act(() => {
+        result.current.dismissBackgroundShell(1001);
+      });
+
+      expect(mockShellKill).toHaveBeenCalledWith(1001);
+      expect(result.current.backgroundShellCount).toBe(0);
+      expect(result.current.backgroundShells.has(1001)).toBe(false);
+    });
+
+    it('should handle backgrounding the current shell', async () => {
+      // Simulate an active shell
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, callback) => {
+        mockShellOutputCallback = callback;
+        return Promise.resolve({
+          pid: 555,
+          result: new Promise((resolve) => {
+            resolveExecutionPromise = resolve;
+          }),
+        });
+      });
+
+      const { result } = renderProcessorHook();
+
+      await act(async () => {
+        result.current.handleShellCommand('top', new AbortController().signal);
+      });
+
+      expect(result.current.activeShellPtyId).toBe(555);
+
+      act(() => {
+        result.current.backgroundCurrentShell();
+      });
+
+      expect(mockShellBackground).toHaveBeenCalledWith(555);
+      // The actual state update happens when the promise resolves with backgrounded: true
+      // which is handled in handleShellCommand's .then block.
+      // We simulate that here:
+
+      await act(async () => {
+        resolveExecutionPromise(
+          createMockServiceResult({
+            backgrounded: true,
+            pid: 555,
+            output: 'running...',
+          }),
+        );
+      });
+      // Wait for promise resolution
+      await act(async () => await onExecMock.mock.calls[0][0]);
+
+      expect(result.current.backgroundShellCount).toBe(1);
+      expect(result.current.activeShellPtyId).toBeNull();
+    });
+
+    it('should persist background shell on successful exit and mark as exited', async () => {
+      const { result } = renderProcessorHook();
+
+      act(() => {
+        result.current.registerBackgroundShell(888, 'auto-exit', '');
+      });
+
+      // Find the exit callback registered
+      const exitCallback = mockShellOnExit.mock.calls.find(
+        (call) => call[0] === 888,
+      )?.[1];
+      expect(exitCallback).toBeDefined();
+
+      if (exitCallback) {
+        act(() => {
+          exitCallback(0);
+        });
+      }
+
+      // Should NOT be removed, but updated
+      expect(result.current.backgroundShellCount).toBe(0); // Badge count is 0
+      expect(result.current.backgroundShells.has(888)).toBe(true); // Map has it
+      const shell = result.current.backgroundShells.get(888);
+      expect(shell?.status).toBe('exited');
+      expect(shell?.exitCode).toBe(0);
+    });
+
+    it('should persist background shell on failed exit', async () => {
+      const { result } = renderProcessorHook();
+
+      act(() => {
+        result.current.registerBackgroundShell(999, 'fail-exit', '');
+      });
+
+      const exitCallback = mockShellOnExit.mock.calls.find(
+        (call) => call[0] === 999,
+      )?.[1];
+      expect(exitCallback).toBeDefined();
+
+      if (exitCallback) {
+        act(() => {
+          exitCallback(1);
+        });
+      }
+
+      // Should NOT be removed, but updated
+      expect(result.current.backgroundShellCount).toBe(0); // Badge count is 0
+      const shell = result.current.backgroundShells.get(999);
+      expect(shell?.status).toBe('exited');
+      expect(shell?.exitCode).toBe(1);
+
+      // Now dismiss it
+      act(() => {
+        result.current.dismissBackgroundShell(999);
+      });
+      expect(result.current.backgroundShellCount).toBe(0);
+    });
+
+    it('should NOT trigger re-render on background shell output when visible', async () => {
+      const { result, getRenderCount } = renderProcessorHook();
+
+      act(() => {
+        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+      });
+
+      // Show the background shells
+      act(() => {
+        result.current.toggleBackgroundShell();
+      });
+
+      const initialRenderCount = getRenderCount();
+
+      const subscribeCallback = mockShellSubscribe.mock.calls.find(
+        (call) => call[0] === 1001,
+      )?.[1];
+      expect(subscribeCallback).toBeDefined();
+
+      if (subscribeCallback) {
+        act(() => {
+          subscribeCallback({ type: 'data', chunk: ' + updated' });
+        });
+      }
+
+      expect(getRenderCount()).toBeGreaterThan(initialRenderCount);
+      const shell = result.current.backgroundShells.get(1001);
+      expect(shell?.output).toBe('initial + updated');
+    });
+
+    it('should NOT trigger re-render on background shell output when hidden', async () => {
+      const { result, getRenderCount } = renderProcessorHook();
+
+      act(() => {
+        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+      });
+
+      // Ensure background shells are hidden (default)
+      const initialRenderCount = getRenderCount();
+
+      const subscribeCallback = mockShellSubscribe.mock.calls.find(
+        (call) => call[0] === 1001,
+      )?.[1];
+      expect(subscribeCallback).toBeDefined();
+
+      if (subscribeCallback) {
+        act(() => {
+          subscribeCallback({ type: 'data', chunk: ' + updated' });
+        });
+      }
+
+      expect(getRenderCount()).toBeGreaterThan(initialRenderCount);
+      const shell = result.current.backgroundShells.get(1001);
+      expect(shell?.output).toBe('initial + updated');
+    });
+
+    it('should trigger re-render on binary progress when visible', async () => {
+      const { result, getRenderCount } = renderProcessorHook();
+
+      act(() => {
+        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+      });
+
+      // Show the background shells
+      act(() => {
+        result.current.toggleBackgroundShell();
+      });
+
+      const initialRenderCount = getRenderCount();
+
+      const subscribeCallback = mockShellSubscribe.mock.calls.find(
+        (call) => call[0] === 1001,
+      )?.[1];
+      expect(subscribeCallback).toBeDefined();
+
+      if (subscribeCallback) {
+        act(() => {
+          subscribeCallback({ type: 'binary_progress', bytesReceived: 1024 });
+        });
+      }
+
+      expect(getRenderCount()).toBeGreaterThan(initialRenderCount);
+      const shell = result.current.backgroundShells.get(1001);
+      expect(shell?.isBinary).toBe(true);
+      expect(shell?.binaryBytesReceived).toBe(1024);
+    });
+
+    it('should NOT hide background shell when model is responding without confirmation', async () => {
+      const { result, rerender } = renderProcessorHook();
+
+      // 1. Register and show background shell
+      act(() => {
+        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+      });
+      act(() => {
+        result.current.toggleBackgroundShell();
+      });
+      expect(result.current.isBackgroundShellVisible).toBe(true);
+
+      // 2. Simulate model responding (not waiting for confirmation)
+      act(() => {
+        rerender(false); // isWaitingForConfirmation = false
+      });
+
+      // Should stay visible
+      expect(result.current.isBackgroundShellVisible).toBe(true);
+    });
+
+    it('should hide background shell when waiting for confirmation and restore after delay', async () => {
+      const { result, rerender } = renderProcessorHook();
+
+      // 1. Register and show background shell
+      act(() => {
+        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+      });
+      act(() => {
+        result.current.toggleBackgroundShell();
+      });
+      expect(result.current.isBackgroundShellVisible).toBe(true);
+
+      // 2. Simulate tool confirmation showing up
+      act(() => {
+        rerender(true); // isWaitingForConfirmation = true
+      });
+
+      // Should be hidden
+      expect(result.current.isBackgroundShellVisible).toBe(false);
+
+      // 3. Simulate confirmation accepted (waiting for PTY start)
+      act(() => {
+        rerender(false);
+      });
+
+      // Should STAY hidden during the 300ms gap
+      expect(result.current.isBackgroundShellVisible).toBe(false);
+
+      // 4. Wait for restore delay
+      await waitFor(() =>
+        expect(result.current.isBackgroundShellVisible).toBe(true),
+      );
+    });
+
+    it('should auto-hide background shell when foreground shell starts and restore when it ends', async () => {
+      const { result } = renderProcessorHook();
+
+      // 1. Register and show background shell
+      act(() => {
+        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+      });
+      act(() => {
+        result.current.toggleBackgroundShell();
+      });
+      expect(result.current.isBackgroundShellVisible).toBe(true);
+
+      // 2. Start foreground shell
+      act(() => {
+        result.current.handleShellCommand('ls', new AbortController().signal);
+      });
+
+      // Wait for PID to be set
+      await waitFor(() => expect(result.current.activeShellPtyId).toBe(12345));
+
+      // Should be hidden automatically
+      expect(result.current.isBackgroundShellVisible).toBe(false);
+
+      // 3. Complete foreground shell
+      act(() => {
+        resolveExecutionPromise(createMockServiceResult());
+      });
+
+      await waitFor(() => expect(result.current.activeShellPtyId).toBe(null));
+
+      // Should be restored automatically (after delay)
+      await waitFor(() =>
+        expect(result.current.isBackgroundShellVisible).toBe(true),
+      );
+    });
+
+    it('should NOT restore background shell if it was manually hidden during foreground execution', async () => {
+      const { result } = renderProcessorHook();
+
+      // 1. Register and show background shell
+      act(() => {
+        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+      });
+      act(() => {
+        result.current.toggleBackgroundShell();
+      });
+      expect(result.current.isBackgroundShellVisible).toBe(true);
+
+      // 2. Start foreground shell
+      act(() => {
+        result.current.handleShellCommand('ls', new AbortController().signal);
+      });
+      await waitFor(() => expect(result.current.activeShellPtyId).toBe(12345));
+      expect(result.current.isBackgroundShellVisible).toBe(false);
+
+      // 3. Manually toggle visibility (e.g. user wants to peek)
+      act(() => {
+        result.current.toggleBackgroundShell();
+      });
+      expect(result.current.isBackgroundShellVisible).toBe(true);
+
+      // 4. Complete foreground shell
+      act(() => {
+        resolveExecutionPromise(createMockServiceResult());
+      });
+      await waitFor(() => expect(result.current.activeShellPtyId).toBe(null));
+
+      // It should NOT change visibility because manual toggle cleared the auto-restore flag
+      // After delay it should stay true (as it was manually toggled to true)
+      await waitFor(() =>
+        expect(result.current.isBackgroundShellVisible).toBe(true),
+      );
     });
   });
 });

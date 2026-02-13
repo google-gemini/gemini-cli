@@ -177,6 +177,19 @@ jobs:
       - name: 'Smoke test bundle'
         run: 'node ./bundle/gemini.js --version'
 
+      - name: 'Smoke test npx installation'
+        run: |
+          # 1. Package the project into a tarball
+          TARBALL=$(npm pack | tail -n 1)
+
+          # 2. Move to a fresh directory for isolation
+          mkdir -p ../smoke-test-dir
+          mv "$TARBALL" ../smoke-test-dir/
+          cd ../smoke-test-dir
+
+          # 3. Run npx from the tarball
+          npx "./$TARBALL" --version
+
       - name: 'Wait for file system sync'
         run: 'sleep 2'
 
@@ -251,6 +264,19 @@ jobs:
 
       - name: 'Smoke test bundle'
         run: 'node ./bundle/gemini.js --version'
+
+      - name: 'Smoke test npx installation'
+        run: |
+          # 1. Package the project into a tarball
+          TARBALL=$(npm pack | tail -n 1)
+
+          # 2. Move to a fresh directory for isolation
+          mkdir -p ../smoke-test-dir
+          mv "$TARBALL" ../smoke-test-dir/
+          cd ../smoke-test-dir
+
+          # 3. Run npx from the tarball
+          npx "./$TARBALL" --version
 
       - name: 'Wait for file system sync'
         run: 'sleep 2'
@@ -330,11 +356,17 @@ jobs:
           clean-script: 'clean'
 
   test_windows:
-    name: 'Slow Test - Win'
+    name: 'Slow Test - Win - ${{ matrix.shard }}'
     runs-on: 'gemini-cli-windows-16-core'
     needs: 'merge_queue_skipper'
     if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     continue-on-error: true
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        shard:
+          - 'cli'
+          - 'others'
 
     steps:
       - name: 'Checkout'
@@ -385,7 +417,14 @@ jobs:
           NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
-        run: 'npm run test:ci -- --coverage.enabled=false'
+        run: |
+          if ("${{ matrix.shard }}" -eq "cli") {
+            npm run test:ci --workspace @google/gemini-cli -- --coverage.enabled=false
+          } else {
+            # Explicitly list non-cli packages to ensure they are sharded correctly
+            npm run test:ci --workspace @google/gemini-cli-core --workspace @google/gemini-cli-a2a-server --workspace gemini-cli-vscode-ide-companion --workspace @google/gemini-cli-test-utils --if-present -- --coverage.enabled=false
+            npm run test:scripts
+          }
         shell: 'pwsh'
 
       - name: 'Bundle'
@@ -394,6 +433,21 @@ jobs:
 
       - name: 'Smoke test bundle'
         run: 'node ./bundle/gemini.js --version'
+        shell: 'pwsh'
+
+      - name: 'Smoke test npx installation'
+        run: |
+          # 1. Package the project into a tarball
+          $PACK_OUTPUT = npm pack
+          $TARBALL = $PACK_OUTPUT[-1]
+
+          # 2. Move to a fresh directory for isolation
+          New-Item -ItemType Directory -Force -Path ../smoke-test-dir
+          Move-Item $TARBALL ../smoke-test-dir/
+          Set-Location ../smoke-test-dir
+
+          # 3. Run npx from the tarball
+          npx "./$TARBALL" --version
         shell: 'pwsh'
 
   ci:

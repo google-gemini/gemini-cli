@@ -14,6 +14,12 @@ import { MouseProvider } from '../../contexts/MouseContext.js';
 import { describe, it, expect, vi } from 'vitest';
 import { waitFor } from '../../../test-utils/async.js';
 
+vi.mock('../../contexts/UIStateContext.js', () => ({
+  useUIState: vi.fn(() => ({
+    copyModeEnabled: false,
+  })),
+}));
+
 // Mock useStdout to provide a fixed size for testing
 vi.mock('ink', async (importOriginal) => {
   const actual = await importOriginal<typeof import('ink')>();
@@ -371,6 +377,39 @@ describe('ScrollableList Demo Behavior', () => {
       });
       await waitFor(() => {
         expect(listRef?.getScrollState()?.scrollTop).toBe(0);
+      });
+    });
+  });
+
+  describe('Width Prop', () => {
+    it('should apply the width prop to the container', async () => {
+      const items = [{ id: '1', title: 'Item 1' }];
+      let lastFrame: () => string | undefined;
+
+      await act(async () => {
+        const result = render(
+          <MouseProvider mouseEventsEnabled={false}>
+            <KeypressProvider>
+              <ScrollProvider>
+                <Box width={100} height={20}>
+                  <ScrollableList
+                    data={items}
+                    renderItem={({ item }) => <Text>{item.title}</Text>}
+                    estimatedItemHeight={() => 1}
+                    keyExtractor={(item) => item.id}
+                    hasFocus={true}
+                    width={50}
+                  />
+                </Box>
+              </ScrollProvider>
+            </KeypressProvider>
+          </MouseProvider>,
+        );
+        lastFrame = result.lastFrame;
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Item 1');
       });
     });
   });

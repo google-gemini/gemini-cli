@@ -40,6 +40,13 @@ describe('McpStatus', () => {
     blockedServers: [],
     serverStatus: () => MCPServerStatus.CONNECTED,
     authStatus: {},
+    enablementState: {
+      'server-1': {
+        enabled: true,
+        isSessionDisabled: false,
+        isPersistentDisabled: false,
+      },
+    },
     discoveryInProgress: false,
     connectingServers: [],
     showDescriptions: true,

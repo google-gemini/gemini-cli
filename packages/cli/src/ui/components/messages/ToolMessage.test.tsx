@@ -4,15 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import type { ToolMessageProps } from './ToolMessage.js';
-import { ToolMessage } from './ToolMessage.js';
+import type React from 'react';
+import { ToolMessage, type ToolMessageProps } from './ToolMessage.js';
+import { describe, it, expect, vi } from 'vitest';
 import { StreamingState, ToolCallStatus } from '../../types.js';
 import { Text } from 'ink';
-import { StreamingContext } from '../../contexts/StreamingContext.js';
 import type { AnsiOutput } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { tryParseJSON } from '../../../utils/jsonoutput.js';
 
 vi.mock('../TerminalOutput.js', () => ({
   TerminalOutput: function MockTerminalOutput({
@@ -25,45 +24,6 @@ vi.mock('../TerminalOutput.js', () => ({
         MockCursor:({cursor?.x},{cursor?.y})
       </Text>
     );
-  },
-}));
-
-vi.mock('../AnsiOutput.js', () => ({
-  AnsiOutputText: function MockAnsiOutputText({ data }: { data: AnsiOutput }) {
-    // Simple serialization for snapshot stability
-    const serialized = data
-      .map((line) => line.map((token) => token.text || '').join(''))
-      .join('\n');
-    return <Text>MockAnsiOutput:{serialized}</Text>;
-  },
-}));
-
-// Mock child components or utilities if they are complex or have side effects
-vi.mock('../GeminiRespondingSpinner.js', () => ({
-  GeminiRespondingSpinner: ({
-    nonRespondingDisplay,
-  }: {
-    nonRespondingDisplay?: string;
-  }) => {
-    const streamingState = React.useContext(StreamingContext)!;
-    if (streamingState === StreamingState.Responding) {
-      return <Text>MockRespondingSpinner</Text>;
-    }
-    return nonRespondingDisplay ? <Text>{nonRespondingDisplay}</Text> : null;
-  },
-}));
-vi.mock('./DiffRenderer.js', () => ({
-  DiffRenderer: function MockDiffRenderer({
-    diffContent,
-  }: {
-    diffContent: string;
-  }) {
-    return <Text>MockDiff:{diffContent}</Text>;
-  },
-}));
-vi.mock('../../utils/MarkdownDisplay.js', () => ({
-  MarkdownDisplay: function MockMarkdownDisplay({ text }: { text: string }) {
-    return <Text>MockMarkdown:{text}</Text>;
   },
 }));
 
@@ -108,6 +68,128 @@ describe('<ToolMessage />', () => {
     );
     const output = lastFrame();
     expect(output).toMatchSnapshot();
+  });
+
+  describe('JSON rendering', () => {
+    it('pretty prints valid JSON', () => {
+      const testJSONstring = '{"a": 1, "b": [2, 3]}';
+      const { lastFrame } = renderWithContext(
+        <ToolMessage
+          {...baseProps}
+          resultDisplay={testJSONstring}
+          renderOutputAsMarkdown={false}
+        />,
+        StreamingState.Idle,
+      );
+
+      const output = lastFrame();
+
+      // Verify the JSON utility correctly parses the input
+      expect(tryParseJSON(testJSONstring)).toBeTruthy();
+      // Verify pretty-printed JSON appears in output (with proper indentation)
+      expect(output).toContain('"a": 1');
+      expect(output).toContain('"b": [');
+      // Should not use markdown renderer for JSON
+    });
+
+    it('renders pretty JSON in ink frame', () => {
+      const { lastFrame } = renderWithContext(
+        <ToolMessage {...baseProps} resultDisplay='{"a":1,"b":2}' />,
+        StreamingState.Idle,
+      );
+
+      const frame = lastFrame();
+
+      expect(frame).toMatchSnapshot();
+    });
+
+    it('uses JSON renderer even when renderOutputAsMarkdown=true is true', () => {
+      const testJSONstring = '{"a": 1, "b": [2, 3]}';
+      const { lastFrame } = renderWithContext(
+        <ToolMessage
+          {...baseProps}
+          resultDisplay={testJSONstring}
+          renderOutputAsMarkdown={true}
+        />,
+        StreamingState.Idle,
+      );
+
+      const output = lastFrame();
+
+      // Verify the JSON utility correctly parses the input
+      expect(tryParseJSON(testJSONstring)).toBeTruthy();
+      // Verify pretty-printed JSON appears in output
+      expect(output).toContain('"a": 1');
+      expect(output).toContain('"b": [');
+      // Should not use markdown renderer for JSON even when renderOutputAsMarkdown=true
+    });
+    it('falls back to plain text for malformed JSON', () => {
+      const testJSONstring = 'a": 1, "b": [2, 3]}';
+      const { lastFrame } = renderWithContext(
+        <ToolMessage
+          {...baseProps}
+          resultDisplay={testJSONstring}
+          renderOutputAsMarkdown={false}
+        />,
+        StreamingState.Idle,
+      );
+
+      const output = lastFrame();
+
+      expect(tryParseJSON(testJSONstring)).toBeFalsy();
+      expect(typeof output === 'string').toBeTruthy();
+    });
+
+    it('rejects mixed text + JSON renders as plain text', () => {
+      const testJSONstring = `{"result":  "count": 42,"items": ["apple", "banana"]},"meta": {"timestamp": "2025-09-28T12:34:56Z"}}End.`;
+      const { lastFrame } = renderWithContext(
+        <ToolMessage
+          {...baseProps}
+          resultDisplay={testJSONstring}
+          renderOutputAsMarkdown={false}
+        />,
+        StreamingState.Idle,
+      );
+
+      const output = lastFrame();
+
+      expect(tryParseJSON(testJSONstring)).toBeFalsy();
+      expect(typeof output === 'string').toBeTruthy();
+    });
+
+    it('rejects ANSI-tained JSON renders as plain text', () => {
+      const testJSONstring =
+        '\u001b[32mOK\u001b[0m {"status": "success", "data": {"id": 123, "values": [10, 20, 30]}}';
+      const { lastFrame } = renderWithContext(
+        <ToolMessage
+          {...baseProps}
+          resultDisplay={testJSONstring}
+          renderOutputAsMarkdown={false}
+        />,
+        StreamingState.Idle,
+      );
+
+      const output = lastFrame();
+
+      expect(tryParseJSON(testJSONstring)).toBeFalsy();
+      expect(typeof output === 'string').toBeTruthy();
+    });
+
+    it('pretty printing 10kb JSON completes in <50ms', () => {
+      const large = '{"key": "' + 'x'.repeat(10000) + '"}';
+      const { lastFrame } = renderWithContext(
+        <ToolMessage
+          {...baseProps}
+          resultDisplay={large}
+          renderOutputAsMarkdown={false}
+        />,
+        StreamingState.Idle,
+      );
+
+      const start = performance.now();
+      lastFrame();
+      expect(performance.now() - start).toBeLessThan(50);
+    });
   });
 
   describe('ToolStatusIndicator rendering', () => {

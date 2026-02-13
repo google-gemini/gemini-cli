@@ -28,6 +28,7 @@ import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import type { ToolRegistry } from './tool-registry.js';
 import path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import { GeminiClient } from '../core/client.js';
@@ -47,6 +48,7 @@ import {
 } from '../test-utils/mock-message-bus.js';
 
 const rootDir = path.resolve(os.tmpdir(), 'gemini-cli-test-root');
+const plansDir = path.resolve(os.tmpdir(), 'gemini-cli-test-plans');
 
 // --- MOCKS ---
 vi.mock('../core/client.js');
@@ -58,6 +60,7 @@ vi.mock('../ide/ide-client.js', () => ({
 }));
 let mockGeminiClientInstance: Mocked<GeminiClient>;
 let mockBaseLlmClientInstance: Mocked<BaseLlmClient>;
+let mockConfig: Config;
 const mockEnsureCorrectEdit = vi.fn<typeof ensureCorrectEdit>();
 const mockEnsureCorrectFileContent = vi.fn<typeof ensureCorrectFileContent>();
 const mockIdeClient = {
@@ -84,7 +87,7 @@ const mockConfigInternal = {
   getBaseLlmClient: vi.fn(), // Initialize as a plain mock function
   getFileSystemService: () => fsService,
   getIdeMode: vi.fn(() => false),
-  getWorkspaceContext: () => new WorkspaceContext(rootDir),
+  getWorkspaceContext: () => new WorkspaceContext(rootDir, [plansDir]),
   getApiKey: () => 'test-key',
   getModel: () => 'test-model',
   getSandbox: () => false,
@@ -107,8 +110,10 @@ const mockConfigInternal = {
     }) as unknown as ToolRegistry,
   isInteractive: () => false,
   getDisableLLMCorrection: vi.fn(() => true),
+  storage: {
+    getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+  },
 };
-const mockConfig = mockConfigInternal as unknown as Config;
 
 vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
@@ -126,10 +131,42 @@ describe('WriteFileTool', () => {
     tempDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'write-file-test-external-'),
     );
-    // Ensure the rootDir for the tool exists
+    // Ensure the rootDir and plansDir for the tool exists
     if (!fs.existsSync(rootDir)) {
       fs.mkdirSync(rootDir, { recursive: true });
     }
+    if (!fs.existsSync(plansDir)) {
+      fs.mkdirSync(plansDir, { recursive: true });
+    }
+
+    const workspaceContext = new WorkspaceContext(rootDir, [plansDir]);
+    const mockStorage = {
+      getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+    };
+
+    mockConfig = {
+      ...mockConfigInternal,
+      getWorkspaceContext: () => workspaceContext,
+      storage: mockStorage,
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
+    } as unknown as Config;
 
     // Setup GeminiClient mock
     mockGeminiClientInstance = new (vi.mocked(GeminiClient))(
@@ -206,6 +243,9 @@ describe('WriteFileTool', () => {
     if (fs.existsSync(rootDir)) {
       fs.rmSync(rootDir, { recursive: true, force: true });
     }
+    if (fs.existsSync(plansDir)) {
+      fs.rmSync(plansDir, { recursive: true, force: true });
+    }
     vi.clearAllMocks();
   });
 
@@ -236,9 +276,7 @@ describe('WriteFileTool', () => {
         file_path: outsidePath,
         content: 'hello',
       };
-      expect(() => tool.build(params)).toThrow(
-        /File path must be within one of the workspace directories/,
-      );
+      expect(() => tool.build(params)).toThrow(/Path not in workspace/);
     });
 
     it('should throw an error if path is a directory', () => {
@@ -809,9 +847,23 @@ describe('WriteFileTool', () => {
         file_path: '/etc/passwd',
         content: 'malicious',
       };
-      expect(() => tool.build(params)).toThrow(
-        /File path must be within one of the workspace directories/,
-      );
+      expect(() => tool.build(params)).toThrow(/Path not in workspace/);
+    });
+
+    it('should allow paths within the plans directory', () => {
+      const params = {
+        file_path: path.join(plansDir, 'my-plan.md'),
+        content: '# My Plan',
+      };
+      expect(() => tool.build(params)).not.toThrow();
+    });
+
+    it('should reject paths that try to escape the plans directory', () => {
+      const params = {
+        file_path: path.join(plansDir, '..', 'escaped.txt'),
+        content: 'malicious',
+      };
+      expect(() => tool.build(params)).toThrow(/Path not in workspace/);
     });
   });
 
@@ -849,7 +901,7 @@ describe('WriteFileTool', () => {
         errorMessage: 'Generic write error',
         expectedMessagePrefix: 'Error writing to file',
         mockFsExistsSync: false,
-        restoreAllMocks: true,
+        restoreAllMocks: false,
       },
     ])(
       'should return $errorType error when write fails with $errorCode',
@@ -859,25 +911,22 @@ describe('WriteFileTool', () => {
         errorMessage,
         expectedMessagePrefix,
         mockFsExistsSync,
-        restoreAllMocks,
       }) => {
         const filePath = path.join(rootDir, `${errorType}_file.txt`);
         const content = 'test content';
 
-        if (restoreAllMocks) {
-          vi.restoreAllMocks();
-        }
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let existsSyncSpy: any;
+        let existsSyncSpy: // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ReturnType<typeof vi.spyOn<any, 'existsSync'>> | undefined = undefined;
 
         try {
           if (mockFsExistsSync) {
             const originalExistsSync = fs.existsSync;
             existsSyncSpy = vi
-              .spyOn(fs, 'existsSync')
-              .mockImplementation((path) =>
-                path === filePath ? false : originalExistsSync(path as string),
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .spyOn(fs as any, 'existsSync')
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .mockImplementation((path: any) =>
+                path === filePath ? false : originalExistsSync(path),
               );
           }
 

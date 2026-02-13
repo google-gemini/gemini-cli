@@ -15,6 +15,8 @@ import { getErrorMessage } from '../utils/errors.js';
 import { type Config } from '../config/config.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { WEB_SEARCH_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 interface GroundingChunkWeb {
   uri?: string;
@@ -91,6 +93,7 @@ class WebSearchToolInvocation extends BaseToolInvocation<
       const sources = groundingMetadata?.groundingChunks as
         | GroundingChunkItem[]
         | undefined;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const groundingSupports = groundingMetadata?.groundingSupports as
         | GroundingSupportItem[]
         | undefined;
@@ -197,18 +200,9 @@ export class WebSearchTool extends BaseDeclarativeTool<
     super(
       WebSearchTool.Name,
       'GoogleSearch',
-      'Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based on a query.',
+      WEB_SEARCH_DEFINITION.base.description!,
       Kind.Search,
-      {
-        type: 'object',
-        properties: {
-          query: {
-            type: 'string',
-            description: 'The search query to find information on the web.',
-          },
-        },
-        required: ['query'],
-      },
+      WEB_SEARCH_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
@@ -242,5 +236,9 @@ export class WebSearchTool extends BaseDeclarativeTool<
       _toolName,
       _toolDisplayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(WEB_SEARCH_DEFINITION, modelId);
   }
 }

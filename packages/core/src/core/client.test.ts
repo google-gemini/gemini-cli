@@ -213,6 +213,8 @@ describe('Gemini Client (client.ts)', () => {
       getGlobalMemory: vi.fn().mockReturnValue(''),
       getEnvironmentMemory: vi.fn().mockReturnValue(''),
       isJitContextEnabled: vi.fn().mockReturnValue(false),
+      getToolOutputMaskingEnabled: vi.fn().mockReturnValue(false),
+      getDisableLoopDetection: vi.fn().mockReturnValue(false),
 
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getProxy: vi.fn().mockReturnValue(undefined),
@@ -226,7 +228,6 @@ describe('Gemini Client (client.ts)', () => {
       getIdeModeFeature: vi.fn().mockReturnValue(false),
       getIdeMode: vi.fn().mockReturnValue(true),
       getDebugMode: vi.fn().mockReturnValue(false),
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
       getWorkspaceContext: vi.fn().mockReturnValue({
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
@@ -290,6 +291,7 @@ describe('Gemini Client (client.ts)', () => {
     it('should call chat.addHistory with the provided content', async () => {
       const mockChat = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
       } as unknown as GeminiChat;
       client['chat'] = mockChat;
 
@@ -388,6 +390,7 @@ describe('Gemini Client (client.ts)', () => {
         getHistory: mockGetHistory,
         addHistory: vi.fn(),
         setHistory: vi.fn(),
+        setTools: vi.fn(),
         getLastPromptTokenCount: vi.fn(),
       } as unknown as GeminiChat;
     });
@@ -804,6 +807,7 @@ describe('Gemini Client (client.ts)', () => {
 
       const mockChat = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       } as unknown as GeminiChat;
@@ -867,6 +871,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -890,6 +895,7 @@ ${JSON.stringify(
         { model: 'default-routed-model' },
         initialRequest,
         expect.any(AbortSignal),
+        undefined,
       );
     });
 
@@ -924,6 +930,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -1001,6 +1008,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -1117,6 +1125,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -1165,6 +1174,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -1230,6 +1240,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -1287,6 +1298,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -1347,6 +1359,7 @@ ${JSON.stringify(
       const lastPromptTokenCount = 900;
       const mockChat: Partial<GeminiChat> = {
         getLastPromptTokenCount: vi.fn().mockReturnValue(lastPromptTokenCount),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
       };
       client['chat'] = mockChat as GeminiChat;
@@ -1407,6 +1420,7 @@ ${JSON.stringify(
       const lastPromptTokenCount = 900;
       const mockChat: Partial<GeminiChat> = {
         getLastPromptTokenCount: vi.fn().mockReturnValue(lastPromptTokenCount),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
       };
       client['chat'] = mockChat as GeminiChat;
@@ -1465,6 +1479,7 @@ ${JSON.stringify(
           .fn()
           .mockReturnValue([{ role: 'user', parts: [{ text: 'old' }] }]),
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getChatRecordingService: vi.fn().mockReturnValue({
           getConversation: vi.fn(),
           getConversationFilePath: vi.fn(),
@@ -1477,6 +1492,7 @@ ${JSON.stringify(
           .fn()
           .mockReturnValue([{ role: 'user', parts: [{ text: 'old' }] }]),
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getChatRecordingService: vi.fn().mockReturnValue({
           getConversation: vi.fn(),
           getConversationFilePath: vi.fn(),
@@ -1614,6 +1630,7 @@ ${JSON.stringify(
       const lastPromptTokenCount = 10000;
       const mockChat: Partial<GeminiChat> = {
         getLastPromptTokenCount: vi.fn().mockReturnValue(lastPromptTokenCount),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
       };
       client['chat'] = mockChat as GeminiChat;
@@ -1687,6 +1704,7 @@ ${JSON.stringify(
 
         const mockChat: Partial<GeminiChat> = {
           addHistory: vi.fn(),
+          setTools: vi.fn(),
           getHistory: vi.fn().mockReturnValue([]),
           getLastPromptTokenCount: vi.fn(),
         };
@@ -1707,6 +1725,7 @@ ${JSON.stringify(
           { model: 'routed-model' },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
+          undefined,
         );
       });
 
@@ -1724,6 +1743,7 @@ ${JSON.stringify(
           { model: 'routed-model' },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
+          undefined,
         );
 
         // Second turn
@@ -1741,6 +1761,7 @@ ${JSON.stringify(
           { model: 'routed-model' },
           [{ text: 'Continue' }],
           expect.any(AbortSignal),
+          undefined,
         );
       });
 
@@ -1758,6 +1779,7 @@ ${JSON.stringify(
           { model: 'routed-model' },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
+          undefined,
         );
 
         // New prompt
@@ -1779,6 +1801,7 @@ ${JSON.stringify(
           { model: 'new-routed-model' },
           [{ text: 'A new topic' }],
           expect.any(AbortSignal),
+          undefined,
         );
       });
 
@@ -1806,6 +1829,7 @@ ${JSON.stringify(
           { model: 'original-model' },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
+          undefined,
         );
 
         mockRouterService.route.mockResolvedValue({
@@ -1828,6 +1852,7 @@ ${JSON.stringify(
           { model: 'fallback-model' },
           [{ text: 'Continue' }],
           expect.any(AbortSignal),
+          undefined,
         );
       });
     });
@@ -1842,11 +1867,11 @@ ${JSON.stringify(
       const { getCoreSystemPrompt } = await import('./prompts.js');
       const mockGetCoreSystemPrompt = vi.mocked(getCoreSystemPrompt);
 
-      await client.updateSystemInstruction();
+      client.updateSystemInstruction();
 
       expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
         mockConfig,
-        'Global JIT Memory',
+        'Full JIT Memory',
       );
     });
 
@@ -1857,7 +1882,7 @@ ${JSON.stringify(
       const { getCoreSystemPrompt } = await import('./prompts.js');
       const mockGetCoreSystemPrompt = vi.mocked(getCoreSystemPrompt);
 
-      await client.updateSystemInstruction();
+      client.updateSystemInstruction();
 
       expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
         mockConfig,
@@ -1883,6 +1908,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -1912,6 +1938,7 @@ ${JSON.stringify(
         { model: 'default-routed-model' },
         initialRequest,
         expect.any(AbortSignal),
+        undefined,
       );
 
       // Second call with "Please continue."
@@ -1920,6 +1947,7 @@ ${JSON.stringify(
         { model: 'default-routed-model' },
         [{ text: 'System: Please continue.' }],
         expect.any(AbortSignal),
+        undefined,
       );
     });
 
@@ -1936,6 +1964,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -1973,6 +2002,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -2017,6 +2047,7 @@ ${JSON.stringify(
         const mockChat: Partial<GeminiChat> = {
           addHistory: vi.fn(),
           setHistory: vi.fn(),
+          setTools: vi.fn(),
           // Assume history is not empty for delta checks
           getHistory: vi
             .fn()
@@ -2332,6 +2363,7 @@ ${JSON.stringify(
           expect.objectContaining({ model: 'model-a' }),
           expect.anything(),
           expect.anything(),
+          undefined,
         );
       });
 
@@ -2431,6 +2463,7 @@ ${JSON.stringify(
           addHistory: vi.fn(),
           getHistory: vi.fn().mockReturnValue([]), // Default empty history
           setHistory: vi.fn(),
+          setTools: vi.fn(),
           getLastPromptTokenCount: vi.fn(),
         };
         client['chat'] = mockChat as GeminiChat;
@@ -2771,6 +2804,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -2808,6 +2842,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -2845,6 +2880,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -3057,6 +3093,7 @@ ${JSON.stringify(
 
         const mockChat: Partial<GeminiChat> = {
           addHistory: vi.fn(),
+          setTools: vi.fn(),
           getHistory: vi.fn().mockReturnValue([]),
           getLastPromptTokenCount: vi.fn(),
         };
@@ -3091,6 +3128,7 @@ ${JSON.stringify(
 
         const mockChat: Partial<GeminiChat> = {
           addHistory: vi.fn(),
+          setTools: vi.fn(),
           getHistory: vi.fn().mockReturnValue([]),
           getLastPromptTokenCount: vi.fn(),
         };
@@ -3118,6 +3156,7 @@ ${JSON.stringify(
         mockHookSystem.fireAfterAgentEvent.mockResolvedValue({
           shouldStopExecution: () => true,
           getEffectiveReason: () => 'Stopped after agent',
+          shouldClearContext: () => false,
           systemMessage: undefined,
         });
 
@@ -3132,10 +3171,12 @@ ${JSON.stringify(
         );
         const events = await fromAsync(stream);
 
-        expect(events).toContainEqual({
-          type: GeminiEventType.AgentExecutionStopped,
-          value: { reason: 'Stopped after agent' },
-        });
+        expect(events).toContainEqual(
+          expect.objectContaining({
+            type: GeminiEventType.AgentExecutionStopped,
+            value: expect.objectContaining({ reason: 'Stopped after agent' }),
+          }),
+        );
         // sendMessageStream should not recurse
         expect(mockTurnRunFn).toHaveBeenCalledTimes(1);
       });
@@ -3146,11 +3187,61 @@ ${JSON.stringify(
             shouldStopExecution: () => false,
             isBlockingDecision: () => true,
             getEffectiveReason: () => 'Please explain',
+            shouldClearContext: () => false,
             systemMessage: undefined,
           })
           .mockResolvedValueOnce({
             shouldStopExecution: () => false,
             isBlockingDecision: () => false,
+            shouldClearContext: () => false,
+            systemMessage: undefined,
+          });
+
+        mockTurnRunFn.mockImplementation(async function* () {
+          yield { type: GeminiEventType.Content, value: 'Response' };
+        });
+
+        const stream = client.sendMessageStream(
+          { text: 'Hi' },
+          new AbortController().signal,
+          'test-prompt',
+        );
+        const events = await fromAsync(stream);
+
+        expect(events).toContainEqual(
+          expect.objectContaining({
+            type: GeminiEventType.AgentExecutionBlocked,
+            value: expect.objectContaining({ reason: 'Please explain' }),
+          }),
+        );
+        // Should have called turn run twice (original + re-prompt)
+        expect(mockTurnRunFn).toHaveBeenCalledTimes(2);
+        expect(mockTurnRunFn).toHaveBeenNthCalledWith(
+          2,
+          expect.anything(),
+          [{ text: 'Please explain' }],
+          expect.anything(),
+          undefined,
+        );
+      });
+
+      it('should call resetChat when AfterAgent hook returns shouldClearContext: true', async () => {
+        const resetChatSpy = vi
+          .spyOn(client, 'resetChat')
+          .mockResolvedValue(undefined);
+
+        mockHookSystem.fireAfterAgentEvent
+          .mockResolvedValueOnce({
+            shouldStopExecution: () => false,
+            isBlockingDecision: () => true,
+            getEffectiveReason: () => 'Blocked and clearing context',
+            shouldClearContext: () => true,
+            systemMessage: undefined,
+          })
+          .mockResolvedValueOnce({
+            shouldStopExecution: () => false,
+            isBlockingDecision: () => false,
+            shouldClearContext: () => false,
             systemMessage: undefined,
           });
 
@@ -3167,16 +3258,15 @@ ${JSON.stringify(
 
         expect(events).toContainEqual({
           type: GeminiEventType.AgentExecutionBlocked,
-          value: { reason: 'Please explain' },
+          value: {
+            reason: 'Blocked and clearing context',
+            systemMessage: undefined,
+            contextCleared: true,
+          },
         });
-        // Should have called turn run twice (original + re-prompt)
-        expect(mockTurnRunFn).toHaveBeenCalledTimes(2);
-        expect(mockTurnRunFn).toHaveBeenNthCalledWith(
-          2,
-          expect.anything(),
-          [{ text: 'Please explain' }],
-          expect.anything(),
-        );
+        expect(resetChatSpy).toHaveBeenCalledTimes(1);
+
+        resetChatSpy.mockRestore();
       });
     });
   });

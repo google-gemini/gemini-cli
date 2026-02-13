@@ -155,6 +155,84 @@ describe('Hooks Agent Flow', () => {
       // The fake response contains "Hello World"
       expect(afterAgentLog?.hookCall.stdout).toContain('Hello World');
     });
+
+    it('should process clearContext in AfterAgent hook output', async () => {
+      await rig.setup('should process clearContext in AfterAgent hook output', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.after-agent.responses',
+        ),
+      });
+
+      // BeforeModel hook to track message counts across LLM calls
+      const messageCountFile = join(rig.testDir!, 'message-counts.json');
+      const beforeModelScript = `
+        const fs = require('fs');
+        const input = JSON.parse(fs.readFileSync(0, 'utf-8'));
+        const messageCount = input.llm_request?.contents?.length || 0;
+        let counts = [];
+        try { counts = JSON.parse(fs.readFileSync('${messageCountFile}', 'utf-8')); } catch (e) {}
+        counts.push(messageCount);
+        fs.writeFileSync('${messageCountFile}', JSON.stringify(counts));
+        console.log(JSON.stringify({ decision: 'allow' }));
+      `;
+      const beforeModelScriptPath = join(
+        rig.testDir!,
+        'before_model_counter.cjs',
+      );
+      writeFileSync(beforeModelScriptPath, beforeModelScript);
+
+      await rig.setup('should process clearContext in AfterAgent hook output', {
+        settings: {
+          hooks: {
+            enabled: true,
+            BeforeModel: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${beforeModelScriptPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+            AfterAgent: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node -e "console.log(JSON.stringify({decision: 'block', reason: 'Security policy triggered', hookSpecificOutput: {hookEventName: 'AfterAgent', clearContext: true}}))"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      const result = await rig.run({ args: 'Hello test' });
+
+      const hookTelemetryFound = await rig.waitForTelemetryEvent('hook_call');
+      expect(hookTelemetryFound).toBeTruthy();
+
+      const hookLogs = rig.readHookLogs();
+      const afterAgentLog = hookLogs.find(
+        (log) => log.hookCall.hook_event_name === 'AfterAgent',
+      );
+
+      expect(afterAgentLog).toBeDefined();
+      expect(afterAgentLog?.hookCall.stdout).toContain('clearContext');
+      expect(afterAgentLog?.hookCall.stdout).toContain('true');
+      expect(result).toContain('Security policy triggered');
+
+      // Verify context was cleared: second call should not have more messages than first
+      const countsRaw = rig.readFile('message-counts.json');
+      const counts = JSON.parse(countsRaw) as number[];
+      expect(counts.length).toBeGreaterThanOrEqual(2);
+      expect(counts[1]).toBeLessThanOrEqual(counts[0]);
+    });
   });
 
   describe('Multi-step Loops', () => {

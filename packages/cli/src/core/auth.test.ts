@@ -6,18 +6,20 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { performInitialAuth } from './auth.js';
-import { type Config } from '@google/gemini-cli-core';
+import {
+  type Config,
+  ValidationRequiredError,
+  AuthType,
+} from '@google/gemini-cli-core';
 
-vi.mock('@google/gemini-cli-core', () => ({
-  AuthType: {
-    OAUTH: 'oauth',
-  },
-  getErrorMessage: (e: unknown) => (e as Error).message,
-}));
-
-const AuthType = {
-  OAUTH: 'oauth',
-} as const;
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    getErrorMessage: (e: unknown) => (e as Error).message,
+  };
+});
 
 describe('auth', () => {
   let mockConfig: Config;
@@ -37,10 +39,12 @@ describe('auth', () => {
   it('should return null on successful auth', async () => {
     const result = await performInitialAuth(
       mockConfig,
-      AuthType.OAUTH as unknown as Parameters<typeof performInitialAuth>[1],
+      AuthType.LOGIN_WITH_GOOGLE,
     );
     expect(result).toBeNull();
-    expect(mockConfig.refreshAuth).toHaveBeenCalledWith(AuthType.OAUTH);
+    expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
+      AuthType.LOGIN_WITH_GOOGLE,
+    );
   });
 
   it('should return error message on failed auth', async () => {
@@ -48,9 +52,25 @@ describe('auth', () => {
     vi.mocked(mockConfig.refreshAuth).mockRejectedValue(error);
     const result = await performInitialAuth(
       mockConfig,
-      AuthType.OAUTH as unknown as Parameters<typeof performInitialAuth>[1],
+      AuthType.LOGIN_WITH_GOOGLE,
     );
     expect(result).toBe('Failed to login. Message: Auth failed');
-    expect(mockConfig.refreshAuth).toHaveBeenCalledWith(AuthType.OAUTH);
+    expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
+      AuthType.LOGIN_WITH_GOOGLE,
+    );
+  });
+
+  it('should return null if refreshAuth throws ValidationRequiredError', async () => {
+    vi.mocked(mockConfig.refreshAuth).mockRejectedValue(
+      new ValidationRequiredError('Validation required'),
+    );
+    const result = await performInitialAuth(
+      mockConfig,
+      AuthType.LOGIN_WITH_GOOGLE,
+    );
+    expect(result).toBeNull();
+    expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
+      AuthType.LOGIN_WITH_GOOGLE,
+    );
   });
 });

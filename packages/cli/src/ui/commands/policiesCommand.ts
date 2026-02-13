@@ -36,7 +36,8 @@ const categorizeRulesByMode = (
 const formatRule = (rule: PolicyRule, i: number) =>
   `${i + 1}. **${rule.decision.toUpperCase()}** ${rule.toolName ? `tool: \`${rule.toolName}\`` : 'all tools'}` +
   (rule.argsPattern ? ` (args match: \`${rule.argsPattern.source}\`)` : '') +
-  (rule.priority !== undefined ? ` [Priority: ${rule.priority}]` : '');
+  (rule.priority !== undefined ? ` [Priority: ${rule.priority}]` : '') +
+  (rule.source ? ` [Source: ${rule.source}]` : '');
 
 const formatSection = (title: string, rules: PolicyRule[]) =>
   `### ${title}\n${rules.length ? rules.map(formatRule).join('\n') : '_No policies._'}\n\n`;

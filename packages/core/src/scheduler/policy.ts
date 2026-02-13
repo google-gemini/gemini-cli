@@ -4,7 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ApprovalMode, PolicyDecision } from '../policy/types.js';
+import { ToolErrorType } from '../tools/tool-error.js';
+import {
+  ApprovalMode,
+  PolicyDecision,
+  type CheckResult,
+  type PolicyRule,
+} from '../policy/types.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
@@ -21,6 +27,20 @@ import { EDIT_TOOL_NAMES } from '../tools/tool-names.js';
 import type { ValidatingToolCall } from './types.js';
 
 /**
+ * Helper to format the policy denial error.
+ */
+export function getPolicyDenialError(
+  config: Config,
+  rule?: PolicyRule,
+): { errorMessage: string; errorType: ToolErrorType } {
+  const denyMessage = rule?.denyMessage ? ` ${rule.denyMessage}` : '';
+  return {
+    errorMessage: `Tool execution denied by policy.${denyMessage}`,
+    errorType: ToolErrorType.POLICY_VIOLATION,
+  };
+}
+
+/**
  * Queries the system PolicyEngine to determine tool allowance.
  * @returns The PolicyDecision.
  * @throws Error if policy requires ASK_USER but the CLI is non-interactive.
@@ -28,19 +48,25 @@ import type { ValidatingToolCall } from './types.js';
 export async function checkPolicy(
   toolCall: ValidatingToolCall,
   config: Config,
-): Promise<PolicyDecision> {
+): Promise<CheckResult> {
   const serverName =
     toolCall.tool instanceof DiscoveredMCPTool
       ? toolCall.tool.serverName
       : undefined;
 
-  const { decision } = await config
+  const result = await config
     .getPolicyEngine()
     .check(
       { name: toolCall.request.name, args: toolCall.request.args },
       serverName,
     );
 
+  const { decision } = result;
+
+  /*
+   * Return the full check result including the rule that matched.
+   * This is necessary to access metadata like custom deny messages.
+   */
   if (decision === PolicyDecision.ASK_USER) {
     if (!config.isInteractive()) {
       throw new Error(
@@ -51,7 +77,7 @@ export async function checkPolicy(
     }
   }
 
-  return decision;
+  return { decision, rule: result.rule };
 }
 
 /**

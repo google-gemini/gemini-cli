@@ -59,8 +59,12 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.MOVE_LEFT,
-      positive: [createKey('left'), createKey('b', { ctrl: true })],
-      negative: [createKey('left', { ctrl: true }), createKey('b')],
+      positive: [createKey('left')],
+      negative: [
+        createKey('left', { ctrl: true }),
+        createKey('b'),
+        createKey('b', { ctrl: true }),
+      ],
     },
     {
       command: Command.MOVE_RIGHT,
@@ -131,13 +135,24 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.UNDO,
-      positive: [createKey('z', { shift: false, ctrl: true })],
-      negative: [createKey('z'), createKey('z', { shift: true, ctrl: true })],
+      positive: [
+        createKey('z', { shift: false, cmd: true }),
+        createKey('z', { shift: false, alt: true }),
+      ],
+      negative: [
+        createKey('z'),
+        createKey('z', { shift: true, cmd: true }),
+        createKey('z', { shift: false, ctrl: true }),
+      ],
     },
     {
       command: Command.REDO,
-      positive: [createKey('z', { shift: true, ctrl: true })],
-      negative: [createKey('z'), createKey('z', { shift: false, ctrl: true })],
+      positive: [
+        createKey('z', { shift: true, cmd: true }),
+        createKey('z', { shift: true, alt: true }),
+        createKey('z', { shift: true, ctrl: true }),
+      ],
+      negative: [createKey('z'), createKey('z', { shift: false, cmd: true })],
     },
 
     // Screen control
@@ -151,21 +166,27 @@ describe('keyMatchers', () => {
     {
       command: Command.SCROLL_UP,
       positive: [createKey('up', { shift: true })],
-      negative: [createKey('up'), createKey('up', { ctrl: true })],
+      negative: [createKey('up')],
     },
     {
       command: Command.SCROLL_DOWN,
       positive: [createKey('down', { shift: true })],
-      negative: [createKey('down'), createKey('down', { ctrl: true })],
+      negative: [createKey('down')],
     },
     {
       command: Command.SCROLL_HOME,
-      positive: [createKey('home', { ctrl: true })],
+      positive: [
+        createKey('home', { ctrl: true }),
+        createKey('home', { shift: true }),
+      ],
       negative: [createKey('end'), createKey('home')],
     },
     {
       command: Command.SCROLL_END,
-      positive: [createKey('end', { ctrl: true })],
+      positive: [
+        createKey('end', { ctrl: true }),
+        createKey('end', { shift: true }),
+      ],
       negative: [createKey('home'), createKey('end')],
     },
     {
@@ -274,7 +295,10 @@ describe('keyMatchers', () => {
     {
       command: Command.SHOW_ERROR_DETAILS,
       positive: [createKey('f12')],
-      negative: [createKey('o', { ctrl: true }), createKey('f11')],
+      negative: [
+        createKey('o', { ctrl: true }),
+        createKey('b', { ctrl: true }),
+      ],
     },
     {
       command: Command.SHOW_FULL_TODOS,
@@ -307,9 +331,25 @@ describe('keyMatchers', () => {
       negative: [createKey('d'), createKey('c', { ctrl: true })],
     },
     {
+      command: Command.SUSPEND_APP,
+      positive: [
+        createKey('z', { ctrl: true }),
+        createKey('z', { ctrl: true, shift: true }),
+      ],
+      negative: [
+        createKey('z'),
+        createKey('y', { ctrl: true }),
+        createKey('z', { alt: true }),
+      ],
+    },
+    {
       command: Command.SHOW_MORE_LINES,
-      positive: [createKey('s', { ctrl: true })],
-      negative: [createKey('s'), createKey('l', { ctrl: true })],
+      positive: [createKey('o', { ctrl: true })],
+      negative: [
+        createKey('s', { ctrl: true }),
+        createKey('s'),
+        createKey('l', { ctrl: true }),
+      ],
     },
 
     // Shell commands
@@ -331,7 +371,7 @@ describe('keyMatchers', () => {
     {
       command: Command.FOCUS_SHELL_INPUT,
       positive: [createKey('tab')],
-      negative: [createKey('f', { ctrl: true }), createKey('f')],
+      negative: [createKey('f6'), createKey('f', { ctrl: true })],
     },
     {
       command: Command.TOGGLE_YOLO,
@@ -342,6 +382,16 @@ describe('keyMatchers', () => {
       command: Command.CYCLE_APPROVAL_MODE,
       positive: [createKey('tab', { shift: true })],
       negative: [createKey('tab')],
+    },
+    {
+      command: Command.TOGGLE_BACKGROUND_SHELL,
+      positive: [createKey('b', { ctrl: true })],
+      negative: [createKey('f10'), createKey('b')],
+    },
+    {
+      command: Command.TOGGLE_BACKGROUND_SHELL_LIST,
+      positive: [createKey('l', { ctrl: true })],
+      negative: [createKey('l')],
     },
   ];
 

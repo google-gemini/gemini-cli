@@ -25,12 +25,18 @@ import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 //
 // Note that only the "interesting" bits of the responses are actually kept.
 export class RecordingContentGenerator implements ContentGenerator {
-  userTier?: UserTierId;
-
   constructor(
     private readonly realGenerator: ContentGenerator,
     private readonly filePath: string,
   ) {}
+
+  get userTier(): UserTierId | undefined {
+    return this.realGenerator.userTier;
+  }
+
+  get userTierName(): string | undefined {
+    return this.realGenerator.userTierName;
+  }
 
   async generateContent(
     request: GenerateContentParameters,
@@ -42,6 +48,7 @@ export class RecordingContentGenerator implements ContentGenerator {
     );
     const recordedResponse: FakeResponse = {
       method: 'generateContent',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       response: {
         candidates: response.candidates,
         usageMetadata: response.usageMetadata,
@@ -67,6 +74,7 @@ export class RecordingContentGenerator implements ContentGenerator {
 
     async function* stream(filePath: string) {
       for await (const response of realResponses) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         (recordedResponse.response as GenerateContentResponse[]).push({
           candidates: response.candidates,
           usageMetadata: response.usageMetadata,

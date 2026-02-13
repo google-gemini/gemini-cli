@@ -56,6 +56,7 @@ function removeEmptyObjects(data: any): object {
 export function safeJsonStringifyBooleanValuesOnly(obj: any): string {
   let configSeen = false;
   return JSON.stringify(removeEmptyObjects(obj), (key, value) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     if ((value as Config) !== null && !configSeen) {
       configSeen = true;
       return value;

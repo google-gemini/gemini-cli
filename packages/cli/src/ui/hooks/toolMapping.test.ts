@@ -7,7 +7,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mapCoreStatusToDisplayStatus, mapToDisplay } from './toolMapping.js';
 import {
-  debugLogger,
   type AnyDeclarativeTool,
   type AnyToolInvocation,
   type ToolCallRequestInfo,
@@ -22,17 +21,6 @@ import {
 } from '@google/gemini-cli-core';
 import { ToolCallStatus } from '../types.js';
 
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
-  return {
-    ...actual,
-    debugLogger: {
-      warn: vi.fn(),
-    },
-  };
-});
-
 describe('toolMapping', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -40,7 +28,7 @@ describe('toolMapping', () => {
 
   describe('mapCoreStatusToDisplayStatus', () => {
     it.each([
-      ['validating', ToolCallStatus.Executing],
+      ['validating', ToolCallStatus.Pending],
       ['awaiting_approval', ToolCallStatus.Confirming],
       ['executing', ToolCallStatus.Executing],
       ['success', ToolCallStatus.Success],
@@ -53,12 +41,10 @@ describe('toolMapping', () => {
       );
     });
 
-    it('logs warning and defaults to Error for unknown status', () => {
-      const result = mapCoreStatusToDisplayStatus('unknown_status' as Status);
-      expect(result).toBe(ToolCallStatus.Error);
-      expect(debugLogger.warn).toHaveBeenCalledWith(
-        'Unknown core status encountered: unknown_status',
-      );
+    it('throws error for unknown status due to checkExhaustive', () => {
+      expect(() =>
+        mapCoreStatusToDisplayStatus('unknown_status' as Status),
+      ).toThrow('unexpected value unknown_status!');
     });
   });
 
@@ -258,6 +244,35 @@ describe('toolMapping', () => {
 
       expect(displayTool.status).toBe(ToolCallStatus.Canceled);
       expect(displayTool.resultDisplay).toBe('User cancelled');
+    });
+
+    it('propagates borderTop and borderBottom options correctly', () => {
+      const toolCall: ScheduledToolCall = {
+        status: 'scheduled',
+        request: mockRequest,
+        tool: mockTool,
+        invocation: mockInvocation,
+      };
+
+      const result = mapToDisplay(toolCall, {
+        borderTop: true,
+        borderBottom: false,
+      });
+      expect(result.borderTop).toBe(true);
+      expect(result.borderBottom).toBe(false);
+    });
+
+    it('sets resultDisplay to undefined for pre-execution statuses', () => {
+      const toolCall: ScheduledToolCall = {
+        status: 'scheduled',
+        request: mockRequest,
+        tool: mockTool,
+        invocation: mockInvocation,
+      };
+
+      const result = mapToDisplay(toolCall);
+      expect(result.tools[0].resultDisplay).toBeUndefined();
+      expect(result.tools[0].status).toBe(ToolCallStatus.Pending);
     });
   });
 });

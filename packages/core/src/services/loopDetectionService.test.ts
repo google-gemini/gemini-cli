@@ -38,6 +38,7 @@ describe('LoopDetectionService', () => {
     mockConfig = {
       getTelemetryEnabled: () => true,
       isInteractive: () => false,
+      getDisableLoopDetection: () => false,
       getModelAvailabilityService: vi
         .fn()
         .mockReturnValue(createAvailabilityServiceMock()),
@@ -161,6 +162,15 @@ describe('LoopDetectionService', () => {
 
       // Should now return false even though a loop was previously detected
       expect(service.addAndCheck(event)).toBe(false);
+    });
+
+    it('should skip loop detection if disabled in config', () => {
+      vi.spyOn(mockConfig, 'getDisableLoopDetection').mockReturnValue(true);
+      const event = createToolCallRequestEvent('testTool', { param: 'value' });
+      for (let i = 0; i < TOOL_CALL_LOOP_THRESHOLD + 2; i++) {
+        expect(service.addAndCheck(event)).toBe(false);
+      }
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
   });
 
@@ -742,6 +752,7 @@ describe('LoopDetectionService LLM Checks', () => {
     mockConfig = {
       getGeminiClient: () => mockGeminiClient,
       getBaseLlmClient: () => mockBaseLlmClient,
+      getDisableLoopDetection: () => false,
       getDebugMode: () => false,
       getTelemetryEnabled: () => true,
       getModel: vi.fn().mockReturnValue('cognitive-loop-v1'),

@@ -6,16 +6,19 @@
 
 import { Box, Static } from 'ink';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
-import { ShowMoreLines } from './ShowMoreLines.js';
-import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useAppContext } from '../contexts/AppContext.js';
 import { AppHeader } from './AppHeader.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
-import { SCROLL_TO_ITEM_END } from './shared/VirtualizedList.js';
+import {
+  SCROLL_TO_ITEM_END,
+  type VirtualizedListRef,
+} from './shared/VirtualizedList.js';
 import { ScrollableList } from './shared/ScrollableList.js';
-import { useMemo, memo, useCallback } from 'react';
+import { useMemo, memo, useCallback, useEffect, useRef } from 'react';
 import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
+import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
+import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
@@ -29,12 +32,25 @@ export const MainContent = () => {
   const uiState = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
 
+  const confirmingTool = useConfirmingTool();
+  const showConfirmationQueue = confirmingTool !== null;
+
+  const scrollableListRef = useRef<VirtualizedListRef<unknown>>(null);
+
+  useEffect(() => {
+    if (showConfirmationQueue) {
+      scrollableListRef.current?.scrollToEnd();
+    }
+  }, [showConfirmationQueue, confirmingTool]);
+
   const {
     pendingHistoryItems,
     mainAreaWidth,
     staticAreaMaxItemHeight,
     availableTerminalHeight,
+    cleanUiDetailsVisible,
   } = uiState;
+  const showHeaderDetails = cleanUiDetailsVisible;
 
   const historyItems = useMemo(
     () =>
@@ -59,27 +75,27 @@ export const MainContent = () => {
 
   const pendingItems = useMemo(
     () => (
-      <OverflowProvider>
-        <Box flexDirection="column">
-          {pendingHistoryItems.map((item, i) => (
-            <HistoryItemDisplay
-              key={i}
-              availableTerminalHeight={
-                uiState.constrainHeight && !isAlternateBuffer
-                  ? availableTerminalHeight
-                  : undefined
-              }
-              terminalWidth={mainAreaWidth}
-              item={{ ...item, id: 0 }}
-              isPending={true}
-              isFocused={!uiState.isEditorDialogOpen}
-              activeShellPtyId={uiState.activePtyId}
-              embeddedShellFocused={uiState.embeddedShellFocused}
-            />
-          ))}
-          <ShowMoreLines constrainHeight={uiState.constrainHeight} />
-        </Box>
-      </OverflowProvider>
+      <Box flexDirection="column">
+        {pendingHistoryItems.map((item, i) => (
+          <HistoryItemDisplay
+            key={i}
+            availableTerminalHeight={
+              (uiState.constrainHeight && !isAlternateBuffer) ||
+              isAlternateBuffer
+                ? availableTerminalHeight
+                : undefined
+            }
+            terminalWidth={mainAreaWidth}
+            item={{ ...item, id: 0 }}
+            isPending={true}
+            activeShellPtyId={uiState.activePtyId}
+            embeddedShellFocused={uiState.embeddedShellFocused}
+          />
+        ))}
+        {showConfirmationQueue && confirmingTool && (
+          <ToolConfirmationQueue confirmingTool={confirmingTool} />
+        )}
+      </Box>
     ),
     [
       pendingHistoryItems,
@@ -87,9 +103,10 @@ export const MainContent = () => {
       isAlternateBuffer,
       availableTerminalHeight,
       mainAreaWidth,
-      uiState.isEditorDialogOpen,
       uiState.activePtyId,
       uiState.embeddedShellFocused,
+      showConfirmationQueue,
+      confirmingTool,
     ],
   );
 
@@ -105,7 +122,13 @@ export const MainContent = () => {
   const renderItem = useCallback(
     ({ item }: { item: (typeof virtualizedData)[number] }) => {
       if (item.type === 'header') {
-        return <MemoizedAppHeader key="app-header" version={version} />;
+        return (
+          <MemoizedAppHeader
+            key="app-header"
+            version={version}
+            showDetails={showHeaderDetails}
+          />
+        );
       } else if (item.type === 'history') {
         return (
           <MemoizedHistoryItemDisplay
@@ -122,13 +145,21 @@ export const MainContent = () => {
         return pendingItems;
       }
     },
-    [version, mainAreaWidth, uiState.slashCommands, pendingItems],
+    [
+      showHeaderDetails,
+      version,
+      mainAreaWidth,
+      uiState.slashCommands,
+      pendingItems,
+    ],
   );
 
   if (isAlternateBuffer) {
     return (
       <ScrollableList
-        hasFocus={!uiState.isEditorDialogOpen}
+        ref={scrollableListRef}
+        hasFocus={!uiState.isEditorDialogOpen && !uiState.embeddedShellFocused}
+        width={uiState.terminalWidth}
         data={virtualizedData}
         renderItem={renderItem}
         estimatedItemHeight={() => 100}

@@ -7,7 +7,6 @@
 import {
   type ToolCall,
   type Status as CoreStatus,
-  type ToolCallConfirmationDetails,
   type SerializableConfirmationDetails,
   type ToolResultDisplay,
   debugLogger,
@@ -18,12 +17,14 @@ import {
   type IndividualToolCallDisplay,
 } from '../types.js';
 
+import { checkExhaustive } from '@google/gemini-cli-core';
+
 export function mapCoreStatusToDisplayStatus(
   coreStatus: CoreStatus,
 ): ToolCallStatus {
   switch (coreStatus) {
     case 'validating':
-      return ToolCallStatus.Executing;
+      return ToolCallStatus.Pending;
     case 'awaiting_approval':
       return ToolCallStatus.Confirming;
     case 'executing':
@@ -37,8 +38,7 @@ export function mapCoreStatusToDisplayStatus(
     case 'scheduled':
       return ToolCallStatus.Pending;
     default:
-      debugLogger.warn(`Unknown core status encountered: ${coreStatus}`);
-      return ToolCallStatus.Error;
+      return checkExhaustive(coreStatus);
   }
 }
 
@@ -49,8 +49,10 @@ export function mapCoreStatusToDisplayStatus(
  */
 export function mapToDisplay(
   toolOrTools: ToolCall[] | ToolCall,
+  options: { borderTop?: boolean; borderBottom?: boolean } = {},
 ): HistoryItemToolGroup {
   const toolCalls = Array.isArray(toolOrTools) ? toolOrTools : [toolOrTools];
+  const { borderTop, borderBottom } = options;
 
   const toolDisplays = toolCalls.map((call): IndividualToolCallDisplay => {
     let description: string;
@@ -73,10 +75,8 @@ export function mapToDisplay(
     };
 
     let resultDisplay: ToolResultDisplay | undefined = undefined;
-    let confirmationDetails:
-      | ToolCallConfirmationDetails
-      | SerializableConfirmationDetails
-      | undefined = undefined;
+    let confirmationDetails: SerializableConfirmationDetails | undefined =
+      undefined;
     let outputFile: string | undefined = undefined;
     let ptyId: number | undefined = undefined;
     let correlationId: string | undefined = undefined;
@@ -127,5 +127,7 @@ export function mapToDisplay(
   return {
     type: 'tool_group',
     tools: toolDisplays,
+    borderTop,
+    borderBottom,
   };
 }

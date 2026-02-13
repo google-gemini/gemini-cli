@@ -125,6 +125,7 @@ export const METADATA_KEY = '__persistedState';
 export function getPersistedState(
   metadata: PersistedTaskMetadata,
 ): PersistedStateMetadata | undefined {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return metadata?.[METADATA_KEY] as PersistedStateMetadata | undefined;
 }
 

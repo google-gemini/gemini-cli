@@ -41,7 +41,7 @@ export class HookRegistry {
     this.entries = [];
     this.processHooksFromConfig();
 
-    debugLogger.log(
+    debugLogger.debug(
       `Hook registry initialized with ${this.entries.length} hook entries`,
     );
   }
@@ -226,6 +226,7 @@ please review the project settings (.gemini/settings.json) and remove them.`;
         this.validateHookConfig(hookConfig, eventName, source)
       ) {
         // Check if this hook is in the disabled list
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const hookName = this.getHookName({
           config: hookConfig,
         } as HookRegistryEntry);
@@ -282,6 +283,7 @@ please review the project settings (.gemini/settings.json) and remove them.`;
    */
   private isValidEventName(eventName: string): eventName is HookEventName {
     const validEventNames = Object.values(HookEventName);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return validEventNames.includes(eventName as HookEventName);
   }
 
