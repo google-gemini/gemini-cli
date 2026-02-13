@@ -27,6 +27,7 @@ To standardize the process of updating changelog files (`latest.md`,
   chores.
 - **Avoid** mentioning features that are "experimental" or "in preview" in
   Stable Releases.
+- **DO NOT** include PR numbers, links, or author names in these highlights.
 - Refer to `.gemini/skills/docs-changelog/references/highlights_examples.md`
   for the correct style and tone.
 
@@ -58,17 +59,23 @@ To standardize the process of updating changelog files (`latest.md`,
 
 ### A.1: Stable Release (e.g., `v0.28.0`)
 
-1.  **Update `index.md`**:
-    -   Generate a concise announcement for the release.
+For a stable release, you will generate two distinct summaries from the
+changelog: a concise **announcement** for the main changelog page, and a more
+detailed **highlights** section for the release-specific page.
+
+1.  **Create the Announcement for `index.md`**:
+    -   Generate a concise announcement summarizing the most important changes.
     -   **Important**: The format for this announcement is unique. You **must**
         use the existing announcements in `docs/changelogs/index.md` and the
         example within
         `.gemini/skills/docs-changelog/references/index_template.md` as your
-        guide for structure and style, not the general highlight guidelines.
+        guide. This format includes PR links and authors.
     -   Add this new announcement to the top of `docs/changelogs/index.md`.
-2.  **Update `latest.md`**:
-    -   Generate a comprehensive "Highlights" section, following the highlight
-        guidelines.
+
+2.  **Create Highlights and Update `latest.md`**:
+    -   Generate a comprehensive "Highlights" section, following the guidelines
+        in the "Guidelines for `latest.md` and `preview.md` Highlights" section
+        above.
     -   Take the content from
         `.gemini/skills/docs-changelog/references/latest_template.md`.
     -   Populate the template with the `version`, `release_date`, generated
