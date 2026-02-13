@@ -150,7 +150,7 @@
       },
       { "label": "Memory (tool)", "slug": "docs/tools/memory" },
       { "label": "Model routing", "slug": "docs/cli/model-routing" },
-      { "label": "Plan mode (experimental)", "slug": "docs/cli/plan-mode.md" },
+      { "label": "Plan mode (experimental)", "slug": "docs/cli/plan-mode" },
       { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
       { "label": "Shell (tool)", "slug": "docs/tools/shell" },
       { "label": "Telemetry", "slug": "docs/cli/telemetry" },
