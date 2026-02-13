@@ -41,7 +41,7 @@ function flattenSchema(schema: SettingsSchema, prefix = ''): FlattenedSchema {
 let _FLATTENED_SCHEMA: FlattenedSchema | undefined;
 
 /** Returns a flattened schema, the first call is memoized for future requests. */
-export function getFlattenedSchema() {
+function getFlattenedSchema() {
   return (
     _FLATTENED_SCHEMA ??
     (_FLATTENED_SCHEMA = flattenSchema(getSettingsSchema()))
@@ -132,10 +132,7 @@ export function getRestartRequiredSettings(): string[] {
 /**
  * Recursively gets a value from a nested object using a key path array.
  */
-export function getNestedValue(
-  obj: Record<string, unknown>,
-  path: string[],
-): unknown {
+function getNestedValue(obj: Record<string, unknown>, path: string[]): unknown {
   const [first, ...rest] = path;
   if (!first || !(first in obj)) {
     return undefined;
