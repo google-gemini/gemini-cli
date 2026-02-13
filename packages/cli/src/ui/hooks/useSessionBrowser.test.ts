@@ -14,10 +14,11 @@ import {
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { getSessionFiles, type SessionInfo } from '../../utils/sessionUtils.js';
-import type {
-  Config,
-  ConversationRecord,
-  MessageRecord,
+import {
+  type Config,
+  type ConversationRecord,
+  type MessageRecord,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { coreEvents } from '@google/gemini-cli-core';
 
@@ -238,7 +239,7 @@ describe('convertSessionToHistoryFormats', () => {
             id: 'call_1',
             name: 'get_time',
             args: {},
-            status: 'success',
+            status: CoreToolCallStatus.Success,
             result: '12:00',
           },
         ],
@@ -258,7 +259,7 @@ describe('convertSessionToHistoryFormats', () => {
         expect.objectContaining({
           callId: 'call_1',
           name: 'get_time',
-          status: 'Success',
+          status: CoreToolCallStatus.Success,
         }),
       ],
     });

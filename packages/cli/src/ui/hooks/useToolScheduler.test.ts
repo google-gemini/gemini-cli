@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { useToolScheduler } from './useToolScheduler.js';
@@ -18,6 +18,7 @@ import {
   type AnyDeclarativeTool,
   type AnyToolInvocation,
   ROOT_SCHEDULER_ID,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
 
@@ -98,7 +99,7 @@ describe('useToolScheduler', () => {
     );
 
     const mockToolCall = {
-      status: 'executing' as const,
+      status: CoreToolCallStatus.Executing as const,
       request: {
         callId: 'call-1',
         name: 'test_tool',
@@ -124,7 +125,7 @@ describe('useToolScheduler', () => {
     // Expect Core Object structure, not Display Object
     expect(toolCalls[0]).toMatchObject({
       request: { callId: 'call-1', name: 'test_tool' },
-      status: 'executing', // Core status
+      status: CoreToolCallStatus.Executing,
       liveOutput: 'Loading...',
       responseSubmittedToGemini: false,
     });
@@ -140,7 +141,7 @@ describe('useToolScheduler', () => {
     );
 
     const mockToolCall = {
-      status: 'success' as const,
+      status: CoreToolCallStatus.Success as const,
       request: {
         callId: 'call-1',
         name: 'test',
@@ -206,7 +207,7 @@ describe('useToolScheduler', () => {
         type: MessageBusType.TOOL_CALLS_UPDATE,
         toolCalls: [
           {
-            status: 'executing' as const,
+            status: CoreToolCallStatus.Executing as const,
             request: {
               callId: 'call-1',
               name: 'test',
@@ -252,7 +253,7 @@ describe('useToolScheduler', () => {
     const onComplete = vi.fn().mockResolvedValue(undefined);
 
     const completedToolCall = {
-      status: 'success' as const,
+      status: CoreToolCallStatus.Success as const,
       request: {
         callId: 'call-1',
         name: 'test',
@@ -316,7 +317,7 @@ describe('useToolScheduler', () => {
     );
 
     const callRoot = {
-      status: 'success' as const,
+      status: CoreToolCallStatus.Success as const,
       request: {
         callId: 'call-root',
         name: 'test',
@@ -390,7 +391,7 @@ describe('useToolScheduler', () => {
     act(() => {
       void mockMessageBus.publish({
         type: MessageBusType.TOOL_CALLS_UPDATE,
-        toolCalls: [{ ...callRoot, status: 'executing' }],
+        toolCalls: [{ ...callRoot, status: CoreToolCallStatus.Executing }],
         schedulerId: ROOT_SCHEDULER_ID,
       } as ToolCallsUpdateMessage);
     });
@@ -399,7 +400,7 @@ describe('useToolScheduler', () => {
     expect(toolCalls).toHaveLength(2);
     expect(
       toolCalls.find((t) => t.request.callId === 'call-root')?.status,
-    ).toBe('executing');
+    ).toBe(CoreToolCallStatus.Executing);
     expect(
       toolCalls.find((t) => t.request.callId === 'call-sub')?.schedulerId,
     ).toBe('subagent-1');

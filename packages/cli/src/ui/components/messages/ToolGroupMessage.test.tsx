@@ -8,9 +8,12 @@ import { renderWithProviders } from '../../../test-utils/render.js';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
 import type { IndividualToolCallDisplay } from '../../types.js';
-import { ToolCallStatus } from '../../types.js';
 import { Scrollable } from '../shared/Scrollable.js';
-import { ASK_USER_DISPLAY_NAME, makeFakeConfig } from '@google/gemini-cli-core';
+import {
+  ASK_USER_DISPLAY_NAME,
+  makeFakeConfig,
+  CoreToolCallStatus,
+} from '@google/gemini-cli-core';
 import os from 'node:os';
 
 describe('<ToolGroupMessage />', () => {
@@ -25,7 +28,7 @@ describe('<ToolGroupMessage />', () => {
     name: 'test-tool',
     description: 'A tool for testing',
     resultDisplay: 'Test result',
-    status: ToolCallStatus.Success,
+    status: CoreToolCallStatus.Success,
     confirmationDetails: undefined,
     renderOutputAsMarkdown: false,
     ...overrides,
@@ -65,7 +68,7 @@ describe('<ToolGroupMessage />', () => {
       const toolCalls = [
         createToolCall({
           callId: 'confirm-tool',
-          status: ToolCallStatus.Confirming,
+          status: CoreToolCallStatus.AwaitingApproval,
           confirmationDetails: {
             type: 'info',
             title: 'Confirm tool',
@@ -90,19 +93,19 @@ describe('<ToolGroupMessage />', () => {
           callId: 'tool-1',
           name: 'successful-tool',
           description: 'This tool succeeded',
-          status: ToolCallStatus.Success,
+          status: CoreToolCallStatus.Success,
         }),
         createToolCall({
           callId: 'tool-2',
           name: 'pending-tool',
           description: 'This tool is pending',
-          status: ToolCallStatus.Pending,
+          status: CoreToolCallStatus.Scheduled,
         }),
         createToolCall({
           callId: 'tool-3',
           name: 'error-tool',
           description: 'This tool failed',
-          status: ToolCallStatus.Error,
+          status: CoreToolCallStatus.Error,
         }),
       ];
 
@@ -130,19 +133,19 @@ describe('<ToolGroupMessage />', () => {
           callId: 'tool-1',
           name: 'read_file',
           description: 'Read a file',
-          status: ToolCallStatus.Success,
+          status: CoreToolCallStatus.Success,
         }),
         createToolCall({
           callId: 'tool-2',
           name: 'run_shell_command',
           description: 'Run command',
-          status: ToolCallStatus.Executing,
+          status: CoreToolCallStatus.Executing,
         }),
         createToolCall({
           callId: 'tool-3',
           name: 'write_file',
           description: 'Write to file',
-          status: ToolCallStatus.Pending,
+          status: CoreToolCallStatus.Scheduled,
         }),
       ];
 
@@ -273,7 +276,7 @@ describe('<ToolGroupMessage />', () => {
           callId: 'tool-output-file',
           name: 'tool-with-file',
           description: 'Tool that saved output to file',
-          status: ToolCallStatus.Success,
+          status: CoreToolCallStatus.Success,
           outputFile: '/path/to/output.txt',
         }),
       ];
@@ -333,7 +336,7 @@ describe('<ToolGroupMessage />', () => {
       const toolCalls = [
         createToolCall({
           name: 'run_shell_command',
-          status: ToolCallStatus.Success,
+          status: CoreToolCallStatus.Success,
         }),
       ];
       const { lastFrame, unmount } = renderWithProviders(
@@ -351,11 +354,11 @@ describe('<ToolGroupMessage />', () => {
 
     it('uses gray border when all tools are successful and no shell commands', () => {
       const toolCalls = [
-        createToolCall({ status: ToolCallStatus.Success }),
+        createToolCall({ status: CoreToolCallStatus.Success }),
         createToolCall({
           callId: 'tool-2',
           name: 'another-tool',
-          status: ToolCallStatus.Success,
+          status: CoreToolCallStatus.Success,
         }),
       ];
       const { lastFrame, unmount } = renderWithProviders(
@@ -409,28 +412,28 @@ describe('<ToolGroupMessage />', () => {
   describe('Ask User Filtering', () => {
     it.each([
       {
-        status: ToolCallStatus.Pending,
+        status: CoreToolCallStatus.Scheduled,
         resultDisplay: 'test result',
         shouldHide: true,
       },
       {
-        status: ToolCallStatus.Executing,
+        status: CoreToolCallStatus.Executing,
         resultDisplay: 'test result',
         shouldHide: true,
       },
       {
-        status: ToolCallStatus.Confirming,
+        status: CoreToolCallStatus.AwaitingApproval,
         resultDisplay: 'test result',
         shouldHide: true,
       },
       {
-        status: ToolCallStatus.Success,
+        status: CoreToolCallStatus.Success,
         resultDisplay: 'test result',
         shouldHide: false,
       },
-      { status: ToolCallStatus.Error, resultDisplay: '', shouldHide: true },
+      { status: CoreToolCallStatus.Error, resultDisplay: '', shouldHide: true },
       {
-        status: ToolCallStatus.Error,
+        status: CoreToolCallStatus.Error,
         resultDisplay: 'error message',
         shouldHide: false,
       },
@@ -465,12 +468,12 @@ describe('<ToolGroupMessage />', () => {
         createToolCall({
           callId: 'other-tool',
           name: 'other-tool',
-          status: ToolCallStatus.Success,
+          status: CoreToolCallStatus.Success,
         }),
         createToolCall({
           callId: 'ask-user-pending',
           name: ASK_USER_DISPLAY_NAME,
-          status: ToolCallStatus.Pending,
+          status: CoreToolCallStatus.Scheduled,
         }),
       ];
 
@@ -491,7 +494,7 @@ describe('<ToolGroupMessage />', () => {
         createToolCall({
           callId: 'ask-user-tool',
           name: ASK_USER_DISPLAY_NAME,
-          status: ToolCallStatus.Executing,
+          status: CoreToolCallStatus.Executing,
         }),
       ];
 
