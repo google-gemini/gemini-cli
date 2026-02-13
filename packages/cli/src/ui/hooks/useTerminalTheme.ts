@@ -56,11 +56,18 @@ export function useTerminalTheme(
       if (!match) return;
 
       const hexColor = parseColor(match[1], match[2], match[3]);
-      const luminance = getLuminance(hexColor);
+      if (!hexColor) return;
+
+      const previousColor = config.getTerminalBackground();
+
+      if (previousColor === hexColor) {
+        return;
+      }
+
       config.setTerminalBackground(hexColor);
       themeManager.setTerminalBackground(hexColor);
-      refreshStatic();
 
+      const luminance = getLuminance(hexColor);
       const currentThemeName = settings.merged.ui.theme;
 
       const newTheme = shouldSwitchTheme(
@@ -72,6 +79,11 @@ export function useTerminalTheme(
 
       if (newTheme) {
         void handleThemeSelect(newTheme, SettingScope.User);
+      } else {
+        // The existing theme had its background changed so refresh because
+        // there may be existing static UI rendered that relies on the old
+        // background color.
+        refreshStatic();
       }
     };
 
