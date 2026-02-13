@@ -292,13 +292,13 @@ const SETTINGS_SCHEMA = {
           },
           maxAge: {
             type: 'string',
-            label: 'Max Session Age',
+            label: 'Keep chat history',
             category: 'General',
             requiresRestart: false,
             default: undefined as string | undefined,
             description:
               'Maximum age of sessions to keep (e.g., "30d", "7d", "24h", "1w")',
-            showInDialog: false,
+            showInDialog: true,
           },
           maxCount: {
             type: 'number',
