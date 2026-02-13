@@ -167,10 +167,11 @@ configuration file.
   `"tools": {"core": ["run_shell_command(git)"]}` will only allow `git`
   commands. Including the generic `run_shell_command` acts as a wildcard,
   allowing any command not explicitly blocked.
-- `tools.exclude`: To block specific commands, add entries to the `exclude` list
-  under the `tools` category in the format `run_shell_command(<command>)`. For
-  example, `"tools": {"exclude": ["run_shell_command(rm)"]}` will block `rm`
-  commands.
+- `tools.exclude` [DEPRECATED]: To block specific commands, use the
+  [Policy Engine](../core/policy-engine.md). Historically, this setting allowed
+  adding entries to the `exclude` list under the `tools` category in the format
+  `run_shell_command(<command>)`. For example,
+  `"tools": {"exclude": ["run_shell_command(rm)"]}` will block `rm` commands.
 
 The validation logic is designed to be secure and flexible:
 

@@ -10,6 +10,7 @@ import { platform } from 'node:os';
 import * as dotenv from 'dotenv';
 import process from 'node:process';
 import {
+  CoreEvent,
   FatalConfigError,
   GEMINI_DIR,
   getErrorMessage,
@@ -213,6 +214,7 @@ function setNestedProperty(
     }
     const next = current[key];
     if (typeof next === 'object' && next !== null) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       current = next as Record<string, unknown>;
     } else {
       // This path is invalid, so we stop.
@@ -254,6 +256,7 @@ export function mergeSettings(
   // 3. User Settings
   // 4. Workspace Settings
   // 5. System Settings (as overrides)
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return customDeepMerge(
     getMergeStrategyForPath,
     schemaDefaults,
@@ -274,11 +277,26 @@ export function mergeSettings(
 export function createTestMergedSettings(
   overrides: Partial<Settings> = {},
 ): MergedSettings {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return customDeepMerge(
     getMergeStrategyForPath,
     getDefaultsFromSchema(),
     overrides,
   ) as MergedSettings;
+}
+
+/**
+ * An immutable snapshot of settings state.
+ * Used with useSyncExternalStore for reactive updates.
+ */
+export interface LoadedSettingsSnapshot {
+  system: SettingsFile;
+  systemDefaults: SettingsFile;
+  user: SettingsFile;
+  workspace: SettingsFile;
+  isTrusted: boolean;
+  errors: SettingsError[];
+  merged: MergedSettings;
 }
 
 export class LoadedSettings {
@@ -300,6 +318,7 @@ export class LoadedSettings {
       : this.createEmptyWorkspace(workspace);
     this.errors = errors;
     this._merged = this.computeMergedSettings();
+    this._snapshot = this.computeSnapshot();
   }
 
   readonly system: SettingsFile;
@@ -311,6 +330,7 @@ export class LoadedSettings {
 
   private _workspaceFile: SettingsFile;
   private _merged: MergedSettings;
+  private _snapshot: LoadedSettingsSnapshot;
   private _remoteAdminSettings: Partial<Settings> | undefined;
 
   get merged(): MergedSettings {
@@ -355,6 +375,7 @@ export class LoadedSettings {
 
       // The final admin settings are the defaults overridden by remote settings.
       // Any admin settings from files are ignored.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       merged.admin = customDeepMerge(
         (path: string[]) => getMergeStrategyForPath(['admin', ...path]),
         adminDefaults,
@@ -362,6 +383,36 @@ export class LoadedSettings {
       ) as MergedSettings['admin'];
     }
     return merged;
+  }
+
+  private computeSnapshot(): LoadedSettingsSnapshot {
+    const cloneSettingsFile = (file: SettingsFile): SettingsFile => ({
+      path: file.path,
+      rawJson: file.rawJson,
+      settings: structuredClone(file.settings),
+      originalSettings: structuredClone(file.originalSettings),
+    });
+    return {
+      system: cloneSettingsFile(this.system),
+      systemDefaults: cloneSettingsFile(this.systemDefaults),
+      user: cloneSettingsFile(this.user),
+      workspace: cloneSettingsFile(this.workspace),
+      isTrusted: this.isTrusted,
+      errors: [...this.errors],
+      merged: structuredClone(this._merged),
+    };
+  }
+
+  // Passing this along with getSnapshot to useSyncExternalStore allows for idiomatic reactivity on settings changes
+  // React will pass a listener fn into this subscribe fn
+  // that listener fn will perform an object identity check on the snapshot and trigger a React re render if the snapshot has changed
+  subscribe(listener: () => void): () => void {
+    coreEvents.on(CoreEvent.SettingsChanged, listener);
+    return () => coreEvents.off(CoreEvent.SettingsChanged, listener);
+  }
+
+  getSnapshot(): LoadedSettingsSnapshot {
+    return this._snapshot;
   }
 
   forScope(scope: LoadableSettingScope): SettingsFile {
@@ -405,6 +456,7 @@ export class LoadedSettings {
     }
 
     this._merged = this.computeMergedSettings();
+    this._snapshot = this.computeSnapshot();
     coreEvents.emitSettingsChanged();
   }
 
@@ -617,6 +669,7 @@ export function loadSettings(
           return { settings: {} };
         }
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const settingsObject = rawSettings as Record<string, unknown>;
 
         // Validate settings structure with Zod
@@ -862,6 +915,7 @@ export function migrateDeprecatedSettings(
     const uiSettings = settings.ui as Record<string, unknown> | undefined;
     if (uiSettings) {
       const newUi = { ...uiSettings };
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const accessibilitySettings = newUi['accessibility'] as
         | Record<string, unknown>
         | undefined;
@@ -892,6 +946,7 @@ export function migrateDeprecatedSettings(
       | undefined;
     if (contextSettings) {
       const newContext = { ...contextSettings };
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const fileFilteringSettings = newContext['fileFiltering'] as
         | Record<string, unknown>
         | undefined;
@@ -909,6 +964,36 @@ export function migrateDeprecatedSettings(
         ) {
           newContext['fileFiltering'] = newFileFiltering;
           loadedSettings.setValue(scope, 'context', newContext);
+          if (!settingsFile.readOnly) {
+            anyModified = true;
+          }
+        }
+      }
+    }
+
+    // Migrate tools settings
+    const toolsSettings = settings.tools as Record<string, unknown> | undefined;
+    if (toolsSettings) {
+      if (toolsSettings['approvalMode'] !== undefined) {
+        foundDeprecated.push('tools.approvalMode');
+
+        const generalSettings =
+          (settings.general as Record<string, unknown> | undefined) || {};
+        const newGeneral = { ...generalSettings };
+
+        // Only set defaultApprovalMode if it's not already set
+        if (newGeneral['defaultApprovalMode'] === undefined) {
+          newGeneral['defaultApprovalMode'] = toolsSettings['approvalMode'];
+          loadedSettings.setValue(scope, 'general', newGeneral);
+          if (!settingsFile.readOnly) {
+            anyModified = true;
+          }
+        }
+
+        if (removeDeprecated) {
+          const newTools = { ...toolsSettings };
+          delete newTools['approvalMode'];
+          loadedSettings.setValue(scope, 'tools', newTools);
           if (!settingsFile.readOnly) {
             anyModified = true;
           }
@@ -1012,6 +1097,7 @@ function migrateExperimentalSettings(
       ...(settings.agents as Record<string, unknown> | undefined),
     };
     const agentsOverrides = {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       ...((agentsSettings['overrides'] as Record<string, unknown>) || {}),
     };
     let modified = false;
@@ -1023,6 +1109,7 @@ function migrateExperimentalSettings(
       const old = experimentalSettings[oldKey];
       if (old) {
         foundDeprecated?.push(`experimental.${oldKey}`);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         migrateFn(old as Record<string, unknown>);
         modified = true;
       }
@@ -1031,6 +1118,7 @@ function migrateExperimentalSettings(
     // Migrate codebaseInvestigatorSettings -> agents.overrides.codebase_investigator
     migrateExperimental('codebaseInvestigatorSettings', (old) => {
       const override = {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         ...(agentsOverrides['codebase_investigator'] as
           | Record<string, unknown>
           | undefined),
@@ -1039,6 +1127,7 @@ function migrateExperimentalSettings(
       if (old['enabled'] !== undefined) override['enabled'] = old['enabled'];
 
       const runConfig = {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         ...(override['runConfig'] as Record<string, unknown> | undefined),
       };
       if (old['maxNumTurns'] !== undefined)
@@ -1049,16 +1138,19 @@ function migrateExperimentalSettings(
 
       if (old['model'] !== undefined || old['thinkingBudget'] !== undefined) {
         const modelConfig = {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           ...(override['modelConfig'] as Record<string, unknown> | undefined),
         };
         if (old['model'] !== undefined) modelConfig['model'] = old['model'];
         if (old['thinkingBudget'] !== undefined) {
           const generateContentConfig = {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             ...(modelConfig['generateContentConfig'] as
               | Record<string, unknown>
               | undefined),
           };
           const thinkingConfig = {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             ...(generateContentConfig['thinkingConfig'] as
               | Record<string, unknown>
               | undefined),
@@ -1076,6 +1168,7 @@ function migrateExperimentalSettings(
     // Migrate cliHelpAgentSettings -> agents.overrides.cli_help
     migrateExperimental('cliHelpAgentSettings', (old) => {
       const override = {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         ...(agentsOverrides['cli_help'] as Record<string, unknown> | undefined),
       };
       if (old['enabled'] !== undefined) override['enabled'] = old['enabled'];

@@ -329,6 +329,11 @@ export const useSlashCommandProcessor = (
         ],
         controller.signal,
       );
+
+      if (controller.signal.aborted) {
+        return;
+      }
+
       setCommands(commandService.getCommands());
     })();
 
@@ -467,6 +472,7 @@ export const useSlashCommandProcessor = (
                       actions.openModelDialog();
                       return { type: 'handled' };
                     case 'agentConfig': {
+                      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                       const props = result.props as Record<string, unknown>;
                       if (
                         !props ||
@@ -482,12 +488,14 @@ export const useSlashCommandProcessor = (
                       actions.openAgentConfigDialog(
                         props['name'],
                         props['displayName'],
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                         props['definition'] as AgentDefinition,
                       );
                       return { type: 'handled' };
                     }
                     case 'permissions':
                       actions.openPermissionsDialog(
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                         result.props as { targetDirectory?: string },
                       );
                       return { type: 'handled' };

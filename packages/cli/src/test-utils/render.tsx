@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -33,6 +33,9 @@ import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
 import { AppContext, type AppState } from '../ui/contexts/AppContext.js';
 import { createMockSettings } from './settings.js';
+import { themeManager, DEFAULT_THEME } from '../ui/themes/theme-manager.js';
+import { DefaultLight } from '../ui/themes/default-light.js';
+import { pickDefaultThemeName } from '../ui/themes/theme.js';
 
 export const persistentStateMock = new FakePersistentState();
 
@@ -52,6 +55,7 @@ export const render = (
   terminalWidth?: number,
 ): ReturnType<typeof inkRender> => {
   let renderResult: ReturnType<typeof inkRender> =
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     undefined as unknown as ReturnType<typeof inkRender>;
   act(() => {
     renderResult = inkRender(tree);
@@ -113,14 +117,19 @@ const getMockConfigInternal = (): Config => {
   return mockConfigInternal;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
 const configProxy = new Proxy({} as Config, {
   get(_target, prop) {
     if (prop === 'getTargetDir') {
       return () =>
         '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long';
     }
+    if (prop === 'getUseBackgroundColor') {
+      return () => true;
+    }
     const internal = getMockConfigInternal();
     if (prop in internal) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return internal[prop as keyof typeof internal];
     }
     throw new Error(`mockConfig does not have property ${String(prop)}`);
@@ -144,10 +153,17 @@ const baseMockUiState = {
   terminalWidth: 120,
   terminalHeight: 40,
   currentModel: 'gemini-pro',
-  terminalBackgroundColor: undefined,
+  terminalBackgroundColor: 'black',
+  cleanUiDetailsVisible: false,
   activePtyId: undefined,
   backgroundShells: new Map(),
   backgroundShellHeight: 0,
+  quota: {
+    userTier: undefined,
+    stats: undefined,
+    proQuotaRequest: null,
+    validationRequest: null,
+  },
 };
 
 export const mockAppState: AppState = {
@@ -192,12 +208,15 @@ const mockUIActions: UIActions = {
   handleApiKeyCancel: vi.fn(),
   setBannerVisible: vi.fn(),
   setShortcutsHelpVisible: vi.fn(),
+  setCleanUiDetailsVisible: vi.fn(),
+  toggleCleanUiDetailsVisible: vi.fn(),
+  revealCleanUiDetailsTemporarily: vi.fn(),
+  handleWarning: vi.fn(),
   setEmbeddedShellFocused: vi.fn(),
   dismissBackgroundShell: vi.fn(),
   setActiveBackgroundShellPid: vi.fn(),
   setIsBackgroundShellListOpen: vi.fn(),
   setAuthContext: vi.fn(),
-  handleWarning: vi.fn(),
   handleRestart: vi.fn(),
   handleNewAgentsSelect: vi.fn(),
 };
@@ -210,6 +229,7 @@ export const renderWithProviders = (
     uiState: providedUiState,
     width,
     mouseEventsEnabled = false,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     config = configProxy as unknown as Config,
     useAlternateBuffer = true,
     uiActions,
@@ -231,17 +251,20 @@ export const renderWithProviders = (
     appState?: AppState;
   } = {},
 ): ReturnType<typeof render> & { simulateClick: typeof simulateClick } => {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const baseState: UIState = new Proxy(
     { ...baseMockUiState, ...providedUiState },
     {
       get(target, prop) {
         if (prop in target) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           return target[prop as keyof typeof target];
         }
         // For properties not in the base mock or provided state,
         // we'll check the original proxy to see if it's a defined but
         // unprovided property, and if not, throw.
         if (prop in baseMockUiState) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           return baseMockUiState[prop as keyof typeof baseMockUiState];
         }
         throw new Error(`mockUiState does not have property ${String(prop)}`);
@@ -277,6 +300,15 @@ export const renderWithProviders = (
     terminalWidth,
     mainAreaWidth,
   };
+
+  themeManager.setTerminalBackground(baseState.terminalBackgroundColor);
+  const themeName = pickDefaultThemeName(
+    baseState.terminalBackgroundColor,
+    themeManager.getAllThemes(),
+    DEFAULT_THEME.name,
+    DefaultLight.name,
+  );
+  themeManager.setActiveTheme(themeName);
 
   const finalUIActions = { ...mockUIActions, ...uiActions };
 
@@ -347,7 +379,9 @@ export function renderHook<Result, Props>(
   rerender: (props?: Props) => void;
   unmount: () => void;
 } {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const result = { current: undefined as unknown as Result };
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   let currentProps = options?.initialProps as Props;
 
   function TestComponent({
@@ -378,6 +412,7 @@ export function renderHook<Result, Props>(
 
   function rerender(props?: Props) {
     if (arguments.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       currentProps = props as Props;
     }
     act(() => {
@@ -411,6 +446,7 @@ export function renderHookWithProviders<Result, Props>(
   rerender: (props?: Props) => void;
   unmount: () => void;
 } {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const result = { current: undefined as unknown as Result };
 
   let setPropsFn: ((props: Props) => void) | undefined;
@@ -432,6 +468,7 @@ export function renderHookWithProviders<Result, Props>(
   act(() => {
     renderResult = renderWithProviders(
       <Wrapper>
+        {/* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */}
         <TestComponent initialProps={options.initialProps as Props} />
       </Wrapper>,
       options,
@@ -441,6 +478,7 @@ export function renderHookWithProviders<Result, Props>(
   function rerender(newProps?: Props) {
     act(() => {
       if (arguments.length > 0 && setPropsFn) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         setPropsFn(newProps as Props);
       } else if (forceUpdateFn) {
         forceUpdateFn();

@@ -103,6 +103,43 @@ describe('McpClientManager', () => {
     expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.COMPLETED);
   });
 
+  it('should mark discovery completed when all configured servers are user-disabled', async () => {
+    mockConfig.getMcpServers.mockReturnValue({
+      'test-server': {},
+    });
+    mockConfig.getMcpEnablementCallbacks.mockReturnValue({
+      isSessionDisabled: vi.fn().mockReturnValue(false),
+      isFileEnabled: vi.fn().mockResolvedValue(false),
+    });
+
+    const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+    const promise = manager.startConfiguredMcpServers();
+    expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.IN_PROGRESS);
+    await promise;
+
+    expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.COMPLETED);
+    expect(manager.getMcpServerCount()).toBe(0);
+    expect(mockedMcpClient.connect).not.toHaveBeenCalled();
+    expect(mockedMcpClient.discover).not.toHaveBeenCalled();
+  });
+
+  it('should mark discovery completed when all configured servers are blocked', async () => {
+    mockConfig.getMcpServers.mockReturnValue({
+      'test-server': {},
+    });
+    mockConfig.getBlockedMcpServers.mockReturnValue(['test-server']);
+
+    const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+    const promise = manager.startConfiguredMcpServers();
+    expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.IN_PROGRESS);
+    await promise;
+
+    expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.COMPLETED);
+    expect(manager.getMcpServerCount()).toBe(0);
+    expect(mockedMcpClient.connect).not.toHaveBeenCalled();
+    expect(mockedMcpClient.discover).not.toHaveBeenCalled();
+  });
+
   it('should not discover tools if folder is not trusted', async () => {
     mockConfig.getMcpServers.mockReturnValue({
       'test-server': {},

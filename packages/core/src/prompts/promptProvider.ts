@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import type { Config } from '../config/config.js';
+import type { HierarchicalMemory } from '../config/memory.js';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { ApprovalMode } from '../policy/types.js';
 import * as snippets from './snippets.js';
@@ -25,9 +26,12 @@ import {
   WRITE_TODOS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { resolveModel, isPreviewModel } from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
 
 /**
  * Orchestrates prompt generation by gathering context and building options.
@@ -38,7 +42,7 @@ export class PromptProvider {
    */
   getCoreSystemPrompt(
     config: Config,
-    userMemory?: string,
+    userMemory?: string | HierarchicalMemory,
     interactiveOverride?: boolean,
   ): string {
     const systemMdResolution = resolvePathFromEnv(
@@ -48,6 +52,7 @@ export class PromptProvider {
     const interactiveMode = interactiveOverride ?? config.isInteractive();
     const approvalMode = config.getApprovalMode?.() ?? ApprovalMode.DEFAULT;
     const isPlanMode = approvalMode === ApprovalMode.PLAN;
+    const isYoloMode = approvalMode === ApprovalMode.YOLO;
     const skills = config.getSkillManager().getSkills();
     const toolNames = config.getToolRegistry().getAllToolNames();
     const enabledToolNames = new Set(toolNames);
@@ -56,12 +61,13 @@ export class PromptProvider {
     const desiredModel = resolveModel(config.getActiveModel());
     const isGemini3 = isPreviewModel(desiredModel);
     const activeSnippets = isGemini3 ? snippets : legacySnippets;
+    const contextFilenames = getAllGeminiMdFilenames();
 
     // --- Context Gathering ---
     let planModeToolsList = PLAN_MODE_TOOLS.filter((t) =>
       enabledToolNames.has(t),
     )
-      .map((t) => `- \`${t}\``)
+      .map((t) => `  <tool>\`${t}\`</tool>`)
       .join('\n');
 
     // Add read-only MCP tools to the list
@@ -73,7 +79,7 @@ export class PromptProvider {
       );
       if (readOnlyMcpTools.length > 0) {
         const mcpToolsList = readOnlyMcpTools
-          .map((t) => `- \`${t.name}\` (${t.serverName})`)
+          .map((t) => `  <tool>\`${t.name}\` (${t.serverName})</tool>`)
           .join('\n');
         planModeToolsList += `\n${mcpToolsList}`;
       }
@@ -106,6 +112,13 @@ export class PromptProvider {
       );
     } else {
       // --- Standard Composition ---
+      const hasHierarchicalMemory =
+        typeof userMemory === 'object' &&
+        userMemory !== null &&
+        (!!userMemory.global?.trim() ||
+          !!userMemory.extension?.trim() ||
+          !!userMemory.project?.trim());
+
       const options: snippets.SystemPromptOptions = {
         preamble: this.withSection('preamble', () => ({
           interactive: interactiveMode,
@@ -114,13 +127,15 @@ export class PromptProvider {
           interactive: interactiveMode,
           isGemini3,
           hasSkills: skills.length > 0,
+          hasHierarchicalMemory,
+          contextFilenames,
         })),
         subAgents: this.withSection('agentContexts', () =>
           config
             .getAgentRegistry()
             .getAllDefinitions()
             .map((d) => ({
-              name: d.displayName || d.name,
+              name: d.name,
               description: d.description,
             })),
         ),
@@ -146,6 +161,8 @@ export class PromptProvider {
             enableEnterPlanModeTool: enabledToolNames.has(
               ENTER_PLAN_MODE_TOOL_NAME,
             ),
+            enableGrep: enabledToolNames.has(GREP_TOOL_NAME),
+            enableGlob: enabledToolNames.has(GLOB_TOOL_NAME),
             approvedPlan: approvedPlanPath
               ? { path: approvedPlanPath }
               : undefined,
@@ -171,6 +188,11 @@ export class PromptProvider {
           }),
         ),
         sandbox: this.withSection('sandbox', () => getSandboxMode()),
+        interactiveYoloMode: this.withSection(
+          'interactiveYoloMode',
+          () => true,
+          isYoloMode && interactiveMode,
+        ),
         gitRepo: this.withSection(
           'git',
           () => ({ interactive: interactiveMode }),
@@ -183,15 +205,19 @@ export class PromptProvider {
             })),
       } as snippets.SystemPromptOptions;
 
-      basePrompt = (
-        activeSnippets.getCoreSystemPrompt as (
-          options: snippets.SystemPromptOptions,
-        ) => string
-      )(options);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const getCoreSystemPrompt = activeSnippets.getCoreSystemPrompt as (
+        options: snippets.SystemPromptOptions,
+      ) => string;
+      basePrompt = getCoreSystemPrompt(options);
     }
 
     // --- Finalization (Shell) ---
-    const finalPrompt = activeSnippets.renderFinalShell(basePrompt, userMemory);
+    const finalPrompt = activeSnippets.renderFinalShell(
+      basePrompt,
+      userMemory,
+      contextFilenames,
+    );
 
     // Sanitize erratic newlines from composition
     const sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');

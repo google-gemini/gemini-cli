@@ -5,7 +5,6 @@
  */
 
 import { useEffect } from 'react';
-import { useStdout } from 'ink';
 import {
   getLuminance,
   parseColor,
@@ -22,10 +21,11 @@ import type { UIActions } from '../contexts/UIActionsContext.js';
 export function useTerminalTheme(
   handleThemeSelect: UIActions['handleThemeSelect'],
   config: Config,
+  refreshStatic: () => void,
 ) {
-  const { stdout } = useStdout();
   const settings = useSettings();
-  const { subscribe, unsubscribe } = useTerminalContext();
+  const { subscribe, unsubscribe, queryTerminalBackground } =
+    useTerminalContext();
 
   useEffect(() => {
     if (settings.merged.ui.autoThemeSwitching === false) {
@@ -44,7 +44,7 @@ export function useTerminalTheme(
         return;
       }
 
-      stdout.write('\x1b]11;?\x1b\\');
+      void queryTerminalBackground();
     }, settings.merged.ui.terminalBackgroundPollingInterval * 1000);
 
     const handleTerminalBackground = (colorStr: string) => {
@@ -58,6 +58,8 @@ export function useTerminalTheme(
       const hexColor = parseColor(match[1], match[2], match[3]);
       const luminance = getLuminance(hexColor);
       config.setTerminalBackground(hexColor);
+      themeManager.setTerminalBackground(hexColor);
+      refreshStatic();
 
       const currentThemeName = settings.merged.ui.theme;
 
@@ -69,7 +71,7 @@ export function useTerminalTheme(
       );
 
       if (newTheme) {
-        handleThemeSelect(newTheme, SettingScope.User);
+        void handleThemeSelect(newTheme, SettingScope.User);
       }
     };
 
@@ -83,10 +85,11 @@ export function useTerminalTheme(
     settings.merged.ui.theme,
     settings.merged.ui.autoThemeSwitching,
     settings.merged.ui.terminalBackgroundPollingInterval,
-    stdout,
     config,
     handleThemeSelect,
     subscribe,
     unsubscribe,
+    queryTerminalBackground,
+    refreshStatic,
   ]);
 }

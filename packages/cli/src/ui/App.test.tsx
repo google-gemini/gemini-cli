@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -66,6 +66,7 @@ describe('App', () => {
 
   const mockUIState: Partial<UIState> = {
     streamingState: StreamingState.Idle,
+    cleanUiDetailsVisible: true,
     quittingMessages: null,
     dialogsVisible: false,
     mainControlsRef: {
@@ -220,10 +221,6 @@ describe('App', () => {
     } as UIState;
 
     const configWithExperiment = makeFakeConfig();
-    vi.spyOn(
-      configWithExperiment,
-      'isEventDrivenSchedulerEnabled',
-    ).mockReturnValue(true);
     vi.spyOn(configWithExperiment, 'isTrustedFolder').mockReturnValue(true);
     vi.spyOn(configWithExperiment, 'getIdeMode').mockReturnValue(false);
 

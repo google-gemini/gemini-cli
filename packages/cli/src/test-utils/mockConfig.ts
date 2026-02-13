@@ -13,10 +13,12 @@ import { createTestMergedSettings } from '../config/settings.js';
  * Creates a mocked Config object with default values and allows overrides.
  */
 export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   ({
     getSandbox: vi.fn(() => undefined),
     getQuestion: vi.fn(() => ''),
     isInteractive: vi.fn(() => false),
+    isInitialized: vi.fn(() => true),
     setTerminalBackground: vi.fn(),
     storage: {
       getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
@@ -152,6 +154,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getBlockedMcpServers: vi.fn().mockReturnValue([]),
     getExperiments: vi.fn().mockReturnValue(undefined),
     getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
+    validatePathAccess: vi.fn().mockReturnValue(null),
     ...overrides,
   }) as unknown as Config;
 
@@ -162,9 +165,11 @@ export function createMockSettings(
   overrides: Record<string, unknown> = {},
 ): LoadedSettings {
   const merged = createTestMergedSettings(
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     (overrides['merged'] as Partial<Settings>) || {},
   );
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     system: { settings: {} },
     systemDefaults: { settings: {} },
