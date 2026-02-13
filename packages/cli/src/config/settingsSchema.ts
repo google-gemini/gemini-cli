@@ -286,7 +286,7 @@ const SETTINGS_SCHEMA = {
             label: 'Enable Session Cleanup',
             category: 'General',
             requiresRestart: false,
-            default: true,
+            default: false,
             description: 'Enable automatic session cleanup',
             showInDialog: true,
           },
@@ -295,7 +295,7 @@ const SETTINGS_SCHEMA = {
             label: 'Max Session Age',
             category: 'General',
             requiresRestart: false,
-            default: '60d' as string,
+            default: undefined as string | undefined,
             description:
               'Maximum age of sessions to keep (e.g., "30d", "7d", "24h", "1w")',
             showInDialog: false,

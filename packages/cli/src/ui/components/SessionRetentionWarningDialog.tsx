@@ -67,13 +67,6 @@ export const SessionRetentionWarningDialog = ({
           initialIndex={1}
         />
       </Box>
-
-      <Box marginTop={1} justifyContent="center">
-        <Text color="gray">
-          (You can adjust the retention period with{' '}
-          <Text bold>sessionRetention.maxAge</Text> in settings.json)
-        </Text>
-      </Box>
     </Box>
   );
 };

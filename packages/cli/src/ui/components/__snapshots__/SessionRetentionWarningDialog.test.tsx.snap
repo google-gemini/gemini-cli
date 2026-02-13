@@ -12,9 +12,7 @@ exports[`SessionRetentionWarningDialog > should match snapshot 1`] = `
 │   1. Keep for 30 days (Recommended)                                                                                  │
 │      123 sessions will be deleted immediately                                                                        │
 │ ● 2. Keep for 90 days                                                                                                │
-│      No sessions will be deleted                                                                                     │
-│                                                                                                                      │
-│                 (You can adjust the retention period with sessionRetention.maxAge in settings.json)                  │
+│      No sessions will be deleted at this time                                                                        │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;

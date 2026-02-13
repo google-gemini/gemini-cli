@@ -41,9 +41,6 @@ describe('SessionRetentionWarningDialog', () => {
     expect(lastFrame()).toContain('42 sessions will be deleted immediately');
     expect(lastFrame()).toContain('Keep for 90 days');
     expect(lastFrame()).toContain('No sessions will be deleted at this time');
-    expect(lastFrame()).toContain(
-      'Adjust the retention period with sessionRetention.maxAge in settings.json',
-    );
   });
 
   it('renders correctly with 0 sessions to delete', () => {
