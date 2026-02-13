@@ -129,6 +129,25 @@ describe('MainContent', () => {
 
     expect(output).toMatchSnapshot();
   });
+  it('does not render empty history items', async () => {
+    const uiStateWithEmptyItems = {
+      ...defaultMockUiState,
+      history: [
+        ...defaultMockUiState.history,
+        { id: 3, type: 'gemini_content', text: '' },
+        { id: 4, type: 'gemini_content', text: 'Non-empty content' },
+      ],
+    };
+
+    const { lastFrame } = renderWithProviders(<MainContent />, {
+      uiState: uiStateWithEmptyItems as Partial<UIState>,
+    });
+    await waitFor(() => expect(lastFrame()).toContain('Non-empty content'));
+    const output = lastFrame();
+
+    expect(output).toContain('Non-empty content');
+    expect(output).toMatchSnapshot();
+  });
 
   describe('MainContent Tool Output Height Logic', () => {
     const testCases = [

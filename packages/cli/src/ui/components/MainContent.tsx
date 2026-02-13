@@ -55,17 +55,19 @@ export const MainContent = () => {
 
   const historyItems = useMemo(
     () =>
-      uiState.history.map((h) => (
-        <MemoizedHistoryItemDisplay
-          terminalWidth={mainAreaWidth}
-          availableTerminalHeight={staticAreaMaxItemHeight}
-          availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
-          key={h.id}
-          item={h}
-          isPending={false}
-          commands={uiState.slashCommands}
-        />
-      )),
+      uiState.history
+        .filter((h) => !(h.type === 'gemini_content' && !h.text))
+        .map((h) => (
+          <MemoizedHistoryItemDisplay
+            terminalWidth={mainAreaWidth}
+            availableTerminalHeight={staticAreaMaxItemHeight}
+            availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
+            key={h.id}
+            item={h}
+            isPending={false}
+            commands={uiState.slashCommands}
+          />
+        )),
     [
       uiState.history,
       mainAreaWidth,
@@ -116,7 +118,9 @@ export const MainContent = () => {
   const virtualizedData = useMemo(
     () => [
       { type: 'header' as const },
-      ...uiState.history.map((item) => ({ type: 'history' as const, item })),
+      ...uiState.history
+        .filter((h) => !(h.type === 'gemini_content' && !h.text))
+        .map((item) => ({ type: 'history' as const, item })),
       { type: 'pending' as const },
     ],
     [uiState.history],
