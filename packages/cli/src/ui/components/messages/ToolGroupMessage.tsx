@@ -14,8 +14,10 @@ import { ShellToolMessage } from './ShellToolMessage.js';
 import { theme } from '../../semantic-colors.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
 import { isShellTool, isThisShellFocused } from './ToolShared.js';
-import { CoreToolCallStatus } from '@google/gemini-cli-core';
-import { shouldHideToolCall } from '../../utils/toolUtils.js';
+import {
+  CoreToolCallStatus,
+  shouldHideToolCall,
+} from '@google/gemini-cli-core';
 import { ShowMoreLines } from '../ShowMoreLines.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
 
@@ -46,15 +48,12 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   // Filter out tool calls that should be hidden (e.g. in-progress Ask User, or Plan Mode operations).
   const toolCalls = useMemo(
     () =>
-      allToolCalls.filter((t) => {
-        const displayStatus = mapCoreStatusToDisplayStatus(t.status);
-        return !shouldHideToolCall({
+      allToolCalls.filter((t) => !shouldHideToolCall({
           displayName: t.name,
-          status: displayStatus,
+          status: t.status,
           approvalMode: t.approvalMode,
           hasResultDisplay: !!t.resultDisplay,
-        });
-      }),
+        })),
     [allToolCalls],
   );
 
