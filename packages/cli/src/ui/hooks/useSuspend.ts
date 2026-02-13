@@ -19,6 +19,7 @@ import {
   cleanupTerminalOnExit,
   terminalCapabilityManager,
 } from '../utils/terminalCapabilityManager.js';
+import { isAndroid } from '../../utils/platform.js';
 import { WARNING_PROMPT_DURATION_MS } from '../constants.js';
 
 interface UseSuspendProps {
@@ -113,7 +114,7 @@ export function useSuspend({
           // Give a tick for resize to process, then trigger remount
           setImmediate(() => {
             refreshStatic();
-            if (process.platform !== 'android') {
+            if (!isAndroid) {
               setForceRerenderKey((prev) => prev + 1);
             }
           });
