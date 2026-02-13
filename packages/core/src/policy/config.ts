@@ -42,26 +42,33 @@ export const USER_POLICY_TIER = 2;
 export const ADMIN_POLICY_TIER = 3;
 
 /**
- * Gets the list of directories to search for policy files, in order of increasing priority
- * (Default -> User -> Admin).
+ * Gets the list of directories to search for policy files, in order of decreasing priority
+ * (Admin -> User -> Default).
  *
  * @param defaultPoliciesDir Optional path to a directory containing default policies.
+ * @param policyPaths Optional user-provided policy paths (from --policy flag).
+ *   When provided, these replace the default user policies directory.
  */
-export function getPolicyDirectories(defaultPoliciesDir?: string): string[] {
-  const dirs = [];
+export function getPolicyDirectories(
+  defaultPoliciesDir?: string,
+  policyPaths?: string[],
+): string[] {
+  const dirs: string[] = [];
 
-  if (defaultPoliciesDir) {
-    dirs.push(defaultPoliciesDir);
+  // Default tier (lowest priority)
+  dirs.push(defaultPoliciesDir ?? DEFAULT_CORE_POLICIES_DIR);
+
+  // User tier (middle priority)
+  if (policyPaths && policyPaths.length > 0) {
+    dirs.push(...policyPaths);
   } else {
-    dirs.push(DEFAULT_CORE_POLICIES_DIR);
+    dirs.push(Storage.getUserPoliciesDir());
   }
 
-  dirs.push(Storage.getUserPoliciesDir());
+  // Admin tier (highest priority)
   dirs.push(Storage.getSystemPoliciesDir());
 
-  // Reverse so highest priority (Admin) is first for loading order if needed,
-  // though loadPoliciesFromToml might want them in a specific order.
-  // CLI implementation reversed them: [DEFAULT, USER, ADMIN].reverse() -> [ADMIN, USER, DEFAULT]
+  // Reverse so highest priority (Admin) is first
   return dirs.reverse();
 }
 
@@ -147,17 +154,40 @@ export async function createPolicyEngineConfig(
   approvalMode: ApprovalMode,
   defaultPoliciesDir?: string,
 ): Promise<PolicyEngineConfig> {
-  const policyDirs = getPolicyDirectories(defaultPoliciesDir);
+  const policyDirs = getPolicyDirectories(
+    defaultPoliciesDir,
+    settings.policyPaths,
+  );
+
   const securePolicyDirs = await filterSecurePolicyDirectories(policyDirs);
+
+  const normalizedAdminPoliciesDir = path.resolve(
+    Storage.getSystemPoliciesDir(),
+  );
 
   // Load policies from TOML files
   const {
     rules: tomlRules,
     checkers: tomlCheckers,
     errors,
-  } = await loadPoliciesFromToml(securePolicyDirs, (dir) =>
-    getPolicyTier(dir, defaultPoliciesDir),
-  );
+  } = await loadPoliciesFromToml(securePolicyDirs, (p) => {
+    const tier = getPolicyTier(p, defaultPoliciesDir);
+
+    // If it's a user-provided path that isn't already categorized as ADMIN,
+    // treat it as USER tier.
+    if (
+      settings.policyPaths?.some(
+        (userPath) => path.resolve(userPath) === path.resolve(p),
+      )
+    ) {
+      const normalizedPath = path.resolve(p);
+      if (normalizedPath !== normalizedAdminPoliciesDir) {
+        return USER_POLICY_TIER;
+      }
+    }
+
+    return tier;
+  });
 
   // Emit any errors encountered during TOML loading to the UI
   // coreEvents has a buffer that will display these once the UI is ready

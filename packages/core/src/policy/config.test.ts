@@ -463,6 +463,21 @@ describe('createPolicyEngineConfig', () => {
       }
       return [];
     });
+    const mockStat = vi.fn(async (p) => {
+      if (typeof p === 'string' && p.includes('/tmp/mock/default/policies')) {
+        return {
+          isDirectory: () => true,
+          isFile: () => false,
+        } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+      }
+      if (typeof p === 'string' && p.includes('default.toml')) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+        } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+      }
+      return actualFs.stat(p);
+    });
     const mockReadFile = vi.fn(async (p, _o) => {
       if (typeof p === 'string' && p.includes('default.toml')) {
         return '[[rule]]\ntoolName = "glob"\ndecision = "allow"\npriority = 50\n';
@@ -471,9 +486,15 @@ describe('createPolicyEngineConfig', () => {
     });
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readdir: mockReaddir, readFile: mockReadFile },
+      default: {
+        ...actualFs,
+        readdir: mockReaddir,
+        readFile: mockReadFile,
+        stat: mockStat,
+      },
       readdir: mockReaddir,
       readFile: mockReadFile,
+      stat: mockStat,
     }));
     vi.resetModules();
     const { createPolicyEngineConfig: createConfig } = await import(
@@ -663,11 +684,37 @@ priority = 150
       },
     );
 
+    const mockStat = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.stat>[0],
+        options?: Parameters<typeof actualFs.stat>[1],
+      ) => {
+        if (
+          typeof path === 'string' &&
+          nodePath
+            .normalize(path)
+            .includes(nodePath.normalize('.gemini/policies'))
+        ) {
+          return {
+            isDirectory: () => true,
+            isFile: () => false,
+          } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+        }
+        return actualFs.stat(path, options);
+      },
+    );
+
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+      default: {
+        ...actualFs,
+        readFile: mockReadFile,
+        readdir: mockReaddir,
+        stat: mockStat,
+      },
       readFile: mockReadFile,
       readdir: mockReaddir,
+      stat: mockStat,
     }));
 
     vi.resetModules();
@@ -766,11 +813,37 @@ required_context = ["environment"]
       },
     );
 
+    const mockStat = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.stat>[0],
+        options?: Parameters<typeof actualFs.stat>[1],
+      ) => {
+        if (
+          typeof path === 'string' &&
+          nodePath
+            .normalize(path)
+            .includes(nodePath.normalize('.gemini/policies'))
+        ) {
+          return {
+            isDirectory: () => true,
+            isFile: () => false,
+          } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+        }
+        return actualFs.stat(path, options);
+      },
+    );
+
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+      default: {
+        ...actualFs,
+        readFile: mockReadFile,
+        readdir: mockReaddir,
+        stat: mockStat,
+      },
       readFile: mockReadFile,
       readdir: mockReaddir,
+      stat: mockStat,
     }));
 
     vi.resetModules();
@@ -862,11 +935,37 @@ name = "invalid-name"
       },
     );
 
+    const mockStat = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.stat>[0],
+        options?: Parameters<typeof actualFs.stat>[1],
+      ) => {
+        if (
+          typeof path === 'string' &&
+          nodePath
+            .normalize(path)
+            .includes(nodePath.normalize('.gemini/policies'))
+        ) {
+          return {
+            isDirectory: () => true,
+            isFile: () => false,
+          } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+        }
+        return actualFs.stat(path, options);
+      },
+    );
+
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+      default: {
+        ...actualFs,
+        readFile: mockReadFile,
+        readdir: mockReaddir,
+        stat: mockStat,
+      },
       readFile: mockReadFile,
       readdir: mockReaddir,
+      stat: mockStat,
     }));
 
     vi.resetModules();
@@ -964,7 +1063,7 @@ name = "invalid-name"
         options?: Parameters<typeof actualFs.readdir>[1],
       ) => {
         const normalizedPath = nodePath.normalize(path.toString());
-        if (normalizedPath.includes(nodePath.normalize('.gemini/policies'))) {
+        if (normalizedPath.includes('gemini-cli-test/user/policies')) {
           return [
             {
               name: 'user-plan.toml',
@@ -977,6 +1076,22 @@ name = "invalid-name"
           path,
           options as Parameters<typeof actualFs.readdir>[1],
         );
+      },
+    );
+
+    const mockStat = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.stat>[0],
+        options?: Parameters<typeof actualFs.stat>[1],
+      ) => {
+        const normalizedPath = nodePath.normalize(path.toString());
+        if (normalizedPath.includes('gemini-cli-test/user/policies')) {
+          return {
+            isDirectory: () => true,
+            isFile: () => false,
+          } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+        }
+        return actualFs.stat(path, options);
       },
     );
 
@@ -1008,12 +1123,35 @@ modes = ["plan"]
 
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+      default: {
+        ...actualFs,
+        readFile: mockReadFile,
+        readdir: mockReaddir,
+        stat: mockStat,
+      },
       readFile: mockReadFile,
       readdir: mockReaddir,
+      stat: mockStat,
     }));
 
     vi.resetModules();
+
+    // Robustly mock Storage using doMock to ensure it persists through imports in config.js
+    vi.doMock('../config/storage.js', async () => {
+      const actual = await vi.importActual<
+        typeof import('../config/storage.js')
+      >('../config/storage.js');
+      class MockStorage extends actual.Storage {
+        static override getUserPoliciesDir() {
+          return '/tmp/gemini-cli-test/user/policies';
+        }
+        static override getSystemPoliciesDir() {
+          return '/tmp/gemini-cli-test/system/policies';
+        }
+      }
+      return { ...actual, Storage: MockStorage };
+    });
+
     const { createPolicyEngineConfig } = await import('./config.js');
 
     const settings: PolicySettings = {};

@@ -25,6 +25,7 @@ export async function createPolicyEngineConfig(
     mcp: settings.mcp,
     tools: settings.tools,
     mcpServers: settings.mcpServers,
+    policyPaths: settings.policyPaths,
   };
 
   return createCorePolicyEngineConfig(policySettings, approvalMode);
