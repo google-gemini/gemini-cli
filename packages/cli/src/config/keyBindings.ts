@@ -129,7 +129,7 @@ export type KeyBindingConfig = {
 export const defaultKeyBindings: KeyBindingConfig = {
   // Basic Controls
   [Command.RETURN]: [{ key: 'return' }],
-  [Command.ESCAPE]: [{ key: 'escape' }],
+  [Command.ESCAPE]: [{ key: 'escape' }, { key: '[', ctrl: true }],
   [Command.QUIT]: [{ key: 'c', ctrl: true }],
   [Command.EXIT]: [{ key: 'd', ctrl: true }],
 
