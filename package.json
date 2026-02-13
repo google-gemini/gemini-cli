@@ -67,10 +67,6 @@
     "cliui": {
       "wrap-ansi": "7.0.0"
     },
-    "@google-cloud/storage": {
-      "fast-xml-parser": "5.3.4"
-    },
-    "fast-xml-parser": "5.3.4",
     "qs": "6.14.1",
     "body-parser": "2.2.2",
     "undici": "7.20.0",
