@@ -24,6 +24,107 @@ import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 
+interface CwdIndicatorProps {
+  targetDir: string;
+  terminalWidth: number;
+  debugMode?: boolean;
+  debugMessage?: string;
+  color?: string;
+}
+
+const CwdIndicator: React.FC<CwdIndicatorProps> = ({
+  targetDir,
+  terminalWidth,
+  debugMode,
+  debugMessage,
+  color = theme.text.primary,
+}) => {
+  const pathLength = Math.max(20, Math.floor(terminalWidth * 0.25));
+  const displayPath = shortenPath(tildeifyPath(targetDir), pathLength);
+  return (
+    <Text color={color}>
+      {displayPath}
+      {debugMode && (
+        <Text color={theme.status.error}>
+          {' ' + (debugMessage || '--debug')}
+        </Text>
+      )}
+    </Text>
+  );
+};
+
+interface BranchIndicatorProps {
+  branchName: string;
+}
+
+const BranchIndicator: React.FC<BranchIndicatorProps> = ({ branchName }) => (
+  <Text color={theme.text.secondary}>({branchName}*)</Text>
+);
+
+interface SandboxIndicatorProps {
+  isTrustedFolder: boolean | undefined;
+  terminalWidth: number;
+  showDocsHint?: boolean;
+}
+
+const SandboxIndicator: React.FC<SandboxIndicatorProps> = ({
+  isTrustedFolder,
+  terminalWidth,
+  showDocsHint = false,
+}) => {
+  if (isTrustedFolder === false) {
+    return <Text color={theme.status.warning}>untrusted</Text>;
+  }
+
+  const sandbox = process.env['SANDBOX'];
+  if (sandbox && sandbox !== 'sandbox-exec') {
+    return (
+      <Text color="green">{sandbox.replace(/^gemini-(?:cli-)?/, '')}</Text>
+    );
+  }
+
+  if (sandbox === 'sandbox-exec') {
+    return (
+      <Text color={theme.status.warning}>
+        macOS Seatbelt{' '}
+        <Text color={theme.text.secondary}>
+          ({process.env['SEATBELT_PROFILE']})
+        </Text>
+      </Text>
+    );
+  }
+
+  return (
+    <Text color={theme.status.error}>
+      no sandbox
+      {showDocsHint && terminalWidth >= 100 && (
+        <Text color={theme.text.secondary}> (see /docs)</Text>
+      )}
+    </Text>
+  );
+};
+
+const CorgiIndicator: React.FC = () => (
+  <Text>
+    <Text color={theme.status.error}>▼</Text>
+    <Text color={theme.text.primary}>(´</Text>
+    <Text color={theme.status.error}>ᴥ</Text>
+    <Text color={theme.text.primary}>`)</Text>
+    <Text color={theme.status.error}>▼</Text>
+  </Text>
+);
+
+interface ErrorIndicatorProps {
+  errorCount: number;
+}
+
+const ErrorIndicator: React.FC<ErrorIndicatorProps> = ({ errorCount }) => (
+  <Box flexDirection="row">
+    <Text color={theme.ui.comment}>| </Text>
+    <ConsoleSummaryDisplay errorCount={errorCount} />
+  </Box>
+);
+
 export const Footer: React.FC = () => {
   const uiState = useUIState();
   const config = useConfig();
@@ -71,9 +172,6 @@ export const Footer: React.FC = () => {
     const hideContextPercentage =
       settings.merged.ui.footer.hideContextPercentage;
 
-    const pathLength = Math.max(20, Math.floor(terminalWidth * 0.25));
-    const displayPath = shortenPath(tildeifyPath(targetDir), pathLength);
-
     const justifyContent =
       hideCWD && hideModelInfo ? 'center' : 'space-between';
 
@@ -94,17 +192,20 @@ export const Footer: React.FC = () => {
               <Text color={theme.text.secondary}>[{displayVimMode}] </Text>
             )}
             {!hideCWD && (
-              <Text color={theme.text.primary}>
-                {displayPath}
+              <Box flexDirection="row">
+                <CwdIndicator
+                  targetDir={targetDir}
+                  terminalWidth={terminalWidth}
+                  debugMode={debugMode}
+                  debugMessage={debugMessage}
+                />
                 {branchName && (
-                  <Text color={theme.text.secondary}> ({branchName}*)</Text>
+                  <>
+                    <Text> </Text>
+                    <BranchIndicator branchName={branchName} />
+                  </>
                 )}
-              </Text>
-            )}
-            {debugMode && (
-              <Text color={theme.status.error}>
-                {' ' + (debugMessage || '--debug')}
-              </Text>
+              </Box>
             )}
           </Box>
         )}
@@ -117,28 +218,11 @@ export const Footer: React.FC = () => {
             justifyContent="center"
             display="flex"
           >
-            {isTrustedFolder === false ? (
-              <Text color={theme.status.warning}>untrusted</Text>
-            ) : process.env['SANDBOX'] &&
-              process.env['SANDBOX'] !== 'sandbox-exec' ? (
-              <Text color="green">
-                {process.env['SANDBOX'].replace(/^gemini-(?:cli-)?/, '')}
-              </Text>
-            ) : process.env['SANDBOX'] === 'sandbox-exec' ? (
-              <Text color={theme.status.warning}>
-                macOS Seatbelt{' '}
-                <Text color={theme.text.secondary}>
-                  ({process.env['SEATBELT_PROFILE']})
-                </Text>
-              </Text>
-            ) : (
-              <Text color={theme.status.error}>
-                no sandbox
-                {terminalWidth >= 100 && (
-                  <Text color={theme.text.secondary}> (see /docs)</Text>
-                )}
-              </Text>
-            )}
+            <SandboxIndicator
+              isTrustedFolder={isTrustedFolder}
+              terminalWidth={terminalWidth}
+              showDocsHint={true}
+            />
           </Box>
         )}
 
@@ -181,20 +265,13 @@ export const Footer: React.FC = () => {
             <Box alignItems="center">
               {corgiMode && (
                 <Box paddingLeft={1} flexDirection="row">
-                  <Text>
-                    <Text color={theme.ui.symbol}>| </Text>
-                    <Text color={theme.status.error}>▼</Text>
-                    <Text color={theme.text.primary}>(´</Text>
-                    <Text color={theme.status.error}>ᴥ</Text>
-                    <Text color={theme.text.primary}>`)</Text>
-                    <Text color={theme.status.error}>▼</Text>
-                  </Text>
+                  <Text color={theme.ui.symbol}>| </Text>
+                  <CorgiIndicator />
                 </Box>
               )}
               {!showErrorDetails && errorCount > 0 && (
-                <Box paddingLeft={1} flexDirection="row">
-                  <Text color={theme.ui.comment}>| </Text>
-                  <ConsoleSummaryDisplay errorCount={errorCount} />
+                <Box paddingLeft={1}>
+                  <ErrorIndicator errorCount={errorCount} />
                 </Box>
               )}
             </Box>
@@ -231,50 +308,31 @@ export const Footer: React.FC = () => {
   for (const id of items) {
     switch (id) {
       case 'cwd': {
-        const pathLength = Math.max(20, Math.floor(terminalWidth * 0.25));
-        const displayPath = shortenPath(tildeifyPath(targetDir), pathLength);
         addElement(
           id,
-          <Text color={theme.text.secondary}>
-            {displayPath}
-            {debugMode && (
-              <Text color={theme.status.error}>
-                {' ' + (debugMessage || '--debug')}
-              </Text>
-            )}
-          </Text>,
+          <CwdIndicator
+            targetDir={targetDir}
+            terminalWidth={terminalWidth}
+            debugMode={debugMode}
+            debugMessage={debugMessage}
+            color={theme.text.secondary}
+          />,
         );
         break;
       }
       case 'git-branch': {
         if (branchName) {
-          addElement(
-            id,
-            <Text color={theme.text.secondary}>{branchName}*</Text>,
-          );
+          addElement(id, <BranchIndicator branchName={branchName} />);
         }
         break;
       }
       case 'sandbox-status': {
         addElement(
           id,
-          isTrustedFolder === false ? (
-            <Text color={theme.status.warning}>untrusted</Text>
-          ) : process.env['SANDBOX'] &&
-            process.env['SANDBOX'] !== 'sandbox-exec' ? (
-            <Text color="green">
-              {process.env['SANDBOX'].replace(/^gemini-(?:cli-)?/, '')}
-            </Text>
-          ) : process.env['SANDBOX'] === 'sandbox-exec' ? (
-            <Text color={theme.status.warning}>
-              macOS Seatbelt{' '}
-              <Text color={theme.text.secondary}>
-                ({process.env['SEATBELT_PROFILE']})
-              </Text>
-            </Text>
-          ) : (
-            <Text color={theme.status.error}>no sandbox</Text>
-          ),
+          <SandboxIndicator
+            isTrustedFolder={isTrustedFolder}
+            terminalWidth={terminalWidth}
+          />,
         );
         break;
       }
@@ -362,22 +420,13 @@ export const Footer: React.FC = () => {
   }
 
   if (corgiMode) {
-    addElement(
-      'corgi-transient',
-      <Text>
-        <Text color={theme.status.error}>▼</Text>
-        <Text color={theme.text.primary}>(´</Text>
-        <Text color={theme.status.error}>ᴥ</Text>
-        <Text color={theme.text.primary}>`)</Text>
-        <Text color={theme.status.error}>▼</Text>
-      </Text>,
-    );
+    addElement('corgi-transient', <CorgiIndicator />);
   }
 
   if (!showErrorDetails && errorCount > 0) {
     addElement(
       'error-count-transient',
-      <ConsoleSummaryDisplay errorCount={errorCount} />,
+      <ErrorIndicator errorCount={errorCount} />,
     );
   }
 
