@@ -37,7 +37,7 @@ User-focused guides and tutorials for daily development workflows.
 - **[Manage sessions and history](./cli/tutorials/session-management.md):**
   Resuming, managing, and rewinding conversations.
 - **[Plan tasks with todos](./cli/tutorials/task-planning.md):** Using todos for
-  complex agent workflows.
+  complex workflows.
 - **[Web search and fetch](./cli/tutorials/web-tools.md):** Searching and
   fetching content from the web.
 - **[Get started with skills](./cli/tutorials/skills-getting-started.md):**

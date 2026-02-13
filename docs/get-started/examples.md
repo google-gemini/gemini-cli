@@ -10,7 +10,7 @@ for file management, code analysis, and data transformation.
 ## Rename your photographs based on content
 
 You can use Gemini CLI to automate file management tasks that require visual
-analysis. In this example, the agent renames images based on their actual
+analysis. In this example, Gemini CLI renames images based on their actual
 subject matter.
 
 Scenario: You have a folder containing the following files:
@@ -40,7 +40,7 @@ photos/green_android_robot.png
 ## Explain a repository by reading its code
 
 Gemini CLI is effective for rapid codebase exploration. The following example
-shows how to ask the agent to fetch, analyze, and summarize a remote project.
+shows how to ask Gemini CLI to fetch, analyze, and summarize a remote project.
 
 Scenario: You want to understand how a popular open-source utility works by
 inspecting its code, not just its README.
@@ -81,7 +81,7 @@ colors. After analyzing the source code, here's how it works:
 
 ## Combine two spreadsheets into one spreadsheet
 
-The agent can process and transform data across multiple files. Use this
+Gemini CLI can process and transform data across multiple files. Use this
 capability to merge reports or reformat data sets without manual copying.
 
 Scenario: You have two .csv files: `Revenue - 2023.csv` and

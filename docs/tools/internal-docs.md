@@ -1,13 +1,13 @@
 # Internal documentation tool (`get_internal_docs`)
 
-The `get_internal_docs` tool allows the Gemini agent to access its own technical
+The `get_internal_docs` tool lets Gemini CLI access its own technical
 documentation to provide more accurate answers about its capabilities and usage.
 
 ## Description
 
-Use this tool when the agent needs to verify specific details about Gemini CLI's
-internal features, built-in commands, or configuration options. It provides the
-agent with direct access to the Markdown files in the `docs/` directory.
+This tool is used when Gemini CLI needs to verify specific details about Gemini
+CLI's internal features, built-in commands, or configuration options. It
+provides direct access to the Markdown files in the `docs/` directory.
 
 ### Arguments
 
@@ -19,23 +19,23 @@ agent with direct access to the Markdown files in the `docs/` directory.
 
 ## Usage
 
-The `get_internal_docs` tool is used exclusively by the Gemini agent. You cannot
+The `get_internal_docs` tool is used exclusively by Gemini CLI. You cannot
 invoke this tool manually.
 
-When the agent uses this tool, it retrieves the content of the requested
+When Gemini CLI uses this tool, it retrieves the content of the requested
 documentation file and processes it to answer your question. This ensures that
 the information provided by the AI is grounded in the latest project
 documentation.
 
 ## Behavior
 
-The agent uses this tool to ensure technical accuracy:
+Gemini CLI uses this tool to ensure technical accuracy:
 
-- **Capability discovery:** If the agent is unsure how a feature works, it can
+- **Capability discovery:** If Gemini CLI is unsure how a feature works, it can
   lookup the corresponding documentation.
-- **Reference lookup:** The agent can verify slash command sub-commands or
+- **Reference lookup:** Gemini CLI can verify slash command sub-commands or
   specific setting names.
-- **Self-correction:** The agent can use the documentation to correct its
+- **Self-correction:** Gemini CLI can use the documentation to correct its
   understanding of Gemini CLI's system logic.
 
 ## Next steps
