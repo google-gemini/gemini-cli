@@ -1779,7 +1779,7 @@ describe('useGeminiStream', () => {
         await result.current.handleApprovalModeChange(ApprovalMode.YOLO);
       });
 
-      // Both tool calls should be auto-approved via MessageBus
+      // Both tool calls should be auto-approved
       expect(mockMessageBus.publish).toHaveBeenCalledTimes(2);
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1933,7 +1933,7 @@ describe('useGeminiStream', () => {
         await result.current.handleApprovalModeChange(ApprovalMode.YOLO);
       });
 
-      // Only the awaiting_approval tool should be processed via MessageBus
+      // Only the awaiting_approval tool should be processed.
       expect(mockMessageBus.publish).toHaveBeenCalledTimes(1);
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
         expect.objectContaining({ correlationId: 'corr-call1' }),
