@@ -517,13 +517,14 @@ async function handleRemove(
     };
   }
 
-  // Parse optional --scope flag
+  // Parse optional --scope flag from the end to avoid conflicts with
+  // server names that might contain "--scope" as a substring.
   const parts = serverName.split(/\s+/);
-  const scopeIdx = parts.indexOf('--scope');
   let requestedScope: 'user' | 'project' | undefined;
   let name: string;
-  if (scopeIdx !== -1 && parts[scopeIdx + 1]) {
-    const scopeValue = parts[scopeIdx + 1];
+  const lastTwoParts = parts.slice(-2);
+  if (lastTwoParts[0] === '--scope' && lastTwoParts[1]) {
+    const scopeValue = lastTwoParts[1];
     if (scopeValue !== 'user' && scopeValue !== 'project') {
       return {
         type: 'message',
@@ -532,11 +533,9 @@ async function handleRemove(
       };
     }
     requestedScope = scopeValue;
-    name = parts
-      .filter((_, i) => i !== scopeIdx && i !== scopeIdx + 1)
-      .join(' ');
+    name = parts.slice(0, -2).join(' ');
   } else {
-    name = parts.filter((p) => p !== '--scope').join(' ');
+    name = serverName;
   }
 
   // Validate server exists in the MCP client manager
@@ -607,11 +606,6 @@ async function handleRemove(
       Date.now(),
     );
     await mcpClientManager.removeServer(name);
-  }
-
-  // Update the client with the new tools
-  if (config.getGeminiClient()?.isInitialized()) {
-    await config.getGeminiClient().setTools();
   }
 
   // Reload the slash commands to reflect the changes
