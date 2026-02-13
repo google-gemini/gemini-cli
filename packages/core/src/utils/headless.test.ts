@@ -120,18 +120,18 @@ describe('isHeadlessMode', () => {
     }
   });
 
-  it('should return true if -y or --yolo is in process.argv as a fallback', () => {
+  it('should return false if -y or --yolo is in process.argv as a fallback', () => {
     const originalArgv = process.argv;
     process.argv = ['node', 'index.js', '-y'];
     try {
-      expect(isHeadlessMode()).toBe(true);
+      expect(isHeadlessMode()).toBe(false);
     } finally {
       process.argv = originalArgv;
     }
 
     process.argv = ['node', 'index.js', '--yolo'];
     try {
-      expect(isHeadlessMode()).toBe(true);
+      expect(isHeadlessMode()).toBe(false);
     } finally {
       process.argv = originalArgv;
     }
