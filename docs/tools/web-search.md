@@ -1,42 +1,32 @@
 # Web search tool (`google_web_search`)
 
-This document describes the `google_web_search` tool.
+The `google_web_search` tool allows the Gemini agent to retrieve up-to-date
+information, news, and facts from the internet via Google Search.
 
-## Description
+## Technical reference
 
-Use `google_web_search` to perform a web search using Google Search via the
-Gemini API. The `google_web_search` tool returns a summary of web results with
-sources.
+The agent uses this tool when your request requires knowledge of current events
+or specific online documentation not available in its internal training data.
 
 ### Arguments
 
-`google_web_search` takes one argument:
+- `query` (string, required): The search query to be executed.
 
-- `query` (string, required): The search query.
+## Technical behavior
 
-## How to use `google_web_search` with the Gemini CLI
+- **Grounding:** Returns a generated summary based on search results.
+- **Citations:** Includes source URIs and titles for factual grounding.
+- **Processing:** The Gemini API processes the search results before returning a
+  synthesized response to the agent.
 
-The `google_web_search` tool sends a query to the Gemini API, which then
-performs a web search. `google_web_search` will return a generated response
-based on the search results, including citations and sources.
+## Use cases
 
-Usage:
+- Researching the latest version of a software library or API.
+- Finding solutions to recent software bugs or security vulnerabilities.
+- Retrieving news or documentation updated after the model's knowledge cutoff.
 
-```
-google_web_search(query="Your query goes here.")
-```
+## Next steps
 
-## `google_web_search` examples
-
-Get information on a topic:
-
-```
-google_web_search(query="latest advancements in AI-powered code generation")
-```
-
-## Important notes
-
-- **Response returned:** The `google_web_search` tool returns a processed
-  summary, not a raw list of search results.
-- **Citations:** The response includes citations to the sources used to generate
-  the summary.
+- Follow the [Web tools guide](../cli/tutorials/web-tools.md) for practical
+  usage examples.
+- Explore the [Web fetch tool reference](./web-fetch.md) for direct URL access.

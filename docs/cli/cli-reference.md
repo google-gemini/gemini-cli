@@ -1,4 +1,4 @@
-# CLI cheatsheet
+# Gemini CLI cheatsheet
 
 This page provides a reference for commonly used Gemini CLI commands, options,
 and parameters.
@@ -9,8 +9,7 @@ and parameters.
 | ---------------------------------- | ---------------------------------- | --------------------------------------------------- |
 | `gemini`                           | Start interactive REPL             | `gemini`                                            |
 | `gemini "query"`                   | Query non-interactively, then exit | `gemini "explain this project"`                     |
-| `gemini -p "query"`                | Query via SDK, then exit           | `gemini -p "explain this function"`                 |
-| `cat file \| gemini -p "query"`    | Process piped content              | `cat logs.txt \| gemini -p "explain"`               |
+| `cat file \| gemini`               | Process piped content              | `cat logs.txt \| gemini`                            |
 | `gemini -i "query"`                | Execute and continue interactively | `gemini -i "What is the purpose of this project?"`  |
 | `gemini -r "latest"`               | Continue most recent session       | `gemini -r "latest"`                                |
 | `gemini -r "latest" "query"`       | Continue session with a new prompt | `gemini -r "latest" "Check for type errors"`        |
@@ -53,8 +52,8 @@ and parameters.
 
 ## Model selection
 
-The `--model` (or `-m`) flag allows you to specify which Gemini model to use.
-You can use either model aliases (user-friendly names) or concrete model names.
+The `--model` (or `-m`) flag lets you specify which Gemini model to use. You can
+use either model aliases (user-friendly names) or concrete model names.
 
 ### Model aliases
 
