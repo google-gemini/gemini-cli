@@ -2060,6 +2060,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const hadPendingAttentionRef = useRef(false);
   const previousFocusedRef = useRef(isFocused);
+  const previousStreamingStateRef = useRef(streamingState);
   const lastSentAttentionNotificationRef = useRef<{
     key: string;
     sentAt: number;
@@ -2106,6 +2107,28 @@ Logging in with Google... Restarting Gemini CLI to continue.
       buildMacNotificationContent(pendingAttentionNotification.event),
     );
   }, [isFocused, pendingAttentionNotification, settings]);
+
+  useEffect(() => {
+    const previousStreamingState = previousStreamingStateRef.current;
+    previousStreamingStateRef.current = streamingState;
+
+    const justCompletedTurn =
+      previousStreamingState === StreamingState.Responding &&
+      streamingState === StreamingState.Idle;
+
+    if (!justCompletedTurn || isFocused || pendingAttentionNotification) {
+      return;
+    }
+
+    void notifyMacOs(
+      settings,
+      buildMacNotificationContent({
+        type: 'attention',
+        heading: 'Response ready',
+        detail: 'Gemini CLI finished responding.',
+      }),
+    );
+  }, [streamingState, isFocused, pendingAttentionNotification, settings]);
 
   const isPassiveShortcutsHelpState =
     isInputActive &&

@@ -630,6 +630,45 @@ describe('AppContainer State Management', () => {
       });
     });
 
+    it('sends a macOS notification when a response completes while unfocused', async () => {
+      mockedUseFocus.mockReturnValue(false);
+      let currentStreamingState: 'idle' | 'responding' = 'responding';
+      mockedUseGeminiStream.mockImplementation(() => ({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: currentStreamingState,
+      }));
+
+      let unmount: (() => void) | undefined;
+      let rerender: ((tree: ReactElement) => void) | undefined;
+
+      await act(async () => {
+        const rendered = renderAppContainer();
+        unmount = rendered.unmount;
+        rerender = rendered.rerender;
+      });
+
+      currentStreamingState = 'idle';
+      await act(async () => {
+        rerender?.(getAppContainer());
+      });
+
+      await waitFor(() =>
+        expect(
+          macOsNotificationsMocks.buildMacNotificationContent,
+        ).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'attention',
+            heading: 'Response ready',
+          }),
+        ),
+      );
+      expect(macOsNotificationsMocks.notifyMacOs).toHaveBeenCalled();
+
+      await act(async () => {
+        unmount?.();
+      });
+    });
+
     it('initializes with theme error from initialization result', async () => {
       const initResultWithError = {
         ...mockInitResult,
