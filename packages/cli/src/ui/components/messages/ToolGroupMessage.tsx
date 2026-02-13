@@ -48,12 +48,15 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   // Filter out tool calls that should be hidden (e.g. in-progress Ask User, or Plan Mode operations).
   const toolCalls = useMemo(
     () =>
-      allToolCalls.filter((t) => !shouldHideToolCall({
-          displayName: t.name,
-          status: t.status,
-          approvalMode: t.approvalMode,
-          hasResultDisplay: !!t.resultDisplay,
-        })),
+      allToolCalls.filter(
+        (t) =>
+          !shouldHideToolCall({
+            displayName: t.name,
+            status: t.status,
+            approvalMode: t.approvalMode,
+            hasResultDisplay: !!t.resultDisplay,
+          }),
+      ),
     [allToolCalls],
   );
 
