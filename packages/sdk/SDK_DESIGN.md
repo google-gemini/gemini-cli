@@ -1,8 +1,14 @@
 # `Gemini CLI SDK`
 
+> **Implementation Status:** Core agent loop, tool execution, and session
+> context are implemented. Advanced features like hooks, skills, subagents, and
+> ACP are currently missing.
+
 # `Examples`
 
 ## `Simple Example`
+
+> **Status:** Implemented. `GeminiCliAgent` supports `cwd` and `sendStream`.
 
 Equivalent to `gemini -p "what does this project do?"`. Loads all workspace and
 user settings.
@@ -27,6 +33,9 @@ Validation:
 
 ## `System Instructions`
 
+> **Status:** Implemented. Both static string instructions and dynamic functions
+> (receiving `SessionContext`) are supported.
+
 System instructions can be provided by a static string OR dynamically via a
 function:
 
@@ -46,6 +55,9 @@ Validation:
 - Dynamic instructions show up and contain dynamic content.
 
 ## `Custom Tools`
+
+> **Status:** Implemented. `tool()` helper and `GeminiCliAgent` support custom
+> tool definitions and execution.
 
 ```ts
 import { GeminiCliAgent, tool, z } from "@google/gemini-cli-sdk";
@@ -73,6 +85,8 @@ Validation:
 - Model receives tool response after returning tool
 
 ## `Custom Hooks`
+
+> **Status:** Not Implemented.
 
 SDK users can provide programmatic custom hooks
 
@@ -127,6 +141,8 @@ Validation (these are probably hardest to validate):
 
 ## `Custom Skills`
 
+> **Status:** Not Implemented.
+
 Custom skills can be referenced by individual directories or by "skill roots"
 (directories containing many skills).
 
@@ -157,6 +173,8 @@ const mySkill = skill({
 
 ## `Subagents`
 
+> **Status:** Not Implemented.
+
 ```ts
 import { GeminiCliAgent, subagent } from "@google/gemini-cli";
 
@@ -181,6 +199,8 @@ const agent = new GeminiCliAgent({
 
 ## `Extensions`
 
+> **Status:** Not Implemented.
+
 Potentially the most important feature of the Gemini CLI SDK is support for
 extensions, which modularly encapsulate all of the primitives listed above:
 
@@ -201,6 +221,8 @@ INSTRUCTIONS",
 
 ## `ACP Mode`
 
+> **Status:** Not Implemented.
+
 The SDK will include a wrapper utility to interact with the agent via ACP
 instead of the SDK's natural API.
 
@@ -219,11 +241,16 @@ client.send({...clientMessage}); // e.g. a "session/prompt" message
 
 ## `Approvals / Policies`
 
+> **Status:** Not Implemented.
+
 TODO
 
 # `Implementation Guidance`
 
 ## `Session Context`
+
+> **Status:** Implemented. `SessionContext` interface exists and is passed to
+> tools.
 
 Whenever executing a tool, hook, command, or skill, a SessionContext object
 should be passed as an additional argument after the arguments/payload. The
@@ -245,18 +272,27 @@ export interface SessionContext {
 }
 
 export interface AgentFilesystem {
-  readFile(path: string): Promise<string | null>
-  writeFile(path: string, content: string): Promise<void>
-  // consider others including delete, globbing, etc but read/write are bare minimum}
+  readFile(path: string): Promise<string | null>;
+  writeFile(path: string, content: string): Promise<void>;
+  // consider others including delete, globbing, etc but read/write are bare minimum
+}
 
 export interface AgentShell {
   // simple promise-based execution that blocks until complete
-  exec(cmd: string, options?: AgentShellOptions): Promise<{exitCode: number, output: string, stdout: string, stderr: string}>
+  exec(
+    cmd: string,
+    options?: AgentShellOptions,
+  ): Promise<{
+    exitCode: number;
+    output: string;
+    stdout: string;
+    stderr: string;
+  }>;
   start(cmd: string, options?: AgentShellOptions): AgentShellProcess;
 }
 
 export interface AgentShellOptions {
-  env?: Record<string,string>;
+  env?: Record<string, string>;
   timeoutSeconds?: number;
 }
 
@@ -277,3 +313,21 @@ export interface AgentShellProcess {
   the same session id?
 - Presumably the transcript is kept updated in memory and also persisted to disk
   by default?
+
+# `Next Steps`
+
+Based on the current implementation status, we can proceed with:
+
+## Feature 2: Custom Skills Support
+
+Implement support for loading and registering custom skills. This involves
+adding a `skills` option to `GeminiCliAgentOptions` and implementing the logic
+to read skill definitions from directories.
+
+**Tasks:**
+
+1.  Add `skills` option to `GeminiCliAgentOptions`.
+2.  Implement `skillDir` and `skillRoot` helpers to load skills from the
+    filesystem.
+3.  Update `GeminiCliAgent` to register loaded skills with the internal tool
+    registry.
