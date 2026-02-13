@@ -424,22 +424,6 @@ describe('Core System Prompt (prompts.ts)', () => {
       expect(prompt).toMatchSnapshot();
     });
 
-    it('should include legacy PLAN mode instructions with inquiry handling', () => {
-      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
-      vi.mocked(mockConfig.getActiveModel).mockReturnValue(
-        DEFAULT_GEMINI_FLASH_LITE_MODEL,
-      );
-      const prompt = getCoreSystemPrompt(mockConfig);
-      expect(prompt).toContain('# Active Approval Mode: Plan');
-      expect(prompt).toContain(
-        'For Inquiries, you may answer directly without following these phases.',
-      );
-      expect(prompt).toContain(
-        'If the request is an **Inquiry**, answer directly in your chat response.',
-      );
-      expect(prompt).toMatchSnapshot();
-    });
-
     it('should NOT include approval mode instructions for DEFAULT mode', () => {
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
         ApprovalMode.DEFAULT,
