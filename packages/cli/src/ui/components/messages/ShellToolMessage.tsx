@@ -194,17 +194,17 @@ function getShellMaxLines(
   isAlternateBuffer: boolean,
   isThisShellFocused: boolean,
   availableTerminalHeight: number | undefined,
-): number {
+): number | undefined {
+  if (availableTerminalHeight === undefined) {
+    return isAlternateBuffer ? ACTIVE_SHELL_MAX_LINES : undefined;
+  }
+
   if (
     status === ToolCallStatus.Success ||
     status === ToolCallStatus.Error ||
     status === ToolCallStatus.Canceled
   ) {
     return COMPLETED_SHELL_MAX_LINES;
-  }
-
-  if (availableTerminalHeight === undefined) {
-    return ACTIVE_SHELL_MAX_LINES;
   }
 
   const maxLinesBasedOnHeight = Math.max(1, availableTerminalHeight - 2);

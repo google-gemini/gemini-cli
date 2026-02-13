@@ -183,7 +183,7 @@ describe('<ShellToolMessage />', () => {
         true,
       ],
       [
-        'defaults to ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is undefined',
+        'defaults to ACTIVE_SHELL_MAX_LINES in alternate buffer when availableTerminalHeight is undefined',
         undefined,
         ACTIVE_SHELL_MAX_LINES,
         false,
@@ -206,6 +206,24 @@ describe('<ShellToolMessage />', () => {
         const frame = lastFrame();
         expect(frame!.match(/Line \d+/g)?.length).toBe(expectedMaxLines);
         expect(frame).toMatchSnapshot();
+      });
+    });
+
+    it('fully expands in standard mode when availableTerminalHeight is undefined', async () => {
+      const { lastFrame } = renderShell(
+        {
+          resultDisplay: LONG_OUTPUT,
+          renderOutputAsMarkdown: false,
+          availableTerminalHeight: undefined,
+          status: ToolCallStatus.Executing,
+        },
+        { useAlternateBuffer: false },
+      );
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        // Should show all 100 lines
+        expect(frame!.match(/Line \d+/g)?.length).toBe(100);
       });
     });
   });

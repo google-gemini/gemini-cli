@@ -57,7 +57,9 @@ export const MainContent = () => {
       uiState.history.map((h) => (
         <MemoizedHistoryItemDisplay
           terminalWidth={mainAreaWidth}
-          availableTerminalHeight={staticAreaMaxItemHeight}
+          availableTerminalHeight={
+            uiState.constrainHeight ? staticAreaMaxItemHeight : undefined
+          }
           availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
           key={h.id}
           item={h}
@@ -70,6 +72,7 @@ export const MainContent = () => {
       mainAreaWidth,
       staticAreaMaxItemHeight,
       uiState.slashCommands,
+      uiState.constrainHeight,
     ],
   );
 
