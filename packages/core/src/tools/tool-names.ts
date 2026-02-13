@@ -4,31 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  EDIT_TOOL_NAME,
-  GLOB_TOOL_NAME,
-  GREP_TOOL_NAME,
-  LS_TOOL_NAME,
-  READ_FILE_TOOL_NAME,
-  SHELL_TOOL_NAME,
-  WEB_SEARCH_TOOL_NAME,
-  WRITE_FILE_TOOL_NAME,
-} from './definitions/coreTools.js';
-
 // Centralized constants for tool names.
 // This prevents circular dependencies that can occur when other modules (like agents)
 // need to reference a tool's name without importing the tool's implementation.
 
-export {
-  EDIT_TOOL_NAME,
-  GLOB_TOOL_NAME,
-  GREP_TOOL_NAME,
-  LS_TOOL_NAME,
-  READ_FILE_TOOL_NAME,
-  SHELL_TOOL_NAME,
-  WEB_SEARCH_TOOL_NAME,
-  WRITE_FILE_TOOL_NAME,
-};
+export const GLOB_TOOL_NAME = 'glob';
+export const GREP_TOOL_NAME = 'grep_search';
+export const LS_TOOL_NAME = 'list_directory';
+export const READ_FILE_TOOL_NAME = 'read_file';
+export const SHELL_TOOL_NAME = 'run_shell_command';
+export const WRITE_FILE_TOOL_NAME = 'write_file';
+export const EDIT_TOOL_NAME = 'replace';
+export const WEB_SEARCH_TOOL_NAME = 'google_web_search';
 
 export const WRITE_TODOS_TOOL_NAME = 'write_todos';
 export const WEB_FETCH_TOOL_NAME = 'web_fetch';
