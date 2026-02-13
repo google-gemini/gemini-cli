@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useCallback, useContext, useMemo, useState } from 'react';
+import { useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { Box, Text } from 'ink';
 import {
   PREVIEW_GEMINI_MODEL,
@@ -32,6 +32,8 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const config = useContext(ConfigContext);
   const [view, setView] = useState<'main' | 'manual'>('main');
   const [persistMode, setPersistMode] = useState(false);
+  // Use a ref to track the current persist mode to avoid React state timing issues
+  const persistModeRef = useRef(false);
 
   // Determine the Preferred Model (read once when the dialog opens).
   const preferredModel = config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
@@ -63,7 +65,12 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         return true;
       }
       if (key.name === 'tab') {
-        setPersistMode((prev) => !prev);
+        setPersistMode((prev) => {
+          const newValue = !prev;
+          // Update ref immediately to avoid timing issues
+          persistModeRef.current = newValue;
+          return newValue;
+        });
         return true;
       }
       return false;
@@ -162,13 +169,15 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       }
 
       if (config) {
-        config.setModel(model, persistMode ? false : true);
+        // Use ref value to avoid stale closure issues with rapid key presses
+        const shouldPersist = persistModeRef.current;
+        config.setModel(model, shouldPersist ? false : true);
         const event = new ModelSlashCommandEvent(model);
         logModelSlashCommand(config, event);
       }
       onClose();
     },
-    [config, onClose, persistMode],
+    [config, onClose],
   );
 
   return (
