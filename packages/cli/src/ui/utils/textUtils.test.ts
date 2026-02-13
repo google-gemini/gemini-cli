@@ -339,9 +339,9 @@ describe('textUtils', () => {
         expect(stripUnsafeCharacters(input)).toBe('safetxt.sh');
       });
 
-      it('should strip all BiDi control characters (U+202A-U+202E, U+2066-U+2069)', () => {
+      it('should strip all BiDi control characters (LRM, RLM, U+202A-U+202E, U+2066-U+2069)', () => {
         const bidiChars =
-          '\u202A\u202B\u202C\u202D\u202E\u2066\u2067\u2068\u2069';
+          '\u200E\u200F\u202A\u202B\u202C\u202D\u202E\u2066\u2067\u2068\u2069';
         expect(stripUnsafeCharacters('a' + bidiChars + 'b')).toBe('ab');
       });
 

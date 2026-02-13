@@ -22,7 +22,10 @@ import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
 import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
 import { MaxSizedBox, MINIMUM_MAX_HEIGHT } from '../shared/MaxSizedBox.js';
-import { sanitizeForDisplay } from '../../utils/textUtils.js';
+import {
+  sanitizeForDisplay,
+  stripUnsafeCharacters,
+} from '../../utils/textUtils.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
@@ -330,7 +333,7 @@ export const ToolConfirmationMessage: React.FC<
       if (!confirmationDetails.isModifying) {
         bodyContent = (
           <DiffRenderer
-            diffContent={confirmationDetails.fileDiff}
+            diffContent={stripUnsafeCharacters(confirmationDetails.fileDiff)}
             filename={sanitizeForDisplay(confirmationDetails.fileName)}
             availableTerminalHeight={availableBodyContentHeight()}
             terminalWidth={terminalWidth}
