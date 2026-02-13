@@ -1842,7 +1842,7 @@ console.log(JSON.stringify({
         settings: {
           hooksConfig: {
             enabled: true,
-            disabled: [normalizePath(disabledCmd)],
+            disabled: ['hook-b'],
           },
           hooks: {
             BeforeTool: [
@@ -1850,11 +1850,13 @@ console.log(JSON.stringify({
                 hooks: [
                   {
                     type: 'command',
+                    name: 'hook-a',
                     command: enabledCmd,
                     timeout: 60000,
                   },
                   {
                     type: 'command',
+                    name: 'hook-b',
                     command: disabledCmd,
                     timeout: 60000,
                   },
@@ -1914,7 +1916,7 @@ console.log(JSON.stringify({
         settings: {
           hooksConfig: {
             enabled: true,
-            disabled: [normalizePath(disabledCmd)],
+            disabled: ['multi-hook-disabled'],
           },
           hooks: {
             BeforeTool: [
@@ -1922,11 +1924,13 @@ console.log(JSON.stringify({
                 hooks: [
                   {
                     type: 'command',
+                    name: 'multi-hook-active',
                     command: activeCmd,
                     timeout: 60000,
                   },
                   {
                     type: 'command',
+                    name: 'multi-hook-disabled',
                     command: disabledCmd,
                     timeout: 60000,
                   },
