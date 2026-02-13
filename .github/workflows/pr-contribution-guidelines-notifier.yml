@@ -15,10 +15,7 @@ jobs:
     steps:
       - name: 'Generate GitHub App Token'
         id: 'generate_token'
-        env:
-          APP_ID: '${{ secrets.APP_ID }}'
-        if: |-
-          ${{ env.APP_ID != '' }}
+        if: "github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository"
         uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
         with:
           app-id: '${{ secrets.APP_ID }}'
@@ -64,6 +61,7 @@ jobs:
             }
 
             // 2. Check if the PR is already associated with an issue
+            // Check A: Official GitHub "Closing Issue" link (GraphQL)
             const query = `
               query($owner:String!, $repo:String!, $number:Int!) {
                 repository(owner:$owner, name:$repo) {
@@ -77,9 +75,14 @@ jobs:
             `;
             const variables = { owner: org, repo: repo, number: pr_number };
             const result = await github.graphql(query, variables);
-            const issueCount = result.repository.pullRequest.closingIssuesReferences.totalCount;
+            const hasClosingLink = result.repository.pullRequest.closingIssuesReferences.totalCount > 0;
 
-            if (issueCount > 0) {
+            // Check B: Regex for mentions (e.g., "Related to #123", "Part of #123", "#123")
+            const body = context.payload.pull_request.body || '';
+            const mentionRegex = /(?:#|https:\/\/github\.com\/[^\/]+\/[^\/]+\/issues\/)(\d+)/i;
+            const hasMentionLink = mentionRegex.test(body);
+
+            if (hasClosingLink || hasMentionLink) {
               core.info(`PR #${pr_number} is already associated with an issue. No notification needed.`);
               return;
             }
@@ -97,9 +100,17 @@ jobs:
             Thank you for your understanding and for being a part of our community!
             `.trim().replace(/^[ ]+/gm, '');
 
-            await github.rest.issues.createComment({
-              owner: org,
-              repo: repo,
-              issue_number: pr_number,
-              body: comment
-            });
+            try {
+              await github.rest.issues.createComment({
+                owner: org,
+                repo: repo,
+                issue_number: pr_number,
+                body: comment
+              });
+            } catch (e) {
+              if (e.status === 403) {
+                core.warning('Failed to post comment due to insufficient permissions (likely a fork PR using GITHUB_TOKEN).');
+              } else {
+                throw e;
+              }
+            }
