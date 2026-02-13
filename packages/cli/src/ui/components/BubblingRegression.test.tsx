@@ -9,7 +9,7 @@ import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { AskUserDialog } from './AskUserDialog.js';
-import type { Question } from '@google/gemini-cli-core';
+import { QuestionType, type Question } from '@google/gemini-cli-core';
 
 describe('Key Bubbling Regression', () => {
   afterEach(() => {
@@ -20,6 +20,7 @@ describe('Key Bubbling Regression', () => {
     {
       question: 'Choice Q?',
       header: 'Choice',
+      type: QuestionType.CHOICE,
       options: [
         { label: 'Option 1', description: '' },
         { label: 'Option 2', description: '' },

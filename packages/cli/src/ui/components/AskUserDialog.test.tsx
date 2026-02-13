@@ -37,6 +37,7 @@ describe('AskUserDialog', () => {
     {
       question: 'Which authentication method should we use?',
       header: 'Auth',
+      type: QuestionType.CHOICE,
       options: [
         { label: 'OAuth 2.0', description: 'Industry standard, supports SSO' },
         { label: 'JWT tokens', description: 'Stateless, good for APIs' },
@@ -74,6 +75,7 @@ describe('AskUserDialog', () => {
         {
           question: 'Which features?',
           header: 'Features',
+          type: QuestionType.CHOICE,
           options: [
             { label: 'TypeScript', description: '' },
             { label: 'ESLint', description: '' },
@@ -171,6 +173,7 @@ describe('AskUserDialog', () => {
       {
         question: 'Which authentication method?',
         header: 'Auth',
+        type: QuestionType.CHOICE,
         options: [{ label: 'OAuth 2.0', description: '' }],
         multiSelect: false,
       },
@@ -228,6 +231,7 @@ describe('AskUserDialog', () => {
           {
             question: 'Choose an option',
             header: 'Scroll Test',
+            type: QuestionType.CHOICE,
             options: Array.from({ length: 15 }, (_, i) => ({
               label: `Option ${i + 1}`,
               description: `Description ${i + 1}`,
@@ -296,6 +300,7 @@ describe('AskUserDialog', () => {
       {
         question: 'Which database should we use?',
         header: 'Database',
+        type: QuestionType.CHOICE,
         options: [
           { label: 'PostgreSQL', description: 'Relational database' },
           { label: 'MongoDB', description: 'Document database' },
@@ -305,6 +310,7 @@ describe('AskUserDialog', () => {
       {
         question: 'Which ORM do you prefer?',
         header: 'ORM',
+        type: QuestionType.CHOICE,
         options: [
           { label: 'Prisma', description: 'Type-safe ORM' },
           { label: 'Drizzle', description: 'Lightweight ORM' },
@@ -359,12 +365,14 @@ describe('AskUserDialog', () => {
       {
         question: 'Which testing framework?',
         header: 'Testing',
+        type: QuestionType.CHOICE,
         options: [{ label: 'Vitest', description: 'Fast unit testing' }],
         multiSelect: false,
       },
       {
         question: 'Which CI provider?',
         header: 'CI',
+        type: QuestionType.CHOICE,
         options: [
           { label: 'GitHub Actions', description: 'Built into GitHub' },
         ],
@@ -402,12 +410,14 @@ describe('AskUserDialog', () => {
       {
         question: 'Which package manager?',
         header: 'Package',
+        type: QuestionType.CHOICE,
         options: [{ label: 'pnpm', description: 'Fast, disk efficient' }],
         multiSelect: false,
       },
       {
         question: 'Which bundler?',
         header: 'Bundler',
+        type: QuestionType.CHOICE,
         options: [{ label: 'Vite', description: 'Next generation bundler' }],
         multiSelect: false,
       },
@@ -465,6 +475,7 @@ describe('AskUserDialog', () => {
       {
         question: 'Which framework?',
         header: 'Framework',
+        type: QuestionType.CHOICE,
         options: [
           { label: 'React', description: 'Component library' },
           { label: 'Vue', description: 'Progressive framework' },
@@ -474,6 +485,7 @@ describe('AskUserDialog', () => {
       {
         question: 'Which styling?',
         header: 'Styling',
+        type: QuestionType.CHOICE,
         options: [
           { label: 'Tailwind', description: 'Utility-first CSS' },
           { label: 'CSS Modules', description: 'Scoped styles' },
@@ -500,12 +512,14 @@ describe('AskUserDialog', () => {
       {
         question: 'Create tests?',
         header: 'Tests',
+        type: QuestionType.CHOICE,
         options: [{ label: 'Yes', description: 'Generate test files' }],
         multiSelect: false,
       },
       {
         question: 'Add documentation?',
         header: 'Docs',
+        type: QuestionType.CHOICE,
         options: [{ label: 'Yes', description: 'Generate JSDoc comments' }],
         multiSelect: false,
       },
@@ -545,12 +559,14 @@ describe('AskUserDialog', () => {
       {
         question: 'Which license?',
         header: 'License',
+        type: QuestionType.CHOICE,
         options: [{ label: 'MIT', description: 'Permissive license' }],
         multiSelect: false,
       },
       {
         question: 'Include README?',
         header: 'README',
+        type: QuestionType.CHOICE,
         options: [{ label: 'Yes', description: 'Generate README.md' }],
         multiSelect: false,
       },
@@ -580,12 +596,14 @@ describe('AskUserDialog', () => {
       {
         question: 'Target Node version?',
         header: 'Node',
+        type: QuestionType.CHOICE,
         options: [{ label: 'Node 20', description: 'LTS version' }],
         multiSelect: false,
       },
       {
         question: 'Enable strict mode?',
         header: 'Strict',
+        type: QuestionType.CHOICE,
         options: [{ label: 'Yes', description: 'Strict TypeScript' }],
         multiSelect: false,
       },
@@ -727,6 +745,7 @@ describe('AskUserDialog', () => {
         {
           question: 'Should it be async?',
           header: 'Async',
+          type: QuestionType.CHOICE,
           options: [
             { label: 'Yes', description: 'Use async/await' },
             { label: 'No', description: 'Synchronous hook' },
@@ -773,6 +792,7 @@ describe('AskUserDialog', () => {
         {
           question: 'Which styling approach?',
           header: 'Style',
+          type: QuestionType.CHOICE,
           options: [
             { label: 'CSS Modules', description: 'Scoped CSS' },
             { label: 'Tailwind', description: 'Utility classes' },
@@ -895,6 +915,7 @@ describe('AskUserDialog', () => {
         {
           question: 'Choice Q?',
           header: 'Choice',
+          type: QuestionType.CHOICE,
           options: [{ label: 'Option 1', description: '' }],
           multiSelect: false,
         },
@@ -952,12 +973,14 @@ describe('AskUserDialog', () => {
         {
           question: 'Question 1?',
           header: 'Q1',
+          type: QuestionType.CHOICE,
           options: [{ label: 'A1', description: '' }],
           multiSelect: false,
         },
         {
           question: 'Question 2?',
           header: 'Q2',
+          type: QuestionType.CHOICE,
           options: [{ label: 'A2', description: '' }],
           multiSelect: false,
         },
@@ -1008,6 +1031,7 @@ describe('AskUserDialog', () => {
         {
           question: 'Which option do you prefer?',
           header: 'Test',
+          type: QuestionType.CHOICE,
           options: [{ label: 'Yes', description: '' }],
           multiSelect: false,
         },
@@ -1036,6 +1060,7 @@ describe('AskUserDialog', () => {
         {
           question: 'Is **this** working?',
           header: 'Test',
+          type: QuestionType.CHOICE,
           options: [{ label: 'Yes', description: '' }],
           multiSelect: false,
         },
@@ -1067,6 +1092,7 @@ describe('AskUserDialog', () => {
         {
           question: 'Is **this** working?',
           header: 'Test',
+          type: QuestionType.CHOICE,
           options: [{ label: 'Yes', description: '' }],
           multiSelect: false,
         },
@@ -1096,6 +1122,7 @@ describe('AskUserDialog', () => {
         {
           question: 'Run `npm start`?',
           header: 'Test',
+          type: QuestionType.CHOICE,
           options: [{ label: 'Yes', description: '' }],
           multiSelect: false,
         },
@@ -1126,6 +1153,7 @@ describe('AskUserDialog', () => {
       {
         question: 'Choose an option',
         header: 'Context Test',
+        type: QuestionType.CHOICE,
         options: Array.from({ length: 10 }, (_, i) => ({
           label: `Option ${i + 1}`,
           description: `Description ${i + 1}`,
@@ -1162,6 +1190,7 @@ describe('AskUserDialog', () => {
       {
         question: longQuestion,
         header: 'Alternate Buffer Test',
+        type: QuestionType.CHOICE,
         options: [{ label: 'Option 1', description: 'Desc 1' }],
         multiSelect: false,
       },
@@ -1195,6 +1224,7 @@ describe('AskUserDialog', () => {
         {
           question: 'Select your preferred language:',
           header: 'Language',
+          type: QuestionType.CHOICE,
           options: [
             { label: 'TypeScript', description: '' },
             { label: 'JavaScript', description: '' },
@@ -1228,6 +1258,7 @@ describe('AskUserDialog', () => {
         {
           question: 'Select your preferred language:',
           header: 'Language',
+          type: QuestionType.CHOICE,
           options: [
             { label: 'TypeScript', description: '' },
             { label: 'JavaScript', description: '' },
