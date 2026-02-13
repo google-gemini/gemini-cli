@@ -123,7 +123,7 @@
               "type": "boolean"
             },
             "maxAge": {
-              "title": "Max Session Age",
+              "title": "Keep chat history",
               "description": "Maximum age of sessions to keep (e.g., \"30d\", \"7d\", \"24h\", \"1w\")",
               "markdownDescription": "Maximum age of sessions to keep (e.g., \"30d\", \"7d\", \"24h\", \"1w\")\n\n- Category: `General`\n- Requires restart: `no`",
               "type": "string"
