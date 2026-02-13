@@ -61,7 +61,7 @@
     "simple-git": "^3.28.0",
     "string-width": "^8.1.0",
     "strip-ansi": "^7.1.0",
-    "strip-json-comments": "^3.1.1",
+    "strip-json-comments": "^5.0.3",
     "tar": "^7.5.2",
     "tinygradient": "^1.1.5",
     "undici": "^7.10.0",
