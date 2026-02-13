@@ -19,6 +19,8 @@ import type {
 import { AggregationTemporality } from '@opentelemetry/sdk-metrics';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 
+import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+
 class FileExporter {
   protected writeStream: fs.WriteStream;
 
