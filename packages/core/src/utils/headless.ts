@@ -40,6 +40,17 @@ export function isHeadlessMode(options?: HeadlessModeOptions): boolean {
     process.env['GITHUB_ACTIONS'] === 'true' ||
     !!options?.prompt ||
     (!!process.stdin && !process.stdin.isTTY) ||
+<<<<<<< HEAD
     (!!process.stdout && !process.stdout.isTTY)
   );
+=======
+    (!!process.stdout && !process.stdout.isTTY);
+
+  if (isNotTTY || !!options?.prompt || !!options?.query) {
+    return true;
+  }
+
+  // Fallback: check process.argv for flags that imply headless mode.
+  return process.argv.some((arg) => arg === '-p' || arg === '--prompt');
+>>>>>>> d0c6a56c6 (fix(core): ensure --yolo does not force headless mode (#18976))
 }

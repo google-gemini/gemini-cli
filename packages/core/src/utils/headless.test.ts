@@ -99,10 +99,49 @@ describe('isHeadlessMode', () => {
     expect(isHeadlessMode({ prompt: true })).toBe(true);
   });
 
+<<<<<<< HEAD
   it('should return false if query is provided but it is still a TTY', () => {
     // Note: per current logic, query alone doesn't force headless if TTY
     // This matches the existing behavior in packages/cli/src/config/config.ts
     expect(isHeadlessMode({ query: 'test query' })).toBe(false);
+=======
+  it('should return true if query is provided', () => {
+    expect(isHeadlessMode({ query: 'test query' })).toBe(true);
+  });
+
+  it('should return true if -p or --prompt is in process.argv as a fallback', () => {
+    const originalArgv = process.argv;
+    process.argv = ['node', 'index.js', '-p', 'hello'];
+    try {
+      expect(isHeadlessMode()).toBe(true);
+    } finally {
+      process.argv = originalArgv;
+    }
+
+    process.argv = ['node', 'index.js', '--prompt', 'hello'];
+    try {
+      expect(isHeadlessMode()).toBe(true);
+    } finally {
+      process.argv = originalArgv;
+    }
+  });
+
+  it('should return false if -y or --yolo is in process.argv as a fallback', () => {
+    const originalArgv = process.argv;
+    process.argv = ['node', 'index.js', '-y'];
+    try {
+      expect(isHeadlessMode()).toBe(false);
+    } finally {
+      process.argv = originalArgv;
+    }
+
+    process.argv = ['node', 'index.js', '--yolo'];
+    try {
+      expect(isHeadlessMode()).toBe(false);
+    } finally {
+      process.argv = originalArgv;
+    }
+>>>>>>> d0c6a56c6 (fix(core): ensure --yolo does not force headless mode (#18976))
   });
 
   it('should handle undefined process.stdout gracefully', () => {
