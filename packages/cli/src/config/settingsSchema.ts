@@ -329,16 +329,6 @@ const SETTINGS_SCHEMA = {
             description:
               'INTERNAL: Whether the user has acknowledged the session retention warning',
           },
-          retentionEnforcementDate: {
-            type: 'string',
-            label: 'Retention Enforcement Date',
-            category: 'General',
-            requiresRestart: false,
-            default: undefined as string | undefined,
-            showInDialog: false,
-            description:
-              'INTERNAL: Date when session retention enforcement begins (ISO string)',
-          },
         },
         description: 'Settings for automatic session cleanup.',
       },

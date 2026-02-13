@@ -147,12 +147,6 @@
               "markdownDescription": "INTERNAL: Whether the user has acknowledged the session retention warning\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
               "default": false,
               "type": "boolean"
-            },
-            "retentionEnforcementDate": {
-              "title": "Retention Enforcement Date",
-              "description": "INTERNAL: Date when session retention enforcement begins (ISO string)",
-              "markdownDescription": "INTERNAL: Date when session retention enforcement begins (ISO string)\n\n- Category: `General`\n- Requires restart: `no`",
-              "type": "string"
             }
           },
           "additionalProperties": false

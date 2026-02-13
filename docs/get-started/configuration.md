@@ -168,11 +168,6 @@ their corresponding top-level category object in your `settings.json` file.
     retention warning
   - **Default:** `false`
 
-- **`general.sessionRetention.retentionEnforcementDate`** (string):
-  - **Description:** INTERNAL: Date when session retention enforcement begins
-    (ISO string)
-  - **Default:** `undefined`
-
 #### `output`
 
 - **`output.format`** (enum):
