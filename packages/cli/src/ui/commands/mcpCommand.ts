@@ -30,7 +30,7 @@ import {
   normalizeServerId,
   canLoadServer,
 } from '../../config/mcp/mcpServerEnablement.js';
-import { loadSettings } from '../../config/settings.js';
+import { loadSettings, SettingScope } from '../../config/settings.js';
 
 const authCommand: SlashCommand = {
   name: 'auth',
@@ -494,6 +494,155 @@ const disableCommand: SlashCommand = {
   completion: (ctx, arg) => getEnablementCompletion(ctx, arg, true),
 };
 
+async function handleRemove(
+  context: CommandContext,
+  args: string,
+): Promise<MessageActionReturn> {
+  const { config } = context.services;
+  if (!config) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    };
+  }
+
+  const serverName = args.trim();
+  if (!serverName) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content:
+        'Server name required. Usage: /mcp remove <server-name> [--scope user|project]',
+    };
+  }
+
+  // Parse optional --scope flag
+  const parts = serverName.split(/\s+/);
+  const scopeIdx = parts.indexOf('--scope');
+  let requestedScope: 'user' | 'project' | undefined;
+  let name: string;
+  if (scopeIdx !== -1 && parts[scopeIdx + 1]) {
+    const scopeValue = parts[scopeIdx + 1];
+    if (scopeValue !== 'user' && scopeValue !== 'project') {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Invalid scope '${scopeValue}'. Must be 'user' or 'project'.`,
+      };
+    }
+    requestedScope = scopeValue;
+    name = parts
+      .filter((_, i) => i !== scopeIdx && i !== scopeIdx + 1)
+      .join(' ');
+  } else {
+    name = parts.filter((p) => p !== '--scope').join(' ');
+  }
+
+  // Validate server exists in the MCP client manager
+  const servers = config.getMcpClientManager()?.getMcpServers() || {};
+  if (!servers[name]) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Server '${name}' not found. Use /mcp list to see available servers.`,
+    };
+  }
+
+  // Prevent removal of extension-provided servers
+  const serverConfig = servers[name];
+  if (serverConfig.extension) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Server '${name}' is provided by extension '${serverConfig.extension.name}'. Uninstall the extension instead.`,
+    };
+  }
+
+  // Auto-detect scope: check workspace first, then user
+  const settings = loadSettings();
+  let scope: SettingScope.Workspace | SettingScope.User | undefined;
+
+  if (requestedScope === 'project') {
+    scope = SettingScope.Workspace;
+  } else if (requestedScope === 'user') {
+    scope = SettingScope.User;
+  } else {
+    // Auto-detect: check workspace settings first
+    const workspaceMcp = settings.forScope(SettingScope.Workspace).settings
+      .mcpServers;
+    if (workspaceMcp && name in workspaceMcp) {
+      scope = SettingScope.Workspace;
+    } else {
+      const userMcp = settings.forScope(SettingScope.User).settings.mcpServers;
+      if (userMcp && name in userMcp) {
+        scope = SettingScope.User;
+      }
+    }
+  }
+
+  if (!scope) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Server '${name}' was not found in user or project settings files. It may be defined elsewhere.`,
+    };
+  }
+
+  const scopeSettings = settings.forScope(scope).settings;
+  const mcpServers = { ...scopeSettings.mcpServers };
+  delete mcpServers[name];
+  settings.setValue(scope, 'mcpServers', mcpServers);
+
+  const scopeLabel = scope === SettingScope.Workspace ? 'project' : 'user';
+
+  // Disconnect the server and clean up in-memory state
+  const mcpClientManager = config.getMcpClientManager();
+  if (mcpClientManager) {
+    context.ui.addItem(
+      {
+        type: 'info',
+        text: `Removing '${name}' from ${scopeLabel} settings...`,
+      },
+      Date.now(),
+    );
+    await mcpClientManager.removeServer(name);
+  }
+
+  // Update the client with the new tools
+  if (config.getGeminiClient()?.isInitialized()) {
+    await config.getGeminiClient().setTools();
+  }
+
+  // Reload the slash commands to reflect the changes
+  context.ui.reloadCommands();
+
+  return {
+    type: 'message',
+    messageType: 'info',
+    content: `MCP server '${name}' removed from ${scopeLabel} settings.`,
+  };
+}
+
+const removeCommand: SlashCommand = {
+  name: 'remove',
+  altNames: ['rm', 'delete'],
+  description: 'Remove an MCP server from settings',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: (ctx, args) => handleRemove(ctx, args),
+  completion: async (ctx, partialArg) => {
+    const { config } = ctx.services;
+    if (!config) return [];
+    const servers = config.getMcpClientManager()?.getMcpServers() || {};
+    // Only suggest non-extension servers for removal
+    return Object.entries(servers)
+      .filter(([_, server]) => !server.extension)
+      .map(([name]) => name)
+      .filter((name) => name.startsWith(partialArg));
+  },
+};
+
 export const mcpCommand: SlashCommand = {
   name: 'mcp',
   description: 'Manage configured Model Context Protocol (MCP) servers',
@@ -507,6 +656,7 @@ export const mcpCommand: SlashCommand = {
     refreshCommand,
     enableCommand,
     disableCommand,
+    removeCommand,
   ],
   action: async (context: CommandContext) => listAction(context),
 };

@@ -92,6 +92,25 @@ export class McpClientManager {
   }
 
   /**
+   * Removes a single MCP server by name:
+   *
+   *    - Removes the server from the internal configuration map.
+   *    - Disconnects the client from the server.
+   *    - Updates the Gemini chat configuration to load the new tools.
+   */
+  async removeServer(name: string): Promise<void> {
+    debugLogger.log(`Removing MCP server: ${name}`);
+    this.allServerConfigs.delete(name);
+    // Also remove from blocked servers if present
+    const index = this.blockedMcpServers.findIndex((s) => s.name === name);
+    if (index !== -1) {
+      this.blockedMcpServers.splice(index, 1);
+    }
+    await this.disconnectClient(name, true);
+    await this.cliConfig.refreshMcpContext();
+  }
+
+  /**
    * For all the MCP servers associated with this extension:
    *
    *    - Adds all its MCP servers to the global configuration object.

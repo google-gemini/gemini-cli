@@ -11,7 +11,9 @@ A test server
   Tools:
   - tool-1
     A test tool
-"
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers"
 `;
 
 exports[`McpStatus > renders correctly with a blocked server 1`] = `
@@ -24,7 +26,9 @@ A test server
     A test tool
 
 🔴 server-1 (from test-extension) - Blocked
-"
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers"
 `;
 
 exports[`McpStatus > renders correctly with a connected server 1`] = `
@@ -35,7 +39,9 @@ A test server
   Tools:
   - tool-1
     A test tool
-"
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers"
 `;
 
 exports[`McpStatus > renders correctly with a connecting server 1`] = `
@@ -46,7 +52,9 @@ A test server
   Tools:
   - tool-1
     A test tool
-"
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers"
 `;
 
 exports[`McpStatus > renders correctly with a disconnected server 1`] = `
@@ -57,7 +65,9 @@ A test server
   Tools:
   - tool-1
     A test tool
-"
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers"
 `;
 
 exports[`McpStatus > renders correctly with authenticated OAuth status 1`] = `
@@ -68,7 +78,9 @@ A test server
   Tools:
   - tool-1
     A test tool
-"
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers"
 `;
 
 exports[`McpStatus > renders correctly with expired OAuth status 1`] = `
@@ -79,7 +91,9 @@ A test server
   Tools:
   - tool-1
     A test tool
-"
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers"
 `;
 
 exports[`McpStatus > renders correctly with parametersJsonSchema 1`] = `
@@ -99,7 +113,9 @@ A test server
           }
         }
       }
-"
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers"
 `;
 
 exports[`McpStatus > renders correctly with prompts 1`] = `
@@ -113,7 +129,9 @@ A test server
   Prompts:
   - prompt-1
     A test prompt
-"
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers"
 `;
 
 exports[`McpStatus > renders correctly with resources 1`] = `
@@ -127,7 +145,9 @@ A test server
   Resources:
   - resource-1 (file:///tmp/resource-1.txt)
     A test resource
-"
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers"
 `;
 
 exports[`McpStatus > renders correctly with schema enabled 1`] = `
@@ -147,7 +167,9 @@ A test server
           }
         }
       }
-"
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers"
 `;
 
 exports[`McpStatus > renders correctly with unauthenticated OAuth status 1`] = `
@@ -158,5 +180,7 @@ A test server
   Tools:
   - tool-1
     A test tool
-"
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers"
 `;

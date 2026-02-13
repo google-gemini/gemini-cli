@@ -1059,7 +1059,11 @@ provide tools. Enablement state is stored in
 `~/.gemini/mcp-server-enablement.json`.
 
 The same commands are available as slash commands during an active session:
-`/mcp enable <name>` and `/mcp disable <name>`.
+`/mcp enable <name>`, `/mcp disable <name>`, and `/mcp remove <name>`.
+
+The `/mcp remove` slash command also supports a `--scope` flag (`user` or
+`project`). If omitted, it auto-detects the scope by checking project settings
+first, then user settings. Aliases: `/mcp rm`, `/mcp delete`.
 
 ## Instructions
 

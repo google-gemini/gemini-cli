@@ -316,6 +316,12 @@ export const McpStatus: React.FC<McpStatusProps> = ({
           <Text> - Blocked</Text>
         </Box>
       ))}
+
+      <Box marginTop={1}>
+        <Text color={theme.text.secondary}>
+          Tip: /mcp enable|disable|remove {'<name>'} to manage servers
+        </Text>
+      </Box>
     </Box>
   );
 };
