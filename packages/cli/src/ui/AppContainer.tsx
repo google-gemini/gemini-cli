@@ -1472,7 +1472,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const { handleSuspend } = useSuspend({
     handleWarning,
     setRawMode,
-    refreshStatic,
     shouldUseAlternateScreen,
   });
 

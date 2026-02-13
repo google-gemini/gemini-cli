@@ -266,14 +266,10 @@ export async function startInteractiveUI(
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
+  const app = <AppWrapper key="gemini-root" />;
+
   const instance = render(
-    process.env['DEBUG'] ? (
-      <React.StrictMode>
-        <AppWrapper key="gemini-root" />
-      </React.StrictMode>
-    ) : (
-      <AppWrapper key="gemini-root" />
-    ),
+    process.env['DEBUG'] ? <React.StrictMode>{app}</React.StrictMode> : app,
     {
       stdout: inkStdout,
       stderr: inkStderr,

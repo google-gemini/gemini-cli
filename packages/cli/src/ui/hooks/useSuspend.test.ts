@@ -81,7 +81,6 @@ describe('useSuspend', () => {
   it('cleans terminal state on suspend and restores/repaints on resume in alternate screen mode', () => {
     const handleWarning = vi.fn();
     const setRawMode = vi.fn();
-    const refreshStatic = vi.fn();
     const enableSupportedModes =
       terminalCapabilityManager.enableSupportedModes as unknown as Mock;
 
@@ -89,7 +88,6 @@ describe('useSuspend', () => {
       useSuspend({
         handleWarning,
         setRawMode,
-        refreshStatic,
         shouldUseAlternateScreen: true,
       }),
     );
@@ -123,7 +121,6 @@ describe('useSuspend', () => {
     expect(enableSupportedModes).toHaveBeenCalledTimes(1);
     expect(enableMouseEvents).toHaveBeenCalledTimes(1);
     expect(setRawMode).toHaveBeenCalledWith(true);
-    expect(refreshStatic).toHaveBeenCalledTimes(1);
 
     unmount();
   });
@@ -131,13 +128,11 @@ describe('useSuspend', () => {
   it('does not toggle alternate screen or mouse restore when alternate screen mode is disabled', () => {
     const handleWarning = vi.fn();
     const setRawMode = vi.fn();
-    const refreshStatic = vi.fn();
 
     const { result, unmount } = renderHook(() =>
       useSuspend({
         handleWarning,
         setRawMode,
-        refreshStatic,
         shouldUseAlternateScreen: false,
       }),
     );
@@ -163,13 +158,11 @@ describe('useSuspend', () => {
 
     const handleWarning = vi.fn();
     const setRawMode = vi.fn();
-    const refreshStatic = vi.fn();
 
     const { result, unmount } = renderHook(() =>
       useSuspend({
         handleWarning,
         setRawMode,
-        refreshStatic,
         shouldUseAlternateScreen: true,
       }),
     );

@@ -25,14 +25,12 @@ import { WARNING_PROMPT_DURATION_MS } from '../constants.js';
 interface UseSuspendProps {
   handleWarning: (message: string) => void;
   setRawMode: (mode: boolean) => void;
-  refreshStatic: () => void;
   shouldUseAlternateScreen: boolean;
 }
 
 export function useSuspend({
   handleWarning,
   setRawMode,
-  refreshStatic,
   shouldUseAlternateScreen,
 }: UseSuspendProps) {
   const [ctrlZPressCount, setCtrlZPressCount] = useState(0);
@@ -107,11 +105,6 @@ export function useSuspend({
           // Force Ink to do a complete repaint by emitting a resize event.
           // We avoid remounting the entire App component to preserve local state.
           process.stdout.emit('resize');
-
-          // Give a tick for resize to process
-          setImmediate(() => {
-            refreshStatic();
-          });
         } finally {
           if (onResumeHandlerRef.current === onResume) {
             onResumeHandlerRef.current = null;
