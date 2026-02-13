@@ -5,16 +5,15 @@
  */
 
 import type React from 'react';
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Box, Text } from 'ink';
-import {
-  ExtensionRegistryClient,
-  type RegistryExtension,
-} from '../../../config/extensionRegistryClient.js';
+import type { RegistryExtension } from '../../../config/extensionRegistryClient.js';
+
 import { SearchableList } from '../shared/SearchableList.js';
 import type { GenericListItem } from '../../hooks/useFuzzyList.js';
 import { theme } from '../../semantic-colors.js';
 
+import { useExtensionRegistry } from '../../hooks/useExtensionRegistry.js';
 import { ExtensionUpdateState } from '../../state/extensions.js';
 import { useExtensionUpdates } from '../../hooks/useExtensionUpdates.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
@@ -35,9 +34,7 @@ export function ExtensionRegistryView({
   onClose,
   extensionManager,
 }: ExtensionRegistryViewProps): React.JSX.Element {
-  const [extensions, setExtensions] = useState<RegistryExtension[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { extensions, loading, error, search } = useExtensionRegistry();
   const config = useConfig();
 
   const { extensionsUpdateState } = useExtensionUpdates(
@@ -47,33 +44,6 @@ export function ExtensionRegistryView({
   );
 
   const installedExtensions = extensionManager.getExtensions();
-
-  const client = useMemo(() => new ExtensionRegistryClient(), []);
-
-  useEffect(() => {
-    let active = true;
-    const fetchExtensions = async () => {
-      try {
-        // Fetch all extensions to enable comprehensive local fuzzy search.
-        // Display virtualization/pagination is handled by SearchableList.
-        const extensions = await client.getAllExtensions();
-        if (active) {
-          setExtensions(extensions);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (active) {
-          setError(err instanceof Error ? err.message : String(err));
-          setLoading(false);
-        }
-      }
-    };
-
-    void fetchExtensions();
-    return () => {
-      active = false;
-    };
-  }, [client]);
 
   const items: ExtensionItem[] = useMemo(
     () =>
@@ -158,7 +128,8 @@ export function ExtensionRegistryView({
       </Box>
       <Box flexShrink={0} marginLeft={2}>
         <Text color={theme.text.secondary}>
-          Reg: {extensions.length} | Inst: {installedExtensions.length}
+          {installedExtensions.length &&
+            `${installedExtensions.length} installed`}
         </Text>
       </Box>
     </Box>
@@ -206,6 +177,8 @@ export function ExtensionRegistryView({
       header={header}
       footer={footer}
       maxItemsToShow={8}
+      disableFiltering={true}
+      onSearch={search}
     />
   );
 }

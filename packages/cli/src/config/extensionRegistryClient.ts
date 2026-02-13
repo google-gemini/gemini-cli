@@ -85,11 +85,24 @@ export class ExtensionRegistryClient {
 
     const fzf = new AsyncFzf(allExtensions, {
       selector: (ext: RegistryExtension) =>
-        `${ext.extensionName} ${ext.extensionDescription} ${ext.fullName}`,
+        `${ext.extensionName} ${ext.extensionDescription || ''} ${
+          ext.fullName || ''
+        }`,
       fuzzy: 'v2',
     });
     const results = await fzf.find(query);
-    return results.map((r: { item: RegistryExtension }) => r.item);
+
+    if (results.length === 0) {
+      return [];
+    }
+
+    const maxScore = results[0].score;
+    const THRESHOLD_RATIO = 0.75;
+    const threshold = maxScore * THRESHOLD_RATIO;
+
+    return results
+      .filter((r: { score: number }) => r.score >= threshold)
+      .map((r: { item: RegistryExtension }) => r.item);
   }
 
   async getExtension(id: string): Promise<RegistryExtension | undefined> {

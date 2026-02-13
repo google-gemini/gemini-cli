@@ -24,6 +24,7 @@ export interface UseFuzzyListProps<T extends GenericListItem> {
   items: T[];
   initialQuery?: string;
   onSearch?: (query: string) => void;
+  disableFiltering?: boolean;
 }
 
 export interface UseFuzzyListResult<T extends GenericListItem> {
@@ -38,6 +39,7 @@ export function useFuzzyList<T extends GenericListItem>({
   items,
   initialQuery = '',
   onSearch,
+  disableFiltering = false,
 }: UseFuzzyListProps<T>): UseFuzzyListResult<T> {
   // Search state
   const [searchQuery, setSearchQuery] = useState(initialQuery);
@@ -46,40 +48,81 @@ export function useFuzzyList<T extends GenericListItem>({
   );
 
   // FZF instance for fuzzy searching
-  const fzfInstance = useMemo(() => new AsyncFzf(items, {
+  // FZF instance for fuzzy searching - skip if filtering is disabled
+  const fzfInstance = useMemo(() => {
+    if (disableFiltering) return null;
+    return new AsyncFzf(items, {
       fuzzy: 'v2',
       casing: 'case-insensitive',
       selector: (item: T) => item.label,
-    }), [items]);
+    });
+  }, [items, disableFiltering]);
 
   // Perform search
   useEffect(() => {
     let active = true;
-    if (!searchQuery.trim() || !fzfInstance) {
+    if (!searchQuery.trim() || (!fzfInstance && !disableFiltering)) {
       setFilteredKeys(items.map((i) => i.key));
       return;
     }
 
     const doSearch = async () => {
-      const results = await fzfInstance.find(searchQuery);
+      // If filtering is disabled, or no query/fzf, just return all items (or handle external search elsewhere)
+      if (disableFiltering) {
+        onSearch?.(searchQuery);
+        // When filtering is disabled, we assume the items passed in are already filtered
+        // so we set filteredKeys to all items
+        const allKeys = items.map((i) => i.key);
+        setFilteredKeys((prev) => {
+          if (
+            prev.length === allKeys.length &&
+            prev.every((key, index) => key === allKeys[index])
+          ) {
+            return prev;
+          }
+          return allKeys;
+        });
+        return;
+      }
 
-      if (!active) return;
+      if (fzfInstance) {
+        const results = await fzfInstance.find(searchQuery);
 
-      const matchedKeys = results.map((res: { item: T }) => res.item.key);
-      setFilteredKeys(matchedKeys);
-      onSearch?.(searchQuery);
+        if (!active) return;
+
+        const matchedKeys = results.map((res: { item: T }) => res.item.key);
+        setFilteredKeys((prev) => {
+          if (
+            prev.length === matchedKeys.length &&
+            prev.every((key, index) => key === matchedKeys[index])
+          ) {
+            return prev;
+          }
+          return matchedKeys;
+        });
+        onSearch?.(searchQuery);
+      }
     };
 
     void doSearch().catch((error) => {
       // eslint-disable-next-line no-console
       console.error('Search failed:', error);
-      setFilteredKeys(items.map((i) => i.key)); // Reset to all items on error
+      const allKeys = items.map((i) => i.key);
+      setFilteredKeys((prev) => {
+        if (
+          prev.length === allKeys.length &&
+          prev.every((key, index) => key === allKeys[index])
+        ) {
+          return prev;
+        }
+        return allKeys;
+      });
     });
 
     return () => {
       active = false;
     };
-  }, [searchQuery, fzfInstance, items, onSearch]);
+  }, [searchQuery, fzfInstance, items, onSearch, disableFiltering]);
 
   // Get mainAreaWidth for search buffer viewport from UIState
   const { mainAreaWidth } = useUIState();
@@ -99,9 +142,10 @@ export function useFuzzyList<T extends GenericListItem>({
 
   // Filtered items to display
   const filteredItems = useMemo(() => {
+    if (disableFiltering) return items;
     if (!searchQuery) return items;
     return items.filter((item) => filteredKeys.includes(item.key));
-  }, [items, filteredKeys, searchQuery]);
+  }, [items, filteredKeys, searchQuery, disableFiltering]);
 
   // Calculate max label width for alignment
   const maxLabelWidth = useMemo(() => {

@@ -40,7 +40,7 @@ describe('ExtensionRegistryView', () => {
     // Return a promise that doesn't resolve immediately to keep the loading state active
     vi.spyOn(
       ExtensionRegistryClient.prototype,
-      'getAllExtensions',
+      'searchExtensions',
     ).mockReturnValue(new Promise(() => {}));
 
     const mockExtensionManager = {
@@ -58,7 +58,7 @@ describe('ExtensionRegistryView', () => {
   it('should render extensions after fetching', async () => {
     vi.spyOn(
       ExtensionRegistryClient.prototype,
-      'getAllExtensions',
+      'searchExtensions',
     ).mockResolvedValue(mockExtensions as unknown as RegistryExtension[]);
 
     const mockExtensionManager = {
@@ -71,9 +71,11 @@ describe('ExtensionRegistryView', () => {
       />,
     );
 
+    // Wait for effect and debounce
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
+      // Add a small delay for debounce/async logic if needed, though mocking resolved value should be enough if called immediately
     });
 
     const frame = lastFrame();
@@ -86,7 +88,7 @@ describe('ExtensionRegistryView', () => {
   it('should render error message on fetch failure', async () => {
     vi.spyOn(
       ExtensionRegistryClient.prototype,
-      'getAllExtensions',
+      'searchExtensions',
     ).mockRejectedValue(new Error('Fetch failed'));
 
     const mockExtensionManager = {
@@ -113,7 +115,7 @@ describe('ExtensionRegistryView', () => {
   it('should call onSelect when an item is selected', async () => {
     vi.spyOn(
       ExtensionRegistryClient.prototype,
-      'getAllExtensions',
+      'searchExtensions',
     ).mockResolvedValue(mockExtensions as unknown as RegistryExtension[]);
     const onSelect = vi.fn();
 

@@ -42,6 +42,8 @@ export interface SearchableListProps<T extends GenericListItem> {
   footer?:
     | React.ReactNode
     | ((pagination: SearchableListPaginationInfo) => React.ReactNode);
+  /** If true, disables client-side filtering. Useful if items are already filtered externally. */
+  disableFiltering?: boolean;
 }
 
 export interface SearchableListPaginationInfo {
@@ -63,21 +65,38 @@ export function SearchableList<T extends GenericListItem>({
   searchPlaceholder = 'Search...',
   maxItemsToShow = 10,
   renderItem,
+
   header,
   footer,
-}: SearchableListProps<T>): React.JSX.Element {
+  disableFiltering = false,
+  onSearch,
+}: SearchableListProps<T> & {
+  onSearch?: (query: string) => void;
+}): React.JSX.Element {
   const { filteredItems, searchBuffer, maxLabelWidth } = useFuzzyList({
     items,
     initialQuery: initialSearchQuery,
+    disableFiltering,
+    onSearch,
   });
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
 
-  // Reset selection when filtered items change
+  const prevFilteredKeysRef = React.useRef<string[]>([]);
   useEffect(() => {
-    setActiveIndex(0);
-    setScrollOffset(0);
+    const currentKeys = filteredItems.map((item) => item.key);
+    const prevKeys = prevFilteredKeysRef.current;
+
+    const hasChanged =
+      currentKeys.length !== prevKeys.length ||
+      currentKeys.some((key, index) => key !== prevKeys[index]);
+
+    if (hasChanged) {
+      setActiveIndex(0);
+      setScrollOffset(0);
+      prevFilteredKeysRef.current = currentKeys;
+    }
   }, [filteredItems]);
 
   // Calculate visible items
