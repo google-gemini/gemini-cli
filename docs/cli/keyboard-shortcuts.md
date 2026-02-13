@@ -8,12 +8,12 @@ available combinations.
 
 #### Basic Controls
 
-| Action                                                          | Keys       |
-| --------------------------------------------------------------- | ---------- |
-| Confirm the current selection or choice.                        | `Enter`    |
-| Dismiss dialogs or cancel the current focus.                    | `Esc`      |
-| Cancel the current request or quit the CLI when input is empty. | `Ctrl + C` |
-| Exit the CLI when the input buffer is empty.                    | `Ctrl + D` |
+| Action                                                          | Keys                  |
+| --------------------------------------------------------------- | --------------------- |
+| Confirm the current selection or choice.                        | `Enter`               |
+| Dismiss dialogs or cancel the current focus.                    | `Esc`<br />`Ctrl + [` |
+| Cancel the current request or quit the CLI when input is empty. | `Ctrl + C`            |
+| Exit the CLI when the input buffer is empty.                    | `Ctrl + D`            |
 
 #### Cursor Movement
 
