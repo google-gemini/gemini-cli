@@ -131,6 +131,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
           "required": [
             "question",
             "header",
+            "type",
           ],
           "type": "object",
         },
@@ -919,6 +920,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
           "required": [
             "question",
             "header",
+            "type",
           ],
           "type": "object",
         },
