@@ -290,8 +290,8 @@ describe('handleAtCommand', () => {
       path.join(testRootDir, 'path', 'to', 'my file.txt'),
       fileContent,
     );
-    const escapedpath = path.join(testRootDir, 'path', 'to', 'my\\ file.txt');
-    const query = `@${escapedpath}`;
+
+    const query = `@${core.escapePath(filePath)}`;
 
     const result = await handleAtCommand({
       query,
@@ -960,8 +960,8 @@ describe('handleAtCommand', () => {
         path.join(testRootDir, 'spaced file.txt'),
         fileContent,
       );
-      const escapedPath = path.join(testRootDir, 'spaced\\ file.txt');
-      const query = `Check @${escapedPath}, it has spaces.`;
+
+      const query = `Check @${core.escapePath(filePath)}, it has spaces.`;
 
       const result = await handleAtCommand({
         query,

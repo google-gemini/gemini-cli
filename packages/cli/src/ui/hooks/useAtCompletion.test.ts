@@ -13,6 +13,7 @@ import type { Config, FileSearch } from '@google/gemini-cli-core';
 import {
   FileSearchFactory,
   FileDiscoveryService,
+  escapePath,
 } from '@google/gemini-cli-core';
 import type { FileSystemStructure } from '@google/gemini-cli-test-utils';
 import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
@@ -90,7 +91,7 @@ describe('useAtCompletion', () => {
         'src/',
         'src/components/',
         'file.txt',
-        'src/components/Button\\ with\\ spaces.tsx',
+        `${escapePath('src/components/Button with spaces.tsx')}`,
         'src/components/Button.tsx',
         'src/index.js',
       ]);
