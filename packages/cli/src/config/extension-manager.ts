@@ -50,6 +50,7 @@ import {
   coreEvents,
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
@@ -383,7 +384,7 @@ Would you like to attempt to install via "git clone" instead?`,
               newExtensionConfig.version,
               previousExtensionConfig.version,
               installMetadata.type,
-              'success',
+              CoreToolCallStatus.Success,
             ),
           );
         } else {
@@ -395,7 +396,7 @@ Would you like to attempt to install via "git clone" instead?`,
               getExtensionId(newExtensionConfig, installMetadata),
               newExtensionConfig.version,
               installMetadata.type,
-              'success',
+              CoreToolCallStatus.Success,
             ),
           );
           await this.enableExtension(
@@ -433,7 +434,7 @@ Would you like to attempt to install via "git clone" instead?`,
             newExtensionConfig?.version ?? '',
             previousExtensionConfig.version,
             installMetadata.type,
-            'error',
+            CoreToolCallStatus.Error,
           ),
         );
       } else {
@@ -445,7 +446,7 @@ Would you like to attempt to install via "git clone" instead?`,
             extensionId ?? '',
             newExtensionConfig?.version ?? '',
             installMetadata.type,
-            'error',
+            CoreToolCallStatus.Error,
           ),
         );
       }
@@ -491,7 +492,7 @@ Would you like to attempt to install via "git clone" instead?`,
         extension.name,
         hashValue(extension.name),
         extension.id,
-        'success',
+        CoreToolCallStatus.Success,
       ),
     );
   }

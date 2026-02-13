@@ -13,6 +13,7 @@ import type {
   ToolCallRecord,
   MessageRecord,
 } from './chatRecordingService.js';
+import { CoreToolCallStatus } from '../scheduler/types.js';
 import type { Content, Part } from '@google/genai';
 import { ChatRecordingService } from './chatRecordingService.js';
 import type { Config } from '../config/config.js';
@@ -247,7 +248,7 @@ describe('ChatRecordingService', () => {
         id: 'tool-1',
         name: 'testTool',
         args: {},
-        status: 'awaiting_approval',
+        status: CoreToolCallStatus.AwaitingApproval,
         timestamp: new Date().toISOString(),
       };
       chatRecordingService.recordToolCalls('gemini-pro', [toolCall]);
@@ -274,7 +275,7 @@ describe('ChatRecordingService', () => {
         id: 'tool-1',
         name: 'testTool',
         args: {},
-        status: 'awaiting_approval',
+        status: CoreToolCallStatus.AwaitingApproval,
         timestamp: new Date().toISOString(),
       };
       chatRecordingService.recordToolCalls('gemini-pro', [toolCall]);
@@ -571,7 +572,7 @@ describe('ChatRecordingService', () => {
           name: 'list_files',
           args: { path: '.' },
           result: originalResult,
-          status: 'success',
+          status: CoreToolCallStatus.Success,
           timestamp: new Date().toISOString(),
         },
       ]);
@@ -650,7 +651,7 @@ describe('ChatRecordingService', () => {
           name: 'read_file',
           args: { path: 'image.png' },
           result: originalResult,
-          status: 'success',
+          status: CoreToolCallStatus.Success,
           timestamp: new Date().toISOString(),
         },
       ]);
@@ -707,7 +708,7 @@ describe('ChatRecordingService', () => {
           name: 'read_file',
           args: { path: 'test.txt' },
           result: [],
-          status: 'success',
+          status: CoreToolCallStatus.Success,
           timestamp: new Date().toISOString(),
         },
       ]);

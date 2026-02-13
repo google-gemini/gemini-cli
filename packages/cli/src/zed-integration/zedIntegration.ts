@@ -13,6 +13,7 @@ import type {
   ConversationRecord,
 } from '@google/gemini-cli-core';
 import {
+  CoreToolCallStatus,
   AuthType,
   logToolCall,
   convertToFunctionResponse,
@@ -451,7 +452,10 @@ export class Session {
             await this.sendUpdate({
               sessionUpdate: 'tool_call',
               toolCallId: toolCall.id,
-              status: toolCall.status === 'success' ? 'completed' : 'failed',
+              status:
+                toolCall.status === CoreToolCallStatus.Success
+                  ? 'completed'
+                  : 'failed',
               title: toolCall.displayName || toolCall.name,
               content: toolCallContent,
               kind: tool ? toAcpToolKind(tool.kind) : 'other',
@@ -477,7 +481,7 @@ export class Session {
     while (nextMessage !== null) {
       if (pendingSend.signal.aborted) {
         chat.addHistory(nextMessage);
-        return { stopReason: 'cancelled' };
+        return { stopReason: CoreToolCallStatus.Cancelled };
       }
 
       const functionCalls: FunctionCall[] = [];
@@ -494,7 +498,7 @@ export class Session {
 
         for await (const resp of responseStream) {
           if (pendingSend.signal.aborted) {
-            return { stopReason: 'cancelled' };
+            return { stopReason: CoreToolCallStatus.Cancelled };
           }
 
           if (
@@ -529,7 +533,7 @@ export class Session {
         }
 
         if (pendingSend.signal.aborted) {
-          return { stopReason: 'cancelled' };
+          return { stopReason: CoreToolCallStatus.Cancelled };
         }
       } catch (error) {
         if (getErrorStatus(error) === 429) {
@@ -543,7 +547,7 @@ export class Session {
           pendingSend.signal.aborted ||
           (error instanceof Error && error.name === 'AbortError')
         ) {
-          return { stopReason: 'cancelled' };
+          return { stopReason: CoreToolCallStatus.Cancelled };
         }
 
         throw new acp.RequestError(
@@ -663,7 +667,7 @@ export class Session {
 
         const output = await this.connection.requestPermission(params);
         const outcome =
-          output.outcome.outcome === 'cancelled'
+          output.outcome.outcome === CoreToolCallStatus.Cancelled
             ? ToolConfirmationOutcome.Cancel
             : z
                 .nativeEnum(ToolConfirmationOutcome)
@@ -728,7 +732,7 @@ export class Session {
 
       this.chat.recordCompletedToolCalls(this.config.getActiveModel(), [
         {
-          status: 'success',
+          status: CoreToolCallStatus.Success,
           request: {
             callId,
             name: fc.name,
@@ -773,7 +777,7 @@ export class Session {
 
       this.chat.recordCompletedToolCalls(this.config.getActiveModel(), [
         {
-          status: 'error',
+          status: CoreToolCallStatus.Error,
           request: {
             callId,
             name: fc.name,
