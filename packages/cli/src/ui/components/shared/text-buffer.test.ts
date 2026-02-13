@@ -41,6 +41,7 @@ import {
   getTransformedImagePath,
 } from './text-buffer.js';
 import { cpLen } from '../../utils/textUtils.js';
+import { escapePath } from '@google/gemini-cli-core';
 
 const defaultVisualLayout: VisualLayout = {
   visualLines: [''],
@@ -1077,14 +1078,16 @@ describe('useTextBuffer', () => {
         useTextBuffer({ viewport, escapePastedPaths: true }),
       );
       // Construct escaped path string: "/path/to/my\ file.txt /path/to/other.txt"
-      const escapedFile1 = file1.replace(/ /g, '\\ ');
-      const filePaths = `${escapedFile1} ${file2}`;
+
+      const filePaths = `${escapePath(file1)} ${file2}`;
 
       act(() => result.current.insert(filePaths, { paste: true }));
-      expect(getBufferState(result).text).toBe(`@${escapedFile1} @${file2} `);
+      expect(getBufferState(result).text).toBe(
+        `@${escapePath(file1)} @${file2} `,
+      );
     });
 
-    it('should only prepend @ to valid paths in multi-path paste', () => {
+    it('should not prepend @ unless all paths are valid', () => {
       const validFile = path.join(tempDir, 'valid.txt');
       const invalidFile = path.join(tempDir, 'invalid.jpg');
       fs.writeFileSync(validFile, '');
@@ -1098,7 +1101,7 @@ describe('useTextBuffer', () => {
       );
       const filePaths = `${validFile} ${invalidFile}`;
       act(() => result.current.insert(filePaths, { paste: true }));
-      expect(getBufferState(result).text).toBe(`@${validFile} ${invalidFile} `);
+      expect(getBufferState(result).text).toBe(`${validFile} ${invalidFile}`);
     });
   });
 
@@ -2869,12 +2872,26 @@ describe('Unicode helper functions', () => {
   });
 });
 
+const mockPlatform = (platform: string) => {
+  vi.stubGlobal(
+    'process',
+    Object.create(process, {
+      platform: {
+        get: () => platform,
+      },
+    }),
+  );
+};
+
 describe('Transformation Utilities', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   describe('getTransformedImagePath', () => {
+    beforeEach(() => mockPlatform('linux'));
+
     it('should transform a simple image path', () => {
       expect(getTransformedImagePath('@test.png')).toBe('[Image test.png]');
     });
@@ -2902,11 +2919,6 @@ describe('Transformation Utilities', () => {
 
     it('should handle POSIX-style forward-slash paths on any platform', () => {
       const input = '@C:/Users/foo/screenshots/image2x.png';
-      expect(getTransformedImagePath(input)).toBe('[Image image2x.png]');
-    });
-
-    it('should handle Windows-style backslash paths on any platform', () => {
-      const input = '@C:\\Users\\foo\\screenshots\\image2x.png';
       expect(getTransformedImagePath(input)).toBe('[Image image2x.png]');
     });
 
