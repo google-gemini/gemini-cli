@@ -585,9 +585,6 @@ export class TestRig {
     });
     this._spawnedProcesses.push(child);
 
-    if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
-    }
-
     let stdout = '';
     let stderr = '';
 
@@ -842,9 +839,6 @@ export class TestRig {
   }
 
   async cleanup() {
-    if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
-    }
-
     // Kill any interactive runs that are still active
     for (const run of this._interactiveRuns) {
       try {
@@ -893,8 +887,6 @@ export class TestRig {
     // Clean up test directory and home directory
     if (this.testDir && !env['KEEP_OUTPUT']) {
       try {
-        if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
-        }
         fs.rmSync(this.testDir, { recursive: true, force: true });
       } catch (error) {
         // Ignore cleanup errors
@@ -905,8 +897,6 @@ export class TestRig {
     }
     if (this.homeDir && !env['KEEP_OUTPUT']) {
       try {
-        if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
-        }
         fs.rmSync(this.homeDir, { recursive: true, force: true });
       } catch (error) {
         // Ignore cleanup errors
