@@ -38,7 +38,7 @@ import type { ToolCallConfirmationDetails } from '../tools/tools.js';
  * Main hook system that coordinates all hook-related functionality
  */
 
-export interface BeforeModelHookResult {
+interface BeforeModelHookResult {
   /** Whether the model call was blocked */
   blocked: boolean;
   /** Whether the execution should be stopped entirely */
@@ -56,7 +56,7 @@ export interface BeforeModelHookResult {
 /**
  * Result from firing the BeforeToolSelection hook.
  */
-export interface BeforeToolSelectionHookResult {
+interface BeforeToolSelectionHookResult {
   /** Modified tool config */
   toolConfig?: ToolConfig;
   /** Modified tools */
@@ -67,7 +67,7 @@ export interface BeforeToolSelectionHookResult {
  * Result from firing the AfterModel hook.
  * Contains either a modified response or indicates to use the original chunk.
  */
-export interface AfterModelHookResult {
+interface AfterModelHookResult {
   /** The response to yield (either modified or original) */
   response: GenerateContentResponse;
   /** Whether the execution should be stopped entirely */

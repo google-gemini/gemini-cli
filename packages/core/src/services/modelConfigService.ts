@@ -60,7 +60,7 @@ export type ResolvedModelConfig = _ResolvedModelConfig & {
   readonly _brand: unique symbol;
 };
 
-export interface _ResolvedModelConfig {
+interface _ResolvedModelConfig {
   model: string; // The actual, resolved model name
   generateContentConfig: GenerateContentConfig;
 }

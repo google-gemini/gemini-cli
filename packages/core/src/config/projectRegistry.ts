@@ -10,7 +10,7 @@ import * as os from 'node:os';
 import { lock } from 'proper-lockfile';
 import { debugLogger } from '../utils/debugLogger.js';
 
-export interface RegistryData {
+interface RegistryData {
   projects: Record<string, string>;
 }
 

@@ -26,7 +26,7 @@ export type StdioConfig = {
   args: string[];
 };
 
-export type ConnectionConfig = {
+type ConnectionConfig = {
   port?: string;
   authToken?: string;
   stdio?: StdioConfig;

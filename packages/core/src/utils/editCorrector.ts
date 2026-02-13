@@ -402,7 +402,7 @@ const OLD_STRING_CORRECTION_SCHEMA: Record<string, unknown> = {
   required: ['corrected_target_snippet'],
 };
 
-export async function correctOldStringMismatch(
+async function correctOldStringMismatch(
   baseLlmClient: BaseLlmClient,
   fileContent: string,
   problematicSnippet: string,
@@ -480,7 +480,7 @@ const NEW_STRING_CORRECTION_SCHEMA: Record<string, unknown> = {
 /**
  * Adjusts the new_string to align with a corrected old_string, maintaining the original intent.
  */
-export async function correctNewString(
+async function correctNewString(
   baseLlmClient: BaseLlmClient,
   originalOldString: string,
   correctedOldString: string,
@@ -561,7 +561,7 @@ const CORRECT_NEW_STRING_ESCAPING_SCHEMA: Record<string, unknown> = {
   required: ['corrected_new_string_escaping'],
 };
 
-export async function correctNewStringEscaping(
+async function correctNewStringEscaping(
   baseLlmClient: BaseLlmClient,
   oldString: string,
   potentiallyProblematicNewString: string,
@@ -634,7 +634,7 @@ const CORRECT_STRING_ESCAPING_SCHEMA: Record<string, unknown> = {
   required: ['corrected_string_escaping'],
 };
 
-export async function correctStringEscaping(
+async function correctStringEscaping(
   potentiallyProblematicString: string,
   baseLlmClient: BaseLlmClient,
   abortSignal: AbortSignal,

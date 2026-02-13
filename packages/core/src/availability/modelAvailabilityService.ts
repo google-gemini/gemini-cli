@@ -7,9 +7,9 @@
 export type ModelId = string;
 
 type TerminalUnavailabilityReason = 'quota' | 'capacity';
-export type TurnUnavailabilityReason = 'retry_once_per_turn';
+type TurnUnavailabilityReason = 'retry_once_per_turn';
 
-export type UnavailabilityReason =
+type UnavailabilityReason =
   | TerminalUnavailabilityReason
   | TurnUnavailabilityReason
   | 'unknown';
@@ -24,7 +24,7 @@ type HealthState =
       consumed: boolean;
     };
 
-export interface ModelAvailabilitySnapshot {
+interface ModelAvailabilitySnapshot {
   available: boolean;
   reason?: UnavailabilityReason;
 }

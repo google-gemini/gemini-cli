@@ -24,7 +24,7 @@ interface StartupPhase {
 /**
  * Handle returned by start() that allows ending the phase without repeating the phase name.
  */
-export interface StartupPhaseHandle {
+interface StartupPhaseHandle {
   end(details?: Record<string, string | number | boolean>): void;
 }
 

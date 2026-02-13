@@ -1112,7 +1112,7 @@ export async function inferInstallMetadata(
   }
 }
 
-export function getExtensionId(
+function getExtensionId(
   config: ExtensionConfig,
   installMetadata?: ExtensionInstallMetadata,
 ): string {

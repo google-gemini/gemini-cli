@@ -16,7 +16,7 @@ import type { EditorType } from '../utils/editor.js';
 /**
  * Options for scheduling agent tools.
  */
-export interface AgentSchedulingOptions {
+interface AgentSchedulingOptions {
   /** The unique ID for this agent's scheduler. */
   schedulerId: string;
   /** The ID of the tool call that invoked this agent. */

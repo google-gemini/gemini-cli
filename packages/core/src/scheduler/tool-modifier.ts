@@ -14,7 +14,7 @@ import {
 import type { ToolConfirmationPayload } from '../tools/tools.js';
 import type { WaitingToolCall } from './types.js';
 
-export interface ModificationResult {
+interface ModificationResult {
   updatedParams: Record<string, unknown>;
   updatedDiff?: string;
 }
