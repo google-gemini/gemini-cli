@@ -38,6 +38,7 @@ describe('conseca_logger', () => {
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(true),
       isInteractive: vi.fn().mockReturnValue(true),
+      getExperiments: vi.fn().mockReturnValue({ experimentIds: [] }),
     } as unknown as Config;
 
     mockLogger = {
