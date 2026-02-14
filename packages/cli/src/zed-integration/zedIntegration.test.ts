@@ -118,6 +118,8 @@ describe('GeminiAgent', () => {
         subscribe: vi.fn(),
         unsubscribe: vi.fn(),
       }),
+      getApprovalMode: vi.fn().mockReturnValue('default'),
+      isPlanEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Awaited<ReturnType<typeof loadCliConfig>>>;
     mockSettings = {
       merged: {
@@ -182,6 +184,59 @@ describe('GeminiAgent', () => {
     expect(loadCliConfig).toHaveBeenCalled();
     expect(mockConfig.initialize).toHaveBeenCalled();
     expect(mockConfig.getGeminiClient).toHaveBeenCalled();
+  });
+
+  it('should return modes without plan mode when plan is disabled', async () => {
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: 'test-key',
+    });
+    mockConfig.isPlanEnabled = vi.fn().mockReturnValue(false);
+    mockConfig.getApprovalMode = vi.fn().mockReturnValue('default');
+
+    const response = await agent.newSession({
+      cwd: '/tmp',
+      mcpServers: [],
+    });
+
+    expect(response.modes).toEqual({
+      availableModes: [
+        { id: 'default', name: 'Default', description: 'Prompts for approval' },
+        {
+          id: 'autoEdit',
+          name: 'Auto Edit',
+          description: 'Auto-approves edit tools',
+        },
+        { id: 'yolo', name: 'YOLO', description: 'Auto-approves all tools' },
+      ],
+      currentModeId: 'default',
+    });
+  });
+
+  it('should return modes with plan mode when plan is enabled', async () => {
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: 'test-key',
+    });
+    mockConfig.isPlanEnabled = vi.fn().mockReturnValue(true);
+    mockConfig.getApprovalMode = vi.fn().mockReturnValue('plan');
+
+    const response = await agent.newSession({
+      cwd: '/tmp',
+      mcpServers: [],
+    });
+
+    expect(response.modes).toEqual({
+      availableModes: [
+        { id: 'default', name: 'Default', description: 'Prompts for approval' },
+        {
+          id: 'autoEdit',
+          name: 'Auto Edit',
+          description: 'Auto-approves edit tools',
+        },
+        { id: 'yolo', name: 'YOLO', description: 'Auto-approves all tools' },
+        { id: 'plan', name: 'Plan', description: 'Read-only mode' },
+      ],
+      currentModeId: 'plan',
+    });
   });
 
   it('should fail session creation if Gemini API key is missing', async () => {
@@ -305,6 +360,32 @@ describe('GeminiAgent', () => {
     expect(session.prompt).toHaveBeenCalled();
     expect(result).toEqual({ stopReason: 'end_turn' });
   });
+
+  it('should delegate setMode to session', async () => {
+    await agent.newSession({ cwd: '/tmp', mcpServers: [] });
+    const session = (
+      agent as unknown as { sessions: Map<string, Session> }
+    ).sessions.get('test-session-id');
+    if (!session) throw new Error('Session not found');
+    session.setMode = vi.fn().mockReturnValue({});
+
+    const result = await agent.setSessionMode({
+      sessionId: 'test-session-id',
+      modeId: 'plan',
+    });
+
+    expect(session.setMode).toHaveBeenCalledWith('plan');
+    expect(result).toEqual({});
+  });
+
+  it('should throw error when setting mode on non-existent session', async () => {
+    await expect(
+      agent.setSessionMode({
+        sessionId: 'unknown',
+        modeId: 'plan',
+      }),
+    ).rejects.toThrow('Session not found: unknown');
+  });
 });
 
 describe('Session', () => {
@@ -351,6 +432,7 @@ describe('Session', () => {
       getEnableRecursiveFileSearch: vi.fn().mockReturnValue(false),
       getDebugMode: vi.fn().mockReturnValue(false),
       getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
+      setApprovalMode: vi.fn(),
     } as unknown as Mocked<Config>;
     mockConnection = {
       sessionUpdate: vi.fn(),
@@ -819,5 +901,16 @@ describe('Session', () => {
         MockReadManyFilesTool.mock.results.length - 1
       ].value;
     expect(mockInstance.build).toHaveBeenCalled();
+  });
+
+  it('should set mode on config', () => {
+    session.setMode('plan');
+    expect(mockConfig.setApprovalMode).toHaveBeenCalledWith('plan');
+  });
+
+  it('should throw error for invalid mode', () => {
+    expect(() => session.setMode('invalid-mode')).toThrow(
+      'Invalid mode: invalid-mode',
+    );
   });
 });
