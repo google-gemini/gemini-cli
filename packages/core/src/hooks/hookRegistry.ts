@@ -93,7 +93,8 @@ export class HookRegistry {
   private getHookName(
     entry: HookRegistryEntry | { config: HookConfig },
   ): string {
-    return entry.config.name || entry.config.command || 'unknown-command';
+    const name = entry.config.name || entry.config.command || 'unknown-command';
+    return name.replace(/\\/g, '/');
   }
 
   /**

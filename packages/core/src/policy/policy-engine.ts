@@ -360,8 +360,8 @@ export class PolicyEngine {
       );
 
       if (match) {
-        debugLogger.debug(
-          `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, argsPattern=${rule.argsPattern?.source || 'none'}`,
+        debugLogger.log(
+          `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, source=${rule.source}`,
         );
 
         if (isShellCommand && toolName) {
@@ -389,7 +389,7 @@ export class PolicyEngine {
 
     // Default if no rule matched
     if (decision === undefined) {
-      debugLogger.debug(
+      debugLogger.log(
         `[PolicyEngine.check] NO MATCH - using default decision: ${this.defaultDecision}`,
       );
       if (toolName && SHELL_TOOL_NAMES.includes(toolName)) {
