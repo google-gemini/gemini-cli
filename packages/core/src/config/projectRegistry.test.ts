@@ -107,6 +107,25 @@ describe('ProjectRegistry', () => {
     expect(id1).toBe(id2);
   });
 
+  it('preserves path casing on Windows', async () => {
+    // Regression test: Mixed-case paths MUST be preserved in the registry (not lowercased).
+    const registry = new ProjectRegistry(registryPath);
+    await registry.initialize();
+
+    const mixedCasePath = path.join(tempDir, 'MyProject');
+    const id = await registry.getShortId(mixedCasePath);
+
+    // IDs are slugified (lowercase), but path keys in registry must remain case-sensitive.
+    expect(id).toBe('myproject');
+
+    // Verify raw registry file data preserves path casing
+    const data = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    const expectedKey = path.resolve(mixedCasePath);
+
+    expect(Object.keys(data.projects)).toContain(expectedKey);
+    expect(data.projects[expectedKey]).toBe('myproject');
+  });
+
   it('creates ownership markers in base directories', async () => {
     const registry = new ProjectRegistry(registryPath, [baseDir1, baseDir2]);
     await registry.initialize();
