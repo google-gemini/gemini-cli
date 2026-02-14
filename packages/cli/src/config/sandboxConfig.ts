@@ -93,18 +93,33 @@ function getSandboxCommand(
   return '';
 }
 
+async function getSandboxImage(
+  settings: Settings,
+  __dirname: string,
+): Promise<string | undefined> {
+  const packageJson = await getPackageJson(__dirname);
+  const image =
+    process.env['GEMINI_SANDBOX_IMAGE'] ??
+    settings.tools?.sandboxImage ??
+    packageJson?.config?.sandboxImageUri;
+
+  if (image && /[\s;'"&|<>`$()\\]/.test(image)) {
+    throw new FatalSandboxError(
+      `Invalid characters in sandbox image name: "${image}". ` +
+        `Image names must not contain shell metacharacters.`,
+    );
+  }
+
+  return image;
+}
+
 export async function loadSandboxConfig(
   settings: Settings,
   argv: SandboxCliArgs,
 ): Promise<SandboxConfig | undefined> {
   const sandboxOption = argv.sandbox ?? settings.tools?.sandbox;
   const command = getSandboxCommand(sandboxOption);
-
-  const packageJson = await getPackageJson(__dirname);
-  const image =
-    process.env['GEMINI_SANDBOX_IMAGE'] ??
-    settings.tools?.sandboxImage ??
-    packageJson?.config?.sandboxImageUri;
+  const image = await getSandboxImage(settings, __dirname);
 
   return command && image ? { command, image } : undefined;
 }

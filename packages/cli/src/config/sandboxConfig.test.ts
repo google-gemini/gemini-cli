@@ -262,4 +262,89 @@ describe('loadSandboxConfig', () => {
       },
     );
   });
+
+  describe('sandbox image validation', () => {
+    beforeEach(() => {
+      process.env['GEMINI_SANDBOX'] = 'docker';
+      mockedCommandExistsSync.mockReturnValue(true);
+    });
+
+    it('should accept valid image names', async () => {
+      const validImages = [
+        'ubuntu',
+        'ubuntu:latest',
+        'gcr.io/project/image',
+        'gcr.io/project/image:v1.0.0',
+        'registry.example.com:5000/my-image',
+        'image-with-dashes_and_underscores.dots',
+      ];
+
+      for (const image of validImages) {
+        mockedGetPackageJson.mockResolvedValue({
+          config: { sandboxImageUri: image },
+        });
+        const config = await loadSandboxConfig({}, {});
+        expect(config).toEqual({ command: 'docker', image });
+      }
+    });
+
+    it.each([
+      ['semicolon', 'ubuntu; rm -rf ~'],
+      ['single quote', "ubuntu'foo"],
+      ['double quote', 'ubuntu"foo'],
+      ['ampersand', 'ubuntu && malicious'],
+      ['pipe', 'ubuntu | malicious'],
+      ['less than', 'ubuntu < file'],
+      ['greater than', 'ubuntu > file'],
+      ['backtick', 'ubuntu`command`'],
+      ['dollar sign', 'ubuntu$VAR'],
+      ['open paren', 'ubuntu(foo)'],
+      ['close paren', 'ubuntu)foo'],
+      ['backslash', 'ubuntu\\foo'],
+      ['space', 'ubuntu foo'],
+      ['newline', 'ubuntu\nmalicious'],
+      ['tab', 'ubuntu\tmalicious'],
+    ])(
+      'should reject image with %s from environment variable',
+      async (_, maliciousImage) => {
+        process.env['GEMINI_SANDBOX_IMAGE'] = maliciousImage;
+        await expect(loadSandboxConfig({}, {})).rejects.toThrow(
+          `Invalid characters in sandbox image name: "${maliciousImage}". ` +
+            `Image names must not contain shell metacharacters.`,
+        );
+      },
+    );
+
+    it.each([
+      ['semicolon', 'ubuntu; rm -rf ~'],
+      ['pipe', 'ubuntu | malicious'],
+      ['backtick', 'ubuntu`command`'],
+    ])(
+      'should reject image with %s from settings',
+      async (_, maliciousImage) => {
+        await expect(
+          loadSandboxConfig({ tools: { sandboxImage: maliciousImage } }, {}),
+        ).rejects.toThrow(
+          `Invalid characters in sandbox image name: "${maliciousImage}". ` +
+            `Image names must not contain shell metacharacters.`,
+        );
+      },
+    );
+
+    it.each([
+      ['semicolon', 'ubuntu; rm -rf ~'],
+      ['command substitution', 'ubuntu$(whoami)'],
+    ])(
+      'should reject image with %s from package.json',
+      async (_, maliciousImage) => {
+        mockedGetPackageJson.mockResolvedValue({
+          config: { sandboxImageUri: maliciousImage },
+        });
+        await expect(loadSandboxConfig({}, {})).rejects.toThrow(
+          `Invalid characters in sandbox image name: "${maliciousImage}". ` +
+            `Image names must not contain shell metacharacters.`,
+        );
+      },
+    );
+  });
 });
