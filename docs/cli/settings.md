@@ -30,6 +30,7 @@ they appear in the UI.
 | Enable Prompt Completion | `general.enablePromptCompletion`   | Enable AI-powered prompt completion suggestions while typing.                                                                                                                  | `false`     |
 | Debug Keystroke Logging  | `general.debugKeystrokeLogging`    | Enable debug logging of keystrokes to the console.                                                                                                                             | `false`     |
 | Enable Session Cleanup   | `general.sessionRetention.enabled` | Enable automatic session cleanup                                                                                                                                               | `false`     |
+| Keep chat history        | `general.sessionRetention.maxAge`  | Automatically delete chats older than this time period (e.g., "30d", "7d", "24h", "1w")                                                                                        | `undefined` |
 
 ### Output
 
@@ -49,6 +50,7 @@ they appear in the UI.
 | Dynamic Window Title                 | `ui.dynamicWindowTitle`                 | Update the terminal window title with current status icons (Ready: ◇, Action Required: ✋, Working: ✦)                                                            | `true`  |
 | Show Home Directory Warning          | `ui.showHomeDirectoryWarning`           | Show a warning when running Gemini CLI in the home directory.                                                                                                     | `true`  |
 | Hide Tips                            | `ui.hideTips`                           | Hide helpful tips in the UI                                                                                                                                       | `false` |
+| Show Shortcuts Hint                  | `ui.showShortcutsHint`                  | Show the "? for shortcuts" hint above the input.                                                                                                                  | `true`  |
 | Hide Banner                          | `ui.hideBanner`                         | Hide the application banner                                                                                                                                       | `false` |
 | Hide Context Summary                 | `ui.hideContextSummary`                 | Hide the context summary (GEMINI.md, MCP servers) above the input.                                                                                                | `false` |
 | Hide CWD                             | `ui.footer.hideCWD`                     | Hide the current working directory path in the footer.                                                                                                            | `false` |
@@ -116,12 +118,19 @@ they appear in the UI.
 | Folder Trust                          | `security.folderTrust.enabled`                  | Setting to track whether Folder trust is enabled.                                                                                                                       | `true`  |
 | Enable Environment Variable Redaction | `security.environmentVariableRedaction.enabled` | Enable redaction of environment variables that may contain secrets.                                                                                                     | `false` |
 
+### Advanced
+
+| UI Label                          | Setting                        | Description                                   | Default |
+| --------------------------------- | ------------------------------ | --------------------------------------------- | ------- |
+| Auto Configure Max Old Space Size | `advanced.autoConfigureMemory` | Automatically configure Node.js memory limits | `false` |
+
 ### Experimental
 
-| UI Label         | Setting                      | Description                                                                         | Default |
-| ---------------- | ---------------------------- | ----------------------------------------------------------------------------------- | ------- |
-| Use OSC 52 Paste | `experimental.useOSC52Paste` | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false` |
-| Plan             | `experimental.plan`          | Enable planning features (Plan Mode and tools).                                     | `false` |
+| UI Label                   | Setting                                  | Description                                                                         | Default |
+| -------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------- | ------- |
+| Enable Tool Output Masking | `experimental.toolOutputMasking.enabled` | Enables tool output masking to save tokens.                                         | `true`  |
+| Use OSC 52 Paste           | `experimental.useOSC52Paste`             | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false` |
+| Plan                       | `experimental.plan`                      | Enable planning features (Plan Mode and tools).                                     | `false` |
 
 ### Skills
 

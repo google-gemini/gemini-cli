@@ -4,14 +4,39 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Box } from 'ink';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
-import { ToolCallStatus, StreamingState } from '../types.js';
+import { StreamingState } from '../types.js';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
-import type { Config } from '@google/gemini-cli-core';
+import { type Config, CoreToolCallStatus } from '@google/gemini-cli-core';
 import type { ConfirmingToolState } from '../hooks/useConfirmingTool.js';
+import { theme } from '../semantic-colors.js';
+
+vi.mock('./StickyHeader.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./StickyHeader.js')>();
+  return {
+    ...actual,
+    StickyHeader: vi.fn((props) => actual.StickyHeader(props)),
+  };
+});
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    validatePlanPath: vi.fn().mockResolvedValue(undefined),
+    validatePlanContent: vi.fn().mockResolvedValue(undefined),
+    processSingleFileContent: vi.fn().mockResolvedValue({
+      llmContent: 'Plan content goes here',
+      error: undefined,
+    }),
+  };
+});
+
+const { StickyHeader } = await import('./StickyHeader.js');
 
 describe('ToolConfirmationQueue', () => {
   const mockConfig = {
@@ -19,7 +44,18 @@ describe('ToolConfirmationQueue', () => {
     getIdeMode: () => false,
     getModel: () => 'gemini-pro',
     getDebugMode: () => false,
+    getTargetDir: () => '/mock/target/dir',
+    getFileSystemService: () => ({
+      readFile: vi.fn().mockResolvedValue('Plan content'),
+    }),
+    storage: {
+      getProjectTempPlansDir: () => '/mock/temp/plans',
+    },
   } as unknown as Config;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it('renders the confirming tool with progress indicator', () => {
     const confirmingTool = {
@@ -27,14 +63,13 @@ describe('ToolConfirmationQueue', () => {
         callId: 'call-1',
         name: 'ls',
         description: 'list files',
-        status: ToolCallStatus.Confirming,
+        status: CoreToolCallStatus.AwaitingApproval,
         confirmationDetails: {
           type: 'exec' as const,
           title: 'Confirm execution',
           command: 'ls',
           rootCommand: 'ls',
           rootCommands: ['ls'],
-          onConfirm: vi.fn(),
         },
       },
       index: 1,
@@ -60,6 +95,9 @@ describe('ToolConfirmationQueue', () => {
     expect(output).toContain('list files'); // Tool description
     expect(output).toContain("Allow execution of: 'ls'?");
     expect(output).toMatchSnapshot();
+
+    const stickyHeaderProps = vi.mocked(StickyHeader).mock.calls[0][0];
+    expect(stickyHeaderProps.borderColor).toBe(theme.status.warning);
   });
 
   it('returns null if tool has no confirmation details', () => {
@@ -67,7 +105,7 @@ describe('ToolConfirmationQueue', () => {
       tool: {
         callId: 'call-1',
         name: 'ls',
-        status: ToolCallStatus.Confirming,
+        status: CoreToolCallStatus.AwaitingApproval,
         confirmationDetails: undefined,
       },
       index: 1,
@@ -96,7 +134,7 @@ describe('ToolConfirmationQueue', () => {
         callId: 'call-1',
         name: 'replace',
         description: 'edit file',
-        status: ToolCallStatus.Confirming,
+        status: CoreToolCallStatus.AwaitingApproval,
         confirmationDetails: {
           type: 'edit' as const,
           title: 'Confirm edit',
@@ -105,7 +143,6 @@ describe('ToolConfirmationQueue', () => {
           fileDiff: longDiff,
           originalContent: 'old',
           newContent: 'new',
-          onConfirm: vi.fn(),
         },
       },
       index: 1,
@@ -144,7 +181,7 @@ describe('ToolConfirmationQueue', () => {
         callId: 'call-1',
         name: 'replace',
         description: 'edit file',
-        status: ToolCallStatus.Confirming,
+        status: CoreToolCallStatus.AwaitingApproval,
         confirmationDetails: {
           type: 'edit' as const,
           title: 'Confirm edit',
@@ -153,7 +190,6 @@ describe('ToolConfirmationQueue', () => {
           fileDiff: longDiff,
           originalContent: 'old',
           newContent: 'new',
-          onConfirm: vi.fn(),
         },
       },
       index: 1,
@@ -194,7 +230,7 @@ describe('ToolConfirmationQueue', () => {
         callId: 'call-1',
         name: 'replace',
         description: 'edit file',
-        status: ToolCallStatus.Confirming,
+        status: CoreToolCallStatus.AwaitingApproval,
         confirmationDetails: {
           type: 'edit' as const,
           title: 'Confirm edit',
@@ -203,7 +239,6 @@ describe('ToolConfirmationQueue', () => {
           fileDiff: longDiff,
           originalContent: 'old',
           newContent: 'new',
-          onConfirm: vi.fn(),
         },
       },
       index: 1,
@@ -228,5 +263,81 @@ describe('ToolConfirmationQueue', () => {
     const output = lastFrame();
     expect(output).not.toContain('Press ctrl-o to show more lines');
     expect(output).toMatchSnapshot();
+  });
+
+  it('renders AskUser tool confirmation with Success color', () => {
+    const confirmingTool = {
+      tool: {
+        callId: 'call-1',
+        name: 'ask_user',
+        description: 'ask user',
+        status: CoreToolCallStatus.AwaitingApproval,
+        confirmationDetails: {
+          type: 'ask_user' as const,
+          questions: [],
+          onConfirm: vi.fn(),
+        },
+      },
+      index: 1,
+      total: 1,
+    };
+
+    const { lastFrame } = renderWithProviders(
+      <ToolConfirmationQueue
+        confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+      />,
+      {
+        config: mockConfig,
+        uiState: {
+          terminalWidth: 80,
+        },
+      },
+    );
+
+    const output = lastFrame();
+    expect(output).toMatchSnapshot();
+
+    const stickyHeaderProps = vi.mocked(StickyHeader).mock.calls[0][0];
+    expect(stickyHeaderProps.borderColor).toBe(theme.status.success);
+  });
+
+  it('renders ExitPlanMode tool confirmation with Success color', async () => {
+    const confirmingTool = {
+      tool: {
+        callId: 'call-1',
+        name: 'exit_plan_mode',
+        description: 'exit plan mode',
+        status: CoreToolCallStatus.AwaitingApproval,
+        confirmationDetails: {
+          type: 'exit_plan_mode' as const,
+          planPath: '/path/to/plan',
+          onConfirm: vi.fn(),
+        },
+      },
+      index: 1,
+      total: 1,
+    };
+
+    const { lastFrame } = renderWithProviders(
+      <ToolConfirmationQueue
+        confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+      />,
+      {
+        config: mockConfig,
+        uiState: {
+          terminalWidth: 80,
+        },
+      },
+    );
+
+    await waitFor(() => {
+      expect(lastFrame()).toContain('Plan content goes here');
+    });
+
+    const output = lastFrame();
+    expect(output).toMatchSnapshot();
+
+    const stickyHeaderProps = vi.mocked(StickyHeader).mock.calls[0][0];
+    expect(stickyHeaderProps.borderColor).toBe(theme.status.success);
   });
 });
