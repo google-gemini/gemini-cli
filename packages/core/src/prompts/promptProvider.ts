@@ -67,7 +67,7 @@ export class PromptProvider {
     let planModeToolsList = PLAN_MODE_TOOLS.filter((t) =>
       enabledToolNames.has(t),
     )
-      .map((t) => `- \`${t}\``)
+      .map((t) => `  <tool>\`${t}\`</tool>`)
       .join('\n');
 
     // Add read-only MCP tools to the list
@@ -79,7 +79,7 @@ export class PromptProvider {
       );
       if (readOnlyMcpTools.length > 0) {
         const mcpToolsList = readOnlyMcpTools
-          .map((t) => `- \`${t.name}\` (${t.serverName})`)
+          .map((t) => `  <tool>\`${t.name}\` (${t.serverName})</tool>`)
           .join('\n');
         planModeToolsList += `\n${mcpToolsList}`;
       }

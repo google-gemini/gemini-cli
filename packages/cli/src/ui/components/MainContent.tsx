@@ -48,7 +48,9 @@ export const MainContent = () => {
     mainAreaWidth,
     staticAreaMaxItemHeight,
     availableTerminalHeight,
+    cleanUiDetailsVisible,
   } = uiState;
+  const showHeaderDetails = cleanUiDetailsVisible;
 
   const historyItems = useMemo(
     () =>
@@ -120,7 +122,13 @@ export const MainContent = () => {
   const renderItem = useCallback(
     ({ item }: { item: (typeof virtualizedData)[number] }) => {
       if (item.type === 'header') {
-        return <MemoizedAppHeader key="app-header" version={version} />;
+        return (
+          <MemoizedAppHeader
+            key="app-header"
+            version={version}
+            showDetails={showHeaderDetails}
+          />
+        );
       } else if (item.type === 'history') {
         return (
           <MemoizedHistoryItemDisplay
@@ -137,7 +145,13 @@ export const MainContent = () => {
         return pendingItems;
       }
     },
-    [version, mainAreaWidth, uiState.slashCommands, pendingItems],
+    [
+      showHeaderDetails,
+      version,
+      mainAreaWidth,
+      uiState.slashCommands,
+      pendingItems,
+    ],
   );
 
   if (isAlternateBuffer) {

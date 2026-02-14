@@ -77,7 +77,7 @@ import type {
   CompletedToolCall,
   ToolCallResponseInfo,
 } from './types.js';
-import { ROOT_SCHEDULER_ID } from './types.js';
+import { CoreToolCallStatus, ROOT_SCHEDULER_ID } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import * as ToolUtils from '../utils/tool-utils.js';
 import type { EditorType } from '../utils/editor.js';
@@ -276,7 +276,7 @@ describe('Scheduler (Orchestrator)', () => {
       expect(mockStateManager.enqueue).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({
-            status: 'error',
+            status: CoreToolCallStatus.Error,
             response: expect.objectContaining({
               errorType: ToolErrorType.TOOL_NOT_REGISTERED,
             }),
@@ -295,7 +295,7 @@ describe('Scheduler (Orchestrator)', () => {
       expect(mockStateManager.enqueue).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({
-            status: 'error',
+            status: CoreToolCallStatus.Error,
             response: expect.objectContaining({
               errorType: ToolErrorType.INVALID_TOOL_PARAMS,
             }),
@@ -310,7 +310,7 @@ describe('Scheduler (Orchestrator)', () => {
       expect(mockStateManager.enqueue).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({
-            status: 'validating',
+            status: CoreToolCallStatus.Validating,
             request: req1,
             tool: mockTool,
             invocation: mockInvocation,
@@ -320,12 +320,26 @@ describe('Scheduler (Orchestrator)', () => {
         ]),
       );
     });
+
+    it('should set approvalMode to PLAN when config returns PLAN', async () => {
+      mockConfig.getApprovalMode.mockReturnValue(ApprovalMode.PLAN);
+      await scheduler.schedule(req1, signal);
+
+      expect(mockStateManager.enqueue).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            status: CoreToolCallStatus.Validating,
+            approvalMode: ApprovalMode.PLAN,
+          }),
+        ]),
+      );
+    });
   });
 
   describe('Phase 2: Queue Management', () => {
     it('should drain the queue if multiple calls are scheduled', async () => {
       const validatingCall: ValidatingToolCall = {
-        status: 'validating',
+        status: CoreToolCallStatus.Validating,
         request: req1,
         tool: mockTool,
         invocation: mockInvocation as unknown as AnyToolInvocation,
@@ -355,7 +369,7 @@ describe('Scheduler (Orchestrator)', () => {
 
       // Execute is the end of the loop, stub it
       mockExecutor.execute.mockResolvedValue({
-        status: 'success',
+        status: CoreToolCallStatus.Success,
       } as unknown as SuccessfulToolCall);
 
       await scheduler.schedule(req1, signal);
@@ -382,14 +396,14 @@ describe('Scheduler (Orchestrator)', () => {
       });
 
       const validatingCall1: ValidatingToolCall = {
-        status: 'validating',
+        status: CoreToolCallStatus.Validating,
         request: req1,
         tool: mockTool,
         invocation: mockInvocation as unknown as AnyToolInvocation,
       };
 
       const validatingCall2: ValidatingToolCall = {
-        status: 'validating',
+        status: CoreToolCallStatus.Validating,
         request: req2,
         tool: mockTool,
         invocation: mockInvocation as unknown as AnyToolInvocation,
@@ -419,7 +433,9 @@ describe('Scheduler (Orchestrator)', () => {
         // Yield to the event loop deterministically using queueMicrotask
         await new Promise<void>((resolve) => queueMicrotask(resolve));
         executionLog.push(`end-${id}`);
-        return { status: 'success' } as unknown as SuccessfulToolCall;
+        return {
+          status: CoreToolCallStatus.Success,
+        } as unknown as SuccessfulToolCall;
       });
 
       // Action: Schedule batch of 2 tools
@@ -436,14 +452,14 @@ describe('Scheduler (Orchestrator)', () => {
 
     it('should queue and process multiple schedule() calls made synchronously', async () => {
       const validatingCall1: ValidatingToolCall = {
-        status: 'validating',
+        status: CoreToolCallStatus.Validating,
         request: req1,
         tool: mockTool,
         invocation: mockInvocation as unknown as AnyToolInvocation,
       };
 
       const validatingCall2: ValidatingToolCall = {
-        status: 'validating',
+        status: CoreToolCallStatus.Validating,
         request: req2, // Second request
         tool: mockTool,
         invocation: mockInvocation as unknown as AnyToolInvocation,
@@ -483,7 +499,7 @@ describe('Scheduler (Orchestrator)', () => {
 
       // Executor succeeds instantly
       mockExecutor.execute.mockResolvedValue({
-        status: 'success',
+        status: CoreToolCallStatus.Success,
       } as unknown as SuccessfulToolCall);
 
       // ACT: Call schedule twice synchronously (without awaiting the first)
@@ -500,14 +516,14 @@ describe('Scheduler (Orchestrator)', () => {
 
     it('should queue requests when scheduler is busy (overlapping batches)', async () => {
       const validatingCall1: ValidatingToolCall = {
-        status: 'validating',
+        status: CoreToolCallStatus.Validating,
         request: req1,
         tool: mockTool,
         invocation: mockInvocation as unknown as AnyToolInvocation,
       };
 
       const validatingCall2: ValidatingToolCall = {
-        status: 'validating',
+        status: CoreToolCallStatus.Validating,
         request: req2, // Second request
         tool: mockTool,
         invocation: mockInvocation as unknown as AnyToolInvocation,
@@ -554,13 +570,17 @@ describe('Scheduler (Orchestrator)', () => {
         executionLog.push('start-batch-1');
         await firstBatchPromise; // Simulating long-running tool execution
         executionLog.push('end-batch-1');
-        return { status: 'success' } as unknown as SuccessfulToolCall;
+        return {
+          status: CoreToolCallStatus.Success,
+        } as unknown as SuccessfulToolCall;
       });
 
       mockExecutor.execute.mockImplementationOnce(async () => {
         executionLog.push('start-batch-2');
         executionLog.push('end-batch-2');
-        return { status: 'success' } as unknown as SuccessfulToolCall;
+        return {
+          status: CoreToolCallStatus.Success,
+        } as unknown as SuccessfulToolCall;
       });
 
       // 3. ACTIONS
@@ -608,7 +628,7 @@ describe('Scheduler (Orchestrator)', () => {
 
     it('cancelAll() should cancel active call and clear queue', () => {
       const activeCall: ValidatingToolCall = {
-        status: 'validating',
+        status: CoreToolCallStatus.Validating,
         request: req1,
         tool: mockTool,
         invocation: mockInvocation as unknown as AnyToolInvocation,
@@ -623,7 +643,7 @@ describe('Scheduler (Orchestrator)', () => {
 
       expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
         'call-1',
-        'cancelled',
+        CoreToolCallStatus.Cancelled,
         'Operation cancelled by user',
       );
       // finalizeCall is handled by the processing loop, not synchronously by cancelAll
@@ -656,7 +676,7 @@ describe('Scheduler (Orchestrator)', () => {
 
   describe('Phase 3: Policy & Confirmation Loop', () => {
     const validatingCall: ValidatingToolCall = {
-      status: 'validating',
+      status: CoreToolCallStatus.Validating,
       request: req1,
       tool: mockTool,
       invocation: mockInvocation as unknown as AnyToolInvocation,
@@ -684,7 +704,7 @@ describe('Scheduler (Orchestrator)', () => {
 
       expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
         'call-1',
-        'error',
+        CoreToolCallStatus.Error,
         expect.objectContaining({
           errorType: ToolErrorType.POLICY_VIOLATION,
         }),
@@ -706,7 +726,7 @@ describe('Scheduler (Orchestrator)', () => {
 
       expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
         'call-1',
-        'error',
+        CoreToolCallStatus.Error,
         expect.objectContaining({
           errorType: ToolErrorType.POLICY_VIOLATION,
           responseParts: expect.arrayContaining([
@@ -731,7 +751,7 @@ describe('Scheduler (Orchestrator)', () => {
 
       expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
         'call-1',
-        'error',
+        CoreToolCallStatus.Error,
         expect.objectContaining({
           errorType: ToolErrorType.UNHANDLED_EXCEPTION,
           responseParts: expect.arrayContaining([
@@ -757,7 +777,7 @@ describe('Scheduler (Orchestrator)', () => {
 
       expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
         'call-1',
-        'error',
+        CoreToolCallStatus.Error,
         expect.objectContaining({
           errorType: ToolErrorType.POLICY_VIOLATION,
           responseParts: expect.arrayContaining([
@@ -786,7 +806,7 @@ describe('Scheduler (Orchestrator)', () => {
 
       expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
         'call-1',
-        'error',
+        CoreToolCallStatus.Error,
         expect.objectContaining({
           errorType: ToolErrorType.POLICY_VIOLATION,
           responseParts: expect.arrayContaining([
@@ -810,7 +830,7 @@ describe('Scheduler (Orchestrator)', () => {
 
       // Provide a mock execute to finish the loop
       mockExecutor.execute.mockResolvedValue({
-        status: 'success',
+        status: CoreToolCallStatus.Success,
       } as unknown as SuccessfulToolCall);
 
       await scheduler.schedule(req1, signal);
@@ -827,7 +847,7 @@ describe('Scheduler (Orchestrator)', () => {
       // Triggered execution
       expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
         'call-1',
-        'executing',
+        CoreToolCallStatus.Executing,
       );
       expect(mockExecutor.execute).toHaveBeenCalled();
     });
@@ -835,13 +855,13 @@ describe('Scheduler (Orchestrator)', () => {
     it('should auto-approve remaining identical tools in batch after ProceedAlways', async () => {
       // Setup: two identical tools
       const validatingCall1: ValidatingToolCall = {
-        status: 'validating',
+        status: CoreToolCallStatus.Validating,
         request: req1,
         tool: mockTool,
         invocation: mockInvocation as unknown as AnyToolInvocation,
       };
       const validatingCall2: ValidatingToolCall = {
-        status: 'validating',
+        status: CoreToolCallStatus.Validating,
         request: req2,
         tool: mockTool,
         invocation: mockInvocation as unknown as AnyToolInvocation,
@@ -874,7 +894,7 @@ describe('Scheduler (Orchestrator)', () => {
       });
 
       mockExecutor.execute.mockResolvedValue({
-        status: 'success',
+        status: CoreToolCallStatus.Success,
       } as unknown as SuccessfulToolCall);
 
       await scheduler.schedule([req1, req2], signal);
@@ -904,7 +924,7 @@ describe('Scheduler (Orchestrator)', () => {
       vi.mocked(resolveConfirmation).mockResolvedValue(resolution);
 
       mockExecutor.execute.mockResolvedValue({
-        status: 'success',
+        status: CoreToolCallStatus.Success,
       } as unknown as SuccessfulToolCall);
 
       await scheduler.schedule(req1, signal);
@@ -949,7 +969,7 @@ describe('Scheduler (Orchestrator)', () => {
 
       expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
         'call-1',
-        'cancelled',
+        CoreToolCallStatus.Cancelled,
         'User denied execution.',
       );
       expect(mockStateManager.cancelAllQueued).toHaveBeenCalledWith(
@@ -979,7 +999,7 @@ describe('Scheduler (Orchestrator)', () => {
       // Because the signal is aborted, the catch block should convert the error to a cancellation
       expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
         'call-1',
-        'cancelled',
+        CoreToolCallStatus.Cancelled,
         'Operation cancelled',
       );
     });
@@ -1010,7 +1030,7 @@ describe('Scheduler (Orchestrator)', () => {
 
       expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
         'call-1',
-        'cancelled',
+        CoreToolCallStatus.Cancelled,
         'User denied execution.',
       );
       // We assume the state manager stores these details.
@@ -1021,7 +1041,7 @@ describe('Scheduler (Orchestrator)', () => {
 
   describe('Phase 4: Execution Outcomes', () => {
     const validatingCall: ValidatingToolCall = {
-      status: 'validating',
+      status: CoreToolCallStatus.Validating,
       request: req1,
       tool: mockTool,
       invocation: mockInvocation as unknown as AnyToolInvocation,
@@ -1047,7 +1067,7 @@ describe('Scheduler (Orchestrator)', () => {
       } as unknown as ToolCallResponseInfo;
 
       mockExecutor.execute.mockResolvedValue({
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         response: mockResponse,
       } as unknown as SuccessfulToolCall);
 
@@ -1055,14 +1075,14 @@ describe('Scheduler (Orchestrator)', () => {
 
       expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
         'call-1',
-        'success',
+        CoreToolCallStatus.Success,
         mockResponse,
       );
     });
 
     it('should update state to cancelled when executor returns cancelled status', async () => {
       mockExecutor.execute.mockResolvedValue({
-        status: 'cancelled',
+        status: CoreToolCallStatus.Cancelled,
         response: { callId: 'call-1', responseParts: [] },
       } as unknown as CancelledToolCall);
 
@@ -1070,7 +1090,7 @@ describe('Scheduler (Orchestrator)', () => {
 
       expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
         'call-1',
-        'cancelled',
+        CoreToolCallStatus.Cancelled,
         'Operation cancelled',
       );
     });
@@ -1082,7 +1102,7 @@ describe('Scheduler (Orchestrator)', () => {
       } as unknown as ToolCallResponseInfo;
 
       mockExecutor.execute.mockResolvedValue({
-        status: 'error',
+        status: CoreToolCallStatus.Error,
         response: mockResponse,
       } as unknown as ErroredToolCall);
 
@@ -1090,7 +1110,7 @@ describe('Scheduler (Orchestrator)', () => {
 
       expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
         'call-1',
-        'error',
+        CoreToolCallStatus.Error,
         mockResponse,
       );
     });
@@ -1103,14 +1123,14 @@ describe('Scheduler (Orchestrator)', () => {
 
       // Mock the execution so the state advances
       mockExecutor.execute.mockResolvedValue({
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         response: mockResponse,
       } as unknown as SuccessfulToolCall);
 
       // Mock the state manager to return a SUCCESS state when getToolCall is
       // called
       const successfulCall: SuccessfulToolCall = {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: req1,
         response: mockResponse,
         tool: mockTool,
@@ -1145,7 +1165,7 @@ describe('Scheduler (Orchestrator)', () => {
       };
 
       mockExecutor.execute.mockResolvedValue({
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         response,
       } as unknown as SuccessfulToolCall);
 
@@ -1172,7 +1192,7 @@ describe('Scheduler (Orchestrator)', () => {
       });
 
       const validatingCall: ValidatingToolCall = {
-        status: 'validating',
+        status: CoreToolCallStatus.Validating,
         request: req1,
         tool: mockTool,
         invocation: mockInvocation as unknown as AnyToolInvocation,
@@ -1200,7 +1220,7 @@ describe('Scheduler (Orchestrator)', () => {
       mockExecutor.execute.mockImplementation(async () => {
         capturedContext = getToolCallContext();
         return {
-          status: 'success',
+          status: CoreToolCallStatus.Success,
           request: req1,
           tool: mockTool,
           invocation: mockInvocation as unknown as AnyToolInvocation,

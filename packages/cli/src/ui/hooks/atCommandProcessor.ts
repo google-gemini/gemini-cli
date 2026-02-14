@@ -18,10 +18,10 @@ import {
   ReadManyFilesTool,
   REFERENCE_CONTENT_START,
   REFERENCE_CONTENT_END,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { Buffer } from 'node:buffer';
 import type { HistoryItem, IndividualToolCallDisplay } from '../types.js';
-import { ToolCallStatus } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 
 const REF_CONTENT_HEADER = `\n${REFERENCE_CONTENT_START}`;
@@ -31,12 +31,13 @@ const REF_CONTENT_FOOTER = `\n${REFERENCE_CONTENT_END}`;
  * Regex source for the path/command part of an @ reference.
  * It uses strict ASCII whitespace delimiters to allow Unicode characters like NNBSP in filenames.
  *
- * 1. \\. matches any escaped character (e.g., \ ).
- * 2. [^ \t\n\r,;!?()\[\]{}.] matches any character that is NOT a delimiter and NOT a period.
- * 3. \.(?!$|[ \t\n\r]) matches a period ONLY if it is NOT followed by whitespace or end-of-string.
+ * 1. "(?:[^"]*)" matches a double-quoted string (for Windows paths with spaces).
+ * 2. \\. matches any escaped character (e.g., \ ).
+ * 3. [^ \t\n\r,;!?()\[\]{}.] matches any character that is NOT a delimiter and NOT a period.
+ * 4. \.(?!$|[ \t\n\r]) matches a period ONLY if it is NOT followed by whitespace or end-of-string.
  */
 export const AT_COMMAND_PATH_REGEX_SOURCE =
-  '(?:\\\\.|[^ \\t\\n\\r,;!?()\\[\\]{}.]|\\.(?!$|[ \\t\\n\\r]))+';
+  '(?:(?:"(?:[^"]*)")|(?:\\\\.|[^ \\t\\n\\r,;!?()\\[\\]{}.]|\\.(?!$|[ \\t\\n\\r])))+';
 
 interface HandleAtCommandParams {
   query: string;
@@ -85,8 +86,8 @@ function parseAllAtCommands(query: string): AtCommandPart[] {
       });
     }
 
-    // unescapePath expects the @ symbol to be present, and will handle it.
-    const atPath = unescapePath(fullMatch);
+    // We strip the @ before unescaping so that unescapePath can handle quoted paths correctly on Windows.
+    const atPath = '@' + unescapePath(fullMatch.substring(1));
     parts.push({ type: 'atPath', content: atPath });
 
     lastIndex = matchIndex + fullMatch.length;
@@ -408,7 +409,7 @@ async function readMcpResources(
           callId: `mcp-resource-${resource.serverName}-${resource.uri}`,
           name: `resources/read (${resource.serverName})`,
           description: resource.uri,
-          status: ToolCallStatus.Success,
+          status: CoreToolCallStatus.Success,
           resultDisplay: `Successfully read resource ${resource.uri}`,
           confirmationDetails: undefined,
         } as IndividualToolCallDisplay,
@@ -422,7 +423,7 @@ async function readMcpResources(
           callId: `mcp-resource-${resource.serverName}-${resource.uri}`,
           name: `resources/read (${resource.serverName})`,
           description: resource.uri,
-          status: ToolCallStatus.Error,
+          status: CoreToolCallStatus.Error,
           resultDisplay: `Error reading resource ${resource.uri}: ${getErrorMessage(error)}`,
           confirmationDetails: undefined,
         } as IndividualToolCallDisplay,
@@ -446,7 +447,9 @@ async function readMcpResources(
   }
 
   if (hasError) {
-    const firstError = displays.find((d) => d.status === ToolCallStatus.Error);
+    const firstError = displays.find(
+      (d) => d.status === CoreToolCallStatus.Error,
+    );
     return {
       parts: [],
       displays,
@@ -499,7 +502,7 @@ async function readLocalFiles(
       callId: `client-read-${userMessageTimestamp}`,
       name: readManyFilesTool.displayName,
       description: invocation.getDescription(),
-      status: ToolCallStatus.Success,
+      status: CoreToolCallStatus.Success,
       resultDisplay:
         result.returnDisplay ||
         `Successfully read: ${fileLabelsForDisplay.join(', ')}`,
@@ -558,7 +561,7 @@ async function readLocalFiles(
       description:
         invocation?.getDescription() ??
         'Error attempting to execute tool to read files',
-      status: ToolCallStatus.Error,
+      status: CoreToolCallStatus.Error,
       resultDisplay: `Error reading files (${fileLabelsForDisplay.join(', ')}): ${getErrorMessage(error)}`,
       confirmationDetails: undefined,
     };

@@ -7,10 +7,10 @@
 import { useMemo } from 'react';
 import { useUIState } from '../contexts/UIStateContext.js';
 import {
-  ToolCallStatus,
   type IndividualToolCallDisplay,
   type HistoryItemToolGroup,
 } from '../types.js';
+import { CoreToolCallStatus } from '@google/gemini-cli-core';
 
 export interface ConfirmingToolState {
   tool: IndividualToolCallDisplay;
@@ -37,7 +37,7 @@ export function useConfirmingTool(): ConfirmingToolState | null {
 
     // 2. Filter for those requiring confirmation
     const confirmingTools = allPendingTools.filter(
-      (t) => t.status === ToolCallStatus.Confirming,
+      (t) => t.status === CoreToolCallStatus.AwaitingApproval,
     );
 
     if (confirmingTools.length === 0) {

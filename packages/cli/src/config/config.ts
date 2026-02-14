@@ -75,6 +75,7 @@ export interface CliArgs {
 
   yolo: boolean | undefined;
   approvalMode: string | undefined;
+  policy: string[] | undefined;
   allowedMcpServerNames: string[] | undefined;
   allowedTools: string[] | undefined;
   experimentalAcp: boolean | undefined;
@@ -157,6 +158,21 @@ export async function parseArguments(
           choices: ['default', 'auto_edit', 'yolo', 'plan'],
           description:
             'Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools), plan (read-only mode)',
+        })
+        .option('policy', {
+          type: 'array',
+          string: true,
+          nargs: 1,
+          description:
+            'Additional policy files or directories to load (comma-separated or multiple --policy)',
+          coerce: (policies: string[]) =>
+            // Handle comma-separated values
+            policies.flatMap((p) =>
+              p
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean),
+            ),
         })
         .option('experimental-acp', {
           type: 'boolean',
@@ -670,6 +686,7 @@ export async function loadCliConfig(
       ...settings.mcp,
       allowed: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
     },
+    policyPaths: argv.policy,
   };
 
   const policyEngineConfig = await createPolicyEngineConfig(

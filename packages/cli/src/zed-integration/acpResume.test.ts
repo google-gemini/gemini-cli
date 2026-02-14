@@ -15,7 +15,11 @@ import {
 } from 'vitest';
 import { GeminiAgent } from './zedIntegration.js';
 import * as acp from '@agentclientprotocol/sdk';
-import { AuthType, type Config } from '@google/gemini-cli-core';
+import {
+  AuthType,
+  type Config,
+  CoreToolCallStatus,
+} from '@google/gemini-cli-core';
 import { loadCliConfig, type CliArgs } from '../config/config.js';
 import {
   SessionSelector,
@@ -98,7 +102,7 @@ describe('GeminiAgent Session Resume', () => {
               id: 'call-1',
               name: 'test_tool',
               displayName: 'Test Tool',
-              status: 'success',
+              status: CoreToolCallStatus.Success,
               resultDisplay: 'Tool output',
             },
           ],
@@ -111,7 +115,7 @@ describe('GeminiAgent Session Resume', () => {
               id: 'call-2',
               name: 'write_file',
               displayName: 'Write File',
-              status: 'error',
+              status: CoreToolCallStatus.Error,
               resultDisplay: 'Permission denied',
             },
           ],

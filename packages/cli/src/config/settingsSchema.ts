@@ -152,6 +152,18 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  policyPaths: {
+    type: 'array',
+    label: 'Policy Paths',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: [] as string[],
+    description: 'Additional policy files or directories to load.',
+    showInDialog: false,
+    items: { type: 'string' },
+    mergeStrategy: MergeStrategy.UNION,
+  },
+
   general: {
     type: 'object',
     label: 'General',
@@ -292,13 +304,13 @@ const SETTINGS_SCHEMA = {
           },
           maxAge: {
             type: 'string',
-            label: 'Max Session Age',
+            label: 'Keep chat history',
             category: 'General',
             requiresRestart: false,
             default: undefined as string | undefined,
             description:
-              'Maximum age of sessions to keep (e.g., "30d", "7d", "24h", "1w")',
-            showInDialog: false,
+              'Automatically delete chats older than this time period (e.g., "30d", "7d", "24h", "1w")',
+            showInDialog: true,
           },
           maxCount: {
             type: 'number',
@@ -318,6 +330,16 @@ const SETTINGS_SCHEMA = {
             default: DEFAULT_MIN_RETENTION,
             description: `Minimum retention period (safety limit, defaults to "${DEFAULT_MIN_RETENTION}")`,
             showInDialog: false,
+          },
+          warningAcknowledged: {
+            type: 'boolean',
+            label: 'Warning Acknowledged',
+            category: 'General',
+            requiresRestart: false,
+            default: false,
+            showInDialog: false,
+            description:
+              'INTERNAL: Whether the user has acknowledged the session retention warning',
           },
         },
         description: 'Settings for automatic session cleanup.',

@@ -892,7 +892,7 @@ ${JSON.stringify(
       // Assert
       expect(ideContextStore.get).toHaveBeenCalled();
       expect(mockTurnRunFn).toHaveBeenCalledWith(
-        { model: 'default-routed-model' },
+        { model: 'default-routed-model', isChatModel: true },
         initialRequest,
         expect.any(AbortSignal),
         undefined,
@@ -1722,7 +1722,7 @@ ${JSON.stringify(
         expect(mockConfig.getModelRouterService).toHaveBeenCalled();
         expect(mockRouterService.route).toHaveBeenCalled();
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          { model: 'routed-model' },
+          { model: 'routed-model', isChatModel: true },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
           undefined,
@@ -1740,7 +1740,7 @@ ${JSON.stringify(
 
         expect(mockRouterService.route).toHaveBeenCalledTimes(1);
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          { model: 'routed-model' },
+          { model: 'routed-model', isChatModel: true },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
           undefined,
@@ -1758,7 +1758,7 @@ ${JSON.stringify(
         expect(mockRouterService.route).toHaveBeenCalledTimes(1);
         // Should stick to the first model
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          { model: 'routed-model' },
+          { model: 'routed-model', isChatModel: true },
           [{ text: 'Continue' }],
           expect.any(AbortSignal),
           undefined,
@@ -1776,7 +1776,7 @@ ${JSON.stringify(
 
         expect(mockRouterService.route).toHaveBeenCalledTimes(1);
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          { model: 'routed-model' },
+          { model: 'routed-model', isChatModel: true },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
           undefined,
@@ -1798,7 +1798,7 @@ ${JSON.stringify(
         expect(mockRouterService.route).toHaveBeenCalledTimes(2);
         // Should use the newly routed model
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          { model: 'new-routed-model' },
+          { model: 'new-routed-model', isChatModel: true },
           [{ text: 'A new topic' }],
           expect.any(AbortSignal),
           undefined,
@@ -1826,7 +1826,7 @@ ${JSON.stringify(
         expect(mockRouterService.route).toHaveBeenCalledTimes(1);
         expect(mockTurnRunFn).toHaveBeenNthCalledWith(
           1,
-          { model: 'original-model' },
+          { model: 'original-model', isChatModel: true },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
           undefined,
@@ -1849,7 +1849,7 @@ ${JSON.stringify(
         expect(mockRouterService.route).toHaveBeenCalledTimes(2);
         expect(mockTurnRunFn).toHaveBeenNthCalledWith(
           2,
-          { model: 'fallback-model' },
+          { model: 'fallback-model', isChatModel: true },
           [{ text: 'Continue' }],
           expect.any(AbortSignal),
           undefined,
@@ -1935,7 +1935,7 @@ ${JSON.stringify(
       // First call with original request
       expect(mockTurnRunFn).toHaveBeenNthCalledWith(
         1,
-        { model: 'default-routed-model' },
+        { model: 'default-routed-model', isChatModel: true },
         initialRequest,
         expect.any(AbortSignal),
         undefined,
@@ -1944,7 +1944,7 @@ ${JSON.stringify(
       // Second call with "Please continue."
       expect(mockTurnRunFn).toHaveBeenNthCalledWith(
         2,
-        { model: 'default-routed-model' },
+        { model: 'default-routed-model', isChatModel: true },
         [{ text: 'System: Please continue.' }],
         expect.any(AbortSignal),
         undefined,

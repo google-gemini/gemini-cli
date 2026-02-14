@@ -8,10 +8,13 @@ import type {
   HistoryItemWithoutId,
   IndividualToolCallDisplay,
 } from '../types.js';
-import { ToolCallStatus } from '../types.js';
 import { useCallback, useReducer, useRef, useEffect } from 'react';
 import type { AnsiOutput, Config, GeminiClient } from '@google/gemini-cli-core';
-import { isBinary, ShellExecutionService } from '@google/gemini-cli-core';
+import {
+  isBinary,
+  ShellExecutionService,
+  CoreToolCallStatus,
+} from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
@@ -301,7 +304,7 @@ export const useShellCommandProcessor = (
           callId,
           name: SHELL_COMMAND_NAME,
           description: rawQuery,
-          status: ToolCallStatus.Executing,
+          status: CoreToolCallStatus.Executing,
           resultDisplay: '',
           confirmationDetails: undefined,
         };
@@ -447,22 +450,22 @@ export const useShellCommandProcessor = (
           }
 
           let finalOutput = mainContent;
-          let finalStatus = ToolCallStatus.Success;
+          let finalStatus = CoreToolCallStatus.Success;
 
           if (result.error) {
-            finalStatus = ToolCallStatus.Error;
+            finalStatus = CoreToolCallStatus.Error;
             finalOutput = `${result.error.message}\n${finalOutput}`;
           } else if (result.aborted) {
-            finalStatus = ToolCallStatus.Canceled;
+            finalStatus = CoreToolCallStatus.Cancelled;
             finalOutput = `Command was cancelled.\n${finalOutput}`;
           } else if (result.backgrounded) {
-            finalStatus = ToolCallStatus.Success;
+            finalStatus = CoreToolCallStatus.Success;
             finalOutput = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
           } else if (result.signal) {
-            finalStatus = ToolCallStatus.Error;
+            finalStatus = CoreToolCallStatus.Error;
             finalOutput = `Command terminated by signal: ${result.signal}.\n${finalOutput}`;
           } else if (result.exitCode !== 0) {
-            finalStatus = ToolCallStatus.Error;
+            finalStatus = CoreToolCallStatus.Error;
             finalOutput = `Command exited with code ${result.exitCode}.\n${finalOutput}`;
           }
 
@@ -480,7 +483,7 @@ export const useShellCommandProcessor = (
             resultDisplay: finalOutput,
           };
 
-          if (finalStatus !== ToolCallStatus.Canceled) {
+          if (finalStatus !== CoreToolCallStatus.Cancelled) {
             addItemToHistory(
               {
                 type: 'tool_group',

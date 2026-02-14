@@ -31,3 +31,12 @@ exports[`<GeminiMessage /> - Raw Markdown Display Snapshots > renders with rende
    1 const x = 1;
 "
 `;
+
+exports[`<GeminiMessage /> - Raw Markdown Display Snapshots > wraps long lines correctly in raw markdown mode 1`] = `
+"✦  This is a long
+   line that should
+   wrap correctly
+   without
+   truncation
+"
+`;

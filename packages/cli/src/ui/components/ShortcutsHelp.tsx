@@ -22,13 +22,14 @@ const buildShortcutItems = (): ShortcutItem[] => {
 
   return [
     { key: '!', description: 'shell mode' },
+    { key: '@', description: 'select file or folder' },
+    { key: 'Esc Esc', description: 'clear & rewind' },
+    { key: 'Tab Tab', description: 'focus UI' },
+    { key: 'Ctrl+Y', description: 'YOLO mode' },
     { key: 'Shift+Tab', description: 'cycle mode' },
     { key: 'Ctrl+V', description: 'paste images' },
-    { key: '@', description: 'select file or folder' },
-    { key: 'Ctrl+Y', description: 'YOLO mode' },
-    { key: 'Ctrl+R', description: 'reverse-search history' },
-    { key: 'Esc Esc', description: 'clear prompt / rewind' },
     { key: `${altLabel}+M`, description: 'raw markdown mode' },
+    { key: 'Ctrl+R', description: 'reverse-search history' },
     { key: 'Ctrl+X', description: 'open external editor' },
   ];
 };
@@ -46,15 +47,29 @@ const Shortcut: React.FC<{ item: ShortcutItem }> = ({ item }) => (
 
 export const ShortcutsHelp: React.FC = () => {
   const { terminalWidth } = useUIState();
-  const items = buildShortcutItems();
-
   const isNarrow = isNarrowWidth(terminalWidth);
+  const items = buildShortcutItems();
+  const itemsForDisplay = isNarrow
+    ? items
+    : [
+        // Keep first column stable: !, @, Esc Esc, Tab Tab.
+        items[0],
+        items[5],
+        items[6],
+        items[1],
+        items[4],
+        items[7],
+        items[2],
+        items[8],
+        items[9],
+        items[3],
+      ];
 
   return (
     <Box flexDirection="column" width="100%">
       <SectionHeader title="Shortcuts (for more, see /help)" />
       <Box flexDirection="row" flexWrap="wrap" paddingLeft={1} paddingRight={2}>
-        {items.map((item, index) => (
+        {itemsForDisplay.map((item, index) => (
           <Box
             key={`${item.key}-${index}`}
             width={isNarrow ? '100%' : '33%'}
