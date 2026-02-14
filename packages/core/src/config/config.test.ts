@@ -2158,6 +2158,29 @@ describe('Config Quota & Preview Model Access', () => {
       // Should remain default (false)
       expect(config.getHasAccessToPreviewModel()).toBe(false);
     });
+
+    it('should cache quota results and respect throttling', async () => {
+      const quota1 = { buckets: [{ modelId: 'model1' }] };
+      const quota2 = { buckets: [{ modelId: 'model2' }] };
+
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValueOnce(quota1);
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValueOnce(quota2);
+
+      const result1 = await config.refreshUserQuota();
+      expect(result1).toEqual(quota1);
+      expect(config.getCachedQuota()).toEqual(quota1);
+      expect(mockCodeAssistServer.retrieveUserQuota).toHaveBeenCalledTimes(1);
+
+      // Second call should return cached result due to throttle
+      const result2 = await config.refreshUserQuota();
+      expect(result2).toEqual(quota1);
+      expect(mockCodeAssistServer.retrieveUserQuota).toHaveBeenCalledTimes(1);
+
+      // Force call should bypass cache
+      const result3 = await config.refreshUserQuota(true);
+      expect(result3).toEqual(quota2);
+      expect(mockCodeAssistServer.retrieveUserQuota).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('refreshUserQuotaIfStale', () => {
