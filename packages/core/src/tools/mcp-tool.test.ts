@@ -8,15 +8,21 @@
 import type { Mocked } from 'vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-import { DiscoveredMCPTool, generateValidName } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
+import {
+  DiscoveredMCPTool,
+  type DiscoveredMCPToolInvocation,
+  generateValidName,
+} from './mcp-tool.js';
 import type { ToolResult } from './tools.js';
 import { ToolConfirmationOutcome } from './tools.js'; // Added ToolConfirmationOutcome
-import type { CallableTool, Part } from '@google/genai';
+import type { CallableTool, FunctionCall, Part } from '@google/genai';
+import type { Progress } from '@modelcontextprotocol/sdk/types.js';
 import { ToolErrorType } from './tool-error.js';
 import {
   createMockMessageBus,
   getMockMessageBusInstance,
 } from '../test-utils/mock-message-bus.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
 
 // Mock @google/genai mcpToTool and CallableTool
 // We only need to mock the parts of CallableTool that DiscoveredMCPTool uses.
@@ -930,6 +936,123 @@ describe('DiscoveredMCPTool', () => {
       const invocation = tool.build(params);
       const description = invocation.getDescription();
       expect(description).toBe('{"param":"testValue","param2":"anotherOne"}');
+    });
+  });
+
+  describe('DiscoveredMCPToolInvocation progress', () => {
+    let progressMockCallTool: ReturnType<typeof vi.fn>;
+    let mockBus: ReturnType<typeof createMockMessageBus>;
+
+    beforeEach(() => {
+      progressMockCallTool = vi.fn();
+      mockBus = createMockMessageBus();
+    });
+
+    function buildInvocation(callId?: string) {
+      const mockCallableToolInst = {
+        tool: vi.fn(),
+        callTool: progressMockCallTool,
+      } as unknown as Mocked<CallableTool>;
+
+      const testTool = new DiscoveredMCPTool(
+        mockCallableToolInst,
+        'test-server',
+        'test-tool',
+        'A test tool',
+        { type: 'object', properties: {} },
+        mockBus,
+        false,
+        false,
+      );
+
+      const invocation = testTool.build({
+        param: 'value',
+      }) as DiscoveredMCPToolInvocation;
+      if (callId) {
+        invocation.setCallId(callId);
+      }
+      return invocation;
+    }
+
+    it('should pass progressCallback as second arg to callTool when callId is set', async () => {
+      progressMockCallTool.mockResolvedValue(
+        createSdkResponse('test-tool', {
+          content: [{ type: 'text', text: 'done' }],
+        }),
+      );
+
+      await buildInvocation('test-call-123').execute(
+        new AbortController().signal,
+      );
+
+      expect(progressMockCallTool).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.any(Function), // progressCallback
+      );
+    });
+
+    it('should not pass progressCallback when callId is not set', async () => {
+      progressMockCallTool.mockResolvedValue(
+        createSdkResponse('test-tool', {
+          content: [{ type: 'text', text: 'done' }],
+        }),
+      );
+
+      await buildInvocation().execute(new AbortController().signal);
+
+      expect(progressMockCallTool).toHaveBeenCalledWith(
+        expect.any(Array), // functionCalls only — no second arg
+      );
+    });
+
+    it('should emit progress events via coreEvents when callId is set', async () => {
+      const handler = vi.fn();
+      coreEvents.on(CoreEvent.MCPToolProgress, handler);
+
+      progressMockCallTool.mockImplementation(
+        async (_calls: FunctionCall[], progressCb?: (p: Progress) => void) => {
+          if (progressCb) {
+            progressCb({ progress: 25, total: 100, message: 'Starting...' });
+            progressCb({ progress: 50, total: 100, message: 'Halfway...' });
+            progressCb({ progress: 100, total: 100, message: 'Done!' });
+          }
+          return [
+            {
+              functionResponse: { name: 'test', response: { content: [] } },
+            },
+          ];
+        },
+      );
+
+      await buildInvocation('test-call-123').execute(
+        new AbortController().signal,
+      );
+
+      expect(handler).toHaveBeenCalledTimes(3);
+      expect(handler).toHaveBeenNthCalledWith(1, {
+        callId: 'test-call-123',
+        serverName: 'test-server',
+        toolName: 'test-tool',
+        progress: 25,
+        total: 100,
+        message: 'Starting...',
+      });
+
+      coreEvents.off(CoreEvent.MCPToolProgress, handler);
+    });
+
+    it('should not emit progress events when callId is not set', async () => {
+      const handler = vi.fn();
+      coreEvents.on(CoreEvent.MCPToolProgress, handler);
+
+      progressMockCallTool.mockResolvedValue([
+        { functionResponse: { name: 'test', response: { content: [] } } },
+      ]);
+
+      await buildInvocation().execute(new AbortController().signal);
+
+      expect(handler).not.toHaveBeenCalled();
+      coreEvents.off(CoreEvent.MCPToolProgress, handler);
     });
   });
 });

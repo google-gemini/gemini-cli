@@ -22,6 +22,7 @@ import type {
   Prompt,
   ReadResourceResult,
   Resource,
+  Progress,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
   ListResourcesResultSchema,
@@ -1073,7 +1074,18 @@ export async function discoverTools(
   }
 }
 
-class McpCallableTool implements CallableTool {
+/**
+ * Extended CallableTool interface that supports progress reporting.
+ * Used by MCP tools that can emit progress updates.
+ */
+export interface CallableToolWithProgress extends CallableTool {
+  callTool(
+    functionCalls: FunctionCall[],
+    progressCallback?: (progress: Progress) => void,
+  ): Promise<Part[]>;
+}
+
+class McpCallableTool implements CallableToolWithProgress {
   constructor(
     private readonly client: Client,
     private readonly toolDef: McpTool,
@@ -1092,7 +1104,10 @@ class McpCallableTool implements CallableTool {
     };
   }
 
-  async callTool(functionCalls: FunctionCall[]): Promise<Part[]> {
+  async callTool(
+    functionCalls: FunctionCall[],
+    progressCallback?: (progress: Progress) => void,
+  ): Promise<Part[]> {
     // We only expect one function call at a time for MCP tools in this context
     if (functionCalls.length !== 1) {
       throw new Error('McpCallableTool only supports single function call');
@@ -1107,7 +1122,11 @@ class McpCallableTool implements CallableTool {
           arguments: call.args as Record<string, unknown>,
         },
         undefined,
-        { timeout: this.timeout },
+        {
+          timeout: this.timeout,
+          onprogress: progressCallback,
+          resetTimeoutOnProgress: true,
+        },
       );
 
       return [
