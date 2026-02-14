@@ -16,12 +16,14 @@ using the `/theme` command within Gemini CLI:
   - `Default`
   - `Dracula`
   - `GitHub`
+  - `Solarized Dark`
 - **Light themes:**
   - `ANSI Light`
   - `Ayu Light`
   - `Default Light`
   - `GitHub Light`
   - `Google Code`
+  - `Solarized Light`
   - `Xcode`
 
 ### Changing themes
@@ -208,6 +210,10 @@ untrusted sources.
 
 <img src="/assets/theme-github.png" alt="GitHub theme" width="600">
 
+### Solarized Dark
+
+<img src="/assets/theme-solarized-dark.png" alt="Solarized Dark theme" width="600">
+
 ## Light themes
 
 ### ANSI Light
@@ -229,6 +235,10 @@ untrusted sources.
 ### Google Code
 
 <img src="/assets/theme-google-light.png" alt="Google Code theme" width="600">
+
+### Solarized Light
+
+<img src="/assets/theme-solarized-light.png" alt="Solarized Light theme" width="600">
 
 ### Xcode
 
