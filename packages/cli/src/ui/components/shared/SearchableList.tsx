@@ -4,17 +4,34 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import { TextInput } from './TextInput.js';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
-import {
-  useFuzzyList,
-  type GenericListItem,
-} from '../../hooks/useFuzzyList.js';
+import { type TextBuffer } from './text-buffer.js';
+
+export interface GenericListItem {
+  key: string;
+  label: string;
+  description?: string;
+  scopeMessage?: string;
+}
+
+export interface SearchListState<T extends GenericListItem> {
+  filteredItems: T[];
+  searchBuffer: TextBuffer | undefined;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  maxLabelWidth: number;
+}
+
+export type SearchListHook<T extends GenericListItem> = (props: {
+  items: T[];
+  initialQuery?: string;
+  onSearch?: (query: string) => void;
+}) => SearchListState<T>;
 
 export interface SearchableListProps<T extends GenericListItem> {
   /** List title */
@@ -31,6 +48,29 @@ export interface SearchableListProps<T extends GenericListItem> {
   searchPlaceholder?: string;
   /** Max items to show at once */
   maxItemsToShow?: number;
+  /** Custom item renderer */
+  renderItem?: (
+    item: T,
+    isActive: boolean,
+    labelWidth: number,
+  ) => React.JSX.Element;
+  /** Optional custom header element */
+  header?: React.ReactNode;
+  /** Optional custom footer element, can be a function to receive pagination info */
+  footer?:
+    | React.ReactNode
+    | ((pagination: SearchableListPaginationInfo) => React.ReactNode);
+  /** The hook to use for search state management */
+  useSearch: SearchListHook<T>;
+  /** Optional callback for search query changes */
+  onSearch?: (query: string) => void;
+}
+
+export interface SearchableListPaginationInfo {
+  startIndex: number; // 0-indexed
+  endIndex: number; // 0-indexed, exclusive
+  totalVisible: number;
+  totalItems: number;
 }
 
 /**
@@ -44,19 +84,36 @@ export function SearchableList<T extends GenericListItem>({
   initialSearchQuery = '',
   searchPlaceholder = 'Search...',
   maxItemsToShow = 10,
+  renderItem,
+
+  header,
+  footer,
+  useSearch,
+  onSearch,
 }: SearchableListProps<T>): React.JSX.Element {
-  const { filteredItems, searchBuffer, maxLabelWidth } = useFuzzyList({
+  const { filteredItems, searchBuffer, maxLabelWidth } = useSearch({
     items,
     initialQuery: initialSearchQuery,
+    onSearch,
   });
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
 
-  // Reset selection when filtered items change
+  const prevFilteredKeysRef = React.useRef<string[]>([]);
   useEffect(() => {
-    setActiveIndex(0);
-    setScrollOffset(0);
+    const currentKeys = filteredItems.map((item) => item.key);
+    const prevKeys = prevFilteredKeysRef.current;
+
+    const hasChanged =
+      currentKeys.length !== prevKeys.length ||
+      currentKeys.some((key, index) => key !== prevKeys[index]);
+
+    if (hasChanged) {
+      setActiveIndex(0);
+      setScrollOffset(0);
+      prevFilteredKeysRef.current = currentKeys;
+    }
   }, [filteredItems]);
 
   // Calculate visible items
@@ -113,16 +170,25 @@ export function SearchableList<T extends GenericListItem>({
 
   return (
     <Box
-      borderStyle="round"
-      borderColor={theme.border.default}
       flexDirection="column"
       padding={1}
       width="100%"
+      height="100%"
+      borderStyle="round"
+      borderColor={theme.border.default}
     >
-      {/* Header */}
+      {/* Title */}
       {title && (
-        <Box marginBottom={1}>
-          <Text bold>{title}</Text>
+        <Box marginX={1}>
+          <Text bold color={theme.text.primary}>
+            {'>'} {title}
+          </Text>
+        </Box>
+      )}
+
+      {header && (
+        <Box marginX={1} marginTop={1}>
+          {header}
         </Box>
       )}
 
@@ -132,7 +198,9 @@ export function SearchableList<T extends GenericListItem>({
           borderStyle="round"
           borderColor={theme.border.focused}
           paddingX={1}
-          marginBottom={1}
+          height={3}
+          marginTop={1}
+          width="100%"
         >
           <TextInput
             buffer={searchBuffer}
@@ -143,45 +211,85 @@ export function SearchableList<T extends GenericListItem>({
       )}
 
       {/* List */}
-      <Box flexDirection="column">
+      <Box flexDirection="column" flexGrow={1}>
+        {showScrollUp && (
+          <Box marginLeft={1}>
+            <Text color={theme.text.secondary}>▲</Text>
+          </Box>
+        )}
         {visibleItems.length === 0 ? (
-          <Text color={theme.text.secondary}>No items found.</Text>
+          <Box marginLeft={2}>
+            <Text color={theme.text.secondary}>No items found.</Text>
+          </Box>
         ) : (
           visibleItems.map((item, idx) => {
             const index = scrollOffset + idx;
             const isActive = index === activeIndex;
 
+            if (renderItem) {
+              return (
+                <React.Fragment key={item.key}>
+                  <Box>{renderItem(item, isActive, maxLabelWidth)}</Box>
+                  <Box height={1} />
+                </React.Fragment>
+              );
+            }
+
             return (
-              <Box key={item.key} flexDirection="row">
-                <Text
-                  color={isActive ? theme.status.success : theme.text.secondary}
-                >
-                  {isActive ? '> ' : '  '}
-                </Text>
-                <Box width={maxLabelWidth + 2}>
-                  <Text
-                    color={isActive ? theme.status.success : theme.text.primary}
-                  >
-                    {item.label}
-                  </Text>
+              <React.Fragment key={item.key}>
+                <Box flexDirection="row" alignItems="flex-start">
+                  <Box minWidth={2} flexShrink={0}>
+                    <Text
+                      color={
+                        isActive ? theme.status.success : theme.text.secondary
+                      }
+                    >
+                      {isActive ? '> ' : '  '}
+                    </Text>
+                  </Box>
+                  <Box width={maxLabelWidth + 2}>
+                    <Text
+                      bold={isActive}
+                      color={
+                        isActive ? theme.status.success : theme.text.primary
+                      }
+                    >
+                      {item.label}
+                    </Text>
+                  </Box>
+                  {item.description && (
+                    <Text color={theme.text.secondary} wrap="truncate-end">
+                      {' '}
+                      | {item.description}
+                    </Text>
+                  )}
                 </Box>
-                {item.description && (
-                  <Text color={theme.text.secondary}>{item.description}</Text>
-                )}
-              </Box>
+                <Box height={1} />
+              </React.Fragment>
             );
           })
         )}
+        {showScrollDown && (
+          <Box marginLeft={1}>
+            <Text color={theme.text.secondary}>▼</Text>
+          </Box>
+        )}
       </Box>
 
-      {/* Footer/Scroll Indicators */}
-      {(showScrollUp || showScrollDown) && (
-        <Box marginTop={1} justifyContent="center">
-          <Text color={theme.text.secondary}>
-            {showScrollUp ? '▲ ' : '  '}
-            {filteredItems.length} items
-            {showScrollDown ? ' ▼' : '  '}
-          </Text>
+      {/* Footer */}
+      {footer && (
+        <Box marginX={1} marginTop={1}>
+          {typeof footer === 'function'
+            ? footer({
+                startIndex: scrollOffset,
+                endIndex: Math.min(
+                  scrollOffset + maxItemsToShow,
+                  filteredItems.length,
+                ),
+                totalVisible: filteredItems.length,
+                totalItems: items.length,
+              })
+            : footer}
         </Box>
       )}
     </Box>

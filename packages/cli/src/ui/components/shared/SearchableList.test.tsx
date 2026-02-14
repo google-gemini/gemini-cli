@@ -8,9 +8,50 @@ import React from 'react';
 import { render } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SearchableList, type SearchableListProps } from './SearchableList.js';
+import {
+  SearchableList,
+  type SearchableListProps,
+  type SearchListState,
+  type GenericListItem,
+} from './SearchableList.js';
 import { KeypressProvider } from '../../contexts/KeypressContext.js';
-import { type GenericListItem } from '../../hooks/useFuzzyList.js';
+import { useTextBuffer } from './text-buffer.js';
+// Local mock search hook to avoid dependency on production hooks
+const useMockSearch = (props: {
+  items: GenericListItem[];
+  initialQuery?: string;
+  onSearch?: (query: string) => void;
+}): SearchListState<GenericListItem> => {
+  const { onSearch, items, initialQuery = '' } = props;
+  const [text, setText] = React.useState(initialQuery);
+  const filteredItems = React.useMemo(
+    () =>
+      items.filter((item: GenericListItem) =>
+        item.label.toLowerCase().includes(text.toLowerCase()),
+      ),
+    [items, text],
+  );
+
+  // Sync with props.onSearch
+  React.useEffect(() => {
+    onSearch?.(text);
+  }, [text, onSearch]);
+
+  const searchBuffer = useTextBuffer({
+    initialText: text,
+    onChange: setText,
+    viewport: { width: 100, height: 1 },
+    singleLine: true,
+  });
+
+  return {
+    filteredItems,
+    searchBuffer,
+    searchQuery: text,
+    setSearchQuery: setText,
+    maxLabelWidth: 10,
+  };
+};
 
 // Mock UI State
 vi.mock('../../contexts/UIStateContext.js', () => ({
@@ -55,6 +96,7 @@ describe('SearchableList', () => {
       items: mockItems,
       onSelect: mockOnSelect,
       onClose: mockOnClose,
+      useSearch: useMockSearch,
       ...props,
     };
 

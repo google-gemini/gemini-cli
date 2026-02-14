@@ -1,25 +1,17 @@
 /**
  * @license
- * Copyright 2026 Google LLC
+ * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { AsyncFzf } from 'fzf';
-import { useUIState } from '../contexts/UIStateContext.js';
 import {
   useTextBuffer,
   type TextBuffer,
 } from '../components/shared/text-buffer.js';
+import { useUIState } from '../contexts/UIStateContext.js';
 import { getCachedStringWidth } from '../utils/textUtils.js';
-
-interface FzfResult {
-  item: string;
-  start: number;
-  end: number;
-  score: number;
-  positions?: number[];
-}
 
 export interface GenericListItem {
   key: string;
@@ -31,7 +23,6 @@ export interface GenericListItem {
 export interface UseFuzzyListProps<T extends GenericListItem> {
   items: T[];
   initialQuery?: string;
-  onSearch?: (query: string) => void;
 }
 
 export interface UseFuzzyListResult<T extends GenericListItem> {
@@ -45,8 +36,8 @@ export interface UseFuzzyListResult<T extends GenericListItem> {
 export function useFuzzyList<T extends GenericListItem>({
   items,
   initialQuery = '',
-  onSearch,
 }: UseFuzzyListProps<T>): UseFuzzyListResult<T> {
+  // ...
   // Search state
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [filteredKeys, setFilteredKeys] = useState<string[]>(() =>
@@ -54,26 +45,20 @@ export function useFuzzyList<T extends GenericListItem>({
   );
 
   // FZF instance for fuzzy searching
-  const { fzfInstance, searchMap } = useMemo(() => {
-    const map = new Map<string, string>();
-    const searchItems: string[] = [];
-
-    items.forEach((item) => {
-      searchItems.push(item.label);
-      map.set(item.label.toLowerCase(), item.key);
-    });
-
-    const fzf = new AsyncFzf(searchItems, {
-      fuzzy: 'v2',
-      casing: 'case-insensitive',
-    });
-    return { fzfInstance: fzf, searchMap: map };
-  }, [items]);
+  const fzfInstance = useMemo(
+    () =>
+      new AsyncFzf(items, {
+        fuzzy: 'v2',
+        casing: 'case-insensitive',
+        selector: (item: T) => item.label,
+      }),
+    [items],
+  );
 
   // Perform search
   useEffect(() => {
     let active = true;
-    if (!searchQuery.trim() || !fzfInstance) {
+    if (!searchQuery.trim()) {
       setFilteredKeys(items.map((i) => i.key));
       return;
     }
@@ -83,25 +68,37 @@ export function useFuzzyList<T extends GenericListItem>({
 
       if (!active) return;
 
-      const matchedKeys = new Set<string>();
-      results.forEach((res: FzfResult) => {
-        const key = searchMap.get(res.item.toLowerCase());
-        if (key) matchedKeys.add(key);
+      const matchedKeys = results.map((res: { item: T }) => res.item.key);
+      setFilteredKeys((prev) => {
+        if (
+          prev.length === matchedKeys.length &&
+          prev.every((key, index) => key === matchedKeys[index])
+        ) {
+          return prev;
+        }
+        return matchedKeys;
       });
-      setFilteredKeys(Array.from(matchedKeys));
-      onSearch?.(searchQuery);
     };
 
     void doSearch().catch((error) => {
       // eslint-disable-next-line no-console
       console.error('Search failed:', error);
-      setFilteredKeys(items.map((i) => i.key)); // Reset to all items on error
+      const allKeys = items.map((i) => i.key);
+      setFilteredKeys((prev) => {
+        if (
+          prev.length === allKeys.length &&
+          prev.every((key, index) => key === allKeys[index])
+        ) {
+          return prev;
+        }
+        return allKeys;
+      });
     });
 
     return () => {
       active = false;
     };
-  }, [searchQuery, fzfInstance, searchMap, items, onSearch]);
+  }, [searchQuery, fzfInstance, items]);
 
   // Get mainAreaWidth for search buffer viewport from UIState
   const { mainAreaWidth } = useUIState();
