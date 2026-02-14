@@ -112,6 +112,7 @@ export class GeminiAgent {
       },
     ];
 
+    await this.config.initialize();
     return {
       protocolVersion: acp.PROTOCOL_VERSION,
       authMethods,
