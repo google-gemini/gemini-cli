@@ -224,4 +224,59 @@ describe('ExtensionRegistryClient', () => {
       'Failed to fetch extensions: Not Found',
     );
   });
+
+  it('should deduplicate extensions by ID', async () => {
+    const duplicateExtensions = [
+      mockExtensions[0],
+      mockExtensions[0], // Duplicate
+      mockExtensions[1],
+    ];
+
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => duplicateExtensions,
+    });
+
+    const result = await client.getAllExtensions();
+    expect(result).toHaveLength(2);
+    expect(result[0].id).toBe('ext1');
+    expect(result[1].id).toBe('ext2');
+  });
+
+  it('should not return irrelevant results for specific queries', async () => {
+    const extensions = [
+      {
+        ...mockExtensions[0],
+        id: 'conductor',
+        extensionName: 'conductor',
+        extensionDescription:
+          'Conductor is a Gemini CLI extension that allows you to specify, plan, and implement software features.',
+        fullName: 'google/conductor',
+      },
+      {
+        ...mockExtensions[1],
+        id: 'dataplex',
+        extensionName: 'dataplex',
+        extensionDescription:
+          'Connect to Dataplex Universal Catalog to discover, manage, monitor, and govern data and AI artifacts across your data platform',
+        fullName: 'google/dataplex',
+      },
+    ];
+
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => extensions,
+    });
+
+    const results = await client.searchExtensions('conductor');
+
+    // Conductor should definitely be first
+    expect(results[0].id).toBe('conductor');
+
+    // Dataplex should ideally NOT be in the results, or at least be ranked lower (which it will be if it matches at all).
+    // But user complaint is that it IS in results.
+    // Let's assert it is NOT in results if we want strictness.
+    const ids = results.map((r) => r.id);
+    expect(ids).not.toContain('dataplex');
+  });
 });
