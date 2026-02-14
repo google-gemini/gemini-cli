@@ -363,37 +363,8 @@ export class TestRig {
 
     if (!this._initialized) {
       // Clean up existing directories from previous runs (e.g. retries)
-      const cleanDir = (dir: string) => {
-        if (fs.existsSync(dir)) {
-          for (let i = 0; i < 5; i++) {
-            try {
-              fs.rmSync(dir, { recursive: true, force: true });
-              return;
-            } catch (err) {
-              if (i === 4) {
-                console.error(
-                  `Failed to clean directory ${dir} after 5 attempts:`,
-                  err,
-                );
-                throw err;
-              }
-              const delay = Math.pow(2, i) * 1000;
-              const sleepCmd =
-                process.platform === 'win32'
-                  ? `timeout /t ${Math.max(1, Math.floor(delay / 1000))} /nobreak`
-                  : `sleep ${delay / 1000}`;
-              try {
-                execSync(sleepCmd, { stdio: 'ignore' });
-              } catch {
-                /* ignore */
-              }
-            }
-          }
-        }
-      };
-
-      cleanDir(this.testDir);
-      cleanDir(this.homeDir);
+      this._cleanDir(this.testDir);
+      this._cleanDir(this.homeDir);
       this._initialized = true;
     }
 
@@ -409,6 +380,36 @@ export class TestRig {
 
     // Create a settings file to point the CLI to the local collector
     this._createSettingsFile(options.settings);
+  }
+
+  private _cleanDir(dir: string) {
+    if (fs.existsSync(dir)) {
+      for (let i = 0; i < 10; i++) {
+        try {
+          fs.rmSync(dir, { recursive: true, force: true });
+          return;
+        } catch (err) {
+          if (i === 9) {
+            console.error(
+              `Failed to clean directory ${dir} after 10 attempts:`,
+              err,
+            );
+            throw err;
+          }
+          const delay = Math.min(Math.pow(2, i) * 1000, 10000); // Max 10s delay
+          try {
+            const sharedBuffer = new Int32Array(new SharedArrayBuffer(4));
+            Atomics.wait(sharedBuffer, 0, 0, delay);
+          } catch {
+            // Fallback for environments where SharedArrayBuffer might be restricted
+            const start = Date.now();
+            while (Date.now() - start < delay) {
+              /* busy wait */
+            }
+          }
+        }
+      }
+    }
   }
 
   private _createSettingsFile(overrideSettings?: Record<string, unknown>) {
@@ -896,21 +897,21 @@ export class TestRig {
     // Clean up test directory and home directory
     if (this.testDir && !env['KEEP_OUTPUT']) {
       try {
-        fs.rmSync(this.testDir, { recursive: true, force: true });
+        this._cleanDir(this.testDir);
       } catch (error) {
         // Ignore cleanup errors
         if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
-          console.warn('Cleanup warning:', (error as Error).message);
+          console.warn('Cleanup warning (testDir):', (error as Error).message);
         }
       }
     }
     if (this.homeDir && !env['KEEP_OUTPUT']) {
       try {
-        fs.rmSync(this.homeDir, { recursive: true, force: true });
+        this._cleanDir(this.homeDir);
       } catch (error) {
         // Ignore cleanup errors
         if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
-          console.warn('Cleanup warning:', (error as Error).message);
+          console.warn('Cleanup warning (homeDir):', (error as Error).message);
         }
       }
     }
