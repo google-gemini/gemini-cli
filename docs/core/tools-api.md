@@ -126,6 +126,36 @@ architecture supports extension through:
   with the server name from your configuration (e.g.,
   `serverAlias__actualToolName`).
 
+## Sandboxing and security for discovered tools
+
+When using custom discovered tools (configured via `tools.discoveryCommand`),
+the Gemini CLI automatically enforces sandboxing if a container-based sandbox
+(`docker` or `podman`) is configured in your settings.
+
+- **Existing sandbox:** If the Gemini CLI session is already running inside a
+  sandbox (for example, started with the `--sandbox` flag), the tool executes
+  within that same environment.
+- **Automatic wrapping:** If the session is running on the host (not sandboxed),
+  the tool execution is **automatically wrapped** in a transient sandbox
+  container to ensure isolation.
+
+This transient container is hardened with the following security measures:
+
+- **User Mapping:** Runs with the host user's UID/GID to prevent file ownership
+  issues.
+- **Privilege Restrictions:** Applies `--security-opt no-new-privileges` and
+  drops all capabilities (`--cap-drop ALL`) to minimize the attack surface.
+- **Environment Propagation:** Explicitly passes necessary environment variables
+  (such as `GEMINI_API_KEY` and `GOOGLE_CLOUD_PROJECT`) to ensure tool
+  functionality.
+- **Mounts:** The project root is mounted to the container, and the working
+  directory is set to the project root.
+
+> **Warning:** This automatic wrapping is **not supported** for `sandbox-exec`
+> (macOS Seatbelt) or unknown sandbox commands. In these cases, execution fails
+> with a fatal error to maintain security. You must run the entire session with
+> `--sandbox` to use these tools securely in those environments.
+
 This tool system provides a flexible and powerful way to augment the Gemini
 model's capabilities, making the Gemini CLI a versatile assistant for a wide
 range of tasks.

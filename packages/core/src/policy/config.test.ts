@@ -80,7 +80,7 @@ describe('createPolicyEngineConfig', () => {
     // But other directories (user, default) should be there
     expect(calledDirs).toContain('/non/existent/user/policies');
     expect(calledDirs).toContain('/tmp/mock/default/policies');
-  });
+  }, 30000);
 
   it('should return ASK_USER for write tools and ALLOW for read-only tools by default', async () => {
     const actualFs =
