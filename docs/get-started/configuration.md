@@ -633,6 +633,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** The format to use when importing memory.
   - **Default:** `undefined`
 
+- **`context.includeDirectoryTree`** (boolean):
+  - **Description:** Whether to include the directory tree of the current
+    working directory in the initial request to the model.
+  - **Default:** `true`
+
 - **`context.discoveryMaxDirs`** (number):
   - **Description:** Maximum number of directories to search for memory.
   - **Default:** `200`
