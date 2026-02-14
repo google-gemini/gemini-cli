@@ -16,6 +16,8 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { Config } from '../config/config.js';
 import { ENTER_PLAN_MODE_TOOL_NAME } from './tool-names.js';
 import { ApprovalMode } from '../policy/types.js';
+import { ENTER_PLAN_MODE_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 export interface EnterPlanModeParams {
   reason?: string;
@@ -32,18 +34,9 @@ export class EnterPlanModeTool extends BaseDeclarativeTool<
     super(
       ENTER_PLAN_MODE_TOOL_NAME,
       'Enter Plan Mode',
-      'Switch to Plan Mode to safely research, design, and plan complex changes using read-only tools.',
+      ENTER_PLAN_MODE_DEFINITION.base.description!,
       Kind.Plan,
-      {
-        type: 'object',
-        properties: {
-          reason: {
-            type: 'string',
-            description:
-              'Short reason explaining why you are entering plan mode.',
-          },
-        },
-      },
+      ENTER_PLAN_MODE_DEFINITION.base.parametersJsonSchema,
       messageBus,
     );
   }
@@ -61,6 +54,10 @@ export class EnterPlanModeTool extends BaseDeclarativeTool<
       toolDisplayName,
       this.config,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(ENTER_PLAN_MODE_DEFINITION, modelId);
   }
 }
 
