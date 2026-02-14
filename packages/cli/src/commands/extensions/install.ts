@@ -25,6 +25,7 @@ interface InstallArgs {
   autoUpdate?: boolean;
   allowPreRelease?: boolean;
   consent?: boolean;
+  skipSettings?: boolean;
 }
 
 export async function handleInstall(args: InstallArgs) {
@@ -48,7 +49,7 @@ export async function handleInstall(args: InstallArgs) {
     const extensionManager = new ExtensionManager({
       workspaceDir,
       requestConsent,
-      requestSetting: promptForSetting,
+      requestSetting: args.skipSettings ? null : promptForSetting,
       settings: loadSettings(workspaceDir).merged,
     });
     await extensionManager.loadExtensions();
@@ -91,6 +92,11 @@ export const installCommand: CommandModule = {
         type: 'boolean',
         default: false,
       })
+      .option('skip-settings', {
+        describe: 'Skip the configuration on install process.',
+        type: 'boolean',
+        default: false,
+      })
       .check((argv) => {
         if (!argv.source) {
           throw new Error('The source argument must be provided.');
@@ -109,6 +115,7 @@ export const installCommand: CommandModule = {
       allowPreRelease: argv['pre-release'] as boolean | undefined,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       consent: argv['consent'] as boolean | undefined,
+      skipSettings: argv['skip-settings'] as boolean | undefined,
     });
     await exitCli();
   },
