@@ -1,14 +1,13 @@
 {
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "declaration": true,
     "outDir": "dist/src",
-    "strict": true,
-    "skipLibCheck": true,
-    "isolatedModules": true,
-    "resolveJsonModule": true
+    "declaration": true,
+    "sourceMap": true,
+    "noEmit": false,
+    "composite": false,
+    "incremental": false,
+    "verbatimModuleSyntax": false
   },
   "include": ["src"]
 }

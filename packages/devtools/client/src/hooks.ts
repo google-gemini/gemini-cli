@@ -26,49 +26,65 @@ export function useDevToolsData() {
     evtSource.onerror = () => setIsConnected(false);
 
     evtSource.addEventListener('snapshot', (e) => {
-      const data = JSON.parse(e.data);
-      // Merge with existing data to preserve logs across server restarts
-      setNetworkLogs((prev) => {
-        if (data.networkLogs.length === 0) return prev;
-        const merged = new Map(prev.map((l: NetworkLog) => [l.id, l]));
-        for (const log of data.networkLogs) merged.set(log.id, log);
-        return Array.from(merged.values());
-      });
-      setConsoleLogs((prev) => {
-        if (data.consoleLogs.length === 0) return prev;
-        const existingIds = new Set(prev.map((l: ConsoleLog) => l.id));
-        const newLogs = data.consoleLogs.filter(
-          (l: ConsoleLog) => !existingIds.has(l.id),
-        );
-        const merged = [...prev, ...newLogs];
-        return merged.length > 5000 ? merged.slice(-5000) : merged;
-      });
-      setConnectedSessions(data.sessions);
+      try {
+        const data = JSON.parse(e.data);
+        // Merge with existing data to preserve logs across server restarts
+        setNetworkLogs((prev) => {
+          if (data.networkLogs.length === 0) return prev;
+          const merged = new Map(prev.map((l: NetworkLog) => [l.id, l]));
+          for (const log of data.networkLogs) merged.set(log.id, log);
+          return Array.from(merged.values());
+        });
+        setConsoleLogs((prev) => {
+          if (data.consoleLogs.length === 0) return prev;
+          const existingIds = new Set(prev.map((l: ConsoleLog) => l.id));
+          const newLogs = data.consoleLogs.filter(
+            (l: ConsoleLog) => !existingIds.has(l.id),
+          );
+          const merged = [...prev, ...newLogs];
+          return merged.length > 5000 ? merged.slice(-5000) : merged;
+        });
+        setConnectedSessions(data.sessions);
+      } catch {
+        // Malformed snapshot — ignore
+      }
     });
 
     evtSource.addEventListener('network', (e) => {
-      const log = JSON.parse(e.data) as NetworkLog;
-      setNetworkLogs((prev) => {
-        const idx = prev.findIndex((l) => l.id === log.id);
-        if (idx > -1) {
-          const next = [...prev];
-          next[idx] = log;
-          return next;
-        }
-        return [...prev, log];
-      });
+      try {
+        const log = JSON.parse(e.data) as NetworkLog;
+        setNetworkLogs((prev) => {
+          const idx = prev.findIndex((l) => l.id === log.id);
+          if (idx > -1) {
+            const next = [...prev];
+            next[idx] = log;
+            return next;
+          }
+          return [...prev, log];
+        });
+      } catch {
+        // Malformed network event — ignore
+      }
     });
 
     evtSource.addEventListener('console', (e) => {
-      const log = JSON.parse(e.data) as ConsoleLog;
-      setConsoleLogs((prev) => {
-        const next = [...prev, log];
-        return next.length > 5000 ? next.slice(-5000) : next;
-      });
+      try {
+        const log = JSON.parse(e.data) as ConsoleLog;
+        setConsoleLogs((prev) => {
+          const next = [...prev, log];
+          return next.length > 5000 ? next.slice(-5000) : next;
+        });
+      } catch {
+        // Malformed console event — ignore
+      }
     });
 
     evtSource.addEventListener('session', (e) => {
-      setConnectedSessions(JSON.parse(e.data));
+      try {
+        setConnectedSessions(JSON.parse(e.data));
+      } catch {
+        // Malformed session event — ignore
+      }
     });
 
     return () => evtSource.close();

@@ -239,6 +239,8 @@ export class DevTools extends EventEmitter {
           }
           this.port++;
           this.server?.listen(this.port, '127.0.0.1');
+        } else {
+          reject(e instanceof Error ? e : new Error(String(e)));
         }
       });
       this.server.listen(this.port, '127.0.0.1', () => {
@@ -324,7 +326,7 @@ export class DevTools extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    switch (message.type) {
+    switch (message['type']) {
       case 'pong':
         session.lastPing = Date.now();
         break;
@@ -332,20 +334,20 @@ export class DevTools extends EventEmitter {
       case 'console':
         this.addInternalConsoleLog(
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          message.payload as ConsoleLogPayload,
+          message['payload'] as ConsoleLogPayload,
           sessionId,
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          message.timestamp as number,
+          message['timestamp'] as number,
         );
         break;
 
       case 'network':
         this.addInternalNetworkLog(
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          message.payload as IncomingNetworkPayload,
+          message['payload'] as IncomingNetworkPayload,
           sessionId,
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          message.timestamp as number,
+          message['timestamp'] as number,
         );
         break;
 
