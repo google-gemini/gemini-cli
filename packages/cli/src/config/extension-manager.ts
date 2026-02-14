@@ -55,6 +55,7 @@ import {
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { ExtensionStorage } from './extensions/storage.js';
+import { removeDirectoryWithRetry } from '../utils/retry.js';
 import {
   EXTENSIONS_CONFIG_FILENAME,
   INSTALL_METADATA_FILENAME,
@@ -406,7 +407,7 @@ Would you like to attempt to install via "git clone" instead?`,
         }
       } finally {
         if (tempDir) {
-          await fs.promises.rm(tempDir, { recursive: true, force: true });
+          await removeDirectoryWithRetry(tempDir);
         }
       }
       return extension;
@@ -475,10 +476,7 @@ Would you like to attempt to install via "git clone" instead?`,
         : path.basename(extension.path),
     );
 
-    await fs.promises.rm(storage.getExtensionDir(), {
-      recursive: true,
-      force: true,
-    });
+    await removeDirectoryWithRetry(storage.getExtensionDir());
 
     // The rest of the cleanup below here is only for true uninstalls, not
     // uninstalls related to updates.
