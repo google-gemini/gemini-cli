@@ -6,6 +6,7 @@
  */
 
 import { createHash } from 'node:crypto';
+import { LLMProvider, SimulatedProvider, GeminiProxyClient } from './llm-provider';
 
 // --- Crypto Primitives (Simulated PQC & BLAKE3) ---
 
@@ -26,9 +27,9 @@ interface HashAlgorithm {
 /**
  * Standard SHA-256 implementation.
  */
-const sha256: HashAlgorithm = (input: string): string => {
-  return createHash('sha256').update(input).digest('hex');
-};
+// const sha256: HashAlgorithm = (input: string): string => {
+//   return createHash('sha256').update(input).digest('hex');
+// };
 
 /**
  * Simulated BLAKE3 implementation (wraps SHA-256 for prototype continuity).
@@ -203,22 +204,28 @@ class MockKnowledgeBase extends KnowledgeBaseAdapter {
 class ResearchModule {
   public ledger: State[] = [];
 
-  constructor(private knowledgeBase: KnowledgeBaseAdapter) {}
+  constructor(
+    private knowledgeBase: KnowledgeBaseAdapter,
+    private llmProvider: LLMProvider
+  ) {}
 
   async initialize() {
     this.ledger.push(await createGenesis('TAS_GENESIS_BLOCK'));
   }
 
   // Layer 1: Probabilistic Proposal
-  generateProposal(query: string): string {
+  async generateProposal(query: string): Promise<string> {
     console.log(`\nLayer 1: Probabilistic Proposal (Query: "${query}")`);
-    const draft = `Neuro-symbolic AI is exploding in 2026, merging neural networks’ pattern recognition with symbolic logic for reasoning without hallucinations. This enables verifiable, auditable outputs — step-by-step checks, reduced errors, and true understanding. It’s the bridge from probabilistic LLMs to deterministic reliability, powering safer AI in mental health, business, and beyond. Recursive self-improvement becomes bounded and provable.`;
+
+    const draft = await this.llmProvider.generate(query);
+
     console.log(`[Generated] ${draft.substring(0, 100)}...`);
     return draft;
   }
 
   // Layer 2: Deterministic Verification
   verifyClaims(_proposal: string): Claim[] {
+    void _proposal; // Suppress unused var check
     console.log('\nLayer 2: Deterministic Verification');
     const claims: Claim[] = [
       { topic: '2026 Turning Point', content: '2026 as the Year of Neuro-Symbolic AI' },
@@ -282,7 +289,7 @@ class ResearchModule {
   async run(query: string) {
     if (this.ledger.length === 0) await this.initialize();
 
-    const proposal = this.generateProposal(query);
+    const proposal = await this.generateProposal(query);
     const verifiedClaims = this.verifyClaims(proposal);
 
     if (this.recursiveSelfCheck(verifiedClaims)) {
@@ -299,7 +306,20 @@ class ResearchModule {
 // Run the Prototype
 async function main() {
   const kb = new MockKnowledgeBase();
-  const module = new ResearchModule(kb);
+
+  // Use real Gemini Proxy if configured, otherwise simulate
+  const useProxy = process.env.USE_GEMINI_PROXY === 'true';
+  const llmProvider = useProxy
+    ? new GeminiProxyClient()
+    : new SimulatedProvider();
+
+  if (useProxy) {
+    console.log('--- Mode: REAL (Gemini Proxy) ---');
+  } else {
+    console.log('--- Mode: SIMULATED ---');
+  }
+
+  const module = new ResearchModule(kb, llmProvider);
   await module.run('Advances in neuro-symbolic AI as a foundation for verifiable, deterministic intelligence in 2026');
 }
 
