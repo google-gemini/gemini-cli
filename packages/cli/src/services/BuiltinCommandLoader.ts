@@ -73,7 +73,10 @@ export class BuiltinCommandLoader implements ICommandLoader {
    * @param _signal An AbortSignal (unused for this synchronous loader).
    * @returns A promise that resolves to an array of `SlashCommand` objects.
    */
-  async loadCommands(_signal: AbortSignal): Promise<SlashCommand[]> {
+  async loadCommands(signal: AbortSignal): Promise<SlashCommand[]> {
+    if (signal.aborted) {
+      return [];
+    }
     const handle = startupProfiler.start('load_builtin_commands');
 
     const isNightlyBuild = await isNightly(process.cwd());
