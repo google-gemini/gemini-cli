@@ -220,7 +220,7 @@ describe('<ShellToolMessage />', () => {
           resultDisplay: LONG_OUTPUT,
           renderOutputAsMarkdown: false,
           availableTerminalHeight: undefined,
-          status: ToolCallStatus.Executing,
+          status: CoreToolCallStatus.Executing,
         },
         { useAlternateBuffer: false },
       );
