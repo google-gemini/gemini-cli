@@ -1696,6 +1696,9 @@ ${JSON.stringify(
           mockRouterService as unknown as ModelRouterService,
         );
 
+        // Set model to 'auto' so router gets invoked (non-auto models skip routing)
+        vi.mocked(mockConfig.getModel).mockReturnValue('auto');
+
         mockTurnRunFn.mockReturnValue(
           (async function* () {
             yield { type: 'content', value: 'Hello' };
@@ -1853,6 +1856,47 @@ ${JSON.stringify(
           [{ text: 'Continue' }],
           expect.any(AbortSignal),
           undefined,
+        );
+      });
+
+      it('should skip the router when a non-auto model is explicitly set', async () => {
+        // Set a specific (non-auto) model
+        vi.mocked(mockConfig.getModel).mockReturnValue('gemini-2.5-flash');
+
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-skip-router',
+        );
+        await fromAsync(stream);
+
+        // Router should NOT be called when a specific model is set
+        expect(mockRouterService.route).not.toHaveBeenCalled();
+        // Should use the explicitly set model (resolved)
+        expect(mockTurnRunFn).toHaveBeenCalledWith(
+          { model: 'gemini-2.5-flash' },
+          [{ text: 'Hi' }],
+          expect.any(AbortSignal),
+        );
+      });
+
+      it('should call the router when an auto model is set', async () => {
+        // Set an auto model
+        vi.mocked(mockConfig.getModel).mockReturnValue('auto');
+
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-auto-router',
+        );
+        await fromAsync(stream);
+
+        // Router SHOULD be called for auto models
+        expect(mockRouterService.route).toHaveBeenCalled();
+        expect(mockTurnRunFn).toHaveBeenCalledWith(
+          { model: 'routed-model' },
+          [{ text: 'Hi' }],
+          expect.any(AbortSignal),
         );
       });
     });
