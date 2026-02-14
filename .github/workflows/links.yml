@@ -10,6 +10,9 @@ on:
   schedule:
     - cron: '00 18 * * *'
 
+permissions:
+  contents: read
+
 jobs:
   linkChecker:
     runs-on: 'ubuntu-latest'
