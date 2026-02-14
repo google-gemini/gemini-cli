@@ -77,6 +77,15 @@ Slash commands provide meta-level control over the CLI itself.
   tokens used for future tasks while retaining a high level summary of what has
   happened.
 
+- **`/footer`** (or **`/statusline`**)
+  - **Description:** Open an interactive dialog to configure which items appear
+    in the CLI footer (statusline). You can toggle items, reorder them, and
+    preview changes in real-time.
+
+- **`/help`**
+  - **Description:** Display help information about Gemini CLI, including
+    available commands and their usage.
+
 ### `/copy`
 
 - **Description:** Copies the last output produced by Gemini CLI to your

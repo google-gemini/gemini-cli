@@ -1,0 +1,35 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<FooterConfigDialog /> > renders correctly with default settings 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                      │
+│  Configure Footer                                                                                                    │
+│  Select which items to display in the footer.                                                                        │
+│                                                                                                                      │
+│  Type to search                                                                                                      │
+│  ╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮  │
+│  │                                                                                                                │  │
+│  ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯  │
+│                                                                                                                      │
+│  > [✓] cwd                                        Current directory path                                             │
+│    [✓] git-branch                                 Current git branch name                                            │
+│    [✓] sandbox-status                             Sandbox type and trust indicator                                   │
+│    [✓] model-name                                 Current model identifier                                           │
+│    [✓] quota                                      Remaining usage on daily limit                                     │
+│    [ ] context-remaining                          Percentage of context window remaining                             │
+│    [ ] memory-usage                               Node.js heap memory usage                                          │
+│    [ ] session-id                                 Unique identifier for the current session                          │
+│    [ ] code-changes                               Lines added/removed in the session                                 │
+│    [ ] token-count                                Total tokens used in the session                                   │
+│                                                                                                                      │
+│    Reset to default footer                                                                                           │
+│                                                                                                                      │
+│  ↑/↓ navigate · ←/→ reorder · enter select · esc close                                                               │
+│                                                                                                                      │
+│  ┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐  │
+│  │ Preview:                                                                                                       │  │
+│  │ ~/project/path | main* | docker | gemini-2.5-pro | daily 97%                                                   │  │
+│  └────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
