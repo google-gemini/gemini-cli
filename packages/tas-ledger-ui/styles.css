@@ -1,0 +1,165 @@
+body {
+  background-color: #0a0a0a;
+  color: #e0e0e0;
+  font-family: monospace;
+  margin: 0;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  --accent-color: #f7c948;
+}
+
+.viz-stage {
+  flex: 2;
+  position: relative;
+  background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
+}
+
+#spiral-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.hud {
+  flex: 1;
+  border-left: 1px solid #333;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: #111;
+  overflow-y: auto;
+}
+
+h2, h3 { margin: 0 0 10px 0; color: var(--accent-color); }
+
+.panel {
+  border: 1px solid #333;
+  padding: 10px;
+  background: #161616;
+}
+
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+input[type="text"] {
+  background: #222;
+  border: 1px solid #444;
+  color: #fff;
+  padding: 8px;
+  font-family: monospace;
+}
+
+button {
+  background: #333;
+  color: #fff;
+  border: 1px solid #555;
+  padding: 10px;
+  cursor: pointer;
+  font-family: monospace;
+  font-weight: bold;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button:not(:disabled):hover {
+  background: #444;
+  border-color: var(--accent-color);
+}
+
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #666;
+  border-top: 1px solid #222;
+  padding-top: 10px;
+}
+
+.ledger-stream {
+  height: 150px;
+  overflow-y: auto;
+  border-top: 1px solid #333;
+  padding-top: 10px;
+}
+
+.ledger-block {
+  font-size: 10px;
+  border-bottom: 1px solid #222;
+  padding: 4px 0;
+  opacity: 0.7;
+  transition: all 0.5s ease;
+}
+
+.entry-pending { color: #f7c948; }
+.entry-verified { color: #37d67a; opacity: 1; }
+
+.block-id { font-weight: bold; }
+.block-meta { color: #888; }
+
+/* Pulse for nodes that pass the Invariant Check */
+.node-sovereign-active {
+    animation: sovereignPulse 3s infinite ease-in-out;
+    stroke: var(--accent-color);
+    stroke-width: 2px;
+}
+
+@keyframes sovereignPulse {
+    0% {
+        filter: drop-shadow(0 0 2px rgba(255, 215, 0, 0.4));
+        transform: scale(1);
+    }
+    50% {
+        filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.8));
+        transform: scale(1.05); /* The Contraction Mapping/Expansion */
+    }
+    100% {
+        filter: drop-shadow(0 0 2px rgba(255, 215, 0, 0.4));
+        transform: scale(1);
+    }
+}
+
+/* For nodes that fail the Invariant (Cessation of Existence) */
+.node-invariant-fail {
+    opacity: 0.2;
+    filter: grayscale(100%) blur(1px);
+    transition: all 2s ease;
+}
+
+/* Flash effect */
+#resonance-flash {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: white;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s ease-out;
+  z-index: 999;
+}
+#resonance-flash.on { opacity: 0.15; }
+
+/* Progress bar */
+.progress-container {
+  height: 4px;
+  background: #222;
+  margin-top: 5px;
+}
+#hold-progress {
+  height: 100%;
+  width: 0%;
+  background: var(--accent-color);
+  transition: width 0.1s linear;
+}

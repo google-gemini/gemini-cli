@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>TAS Sovereign Ledger</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+
+  <div class="viz-stage">
+    <div id="resonance-flash"></div>
+    <svg id="spiral-svg"></svg>
+  </div>
+
+  <div class="hud">
+    <h2>TAS LEDGER [V0.2]</h2>
+
+    <div id="system-status" class="status-bar">SYSTEM: READY</div>
+    <div id="focus-status" class="status-bar">FOCUS: UNLOCKED</div>
+
+    <div class="panel">
+      <h3>NODE MANIFEST</h3>
+      <pre id="manifest">-- Select Node --</pre>
+    </div>
+
+    <div class="panel">
+      <h3>PHYSICS AUDIT</h3>
+      <pre id="audit-output">Waiting for selection...</pre>
+    </div>
+
+    <div class="controls panel">
+      <label>
+        <input type="checkbox" id="key-consent"> Consent: "I affirm the invariant."
+      </label>
+      <input type="text" id="key-phrase" placeholder="TYPE 'LOCK' TO ARM" />
+
+      <button id="hold-exec" disabled>HOLD TO EXECUTE (IFF READY)</button>
+      <div class="progress-container">
+        <div id="hold-progress"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>IMMUTABLE STRAND</h3>
+      <div id="ledger-status" class="status-bar">SYNCED</div>
+      <div id="ledger-stream" class="ledger-stream"></div>
+      <button onclick="exportDNA()" style="margin-top:10px; width:100%">EXPORT DNA</button>
+    </div>
+
+  </div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

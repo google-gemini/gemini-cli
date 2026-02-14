@@ -25,13 +25,6 @@ interface HashAlgorithm {
 }
 
 /**
- * Standard SHA-256 implementation.
- */
-// const sha256: HashAlgorithm = (input: string): string => {
-//   return createHash('sha256').update(input).digest('hex');
-// };
-
-/**
  * Simulated BLAKE3 implementation (wraps SHA-256 for prototype continuity).
  * @todo Replace with actual BLAKE3 library in production.
  */
@@ -199,10 +192,17 @@ class MockKnowledgeBase extends KnowledgeBaseAdapter {
   }
 }
 
+// --- Visual Hooks (Sovereign Pulse) ---
+
+export interface VerificationHook {
+  (stateIndex: number, result: 'sovereign-active' | 'invariant-fail', bondHash?: string): void;
+}
+
 // --- Research Module Simulation ---
 
 class ResearchModule {
   public ledger: State[] = [];
+  public onPulse?: VerificationHook;
 
   constructor(
     private knowledgeBase: KnowledgeBaseAdapter,
@@ -256,6 +256,12 @@ class ResearchModule {
       return true;
     } else {
       console.error('[Invariant Check] FAILED: Unproven claims detected.');
+
+      // Hook: Invariant Fail
+      if (this.onPulse) {
+        this.onPulse(this.ledger.length, 'invariant-fail');
+      }
+
       return false;
     }
   }
@@ -283,6 +289,12 @@ class ResearchModule {
     this.ledger.push(newState);
 
     console.log(`[Ledger Commit] ${newState.toString()}`);
+
+    // Hook: Sovereign Active (Bond Verified)
+    if (this.onPulse) {
+      this.onPulse(newState.index, 'sovereign-active', newState.bond);
+    }
+
     return newState;
   }
 
@@ -320,6 +332,16 @@ async function main() {
   }
 
   const module = new ResearchModule(kb, llmProvider);
+
+  // Attach Pulse Hook
+  module.onPulse = (index, result, bond) => {
+    if (result === 'sovereign-active') {
+      console.log(`[PULSE] Node ${index}: Bond H(parent || φ || t) Verified. (Bond: ${bond?.substring(0,8)}...)`);
+    } else {
+      console.warn(`[PULSE] Node ${index}: Invariant Failed. Existence <=> Null.`);
+    }
+  };
+
   await module.run('Advances in neuro-symbolic AI as a foundation for verifiable, deterministic intelligence in 2026');
 }
 
