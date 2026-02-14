@@ -215,7 +215,6 @@ export const AppContainer = (props: AppContainerProps) => {
   useMemoryMonitor(historyManager);
   const isAlternateBuffer = useAlternateBuffer();
   const [corgiMode, setCorgiMode] = useState(false);
-  const [forceRerenderKey, setForceRerenderKey] = useState(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [quittingMessages, setQuittingMessages] = useState<
     HistoryItem[] | null
@@ -1497,8 +1496,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const { handleSuspend } = useSuspend({
     handleWarning,
     setRawMode,
-    refreshStatic,
-    setForceRerenderKey,
     shouldUseAlternateScreen,
   });
 
@@ -1526,6 +1523,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       return;
     }
 
+    if (!isAlternateBuffer) {
+      return;
+    }
+
     const handler = setTimeout(() => {
       refreshStatic();
     }, 300);
@@ -1533,7 +1534,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     return () => {
       clearTimeout(handler);
     };
-  }, [terminalWidth, refreshStatic]);
+  }, [terminalWidth, terminalHeight, isAlternateBuffer, refreshStatic]);
 
   useEffect(() => {
     const unsubscribe = ideContextStore.subscribe(setIdeContextState);
@@ -2428,7 +2429,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           >
             <ToolActionsProvider config={config} toolCalls={allToolCalls}>
               <ShellFocusContext.Provider value={isFocused}>
-                <App key={`app-${forceRerenderKey}`} />
+                <App />
               </ShellFocusContext.Provider>
             </ToolActionsProvider>
           </AppContext.Provider>
