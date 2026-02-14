@@ -8,6 +8,7 @@ import React from 'react';
 import { Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { debugLogger } from '@google/gemini-cli-core';
+import { stripUnsafeCharacters } from './textUtils.js';
 
 // Constants for Markdown parsing
 const BOLD_MARKER_LENGTH = 2; // For "**"
@@ -23,9 +24,10 @@ interface RenderInlineProps {
 }
 
 const RenderInlineInternal: React.FC<RenderInlineProps> = ({
-  text,
+  text: rawText,
   defaultColor,
 }) => {
+  const text = stripUnsafeCharacters(rawText);
   const baseColor = defaultColor ?? theme.text.primary;
   // Early return for plain text without markdown or URLs
   if (!/[*_~`<[https?:]/.test(text)) {
