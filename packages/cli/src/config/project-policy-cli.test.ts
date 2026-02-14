@@ -32,6 +32,14 @@ vi.mock('@google/gemini-cli-core', async () => {
       checkers: [],
     }),
     getVersion: vi.fn().mockResolvedValue('test-version'),
+    PolicyIntegrityManager: vi.fn().mockImplementation(() => ({
+      checkIntegrity: vi.fn().mockResolvedValue({
+        status: 'match', // IntegrityStatus.MATCH
+        hash: 'test-hash',
+        fileCount: 1,
+      }),
+    })),
+    IntegrityStatus: { MATCH: 'match', NEW: 'new', MISMATCH: 'mismatch' },
   };
 });
 

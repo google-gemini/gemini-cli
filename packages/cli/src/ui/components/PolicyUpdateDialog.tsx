@@ -1,20 +1,15 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import { Box, Text } from 'ink';
 import type React from 'react';
-import { useEffect, useState, useCallback } from 'react';
 import { theme } from '../semantic-colors.js';
 import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import * as process from 'node:process';
-import { relaunchApp } from '../../utils/processUtils.js';
-import { runExitCleanup } from '../../utils/cleanup.js';
-import { ExitCodes } from '@google/gemini-cli-core';
 
 export enum PolicyUpdateChoice {
   ACCEPT = 'accept',
@@ -34,33 +29,10 @@ export const PolicyUpdateDialog: React.FC<PolicyUpdateDialogProps> = ({
   identifier,
   isRestarting,
 }) => {
-  const [exiting, setExiting] = useState(false);
-
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
-    if (isRestarting) {
-      timer = setTimeout(async () => {
-        await relaunchApp();
-      }, 250);
-    }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [isRestarting]);
-
-  const handleExit = useCallback(() => {
-    setExiting(true);
-    // Give time for the UI to render the exiting message
-    setTimeout(async () => {
-      await runExitCleanup();
-      process.exit(ExitCodes.FATAL_CANCELLATION_ERROR);
-    }, 100);
-  }, []);
-
   useKeypress(
     (key) => {
       if (key.name === 'escape') {
-        handleExit();
+        onSelect(PolicyUpdateChoice.IGNORE);
         return true;
       }
       return false;
@@ -111,14 +83,6 @@ export const PolicyUpdateDialog: React.FC<PolicyUpdateDialogProps> = ({
         <Box marginLeft={1} marginTop={1}>
           <Text color={theme.status.warning}>
             Gemini CLI is restarting to apply the policy changes...
-          </Text>
-        </Box>
-      )}
-      {exiting && (
-        <Box marginLeft={1} marginTop={1}>
-          <Text color={theme.status.warning}>
-            A selection must be made to continue. Exiting since escape was
-            pressed.
           </Text>
         </Box>
       )}

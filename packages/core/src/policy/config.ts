@@ -61,7 +61,7 @@ export function getPolicyDirectories(
   // Admin tier (highest priority)
   dirs.push(Storage.getSystemPoliciesDir());
 
-  // User tier (second higheset priority)
+  // User tier (second highest priority)
   if (policyPaths && policyPaths.length > 0) {
     dirs.push(...policyPaths);
   } else {
