@@ -126,6 +126,11 @@ import {
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath } from '../utils/paths.js';
 
+import { CheckerRunner } from '../safety/checker-runner.js';
+import { ContextBuilder } from '../safety/context-builder.js';
+import { CheckerRegistry } from '../safety/registry.js';
+import { ConsecaSafetyChecker } from '../safety/conseca/conseca.js';
+
 export interface AccessibilitySettings {
   enableLoadingPhrases?: boolean;
   screenReader?: boolean;
@@ -489,6 +494,7 @@ export interface ConfigParameters {
     adminSkillsEnabled?: boolean;
     agents?: AgentSettings;
   }>;
+  enableConseca?: boolean;
 }
 
 export class Config {
@@ -516,6 +522,7 @@ export class Config {
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
+  readonly enableConseca: boolean;
 
   private readonly coreTools: string[] | undefined;
   /** @deprecated Use Policy Engine instead */
@@ -830,11 +837,33 @@ export class Config {
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
-    this.policyEngine = new PolicyEngine({
-      ...params.policyEngineConfig,
-      approvalMode:
-        params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+    this.enableConseca = params.enableConseca ?? false;
+
+    // Initialize Safety Infrastructure
+    const contextBuilder = new ContextBuilder(this);
+    const checkersPath = this.targetDir;
+    // The checkersPath  is used to resolve external checkers. Since we do not have any external checkers currently, it is set to the targetDir.
+    const checkerRegistry = new CheckerRegistry(checkersPath);
+    const checkerRunner = new CheckerRunner(contextBuilder, checkerRegistry, {
+      checkersPath,
+      timeout: 30000, // 30 seconds to allow for LLM-based checkers
     });
+
+    this.policyEngine = new PolicyEngine(
+      {
+        ...params.policyEngineConfig,
+        approvalMode:
+          params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+      },
+      checkerRunner,
+    );
+
+    // Register Conseca if enabled
+    if (this.enableConseca) {
+      debugLogger.log('[SAFETY] Registering Conseca Safety Checker');
+      ConsecaSafetyChecker.getInstance().setConfig(this);
+    }
+
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
     this.acknowledgedAgentsService = new AcknowledgedAgentsService();
     this.skillManager = new SkillManager();
