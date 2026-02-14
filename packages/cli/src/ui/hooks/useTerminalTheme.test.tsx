@@ -16,6 +16,7 @@ const mockSubscribe = vi.fn();
 const mockUnsubscribe = vi.fn();
 const mockHandleThemeSelect = vi.fn();
 const mockQueryTerminalBackground = vi.fn();
+let mockIsAlternateBufferEnabled = false;
 
 vi.mock('ink', async () => ({
   useStdout: () => ({
@@ -45,6 +46,10 @@ const mockSettings = {
 
 vi.mock('../contexts/SettingsContext.js', () => ({
   useSettings: () => mockSettings,
+}));
+
+vi.mock('./useAlternateBuffer.js', () => ({
+  isAlternateBufferEnabled: () => mockIsAlternateBufferEnabled,
 }));
 
 vi.mock('../themes/theme-manager.js', async () => {
@@ -83,6 +88,7 @@ describe('useTerminalTheme', () => {
     vi.mocked(themeManager.setTerminalBackground).mockClear();
     mockSettings.merged.ui.autoThemeSwitching = true;
     mockSettings.merged.ui.theme = 'default';
+    mockIsAlternateBufferEnabled = false;
   });
 
   afterEach(() => {
@@ -187,5 +193,39 @@ describe('useTerminalTheme', () => {
     expect(mockQueryTerminalBackground).not.toHaveBeenCalled();
 
     mockSettings.merged.ui.autoThemeSwitching = true;
+  });
+
+  it('should call refreshStatic if background changes without theme switch and alternate buffer is enabled', () => {
+    mockIsAlternateBufferEnabled = true;
+    const refreshStatic = vi.fn();
+    renderHook(() =>
+      useTerminalTheme(mockHandleThemeSelect, config, refreshStatic),
+    );
+
+    const handler = mockSubscribe.mock.calls[0][0];
+
+    // Change background slightly but not enough to switch theme
+    handler('rgb:0100/0100/0100');
+
+    expect(config.setTerminalBackground).toHaveBeenCalledWith('#010101');
+    expect(mockHandleThemeSelect).not.toHaveBeenCalled();
+    expect(refreshStatic).toHaveBeenCalled();
+  });
+
+  it('should NOT call refreshStatic if background changes without theme switch and alternate buffer is disabled', () => {
+    mockIsAlternateBufferEnabled = false;
+    const refreshStatic = vi.fn();
+    renderHook(() =>
+      useTerminalTheme(mockHandleThemeSelect, config, refreshStatic),
+    );
+
+    const handler = mockSubscribe.mock.calls[0][0];
+
+    // Change background slightly but not enough to switch theme
+    handler('rgb:0100/0100/0100');
+
+    expect(config.setTerminalBackground).toHaveBeenCalledWith('#010101');
+    expect(mockHandleThemeSelect).not.toHaveBeenCalled();
+    expect(refreshStatic).not.toHaveBeenCalled();
   });
 });

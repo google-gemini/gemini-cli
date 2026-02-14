@@ -13,6 +13,7 @@ import {
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
 import { DefaultLight } from '../themes/default-light.js';
 import { useSettings } from '../contexts/SettingsContext.js';
+import { isAlternateBufferEnabled } from './useAlternateBuffer.js';
 import type { Config } from '@google/gemini-cli-core';
 import { useTerminalContext } from '../contexts/TerminalContext.js';
 import { SettingScope } from '../../config/settings.js';
@@ -79,10 +80,12 @@ export function useTerminalTheme(
 
       if (newTheme) {
         void handleThemeSelect(newTheme, SettingScope.User);
-      } else {
+      } else if (isAlternateBufferEnabled(settings)) {
         // The existing theme had its background changed so refresh because
         // there may be existing static UI rendered that relies on the old
         // background color.
+        // We only do this in alternate buffer mode because in normal mode
+        // refreshStatic() clears the entire terminal, which is very disruptive.
         refreshStatic();
       }
     };
@@ -94,6 +97,7 @@ export function useTerminalTheme(
       unsubscribe(handleTerminalBackground);
     };
   }, [
+    settings,
     settings.merged.ui.theme,
     settings.merged.ui.autoThemeSwitching,
     settings.merged.ui.terminalBackgroundPollingInterval,

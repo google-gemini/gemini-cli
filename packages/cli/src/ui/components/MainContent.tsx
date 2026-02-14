@@ -36,10 +36,16 @@ export const MainContent = () => {
   const showConfirmationQueue = confirmingTool !== null;
 
   const scrollableListRef = useRef<VirtualizedListRef<unknown>>(null);
+  const lastConfirmingToolId = useRef<string | null>(null);
 
   useEffect(() => {
-    if (showConfirmationQueue) {
-      scrollableListRef.current?.scrollToEnd();
+    if (showConfirmationQueue && confirmingTool) {
+      if (confirmingTool.tool.callId !== lastConfirmingToolId.current) {
+        scrollableListRef.current?.scrollToEnd();
+        lastConfirmingToolId.current = confirmingTool.tool.callId;
+      }
+    } else {
+      lastConfirmingToolId.current = null;
     }
   }, [showConfirmationQueue, confirmingTool]);
 

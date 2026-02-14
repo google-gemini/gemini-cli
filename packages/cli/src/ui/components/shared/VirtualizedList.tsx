@@ -52,6 +52,7 @@ export type VirtualizedListRef<T> = {
     scrollTop: number;
     scrollHeight: number;
     innerHeight: number;
+    isStickingToBottom: boolean;
   };
 };
 
@@ -280,7 +281,15 @@ function VirtualizedList<T>(
     getAnchorForScrollTop,
     offsets,
     isStickingToBottom,
+    copyModeEnabled,
   ]);
+
+  useEffect(() => {
+    if (copyModeEnabled) {
+      setScrollAnchor({ index: 0, offset: 0 });
+      setIsStickingToBottom(false);
+    }
+  }, [copyModeEnabled]);
 
   useLayoutEffect(() => {
     if (
@@ -458,6 +467,7 @@ function VirtualizedList<T>(
         scrollTop: getScrollTop(),
         scrollHeight: totalHeight,
         innerHeight: containerHeight,
+        isStickingToBottom,
       }),
     }),
     [
@@ -470,6 +480,7 @@ function VirtualizedList<T>(
       getScrollTop,
       setPendingScrollTop,
       containerHeight,
+      isStickingToBottom,
     ],
   );
 
