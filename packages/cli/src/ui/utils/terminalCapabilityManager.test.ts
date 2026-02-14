@@ -298,12 +298,7 @@ describe('TerminalCapabilityManager', () => {
       expect(fs.writeSync).toHaveBeenCalledWith(
         expect.anything(),
         // eslint-disable-next-line no-control-regex
-        expect.stringMatching(/^\x1b\[8m/),
-      );
-      expect(fs.writeSync).toHaveBeenCalledWith(
-        expect.anything(),
-        // eslint-disable-next-line no-control-regex
-        expect.stringMatching(/\x1b\[2K\r\x1b\[0m$/),
+        expect.stringMatching(/^\x1b\[8m.*\x1b\[2K\r\x1b\[0m$/s),
       );
     });
   });
