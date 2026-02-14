@@ -47,7 +47,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import levenshtein from 'fast-levenshtein';
 
 const ENABLE_FUZZY_MATCH_RECOVERY = true;
-const FUZZY_MATCH_THRESHOLD = 0.15; // Allow up to 15% weighted difference
+const FUZZY_MATCH_THRESHOLD = 0.05; // Allow up to 5% weighted difference
 const WHITESPACE_PENALTY_FACTOR = 0.1; // Whitespace differences cost 10% of a character difference
 
 interface ReplacementContext {
