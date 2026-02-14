@@ -93,7 +93,6 @@ export async function updatePolicy(
   // Mode Transitions (AUTO_EDIT)
   if (isAutoEditTransition(tool, outcome)) {
     deps.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
-    return;
   }
 
   // Specialized Tools (MCP)
