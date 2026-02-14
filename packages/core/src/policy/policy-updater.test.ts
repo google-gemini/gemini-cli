@@ -151,9 +151,14 @@ describe('createPolicyUpdater', () => {
     expect(policyEngine.addRule).toHaveBeenCalledWith(
       expect.objectContaining({
         toolName: 'activate_skill',
-        argsPattern: new RegExp('"name":"test-skill"'),
+        argsPattern: expect.any(RegExp),
       }),
     );
+    const addedRule = policyEngine
+      .getRules()
+      .find((rule) => rule.toolName === 'activate_skill');
+    expect(addedRule?.argsPattern).toBeDefined();
+    expect(addedRule!.argsPattern!.test('{"name":"test-skill"}')).toBe(true);
   });
 
   it('should reject unsafe regex patterns', async () => {

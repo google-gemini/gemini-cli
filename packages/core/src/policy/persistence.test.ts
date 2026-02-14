@@ -197,7 +197,12 @@ describe('createPolicyUpdater', () => {
     (fs.readFile as unknown as Mock).mockRejectedValue(
       new Error('File not found'),
     );
-    (fs.writeFile as unknown as Mock).mockResolvedValue(undefined);
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    (fs.open as unknown as Mock).mockResolvedValue(mockFileHandle);
     (fs.rename as unknown as Mock).mockResolvedValue(undefined);
 
     const toolName = 'activate_skill';
@@ -216,13 +221,14 @@ describe('createPolicyUpdater', () => {
     const rules = policyEngine.getRules();
     const addedRule = rules.find((r) => r.toolName === toolName);
     expect(addedRule).toBeDefined();
-    expect(addedRule?.argsPattern).toEqual(new RegExp(`"name":"test-skill"`));
+    expect(addedRule!.argsPattern!.test('{"name":"test-skill"}')).toBe(true);
 
     // Verify file written
-    const writeCall = (fs.writeFile as unknown as Mock).mock.calls[0];
-    const writtenContent = writeCall[1] as string;
+    expect(fs.open).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/), 'wx');
+    const writeCall = mockFileHandle.writeFile.mock.calls[0];
+    const writtenContent = writeCall[0] as string;
     expect(writtenContent).toContain(`toolName = "activate_skill"`);
-    expect(writtenContent).toContain(`argsPattern = "\\"name\\":\\"test-skill\\""`);
+    expect(writtenContent).toContain(`argsPattern = '"name":"test\\-skill"'`);
   });
 
   it('should escape special characters in toolName and mcpName', async () => {

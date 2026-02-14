@@ -37,6 +37,7 @@ import { Scheduler } from './scheduler.js';
 import { ROOT_SCHEDULER_ID } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
+import { ACTIVATE_SKILL_TOOL_NAME } from '../tools/tool-names.js';
 
 describe('policy.ts', () => {
   describe('checkPolicy', () => {
@@ -216,6 +217,25 @@ describe('policy.ts', () => {
           persist: true,
         }),
       );
+    });
+
+    it('should not publish fallback standard updates for activate_skill', async () => {
+      const mockConfig = {
+        setApprovalMode: vi.fn(),
+      } as unknown as Mocked<Config>;
+      const mockMessageBus = {
+        publish: vi.fn(),
+      } as unknown as Mocked<MessageBus>;
+      const tool = { name: ACTIVATE_SKILL_TOOL_NAME } as AnyDeclarativeTool;
+
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.ProceedAlwaysAndSave,
+        undefined,
+        { config: mockConfig, messageBus: mockMessageBus },
+      );
+
+      expect(mockMessageBus.publish).not.toHaveBeenCalled();
     });
 
     it('should handle shell command prefixes', async () => {
