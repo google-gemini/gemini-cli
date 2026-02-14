@@ -60,6 +60,14 @@ export function sanitizeTestName(name: string) {
     .replace(/-+/g, '-');
 }
 
+/**
+ * Normalizes a path for use in command-line arguments.
+ * On Windows, this converts backslashes to forward slashes.
+ */
+export function normalizePath(p: string): string {
+  return p.replace(/\\/g, '/');
+}
+
 // Helper to create detailed error messages
 export function createToolCallErrorMessage(
   expectedTools: string | string[],
@@ -345,6 +353,7 @@ export class TestRig {
   originalFakeResponsesPath?: string;
   private _interactiveRuns: InteractiveRun[] = [];
   private _spawnedProcesses: ChildProcess[] = [];
+  private _initialized = false;
 
   setup(
     testName: string,
@@ -359,6 +368,34 @@ export class TestRig {
       env['INTEGRATION_TEST_FILE_DIR'] || join(os.tmpdir(), 'gemini-cli-tests');
     this.testDir = join(testFileDir, sanitizedName);
     this.homeDir = join(testFileDir, sanitizedName + '-home');
+
+    if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+      console.log(`[TestRig] Setting up test: ${testName}`);
+      console.log(`[TestRig] testDir: ${this.testDir}`);
+      console.log(`[TestRig] homeDir: ${this.homeDir}`);
+    }
+
+    if (!this._initialized) {
+      // Clean up existing directories from previous runs (e.g. retries)
+      if (fs.existsSync(this.testDir)) {
+        if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+          console.log(
+            `[TestRig] Cleaning up existing testDir: ${this.testDir}`,
+          );
+        }
+        fs.rmSync(this.testDir, { recursive: true, force: true });
+      }
+      if (fs.existsSync(this.homeDir)) {
+        if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+          console.log(
+            `[TestRig] Cleaning up existing homeDir: ${this.homeDir}`,
+          );
+        }
+        fs.rmSync(this.homeDir, { recursive: true, force: true });
+      }
+      this._initialized = true;
+    }
+
     mkdirSync(this.testDir, { recursive: true });
     mkdirSync(this.homeDir, { recursive: true });
     if (options.fakeResponsesPath) {
@@ -436,6 +473,17 @@ export class TestRig {
     const filePath = join(this.testDir!, fileName);
     writeFileSync(filePath, content);
     return filePath;
+  }
+
+  createScript(fileName: string, content: string) {
+    if (!this.testDir) {
+      throw new Error(
+        'TestRig.setup must be called before creating files or scripts',
+      );
+    }
+    const scriptPath = join(this.testDir, fileName);
+    writeFileSync(scriptPath, content);
+    return normalizePath(scriptPath);
   }
 
   mkdir(dir: string) {
@@ -572,7 +620,8 @@ export class TestRig {
       }
     });
 
-    const timeout = options.timeout ?? 300000;
+    const isWinCI = os.platform() === 'win32' && process.env['CI'] === 'true';
+    const timeout = options.timeout ?? (isWinCI ? 600000 : 300000); // 10 mins on Win CI, 5 mins otherwise
     const promise = new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => {
         child.kill('SIGKILL');
@@ -743,7 +792,8 @@ export class TestRig {
       }
     });
 
-    const timeout = options.timeout ?? 300000;
+    const isWinCI = os.platform() === 'win32' && process.env['CI'] === 'true';
+    const timeout = options.timeout ?? (isWinCI ? 600000 : 300000); // 10 mins on Win CI, 5 mins otherwise
     const promise = new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => {
         child.kill('SIGKILL');
@@ -1282,6 +1332,20 @@ export class TestRig {
 
     const envVars = this._getCleanEnv(options?.env);
 
+    // Ensure PATH is included for pty
+    if (!envVars['PATH'] && process.env['PATH']) {
+      envVars['PATH'] = process.env['PATH'];
+    }
+
+    // Add critical Windows environment variables if missing
+    if (process.platform === 'win32') {
+      ['SystemRoot', 'COMSPEC', 'windir', 'PATHEXT'].forEach((key) => {
+        if (!envVars[key] && process.env[key]) {
+          envVars[key] = process.env[key];
+        }
+      });
+    }
+
     const ptyOptions: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
@@ -1293,6 +1357,14 @@ export class TestRig {
     };
 
     const executable = command === 'node' ? process.execPath : command;
+    if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+      console.log(`[TestRig] Spawning PTY: ${executable}`);
+      console.log(`[TestRig] Args: ${JSON.stringify(commandArgs)}`);
+      // Only log keys to avoid leaking sensitive info
+      console.log(
+        `[TestRig] Env Keys: ${Object.keys(ptyOptions.env).join(', ')}`,
+      );
+    }
     const ptyProcess = pty.spawn(executable, commandArgs, ptyOptions);
 
     const run = new InteractiveRun(ptyProcess);
