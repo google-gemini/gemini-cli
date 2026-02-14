@@ -23,7 +23,8 @@
     "typecheck": "tsc --noEmit"
   },
   "files": [
-    "dist"
+    "dist",
+    "assets"
   ],
   "config": {
     "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.30.0-nightly.20260210.a2174751d"
@@ -53,6 +54,7 @@
     "latest-version": "^9.0.0",
     "lowlight": "^3.3.0",
     "mnemonist": "^0.40.3",
+    "node-notifier": "^10.0.1",
     "open": "^10.1.2",
     "prompts": "^2.4.2",
     "proper-lockfile": "^4.1.2",
@@ -74,6 +76,7 @@
     "@types/command-exists": "^1.2.3",
     "@types/hast": "^3.0.4",
     "@types/node": "^20.11.24",
+    "@types/node-notifier": "^8.0.5",
     "@types/react": "^19.2.0",
     "@types/semver": "^7.7.0",
     "@types/shell-quote": "^1.7.5",

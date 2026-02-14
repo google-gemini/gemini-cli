@@ -104,6 +104,10 @@ import { PolicyEngine } from '../policy/policy-engine.js';
 import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type { UserTierId } from '../code_assist/types.js';
+import {
+  NotificationService,
+  type NotificationConfig,
+} from '../services/notification/NotificationService.js';
 import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
 import type { AdminControlsSettings } from '../code_assist/types.js';
 import type { HierarchicalMemory } from './memory.js';
@@ -474,6 +478,7 @@ export interface ConfigParameters {
   enableAgents?: boolean;
   enableEventDrivenScheduler?: boolean;
   skillsSupport?: boolean;
+  notifications?: NotificationConfig;
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
@@ -488,6 +493,7 @@ export interface ConfigParameters {
     disabledSkills?: string[];
     adminSkillsEnabled?: boolean;
     agents?: AgentSettings;
+    notifications?: NotificationConfig;
   }>;
 }
 
@@ -625,6 +631,7 @@ export class Config {
   private readonly eventEmitter?: EventEmitter;
   private readonly useWriteTodos: boolean;
   private readonly messageBus: MessageBus;
+  private readonly notificationService: NotificationService;
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
   private readonly continueOnFailedApiCall: boolean;
@@ -654,6 +661,7 @@ export class Config {
         disabledSkills?: string[];
         adminSkillsEnabled?: boolean;
         agents?: AgentSettings;
+        notifications?: NotificationConfig;
       }>)
     | undefined;
 
@@ -836,6 +844,10 @@ export class Config {
         params.approvalMode ?? params.policyEngineConfig?.approvalMode,
     });
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
+    this.notificationService = new NotificationService(
+      params.notifications ?? { enabled: true },
+    );
+    this.notificationService.subscribeToBus(this.messageBus);
     this.acknowledgedAgentsService = new AcknowledgedAgentsService();
     this.skillManager = new SkillManager();
     this.outputSettings = {
@@ -949,6 +961,7 @@ export class Config {
     await this.agentRegistry.initialize();
 
     coreEvents.on(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
+    coreEvents.on(CoreEvent.SettingsChanged, this.onSettingsChanged);
 
     this.toolRegistry = await this.createToolRegistry();
     discoverToolsHandle?.end();
@@ -2338,6 +2351,10 @@ export class Config {
     return this.messageBus;
   }
 
+  getNotificationService(): NotificationService {
+    return this.notificationService;
+  }
+
   getPolicyEngine(): PolicyEngine {
     return this.policyEngine;
   }
@@ -2590,12 +2607,23 @@ export class Config {
     }
   };
 
+  private onSettingsChanged = async () => {
+    if (this.onReload) {
+      const refreshed = await this.onReload();
+      if (refreshed.notifications) {
+        this.notificationService.updateConfig(refreshed.notifications);
+      }
+    }
+  };
+
   /**
    * Disposes of resources and removes event listeners.
    */
   async dispose(): Promise<void> {
     this.logCurrentModeDuration(this.getApprovalMode());
     coreEvents.off(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
+    coreEvents.off(CoreEvent.SettingsChanged, this.onSettingsChanged);
+    this.notificationService.dispose();
     this.agentRegistry?.dispose();
     this.geminiClient?.dispose();
     if (this.mcpClientManager) {

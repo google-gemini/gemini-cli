@@ -139,6 +139,13 @@ export interface SlashCommandConflictsPayload {
 }
 
 /**
+ * Payload for the 'window-focus-changed' event.
+ */
+export interface WindowFocusChangedPayload {
+  focused: boolean;
+}
+
+/**
  * Payload for the 'quota-changed' event.
  */
 export interface QuotaChangedPayload {
@@ -164,6 +171,7 @@ export enum CoreEvent {
   RetryAttempt = 'retry-attempt',
   ConsentRequest = 'consent-request',
   AgentsDiscovered = 'agents-discovered',
+  WindowFocusChanged = 'window-focus-changed',
   RequestEditorSelection = 'request-editor-selection',
   EditorSelected = 'editor-selected',
   SlashCommandConflicts = 'slash-command-conflicts',
@@ -195,6 +203,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.RetryAttempt]: [RetryAttemptPayload];
   [CoreEvent.ConsentRequest]: [ConsentRequestPayload];
   [CoreEvent.AgentsDiscovered]: [AgentsDiscoveredPayload];
+  [CoreEvent.WindowFocusChanged]: [WindowFocusChangedPayload];
   [CoreEvent.RequestEditorSelection]: never[];
   [CoreEvent.EditorSelected]: [EditorSelectedPayload];
   [CoreEvent.SlashCommandConflicts]: [SlashCommandConflictsPayload];
@@ -338,6 +347,14 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   emitSlashCommandConflicts(conflicts: SlashCommandConflict[]): void {
     const payload: SlashCommandConflictsPayload = { conflicts };
     this._emitOrQueue(CoreEvent.SlashCommandConflicts, payload);
+  }
+
+  /**
+   * Notifies subscribers that the window focus has changed.
+   */
+  emitWindowFocusChanged(focused: boolean): void {
+    const payload: WindowFocusChangedPayload = { focused };
+    this.emit(CoreEvent.WindowFocusChanged, payload);
   }
 
   /**

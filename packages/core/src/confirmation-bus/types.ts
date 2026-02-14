@@ -21,6 +21,7 @@ export enum MessageBusType {
   TOOL_CALLS_UPDATE = 'tool-calls-update',
   ASK_USER_REQUEST = 'ask-user-request',
   ASK_USER_RESPONSE = 'ask-user-response',
+  NOTIFICATION_REQUEST = 'notification-request',
 }
 
 export interface ToolCallsUpdateMessage {
@@ -171,6 +172,13 @@ export interface AskUserResponse {
   cancelled?: boolean;
 }
 
+export interface NotificationRequest {
+  type: MessageBusType.NOTIFICATION_REQUEST;
+  message: string;
+  title?: string;
+  force?: boolean;
+}
+
 export type Message =
   | ToolConfirmationRequest
   | ToolConfirmationResponse
@@ -180,4 +188,5 @@ export type Message =
   | UpdatePolicy
   | AskUserRequest
   | AskUserResponse
-  | ToolCallsUpdateMessage;
+  | ToolCallsUpdateMessage
+  | NotificationRequest;

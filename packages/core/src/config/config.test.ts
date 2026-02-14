@@ -172,6 +172,7 @@ const mockCoreEvents = vi.hoisted(() => ({
   emitConsoleLog: vi.fn(),
   emitQuotaChanged: vi.fn(),
   on: vi.fn(),
+  off: vi.fn(),
 }));
 
 const mockSetGlobalProxy = vi.hoisted(() => vi.fn());
