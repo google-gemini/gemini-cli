@@ -46,7 +46,8 @@ Tips for getting started:
 ╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool2 Description for tool 2                                          │
 │                                                                          │
-╰──────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`AlternateBufferQuittingDisplay > renders with empty history and no pending items > empty 1`] = `
@@ -64,7 +65,8 @@ Tips for getting started:
 1. Ask questions, edit files, or run commands.
 2. Be specific for the best results.
 3. Create GEMINI.md files to customize your interactions with Gemini.
-4. /help for more information."
+4. /help for more information.
+"
 `;
 
 exports[`AlternateBufferQuittingDisplay > renders with history but no pending items > with_history_no_pending 1`] = `
@@ -90,7 +92,8 @@ Tips for getting started:
 ╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool2 Description for tool 2                                          │
 │                                                                          │
-╰──────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`AlternateBufferQuittingDisplay > renders with pending items but no history > with_pending_no_history 1`] = `
@@ -108,7 +111,8 @@ Tips for getting started:
 1. Ask questions, edit files, or run commands.
 2. Be specific for the best results.
 3. Create GEMINI.md files to customize your interactions with Gemini.
-4. /help for more information."
+4. /help for more information.
+"
 `;
 
 exports[`AlternateBufferQuittingDisplay > renders with user and gemini messages > with_user_gemini_messages 1`] = `

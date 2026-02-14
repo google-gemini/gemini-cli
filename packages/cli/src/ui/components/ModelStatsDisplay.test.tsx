@@ -33,7 +33,7 @@ vi.mock('../contexts/SettingsContext.js', async (importOriginal) => {
 const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
 const useSettingsMock = vi.mocked(SettingsContext.useSettings);
 
-const renderWithMockedStats = (
+const renderWithMockedStats = async (
   metrics: SessionMetrics,
   width?: number,
   currentModel: string = 'gemini-2.5-pro',
@@ -59,7 +59,12 @@ const renderWithMockedStats = (
     },
   } as unknown as LoadedSettings);
 
-  return render(<ModelStatsDisplay currentModel={currentModel} />, width);
+  const result = render(
+    <ModelStatsDisplay currentModel={currentModel} />,
+    width,
+  );
+  await result.waitUntilReady();
+  return result;
 };
 
 describe('<ModelStatsDisplay />', () => {
@@ -76,8 +81,8 @@ describe('<ModelStatsDisplay />', () => {
     vi.restoreAllMocks();
   });
 
-  it('should render "no API calls" message when there are no active models', () => {
-    const { lastFrame } = renderWithMockedStats({
+  it('should render "no API calls" message when there are no active models', async () => {
+    const { lastFrame, unmount } = await renderWithMockedStats({
       models: {},
       tools: {
         totalCalls: 0,
@@ -102,10 +107,11 @@ describe('<ModelStatsDisplay />', () => {
       'No API calls have been made in this session.',
     );
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('should not display conditional rows if no model has data for them', () => {
-    const { lastFrame } = renderWithMockedStats({
+  it('should not display conditional rows if no model has data for them', async () => {
+    const { lastFrame, unmount } = await renderWithMockedStats({
       models: {
         'gemini-2.5-pro': {
           api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
@@ -144,10 +150,11 @@ describe('<ModelStatsDisplay />', () => {
     expect(output).not.toContain('Thoughts');
     expect(output).not.toContain('Tool');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('should display conditional rows if at least one model has data', () => {
-    const { lastFrame } = renderWithMockedStats({
+  it('should display conditional rows if at least one model has data', async () => {
+    const { lastFrame, unmount } = await renderWithMockedStats({
       models: {
         'gemini-2.5-pro': {
           api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
@@ -198,10 +205,11 @@ describe('<ModelStatsDisplay />', () => {
     expect(output).toContain('Thoughts');
     expect(output).toContain('Tool');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('should display stats for multiple models correctly', () => {
-    const { lastFrame } = renderWithMockedStats({
+  it('should display stats for multiple models correctly', async () => {
+    const { lastFrame, unmount } = await renderWithMockedStats({
       models: {
         'gemini-2.5-pro': {
           api: { totalRequests: 10, totalErrors: 1, totalLatencyMs: 1000 },
@@ -251,10 +259,11 @@ describe('<ModelStatsDisplay />', () => {
     expect(output).toContain('gemini-2.5-pro');
     expect(output).toContain('gemini-2.5-flash');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('should handle large values without wrapping or overlapping', () => {
-    const { lastFrame } = renderWithMockedStats({
+  it('should handle large values without wrapping or overlapping', async () => {
+    const { lastFrame, unmount } = await renderWithMockedStats({
       models: {
         'gemini-2.5-pro': {
           api: {
@@ -293,10 +302,11 @@ describe('<ModelStatsDisplay />', () => {
     });
 
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('should display a single model correctly', () => {
-    const { lastFrame } = renderWithMockedStats({
+  it('should display a single model correctly', async () => {
+    const { lastFrame, unmount } = await renderWithMockedStats({
       models: {
         'gemini-2.5-pro': {
           api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
@@ -334,10 +344,11 @@ describe('<ModelStatsDisplay />', () => {
     expect(output).toContain('gemini-2.5-pro');
     expect(output).not.toContain('gemini-2.5-flash');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('should handle models with long names (gemini-3-*-preview) without layout breaking', () => {
-    const { lastFrame } = renderWithMockedStats(
+  it('should handle models with long names (gemini-3-*-preview) without layout breaking', async () => {
+    const { lastFrame, unmount } = await renderWithMockedStats(
       {
         models: {
           'gemini-3-pro-preview': {
@@ -391,9 +402,10 @@ describe('<ModelStatsDisplay />', () => {
     expect(output).toContain('gemini-3-pro-');
     expect(output).toContain('gemini-3-flash-');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('should render user identity information when provided', () => {
+  it('should render user identity information when provided', async () => {
     useSettingsMock.mockReturnValue({
       merged: {
         ui: {
@@ -401,14 +413,6 @@ describe('<ModelStatsDisplay />', () => {
         },
       },
     } as unknown as LoadedSettings);
-
-    const { lastFrame } = render(
-      <ModelStatsDisplay
-        selectedAuthType="oauth"
-        userEmail="test@example.com"
-        tier="Pro"
-      />,
-    );
 
     useSessionStatsMock.mockReturnValue({
       stats: {
@@ -455,11 +459,21 @@ describe('<ModelStatsDisplay />', () => {
       startNewPrompt: vi.fn(),
     });
 
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <ModelStatsDisplay
+        selectedAuthType="oauth"
+        userEmail="test@example.com"
+        tier="Pro"
+      />,
+    );
+    await waitUntilReady();
+
     const output = lastFrame();
     expect(output).toContain('Auth Method:');
     expect(output).toContain('Logged in with Google');
     expect(output).toContain('(test@example.com)');
     expect(output).toContain('Tier:');
     expect(output).toContain('Pro');
+    unmount();
   });
 });

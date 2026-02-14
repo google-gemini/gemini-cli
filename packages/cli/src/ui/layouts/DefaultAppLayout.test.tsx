@@ -101,32 +101,38 @@ describe('<DefaultAppLayout />', () => {
     mockUIState.streamingState = StreamingState.Idle;
   });
 
-  it('renders BackgroundShellDisplay when shells exist and active', () => {
+  it('renders BackgroundShellDisplay when shells exist and active', async () => {
     mockUIState.backgroundShells.set(123, createMockShell(123));
     mockUIState.activeBackgroundShellPid = 123;
     mockUIState.backgroundShellHeight = 5;
 
-    const { lastFrame } = render(<DefaultAppLayout />);
+    const { lastFrame, waitUntilReady, unmount } = render(<DefaultAppLayout />);
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('hides BackgroundShellDisplay when StreamingState is WaitingForConfirmation', () => {
+  it('hides BackgroundShellDisplay when StreamingState is WaitingForConfirmation', async () => {
     mockUIState.backgroundShells.set(123, createMockShell(123));
     mockUIState.activeBackgroundShellPid = 123;
     mockUIState.backgroundShellHeight = 5;
     mockUIState.streamingState = StreamingState.WaitingForConfirmation;
 
-    const { lastFrame } = render(<DefaultAppLayout />);
+    const { lastFrame, waitUntilReady, unmount } = render(<DefaultAppLayout />);
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('shows BackgroundShellDisplay when StreamingState is NOT WaitingForConfirmation', () => {
+  it('shows BackgroundShellDisplay when StreamingState is NOT WaitingForConfirmation', async () => {
     mockUIState.backgroundShells.set(123, createMockShell(123));
     mockUIState.activeBackgroundShellPid = 123;
     mockUIState.backgroundShellHeight = 5;
     mockUIState.streamingState = StreamingState.Responding;
 
-    const { lastFrame } = render(<DefaultAppLayout />);
+    const { lastFrame, waitUntilReady, unmount } = render(<DefaultAppLayout />);
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 });

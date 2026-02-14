@@ -1,17 +1,38 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`<Footer /> > displays "Limit reached" message when remaining is 0 1`] = `" ...directories/to/make/it/long                 no sandbox (see /docs)                  /model gemini-pro Limit reached"`;
+exports[`<Footer /> > displays "Limit reached" message when remaining is 0 1`] = `
+" ...directories/to/make/it/long                 no sandbox (see /docs)                  /model gemini-pro Limit reached
+"
+`;
 
-exports[`<Footer /> > displays the usage indicator when usage is low 1`] = `" ...directories/to/make/it/long                      no sandbox (see /docs)                       /model gemini-pro 15%"`;
+exports[`<Footer /> > displays the usage indicator when usage is low 1`] = `
+" ...directories/to/make/it/long                      no sandbox (see /docs)                       /model gemini-pro 15%
+"
+`;
 
-exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders complete footer in narrow terminal (baseline narrow) > complete-footer-narrow 1`] = `" ...s/to/make/it/long            no sandbox             /model gemini-pro 100%"`;
+exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders complete footer in narrow terminal (baseline narrow) > complete-footer-narrow 1`] = `
+" ...s/to/make/it/long            no sandbox             /model gemini-pro 100%
+"
+`;
 
-exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders complete footer with all sections visible (baseline) > complete-footer-wide 1`] = `" ...directories/to/make/it/long               no sandbox (see /docs)                /model gemini-pro 100% context left"`;
+exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders complete footer with all sections visible (baseline) > complete-footer-wide 1`] = `
+" ...directories/to/make/it/long               no sandbox (see /docs)                /model gemini-pro 100% context left
+"
+`;
 
-exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders footer with CWD and model info hidden to test alignment (only sandbox visible) > footer-only-sandbox 1`] = `"                                                 no sandbox (see /docs)"`;
+exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders footer with CWD and model info hidden to test alignment (only sandbox visible) > footer-only-sandbox 1`] = `
+"                                                 no sandbox (see /docs)
+"
+`;
 
 exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders footer with all optional sections hidden (minimal footer) > footer-minimal 1`] = `""`;
 
-exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders footer with only model info hidden (partial filtering) > footer-no-model 1`] = `" ...directories/to/make/it/long                                 no sandbox (see /docs)"`;
+exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders footer with only model info hidden (partial filtering) > footer-no-model 1`] = `
+" ...directories/to/make/it/long                                 no sandbox (see /docs)
+"
+`;
 
-exports[`<Footer /> > hides the usage indicator when usage is not near limit 1`] = `" ...directories/to/make/it/long                        no sandbox (see /docs)                        /model gemini-pro"`;
+exports[`<Footer /> > hides the usage indicator when usage is not near limit 1`] = `
+" ...directories/to/make/it/long                        no sandbox (see /docs)                        /model gemini-pro
+"
+`;

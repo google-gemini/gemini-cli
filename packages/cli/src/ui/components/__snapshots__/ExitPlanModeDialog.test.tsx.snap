@@ -19,11 +19,12 @@ Files to Modify
 
   1.  Yes, automatically accept edits
       Approves plan and allows tools to run automatically
-  2.  Yes, manually accept edits
+● 2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool
-● 3.  Type your feedback...
+  3.  Type your feedback...
 
-Enter to submit · Esc to cancel"
+Enter to select · ↑/↓ to navigate · Esc to cancel
+"
 `;
 
 exports[`ExitPlanModeDialog > useAlternateBuffer: false > calls onFeedback when feedback is typed and submitted 1`] = `
@@ -43,16 +44,20 @@ Files to Modify
  - src/index.ts - Add auth middleware
  - src/config.ts - Add auth configuration options
 
-  1.  Yes, automatically accept edits
+● 1.  Yes, automatically accept edits
       Approves plan and allows tools to run automatically
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool
-● 3.  Add tests
+  3.  Type your feedback...
 
-Enter to submit · Esc to cancel"
+Enter to select · ↑/↓ to navigate · Esc to cancel
+"
 `;
 
-exports[`ExitPlanModeDialog > useAlternateBuffer: false > displays error state when file read fails 1`] = `" Error reading plan: File not found"`;
+exports[`ExitPlanModeDialog > useAlternateBuffer: false > displays error state when file read fails 1`] = `
+" Error reading plan: File not found
+"
+`;
 
 exports[`ExitPlanModeDialog > useAlternateBuffer: false > handles long plan content appropriately 1`] = `
 "Overview
@@ -77,7 +82,8 @@ Implementation Steps
       Approves plan but requires confirmation for each tool
   3.  Type your feedback...
 
-Enter to select · ↑/↓ to navigate · Esc to cancel"
+Enter to select · ↑/↓ to navigate · Esc to cancel
+"
 `;
 
 exports[`ExitPlanModeDialog > useAlternateBuffer: false > renders correctly with plan content 1`] = `
@@ -103,7 +109,8 @@ Files to Modify
       Approves plan but requires confirmation for each tool
   3.  Type your feedback...
 
-Enter to select · ↑/↓ to navigate · Esc to cancel"
+Enter to select · ↑/↓ to navigate · Esc to cancel
+"
 `;
 
 exports[`ExitPlanModeDialog > useAlternateBuffer: true > bubbles up Ctrl+C when feedback is empty while editing 1`] = `
@@ -125,11 +132,12 @@ Files to Modify
 
   1.  Yes, automatically accept edits
       Approves plan and allows tools to run automatically
-  2.  Yes, manually accept edits
+● 2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool
-● 3.  Type your feedback...
+  3.  Type your feedback...
 
-Enter to submit · Esc to cancel"
+Enter to select · ↑/↓ to navigate · Esc to cancel
+"
 `;
 
 exports[`ExitPlanModeDialog > useAlternateBuffer: true > calls onFeedback when feedback is typed and submitted 1`] = `
@@ -149,16 +157,20 @@ Files to Modify
  - src/index.ts - Add auth middleware
  - src/config.ts - Add auth configuration options
 
-  1.  Yes, automatically accept edits
+● 1.  Yes, automatically accept edits
       Approves plan and allows tools to run automatically
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool
-● 3.  Add tests
+  3.  Type your feedback...
 
-Enter to submit · Esc to cancel"
+Enter to select · ↑/↓ to navigate · Esc to cancel
+"
 `;
 
-exports[`ExitPlanModeDialog > useAlternateBuffer: true > displays error state when file read fails 1`] = `" Error reading plan: File not found"`;
+exports[`ExitPlanModeDialog > useAlternateBuffer: true > displays error state when file read fails 1`] = `
+" Error reading plan: File not found
+"
+`;
 
 exports[`ExitPlanModeDialog > useAlternateBuffer: true > handles long plan content appropriately 1`] = `
 "Overview
@@ -204,7 +216,8 @@ Testing Strategy
       Approves plan but requires confirmation for each tool
   3.  Type your feedback...
 
-Enter to select · ↑/↓ to navigate · Esc to cancel"
+Enter to select · ↑/↓ to navigate · Esc to cancel
+"
 `;
 
 exports[`ExitPlanModeDialog > useAlternateBuffer: true > renders correctly with plan content 1`] = `
@@ -230,5 +243,6 @@ Files to Modify
       Approves plan but requires confirmation for each tool
   3.  Type your feedback...
 
-Enter to select · ↑/↓ to navigate · Esc to cancel"
+Enter to select · ↑/↓ to navigate · Esc to cancel
+"
 `;

@@ -16,7 +16,8 @@ exports[`ToolConfirmationQueue > calculates availableContentHeight based on avai
 │   4. No, suggest changes (esc)                                               │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
- Press ctrl-o to show more lines"
+ Press ctrl-o to show more lines
+"
 `;
 
 exports[`ToolConfirmationQueue > does not render expansion hint when constrainHeight is false 1`] = `
@@ -37,7 +38,8 @@ exports[`ToolConfirmationQueue > does not render expansion hint when constrainHe
 │   3. Modify with external editor                                             │
 │   4. No, suggest changes (esc)                                               │
 │                                                                              │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`ToolConfirmationQueue > renders AskUser tool confirmation with Success color 1`] = `
@@ -48,7 +50,8 @@ exports[`ToolConfirmationQueue > renders AskUser tool confirmation with Success 
 │                                                                              │
 │                                                                              │
 │ Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel              │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`ToolConfirmationQueue > renders ExitPlanMode tool confirmation with Success color 1`] = `
@@ -64,7 +67,8 @@ exports[`ToolConfirmationQueue > renders ExitPlanMode tool confirmation with Suc
 │   3.  Type your feedback...                                                  │
 │                                                                              │
 │ Enter to select · ↑/↓ to navigate · Esc to cancel                            │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`ToolConfirmationQueue > renders expansion hint when content is long and constrained 1`] = `
@@ -84,19 +88,6 @@ exports[`ToolConfirmationQueue > renders expansion hint when content is long and
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
  Press ctrl-o to show more lines
-
-
-
-
-
-
-
-
-
-
-
-
-
 "
 `;
 
@@ -113,5 +104,6 @@ exports[`ToolConfirmationQueue > renders the confirming tool with progress indic
 │   2. Allow for this session                                                  │
 │   3. No, suggest changes (esc)                                               │
 │                                                                              │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;

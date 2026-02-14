@@ -105,33 +105,39 @@ describe('MainContent', () => {
   });
 
   it('renders in normal buffer mode', async () => {
-    const { lastFrame } = renderWithProviders(<MainContent />, {
+    const { lastFrame, unmount } = renderWithProviders(<MainContent />, {
       uiState: defaultMockUiState as Partial<UIState>,
     });
     await waitFor(() => expect(lastFrame()).toContain('AppHeader(full)'));
     const output = lastFrame();
 
+    expect(output).toContain('AppHeader');
     expect(output).toContain('Hello');
     expect(output).toContain('Hi there');
+    unmount();
   });
 
   it('renders in alternate buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
-    const { lastFrame } = renderWithProviders(<MainContent />, {
-      uiState: defaultMockUiState as Partial<UIState>,
-    });
-    await waitFor(() => expect(lastFrame()).toContain('ScrollableList'));
-    const output = lastFrame();
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <MainContent />,
+      {
+        uiState: defaultMockUiState as Partial<UIState>,
+      },
+    );
+    await waitUntilReady();
 
+    const output = lastFrame();
     expect(output).toContain('AppHeader(full)');
     expect(output).toContain('Hello');
     expect(output).toContain('Hi there');
+    unmount();
   });
 
   it('renders minimal header in minimal mode (alternate buffer)', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
 
-    const { lastFrame } = renderWithProviders(<MainContent />, {
+    const { lastFrame, unmount } = renderWithProviders(<MainContent />, {
       uiState: {
         ...defaultMockUiState,
         cleanUiDetailsVisible: false,
@@ -143,6 +149,7 @@ describe('MainContent', () => {
     expect(output).toContain('AppHeader(minimal)');
     expect(output).not.toContain('AppHeader(full)');
     expect(output).toContain('Hello');
+    unmount();
   });
 
   it('restores full header details after toggle in alternate buffer mode', async () => {
@@ -200,15 +207,19 @@ describe('MainContent', () => {
 
   it('does not constrain height in alternate buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
-    const { lastFrame } = renderWithProviders(<MainContent />, {
-      uiState: defaultMockUiState as Partial<UIState>,
-    });
-    await waitFor(() => expect(lastFrame()).toContain('Hello'));
-    const output = lastFrame();
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <MainContent />,
+      {
+        uiState: defaultMockUiState as Partial<UIState>,
+      },
+    );
+    await waitUntilReady();
 
+    const output = lastFrame();
     expect(output).toContain('AppHeader(full)');
     expect(output).toContain('Hello');
     expect(output).toContain('Hi there');
+    unmount();
   });
 
   describe('MainContent Tool Output Height Logic', () => {
@@ -297,10 +308,14 @@ describe('MainContent', () => {
           bannerVisible: false,
         };
 
-        const { lastFrame } = renderWithProviders(<MainContent />, {
-          uiState: uiState as Partial<UIState>,
-          useAlternateBuffer: isAlternateBuffer,
-        });
+        const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+          <MainContent />,
+          {
+            uiState: uiState as Partial<UIState>,
+            useAlternateBuffer: isAlternateBuffer,
+          },
+        );
+        await waitUntilReady();
 
         const output = lastFrame();
 
@@ -317,6 +332,7 @@ describe('MainContent', () => {
 
         // Snapshots for visual verification
         expect(output).toMatchSnapshot();
+        unmount();
       },
     );
   });

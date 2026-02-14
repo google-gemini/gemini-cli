@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render as inkRender } from 'ink-testing-library';
+import { render as inkRenderDirect, type Instance as InkInstance } from 'ink';
+import { EventEmitter } from 'node:events';
 import { Box } from 'ink';
 import type React from 'react';
+import { Terminal } from '@xterm/headless';
 import { vi } from 'vitest';
 import { act, useState } from 'react';
 import os from 'node:os';
@@ -49,51 +51,249 @@ vi.mock('../ui/utils/terminalUtils.js', () => ({
   isITerm2: vi.fn(() => false),
 }));
 
-// Wrapper around ink-testing-library's render that ensures act() is called
+type TerminalState = {
+  terminal: Terminal;
+  cols: number;
+  rows: number;
+};
+
+class XtermStdout extends EventEmitter {
+  private state: TerminalState;
+  private pendingWrites = 0;
+  private queue: { promise: Promise<void> };
+  isTTY = true;
+
+  constructor(state: TerminalState, queue: { promise: Promise<void> }) {
+    super();
+    this.state = state;
+    this.queue = queue;
+  }
+
+  get columns() {
+    return this.state.terminal.cols;
+  }
+
+  get rows() {
+    return this.state.terminal.rows;
+  }
+
+  get frames(): string[] {
+    return [];
+  }
+
+  write = (data: string) => {
+    this.pendingWrites++;
+    this.queue.promise = this.queue.promise.then(async () => {
+      await new Promise<void>((resolve) =>
+        this.state.terminal.write(data, resolve),
+      );
+      this.pendingWrites--;
+    });
+  };
+
+  clear = () => {
+    this.state.terminal.reset();
+  };
+
+  dispose = () => {
+    this.state.terminal.dispose();
+  };
+
+  lastFrame = (options: { allowEmpty?: boolean } = {}) => {
+    const buffer = this.state.terminal.buffer.active;
+    const allLines: string[] = [];
+    for (let i = 0; i < buffer.length; i++) {
+      allLines.push(buffer.getLine(i)?.translateToString(true) ?? '');
+    }
+
+    const trimmed = [...allLines];
+    while (trimmed.length > 0 && trimmed[trimmed.length - 1] === '') {
+      trimmed.pop();
+    }
+    const result = trimmed.join('\n');
+    if (result === '' && !options.allowEmpty) {
+      throw new Error(
+        'lastFrame() returned an empty string. If this is intentional, use lastFrame({ allowEmpty: true }). ' +
+          'Otherwise, ensure you are calling await waitUntilReady() and that the component is rendering correctly.',
+      );
+    }
+    return result === '' ? result : result + '\n';
+  };
+
+  async waitUntilReady() {
+    if (!vi.isFakeTimers()) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    await act(async () => {
+      if (vi.isFakeTimers()) {
+        await vi.advanceTimersByTimeAsync(50);
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    });
+    while (this.pendingWrites > 0) {
+      await act(async () => {
+        if (vi.isFakeTimers()) {
+          await vi.advanceTimersByTimeAsync(10);
+        } else {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+      });
+    }
+  }
+}
+
+class XtermStderr extends EventEmitter {
+  private state: TerminalState;
+  private pendingWrites = 0;
+  private queue: { promise: Promise<void> };
+  isTTY = true;
+
+  constructor(state: TerminalState, queue: { promise: Promise<void> }) {
+    super();
+    this.state = state;
+    this.queue = queue;
+  }
+
+  write = (data: string) => {
+    this.pendingWrites++;
+    this.queue.promise = this.queue.promise.then(async () => {
+      await new Promise<void>((resolve) =>
+        this.state.terminal.write(data, resolve),
+      );
+      this.pendingWrites--;
+    });
+  };
+
+  dispose = () => {
+    this.state.terminal.dispose();
+  };
+
+  lastFrame = () => '';
+}
+
+class XtermStdin extends EventEmitter {
+  isTTY = true;
+  data: string | null = null;
+  constructor(options: { isTTY?: boolean } = {}) {
+    super();
+    this.isTTY = options.isTTY ?? true;
+  }
+
+  write = (data: string) => {
+    this.data = data;
+    this.emit('readable');
+    this.emit('data', data);
+  };
+
+  setEncoding() {}
+  setRawMode() {}
+  resume() {}
+  pause() {}
+  ref() {}
+  unref() {}
+
+  read = () => {
+    const { data } = this;
+    this.data = null;
+    return data;
+  };
+}
+
+export type RenderInstance = {
+  rerender: (tree: React.ReactElement) => void;
+  unmount: () => void;
+  cleanup: () => void;
+  stdout: XtermStdout;
+  stderr: XtermStderr;
+  stdin: XtermStdin;
+  frames: string[];
+  lastFrame: (options?: { allowEmpty?: boolean }) => string;
+  terminal: Terminal;
+  waitUntilReady: () => Promise<void>;
+};
+
+const instances: InkInstance[] = [];
+
+// Wrapper around ink's render that ensures act() is called and uses Xterm for output
 export const render = (
   tree: React.ReactElement,
   terminalWidth?: number,
-): ReturnType<typeof inkRender> => {
-  let renderResult: ReturnType<typeof inkRender> =
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    undefined as unknown as ReturnType<typeof inkRender>;
-  act(() => {
-    renderResult = inkRender(tree);
+): RenderInstance => {
+  const cols = terminalWidth ?? 100;
+  const rows = 40;
+  const terminal = new Terminal({
+    cols,
+    rows,
+    allowProposedApi: true,
+    convertEol: true,
   });
 
-  if (terminalWidth !== undefined && renderResult?.stdout) {
-    // Override the columns getter on the stdout instance provided by ink-testing-library
-    Object.defineProperty(renderResult.stdout, 'columns', {
-      get: () => terminalWidth,
-      configurable: true,
-    });
+  const state: TerminalState = {
+    terminal,
+    cols,
+    rows,
+  };
+  const writeQueue = { promise: Promise.resolve() };
+  const stdout = new XtermStdout(state, writeQueue);
+  const stderr = new XtermStderr(state, writeQueue);
+  const stdin = new XtermStdin();
 
-    // Trigger a rerender so Ink can pick up the new terminal width
-    act(() => {
-      renderResult.rerender(tree);
+  let instance!: InkInstance;
+  stdout.clear();
+  act(() => {
+    instance = inkRenderDirect(tree, {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      stderr: stderr as unknown as NodeJS.WriteStream,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      stdin: stdin as unknown as NodeJS.ReadStream,
+      debug: false,
+      exitOnCtrlC: false,
+      patchConsole: false,
     });
-  }
+  });
 
-  const originalUnmount = renderResult.unmount;
-  const originalRerender = renderResult.rerender;
+  instances.push(instance);
 
   return {
-    ...renderResult,
-    unmount: () => {
-      act(() => {
-        originalUnmount();
-      });
-    },
     rerender: (newTree: React.ReactElement) => {
       act(() => {
-        originalRerender(newTree);
+        stdout.clear();
+        instance.rerender(newTree);
       });
     },
+    unmount: () => {
+      act(() => {
+        instance.unmount();
+      });
+      stdout.dispose();
+      stderr.dispose();
+    },
+    cleanup: instance.cleanup,
+    stdout,
+    stderr,
+    stdin,
+    frames: stdout.frames,
+    lastFrame: stdout.lastFrame,
+    terminal: state.terminal,
+    waitUntilReady: () => stdout.waitUntilReady(),
   };
 };
 
+export const cleanup = () => {
+  for (const instance of instances) {
+    act(() => {
+      instance.unmount();
+    });
+    instance.cleanup();
+  }
+  instances.length = 0;
+};
+
 export const simulateClick = async (
-  stdin: ReturnType<typeof inkRender>['stdin'],
+  stdin: XtermStdin,
   col: number,
   row: number,
   button: 0 | 1 | 2 = 0, // 0 for left, 1 for middle, 2 for right
@@ -150,7 +350,7 @@ export const mockSettings = new LoadedSettings(
 const baseMockUiState = {
   renderMarkdown: true,
   streamingState: StreamingState.Idle,
-  terminalWidth: 120,
+  terminalWidth: 100,
   terminalHeight: 40,
   currentModel: 'gemini-pro',
   terminalBackgroundColor: 'black',
@@ -250,7 +450,13 @@ export const renderWithProviders = (
     };
     appState?: AppState;
   } = {},
-): ReturnType<typeof render> & { simulateClick: typeof simulateClick } => {
+): RenderInstance & {
+  simulateClick: (
+    col: number,
+    row: number,
+    button?: 0 | 1 | 2,
+  ) => Promise<void>;
+} => {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const baseState: UIState = new Proxy(
     { ...baseMockUiState, ...providedUiState },
@@ -365,7 +571,11 @@ export const renderWithProviders = (
     terminalWidth,
   );
 
-  return { ...renderResult, simulateClick };
+  return {
+    ...renderResult,
+    simulateClick: (col: number, row: number, button?: 0 | 1 | 2) =>
+      simulateClick(renderResult.stdin, col, row, button),
+  };
 };
 
 export function renderHook<Result, Props>(
@@ -378,6 +588,7 @@ export function renderHook<Result, Props>(
   result: { current: Result };
   rerender: (props?: Props) => void;
   unmount: () => void;
+  waitUntilReady: () => Promise<void>;
 } {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const result = { current: undefined as unknown as Result };
@@ -399,6 +610,7 @@ export function renderHook<Result, Props>(
 
   let inkRerender: (tree: React.ReactElement) => void = () => {};
   let unmount: () => void = () => {};
+  let waitUntilReady: () => Promise<void> = async () => {};
 
   act(() => {
     const renderResult = render(
@@ -408,6 +620,7 @@ export function renderHook<Result, Props>(
     );
     inkRerender = renderResult.rerender;
     unmount = renderResult.unmount;
+    waitUntilReady = renderResult.waitUntilReady;
   });
 
   function rerender(props?: Props) {
@@ -424,7 +637,7 @@ export function renderHook<Result, Props>(
     });
   }
 
-  return { result, rerender, unmount };
+  return { result, rerender, unmount, waitUntilReady };
 }
 
 export function renderHookWithProviders<Result, Props>(
@@ -445,6 +658,7 @@ export function renderHookWithProviders<Result, Props>(
   result: { current: Result };
   rerender: (props?: Props) => void;
   unmount: () => void;
+  waitUntilReady: () => Promise<void>;
 } {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const result = { current: undefined as unknown as Result };
@@ -494,5 +708,6 @@ export function renderHookWithProviders<Result, Props>(
         renderResult.unmount();
       });
     },
+    waitUntilReady: () => renderResult.waitUntilReady(),
   };
 }
