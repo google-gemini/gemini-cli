@@ -96,3 +96,9 @@ export { OAuthUtils } from './mcp/oauth-utils.js';
 export * from './telemetry/index.js';
 export { sessionId } from './utils/session.js';
 export * from './utils/browser.js';
+
+// --- TAS Alpha Engine Exports ---
+export * from './alpha/loop.js';
+export * from './ethics/axiom.js';
+export * from './ethics/auditor.js';
+// Note: telemetry/tracer.ts is internal or can be exported if needed
