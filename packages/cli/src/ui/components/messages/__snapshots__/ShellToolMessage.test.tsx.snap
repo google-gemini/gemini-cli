@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`<ShellToolMessage /> > Height Constraints > defaults to ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is undefined 1`] = `
+exports[`<ShellToolMessage /> > Height Constraints > defaults to ACTIVE_SHELL_MAX_LINES in alternate buffer when availableTerminalHeight is undefined 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ⊷  Shell Command A shell command                                             │
 │                                                                              │

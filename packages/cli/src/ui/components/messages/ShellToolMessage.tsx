@@ -67,6 +67,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   borderDimColor,
 }) => {
   const isAlternateBuffer = useAlternateBuffer();
+
   const isThisShellFocused = checkIsShellFocused(
     name,
     status,
@@ -193,17 +194,17 @@ function getShellMaxLines(
   isAlternateBuffer: boolean,
   isThisShellFocused: boolean,
   availableTerminalHeight: number | undefined,
-): number {
+): number | undefined {
+  if (availableTerminalHeight === undefined) {
+    return isAlternateBuffer ? ACTIVE_SHELL_MAX_LINES : undefined;
+  }
+
   if (
     status === CoreToolCallStatus.Success ||
     status === CoreToolCallStatus.Error ||
     status === CoreToolCallStatus.Cancelled
   ) {
     return COMPLETED_SHELL_MAX_LINES;
-  }
-
-  if (availableTerminalHeight === undefined) {
-    return ACTIVE_SHELL_MAX_LINES;
   }
 
   const maxLinesBasedOnHeight = Math.max(1, availableTerminalHeight - 2);

@@ -81,7 +81,8 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     [],
   );
 
-  const truncatedResultDisplay = React.useMemo(() => {
+  const { truncatedResultDisplay, hiddenLinesCount } = React.useMemo(() => {
+    let hiddenLines = 0;
     // Only truncate string output if not in alternate buffer mode to ensure
     // we can scroll through the full output.
     if (typeof resultDisplay === 'string' && !isAlternateBuffer) {
@@ -94,14 +95,25 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         const contentText = hasTrailingNewline ? text.slice(0, -1) : text;
         const lines = contentText.split('\n');
         if (lines.length > maxLines) {
+          hiddenLines = lines.length - maxLines;
           text =
             lines.slice(-maxLines).join('\n') +
             (hasTrailingNewline ? '\n' : '');
         }
       }
-      return text;
+      return { truncatedResultDisplay: text, hiddenLinesCount: hiddenLines };
     }
-    return resultDisplay;
+
+    if (Array.isArray(resultDisplay) && !isAlternateBuffer && maxLines) {
+      if (resultDisplay.length > maxLines) {
+        return {
+          truncatedResultDisplay: resultDisplay.slice(-maxLines),
+          hiddenLinesCount: resultDisplay.length - maxLines,
+        };
+      }
+    }
+
+    return { truncatedResultDisplay: resultDisplay, hiddenLinesCount: 0 };
   }, [resultDisplay, isAlternateBuffer, maxLines]);
 
   if (!truncatedResultDisplay) return null;
@@ -229,7 +241,11 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
 
   return (
     <Box width={childWidth} flexDirection="column">
-      <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
+      <MaxSizedBox
+        maxHeight={availableHeight}
+        maxWidth={childWidth}
+        additionalHiddenLinesCount={hiddenLinesCount}
+      >
         {content}
       </MaxSizedBox>
     </Box>

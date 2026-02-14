@@ -20,6 +20,11 @@ import {
 } from '@google/gemini-cli-core';
 import { ShowMoreLines } from '../ShowMoreLines.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
+import { OverflowProvider } from '../../contexts/OverflowContext.js';
+import {
+  ACTIVE_SHELL_MAX_LINES,
+  COMPLETED_SHELL_MAX_LINES,
+} from '../../constants.js';
 
 interface ToolGroupMessageProps {
   groupId: number;
@@ -31,6 +36,7 @@ interface ToolGroupMessageProps {
   onShellInputSubmit?: (input: string) => void;
   borderTop?: boolean;
   borderBottom?: boolean;
+  isExpandable?: boolean;
 }
 
 // Main component renders the border and maps the tools using ToolMessage
@@ -44,6 +50,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   embeddedShellFocused,
   borderTop: borderTopOverride,
   borderBottom: borderBottomOverride,
+  isExpandable,
 }) => {
   // Filter out tool calls that should be hidden (e.g. in-progress Ask User, or Plan Mode operations).
   const toolCalls = useMemo(
@@ -107,14 +114,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
 
-  // If all tools are filtered out (e.g., in-progress AskUser tools, confirming tools),
-  // only render if we need to close a border from previous
-  // tool groups. borderBottomOverride=true means we must render the closing border;
-  // undefined or false means there's nothing to display.
-  if (visibleToolCalls.length === 0 && borderBottomOverride !== true) {
-    return null;
-  }
-
   let countToolCallsWithResults = 0;
   for (const tool of visibleToolCalls) {
     if (tool.resultDisplay !== undefined && tool.resultDisplay !== '') {
@@ -135,100 +134,164 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   const contentWidth = terminalWidth - TOOL_MESSAGE_HORIZONTAL_MARGIN;
 
+  const hasOverflow = useMemo(() => {
+    if (!availableTerminalHeightPerToolMessage) return false;
+    return visibleToolCalls.some((tool) => {
+      if (typeof tool.resultDisplay === 'string') {
+        const text = tool.resultDisplay;
+        const hasTrailingNewline = text.endsWith('\n');
+        const contentText = hasTrailingNewline ? text.slice(0, -1) : text;
+        const lineCount = contentText.split('\n').length;
+
+        const focused = isThisShellFocused(
+          tool.name,
+          tool.status,
+          tool.ptyId,
+          activeShellPtyId,
+          embeddedShellFocused,
+        );
+
+        const limit = focused
+          ? ACTIVE_SHELL_MAX_LINES
+          : COMPLETED_SHELL_MAX_LINES;
+        const maxLines = Math.min(availableTerminalHeightPerToolMessage, limit);
+
+        return lineCount > maxLines;
+      }
+      if (Array.isArray(tool.resultDisplay)) {
+        const focused = isThisShellFocused(
+          tool.name,
+          tool.status,
+          tool.ptyId,
+          activeShellPtyId,
+          embeddedShellFocused,
+        );
+        const limit = focused
+          ? ACTIVE_SHELL_MAX_LINES
+          : COMPLETED_SHELL_MAX_LINES;
+        const maxLines = Math.min(availableTerminalHeightPerToolMessage, limit);
+
+        return tool.resultDisplay.length > maxLines;
+      }
+      return false;
+    });
+  }, [
+    visibleToolCalls,
+    availableTerminalHeightPerToolMessage,
+    activeShellPtyId,
+    embeddedShellFocused,
+  ]);
+
+  // If all tools are filtered out (e.g., in-progress AskUser tools, confirming tools),
+  // only render if we need to close a border from previous
+  // tool groups. borderBottomOverride=true means we must render the closing border;
+  // undefined or false means there's nothing to display.
+  if (visibleToolCalls.length === 0 && borderBottomOverride !== true) {
+    return null;
+  }
+
   return (
-    // This box doesn't have a border even though it conceptually does because
-    // we need to allow the sticky headers to render the borders themselves so
-    // that the top border can be sticky.
-    <Box
-      flexDirection="column"
-      /*
+    <OverflowProvider>
+      {/* This box doesn't have a border even though it conceptually does because
+        we need to allow the sticky headers to render the borders themselves so
+        that the top border can be sticky.
+      */}
+      <Box
+        flexDirection="column"
+        /*
         This width constraint is highly important and protects us from an Ink rendering bug.
         Since the ToolGroup can typically change rendering states frequently, it can cause
         Ink to render the border of the box incorrectly and span multiple lines and even
         cause tearing.
       */
-      width={terminalWidth}
-      paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
-    >
-      {visibleToolCalls.map((tool, index) => {
-        const isFirst = index === 0;
-        const isShellToolCall = isShellTool(tool.name);
+        width={terminalWidth}
+        paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
+      >
+        {visibleToolCalls.map((tool, index) => {
+          const isFirst = index === 0;
+          const isShellToolCall = isShellTool(tool.name);
 
-        const commonProps = {
-          ...tool,
-          availableTerminalHeight: availableTerminalHeightPerToolMessage,
-          terminalWidth: contentWidth,
-          emphasis: 'medium' as const,
-          isFirst:
-            borderTopOverride !== undefined
-              ? borderTopOverride && isFirst
-              : isFirst,
-          borderColor,
-          borderDimColor,
-        };
+          const commonProps = {
+            ...tool,
+            availableTerminalHeight: availableTerminalHeightPerToolMessage,
+            terminalWidth: contentWidth,
+            emphasis: 'medium' as const,
+            isFirst:
+              borderTopOverride !== undefined
+                ? borderTopOverride && isFirst
+                : isFirst,
+            borderColor,
+            borderDimColor,
+            isExpandable,
+          };
 
-        return (
-          <Box
-            key={tool.callId}
-            flexDirection="column"
-            minHeight={1}
-            width={contentWidth}
-          >
-            {isShellToolCall ? (
-              <ShellToolMessage
-                {...commonProps}
-                activeShellPtyId={activeShellPtyId}
-                embeddedShellFocused={embeddedShellFocused}
-                config={config}
-              />
-            ) : (
-              <ToolMessage {...commonProps} />
-            )}
+          return (
             <Box
-              borderLeft={true}
-              borderRight={true}
-              borderTop={false}
-              borderBottom={false}
-              borderColor={borderColor}
-              borderDimColor={borderDimColor}
+              key={tool.callId}
               flexDirection="column"
-              borderStyle="round"
-              paddingLeft={1}
-              paddingRight={1}
+              minHeight={1}
+              width={contentWidth}
             >
-              {tool.outputFile && (
-                <Box>
-                  <Text color={theme.text.primary}>
-                    Output too long and was saved to: {tool.outputFile}
-                  </Text>
-                </Box>
+              {isShellToolCall ? (
+                <ShellToolMessage
+                  {...commonProps}
+                  activeShellPtyId={activeShellPtyId}
+                  embeddedShellFocused={embeddedShellFocused}
+                  config={config}
+                />
+              ) : (
+                <ToolMessage {...commonProps} />
               )}
+              <Box
+                borderLeft={true}
+                borderRight={true}
+                borderTop={false}
+                borderBottom={false}
+                borderColor={borderColor}
+                borderDimColor={borderDimColor}
+                flexDirection="column"
+                borderStyle="round"
+                paddingLeft={1}
+                paddingRight={1}
+              >
+                {tool.outputFile && (
+                  <Box>
+                    <Text color={theme.text.primary}>
+                      Output too long and was saved to: {tool.outputFile}
+                    </Text>
+                  </Box>
+                )}
+              </Box>
             </Box>
-          </Box>
-        );
-      })}
-      {
-        /*
+          );
+        })}
+        {
+          /*
               We have to keep the bottom border separate so it doesn't get
               drawn over by the sticky header directly inside it.
              */
-        (visibleToolCalls.length > 0 || borderBottomOverride !== undefined) && (
-          <Box
-            height={0}
-            width={contentWidth}
-            borderLeft={true}
-            borderRight={true}
-            borderTop={false}
-            borderBottom={borderBottomOverride ?? true}
-            borderColor={borderColor}
-            borderDimColor={borderDimColor}
-            borderStyle="round"
+          (visibleToolCalls.length > 0 ||
+            borderBottomOverride !== undefined) && (
+            <Box
+              height={0}
+              width={contentWidth}
+              borderLeft={true}
+              borderRight={true}
+              borderTop={false}
+              borderBottom={borderBottomOverride ?? true}
+              borderColor={borderColor}
+              borderDimColor={borderDimColor}
+              borderStyle="round"
+            />
+          )
+        }
+        {(borderBottomOverride ?? true) && visibleToolCalls.length > 0 && (
+          <ShowMoreLines
+            constrainHeight={constrainHeight && !!isExpandable}
+            isOverflowing={hasOverflow}
           />
-        )
-      }
-      {(borderBottomOverride ?? true) && visibleToolCalls.length > 0 && (
-        <ShowMoreLines constrainHeight={constrainHeight} />
-      )}
-    </Box>
+        )}
+      </Box>
+    </OverflowProvider>
   );
 };
