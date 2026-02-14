@@ -228,14 +228,18 @@ modes = ["autoEdit"]
 `,
       );
 
-      const getPolicyTier = (_dir: string) => 2; // Tier 2
-      const result = await loadPoliciesFromToml([tempDir], getPolicyTier);
+      const getPolicyTier2 = (_dir: string) => 2; // Tier 2
+      const result2 = await loadPoliciesFromToml([tempDir], getPolicyTier2);
 
-      expect(result.rules).toHaveLength(1);
-      expect(result.rules[0].toolName).toBe('tier2-tool');
-      expect(result.rules[0].modes).toEqual(['autoEdit']);
-      expect(result.rules[0].source).toBe('User: tier2.toml');
-      expect(result.errors).toHaveLength(0);
+      expect(result2.rules).toHaveLength(1);
+      expect(result2.rules[0].toolName).toBe('tier2-tool');
+      expect(result2.rules[0].modes).toEqual(['autoEdit']);
+      expect(result2.rules[0].source).toBe('Project: tier2.toml');
+
+      const getPolicyTier3 = (_dir: string) => 3; // Tier 3
+      const result3 = await loadPoliciesFromToml([tempDir], getPolicyTier3);
+      expect(result3.rules[0].source).toBe('User: tier2.toml');
+      expect(result3.errors).toHaveLength(0);
     });
 
     it('should handle TOML parse errors', async () => {

@@ -27,6 +27,7 @@ import type {
   FallbackIntent,
   ValidationIntent,
   AgentDefinition,
+  PolicyUpdateConfirmationRequest,
 } from '@google/gemini-cli-core';
 import { type TransientMessageType } from '../../utils/events.js';
 import type { DOMElement } from 'ink';
@@ -112,6 +113,9 @@ export interface UIState {
   isResuming: boolean;
   shouldShowIdePrompt: boolean;
   isFolderTrustDialogOpen: boolean;
+  isPolicyUpdateDialogOpen: boolean;
+  policyUpdateConfirmationRequest: PolicyUpdateConfirmationRequest | undefined;
+  isRestartingPolicyUpdate: boolean;
   isTrustedFolder: boolean | undefined;
   constrainHeight: boolean;
   showErrorDetails: boolean;

@@ -93,6 +93,10 @@ export class Storage {
     );
   }
 
+  static getPolicyIntegrityStoragePath(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'policy_integrity.json');
+  }
+
   private static getSystemConfigDir(): string {
     if (os.platform() === 'darwin') {
       return '/Library/Application Support/GeminiCli';
@@ -134,6 +138,10 @@ export class Storage {
     const identifier = this.getProjectIdentifier();
     const tempDir = Storage.getGlobalTempDir();
     return path.join(tempDir, identifier);
+  }
+
+  getProjectPoliciesDir(): string {
+    return path.join(this.getGeminiDir(), 'policies');
   }
 
   ensureProjectTempDirExists(): void {
