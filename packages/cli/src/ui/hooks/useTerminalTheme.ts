@@ -13,6 +13,7 @@ import {
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
 import { DefaultLight } from '../themes/default-light.js';
 import { useSettings } from '../contexts/SettingsContext.js';
+import { isAlternateBufferEnabled } from './useAlternateBuffer.js';
 import type { Config } from '@google/gemini-cli-core';
 import { useTerminalContext } from '../contexts/TerminalContext.js';
 import { SettingScope } from '../../config/settings.js';
@@ -96,6 +97,7 @@ export function useTerminalTheme(
       unsubscribe(handleTerminalBackground);
     };
   }, [
+    settings,
     settings.merged.ui.theme,
     settings.merged.ui.autoThemeSwitching,
     settings.merged.ui.terminalBackgroundPollingInterval,
