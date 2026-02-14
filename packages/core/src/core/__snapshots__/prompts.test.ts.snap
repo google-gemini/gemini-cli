@@ -520,8 +520,10 @@ exports[`Core System Prompt (prompts.ts) > should append userMemory with separat
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
 
 ## Context Efficiency:
-- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results using total_max_matches and max_matches_per_file, especially during the research phase.
+- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results by explicitly setting \`total_max_matches\` or \`max_matches_per_file\`, especially during the research phase.
 - For broad discovery, use names_only=true or max_matches_per_file=1 to identify files without retrieving their context.
+- Limit unnecessary context consumption from file reads by using grep_search (configured with \`max_matches_per_file\`) to search large files (> 1kb) or read_file with the desired offset and limit.
+- If the file is small, prefer reading the whole thing over "scrolling" through it by reading ranges repeatedly.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -650,8 +652,10 @@ exports[`Core System Prompt (prompts.ts) > should handle CodebaseInvestigator wi
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
 
 ## Context Efficiency:
-- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results using total_max_matches and max_matches_per_file, especially during the research phase.
+- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results by explicitly setting \`total_max_matches\` or \`max_matches_per_file\`, especially during the research phase.
 - For broad discovery, use names_only=true or max_matches_per_file=1 to identify files without retrieving their context.
+- Limit unnecessary context consumption from file reads by using grep_search (configured with \`max_matches_per_file\`) to search large files (> 1kb) or read_file with the desired offset and limit.
+- If the file is small, prefer reading the whole thing over "scrolling" through it by reading ranges repeatedly.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -746,8 +750,10 @@ exports[`Core System Prompt (prompts.ts) > should handle CodebaseInvestigator wi
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
 
 ## Context Efficiency:
-- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results using total_max_matches and max_matches_per_file, especially during the research phase.
+- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results by explicitly setting \`total_max_matches\` or \`max_matches_per_file\`, especially during the research phase.
 - For broad discovery, use names_only=true or max_matches_per_file=1 to identify files without retrieving their context.
+- Limit unnecessary context consumption from file reads by using grep_search (configured with \`max_matches_per_file\`) to search large files (> 1kb) or read_file with the desired offset and limit.
+- If the file is small, prefer reading the whole thing over "scrolling" through it by reading ranges repeatedly.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -1311,8 +1317,10 @@ exports[`Core System Prompt (prompts.ts) > should include available_skills with 
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
 
 ## Context Efficiency:
-- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results using total_max_matches and max_matches_per_file, especially during the research phase.
+- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results by explicitly setting \`total_max_matches\` or \`max_matches_per_file\`, especially during the research phase.
 - For broad discovery, use names_only=true or max_matches_per_file=1 to identify files without retrieving their context.
+- Limit unnecessary context consumption from file reads by using grep_search (configured with \`max_matches_per_file\`) to search large files (> 1kb) or read_file with the desired offset and limit.
+- If the file is small, prefer reading the whole thing over "scrolling" through it by reading ranges repeatedly.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -1437,8 +1445,10 @@ exports[`Core System Prompt (prompts.ts) > should include correct sandbox instru
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
 
 ## Context Efficiency:
-- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results using total_max_matches and max_matches_per_file, especially during the research phase.
+- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results by explicitly setting \`total_max_matches\` or \`max_matches_per_file\`, especially during the research phase.
 - For broad discovery, use names_only=true or max_matches_per_file=1 to identify files without retrieving their context.
+- Limit unnecessary context consumption from file reads by using grep_search (configured with \`max_matches_per_file\`) to search large files (> 1kb) or read_file with the desired offset and limit.
+- If the file is small, prefer reading the whole thing over "scrolling" through it by reading ranges repeatedly.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -1554,8 +1564,10 @@ exports[`Core System Prompt (prompts.ts) > should include correct sandbox instru
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
 
 ## Context Efficiency:
-- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results using total_max_matches and max_matches_per_file, especially during the research phase.
+- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results by explicitly setting \`total_max_matches\` or \`max_matches_per_file\`, especially during the research phase.
 - For broad discovery, use names_only=true or max_matches_per_file=1 to identify files without retrieving their context.
+- Limit unnecessary context consumption from file reads by using grep_search (configured with \`max_matches_per_file\`) to search large files (> 1kb) or read_file with the desired offset and limit.
+- If the file is small, prefer reading the whole thing over "scrolling" through it by reading ranges repeatedly.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -1671,8 +1683,10 @@ exports[`Core System Prompt (prompts.ts) > should include correct sandbox instru
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
 
 ## Context Efficiency:
-- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results using total_max_matches and max_matches_per_file, especially during the research phase.
+- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results by explicitly setting \`total_max_matches\` or \`max_matches_per_file\`, especially during the research phase.
 - For broad discovery, use names_only=true or max_matches_per_file=1 to identify files without retrieving their context.
+- Limit unnecessary context consumption from file reads by using grep_search (configured with \`max_matches_per_file\`) to search large files (> 1kb) or read_file with the desired offset and limit.
+- If the file is small, prefer reading the whole thing over "scrolling" through it by reading ranges repeatedly.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -1784,8 +1798,10 @@ exports[`Core System Prompt (prompts.ts) > should include planning phase suggest
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
 
 ## Context Efficiency:
-- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results using total_max_matches and max_matches_per_file, especially during the research phase.
+- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results by explicitly setting \`total_max_matches\` or \`max_matches_per_file\`, especially during the research phase.
 - For broad discovery, use names_only=true or max_matches_per_file=1 to identify files without retrieving their context.
+- Limit unnecessary context consumption from file reads by using grep_search (configured with \`max_matches_per_file\`) to search large files (> 1kb) or read_file with the desired offset and limit.
+- If the file is small, prefer reading the whole thing over "scrolling" through it by reading ranges repeatedly.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -1896,8 +1912,10 @@ exports[`Core System Prompt (prompts.ts) > should include sub-agents in XML for 
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
 
 ## Context Efficiency:
-- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results using total_max_matches and max_matches_per_file, especially during the research phase.
+- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results by explicitly setting \`total_max_matches\` or \`max_matches_per_file\`, especially during the research phase.
 - For broad discovery, use names_only=true or max_matches_per_file=1 to identify files without retrieving their context.
+- Limit unnecessary context consumption from file reads by using grep_search (configured with \`max_matches_per_file\`) to search large files (> 1kb) or read_file with the desired offset and limit.
+- If the file is small, prefer reading the whole thing over "scrolling" through it by reading ranges repeatedly.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -2248,8 +2266,10 @@ exports[`Core System Prompt (prompts.ts) > should return the base prompt when us
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
 
 ## Context Efficiency:
-- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results using total_max_matches and max_matches_per_file, especially during the research phase.
+- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results by explicitly setting \`total_max_matches\` or \`max_matches_per_file\`, especially during the research phase.
 - For broad discovery, use names_only=true or max_matches_per_file=1 to identify files without retrieving their context.
+- Limit unnecessary context consumption from file reads by using grep_search (configured with \`max_matches_per_file\`) to search large files (> 1kb) or read_file with the desired offset and limit.
+- If the file is small, prefer reading the whole thing over "scrolling" through it by reading ranges repeatedly.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -2361,8 +2381,10 @@ exports[`Core System Prompt (prompts.ts) > should return the base prompt when us
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
 
 ## Context Efficiency:
-- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results using total_max_matches and max_matches_per_file, especially during the research phase.
+- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results by explicitly setting \`total_max_matches\` or \`max_matches_per_file\`, especially during the research phase.
 - For broad discovery, use names_only=true or max_matches_per_file=1 to identify files without retrieving their context.
+- Limit unnecessary context consumption from file reads by using grep_search (configured with \`max_matches_per_file\`) to search large files (> 1kb) or read_file with the desired offset and limit.
+- If the file is small, prefer reading the whole thing over "scrolling" through it by reading ranges repeatedly.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -2585,8 +2607,10 @@ exports[`Core System Prompt (prompts.ts) > should use chatty system prompt for p
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
 
 ## Context Efficiency:
-- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results using total_max_matches and max_matches_per_file, especially during the research phase.
+- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results by explicitly setting \`total_max_matches\` or \`max_matches_per_file\`, especially during the research phase.
 - For broad discovery, use names_only=true or max_matches_per_file=1 to identify files without retrieving their context.
+- Limit unnecessary context consumption from file reads by using grep_search (configured with \`max_matches_per_file\`) to search large files (> 1kb) or read_file with the desired offset and limit.
+- If the file is small, prefer reading the whole thing over "scrolling" through it by reading ranges repeatedly.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -2698,8 +2722,10 @@ exports[`Core System Prompt (prompts.ts) > should use chatty system prompt for p
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
 
 ## Context Efficiency:
-- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results using total_max_matches and max_matches_per_file, especially during the research phase.
+- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results by explicitly setting \`total_max_matches\` or \`max_matches_per_file\`, especially during the research phase.
 - For broad discovery, use names_only=true or max_matches_per_file=1 to identify files without retrieving their context.
+- Limit unnecessary context consumption from file reads by using grep_search (configured with \`max_matches_per_file\`) to search large files (> 1kb) or read_file with the desired offset and limit.
+- If the file is small, prefer reading the whole thing over "scrolling" through it by reading ranges repeatedly.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
