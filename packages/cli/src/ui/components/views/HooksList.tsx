@@ -23,13 +23,25 @@ interface HooksListProps {
     sequential?: boolean;
     enabled: boolean;
   }>;
+  terminalWidth: number;
 }
 
-export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
+export const HooksList: React.FC<HooksListProps> = ({
+  hooks,
+  terminalWidth,
+}) => {
   if (hooks.length === 0) {
     return (
-      <Box flexDirection="column" marginBottom={1}>
-        <Text>No hooks configured.</Text>
+      <Box
+        borderStyle="round"
+        borderColor={theme.border.default}
+        flexDirection="column"
+        padding={1}
+        marginY={1}
+        width={terminalWidth}
+        flexShrink={0}
+      >
+        <Text color={theme.text.primary}>No hooks configured.</Text>
       </Box>
     );
   }
@@ -47,55 +59,75 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
   );
 
   return (
-    <Box flexDirection="column" marginBottom={1}>
-      <Box flexDirection="column">
+    <Box
+      borderStyle="round"
+      borderColor={theme.border.default}
+      flexDirection="column"
+      padding={1}
+      marginY={1}
+      width={terminalWidth}
+      flexShrink={0}
+      flexGrow={0}
+    >
+      {/* Security Warning */}
+      <Box marginBottom={1} flexDirection="column">
         <Text color={theme.status.warning} bold underline>
           ⚠️ Security Warning:
         </Text>
-        <Text color={theme.status.warning}>
+        <Text color={theme.status.warning} wrap="wrap">
           Hooks can execute arbitrary commands on your system. Only use hooks
           from sources you trust. Review hook scripts carefully.
         </Text>
       </Box>
 
-      <Box marginTop={1}>
-        <Text>
+      {/* Learn more link */}
+      <Box marginBottom={1}>
+        <Text wrap="wrap">
           Learn more:{' '}
           <Text color={theme.text.link}>https://geminicli.com/docs/hooks</Text>
         </Text>
       </Box>
 
-      <Box marginTop={1}>
-        <Text bold>Configured Hooks:</Text>
+      {/* Configured Hooks heading */}
+      <Box marginBottom={1}>
+        <Text bold color={theme.text.accent}>
+          Configured Hooks
+        </Text>
       </Box>
-      <Box flexDirection="column" paddingLeft={2} marginTop={1}>
+
+      {/* Hooks list */}
+      <Box flexDirection="column">
         {Object.entries(hooksByEvent).map(([eventName, eventHooks]) => (
           <Box key={eventName} flexDirection="column" marginBottom={1}>
             <Text color={theme.text.accent} bold>
               {eventName}:
             </Text>
             <Box flexDirection="column" paddingLeft={2}>
-              {eventHooks.map((hook, index) => {
+              {eventHooks.map((hook) => {
                 const hookName =
                   hook.config.name || hook.config.command || 'unknown';
                 const statusColor = hook.enabled
                   ? theme.status.success
                   : theme.text.secondary;
                 const statusText = hook.enabled ? 'enabled' : 'disabled';
+                // Create a stable, unique key from hook properties
+                const hookKey = `${eventName}:${hook.source}:${hook.config.name ?? ''}:${hook.config.command ?? ''}`;
 
                 return (
-                  <Box key={`${eventName}-${index}`} flexDirection="column">
-                    <Box>
-                      <Text>
-                        <Text color={theme.text.accent}>{hookName}</Text>
-                        <Text color={statusColor}>{` [${statusText}]`}</Text>
+                  <Box key={hookKey} flexDirection="column" marginBottom={1}>
+                    <Box flexDirection="row">
+                      <Text color={theme.text.accent} bold>
+                        {hookName}
                       </Text>
+                      <Text color={statusColor}>{` [${statusText}]`}</Text>
                     </Box>
                     <Box paddingLeft={2} flexDirection="column">
                       {hook.config.description && (
-                        <Text italic>{hook.config.description}</Text>
+                        <Text color={theme.text.primary} italic wrap="wrap">
+                          {hook.config.description}
+                        </Text>
                       )}
-                      <Text dimColor>
+                      <Text color={theme.text.secondary} wrap="wrap">
                         Source: {hook.source}
                         {hook.config.name &&
                           hook.config.command &&
@@ -114,7 +146,7 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
         ))}
       </Box>
       <Box marginTop={1}>
-        <Text dimColor>
+        <Text color={theme.text.secondary} wrap="wrap">
           Tip: Use <Text bold>/hooks enable {'<hook-name>'}</Text> or{' '}
           <Text bold>/hooks disable {'<hook-name>'}</Text> to toggle individual
           hooks. Use <Text bold>/hooks enable-all</Text> or{' '}
