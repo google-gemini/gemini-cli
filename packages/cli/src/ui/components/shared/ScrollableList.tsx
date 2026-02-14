@@ -66,6 +66,7 @@ function ScrollableList<T>(
           scrollTop: 0,
           scrollHeight: 0,
           innerHeight: 0,
+          isStickingToBottom: false,
         },
     }),
     [],
@@ -77,6 +78,7 @@ function ScrollableList<T>(
         scrollTop: 0,
         scrollHeight: 0,
         innerHeight: 0,
+        isStickingToBottom: false,
       },
     [],
   );

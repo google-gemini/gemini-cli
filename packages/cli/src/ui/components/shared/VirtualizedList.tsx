@@ -52,6 +52,7 @@ export type VirtualizedListRef<T> = {
     scrollTop: number;
     scrollHeight: number;
     innerHeight: number;
+    isStickingToBottom: boolean;
   };
 };
 
