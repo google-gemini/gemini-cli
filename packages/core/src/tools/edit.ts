@@ -47,7 +47,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import levenshtein from 'fast-levenshtein';
 
 const ENABLE_FUZZY_MATCH_RECOVERY = true;
-const FUZZY_MATCH_THRESHOLD = 0.05; // Allow up to 5% weighted difference
+const FUZZY_MATCH_THRESHOLD = 0.1; // Allow up to 10% weighted difference
 const WHITESPACE_PENALTY_FACTOR = 0.1; // Whitespace differences cost 10% of a character difference
 
 interface ReplacementContext {
@@ -1100,24 +1100,20 @@ async function calculateFuzzyReplacement(
   }
 
   const N = searchLines.length;
-  let bestWindowStartIndex = -1;
-  let minScore = Infinity;
-
+  const candidates: Array<{ index: number; score: number }> = [];
   const searchBlock = searchLines.join('\n');
 
   // Sliding window
   for (let i = 0; i <= sourceLines.length - N; i++) {
     const windowLines = sourceLines.slice(i, i + N);
-    // Join window lines same way we treat search lines (trim end or just raw join?)
-    // Let's keep it simple: join the raw window lines for comparison
-    // But we might want to trim end of window lines too to match our searchLines processing?
-    // Let's stick to the plan: join the window lines.
-    // However, sourceLines includes the newline chars.
     const windowText = windowLines.map((l) => l.trimEnd()).join('\n'); // Normalized join for comparison
 
     // Length Heuristic Optimization
     const lengthDiff = Math.abs(windowText.length - searchBlock.length);
-    if (lengthDiff / searchBlock.length > FUZZY_MATCH_THRESHOLD) {
+    if (
+      lengthDiff / searchBlock.length >
+      FUZZY_MATCH_THRESHOLD / WHITESPACE_PENALTY_FACTOR
+    ) {
       continue;
     }
 
@@ -1131,53 +1127,69 @@ async function calculateFuzzyReplacement(
     const weightedDist = d_norm + (d_raw - d_norm) * WHITESPACE_PENALTY_FACTOR;
     const score = weightedDist / searchBlock.length;
 
-    if (score < minScore) {
-      minScore = score;
-      bestWindowStartIndex = i;
+    if (score <= FUZZY_MATCH_THRESHOLD) {
+      candidates.push({ index: i, score });
     }
   }
 
-  if (bestWindowStartIndex !== -1 && minScore <= FUZZY_MATCH_THRESHOLD) {
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  // Select best non-overlapping matches
+  // Sort by score ascending. If scores equal, prefer earlier index (stable sort).
+  candidates.sort((a, b) => a.score - b.score || a.index - b.index);
+
+  const selectedMatches: Array<{ index: number; score: number }> = [];
+  for (const candidate of candidates) {
+    // Check for overlap with already selected matches
+    // Two windows overlap if their start indices are within N lines of each other
+    // (Assuming window size N. Actually overlap is |i - j| < N)
+    const overlaps = selectedMatches.some(
+      (m) => Math.abs(m.index - candidate.index) < N,
+    );
+    if (!overlaps) {
+      selectedMatches.push(candidate);
+    }
+  }
+
+  // If we found matches, apply them
+  if (selectedMatches.length > 0) {
     const event = new EditStrategyEvent('fuzzy');
     logEditStrategy(config, event);
 
-    // Apply replacement
-    // We need to be careful to preserve indentation of the first line if possible,
-    // or just replace the block entirely. The "flexible" strategy tried to preserve indentation.
-    // Here, we just replace the found block with the new string.
-    // If the user provided indentation in new_string, it will be used.
-    // If we want to be smarter, we could detect indentation of the matched window's first line
-    // and apply it to new_string, but `new_string` is "exact literal text", so we probably shouldn't mess with it too much unless necessary.
-    // For now, simple replacement of the lines.
+    // Sort matches by index descending to apply replacements from bottom to top
+    // so that indices remain valid
+    selectedMatches.sort((a, b) => b.index - a.index);
 
     const newLines = normalizedReplace.split('\n');
-    // If we want to preserve the indentation of the first line of the match:
-    const firstLineMatch = sourceLines[bestWindowStartIndex];
-    const indentationMatch = firstLineMatch.match(/^([ \t]*)/);
-    const indentation = indentationMatch ? indentationMatch[1] : '';
 
-    // If the new string doesn't seem to have indentation relative to the old string, we might want to apply it.
-    // But typically the user provides the new block with correct relative indentation or full indentation.
-    // Let's follow the "flexible" strategy's approach: apply the indentation of the start of the match to every line of the replacement.
-    // EXCEPT if the new string already looks fully indented.
-    // Let's stick to the flexible replacement logic for indentation application to be consistent.
+    for (const match of selectedMatches) {
+      // If we want to preserve the indentation of the first line of the match:
+      const firstLineMatch = sourceLines[match.index];
+      const indentationMatch = firstLineMatch.match(/^([ \t]*)/);
+      const indentation = indentationMatch ? indentationMatch[1] : '';
 
-    const indentedReplaceLines = newLines.map(
-      (line) => `${indentation}${line}`,
-    );
+      const indentedReplaceLines = newLines.map(
+        (line) => `${indentation}${line}`,
+      );
 
-    sourceLines.splice(
-      bestWindowStartIndex,
-      N,
-      indentedReplaceLines.join('\n'), // Use the indented version
-    );
+      let replacementText = indentedReplaceLines.join('\n');
+      // If the last line of the match had a newline, preserve it in the replacement
+      // to avoid merging with the next line or losing a blank line separator.
+      if (sourceLines[match.index + N - 1].endsWith('\n')) {
+        replacementText += '\n';
+      }
+
+      sourceLines.splice(match.index, N, replacementText);
+    }
 
     let modifiedCode = sourceLines.join('');
     modifiedCode = restoreTrailingNewline(currentContent, modifiedCode);
 
     return {
       newContent: modifiedCode,
-      occurrences: 1,
+      occurrences: selectedMatches.length,
       finalOldString: normalizedSearch,
       finalNewString: normalizedReplace,
     };

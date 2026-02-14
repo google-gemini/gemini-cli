@@ -420,6 +420,54 @@ describe('EditTool', () => {
       expect(result.newContent).toBe(content);
     });
 
+    it('should perform multiple fuzzy replacements if multiple valid matches are found', async () => {
+      const content = `
+function doIt() {
+  console.log("hello");
+}
+
+function doIt() {
+  console.log("hello");
+}
+`;
+      // old_string uses single quotes, file uses double.
+      // This is a fuzzy match (quote difference).
+      const oldString = `
+function doIt() {
+  console.log('hello');
+}
+`.trim();
+
+      const newString = `
+function doIt() {
+  console.log("bye");
+}
+`.trim();
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          instruction: 'update',
+          old_string: oldString,
+          new_string: newString,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.occurrences).toBe(2);
+      const expectedContent = `
+function doIt() {
+  console.log("bye");
+}
+
+function doIt() {
+  console.log("bye");
+}
+`;
+      expect(result.newContent).toBe(expectedContent);
+    });
+
     it('should NOT insert extra newlines when replacing a block preceded by a blank line (regression)', async () => {
       const content = '\n  function oldFunc() {\n    // some code\n  }';
       const result = await calculateReplacement(mockConfig, {
