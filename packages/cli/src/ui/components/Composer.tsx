@@ -6,7 +6,11 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
-import { ApprovalMode, checkExhaustive, CoreToolCallStatus } from '@google/gemini-cli-core';
+import {
+  ApprovalMode,
+  checkExhaustive,
+  CoreToolCallStatus,
+} from '@google/gemini-cli-core';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StatusDisplay } from './StatusDisplay.js';
 import { ToastDisplay, shouldShowToast } from './ToastDisplay.js';
