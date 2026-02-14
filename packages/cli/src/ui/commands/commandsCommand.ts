@@ -10,7 +10,11 @@ import {
   type SlashCommandActionReturn,
   CommandKind,
 } from './types.js';
-import { MessageType, type HistoryItemInfo } from '../types.js';
+import {
+  MessageType,
+  type HistoryItemError,
+  type HistoryItemInfo,
+} from '../types.js';
 
 /**
  * Action for the default `/commands` invocation.
@@ -36,17 +40,25 @@ async function listAction(
 async function reloadAction(
   context: CommandContext,
 ): Promise<void | SlashCommandActionReturn> {
-  context.ui.reloadCommands();
+  try {
+    context.ui.reloadCommands();
 
-  context.ui.addItem(
-    {
-      type: MessageType.INFO,
-      text: 'Custom commands reloaded successfully.',
-      icon: '✓ ',
-      color: 'green',
-    } as HistoryItemInfo,
-    Date.now(),
-  );
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: 'Custom commands reloaded successfully.',
+      } as HistoryItemInfo,
+      Date.now(),
+    );
+  } catch (error) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Failed to reload commands: ${error instanceof Error ? error.message : String(error)}`,
+      } as HistoryItemError,
+      Date.now(),
+    );
+  }
 }
 
 export const commandsCommand: SlashCommand = {
