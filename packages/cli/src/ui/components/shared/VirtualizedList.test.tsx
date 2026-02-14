@@ -16,11 +16,11 @@ import {
   useState,
 } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { UIState } from '../../contexts/UIStateContext.js';
 
+let mockCopyModeEnabled = false;
 vi.mock('../../contexts/UIStateContext.js', () => ({
   useUIState: vi.fn(() => ({
-    copyModeEnabled: false,
+    copyModeEnabled: mockCopyModeEnabled,
   })),
 }));
 
@@ -31,6 +31,7 @@ describe('<VirtualizedList />', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCopyModeEnabled = false;
   });
 
   describe('with 10px height and 100 items', () => {
@@ -332,11 +333,59 @@ describe('<VirtualizedList />', () => {
     expect(ref.current?.getScrollState().scrollTop).toBe(4);
   });
 
+  it('resets scroll to top when copyModeEnabled is toggled on', async () => {
+    const longData = Array.from({ length: 100 }, (_, i) => `Item ${i}`);
+    const { lastFrame, rerender } = render(
+      <Box height={10} width={100}>
+        <VirtualizedList
+          data={longData}
+          renderItem={({ item }) => (
+            <Box height={1}>
+              <Text>{item}</Text>
+            </Box>
+          )}
+          keyExtractor={(item) => item}
+          estimatedItemHeight={() => 1}
+          initialScrollIndex={99}
+        />
+      </Box>,
+    );
+    await act(async () => {
+      await delay(0);
+    });
+
+    // Should be at bottom
+    expect(lastFrame()).toContain('Item 99');
+    expect(lastFrame()).not.toContain('Item 0');
+
+    // Toggle copy mode on
+    mockCopyModeEnabled = true;
+    rerender(
+      <Box height={10} width={100}>
+        <VirtualizedList
+          data={longData}
+          renderItem={({ item }) => (
+            <Box height={1}>
+              <Text>{item}</Text>
+            </Box>
+          )}
+          keyExtractor={(item) => item}
+          estimatedItemHeight={() => 1}
+          initialScrollIndex={99}
+        />
+      </Box>,
+    );
+    await act(async () => {
+      await delay(0);
+    });
+
+    // Should have jumped to top
+    expect(lastFrame()).toContain('Item 0');
+    expect(lastFrame()).not.toContain('Item 99');
+  });
+
   it('renders correctly in copyModeEnabled when scrolled', async () => {
-    const { useUIState } = await import('../../contexts/UIStateContext.js');
-    vi.mocked(useUIState).mockReturnValue({
-      copyModeEnabled: true,
-    } as Partial<UIState> as UIState);
+    mockCopyModeEnabled = true;
 
     const longData = Array.from({ length: 100 }, (_, i) => `Item ${i}`);
     // Use copy mode
@@ -365,5 +414,41 @@ describe('<VirtualizedList />', () => {
     expect(lastFrame()).toContain('Item 59');
     // But far away items should not be (ensures we are actually scrolled)
     expect(lastFrame()).not.toContain('Item 0');
+  });
+
+  it('sets isStickingToBottom to true when scrollToEnd is called', async () => {
+    const ref = createRef<VirtualizedListRef<string>>();
+    const longData = Array.from({ length: 100 }, (_, i) => `Item ${i}`);
+    const { lastFrame } = render(
+      <Box height={10} width={100}>
+        <VirtualizedList
+          ref={ref}
+          data={longData}
+          renderItem={({ item }) => (
+            <Box height={1}>
+              <Text>{item}</Text>
+            </Box>
+          )}
+          keyExtractor={(item) => item}
+          estimatedItemHeight={() => 1}
+        />
+      </Box>,
+    );
+    await act(async () => {
+      await delay(0);
+    });
+
+    // Initially NOT sticking to bottom because we started at top
+    expect(ref.current?.getScrollState().isStickingToBottom).toBe(false);
+
+    // Scroll to end via ref
+    await act(async () => {
+      ref.current?.scrollToEnd();
+      await delay(0);
+    });
+
+    // Now it should be sticking to bottom
+    expect(ref.current?.getScrollState().isStickingToBottom).toBe(true);
+    expect(lastFrame()).toContain('Item 99');
   });
 });

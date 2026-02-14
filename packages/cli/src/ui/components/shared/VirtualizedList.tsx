@@ -466,6 +466,7 @@ function VirtualizedList<T>(
         scrollTop: getScrollTop(),
         scrollHeight: totalHeight,
         innerHeight: containerHeight,
+        isStickingToBottom,
       }),
     }),
     [
@@ -478,6 +479,7 @@ function VirtualizedList<T>(
       getScrollTop,
       setPendingScrollTop,
       containerHeight,
+      isStickingToBottom,
     ],
   );
 
