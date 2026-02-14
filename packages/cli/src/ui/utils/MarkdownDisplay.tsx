@@ -337,7 +337,7 @@ const RenderCodeBlockInternal: React.FC<RenderCodeBlockProps> = ({
   const RESERVED_LINES = 2; // Lines reserved for the message itself and potential padding
 
   // When not in alternate buffer mode we need to be careful that we don't
-  // trigger flicker when the pending code is to long to fit in the terminal
+  // trigger flicker when the pending code is too long to fit in the terminal
   if (
     !isAlternateBuffer &&
     isPending &&

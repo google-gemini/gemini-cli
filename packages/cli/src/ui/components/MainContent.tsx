@@ -52,9 +52,15 @@ export const MainContent = () => {
   } = uiState;
   const showHeaderDetails = cleanUiDetailsVisible;
 
+  const filteredHistory = useMemo(
+    () =>
+      uiState.history.filter((h) => !(h.type === 'gemini_content' && !h.text)),
+    [uiState.history],
+  );
+
   const historyItems = useMemo(
     () =>
-      uiState.history.map((h) => (
+      filteredHistory.map((h) => (
         <MemoizedHistoryItemDisplay
           terminalWidth={mainAreaWidth}
           availableTerminalHeight={staticAreaMaxItemHeight}
@@ -66,7 +72,7 @@ export const MainContent = () => {
         />
       )),
     [
-      uiState.history,
+      filteredHistory,
       mainAreaWidth,
       staticAreaMaxItemHeight,
       uiState.slashCommands,
@@ -113,10 +119,10 @@ export const MainContent = () => {
   const virtualizedData = useMemo(
     () => [
       { type: 'header' as const },
-      ...uiState.history.map((item) => ({ type: 'history' as const, item })),
+      ...filteredHistory.map((item) => ({ type: 'history' as const, item })),
       { type: 'pending' as const },
     ],
-    [uiState.history],
+    [filteredHistory],
   );
 
   const renderItem = useCallback(
