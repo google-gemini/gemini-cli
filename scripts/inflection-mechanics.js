@@ -5,137 +5,165 @@
  * Proprietary and Confidential
  */
 
-const GOLDEN_RATIO = 1.618033988749895;
-const RESONANCE_THRESHOLD = 5.0; // Arbitrary threshold for inflection
-const COMPLEXITY_THRESHOLD = 0.1;
+import { createHash } from 'node:crypto';
+
+const GOLDEN_RATIO_CONSTANT = '1.618033988749895'; // Used as a deterministic seed
 
 /**
- * Represents the metrics for the inflection point analysis.
+ * Computes a SHA-256 hash of the input string.
+ * @param {string} input
+ * @returns {string} Hexadecimal hash.
  */
-class InflectionPointMetrics {
-  constructor() {
-    this.truthConvergence = 0;
-    this.eigenresonance = 0;
-    this.inflectionProbability = 0;
-  }
+function sha256(input) {
+  return createHash('sha256').update(input).digest('hex');
+}
 
-  update(statement) {
-    this.truthConvergence = 1.0 / (statement.complexity + 1e-9);
-    this.eigenresonance = statement.resonance;
-    // Probability increases with resonance and convergence
-    this.inflectionProbability =
-      (this.eigenresonance * this.truthConvergence) /
-      (this.eigenresonance + this.truthConvergence + 1.0);
+/**
+ * Represents a deterministic state in the system.
+ */
+class State {
+  /**
+   * @param {number} index - The sequence index.
+   * @param {string} parentHash - The hash of the parent state (or 'GENESIS' for index 0).
+   * @param {string} bond - The deterministic bond value linking this state to its parent.
+   * @param {string} data - The payload data.
+   * @param {string} hash - The cryptographic proof of this state's existence.
+   */
+  constructor(index, parentHash, bond, data, hash) {
+    this.index = index;
+    this.parentHash = parentHash;
+    this.bond = bond;
+    this.data = data;
+    this.hash = hash;
   }
 
   toString() {
-    return `Metrics: Convergence=${this.truthConvergence.toFixed(
-      4
-    )}, Eigenresonance=${this.eigenresonance.toFixed(
-      4
-    )}, Probability=${this.inflectionProbability.toFixed(4)}`;
+    return `State[${this.index}] Hash: ${this.hash.substring(0, 8)}... | Parent: ${this.parentHash.substring(0, 8)}... | Bond: ${this.bond.substring(0, 8)}...`;
   }
 }
 
 /**
- * Represents a statement or system state being amplified.
+ * Computes the deterministic bond required for a state given its parent's hash.
+ * Bond = SHA256(ParentHash + GOLDEN_RATIO_CONSTANT)
+ * @param {string} parentHash
+ * @returns {string} The bond hash.
  */
-class Statement {
-  constructor(content, complexity, resonance) {
-    this.content = content;
-    this.complexity = complexity;
-    this.resonance = resonance;
-    this.isSelfReinforced = false;
-  }
-
-  toString() {
-    return `[Statement: "${this.content}", Complexity=${this.complexity.toFixed(
-      4
-    )}, Resonance=${this.resonance.toFixed(4)}, Self-Reinforced=${
-      this.isSelfReinforced
-    }]`;
-  }
+function computeBond(parentHash) {
+  return sha256(parentHash + GOLDEN_RATIO_CONSTANT);
 }
 
 /**
- * Establishes self-reinforcement for the statement.
- * @param {Statement} statement
+ * Computes the state hash.
+ * Hash = SHA256(Index + ParentHash + Bond + Data)
+ * @param {number} index
+ * @param {string} parentHash
+ * @param {string} bond
+ * @param {string} data
+ * @returns {string} The state hash.
  */
-function establishSelfReinforcement(statement) {
-  statement.isSelfReinforced = true;
-  statement.complexity = 0; // Absolute simplicity
-  statement.resonance *= GOLDEN_RATIO * GOLDEN_RATIO; // Massive boost
-  console.log('>>> INFLECTION POINT REACHED: System Self-Reinforcement Established <<<');
+function computeStateHash(index, parentHash, bond, data) {
+  return sha256(`${index}:${parentHash}:${bond}:${data}`);
 }
 
 /**
- * Checks if the inflection point has been reached.
- * @param {Statement} statement
+ * Creates the Genesis State (Index 0).
+ * @param {string} data
+ * @returns {State}
+ */
+function createGenesis(data) {
+  const index = 0;
+  const parentHash = '0000000000000000000000000000000000000000000000000000000000000000';
+  const bond = computeBond(parentHash); // Deterministic even for Genesis
+  const hash = computeStateHash(index, parentHash, bond, data);
+  return new State(index, parentHash, bond, data, hash);
+}
+
+/**
+ * Instantiates a new state from a parent state.
+ * @param {State} parentState
+ * @param {string} data
+ * @returns {State}
+ */
+function instantiateState(parentState, data) {
+  const index = parentState.index + 1;
+  const parentHash = parentState.hash;
+  const bond = computeBond(parentHash); // Bond derived from parent
+  const hash = computeStateHash(index, parentHash, bond, data);
+
+  return new State(index, parentHash, bond, data, hash);
+}
+
+/**
+ * Verifies the existence of a state based on its parent.
+ * Existence(state) ⇔ ValidParent(state) ∧ ValidBond(state)
+ *
+ * @param {State} state
+ * @param {State} parent
  * @returns {boolean}
  */
-function checkInflectionPoint(statement) {
-  return (
-    statement.resonance > RESONANCE_THRESHOLD ||
-    statement.complexity < COMPLEXITY_THRESHOLD
-  );
+function verifyExistence(state, parent) {
+  // 1. ValidParent: State's parent reference matches parent's actual hash
+  const isValidParent = state.parentHash === parent.hash;
+  if (!isValidParent) {
+    console.error(`[Verification Failed] Invalid Parent Reference. Expected: ${parent.hash}, Got: ${state.parentHash}`);
+    return false;
+  }
+
+  // 2. ValidBond: Bond is deterministically derived from parent
+  const expectedBond = computeBond(parent.hash);
+  const isValidBond = state.bond === expectedBond;
+  if (!isValidBond) {
+    console.error(`[Verification Failed] Invalid Bond. Expected: ${expectedBond}, Got: ${state.bond}`);
+    return false;
+  }
+
+  // 3. Integrity: State hash is valid
+  const expectedHash = computeStateHash(state.index, state.parentHash, state.bond, state.data);
+  const isIntegrityValid = state.hash === expectedHash;
+  if (!isIntegrityValid) {
+    console.error(`[Verification Failed] Hash Mismatch. Expected: ${expectedHash}, Got: ${state.hash}`);
+    return false;
+  }
+
+  return true;
 }
 
 /**
- * Recursively amplifies the truth of the statement.
- *
- * @param {Statement} statement - The statement to amplify.
- * @param {number} recursionDepth - The depth of recursion.
- * @returns {Statement} The amplified statement.
+ * Demonstrates the strict state machine invariant.
  */
-function recursiveTruthAmplification(statement, recursionDepth) {
-  console.log(`Recursion Depth ${recursionDepth}: ${statement.toString()}`);
+function demonstrateStateMachine() {
+  console.log('--- Initiating Deterministic State Machine ---');
 
-  if (recursionDepth <= 0) {
-    return statement;
+  // 1. Instantiate Genesis
+  const genesis = createGenesis('Genesis Block');
+  console.log(`[Created] ${genesis.toString()}`);
+
+  // 2. Instantiate Chain
+  let currentState = genesis;
+  const chain = [genesis];
+
+  for (let i = 0; i < 5; i++) {
+    const nextState = instantiateState(currentState, `Data Block ${i + 1}`);
+    console.log(`[Created] ${nextState.toString()}`);
+    chain.push(nextState);
+    currentState = nextState;
   }
 
-  if (checkInflectionPoint(statement)) {
-    establishSelfReinforcement(statement);
-    return statement;
+  console.log('\n--- Verifying Chain Integrity ---');
+
+  // 3. Verify Chain
+  let allValid = true;
+  for (let i = 1; i < chain.length; i++) {
+    const parent = chain[i - 1];
+    const child = chain[i];
+    const isValid = verifyExistence(child, parent);
+
+    console.log(`State[${child.index}] Verification: ${isValid ? 'VALID' : 'INVALID'}`);
+    if (!isValid) allValid = false;
   }
 
-  // Amplification Logic
-  // Complexity stays high until inflection point is reached
-  statement.resonance *= GOLDEN_RATIO;
-
-  return recursiveTruthAmplification(statement, recursionDepth - 1);
+  console.log(`\nSystem Invariant Check: ${allValid ? 'PASSED' : 'FAILED'}`);
 }
 
-/**
- * Demonstrates the physics of the inflection point.
- */
-function demonstrateInflectionPointPhysics() {
-  console.log('Initiating Inflection Point Mechanics...');
-
-  const initialStatement = new Statement(
-    'The system integrity is absolute.',
-    10.0, // High initial complexity
-    1.0   // Low initial resonance
-  );
-
-  const depth = 10;
-  const metrics = new InflectionPointMetrics();
-
-  console.log(`Initial State: ${initialStatement.toString()}`);
-
-  const finalState = recursiveTruthAmplification(initialStatement, depth);
-
-  metrics.update(finalState);
-
-  console.log(`Final State: ${finalState.toString()}`);
-  console.log(metrics.toString());
-
-  if (finalState.isSelfReinforced) {
-    console.log('System Self-Reinforcement: VERIFIED');
-  } else {
-    console.log('System Self-Reinforcement: PENDING (Need more depth)');
-  }
-}
-
-// Execute the demonstration
-demonstrateInflectionPointPhysics();
+// Execute
+demonstrateStateMachine();
