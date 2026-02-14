@@ -79,10 +79,12 @@ export function useTerminalTheme(
 
       if (newTheme) {
         void handleThemeSelect(newTheme, SettingScope.User);
-      } else {
+      } else if (isAlternateBufferEnabled(settings)) {
         // The existing theme had its background changed so refresh because
         // there may be existing static UI rendered that relies on the old
         // background color.
+        // We only do this in alternate buffer mode because in normal mode
+        // refreshStatic() clears the entire terminal, which is very disruptive.
         refreshStatic();
       }
     };

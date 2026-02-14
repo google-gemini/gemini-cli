@@ -280,7 +280,15 @@ function VirtualizedList<T>(
     getAnchorForScrollTop,
     offsets,
     isStickingToBottom,
+    copyModeEnabled,
   ]);
+
+  useEffect(() => {
+    if (copyModeEnabled) {
+      setScrollAnchor({ index: 0, offset: 0 });
+      setIsStickingToBottom(false);
+    }
+  }, [copyModeEnabled]);
 
   useLayoutEffect(() => {
     if (
