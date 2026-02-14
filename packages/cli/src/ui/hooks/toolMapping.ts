@@ -54,6 +54,8 @@ export function mapToDisplay(
     let outputFile: string | undefined = undefined;
     let ptyId: number | undefined = undefined;
     let correlationId: string | undefined = undefined;
+    let progressMessage: string | undefined = undefined;
+    let progressPercent: number | undefined = undefined;
 
     switch (call.status) {
       case CoreToolCallStatus.Success:
@@ -72,6 +74,8 @@ export function mapToDisplay(
       case CoreToolCallStatus.Executing:
         resultDisplay = call.liveOutput;
         ptyId = call.pid;
+        progressMessage = call.progressMessage;
+        progressPercent = call.progressPercent;
         break;
       case CoreToolCallStatus.Scheduled:
       case CoreToolCallStatus.Validating:
@@ -95,6 +99,8 @@ export function mapToDisplay(
       outputFile,
       ptyId,
       correlationId,
+      progressMessage,
+      progressPercent,
       approvalMode: call.approvalMode,
     };
   });
