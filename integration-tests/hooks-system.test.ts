@@ -43,10 +43,10 @@ describe('Hooks System Integration', () => {
         'should block tool execution when hook returns block decision',
         {
           settings: {
-          hooksConfig: {
-            enabled: true,
-          },
-          hooks: {
+            hooksConfig: {
+              enabled: true,
+            },
+            hooks: {
               BeforeTool: [
                 {
                   matcher: 'write_file',
@@ -99,10 +99,6 @@ describe('Hooks System Integration', () => {
       );
 
       const blockMsg = 'File writing blocked by security policy';
-      const blockJson = JSON.stringify({
-        decision: 'deny',
-        reason: blockMsg,
-      });
 
       const scriptPath = rig.createScript(
         'stderr_block_hook.cjs',
@@ -114,8 +110,8 @@ describe('Hooks System Integration', () => {
         {
           settings: {
             hooksConfig: {
-            enabled: true,
-          },
+              enabled: true,
+            },
             hooks: {
               BeforeTool: [
                 {
@@ -161,9 +157,9 @@ describe('Hooks System Integration', () => {
             log.hookCall.stderr.includes('"decision":"deny"')),
       );
       expect(blockHook).toBeDefined();
-      expect(
-        blockHook?.hookCall.stdout + blockHook?.hookCall.stderr,
-      ).toContain(blockMsg);
+      expect(blockHook?.hookCall.stdout + blockHook?.hookCall.stderr).toContain(
+        blockMsg,
+      );
     });
 
     it('should allow tool execution when hook returns allow decision', async () => {
@@ -186,10 +182,10 @@ describe('Hooks System Integration', () => {
         'should allow tool execution when hook returns allow decision',
         {
           settings: {
-          hooksConfig: {
-            enabled: true,
-          },
-          hooks: {
+            hooksConfig: {
+              enabled: true,
+            },
+            hooks: {
               BeforeTool: [
                 {
                   matcher: 'write_file',
@@ -384,10 +380,10 @@ console.log(JSON.stringify({
         'should block model execution when BeforeModel hook returns deny decision',
         {
           settings: {
-          hooksConfig: {
-            enabled: true,
-          },
-          hooks: {
+            hooksConfig: {
+              enabled: true,
+            },
+            hooks: {
               BeforeModel: [
                 {
                   sequential: true,
@@ -432,10 +428,10 @@ console.log(JSON.stringify({
         'should block model execution when BeforeModel hook returns block decision',
         {
           settings: {
-          hooksConfig: {
-            enabled: true,
-          },
-          hooks: {
+            hooksConfig: {
+              enabled: true,
+            },
+            hooks: {
               BeforeModel: [
                 {
                   sequential: true,
@@ -499,10 +495,10 @@ console.log(JSON.stringify({
 
         rig.setup('should modify LLM responses with AfterModel hooks', {
           settings: {
-          hooksConfig: {
-            enabled: true,
-          },
-          hooks: {
+            hooksConfig: {
+              enabled: true,
+            },
+            hooks: {
               AfterModel: [
                 {
                   hooks: [
@@ -924,10 +920,10 @@ try {
         'should treat mixed stdout (text + JSON) as system message and allow execution when exit code is 0',
         {
           settings: {
-          hooksConfig: {
-            enabled: true,
-          },
-          hooks: {
+            hooksConfig: {
+              enabled: true,
+            },
+            hooks: {
               BeforeTool: [
                 {
                   matcher: 'write_file',
@@ -1388,10 +1384,10 @@ console.log(JSON.stringify({
         'should fire SessionStart hook and display systemMessage in interactive mode',
         {
           settings: {
-          hooksConfig: {
-            enabled: true,
-          },
-          hooks: {
+            hooksConfig: {
+              enabled: true,
+            },
+            hooks: {
               SessionStart: [
                 {
                   matcher: 'startup',
@@ -1472,10 +1468,10 @@ console.log(JSON.stringify({
         'should fire SessionEnd and SessionStart hooks on /clear command',
         {
           settings: {
-          hooksConfig: {
-            enabled: true,
-          },
-          hooks: {
+            hooksConfig: {
+              enabled: true,
+            },
+            hooks: {
               SessionEnd: [
                 {
                   matcher: '*',
@@ -1676,7 +1672,7 @@ console.log(JSON.stringify({
           // Configure automatic compression with a very low threshold
           // This will trigger auto-compression after the first response
           contextCompression: {
-             // enabled: true,
+            // enabled: true,
             targetTokenCount: 10, // Very low threshold to trigger compression
           },
         },

@@ -332,9 +332,6 @@ export class HookRunner {
         stderr += data.toString();
       });
 
-      child.on('exit', (code, signal) => {
-      });
-
       // Handle process exit
       child.on('close', (exitCode) => {
         clearTimeout(timeoutHandle);
