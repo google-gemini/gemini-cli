@@ -459,6 +459,8 @@ export function BaseSettingsDialog({
             paddingX={1}
             height={3}
             marginTop={1}
+            width="100%"
+            minWidth={0}
           >
             <TextInput
               focus={focusSection === 'settings' && !editingKey}
