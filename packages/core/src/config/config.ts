@@ -101,7 +101,12 @@ import { FileExclusions } from '../utils/ignorePatterns.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
-import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
+import {
+  ApprovalMode,
+  PolicyDecision,
+  type PolicyEngineConfig,
+} from '../policy/types.js';
+import { escapeRegex } from '../policy/utils.js';
 import { HookSystem } from '../hooks/index.js';
 import type { UserTierId } from '../code_assist/types.js';
 import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
@@ -479,7 +484,7 @@ export interface ConfigParameters {
   experimentalJitContext?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
-  plan?: boolean;
+  plan?: boolean | { enabled: boolean; directory?: string };
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
@@ -667,6 +672,7 @@ export class Config {
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
+  private readonly planDirectory?: string;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
@@ -754,7 +760,13 @@ export class Config {
     this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
-    this.planEnabled = params.plan ?? false;
+    if (typeof params.plan === 'object') {
+      this.planEnabled = params.plan.enabled;
+      this.planDirectory = params.plan.directory;
+    } else {
+      this.planEnabled = params.plan ?? false;
+      this.planDirectory = undefined;
+    }
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];
@@ -931,9 +943,10 @@ export class Config {
 
     // Add plans directory to workspace context for plan file storage
     if (this.planEnabled) {
-      const plansDir = this.storage.getProjectTempPlansDir();
+      const plansDir = this.getPlanDirectory();
       await fs.promises.mkdir(plansDir, { recursive: true });
       this.workspaceContext.addDirectory(plansDir);
+      this.updatePolicy();
     }
 
     // Initialize centralized FileDiscoveryService
@@ -1969,6 +1982,13 @@ export class Config {
     return this.planEnabled;
   }
 
+  getPlanDirectory(): string {
+    if (this.planDirectory) {
+      return path.resolve(this.getTargetDir(), this.planDirectory);
+    }
+    return this.storage.getProjectTempPlansDir();
+  }
+
   getApprovedPlanPath(): string | undefined {
     return this.approvedPlanPath;
   }
@@ -2589,6 +2609,47 @@ export class Config {
       );
     }
   };
+
+  private updatePolicy(): void {
+    if (this.planEnabled) {
+      const plansDir = this.getPlanDirectory();
+
+      // Add policy rule to allow writing to the plans directory in Plan Mode.
+      // We allow both absolute paths and paths relative to the project root.
+      const relPlansDir = path
+        .relative(this.getTargetDir(), plansDir)
+        .split(path.sep)
+        .join('/');
+      const absPlansDir = plansDir.split(path.sep).join('/');
+
+      const pathPatterns = [];
+      if (relPlansDir && relPlansDir !== '.') {
+        pathPatterns.push(escapeRegex(relPlansDir));
+      }
+      pathPatterns.push(escapeRegex(absPlansDir));
+
+      // Match "file_path":"<plansDir>/<anything>" or "path":"<plansDir>/<anything>"
+      // We use [^"]+ to match the filename/path
+      const pattern = `"(?:file_path|path)":"(?:${pathPatterns.join('|')})/[^"]+"`;
+
+      const ruleParams = {
+        decision: PolicyDecision.ALLOW,
+        priority: 110, // Higher than default project policy (100)
+        modes: [ApprovalMode.PLAN],
+        argsPattern: new RegExp(pattern),
+        source: 'Config (Plan Mode)',
+      };
+
+      this.policyEngine.addRule({
+        ...ruleParams,
+        toolName: 'write_file',
+      });
+      this.policyEngine.addRule({
+        ...ruleParams,
+        toolName: 'replace',
+      });
+    }
+  }
 
   /**
    * Disposes of resources and removes event listeners.

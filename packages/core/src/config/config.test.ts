@@ -10,7 +10,7 @@ import type { ConfigParameters, SandboxConfig } from './config.js';
 import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from './config.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { ApprovalMode } from '../policy/types.js';
+import { ApprovalMode, PolicyDecision } from '../policy/types.js';
 import type { HookDefinition } from '../hooks/types.js';
 import { HookType, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
@@ -2504,6 +2504,24 @@ describe('Plans Directory Initialization', () => {
     expect(context.getDirectories()).toContain(plansDir);
   });
 
+  it('should create custom plans directory and add it to workspace context when plan.directory is provided', async () => {
+    const customDir = 'custom-plans';
+    const config = new Config({
+      ...baseParams,
+      plan: { enabled: true, directory: customDir },
+    });
+
+    await config.initialize();
+
+    const expectedDir = path.resolve(baseParams.targetDir, customDir);
+    expect(fs.promises.mkdir).toHaveBeenCalledWith(expectedDir, {
+      recursive: true,
+    });
+
+    const context = config.getWorkspaceContext();
+    expect(context.getDirectories()).toContain(expectedDir);
+  });
+
   it('should NOT create plans directory or add it to workspace context when plan is disabled', async () => {
     const config = new Config({
       ...baseParams,
@@ -2620,5 +2638,81 @@ describe('syncPlanModeTools', () => {
     config.syncPlanModeTools();
 
     expect(setToolsSpy).toHaveBeenCalled();
+  });
+});
+
+describe('Custom Plans Directory Policy', () => {
+  const customDir = 'conductor';
+  const customParams: ConfigParameters = {
+    sessionId: 'test',
+    targetDir: '/tmp/project',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '/tmp/project',
+    plan: { enabled: true, directory: customDir },
+  };
+
+  beforeEach(() => {
+    vi.spyOn(fs.promises, 'mkdir').mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.mocked(fs.promises.mkdir).mockRestore();
+  });
+
+  it('should allow writing any file in custom plan dir with high priority', async () => {
+    const config = new Config(customParams);
+    await config.initialize();
+
+    const policyEngine = config.getPolicyEngine();
+    const rules = policyEngine.getRules();
+
+    // Find the write_file rule added by Config
+    const writeFileRule = rules.find(
+      (r) => r.toolName === 'write_file' && r.source === 'Config (Plan Mode)',
+    );
+
+    expect(writeFileRule).toBeDefined();
+    expect(writeFileRule?.priority).toBe(110);
+    expect(writeFileRule?.decision).toBe(PolicyDecision.ALLOW);
+
+    // Test regex against various extensions
+    expect(
+      writeFileRule?.argsPattern?.test(`"file_path":"${customDir}/plan.md"`),
+    ).toBe(true);
+    expect(
+      writeFileRule?.argsPattern?.test(
+        `"file_path":"${customDir}/metadata.json"`,
+      ),
+    ).toBe(true);
+    expect(
+      writeFileRule?.argsPattern?.test(`"file_path":"${customDir}/script.sh"`),
+    ).toBe(true);
+  });
+
+  it('should override project policy with lower priority', async () => {
+    const config = new Config(customParams);
+    await config.initialize();
+
+    const policyEngine = config.getPolicyEngine();
+
+    // Add a strict project policy that denies all write_file calls (Priority 100)
+    policyEngine.addRule({
+      toolName: 'write_file',
+      decision: PolicyDecision.DENY,
+      priority: 100,
+      source: 'Project Policy',
+    });
+
+    // Test a call to a path inside the plan dir
+    // We set approval mode to PLAN because the dynamic rule is restricted to PLAN mode
+    config.setApprovalMode(ApprovalMode.PLAN);
+
+    const checkResult = await policyEngine.check(
+      { name: 'write_file', args: { file_path: `${customDir}/plan.md` } },
+      undefined,
+    );
+
+    expect(checkResult.decision).toBe(PolicyDecision.ALLOW);
   });
 });

@@ -380,11 +380,12 @@ describe('SettingsSchema', () => {
     it('should have plan setting in schema', () => {
       const setting = getSettingsSchema().experimental.properties.plan;
       expect(setting).toBeDefined();
-      expect(setting.type).toBe('boolean');
+      expect(setting.type).toBe('object');
       expect(setting.category).toBe('Experimental');
       expect(setting.default).toBe(false);
       expect(setting.requiresRestart).toBe(true);
       expect(setting.showInDialog).toBe(true);
+      expect(setting.ref).toBe('PlanSettings');
       expect(setting.description).toBe(
         'Enable planning features (Plan Mode and tools).',
       );

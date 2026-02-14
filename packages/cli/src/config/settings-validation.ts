@@ -164,6 +164,14 @@ function buildZodSchemaFromDefinition(
     }
   }
 
+  // Special handling for PlanSettings which can be boolean or object
+  if (definition.ref === 'PlanSettings') {
+    const objectSchema = REF_SCHEMAS['PlanSettings'];
+    if (objectSchema) {
+      return z.union([z.boolean(), objectSchema]).optional();
+    }
+  }
+
   // Handle refs using registry
   if (definition.ref && definition.ref in REF_SCHEMAS) {
     return REF_SCHEMAS[definition.ref].optional();

@@ -2281,6 +2281,33 @@ describe('Settings Loading and Merging', () => {
         },
       });
     });
+
+    it('should migrate experimental.plan from boolean to object', () => {
+      const userSettingsContent = {
+        experimental: {
+          plan: true,
+        },
+      };
+
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
+      loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Verify migration happened during loadSettings automatically
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'experimental',
+        expect.objectContaining({ plan: { enabled: true } }),
+      );
+    });
   });
 
   describe('saveSettings', () => {

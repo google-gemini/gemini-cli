@@ -55,7 +55,7 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
     private config: Config,
     messageBus: MessageBus,
   ) {
-    const plansDir = config.storage.getProjectTempPlansDir();
+    const plansDir = config.getPlanDirectory();
     super(
       EXIT_PLAN_MODE_TOOL_NAME,
       'Exit Plan Mode',
@@ -84,9 +84,7 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
 
     // Since validateToolParamValues is synchronous, we use a basic synchronous check
     // for path traversal safety. High-level async validation is deferred to shouldConfirmExecute.
-    const plansDir = resolveToRealPath(
-      this.config.storage.getProjectTempPlansDir(),
-    );
+    const plansDir = resolveToRealPath(this.config.getPlanDirectory());
     const resolvedPath = path.resolve(
       this.config.getTargetDir(),
       params.plan_path,
@@ -142,7 +140,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
 
     const pathError = await validatePlanPath(
       this.params.plan_path,
-      this.config.storage.getProjectTempPlansDir(),
+      this.config.getPlanDirectory(),
       this.config.getTargetDir(),
     );
     if (pathError) {

@@ -928,7 +928,7 @@ their corresponding top-level category object in your `settings.json` file.
     (useful for remote sessions).
   - **Default:** `false`
 
-- **`experimental.plan`** (boolean):
+- **`experimental.plan`** (object):
   - **Description:** Enable planning features (Plan Mode and tools).
   - **Default:** `false`
   - **Requires restart:** Yes

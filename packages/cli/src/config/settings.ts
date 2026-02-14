@@ -1093,6 +1093,18 @@ function migrateExperimentalSettings(
     };
     let modified = false;
 
+    // Migrate experimental.plan: boolean -> experimental.plan: { enabled: boolean }
+    const plan = experimentalSettings['plan'];
+    if (typeof plan === 'boolean') {
+      foundDeprecated?.push('experimental.plan (boolean)');
+      const newExperimental = {
+        ...experimentalSettings,
+        plan: { enabled: plan },
+      };
+      loadedSettings.setValue(scope, 'experimental', newExperimental);
+      modified = true;
+    }
+
     const migrateExperimental = (
       oldKey: string,
       migrateFn: (oldValue: Record<string, unknown>) => void,

@@ -1550,7 +1550,7 @@
           "description": "Enable planning features (Plan Mode and tools).",
           "markdownDescription": "Enable planning features (Plan Mode and tools).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
-          "type": "boolean"
+          "$ref": "#/$defs/PlanSettings"
         }
       },
       "additionalProperties": false
@@ -1923,6 +1923,29 @@
           "description": "Service account email to impersonate (name@project.iam.gserviceaccount.com)."
         }
       }
+    },
+    "PlanSettings": {
+      "description": "Planning features settings. Can be a boolean flag or an object with additional configuration.",
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "object",
+          "description": "Planning features configuration.",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable planning features."
+            },
+            "directory": {
+              "type": "string",
+              "description": "Custom directory for implementation plans."
+            }
+          }
+        }
+      ]
     },
     "TelemetrySettings": {
       "type": "object",
