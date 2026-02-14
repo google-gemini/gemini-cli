@@ -666,18 +666,17 @@ async function handleAutomaticOAuth(
   try {
     debugLogger.log(`🔐 '${mcpServerName}' requires OAuth authentication`);
 
-    // Always try to parse the resource metadata URI from the www-authenticate header
-    let oauthConfig;
-    const resourceMetadataUri =
-      OAuthUtils.parseWWWAuthenticateHeader(wwwAuthenticate);
-    if (resourceMetadataUri) {
-      oauthConfig = await OAuthUtils.discoverOAuthConfig(resourceMetadataUri);
-    } else if (hasNetworkTransport(mcpServerConfig)) {
+    const serverUrl = mcpServerConfig.httpUrl || mcpServerConfig.url;
+
+    // Try to discover OAuth config from the WWW-Authenticate header first
+    let oauthConfig = await OAuthUtils.discoverOAuthFromWWWAuthenticate(
+      wwwAuthenticate,
+      serverUrl,
+    );
+
+    if (!oauthConfig && hasNetworkTransport(mcpServerConfig)) {
       // Fallback: try to discover OAuth config from the base URL
-      const serverUrl = new URL(
-        mcpServerConfig.httpUrl || mcpServerConfig.url!,
-      );
-      const baseUrl = `${serverUrl.protocol}//${serverUrl.host}`;
+      const baseUrl = OAuthUtils.extractBaseUrl(serverUrl!);
       oauthConfig = await OAuthUtils.discoverOAuthConfig(baseUrl);
     }
 
@@ -700,8 +699,6 @@ async function handleAutomaticOAuth(
     };
 
     // Perform OAuth authentication
-    // Pass the server URL for proper discovery
-    const serverUrl = mcpServerConfig.httpUrl || mcpServerConfig.url;
     debugLogger.log(
       `Starting OAuth authentication for server '${mcpServerName}'...`,
     );
