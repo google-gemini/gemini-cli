@@ -247,11 +247,12 @@ export async function runNonInteractive({
           settings,
         );
         // If a slash command is found and returns a prompt, use it.
-        // Otherwise, slashCommandResult falls through to the default prompt
-        // handling.
+        // Otherwise, if it was a slash command, we are done.
         if (slashCommandResult) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           query = slashCommandResult as Part[];
+        } else {
+          return;
         }
       }
 

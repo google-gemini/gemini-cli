@@ -12,7 +12,6 @@ import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
 
 // Event-based transcript delivery to avoid context re-renders
-// See VOICE_INFINITE_LOOP_ANALYSIS.md for details
 const transcriptEmitter = new EventEmitter();
 
 export interface VoiceInputState {
@@ -95,7 +94,7 @@ export function useVoiceInput(config?: {
 
       // Create temp directory
       const tempDir = await mkdtemp(join(tmpdir(), 'gemini-voice-'));
-      debugLogger.log('useVoiceInput: tempDir created', tempDir);
+      debugLogger.debug('useVoiceInput: tempDir created', tempDir);
       tempDirRef.current = tempDir;
       const audioFile = join(tempDir, `recording.${RECORDING_FORMAT}`);
       audioFileRef.current = audioFile;
@@ -104,7 +103,8 @@ export function useVoiceInput(config?: {
       let recordProcess: ReturnType<typeof spawn>;
 
       // Helper to check if command exists using execFile (safer than exec)
-      const commandExists = (cmd: string): Promise<boolean> => new Promise((resolve) => {
+      const commandExists = (cmd: string): Promise<boolean> =>
+        new Promise((resolve) => {
           execFile('which', [cmd], (error) => {
             resolve(!error);
           });
@@ -116,7 +116,7 @@ export function useVoiceInput(config?: {
         if (!soxExists) {
           throw new Error('sox not found');
         }
-        debugLogger.log('useVoiceInput: sox found');
+        debugLogger.debug('useVoiceInput: sox found');
         recordProcess = spawn('sox', [
           '-d', // default input device
           '-b',
@@ -133,15 +133,15 @@ export function useVoiceInput(config?: {
         ]);
 
         recordProcess.stderr?.on('data', (data) => {
-          debugLogger.log('useVoiceInput: sox stderr:', data.toString());
+          debugLogger.debug('useVoiceInput: sox stderr:', data.toString());
         });
 
         recordProcess.on('error', (err) => {
-          debugLogger.log('useVoiceInput: sox error:', err.message);
+          debugLogger.debug('useVoiceInput: sox error:', err.message);
         });
 
         recordProcess.on('exit', (code) => {
-          debugLogger.log('useVoiceInput: sox exited with code:', code);
+          debugLogger.debug('useVoiceInput: sox exited with code:', code);
         });
       } catch {
         // Fall back to arecord (Linux)
@@ -150,7 +150,7 @@ export function useVoiceInput(config?: {
           if (!arecordExists) {
             throw new Error('arecord not found');
           }
-          debugLogger.log('useVoiceInput: arecord found');
+          debugLogger.debug('useVoiceInput: arecord found');
           recordProcess = spawn('arecord', [
             '-f',
             'S16_LE',
@@ -170,7 +170,7 @@ export function useVoiceInput(config?: {
         }
       }
 
-      debugLogger.log('useVoiceInput: recording process spawned', {
+      debugLogger.debug('useVoiceInput: recording process spawned', {
         pid: recordProcess.pid,
       });
       recordingProcessRef.current = recordProcess;
@@ -185,7 +185,7 @@ export function useVoiceInput(config?: {
       });
 
       recordProcess.on('exit', (code, signal) => {
-        debugLogger.log('useVoiceInput: recording process exited', {
+        debugLogger.debug('useVoiceInput: recording process exited', {
           code,
           signal,
         });
@@ -213,7 +213,7 @@ export function useVoiceInput(config?: {
       // Stop recording
       const processToKill = recordingProcessRef.current;
       if (processToKill) {
-        debugLogger.log('useVoiceInput: stopping recording');
+        debugLogger.debug('useVoiceInput: stopping recording');
         processToKill.kill('SIGINT');
 
         // Wait for process to exit
@@ -260,13 +260,14 @@ export function useVoiceInput(config?: {
         throw new Error('No audio recorded (file is empty)');
       }
 
-      debugLogger.log('useVoiceInput: audio file size', stats.size);
+      debugLogger.debug('useVoiceInput: audio file size', stats.size);
 
       // Transcribe using whisper-cli or faster-whisper
       let transcript = '';
 
       // Helper to execute whisper with proper argument array (prevents command injection)
-      const execFileAsync = (file: string, args: string[]): Promise<void> => new Promise((resolve, reject) => {
+      const execFileAsync = (file: string, args: string[]): Promise<void> =>
+        new Promise((resolve, reject) => {
           execFile(file, args, (error) => {
             if (error) {
               reject(error);
@@ -293,7 +294,7 @@ export function useVoiceInput(config?: {
       try {
         if (config?.whisperPath) {
           const validatedPath = validateBinaryPath(config.whisperPath);
-          debugLogger.log(
+          debugLogger.debug(
             'useVoiceInput: using configured whisper path',
             validatedPath,
           );
