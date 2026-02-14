@@ -53,7 +53,9 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
     day: 'numeric',
   });
   const platform = process.platform;
-  const directoryContext = await getDirectoryContextString(config);
+  const directoryContext = config.getIncludeDirectoryTree()
+    ? await getDirectoryContextString(config)
+    : '';
   const tempDir = config.storage.getProjectTempDir();
   const environmentMemory = config.getEnvironmentMemory();
 
@@ -63,7 +65,7 @@ This is the Gemini CLI. We are setting up the context for our chat.
 Today's date is ${today} (formatted according to the user's locale).
 My operating system is: ${platform}
 The project's temporary directory is: ${tempDir}
-${directoryContext}
+${directoryContext ? directoryContext + '\n' : ''}
 
 ${environmentMemory}
 </session_context>`.trim();

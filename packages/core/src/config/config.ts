@@ -436,6 +436,7 @@ export interface ConfigParameters {
   folderTrust?: boolean;
   ideMode?: boolean;
   loadMemoryFromIncludeDirectories?: boolean;
+  includeDirectoryTree?: boolean;
   importFormat?: 'tree' | 'flat';
   discoveryMaxDirs?: number;
   compressionThreshold?: number;
@@ -603,6 +604,7 @@ export class Config {
     | undefined;
   private readonly experimentalZedIntegration: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
+  private readonly includeDirectoryTree: boolean = true;
   private readonly importFormat: 'tree' | 'flat';
   private readonly discoveryMaxDirs: number;
   private readonly compressionThreshold: number | undefined;
@@ -786,6 +788,7 @@ export class Config {
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.folderTrust = params.folderTrust ?? false;
     this.ideMode = params.ideMode ?? false;
+    this.includeDirectoryTree = params.includeDirectoryTree ?? true;
     this.loadMemoryFromIncludeDirectories =
       params.loadMemoryFromIncludeDirectories ?? false;
     this.importFormat = params.importFormat ?? 'tree';
@@ -1159,6 +1162,10 @@ export class Config {
 
   shouldLoadMemoryFromIncludeDirectories(): boolean {
     return this.loadMemoryFromIncludeDirectories;
+  }
+
+  getIncludeDirectoryTree(): boolean {
+    return this.includeDirectoryTree;
   }
 
   getImportFormat(): 'tree' | 'flat' {
