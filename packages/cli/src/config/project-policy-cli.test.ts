@@ -10,11 +10,15 @@ import { loadCliConfig, type CliArgs } from './config.js';
 import { createTestMergedSettings } from './settings.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 // Mock dependencies
 vi.mock('./trustedFolders.js', () => ({
   isWorkspaceTrusted: vi.fn(),
 }));
+
+const mockCheckIntegrity = vi.fn();
+const mockAcceptIntegrity = vi.fn();
 
 vi.mock('@google/gemini-cli-core', async () => {
   const actual = await vi.importActual<typeof ServerConfig>(
@@ -33,13 +37,15 @@ vi.mock('@google/gemini-cli-core', async () => {
     }),
     getVersion: vi.fn().mockResolvedValue('test-version'),
     PolicyIntegrityManager: vi.fn().mockImplementation(() => ({
-      checkIntegrity: vi.fn().mockResolvedValue({
-        status: 'match', // IntegrityStatus.MATCH
-        hash: 'test-hash',
-        fileCount: 1,
-      }),
+      checkIntegrity: mockCheckIntegrity,
+      acceptIntegrity: mockAcceptIntegrity,
     })),
     IntegrityStatus: { MATCH: 'match', NEW: 'new', MISMATCH: 'mismatch' },
+    debugLogger: {
+      warn: vi.fn(),
+      error: vi.fn(),
+    },
+    isHeadlessMode: vi.fn().mockReturnValue(false), // Default to interactive
   };
 });
 
@@ -48,6 +54,13 @@ describe('Project-Level Policy CLI Integration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default to MATCH for existing tests
+    mockCheckIntegrity.mockResolvedValue({
+      status: 'match',
+      hash: 'test-hash',
+      fileCount: 1,
+    });
+    vi.mocked(ServerConfig.isHeadlessMode).mockReturnValue(false);
   });
 
   it('should have getProjectPoliciesDir on Storage class', () => {
@@ -67,12 +80,10 @@ describe('Project-Level Policy CLI Integration', () => {
 
     await loadCliConfig(settings, 'test-session', argv, { cwd: MOCK_CWD });
 
-    // The wrapper createPolicyEngineConfig in policy.ts calls createCorePolicyEngineConfig
-    // We check if the core one was called with 4 arguments, the 4th being the project dir
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.anything(),
       expect.anything(),
-      undefined, // defaultPoliciesDir
+      undefined,
       expect.stringContaining(path.join('.gemini', 'policies')),
     );
   });
@@ -88,7 +99,160 @@ describe('Project-Level Policy CLI Integration', () => {
 
     await loadCliConfig(settings, 'test-session', argv, { cwd: MOCK_CWD });
 
-    // The 4th argument (projectPoliciesDir) should be undefined
+    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      undefined,
+    );
+  });
+
+  it('should NOT pass projectPoliciesDir if integrity is NEW but fileCount is 0', async () => {
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: 'file',
+    });
+    mockCheckIntegrity.mockResolvedValue({
+      status: 'new',
+      hash: 'hash',
+      fileCount: 0,
+    });
+
+    const settings = createTestMergedSettings();
+    const argv = { query: 'test' } as unknown as CliArgs;
+
+    await loadCliConfig(settings, 'test-session', argv, { cwd: MOCK_CWD });
+
+    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      undefined,
+    );
+  });
+
+  it('should warn and NOT pass projectPoliciesDir if integrity MISMATCH in non-interactive mode', async () => {
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: 'file',
+    });
+    mockCheckIntegrity.mockResolvedValue({
+      status: 'mismatch',
+      hash: 'new-hash',
+      fileCount: 1,
+    });
+    vi.mocked(ServerConfig.isHeadlessMode).mockReturnValue(true); // Non-interactive
+
+    const settings = createTestMergedSettings();
+    const argv = { prompt: 'do something' } as unknown as CliArgs;
+
+    await loadCliConfig(settings, 'test-session', argv, { cwd: MOCK_CWD });
+
+    expect(debugLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Project policies changed or are new'),
+    );
+    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      undefined, // Should NOT load policies
+    );
+  });
+
+  it('should accept policies if --accept-changed-policies is passed', async () => {
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: 'file',
+    });
+    mockCheckIntegrity.mockResolvedValue({
+      status: 'mismatch',
+      hash: 'new-hash',
+      fileCount: 1,
+    });
+
+    const settings = createTestMergedSettings();
+    const argv = { acceptChangedPolicies: true } as unknown as CliArgs;
+
+    await loadCliConfig(settings, 'test-session', argv, { cwd: MOCK_CWD });
+
+    expect(mockAcceptIntegrity).toHaveBeenCalledWith(
+      'project',
+      MOCK_CWD,
+      'new-hash',
+    );
+    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      expect.stringContaining(path.join('.gemini', 'policies')),
+    );
+  });
+
+  it('should set policyUpdateConfirmationRequest if integrity MISMATCH in interactive mode', async () => {
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: 'file',
+    });
+    mockCheckIntegrity.mockResolvedValue({
+      status: 'mismatch',
+      hash: 'new-hash',
+      fileCount: 1,
+    });
+    vi.mocked(ServerConfig.isHeadlessMode).mockReturnValue(false); // Interactive
+
+    const settings = createTestMergedSettings();
+    const argv = {
+      query: 'test',
+      promptInteractive: 'test',
+    } as unknown as CliArgs;
+
+    const config = await loadCliConfig(settings, 'test-session', argv, {
+      cwd: MOCK_CWD,
+    });
+
+    expect(config.getPolicyUpdateConfirmationRequest()).toEqual({
+      scope: 'project',
+      identifier: MOCK_CWD,
+      policyDir: expect.stringContaining(path.join('.gemini', 'policies')),
+      newHash: 'new-hash',
+    });
+    // In interactive mode without accept flag, it waits for user confirmation (handled by UI),
+    // so it currently DOES NOT pass the directory to createPolicyEngineConfig yet.
+    // The UI will handle the confirmation and reload/update.
+    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      undefined,
+    );
+  });
+
+  it('should set policyUpdateConfirmationRequest if integrity is NEW with files (first time seen) in interactive mode', async () => {
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: 'file',
+    });
+    mockCheckIntegrity.mockResolvedValue({
+      status: 'new',
+      hash: 'new-hash',
+      fileCount: 5,
+    });
+    vi.mocked(ServerConfig.isHeadlessMode).mockReturnValue(false); // Interactive
+
+    const settings = createTestMergedSettings();
+    const argv = { query: 'test' } as unknown as CliArgs;
+
+    const config = await loadCliConfig(settings, 'test-session', argv, {
+      cwd: MOCK_CWD,
+    });
+
+    expect(config.getPolicyUpdateConfirmationRequest()).toEqual({
+      scope: 'project',
+      identifier: MOCK_CWD,
+      policyDir: expect.stringContaining(path.join('.gemini', 'policies')),
+      newHash: 'new-hash',
+    });
+
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.anything(),
       expect.anything(),
