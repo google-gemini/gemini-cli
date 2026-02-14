@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as os from 'node:os';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import toml from '@iarna/toml';
@@ -37,6 +38,7 @@ import { sanitizeForDisplay } from '../ui/utils/textUtils.js';
 
 interface CommandDirectory {
   path: string;
+  sourceLabel: string;
   extensionName?: string;
   extensionId?: string;
 }
@@ -67,11 +69,21 @@ export class FileCommandLoader implements ICommandLoader {
   private readonly projectRoot: string;
   private readonly folderTrustEnabled: boolean;
   private readonly isTrustedFolder: boolean;
+  private readonly username: string;
 
   constructor(private readonly config: Config | null) {
     this.folderTrustEnabled = !!config?.getFolderTrust();
     this.isTrustedFolder = !!config?.isTrustedFolder();
     this.projectRoot = config?.getProjectRoot() || process.cwd();
+    this.username = this.getUsername();
+  }
+
+  private getUsername(): string {
+    try {
+      return os.userInfo().username;
+    } catch {
+      return process.env['USER'] || process.env['USERNAME'] || 'User';
+    }
   }
 
   /**
@@ -111,6 +123,7 @@ export class FileCommandLoader implements ICommandLoader {
           this.parseAndAdaptFile(
             path.join(dirInfo.path, file),
             dirInfo.path,
+            dirInfo.sourceLabel,
             dirInfo.extensionName,
             dirInfo.extensionId,
           ),
@@ -151,10 +164,16 @@ export class FileCommandLoader implements ICommandLoader {
     const storage = this.config?.storage ?? new Storage(this.projectRoot);
 
     // 1. User commands
-    dirs.push({ path: Storage.getUserCommandsDir() });
+    dirs.push({
+      path: Storage.getUserCommandsDir(),
+      sourceLabel: this.username,
+    });
 
     // 2. Project commands (override user commands)
-    dirs.push({ path: storage.getProjectCommandsDir() });
+    dirs.push({
+      path: storage.getProjectCommandsDir(),
+      sourceLabel: path.basename(this.projectRoot),
+    });
 
     // 3. Extension commands (processed last to detect all conflicts)
     if (this.config) {
@@ -165,6 +184,7 @@ export class FileCommandLoader implements ICommandLoader {
 
       const extensionCommandDirs = activeExtensions.map((ext) => ({
         path: path.join(ext.path, 'commands'),
+        sourceLabel: ext.name,
         extensionName: ext.name,
         extensionId: ext.id,
       }));
@@ -185,8 +205,9 @@ export class FileCommandLoader implements ICommandLoader {
   private async parseAndAdaptFile(
     filePath: string,
     baseDir: string,
-    extensionName?: string,
-    extensionId?: string,
+    sourceLabel: string,
+    extensionName: string | undefined,
+    extensionId: string | undefined,
   ): Promise<SlashCommand | null> {
     let fileContent: string;
     try {
@@ -245,15 +266,13 @@ export class FileCommandLoader implements ICommandLoader {
       })
       .join(':');
 
-    // Add extension name tag for extension commands
+    // Add source label tag for all file-based commands
     const defaultDescription = `Custom command from ${path.basename(filePath)}`;
-    let description = validDef.description || defaultDescription;
-
-    description = sanitizeForDisplay(description, 100);
-
-    if (extensionName) {
-      description = `[${extensionName}] ${description}`;
-    }
+    const rawDescription = validDef.description || defaultDescription;
+    const description = sanitizeForDisplay(
+      `[${sourceLabel}] ${rawDescription}`,
+      100,
+    );
 
     const processors: IPromptProcessor[] = [];
     const usesArgs = validDef.prompt.includes(SHORTHAND_ARGS_PLACEHOLDER);
