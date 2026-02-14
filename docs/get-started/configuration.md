@@ -322,6 +322,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+#### `voice`
+
+- **`voice.whisperPath`** (string):
+  - **Description:** Path to the whisper executable (e.g. /path/to/whisper).
+  - **Default:** `undefined`
+
 #### `ide`
 
 - **`ide.enabled`** (boolean):
