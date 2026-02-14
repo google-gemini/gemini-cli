@@ -47,6 +47,7 @@ import {
   CoreEvent,
   type McpProgressPayload,
 } from '../utils/events.js';
+import { GeminiCliOperation } from '../telemetry/constants.js';
 
 interface SchedulerQueueItem {
   requests: ToolCallRequestInfo[];

@@ -26,6 +26,12 @@ import {
   GEN_AI_AGENT_NAME,
 } from '../telemetry/constants.js';
 import { formatUserHintsForModel } from '../utils/fastAckHelper.js';
+import { runInDevTraceSpan } from '../telemetry/trace.js';
+import {
+  GeminiCliOperation,
+  GEN_AI_AGENT_DESCRIPTION,
+  GEN_AI_AGENT_NAME,
+} from '../telemetry/constants.js';
 
 export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
   constructor(

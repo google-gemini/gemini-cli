@@ -38,6 +38,7 @@ import {
   buildUserSteeringHintPrompt,
   generateSteeringAckMessage,
   getPlanModeExitMessage,
+  GeminiCliOperation,
 } from '@google/gemini-cli-core';
 import type {
   Config,
