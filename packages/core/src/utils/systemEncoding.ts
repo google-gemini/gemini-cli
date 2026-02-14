@@ -6,7 +6,7 @@
 
 import { execSync } from 'node:child_process';
 import os from 'node:os';
-import { detect as chardetDetect } from 'chardet';
+import { detect as chardetDetect, analyse as chardetAnalyse } from 'chardet';
 import { debugLogger } from './debugLogger.js';
 
 // Cache for system encoding to avoid repeated detection
@@ -28,6 +28,37 @@ export function resetEncodingCache(): void {
  * @param buffer A buffer to use for detecting encoding if system detection fails.
  */
 export function getCachedEncodingForBuffer(buffer: Buffer): string {
+  // Level 1: Override
+  if (process.env['GEMINI_CLI_ENCODING']) {
+    let encoding = process.env['GEMINI_CLI_ENCODING'].toLowerCase();
+    // Normalize numeric code pages (e.g., "866" -> "cp866")
+    if (/^\d+$/.test(encoding)) {
+      encoding = `cp${encoding}`;
+    }
+    return encoding;
+  }
+
+  // Level 2: Strict UTF-8 Check
+  try {
+    new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+    return 'utf-8';
+  } catch (_e) {
+    // Not valid UTF-8, continue to other levels
+  }
+
+  // Level 3: Heuristic (Strict UTF-8 check via chardet)
+  try {
+    const matches = chardetAnalyse(buffer);
+    const utf8Match = matches.find(
+      (m) => m.name.toLowerCase() === 'utf-8' && m.confidence >= 90,
+    );
+    if (utf8Match) {
+      return 'utf-8';
+    }
+  } catch (error) {
+    debugLogger.warn('Failed heuristic encoding analysis:', error);
+  }
+
   // Cache system encoding detection since it's system-wide
   if (cachedSystemEncoding === undefined) {
     cachedSystemEncoding = getSystemEncoding();
@@ -51,14 +82,28 @@ export function getCachedEncodingForBuffer(buffer: Buffer): string {
  * @returns The system encoding as a string, or null if detection fails.
  */
 export function getSystemEncoding(): string | null {
+  // Global Override check
+  if (process.env['GEMINI_CLI_ENCODING']) {
+    let encoding = process.env['GEMINI_CLI_ENCODING'].toLowerCase();
+    if (/^\d+$/.test(encoding)) {
+      encoding = `cp${encoding}`;
+    }
+    return encoding;
+  }
+
   // Windows
   if (os.platform() === 'win32') {
     try {
       const output = execSync('chcp', { encoding: 'utf8' });
-      const match = output.match(/:\s*(\d+)/);
+      const match = output.match(/(\d+)\s*$/);
       if (match) {
         const codePage = parseInt(match[1], 10);
         if (!isNaN(codePage)) {
+          if (codePage !== 65001) {
+            debugLogger.log(
+              `System code page is ${codePage}, not UTF-8 (65001). Some characters might be garbled.`,
+            );
+          }
           return windowsCodePageToEncoding(codePage);
         }
       }
