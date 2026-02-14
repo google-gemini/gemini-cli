@@ -534,11 +534,13 @@ function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
   if (options.enableWriteTodosTool) {
     return `2. **Strategy:** Formulate a grounded plan based on your research.${
       options.interactive ? ' Share a concise summary of your strategy.' : ''
-    } For complex tasks, break them down into smaller, manageable subtasks and use the ${formatToolName(WRITE_TODOS_TOOL_NAME)} tool to track your progress.`;
+    } For complex tasks, break them down into smaller, manageable subtasks and use the ${formatToolName(
+      WRITE_TODOS_TOOL_NAME,
+    )} tool to track your progress. When these subtasks are independent, leverage the 'generalist' agent to execute them in parallel, increasing efficiency.`;
   }
   return `2. **Strategy:** Formulate a grounded plan based on your research.${
     options.interactive ? ' Share a concise summary of your strategy.' : ''
-  }`;
+  } For tasks that can be broken down into independent sub-tasks, leverage the 'generalist' agent to parallelize their execution.`;
 }
 
 function workflowVerifyStandardsSuffix(interactive: boolean): string {

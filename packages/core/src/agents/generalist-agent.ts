@@ -8,6 +8,7 @@ import { z } from 'zod';
 import type { Config } from '../config/config.js';
 import { getCoreSystemPrompt } from '../core/prompts.js';
 import type { LocalAgentDefinition } from './types.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 
 const GeneralistAgentSchema = z.object({
   response: z.string().describe('The final response from the agent.'),
@@ -23,8 +24,9 @@ export const GeneralistAgent = (
   kind: 'local',
   name: 'generalist',
   displayName: 'Generalist Agent',
-  description:
-    "A general-purpose AI agent with access to all tools. Use it for complex tasks that don't fit into other specialized agents.",
+  description: `A general-purpose AI agent with access to all tools.
+    - ALWAYS use it to break up and parallelize independent pieces of a larger task, when possible.
+    `,
   experimental: true,
   inputConfig: {
     inputSchema: {
@@ -47,7 +49,15 @@ export const GeneralistAgent = (
     model: 'inherit',
   },
   get toolConfig() {
-    const tools = config.getToolRegistry().getAllToolNames();
+    const tools = config
+      .getToolRegistry()
+      .getAllTools()
+      .map((tool) => {
+        if (tool instanceof DiscoveredMCPTool) {
+          return tool.getFullyQualifiedName();
+        }
+        return tool.name;
+      });
     return {
       tools,
     };
