@@ -850,10 +850,8 @@ describe('gemini.tsx main function kitty protocol', () => {
     expect(runNonInteractive).toHaveBeenCalled();
     const callArgs = vi.mocked(runNonInteractive).mock.calls[0][0];
     expect(callArgs.input).toBe('stdin-data\n\ntest-question');
-    expect(macOsNotificationMocks.buildMacNotificationContent).toHaveBeenCalledWith(
-      { type: 'session_complete' },
-    );
-    expect(macOsNotificationMocks.notifyMacOs).toHaveBeenCalled();
+    expect(macOsNotificationMocks.buildMacNotificationContent).not.toHaveBeenCalled();
+    expect(macOsNotificationMocks.notifyMacOs).not.toHaveBeenCalled();
     expect(processExitSpy).toHaveBeenCalledWith(0);
     processExitSpy.mockRestore();
   });
