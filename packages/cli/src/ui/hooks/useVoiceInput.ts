@@ -7,8 +7,8 @@
 import { debugLogger, tmpdir } from '@google/gemini-cli-core';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { spawn, execFile } from 'node:child_process';
-import { unlink, mkdtemp, stat, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { unlink, mkdtemp, stat, readFile, rm } from 'node:fs/promises';
+import { join, delimiter } from 'node:path';
 import { EventEmitter } from 'node:events';
 
 // Event-based transcript delivery to avoid context re-renders
@@ -75,7 +75,9 @@ export function useVoiceInput(config?: {
         void unlink(audioFileRef.current).catch(() => {});
       }
       if (tempDirRef.current) {
-        // Clean up temp dir
+        void rm(tempDirRef.current, { recursive: true, force: true }).catch(
+          () => {},
+        );
       }
     },
     [],
@@ -102,13 +104,28 @@ export function useVoiceInput(config?: {
       // Start recording with sox or arecord
       let recordProcess: ReturnType<typeof spawn>;
 
-      // Helper to check if command exists using execFile (safer than exec)
-      const commandExists = (cmd: string): Promise<boolean> =>
-        new Promise((resolve) => {
-          execFile('which', [cmd], (error) => {
-            resolve(!error);
-          });
-        });
+      // Helper to check if command exists (cross-platform)
+      const commandExists = async (cmd: string): Promise<boolean> => {
+        const pathEnv = process.env['PATH'] || '';
+        const paths = pathEnv.split(delimiter);
+        const extensions =
+          process.platform === 'win32'
+            ? (process.env['PATHEXT'] || '.EXE').split(';')
+            : [''];
+
+        for (const p of paths) {
+          for (const ext of extensions) {
+            const fullPath = join(p, cmd + ext);
+            try {
+              const s = await stat(fullPath);
+              if (s.isFile()) return true;
+            } catch {
+              // ignore
+            }
+          }
+        }
+        return false;
+      };
 
       // Try sox first, fall back to arecord
       try {
@@ -373,7 +390,23 @@ export function useVoiceInput(config?: {
       await unlink(audioFile).catch(() => {});
       const transcriptFile = audioFile.replace('.wav', '.txt');
       await unlink(transcriptFile).catch(() => {});
+
+      // Clean up temp dir
+      if (tempDirRef.current) {
+        await rm(tempDirRef.current, { recursive: true, force: true }).catch(
+          () => {},
+        );
+        tempDirRef.current = null;
+      }
     } catch (err) {
+      // Clean up temp dir on error as well
+      if (tempDirRef.current) {
+        await rm(tempDirRef.current, { recursive: true, force: true }).catch(
+          () => {},
+        );
+        tempDirRef.current = null;
+      }
+
       setState({
         isRecording: false,
         isTranscribing: false,
