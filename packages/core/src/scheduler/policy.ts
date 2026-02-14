@@ -23,7 +23,7 @@ import {
   type PolicyUpdateOptions,
 } from '../tools/tools.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import { EDIT_TOOL_NAMES } from '../tools/tool-names.js';
+import { ACTIVATE_SKILL_TOOL_NAME, EDIT_TOOL_NAMES } from '../tools/tool-names.js';
 import type { ValidatingToolCall } from './types.js';
 
 /**
@@ -147,6 +147,12 @@ async function handleStandardPolicyUpdate(
     outcome === ToolConfirmationOutcome.ProceedAlways ||
     outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
   ) {
+    // activate_skill already publishes a narrow, skillName-scoped rule from the
+    // tool confirmation callback. Avoid adding a second broad fallback rule.
+    if (tool.name === ACTIVATE_SKILL_TOOL_NAME) {
+      return;
+    }
+
     const options: PolicyUpdateOptions = {};
 
     if (confirmationDetails?.type === 'exec') {

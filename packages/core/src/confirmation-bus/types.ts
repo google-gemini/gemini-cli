@@ -114,6 +114,7 @@ export interface UpdatePolicy {
   argsPattern?: string;
   commandPrefix?: string | string[];
   mcpName?: string;
+  skillName?: string;
 }
 
 export interface ToolPolicyRejection {
