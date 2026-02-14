@@ -219,11 +219,19 @@ export class TerminalCapabilityManager {
       try {
         fs.writeSync(
           process.stdout.fd,
-          TerminalCapabilityManager.KITTY_QUERY +
+          // Use hidden mode to prevent potential "m" character from being printed
+          // to the terminal during startup when querying for modifyOtherKeys.
+          // This can happen on some terminals that might echo the query or
+          // malform the response. We hide the output, send queries, then
+          // immediately clear the line and reset attributes.
+          '\x1b[8m' +
+            TerminalCapabilityManager.KITTY_QUERY +
             TerminalCapabilityManager.OSC_11_QUERY +
             TerminalCapabilityManager.TERMINAL_NAME_QUERY +
             TerminalCapabilityManager.MODIFY_OTHER_KEYS_QUERY +
-            TerminalCapabilityManager.DEVICE_ATTRIBUTES_QUERY,
+            TerminalCapabilityManager.DEVICE_ATTRIBUTES_QUERY +
+            '\x1b[2K\r' +
+            '\x1b[0m',
         );
       } catch (e) {
         debugLogger.warn('Failed to write terminal capability queries:', e);
