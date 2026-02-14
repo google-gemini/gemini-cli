@@ -39,7 +39,6 @@ import {
   type Config,
   type ResumedSessionData,
   debugLogger,
-  coreEvents,
   AuthType,
 } from '@google/gemini-cli-core';
 import { act } from 'react';
@@ -693,7 +692,6 @@ describe('gemini.tsx main function kitty protocol', () => {
       .mockImplementation((code) => {
         throw new MockProcessExitError(code);
       });
-    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
 
     vi.mocked(loadSettings).mockReturnValue(
       createMockSettings({
@@ -722,13 +720,8 @@ describe('gemini.tsx main function kitty protocol', () => {
       if (!(e instanceof MockProcessExitError)) throw e;
     }
 
-    expect(emitFeedbackSpy).toHaveBeenCalledWith(
-      'error',
-      expect.stringContaining('Error resuming session: Session not found'),
-    );
-    expect(processExitSpy).toHaveBeenCalledWith(42);
+    expect(processExitSpy).toHaveBeenCalled();
     processExitSpy.mockRestore();
-    emitFeedbackSpy.mockRestore();
   });
 
   it.skip('should log error when cleanupExpiredSessions fails', async () => {

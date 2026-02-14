@@ -319,6 +319,7 @@ export async function startInteractiveUI(
     });
 
   registerCleanup(() => instance.unmount());
+  await instance.waitUntilExit();
 }
 
 export async function main() {
@@ -705,9 +706,8 @@ export async function main() {
         // Use the existing session ID to continue recording to the same session
         config.setSessionId(resolvedSessionData.conversation.sessionId);
       } catch (error) {
-        coreEvents.emitFeedback(
-          'error',
-          `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        writeToStderr(
+          `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}\n`,
         );
         await runExitCleanup();
         process.exit(ExitCodes.FATAL_INPUT_ERROR);
@@ -812,8 +812,8 @@ export async function main() {
 
     const conversation = config
       .getGeminiClient()
-      ?.getChatRecordingService()
-      ?.getConversation();
+      ?.getChatRecordingService?.()
+      ?.getConversation?.();
     if (conversation) {
       const sessionName = getConversationSessionName(conversation);
       writeToStdout(

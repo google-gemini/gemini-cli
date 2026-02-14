@@ -37,22 +37,26 @@ process.on('uncaughtException', (error) => {
   });
 });
 
-main().catch(async (error) => {
-  await runExitCleanup();
+main()
+  .then(async () => {
+    await runExitCleanup();
+  })
+  .catch(async (error) => {
+    await runExitCleanup();
 
-  if (error instanceof FatalError) {
-    let errorMessage = error.message;
-    if (!process.env['NO_COLOR']) {
-      errorMessage = `\x1b[31m${errorMessage}\x1b[0m`;
+    if (error instanceof FatalError) {
+      let errorMessage = error.message;
+      if (!process.env['NO_COLOR']) {
+        errorMessage = `\x1b[31m${errorMessage}\x1b[0m`;
+      }
+      writeToStderr(errorMessage + '\n');
+      process.exit(error.exitCode);
     }
-    writeToStderr(errorMessage + '\n');
-    process.exit(error.exitCode);
-  }
-  writeToStderr('An unexpected critical error occurred:');
-  if (error instanceof Error) {
-    writeToStderr(error.stack + '\n');
-  } else {
-    writeToStderr(String(error) + '\n');
-  }
-  process.exit(1);
-});
+    writeToStderr('An unexpected critical error occurred:');
+    if (error instanceof Error) {
+      writeToStderr(error.stack + '\n');
+    } else {
+      writeToStderr(String(error) + '\n');
+    }
+    process.exit(1);
+  });
