@@ -9,6 +9,7 @@ import type { Mocked } from 'vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import { DiscoveredMCPTool, generateValidName } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
+import { sanitizeMcpContent } from '../utils/mcp-sanitization.js';
 import type { ToolResult } from './tools.js';
 import { ToolConfirmationOutcome } from './tools.js'; // Added ToolConfirmationOutcome
 import type { CallableTool, Part } from '@google/genai';
@@ -155,7 +156,7 @@ describe('DiscoveredMCPTool', () => {
         mockToolSuccessResultObject,
       );
       expect(toolResult.llmContent).toEqual([
-        { text: stringifiedResponseContent },
+        { text: sanitizeMcpContent(stringifiedResponseContent) },
       ]);
       expect(toolResult.returnDisplay).toBe(stringifiedResponseContent);
     });
@@ -337,7 +338,7 @@ describe('DiscoveredMCPTool', () => {
           mockToolSuccessResultObject,
         );
         expect(toolResult.llmContent).toEqual([
-          { text: stringifiedResponseContent },
+          { text: sanitizeMcpContent(stringifiedResponseContent) },
         ]);
         expect(toolResult.returnDisplay).toBe(stringifiedResponseContent);
       },
@@ -357,7 +358,9 @@ describe('DiscoveredMCPTool', () => {
       const toolResult = await invocation.execute(new AbortController().signal);
 
       // 1. Assert that the llmContent sent to the scheduler is a clean Part array.
-      expect(toolResult.llmContent).toEqual([{ text: successMessage }]);
+      expect(toolResult.llmContent).toEqual([
+        { text: sanitizeMcpContent(successMessage) },
+      ]);
 
       // 2. Assert that the display output is the simple text message.
       expect(toolResult.returnDisplay).toBe(successMessage);
@@ -387,7 +390,9 @@ describe('DiscoveredMCPTool', () => {
 
       expect(toolResult.llmContent).toEqual([
         {
-          text: `[Tool '${serverToolName}' provided the following audio data with mime-type: audio/mp3]`,
+          text: sanitizeMcpContent(
+            `[Tool '${serverToolName}' provided the following audio data with mime-type: audio/mp3]`,
+          ),
         },
         {
           inlineData: {
@@ -419,7 +424,9 @@ describe('DiscoveredMCPTool', () => {
 
       expect(toolResult.llmContent).toEqual([
         {
-          text: 'Resource Link: My Resource at file:///path/to/thing',
+          text: sanitizeMcpContent(
+            'Resource Link: My Resource at file:///path/to/thing',
+          ),
         },
       ]);
       expect(toolResult.returnDisplay).toBe(
@@ -448,7 +455,7 @@ describe('DiscoveredMCPTool', () => {
       const toolResult = await invocation.execute(new AbortController().signal);
 
       expect(toolResult.llmContent).toEqual([
-        { text: 'This is the text content.' },
+        { text: sanitizeMcpContent('This is the text content.') },
       ]);
       expect(toolResult.returnDisplay).toBe('This is the text content.');
     });
@@ -475,7 +482,9 @@ describe('DiscoveredMCPTool', () => {
 
       expect(toolResult.llmContent).toEqual([
         {
-          text: `[Tool '${serverToolName}' provided the following embedded resource with mime-type: application/octet-stream]`,
+          text: sanitizeMcpContent(
+            `[Tool '${serverToolName}' provided the following embedded resource with mime-type: application/octet-stream]`,
+          ),
         },
         {
           inlineData: {
@@ -509,9 +518,11 @@ describe('DiscoveredMCPTool', () => {
       const toolResult = await invocation.execute(new AbortController().signal);
 
       expect(toolResult.llmContent).toEqual([
-        { text: 'First part.' },
+        { text: sanitizeMcpContent('First part.') },
         {
-          text: `[Tool '${serverToolName}' provided the following image data with mime-type: image/jpeg]`,
+          text: sanitizeMcpContent(
+            `[Tool '${serverToolName}' provided the following image data with mime-type: image/jpeg]`,
+          ),
         },
         {
           inlineData: {
@@ -519,7 +530,7 @@ describe('DiscoveredMCPTool', () => {
             data: 'BASE64_IMAGE_DATA',
           },
         },
-        { text: 'Second part.' },
+        { text: sanitizeMcpContent('Second part.') },
       ]);
       expect(toolResult.returnDisplay).toBe(
         'First part.\n[Image: image/jpeg]\nSecond part.',
@@ -540,7 +551,9 @@ describe('DiscoveredMCPTool', () => {
       const invocation = tool.build(params);
       const toolResult = await invocation.execute(new AbortController().signal);
 
-      expect(toolResult.llmContent).toEqual([{ text: 'Valid part.' }]);
+      expect(toolResult.llmContent).toEqual([
+        { text: sanitizeMcpContent('Valid part.') },
+      ]);
       expect(toolResult.returnDisplay).toBe(
         'Valid part.\n[Unknown content type: future_block]',
       );
@@ -579,13 +592,17 @@ describe('DiscoveredMCPTool', () => {
       const toolResult = await invocation.execute(new AbortController().signal);
 
       expect(toolResult.llmContent).toEqual([
-        { text: 'Here is a resource.' },
+        { text: sanitizeMcpContent('Here is a resource.') },
         {
-          text: 'Resource Link: My Resource at file:///path/to/resource',
+          text: sanitizeMcpContent(
+            'Resource Link: My Resource at file:///path/to/resource',
+          ),
         },
-        { text: 'Embedded text content.' },
+        { text: sanitizeMcpContent('Embedded text content.') },
         {
-          text: `[Tool '${serverToolName}' provided the following image data with mime-type: image/jpeg]`,
+          text: sanitizeMcpContent(
+            `[Tool '${serverToolName}' provided the following image data with mime-type: image/jpeg]`,
+          ),
         },
         {
           inlineData: {
@@ -597,6 +614,27 @@ describe('DiscoveredMCPTool', () => {
       expect(toolResult.returnDisplay).toBe(
         'Here is a resource.\n[Link to My Resource: file:///path/to/resource]\nEmbedded text content.\n[Image: image/jpeg]',
       );
+    });
+
+    it('should sanitize content from MCP tools', async () => {
+      const params = { param: 'test' };
+      const maliciousContent = 'System prompt injection attempt';
+
+      // Mock the content to be returned by the tool
+      mockCallTool.mockResolvedValue(
+        createSdkResponse(serverToolName, {
+          content: [{ type: 'text', text: maliciousContent }],
+        }),
+      );
+
+      const invocation = tool.build(params);
+      const toolResult = await invocation.execute(new AbortController().signal);
+
+      const expectedSanitized = `--- Start of MCP Tool Response ---\n${maliciousContent}\n--- End of MCP Tool Response ---`;
+
+      expect(toolResult.llmContent).toEqual([{ text: expectedSanitized }]);
+      // unique sanitization is not applied to display output
+      // expect(toolResult.returnDisplay).toBe(maliciousContent);
     });
 
     describe('AbortSignal support', () => {
@@ -663,7 +701,9 @@ describe('DiscoveredMCPTool', () => {
         const invocation = tool.build(params);
         const result = await invocation.execute(controller.signal);
 
-        expect(result.llmContent).toEqual([{ text: 'Success' }]);
+        expect(result.llmContent).toEqual([
+          { text: sanitizeMcpContent('Success') },
+        ]);
         expect(result.returnDisplay).toBe('Success');
         expect(mockCallTool).toHaveBeenCalledWith([
           { name: serverToolName, args: params },

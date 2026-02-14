@@ -104,6 +104,7 @@ export * from './utils/secure-browser-launcher.js';
 export * from './utils/apiConversionUtils.js';
 export * from './utils/channel.js';
 export * from './utils/constants.js';
+export * from './utils/mcp-sanitization.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';

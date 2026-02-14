@@ -222,7 +222,7 @@ describe('McpPromptLoader', () => {
       });
       expect(result).toEqual({
         type: 'submit_prompt',
-        content: JSON.stringify('Hello, world!'),
+        content: [{ text: 'Hello, world!' }],
       });
     });
 
