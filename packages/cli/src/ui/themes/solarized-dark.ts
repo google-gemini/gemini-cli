@@ -187,12 +187,12 @@ export const SolarizedDark: Theme = new Theme(
       color: solarizedDarkColors.AccentYellow,
     },
     'hljs-addition': {
-      backgroundColor: solarizedDarkColors.AccentGreen,
+      backgroundColor: '#00382f',
       display: 'inline-block',
       width: '100%',
     },
     'hljs-deletion': {
-      backgroundColor: solarizedDarkColors.AccentRed,
+      backgroundColor: '#3d0115',
       display: 'inline-block',
       width: '100%',
     },
