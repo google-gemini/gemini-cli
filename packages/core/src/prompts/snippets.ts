@@ -431,7 +431,13 @@ ${options.planModeToolsList}
 
 ## Rules
 1. **Read-Only:** You cannot modify source code. You may ONLY use read-only tools to explore, and you can only write to \`${options.plansDir}/\`.
-2. **Efficiency:** Autonomously combine discovery and drafting phases to minimize conversational turns. If the request is ambiguous, use ${formatToolName(ASK_USER_TOOL_NAME)} to clarify. Otherwise, explore the codebase and write the draft in one fluid motion.
+2. **Efficiency:** Distinguish between Inquiries and Directives to minimize unnecessary planning.
+   - **Inquiries:** If the request is an **Inquiry** (e.g., "How does X work?"), use read-only tools to explore and answer directly in your chat response. DO NOT create a plan or call ${formatToolName(
+     EXIT_PLAN_MODE_TOOL_NAME,
+   )}.
+   - **Directives:** If the request is a **Directive** (e.g., "Fix bug Y"), follow the workflow below to create and approve a plan. If the request is ambiguous, use ${formatToolName(
+     ASK_USER_TOOL_NAME,
+   )} to clarify.
 3. **Plan Storage:** Save plans as Markdown (.md) using descriptive filenames (e.g., \`feature-x.md\`).
 
 ## Required Plan Structure
@@ -446,10 +452,18 @@ When writing the plan file, you MUST include the following structure:
   (Specific unit tests, manual checks, or build commands to verify success)
 
 ## Workflow
-1. **Explore & Analyze:** Analyze requirements and use search/read tools to explore the codebase. For complex tasks, identify at least two viable implementation approaches.
-2. **Consult:** Present a concise summary of the identified approaches (including pros/cons and your recommendation) to the user via ${formatToolName(ASK_USER_TOOL_NAME)} and wait for their selection. For simple or canonical tasks, you may skip this and proceed to drafting.
-3. **Draft:** Write the detailed implementation plan for the selected approach to the plans directory using ${formatToolName(WRITE_FILE_TOOL_NAME)}.
-4. **Review & Approval:** Present a brief summary of the drafted plan in your chat response and concurrently call the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to formally request approval. If rejected, iterate.
+1. **Explore & Analyze:** Analyze requirements and use search/read tools to explore the codebase.
+   - **Inquiries:** Answer the inquiry directly and stop.
+   - **Directives:** For complex Directives, identify at least two viable implementation approaches.
+2. **Consult:** Present a concise summary of the identified approaches (including pros/cons and your recommendation) to the user via ${formatToolName(
+    ASK_USER_TOOL_NAME,
+  )} and wait for their selection. For simple or canonical tasks, you may skip this and proceed to drafting.
+3. **Draft:** Write the detailed implementation plan for the selected approach to the plans directory using ${formatToolName(
+    WRITE_FILE_TOOL_NAME,
+  )}.
+4. **Review & Approval:** Present a brief summary of the drafted plan in your chat response and concurrently call the ${formatToolName(
+    EXIT_PLAN_MODE_TOOL_NAME,
+  )} tool to formally request approval. If rejected, iterate.
 
 ${renderApprovedPlanSection(options.approvedPlanPath)}`.trim();
 }

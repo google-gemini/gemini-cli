@@ -410,10 +410,17 @@ describe('Core System Prompt (prompts.ts)', () => {
   );
 
   describe('ApprovalMode in System Prompt', () => {
-    it('should include PLAN mode instructions', () => {
+    it('should include PLAN mode instructions with inquiry handling', () => {
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+        PREVIEW_GEMINI_MODEL,
+      );
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain('# Active Approval Mode: Plan');
+      expect(prompt).toContain('Distinguish between Inquiries and Directives');
+      expect(prompt).toContain(
+        '**Inquiries:** Answer the inquiry directly and stop.',
+      );
       expect(prompt).toMatchSnapshot();
     });
 
