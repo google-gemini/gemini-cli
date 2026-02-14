@@ -10,12 +10,12 @@ import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
 // This file serves as the source of truth for all core tool definitions across
-// models. Tool implementation files should not contain any hardcoded 
+// models. Tool implementation files should not contain any hardcoded
 // definitions.
 
-// Each tool has it's section, and a base ToolDefinition defined for that tool. 
-// For different model_ids, definition can be overridden to make the tool 
-// description or schema model_id specific. 
+// Each tool has it's section, and a base ToolDefinition defined for that tool.
+// For different model_ids, definition can be overridden to make the tool
+// description or schema model_id specific.
 
 // ============================================================================
 // TOOL NAMES
@@ -623,7 +623,7 @@ Saves concise global user context (preferences, facts) for use across ALL worksp
 NEVER save workspace-specific context, local paths, or commands (e.g. "The entry point is src/index.js", "The test command is npm test"). These are local to the current workspace and must NOT be saved globally. EXCLUSIVELY for context relevant across ALL workspaces.
 
 - Use for "Remember X" or clear personal facts.
-- Do NOT use for session context. Examples: "Always lint after building", "Never run sudo commands", "Remember my address".`,
+- Do NOT use for session context.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -782,7 +782,7 @@ export const ASK_USER_DEFINITION: ToolDefinition = {
           maxItems: 4,
           items: {
             type: 'object',
-            required: ['question', 'header'],
+            required: ['question', 'header', 'type'],
             properties: {
               question: {
                 type: 'string',
