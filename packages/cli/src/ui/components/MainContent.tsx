@@ -93,6 +93,16 @@ export const MainContent = () => {
     ],
   );
 
+  const staticHistoryItems = useMemo(
+    () => historyItems.slice(0, lastUserPromptIndex + 1),
+    [historyItems, lastUserPromptIndex],
+  );
+
+  const activeHistoryItems = useMemo(
+    () => historyItems.slice(lastUserPromptIndex + 1),
+    [historyItems, lastUserPromptIndex],
+  );
+
   const pendingItems = useMemo(
     () => (
       <Box flexDirection="column">
@@ -206,11 +216,12 @@ export const MainContent = () => {
         key={uiState.historyRemountKey}
         items={[
           <AppHeader key="app-header" version={version} />,
-          ...historyItems,
+          ...staticHistoryItems,
         ]}
       >
         {(item) => item}
       </Static>
+      {activeHistoryItems}
       {pendingItems}
     </>
   );
