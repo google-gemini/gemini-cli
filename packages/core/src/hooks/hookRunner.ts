@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import type { HookConfig } from './types.js';
 import { HookEventName, ConfigSource } from './types.js';
 import type { Config } from '../config/config.js';
@@ -263,11 +263,16 @@ export class HookRunner {
       let timedOut = false;
 
       const shellConfig = getShellConfiguration();
-      const command = this.expandCommand(
+      let command = this.expandCommand(
         hookConfig.command,
         input,
         shellConfig.shell,
       );
+
+      if (shellConfig.shell === 'powershell') {
+        // Append exit code check to ensure the exit code of the command is propagated
+        command = `${command}; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }`;
+      }
 
       // Set up environment variables
       const env = {
@@ -291,12 +296,31 @@ export class HookRunner {
       // Set up timeout
       const timeoutHandle = setTimeout(() => {
         timedOut = true;
-        child.kill('SIGTERM');
+
+        if (process.platform === 'win32' && child.pid) {
+          try {
+            execSync(`taskkill /pid ${child.pid} /f /t`, { timeout: 2000 });
+          } catch (_e) {
+            // Ignore errors if process is already dead or access denied
+            debugLogger.debug(`Taskkill failed: ${_e}`);
+          }
+        } else {
+          child.kill('SIGTERM');
+        }
 
         // Force kill after 5 seconds
         setTimeout(() => {
           if (!child.killed) {
-            child.kill('SIGKILL');
+            if (process.platform === 'win32' && child.pid) {
+              try {
+                execSync(`taskkill /pid ${child.pid} /f /t`, { timeout: 2000 });
+              } catch (_e) {
+                // Ignore
+                debugLogger.debug(`Taskkill failed: ${_e}`);
+              }
+            } else {
+              child.kill('SIGKILL');
+            }
           }
         }, 5000);
       }, timeout);
