@@ -12,19 +12,14 @@ import { theme } from '../semantic-colors.js';
 
 interface ShowMoreLinesProps {
   constrainHeight: boolean;
-  isOverflowing?: boolean;
 }
 
-export const ShowMoreLines = ({
-  constrainHeight,
-  isOverflowing: isOverflowingProp,
-}: ShowMoreLinesProps) => {
+export const ShowMoreLines = ({ constrainHeight }: ShowMoreLinesProps) => {
   const overflowState = useOverflowState();
   const streamingState = useStreamingContext();
 
   const isOverflowing =
-    isOverflowingProp ??
-    (overflowState !== undefined && overflowState.overflowingIds.size > 0);
+    overflowState !== undefined && overflowState.overflowingIds.size > 0;
 
   if (
     !isOverflowing ||
@@ -40,7 +35,6 @@ export const ShowMoreLines = ({
 
   return (
     <Box paddingX={1} marginBottom={1}>
-      {/* <Text color={theme.text.secondary} wrap="truncate"> */}
       <Text color={theme.text.accent} wrap="truncate">
         Press CTRL-O to show more lines
       </Text>

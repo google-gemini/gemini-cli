@@ -18,10 +18,6 @@ import { shouldHideAskUserTool } from '@google/gemini-cli-core';
 import { ShowMoreLines } from '../ShowMoreLines.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { OverflowProvider } from '../../contexts/OverflowContext.js';
-import {
-  ACTIVE_SHELL_MAX_LINES,
-  COMPLETED_SHELL_MAX_LINES,
-} from '../../constants.js';
 
 interface ToolGroupMessageProps {
   groupId: number;
@@ -122,54 +118,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     : undefined;
 
   const contentWidth = terminalWidth - TOOL_MESSAGE_HORIZONTAL_MARGIN;
-
-  const hasOverflow = useMemo(() => {
-    if (!availableTerminalHeightPerToolMessage) return false;
-    return visibleToolCalls.some((tool) => {
-      if (typeof tool.resultDisplay === 'string') {
-        const text = tool.resultDisplay;
-        const hasTrailingNewline = text.endsWith('\n');
-        const contentText = hasTrailingNewline ? text.slice(0, -1) : text;
-        const lineCount = contentText.split('\n').length;
-
-        const focused = isThisShellFocused(
-          tool.name,
-          tool.status,
-          tool.ptyId,
-          activeShellPtyId,
-          embeddedShellFocused,
-        );
-
-        const limit = focused
-          ? ACTIVE_SHELL_MAX_LINES
-          : COMPLETED_SHELL_MAX_LINES;
-        const maxLines = Math.min(availableTerminalHeightPerToolMessage, limit);
-
-        return lineCount > maxLines;
-      }
-      if (Array.isArray(tool.resultDisplay)) {
-        const focused = isThisShellFocused(
-          tool.name,
-          tool.status,
-          tool.ptyId,
-          activeShellPtyId,
-          embeddedShellFocused,
-        );
-        const limit = focused
-          ? ACTIVE_SHELL_MAX_LINES
-          : COMPLETED_SHELL_MAX_LINES;
-        const maxLines = Math.min(availableTerminalHeightPerToolMessage, limit);
-
-        return tool.resultDisplay.length > maxLines;
-      }
-      return false;
-    });
-  }, [
-    visibleToolCalls,
-    availableTerminalHeightPerToolMessage,
-    activeShellPtyId,
-    embeddedShellFocused,
-  ]);
 
   // If all tools are filtered out (e.g., in-progress AskUser tools, confirming tools),
   // only render if we need to close a border from previous
@@ -275,10 +223,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           )
         }
         {(borderBottomOverride ?? true) && visibleToolCalls.length > 0 && (
-          <ShowMoreLines
-            constrainHeight={constrainHeight && !!isExpandable}
-            isOverflowing={hasOverflow}
-          />
+          <ShowMoreLines constrainHeight={constrainHeight && !!isExpandable} />
         )}
       </Box>
     </OverflowProvider>
