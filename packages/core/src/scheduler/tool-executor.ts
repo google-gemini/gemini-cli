@@ -34,6 +34,12 @@ import type {
   CancelledToolCall,
 } from './types.js';
 import { CoreToolCallStatus } from './types.js';
+import {
+  GeminiCliOperation,
+  GEN_AI_TOOL_CALL_ID,
+  GEN_AI_TOOL_DESCRIPTION,
+  GEN_AI_TOOL_NAME,
+} from '../telemetry/constants.js';
 
 export interface ToolExecutionContext {
   call: ToolCall;
@@ -70,11 +76,15 @@ export class ToolExecutor {
 
     return runInDevTraceSpan(
       {
-        name: tool.name,
-        attributes: { type: 'tool-call' },
+        operation: GeminiCliOperation.ToolCall,
+        attributes: {
+          [GEN_AI_TOOL_NAME]: toolName,
+          [GEN_AI_TOOL_CALL_ID]: callId,
+          [GEN_AI_TOOL_DESCRIPTION]: tool.description,
+        },
       },
       async ({ metadata: spanMetadata }) => {
-        spanMetadata.input = { request };
+        spanMetadata.input = request;
 
         try {
           let promise: Promise<ToolResult>;

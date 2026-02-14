@@ -20,6 +20,12 @@ import type { AgentDefinition, AgentInputs } from './types.js';
 import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { formatUserHintsForModel } from '../utils/fastAckHelper.js';
+import { runInDevTraceSpan } from '../telemetry/trace.js';
+import {
+  GeminiCliOperation,
+  GEN_AI_AGENT_DESCRIPTION,
+  GEN_AI_AGENT_NAME,
+} from '../telemetry/constants.js';
 
 export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
   constructor(
@@ -167,7 +173,16 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
       this.withUserHints(this.params),
     );
 
-    return invocation.execute(signal, updateOutput);
+    return runInDevTraceSpan(
+      {
+        operation: GeminiCliOperation.AgentCall,
+        attributes: {
+          [GEN_AI_AGENT_NAME]: this.definition.name,
+          [GEN_AI_AGENT_DESCRIPTION]: this.definition.description,
+        },
+      },
+      () => invocation.execute(signal, updateOutput),
+    );
   }
 
   private withUserHints(agentArgs: AgentInputs): AgentInputs {
