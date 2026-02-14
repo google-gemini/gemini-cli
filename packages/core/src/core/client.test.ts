@@ -243,6 +243,7 @@ describe('Gemini Client (client.ts)', () => {
       getShowModelInfoInChat: vi.fn().mockReturnValue(false),
       getContinueOnFailedApiCall: vi.fn(),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
+      getIncludeDirectoryTree: vi.fn().mockReturnValue(true),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
       },
