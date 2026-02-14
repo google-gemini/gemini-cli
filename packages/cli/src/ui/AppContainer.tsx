@@ -32,6 +32,7 @@ import {
   type HistoryItem,
   type HistoryItemWithoutId,
   type HistoryItemToolGroup,
+  type IndividualToolCallDisplay,
   AuthState,
   type ConfirmationRequest,
   type PermissionConfirmationRequest,
@@ -106,7 +107,7 @@ import { type BackgroundShell } from './hooks/shellCommandProcessor.js';
 import { useVim } from './hooks/vim.js';
 import { type LoadableSettingScope, SettingScope } from '../config/settings.js';
 import { type InitializationResult } from '../core/initializer.js';
-import { useFocus } from './hooks/useFocus.js';
+import { useFocusState } from './hooks/useFocus.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { KeypressPriority } from './contexts/KeypressContext.js';
 import { keyMatchers, Command } from './keyMatchers.js';
@@ -157,6 +158,11 @@ import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useTimedMessage } from './hooks/useTimedMessage.js';
 import { shouldDismissShortcutsHelpOnHotkey } from './utils/shortcutsHelp.js';
 import { useSuspend } from './hooks/useSuspend.js';
+import {
+  buildMacNotificationContent,
+  notifyMacOs,
+  type MacOsNotificationEvent,
+} from '../utils/macosNotifications.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -203,6 +209,126 @@ const SHELL_WIDTH_FRACTION = 0.89;
  * for the shell. This provides vertical padding and space for other UI elements.
  */
 const SHELL_HEIGHT_PADDING = 10;
+const ATTENTION_NOTIFICATION_COOLDOWN_MS = 20_000;
+
+interface PendingAttentionNotification {
+  key: string;
+  event: MacOsNotificationEvent;
+}
+
+function getFirstConfirmingTool(
+  pendingHistoryItems: HistoryItemWithoutId[],
+): IndividualToolCallDisplay | null {
+  for (const item of pendingHistoryItems) {
+    if (item.type !== 'tool_group') {
+      continue;
+    }
+
+    const confirmingTool = item.tools.find(
+      (tool) => tool.status === ToolCallStatus.Confirming,
+    );
+    if (confirmingTool) {
+      return confirmingTool;
+    }
+  }
+
+  return null;
+}
+
+function getPendingAttentionNotification(
+  pendingHistoryItems: HistoryItemWithoutId[],
+  commandConfirmationRequest: ConfirmationRequest | null,
+  authConsentRequest: ConfirmationRequest | null,
+  permissionConfirmationRequest: PermissionConfirmationRequest | null,
+  hasConfirmUpdateExtensionRequests: boolean,
+  hasLoopDetectionConfirmationRequest: boolean,
+): PendingAttentionNotification | null {
+  const confirmingTool = getFirstConfirmingTool(pendingHistoryItems);
+  if (confirmingTool) {
+    const details = confirmingTool.confirmationDetails;
+    if (details?.type === 'ask_user') {
+      const firstQuestion = details.questions.at(0)?.header;
+      return {
+        key: `ask_user:${confirmingTool.callId}`,
+        event: {
+          type: 'attention',
+          heading: 'Answer requested by agent',
+          detail:
+            firstQuestion || 'The agent needs your response to continue.',
+        },
+      };
+    }
+
+    const toolTitle = details?.title || confirmingTool.description;
+    return {
+      key: `tool_confirmation:${confirmingTool.callId}`,
+      event: {
+        type: 'attention',
+        heading: 'Approval required',
+        detail: toolTitle
+          ? `Approve tool action: ${toolTitle}`
+          : 'Approve a pending tool action to continue.',
+      },
+    };
+  }
+
+  if (commandConfirmationRequest) {
+    return {
+      key: 'command_confirmation',
+      event: {
+        type: 'attention',
+        heading: 'Confirmation required',
+        detail: 'A command is waiting for your confirmation.',
+      },
+    };
+  }
+
+  if (authConsentRequest) {
+    return {
+      key: 'auth_consent',
+      event: {
+        type: 'attention',
+        heading: 'Authentication confirmation required',
+        detail: 'Authentication is waiting for your confirmation.',
+      },
+    };
+  }
+
+  if (permissionConfirmationRequest) {
+    return {
+      key: 'filesystem_permission_confirmation',
+      event: {
+        type: 'attention',
+        heading: 'Filesystem permission required',
+        detail: 'Read-only path access is waiting for your confirmation.',
+      },
+    };
+  }
+
+  if (hasConfirmUpdateExtensionRequests) {
+    return {
+      key: 'extension_update_confirmation',
+      event: {
+        type: 'attention',
+        heading: 'Extension update confirmation required',
+        detail: 'An extension update is waiting for your confirmation.',
+      },
+    };
+  }
+
+  if (hasLoopDetectionConfirmationRequest) {
+    return {
+      key: 'loop_detection_confirmation',
+      event: {
+        type: 'attention',
+        heading: 'Loop detection confirmation required',
+        detail: 'A loop detection prompt is waiting for your response.',
+      },
+    };
+  }
+
+  return null;
+}
 
 export const AppContainer = (props: AppContainerProps) => {
   const { config, initializationResult, resumedSessionData } = props;
@@ -918,6 +1044,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleDebugProfiler,
       setShortcutsHelpVisible,
       stableSetText,
+      settings,
     ],
   );
 
@@ -1304,7 +1431,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     sanitizationConfig: config.sanitizationConfig,
   });
 
-  const isFocused = useFocus();
+  const { isFocused, hasReceivedFocusEvent } = useFocusState();
 
   // Context file names computation
   const contextFileNames = useMemo(() => {
@@ -1958,15 +2085,128 @@ Logging in with Google... Restarting Gemini CLI to continue.
     [pendingHistoryItems],
   );
 
+  const hasConfirmUpdateExtensionRequests =
+    confirmUpdateExtensionRequests.length > 0;
+  const hasLoopDetectionConfirmationRequest =
+    !!loopDetectionConfirmationRequest;
+
   const hasPendingActionRequired =
     hasPendingToolConfirmation ||
     !!commandConfirmationRequest ||
     !!authConsentRequest ||
-    confirmUpdateExtensionRequests.length > 0 ||
-    !!loopDetectionConfirmationRequest ||
+    hasConfirmUpdateExtensionRequests ||
+    hasLoopDetectionConfirmationRequest ||
     !!proQuotaRequest ||
     !!validationRequest ||
     !!customDialog;
+
+  const pendingAttentionNotification = useMemo(
+    () =>
+      getPendingAttentionNotification(
+        pendingHistoryItems,
+        commandConfirmationRequest,
+        authConsentRequest,
+        permissionConfirmationRequest,
+        hasConfirmUpdateExtensionRequests,
+        hasLoopDetectionConfirmationRequest,
+      ),
+    [
+      pendingHistoryItems,
+      commandConfirmationRequest,
+      authConsentRequest,
+      permissionConfirmationRequest,
+      hasConfirmUpdateExtensionRequests,
+      hasLoopDetectionConfirmationRequest,
+    ],
+  );
+
+  const hadPendingAttentionRef = useRef(false);
+  const previousFocusedRef = useRef(isFocused);
+  const previousStreamingStateRef = useRef(streamingState);
+  const lastSentAttentionNotificationRef = useRef<{
+    key: string;
+    sentAt: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const wasFocused = previousFocusedRef.current;
+    previousFocusedRef.current = isFocused;
+
+    const hasPendingAttention = pendingAttentionNotification !== null;
+    const hadPendingAttention = hadPendingAttentionRef.current;
+    hadPendingAttentionRef.current = hasPendingAttention;
+
+    const shouldSuppressForFocus = hasReceivedFocusEvent && isFocused;
+    if (!hasPendingAttention || shouldSuppressForFocus) {
+      return;
+    }
+
+    const justEnteredAttentionState = !hadPendingAttention;
+    const justLostFocus = wasFocused && !isFocused;
+    const now = Date.now();
+    const currentKey = pendingAttentionNotification.key;
+    const lastSent = lastSentAttentionNotificationRef.current;
+    const keyChanged = !lastSent || lastSent.key !== currentKey;
+    const onCooldown =
+      !!lastSent &&
+      lastSent.key === currentKey &&
+      now - lastSent.sentAt < ATTENTION_NOTIFICATION_COOLDOWN_MS;
+
+    const shouldNotifyByStateChange = hasReceivedFocusEvent
+      ? justEnteredAttentionState || justLostFocus || keyChanged
+      : justEnteredAttentionState || keyChanged;
+
+    if (!shouldNotifyByStateChange) {
+      return;
+    }
+
+    if (onCooldown) {
+      return;
+    }
+
+    lastSentAttentionNotificationRef.current = {
+      key: currentKey,
+      sentAt: now,
+    };
+
+    void notifyMacOs(
+      settings,
+      buildMacNotificationContent(pendingAttentionNotification.event),
+    );
+  }, [isFocused, hasReceivedFocusEvent, pendingAttentionNotification, settings]);
+
+  useEffect(() => {
+    const previousStreamingState = previousStreamingStateRef.current;
+    previousStreamingStateRef.current = streamingState;
+
+    const justCompletedTurn =
+      previousStreamingState === StreamingState.Responding &&
+      streamingState === StreamingState.Idle;
+
+    const shouldSuppressForFocus = hasReceivedFocusEvent && isFocused;
+    if (
+      !justCompletedTurn ||
+      shouldSuppressForFocus ||
+      pendingAttentionNotification
+    ) {
+      return;
+    }
+
+    void notifyMacOs(
+      settings,
+      buildMacNotificationContent({
+        type: 'attention',
+        heading: 'Response ready',
+        detail: 'Gemini CLI finished responding.',
+      }),
+    );
+  }, [
+    streamingState,
+    isFocused,
+    hasReceivedFocusEvent,
+    pendingAttentionNotification,
+    settings,
+  ]);
 
   const isPassiveShortcutsHelpState =
     isInputActive &&
