@@ -320,4 +320,17 @@ describe('<ToolMessage />', () => {
     );
     expect(lastFrame()).toMatchSnapshot();
   });
+
+  it('renders progress information for executing tools', () => {
+    const { lastFrame } = renderWithContext(
+      <ToolMessage
+        {...baseProps}
+        status={CoreToolCallStatus.Executing}
+        progressMessage="Working on it..."
+        progressPercent={42}
+      />,
+      StreamingState.Responding,
+    );
+    expect(lastFrame()).toContain('Working on it... (42%)');
+  });
 });
