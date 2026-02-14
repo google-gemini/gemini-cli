@@ -32,7 +32,9 @@ process.on('uncaughtException', (error) => {
   } else {
     writeToStderr(String(error) + '\n');
   }
-  process.exit(1);
+  void runExitCleanup().finally(() => {
+    process.exit(1);
+  });
 });
 
 main().catch(async (error) => {

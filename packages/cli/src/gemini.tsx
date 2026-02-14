@@ -641,16 +641,27 @@ export async function main() {
 
     const wasRaw = process.stdin.isRaw;
     if (config.isInteractive() && !wasRaw && process.stdin.isTTY) {
+      const restoreRawMode = () => {
+        if (
+          process.stdin.isTTY &&
+          process.stdin.isRaw !== wasRaw &&
+          typeof process.stdin.setRawMode === 'function'
+        ) {
+          process.stdin.setRawMode(wasRaw);
+        }
+      };
+
       // Set this as early as possible to avoid spurious characters from
       // input showing up in the output.
       process.stdin.setRawMode(true);
+      registerCleanup(restoreRawMode);
 
-      // This cleanup isn't strictly needed but may help in certain situations.
-      process.on('SIGTERM', () => {
-        process.stdin.setRawMode(wasRaw);
-      });
-      process.on('SIGINT', () => {
-        process.stdin.setRawMode(wasRaw);
+      // Best-effort terminal restoration if terminated by signals.
+      process.on('SIGTERM', restoreRawMode);
+      process.on('SIGINT', restoreRawMode);
+      registerCleanup(() => {
+        process.off('SIGTERM', restoreRawMode);
+        process.off('SIGINT', restoreRawMode);
       });
     }
 
