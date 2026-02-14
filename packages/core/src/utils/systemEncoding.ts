@@ -21,6 +21,25 @@ export function resetEncodingCache(): void {
 }
 
 /**
+ * Checks for a manual encoding override via the GEMINI_CLI_ENCODING environment variable.
+ * Normalizes numeric code pages (e.g., "866" -> "cp866").
+ * @returns The normalized encoding string or null if no override is set.
+ */
+function getEncodingOverride(): string | null {
+  const override = process.env['GEMINI_CLI_ENCODING'];
+  if (!override) {
+    return null;
+  }
+
+  let encoding = override.toLowerCase();
+  // Normalize numeric code pages (e.g., "866" -> "cp866")
+  if (/^\d+$/.test(encoding)) {
+    encoding = `cp${encoding}`;
+  }
+  return encoding;
+}
+
+/**
  * Returns the system encoding, caching the result to avoid repeated system calls.
  * If system encoding detection fails, falls back to detecting from the provided buffer.
  * Note: Only the system encoding is cached - buffer-based detection runs for each buffer
@@ -29,13 +48,9 @@ export function resetEncodingCache(): void {
  */
 export function getCachedEncodingForBuffer(buffer: Buffer): string {
   // Level 1: Override
-  if (process.env['GEMINI_CLI_ENCODING']) {
-    let encoding = process.env['GEMINI_CLI_ENCODING'].toLowerCase();
-    // Normalize numeric code pages (e.g., "866" -> "cp866")
-    if (/^\d+$/.test(encoding)) {
-      encoding = `cp${encoding}`;
-    }
-    return encoding;
+  const override = getEncodingOverride();
+  if (override) {
+    return override;
   }
 
   // Level 2: Strict UTF-8 Check
@@ -83,12 +98,9 @@ export function getCachedEncodingForBuffer(buffer: Buffer): string {
  */
 export function getSystemEncoding(): string | null {
   // Global Override check
-  if (process.env['GEMINI_CLI_ENCODING']) {
-    let encoding = process.env['GEMINI_CLI_ENCODING'].toLowerCase();
-    if (/^\d+$/.test(encoding)) {
-      encoding = `cp${encoding}`;
-    }
-    return encoding;
+  const override = getEncodingOverride();
+  if (override) {
+    return override;
   }
 
   // Windows
