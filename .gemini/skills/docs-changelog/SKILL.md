@@ -1,125 +1,131 @@
 ---
 name: docs-changelog
-description: Provides a step-by-step procedure for generating Gemini CLI changelog files based on github release information.
+description: >-
+  Generates and formats changelog files for a new release based on provided
+  version and raw changelog data.
 ---
 
 # Procedure: Updating Changelog for New Releases
 
-The following instructions are run by Gemini CLI when processing new releases.
-
 ## Objective
 
-To standardize the process of updating the Gemini CLI changelog files for a new
-release, ensuring accuracy, consistency, and adherence to project style
-guidelines.
+To standardize the process of updating changelog files (`latest.md`,
+`preview.md`, `index.md`) based on automated release information.
 
-## Release Types
+## Inputs
 
-This skill covers two types of releases:
+- **version**: The release version string (e.g., `v0.28.0`,
+  `v0.29.0-preview.2`).
+- **TIME**: The release timestamp (e.g., `2026-02-12T20:33:15Z`).
+- **BODY**: The raw markdown release notes, containing a "What's Changed"
+  section and a "Full Changelog" link.
 
-*   **Standard Releases:** Regular, versioned releases that are announced to all
-    users. These updates modify `docs/changelogs/latest.md` and
-    `docs/changelogs/index.md`.
-*   **Preview Releases:** Pre-release versions for testing and feedback. These
-    updates only modify `docs/changelogs/preview.md`.
+## Guidelines for `latest.md` and `preview.md` Highlights
 
-Ignore all other releases, such as nightly releases.
+- Aim for **3-5 key highlight points**.
+- **Prioritize** summarizing new features over other changes like bug fixes or
+  chores.
+- **Avoid** mentioning features that are "experimental" or "in preview" in
+  Stable Releases.
+- **DO NOT** include PR numbers, links, or author names in these highlights.
+- Refer to `.gemini/skills/docs-changelog/references/highlights_examples.md`
+  for the correct style and tone.
 
-### Expected Inputs
+## Initial Processing
 
-Regardless of the type of release, the following information is expected:
+1.  **Analyze Version**: Determine the release path based on the `version`
+    string.
+    - If `version` contains "nightly", **STOP**. No changes are made.
+    - If `version` ends in `.0`, follow the **Path A: New Minor Version**
+      procedure.
+    - If `version` does not end in `.0`, follow the **Path B: Patch Version**
+      procedure.
+2.  **Process Time**: Convert the `TIME` input into two formats for later use:
+    `yyyy-mm-dd` and `Month dd, yyyy`.
+3.  **Process Body**:
+    - Save the incoming `BODY` content to a temporary file for processing.
+    - In the "What's Changed" section of the temporary file, reformat all pull
+      request URLs to be markdown links with the PR number as the text (e.g.,
+      `[#12345](URL)`).
+    - If a "New Contributors" section exists, delete it.
+    - Preserve the "**Full Changelog**" link. The processed content of this
+      temporary file will be used in subsequent steps.
 
-*   **New version number:** The version number for the new release
-    (e.g., `v0.27.0`).
-*   **Release date:** The date of the new release (e.g., `2026-02-03`).
-*   **Raw changelog data:** A list of all pull requests and changes
-    included in the release, in the format `description by @author in
-    #pr_number`.
-*   **Previous version number:** The version number of the last release can be
-    calculated by decreasing the minor version number by one and setting the
-    patch or bug fix version number.
+---
 
-## Procedure
+## Path A: New Minor Version
 
-### Initial Setup
+*Use this path if the version number ends in `.0`.*
 
-1.  Identify the files to be modified: 
+### A.1: Stable Release (e.g., `v0.28.0`)
 
-    For standard releases, update `docs/changelogs/latest.md` and
-    `docs/changelogs/index.md`. For preview releases, update
-    `docs/changelogs/preview.md`.
+For a stable release, you will generate two distinct summaries from the
+changelog: a concise **announcement** for the main changelog page, and a more
+detailed **highlights** section for the release-specific page.
 
-2.  Activate the `docs-writer` skill.
+1.  **Create the Announcement for `index.md`**:
+    -   Generate a concise announcement summarizing the most important changes.
+    -   **Important**: The format for this announcement is unique. You **must**
+        use the existing announcements in `docs/changelogs/index.md` and the
+        example within
+        `.gemini/skills/docs-changelog/references/index_template.md` as your
+        guide. This format includes PR links and authors.
+    -   Add this new announcement to the top of `docs/changelogs/index.md`.
 
-### Analyze Raw Changelog Data
+2.  **Create Highlights and Update `latest.md`**:
+    -   Generate a comprehensive "Highlights" section, following the guidelines
+        in the "Guidelines for `latest.md` and `preview.md` Highlights" section
+        above.
+    -   Take the content from
+        `.gemini/skills/docs-changelog/references/latest_template.md`.
+    -   Populate the template with the `version`, `release_date`, generated
+        `highlights`, and the processed content from the temporary file.
+    -   **Completely replace** the contents of `docs/changelogs/latest.md` with
+        the populated template.
 
-1.  Review the complete list of changes. If it is a patch or a bug fix with few
-    changes, skip to the "Update `docs/changelogs/latest.md` or
-    `docs/changelogs/preview.md`" section.
+### A.2: Preview Release (e.g., `v0.29.0-preview.0`)
 
-2.  Group related changes into high-level categories such as
-    important features, "UI/UX Improvements", and "Bug Fixes". Use the existing
-    announcements in `docs/changelogs/index.md` as an example.
+1.  **Update `preview.md`**:
+    -   Generate a comprehensive "Highlights" section, following the highlight
+        guidelines.
+    -   Take the content from
+        `.gemini/skills/docs-changelog/references/preview_template.md`.
+    -   Populate the template with the `version`, `release_date`, generated
+        `highlights`, and the processed content from the temporary file.
+    -   **Completely replace** the contents of `docs/changelogs/preview.md`
+        with the populated template.
 
-### Create Highlight Summaries
+---
 
-Create two distinct versions of the release highlights.
+## Path B: Patch Version
 
-**Important:** Carefully inspect highlights for "experimental" or
-"preview" features before public announcement, and do not include them.
+*Use this path if the version number does **not** end in `.0`.*
 
-#### Version 1: Comprehensive Highlights (for `latest.md` or `preview.md`)
+### B.1: Stable Patch (e.g., `v0.28.1`)
 
-Write a detailed summary for each category focusing on user-facing
-impact.
+- **Target File**: `docs/changelogs/latest.md`
+- Perform the following edits on the target file:
+    1.  Update the version in the main header.
+    2.  Update the "Released:" date.
+    3.  **Prepend** the processed "What's Changed" list from the temporary file
+        to the existing "What's Changed" list in the file.
+    4.  In the "Full Changelog" URL, replace only the trailing version with the
+        new patch version.
 
-#### Version 2: Concise Highlights (for `index.md`)
+### B.2: Preview Patch (e.g., `v0.29.0-preview.3`)
 
-Skip this step for preview releases.
+- **Target File**: `docs/changelogs/preview.md`
+- Perform the following edits on the target file:
+    1.  Update the version in the main header.
+    2.  Update the "Released:" date.
+    3.  **Prepend** the processed "What's Changed" list from the temporary file
+        to the existing "What's Changed" list in the file.
+    4.  In the "Full Changelog" URL, replace only the trailing version with the
+        new patch version.
 
-Write concise summaries including the primary PR and author
-(e.g., `([#12345](link) by @author)`).
+---
 
-### Update `docs/changelogs/latest.md` or `docs/changelogs/preview.md`
+## Finalize
 
-1. Read current content and use `write_file` to replace it with the new
-  version number, and date.
-  
-  If it is a patch or bug fix with few changes, simply add these
-  changes to the "What's Changed" list. Otherwise, replace comprehensive
-  highlights, and the full "What's Changed" list. 
-
-2. For each item in the "What's Changed" list, keep usernames in plaintext, and
-  add github links for each issue number. Example:
-
-  "- feat: implement /rewind command by @username in
-  [#12345](https://github.com/google-gemini/gemini-cli/pull/12345)"
-
-3. Skip entries by @gemini-cli-robot.
-
-4. Do not add the "New Contributors" section.
-
-5. Update the "Full changelog:" link by doing one of following:
-
-   If it is a patch or bug fix with few changes, retain the original link
-   but replace the latter version with the new version. For example, if the
-   patch is version is "v0.28.1", replace the latter version:
-   "https://github.com/google-gemini/gemini-cli/compare/v0.27.0...v0.28.0" with
-   "https://github.com/google-gemini/gemini-cli/compare/v0.27.0...v0.28.1".
-   
-   Otherwise, for minor and major version changes, replace the link with the
-   one included at the end of the changelog data.
-
-6. Ensure lines are wrapped to 80 characters.
-
-### Update `docs/changelogs/index.md`
-
-Skip this step for patches, bug fixes, or preview releases.
-
-Insert a new "Announcements" section for the new version directly
-above the previous version's section. Ensure lines are wrapped to
-80 characters.
-
-### Finalize
-
-Run `npm run format` to ensure consistency.
+- After making changes, run `npm run format` to ensure consistency.
+- Delete any temporary files created during the process.

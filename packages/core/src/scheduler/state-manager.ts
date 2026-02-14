@@ -350,6 +350,7 @@ export class SchedulerStateManager {
       durationMs: startTime ? Date.now() - startTime : undefined,
       outcome: call.outcome,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 
@@ -366,6 +367,7 @@ export class SchedulerStateManager {
       durationMs: startTime ? Date.now() - startTime : undefined,
       outcome: call.outcome,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 
@@ -399,6 +401,7 @@ export class SchedulerStateManager {
       outcome: call.outcome,
       invocation: call.invocation,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 
@@ -424,6 +427,7 @@ export class SchedulerStateManager {
       outcome: call.outcome,
       invocation: call.invocation,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 
@@ -479,6 +483,7 @@ export class SchedulerStateManager {
       durationMs: startTime ? Date.now() - startTime : undefined,
       outcome: call.outcome,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 
@@ -500,6 +505,7 @@ export class SchedulerStateManager {
       outcome: call.outcome,
       invocation: call.invocation,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 
@@ -522,6 +528,7 @@ export class SchedulerStateManager {
       liveOutput,
       pid,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 }

@@ -34,6 +34,7 @@ import {
   addMCPStatusChangeListener,
   removeMCPStatusChangeListener,
   MCPDiscoveryState,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type {
@@ -44,7 +45,7 @@ import type {
   ConfirmationRequest,
   IndividualToolCallDisplay,
 } from '../types.js';
-import { MessageType, ToolCallStatus } from '../types.js';
+import { MessageType } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { type CommandContext, type SlashCommand } from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
@@ -554,7 +555,7 @@ export const useSlashCommandProcessor = (
                       callId,
                       name: 'Expansion',
                       description: 'Command expansion needs shell access',
-                      status: ToolCallStatus.Confirming,
+                      status: CoreToolCallStatus.AwaitingApproval,
                       resultDisplay: undefined,
                       confirmationDetails,
                     };

@@ -17,17 +17,25 @@ import {
   scheduleAgentTools,
   getAuthTypeFromEnv,
   type ToolRegistry,
+  loadSkillsFromDir,
+  ActivateSkillTool,
 } from '@google/gemini-cli-core';
 
 import { type Tool, SdkTool } from './tool.js';
 import { SdkAgentFilesystem } from './fs.js';
 import { SdkAgentShell } from './shell.js';
 import type { SessionContext } from './types.js';
+import type { SkillReference } from './skills.js';
+
+export type SystemInstructions =
+  | string
+  | ((context: SessionContext) => string | Promise<string>);
 
 export interface GeminiCliAgentOptions {
-  instructions: string;
+  instructions: SystemInstructions;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tools?: Array<Tool<any>>;
+  skills?: SkillReference[];
   model?: string;
   cwd?: string;
   debug?: boolean;
@@ -36,13 +44,21 @@ export interface GeminiCliAgentOptions {
 }
 
 export class GeminiCliAgent {
-  private config: Config;
+  private readonly config: Config;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private tools: Array<Tool<any>>;
+  private readonly tools: Array<Tool<any>>;
+  private readonly skillRefs: SkillReference[];
+  private readonly instructions: SystemInstructions;
+  private instructionsLoaded = false;
 
   constructor(options: GeminiCliAgentOptions) {
+    this.instructions = options.instructions;
     const cwd = options.cwd || process.cwd();
     this.tools = options.tools || [];
+    this.skillRefs = options.skills || [];
+
+    const initialMemory =
+      typeof this.instructions === 'string' ? this.instructions : '';
 
     const configParams: ConfigParameters = {
       sessionId: `sdk-${Date.now()}`,
@@ -50,13 +66,15 @@ export class GeminiCliAgent {
       cwd,
       debugMode: options.debug ?? false,
       model: options.model || PREVIEW_GEMINI_MODEL_AUTO,
-      userMemory: options.instructions,
+      userMemory: initialMemory,
       // Minimal config
       enableHooks: false,
       mcpEnabled: false,
       extensionsEnabled: false,
       recordResponses: options.recordResponses,
       fakeResponses: options.fakeResponses,
+      skillsSupport: true,
+      adminSkillsEnabled: true,
     };
 
     this.config = new Config(configParams);
@@ -72,6 +90,45 @@ export class GeminiCliAgent {
 
       await this.config.refreshAuth(authType);
       await this.config.initialize();
+
+      // Load additional skills from options
+      if (this.skillRefs.length > 0) {
+        const skillManager = this.config.getSkillManager();
+
+        const loadPromises = this.skillRefs.map(async (ref) => {
+          try {
+            if (ref.type === 'dir') {
+              return await loadSkillsFromDir(ref.path);
+            }
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error(`Failed to load skills from ${ref.path}:`, e);
+          }
+          return [];
+        });
+
+        const loadedSkills = (await Promise.all(loadPromises)).flat();
+
+        if (loadedSkills.length > 0) {
+          skillManager.addSkills(loadedSkills);
+        }
+      }
+
+      // Re-register ActivateSkillTool if we have skills (either built-in/workspace or manually loaded)
+      // This is required because ActivateSkillTool captures the set of available skills at construction time.
+      const skillManager = this.config.getSkillManager();
+      if (skillManager.getSkills().length > 0) {
+        const registry = this.config.getToolRegistry();
+        const toolName = ActivateSkillTool.Name;
+        // Config.initialize already registers it, but we might have added more skills.
+        // Re-registering updates the schema with new skills.
+        if (registry.getTool(toolName)) {
+          registry.unregisterTool(toolName);
+        }
+        registry.registerTool(
+          new ActivateSkillTool(this.config, this.config.getMessageBus()),
+        );
+      }
 
       // Register tools now that registry exists
       const registry = this.config.getToolRegistry();
@@ -93,6 +150,30 @@ export class GeminiCliAgent {
     let request: Parameters<GeminiClient['sendMessageStream']>[0] = [
       { text: prompt },
     ];
+
+    if (!this.instructionsLoaded && typeof this.instructions === 'function') {
+      const context: SessionContext = {
+        sessionId,
+        transcript: client.getHistory(),
+        cwd: this.config.getWorkingDir(),
+        timestamp: new Date().toISOString(),
+        fs,
+        shell,
+        agent: this,
+      };
+      try {
+        const newInstructions = await this.instructions(context);
+        this.config.setUserMemory(newInstructions);
+        client.updateSystemInstruction();
+        this.instructionsLoaded = true;
+      } catch (e) {
+        const error =
+          e instanceof Error
+            ? e
+            : new Error(`Error resolving dynamic instructions: ${String(e)}`);
+        throw error;
+      }
+    }
 
     while (true) {
       // sendMessageStream returns AsyncGenerator<ServerGeminiStreamEvent, Turn>

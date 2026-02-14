@@ -10,333 +10,353 @@ Slash commands provide meta-level control over the CLI itself.
 
 ### Built-in Commands
 
-- **`/about`**
-  - **Description:** Show version info. Please share this information when
-    filing issues.
+### `/about`
 
-- **`/auth`**
-  - **Description:** Open a dialog that lets you change the authentication
-    method.
+- **Description:** Show version info. Share this information when filing issues.
 
-- **`/bug`**
-  - **Description:** File an issue about Gemini CLI. By default, the issue is
-    filed within the GitHub repository for Gemini CLI. The string you enter
-    after `/bug` will become the headline for the bug being filed. The default
-    `/bug` behavior can be modified using the `advanced.bugCommand` setting in
-    your `.gemini/settings.json` files.
+### `/auth`
 
-- **`/chat`**
-  - **Description:** Save and resume conversation history for branching
-    conversation state interactively, or resuming a previous state from a later
-    session.
-  - **Sub-commands:**
-    - **`delete <tag>`**
-      - **Description:** Deletes a saved conversation checkpoint.
-    - **`list`**
-      - **Description:** Lists available tags for chat state resumption.
-      - **Note:** This command only lists chats saved within the current
-        project. Because chat history is project-scoped, chats saved in other
-        project directories will not be displayed.
-    - **`resume <tag>`**
-      - **Description:** Resumes a conversation from a previous save.
-      - **Note:** You can only resume chats that were saved within the current
-        project. To resume a chat from a different project, you must run the
-        Gemini CLI from that project's directory.
-    - **`save <tag>`**
-      - **Description:** Saves the current conversation history. You must add a
-        `<tag>` for identifying the conversation state.
-      - **Details on checkpoint location:** The default locations for saved chat
-        checkpoints are:
-        - Linux/macOS: `~/.gemini/tmp/<project_hash>/`
-        - Windows: `C:\Users\<YourUsername>\.gemini\tmp\<project_hash>\`
-        - **Behavior:** Chats are saved into a project-specific directory,
-          determined by where you run the CLI. Consequently, saved chats are
-          only accessible when working within that same project.
-        - **Note:** These checkpoints are for manually saving and resuming
-          conversation states. For automatic checkpoints created before file
-          modifications, see the
-          [Checkpointing documentation](../cli/checkpointing.md).
-    - **`share [filename]`**
-      - **Description** Writes the current conversation to a provided Markdown
-        or JSON file. If no filename is provided, then the CLI will generate
-        one.
-      - **Usage** `/chat share file.md` or `/chat share file.json`.
+- **Description:** Open a dialog that lets you change the authentication method.
 
-- **`/clear`**
-  - **Description:** Clear the terminal screen, including the visible session
-    history and scrollback within the CLI. The underlying session data (for
-    history recall) might be preserved depending on the exact implementation,
-    but the visual display is cleared.
-  - **Keyboard shortcut:** Press **Ctrl+L** at any time to perform a clear
-    action.
+### `/bug`
 
-- **`/compress`**
-  - **Description:** Replace the entire chat context with a summary. This saves
-    on tokens used for future tasks while retaining a high level summary of what
-    has happened.
+- **Description:** File an issue about Gemini CLI. By default, the issue is
+  filed within the GitHub repository for Gemini CLI. The string you enter after
+  `/bug` will become the headline for the bug being filed. The default `/bug`
+  behavior can be modified using the `advanced.bugCommand` setting in your
+  `.gemini/settings.json` files.
 
-- **`/copy`**
-  - **Description:** Copies the last output produced by Gemini CLI to your
-    clipboard, for easy sharing or reuse.
-  - **Behavior:**
-    - Local sessions use system clipboard tools (pbcopy/xclip/clip).
-    - Remote sessions (SSH/WSL) use OSC 52 and require terminal support.
-  - **Note:** This command requires platform-specific clipboard tools to be
-    installed.
-    - On Linux, it requires `xclip` or `xsel`. You can typically install them
-      using your system's package manager.
-    - On macOS, it requires `pbcopy`, and on Windows, it requires `clip`. These
-      tools are typically pre-installed on their respective systems.
+### `/chat`
 
-- **`/directory`** (or **`/dir`**)
-  - **Description:** Manage workspace directories for multi-directory support.
-  - **Sub-commands:**
-    - **`add`**:
-      - **Description:** Add a directory to the workspace. The path can be
-        absolute or relative to the current working directory. Moreover, the
-        reference from home directory is supported as well.
-      - **Usage:** `/directory add <path1>,<path2>`
-      - **Note:** Disabled in restrictive sandbox profiles. If you're using
-        that, use `--include-directories` when starting the session instead.
-    - **`show`**:
-      - **Description:** Display all directories added by `/directory add` and
-        `--include-directories`.
-      - **Usage:** `/directory show`
+- **Description:** Save and resume conversation history for branching
+  conversation state interactively, or resuming a previous state from a later
+  session.
+- **Sub-commands:**
+  - **`delete <tag>`**
+    - **Description:** Deletes a saved conversation checkpoint.
+  - **`list`**
+    - **Description:** Lists available tags for chat state resumption.
+    - **Note:** This command only lists chats saved within the current project.
+      Because chat history is project-scoped, chats saved in other project
+      directories will not be displayed.
+  - **`resume <tag>`**
+    - **Description:** Resumes a conversation from a previous save.
+    - **Note:** You can only resume chats that were saved within the current
+      project. To resume a chat from a different project, you must run the
+      Gemini CLI from that project's directory.
+  - **`save <tag>`**
+    - **Description:** Saves the current conversation history. You must add a
+      `<tag>` for identifying the conversation state.
+    - **Details on checkpoint location:** The default locations for saved chat
+      checkpoints are:
+      - Linux/macOS: `~/.gemini/tmp/<project_hash>/`
+      - Windows: `C:\Users\<YourUsername>\.gemini\tmp\<project_hash>\`
+      - **Behavior:** Chats are saved into a project-specific directory,
+        determined by where you run the CLI. Consequently, saved chats are only
+        accessible when working within that same project.
+      - **Note:** These checkpoints are for manually saving and resuming
+        conversation states. For automatic checkpoints created before file
+        modifications, see the
+        [Checkpointing documentation](../cli/checkpointing.md).
+  - **`share [filename]`**
+    - **Description** Writes the current conversation to a provided Markdown or
+      JSON file. If no filename is provided, then the CLI will generate one.
+    - **Usage** `/chat share file.md` or `/chat share file.json`.
 
-- **`/docs`**
-  - **Description:** Open the Gemini CLI documentation in your browser.
+### `/clear`
 
-- **`/editor`**
-  - **Description:** Open a dialog for selecting supported editors.
+- **Description:** Clear the terminal screen, including the visible session
+  history and scrollback within the CLI. The underlying session data (for
+  history recall) might be preserved depending on the exact implementation, but
+  the visual display is cleared.
+- **Keyboard shortcut:** Press **Ctrl+L** at any time to perform a clear action.
 
-- **`/extensions`**
-  - **Description:** Lists all active extensions in the current Gemini CLI
-    session. See [Gemini CLI Extensions](../extensions/index.md).
+### `/compress`
 
-- **`/help`**
-  - **Description:** Display help information about Gemini CLI, including
-    available commands and their usage.
+- **Description:** Replace the entire chat context with a summary. This saves on
+  tokens used for future tasks while retaining a high level summary of what has
+  happened.
 
-- **`/shortcuts`**
-  - **Description:** Toggle the shortcuts panel above the input.
-  - **Shortcut:** Press `?` when the prompt is empty.
-  - **Note:** This is separate from the clean UI detail toggle on double-`Tab`,
-    which switches between minimal and full UI chrome.
+### `/copy`
 
-- **`/hooks`**
-  - **Description:** Manage hooks, which allow you to intercept and customize
-    Gemini CLI behavior at specific lifecycle events.
-  - **Sub-commands:**
-    - **`disable-all`**:
-      - **Description:** Disable all enabled hooks.
-    - **`disable <hook-name>`**:
-      - **Description:** Disable a hook by name.
-    - **`enable-all`**:
-      - **Description:** Enable all disabled hooks.
-    - **`enable <hook-name>`**:
-      - **Description:** Enable a hook by name.
-    - **`list`** (or `show`, `panel`):
-      - **Description:** Display all registered hooks with their status.
+- **Description:** Copies the last output produced by Gemini CLI to your
+  clipboard, for easy sharing or reuse.
+- **Behavior:**
+  - Local sessions use system clipboard tools (pbcopy/xclip/clip).
+  - Remote sessions (SSH/WSL) use OSC 52 and require terminal support.
+- **Note:** This command requires platform-specific clipboard tools to be
+  installed.
+  - On Linux, it requires `xclip` or `xsel`. You can typically install them
+    using your system's package manager.
+  - On macOS, it requires `pbcopy`, and on Windows, it requires `clip`. These
+    tools are typically pre-installed on their respective systems.
 
-- **`/ide`**
-  - **Description:** Manage IDE integration.
-  - **Sub-commands:**
-    - **`disable`**:
-      - **Description:** Disable IDE integration.
-    - **`enable`**:
-      - **Description:** Enable IDE integration.
-    - **`install`**:
-      - **Description:** Install required IDE companion.
-    - **`status`**:
-      - **Description:** Check status of IDE integration.
+### `/directory` (or `/dir`)
 
-- **`/init`**
-  - **Description:** To help users easily create a `GEMINI.md` file, this
-    command analyzes the current directory and generates a tailored context
-    file, making it simpler for them to provide project-specific instructions to
-    the Gemini agent.
+- **Description:** Manage workspace directories for multi-directory support.
+- **Sub-commands:**
+  - **`add`**:
+    - **Description:** Add a directory to the workspace. The path can be
+      absolute or relative to the current working directory. Moreover, the
+      reference from home directory is supported as well.
+    - **Usage:** `/directory add <path1>,<path2>`
+    - **Note:** Disabled in restrictive sandbox profiles. If you're using that,
+      use `--include-directories` when starting the session instead.
+  - **`show`**:
+    - **Description:** Display all directories added by `/directory add` and
+      `--include-directories`.
+    - **Usage:** `/directory show`
 
-- **`/introspect`**
-  - **Description:** Provide debugging information about the current Gemini CLI
-    session, including the state of loaded sub-agents and active hooks. This
-    command is primarily for advanced users and developers.
+### `/docs`
 
-- **`/mcp`**
-  - **Description:** Manage configured Model Context Protocol (MCP) servers.
-  - **Sub-commands:**
-    - **`auth`**:
-      - **Description:** Authenticate with an OAuth-enabled MCP server.
-      - **Usage:** `/mcp auth <server-name>`
-      - **Details:** If `<server-name>` is provided, it initiates the OAuth flow
-        for that server. If no server name is provided, it lists all configured
-        servers that support OAuth authentication.
-    - **`desc`**
-      - **Description:** List configured MCP servers and tools with
-        descriptions.
-    - **`list`** or **`ls`**:
-      - **Description:** List configured MCP servers and tools. This is the
-        default action if no subcommand is specified.
-    - **`refresh`**:
-      - **Description:** Restarts all MCP servers and re-discovers their
-        available tools.
-    - **`schema`**:
-      - **Description:** List configured MCP servers and tools with descriptions
-        and schemas.
+- **Description:** Open the Gemini CLI documentation in your browser.
 
-- **`/memory`**
-  - **Description:** Manage the AI's instructional context (hierarchical memory
-    loaded from `GEMINI.md` files).
-  - **Sub-commands:**
-    - **`add`**:
-      - **Description:** Adds the following text to the AI's memory. Usage:
-        `/memory add <text to remember>`
-    - **`list`**:
-      - **Description:** Lists the paths of the GEMINI.md files in use for
-        hierarchical memory.
-    - **`refresh`**:
-      - **Description:** Reload the hierarchical instructional memory from all
-        `GEMINI.md` files found in the configured locations (global,
-        project/ancestors, and sub-directories). This command updates the model
-        with the latest `GEMINI.md` content.
-    - **`show`**:
-      - **Description:** Display the full, concatenated content of the current
-        hierarchical memory that has been loaded from all `GEMINI.md` files.
-        This lets you inspect the instructional context being provided to the
-        Gemini model.
-    - **Note:** For more details on how `GEMINI.md` files contribute to
-      hierarchical memory, see the
-      [CLI Configuration documentation](../get-started/configuration.md).
+### `/editor`
 
-- [**`/model`**](./model.md)
-  - **Description:** Opens a dialog to choose your Gemini model.
+- **Description:** Open a dialog for selecting supported editors.
 
-- **`/policies`**
-  - **Description:** Manage policies.
-  - **Sub-commands:**
-    - **`list`**:
-      - **Description:** List all active policies grouped by mode.
+### `/extensions`
 
-- **`/privacy`**
-  - **Description:** Display the Privacy Notice and allow users to select
-    whether they consent to the collection of their data for service improvement
-    purposes.
+- **Description:** Lists all active extensions in the current Gemini CLI
+  session. See [Gemini CLI Extensions](../extensions/index.md).
 
-- **`/quit`** (or **`/exit`**)
-  - **Description:** Exit Gemini CLI.
+### `/help` (or `/?`)
 
-- **`/restore`**
-  - **Description:** Restores the project files to the state they were in just
-    before a tool was executed. This is particularly useful for undoing file
-    edits made by a tool. If run without a tool call ID, it will list available
-    checkpoints to restore from.
-  - **Usage:** `/restore [tool_call_id]`
-  - **Note:** Only available if checkpointing is configured via
-    [settings](../get-started/configuration.md). See
-    [Checkpointing documentation](../cli/checkpointing.md) for more details.
+- **Description:** Display help information about Gemini CLI, including
+  available commands and their usage.
 
-- [**`/rewind`**](./rewind.md)
-  - **Description:** Navigates backward through the conversation history,
-    allowing you to review past interactions and potentially revert to a
-    previous state. This feature helps in managing complex or branched
-    conversations.
+### `/hooks`
 
-- **`/resume`**
-  - **Description:** Browse and resume previous conversation sessions. Opens an
-    interactive session browser where you can search, filter, and select from
-    automatically saved conversations.
-  - **Features:**
-    - **Management:** Delete unwanted sessions directly from the browser
-    - **Resume:** Select any session to resume and continue the conversation
-    - **Search:** Use `/` to search through conversation content across all
-      sessions
-    - **Session Browser:** Interactive interface showing all saved sessions with
-      timestamps, message counts, and first user message for context
-    - **Sorting:** Sort sessions by date or message count
-  - **Note:** All conversations are automatically saved as you chat - no manual
-    saving required. See [Session Management](../cli/session-management.md) for
-    complete details.
+- **Description:** Manage hooks, which allow you to intercept and customize
+  Gemini CLI behavior at specific lifecycle events.
+- **Sub-commands:**
+  - **`disable-all`**:
+    - **Description:** Disable all enabled hooks.
+  - **`disable <hook-name>`**:
+    - **Description:** Disable a hook by name.
+  - **`enable-all`**:
+    - **Description:** Enable all disabled hooks.
+  - **`enable <hook-name>`**:
+    - **Description:** Enable a hook by name.
+  - **`list`** (or `show`, `panel`):
+    - **Description:** Display all registered hooks with their status.
 
-- [**`/settings`**](./settings.md)
-  - **Description:** Open the settings editor to view and modify Gemini CLI
-    settings.
-  - **Details:** This command provides a user-friendly interface for changing
-    settings that control the behavior and appearance of Gemini CLI. It is
-    equivalent to manually editing the `.gemini/settings.json` file, but with
-    validation and guidance to prevent errors. See the
-    [settings documentation](./settings.md) for a full list of available
-    settings.
-  - **Usage:** Simply run `/settings` and the editor will open. You can then
-    browse or search for specific settings, view their current values, and
-    modify them as desired. Changes to some settings are applied immediately,
-    while others require a restart.
+### `/ide`
 
-- **`/shells`** (or **`/bashes`**)
-  - **Description:** Toggle the background shells view. This allows you to view
-    and manage long-running processes that you've sent to the background.
-- **`/setup-github`**
-  - **Description:** Set up GitHub Actions to triage issues and review PRs with
-    Gemini.
+- **Description:** Manage IDE integration.
+- **Sub-commands:**
+  - **`disable`**:
+    - **Description:** Disable IDE integration.
+  - **`enable`**:
+    - **Description:** Enable IDE integration.
+  - **`install`**:
+    - **Description:** Install required IDE companion.
+  - **`status`**:
+    - **Description:** Check status of IDE integration.
 
-- [**`/skills`**](./skills.md)
-  - **Description:** Manage Agent Skills, which provide on-demand expertise and
-    specialized workflows.
-  - **Sub-commands:**
-    - **`disable <name>`**:
-      - **Description:** Disable a specific skill by name.
-      - **Usage:** `/skills disable <name>`
-    - **`enable <name>`**:
-      - **Description:** Enable a specific skill by name.
-      - **Usage:** `/skills enable <name>`
-    - **`list`**:
-      - **Description:** List all discovered skills and their current status
-        (enabled/disabled).
-    - **`reload`**:
-      - **Description:** Refresh the list of discovered skills from all tiers
-        (workspace, user, and extensions).
+### `/init`
 
-- **`/stats`**
-  - **Description:** Display detailed statistics for the current Gemini CLI
-    session, including token usage, cached token savings (when available), and
-    session duration. Note: Cached token information is only displayed when
-    cached tokens are being used, which occurs with API key authentication but
-    not with OAuth authentication at this time.
+- **Description:** To help users easily create a `GEMINI.md` file, this command
+  analyzes the current directory and generates a tailored context file, making
+  it simpler for them to provide project-specific instructions to the Gemini
+  agent.
 
-- **`/terminal-setup`**
-  - **Description:** Configure terminal keybindings for multiline input (VS
-    Code, Cursor, Windsurf).
+### `/mcp`
 
-- [**`/theme`**](./themes.md)
-  - **Description:** Open a dialog that lets you change the visual theme of
-    Gemini CLI.
+- **Description:** Manage configured Model Context Protocol (MCP) servers.
+- **Sub-commands:**
+  - **`auth`**:
+    - **Description:** Authenticate with an OAuth-enabled MCP server.
+    - **Usage:** `/mcp auth <server-name>`
+    - **Details:** If `<server-name>` is provided, it initiates the OAuth flow
+      for that server. If no server name is provided, it lists all configured
+      servers that support OAuth authentication.
+  - **`desc`**
+    - **Description:** List configured MCP servers and tools with descriptions.
+  - **`list`** or **`ls`**:
+    - **Description:** List configured MCP servers and tools. This is the
+      default action if no subcommand is specified.
+  - **`refresh`**:
+    - **Description:** Restarts all MCP servers and re-discovers their available
+      tools.
+  - **`schema`**:
+    - **Description:** List configured MCP servers and tools with descriptions
+      and schemas.
 
-- [**`/tools`**](../tools/index.md)
-  - **Description:** Display a list of tools that are currently available within
-    Gemini CLI.
-  - **Usage:** `/tools [desc]`
-  - **Sub-commands:**
-    - **`desc`** or **`descriptions`**:
-      - **Description:** Show detailed descriptions of each tool, including each
-        tool's name with its full description as provided to the model.
-    - **`nodesc`** or **`nodescriptions`**:
-      - **Description:** Hide tool descriptions, showing only the tool names.
+### `/memory`
 
-- **`/vim`**
-  - **Description:** Toggle vim mode on or off. When vim mode is enabled, the
-    input area supports vim-style navigation and editing commands in both NORMAL
-    and INSERT modes.
-  - **Features:**
-    - **Count support:** Prefix commands with numbers (e.g., `3h`, `5w`, `10G`)
-    - **Editing commands:** Delete with `x`, change with `c`, insert with `i`,
-      `a`, `o`, `O`; complex operations like `dd`, `cc`, `dw`, `cw`
-    - **INSERT mode:** Standard text input with escape to return to NORMAL mode
-    - **NORMAL mode:** Navigate with `h`, `j`, `k`, `l`; jump by words with `w`,
-      `b`, `e`; go to line start/end with `0`, `$`, `^`; go to specific lines
-      with `G` (or `gg` for first line)
-    - **Persistent setting:** Vim mode preference is saved to
-      `~/.gemini/settings.json` and restored between sessions
-    - **Repeat last command:** Use `.` to repeat the last editing operation
-    - **Status indicator:** When enabled, shows `[NORMAL]` or `[INSERT]` in the
-      footer
+- **Description:** Manage the AI's instructional context (hierarchical memory
+  loaded from `GEMINI.md` files).
+- **Sub-commands:**
+  - **`add`**:
+    - **Description:** Adds the following text to the AI's memory. Usage:
+      `/memory add <text to remember>`
+  - **`list`**:
+    - **Description:** Lists the paths of the GEMINI.md files in use for
+      hierarchical memory.
+  - **`refresh`**:
+    - **Description:** Reload the hierarchical instructional memory from all
+      `GEMINI.md` files found in the configured locations (global,
+      project/ancestors, and sub-directories). This command updates the model
+      with the latest `GEMINI.md` content.
+  - **`show`**:
+    - **Description:** Display the full, concatenated content of the current
+      hierarchical memory that has been loaded from all `GEMINI.md` files. This
+      lets you inspect the instructional context being provided to the Gemini
+      model.
+  - **Note:** For more details on how `GEMINI.md` files contribute to
+    hierarchical memory, see the
+    [CLI Configuration documentation](../get-started/configuration.md).
+
+### `/model`
+
+- **Description:** Opens a dialog to choose your Gemini model.
+
+### `/policies`
+
+- **Description:** Manage policies.
+- **Sub-commands:**
+  - **`list`**:
+    - **Description:** List all active policies grouped by mode.
+
+### `/privacy`
+
+- **Description:** Display the Privacy Notice and allow users to select whether
+  they consent to the collection of their data for service improvement purposes.
+
+### `/quit` (or `/exit`)
+
+- **Description:** Exit Gemini CLI.
+
+### `/restore`
+
+- **Description:** Restores the project files to the state they were in just
+  before a tool was executed. This is particularly useful for undoing file edits
+  made by a tool. If run without a tool call ID, it will list available
+  checkpoints to restore from.
+- **Usage:** `/restore [tool_call_id]`
+- **Note:** Only available if checkpointing is configured via
+  [settings](../get-started/configuration.md). See
+  [Checkpointing documentation](../cli/checkpointing.md) for more details.
+
+### `/rewind`
+
+- **Description:** Navigates backward through the conversation history, letting
+  you review past interactions and potentially revert both chat state and file
+  changes.
+- **Usage:** Press **Esc** twice as a shortcut.
+- **Features:**
+  - **Select Interaction:** Preview user prompts and file changes.
+  - **Action Selection:** Choose to rewind history only, revert code changes
+    only, or both.
+
+### `/resume`
+
+- **Description:** Browse and resume previous conversation sessions. Opens an
+  interactive session browser where you can search, filter, and select from
+  automatically saved conversations.
+- **Features:**
+  - **Management:** Delete unwanted sessions directly from the browser
+  - **Resume:** Select any session to resume and continue the conversation
+  - **Search:** Use `/` to search through conversation content across all
+    sessions
+  - **Session Browser:** Interactive interface showing all saved sessions with
+    timestamps, message counts, and first user message for context
+  - **Sorting:** Sort sessions by date or message count
+- **Note:** All conversations are automatically saved as you chat - no manual
+  saving required. See [Session Management](../cli/session-management.md) for
+  complete details.
+
+### `/settings`
+
+- **Description:** Open the settings editor to view and modify Gemini CLI
+  settings.
+- **Details:** This command provides a user-friendly interface for changing
+  settings that control the behavior and appearance of Gemini CLI. It is
+  equivalent to manually editing the `.gemini/settings.json` file, but with
+  validation and guidance to prevent errors. See the
+  [settings documentation](./settings.md) for a full list of available settings.
+- **Usage:** Simply run `/settings` and the editor will open. You can then
+  browse or search for specific settings, view their current values, and modify
+  them as desired. Changes to some settings are applied immediately, while
+  others require a restart.
+
+### `/shells` (or `/bashes`)
+
+- **Description:** Toggle the background shells view. This allows you to view
+  and manage long-running processes that you've sent to the background.
+
+### `/setup-github`
+
+- **Description:** Set up GitHub Actions to triage issues and review PRs with
+  Gemini.
+
+### `/skills`
+
+- **Description:** Manage Agent Skills, which provide on-demand expertise and
+  specialized workflows.
+- **Sub-commands:**
+  - **`disable <name>`**:
+    - **Description:** Disable a specific skill by name.
+    - **Usage:** `/skills disable <name>`
+  - **`enable <name>`**:
+    - **Description:** Enable a specific skill by name.
+    - **Usage:** `/skills enable <name>`
+  - **`list`**:
+    - **Description:** List all discovered skills and their current status
+      (enabled/disabled).
+  - **`reload`**:
+    - **Description:** Refresh the list of discovered skills from all tiers
+      (workspace, user, and extensions).
+
+### `/stats`
+
+- **Description:** Display detailed statistics for the current Gemini CLI
+  session, including token usage, cached token savings (when available), and
+  session duration. Note: Cached token information is only displayed when cached
+  tokens are being used, which occurs with API key authentication but not with
+  OAuth authentication at this time.
+
+### `/terminal-setup`
+
+- **Description:** Configure terminal keybindings for multiline input (VS Code,
+  Cursor, Windsurf).
+
+### `/theme`
+
+- **Description:** Open a dialog that lets you change the visual theme of Gemini
+  CLI.
+
+### `/tools`
+
+- **Description:** Display a list of tools that are currently available within
+  Gemini CLI.
+- **Usage:** `/tools [desc]`
+- **Sub-commands:**
+  - **`desc`** or **`descriptions`**:
+    - **Description:** Show detailed descriptions of each tool, including each
+      tool's name with its full description as provided to the model.
+  - **`nodesc`** or **`nodescriptions`**:
+    - **Description:** Hide tool descriptions, showing only the tool names.
+
+### `/vim`
+
+- **Description:** Toggle vim mode on or off. When vim mode is enabled, the
+  input area supports vim-style navigation and editing commands in both NORMAL
+  and INSERT modes.
+- **Features:**
+  - **Count support:** Prefix commands with numbers (e.g., `3h`, `5w`, `10G`)
+  - **Editing commands:** Delete with `x`, change with `c`, insert with `i`,
+    `a`, `o`, `O`; complex operations like `dd`, `cc`, `dw`, `cw`
+  - **INSERT mode:** Standard text input with escape to return to NORMAL mode
+  - **NORMAL mode:** Navigate with `h`, `j`, `k`, `l`; jump by words with `w`,
+    `b`, `e`; go to line start/end with `0`, `$`, `^`; go to specific lines with
+    `G` (or `gg` for first line)
+  - **Persistent setting:** Vim mode preference is saved to
+    `~/.gemini/settings.json` and restored between sessions
+  - **Repeat last command:** Use `.` to repeat the last editing operation
+  - **Status indicator:** When enabled, shows `[NORMAL]` or `[INSERT]` in the
+    footer
 
 ### Custom commands
 

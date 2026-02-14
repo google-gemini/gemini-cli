@@ -1,8 +1,14 @@
 # `Gemini CLI SDK`
 
+> **Implementation Status:** Core agent loop, tool execution, and session
+> context are implemented. Advanced features like hooks, skills, subagents, and
+> ACP are currently missing.
+
 # `Examples`
 
 ## `Simple Example`
+
+> **Status:** Implemented. `GeminiCliAgent` supports `cwd` and `sendStream`.
 
 Equivalent to `gemini -p "what does this project do?"`. Loads all workspace and
 user settings.
@@ -27,6 +33,9 @@ Validation:
 
 ## `System Instructions`
 
+> **Status:** Implemented. Both static string instructions and dynamic functions
+> (receiving `SessionContext`) are supported.
+
 System instructions can be provided by a static string OR dynamically via a
 function:
 
@@ -46,6 +55,9 @@ Validation:
 - Dynamic instructions show up and contain dynamic content.
 
 ## `Custom Tools`
+
+> **Status:** Implemented. `tool()` helper and `GeminiCliAgent` support custom
+> tool definitions and execution.
 
 ```ts
 import { GeminiCliAgent, tool, z } from "@google/gemini-cli-sdk";
@@ -73,6 +85,8 @@ Validation:
 - Model receives tool response after returning tool
 
 ## `Custom Hooks`
+
+> **Status:** Not Implemented.
 
 SDK users can provide programmatic custom hooks
 
@@ -127,35 +141,40 @@ Validation (these are probably hardest to validate):
 
 ## `Custom Skills`
 
+> **Status:** Implemented. `skillDir` helper and `GeminiCliAgent` support
+> loading skills from filesystem.
+
 Custom skills can be referenced by individual directories or by "skill roots"
 (directories containing many skills).
 
-```ts
-import { GeminiCliAgent, skillDir, skillRoot } from '@google/gemini-cli-sdk';
+### Directory Structure
 
-const agent = new GeminiCliAgent({
-  skills: [skillDir('/path/to/single/skill'), skillRoot('/path/to/skills/dir')],
-});
+```
+skill-dir/
+  SKILL.md  (Metadata and instructions)
+  tools/    (Optional directory for tools)
+    my-tool.js
 ```
 
-**NOTE:** I would like to support fully in-memory skills (including reference
-files); however, it seems like that would currently require a pretty significant
-refactor so we'll focus on filesystem skills for now. In an ideal future state,
-we could do something like:
+### Usage
 
-```ts
-import { GeminiCliAgent, skill } from '@google/gemini-cli-sdk';
+```typescript
+import { GeminiCliAgent, skillDir } from '@google/gemini-sdk';
 
-const mySkill = skill({
-  name: 'my-skill',
-  description: 'description of when my skill should be used',
-  content: 'This is the SKILL.md content',
-  // it can also be a function
-  content: (ctx) => `This is dynamic content.`,
+const agent = new GeminiCliAgent({
+  instructions: 'You are a helpful assistant.',
+  skills: [
+    // Load a single skill from a directory
+    skillDir('./my-skill'),
+    // Load all skills found in subdirectories of this root
+    skillDir('./skills-collection'),
+  ],
 });
 ```
 
 ## `Subagents`
+
+> **Status:** Not Implemented.
 
 ```ts
 import { GeminiCliAgent, subagent } from "@google/gemini-cli";
@@ -181,6 +200,8 @@ const agent = new GeminiCliAgent({
 
 ## `Extensions`
 
+> **Status:** Not Implemented.
+
 Potentially the most important feature of the Gemini CLI SDK is support for
 extensions, which modularly encapsulate all of the primitives listed above:
 
@@ -201,6 +222,8 @@ INSTRUCTIONS",
 
 ## `ACP Mode`
 
+> **Status:** Not Implemented.
+
 The SDK will include a wrapper utility to interact with the agent via ACP
 instead of the SDK's natural API.
 
@@ -219,11 +242,16 @@ client.send({...clientMessage}); // e.g. a "session/prompt" message
 
 ## `Approvals / Policies`
 
+> **Status:** Not Implemented.
+
 TODO
 
 # `Implementation Guidance`
 
 ## `Session Context`
+
+> **Status:** Implemented. `SessionContext` interface exists and is passed to
+> tools.
 
 Whenever executing a tool, hook, command, or skill, a SessionContext object
 should be passed as an additional argument after the arguments/payload. The
@@ -245,18 +273,27 @@ export interface SessionContext {
 }
 
 export interface AgentFilesystem {
-  readFile(path: string): Promise<string | null>
-  writeFile(path: string, content: string): Promise<void>
-  // consider others including delete, globbing, etc but read/write are bare minimum}
+  readFile(path: string): Promise<string | null>;
+  writeFile(path: string, content: string): Promise<void>;
+  // consider others including delete, globbing, etc but read/write are bare minimum
+}
 
 export interface AgentShell {
   // simple promise-based execution that blocks until complete
-  exec(cmd: string, options?: AgentShellOptions): Promise<{exitCode: number, output: string, stdout: string, stderr: string}>
+  exec(
+    cmd: string,
+    options?: AgentShellOptions,
+  ): Promise<{
+    exitCode: number;
+    output: string;
+    stdout: string;
+    stderr: string;
+  }>;
   start(cmd: string, options?: AgentShellOptions): AgentShellProcess;
 }
 
 export interface AgentShellOptions {
-  env?: Record<string,string>;
+  env?: Record<string, string>;
   timeoutSeconds?: number;
 }
 
@@ -277,3 +314,21 @@ export interface AgentShellProcess {
   the same session id?
 - Presumably the transcript is kept updated in memory and also persisted to disk
   by default?
+
+# `Next Steps`
+
+Based on the current implementation status, we can proceed with:
+
+## Feature 3: Custom Hooks Support
+
+Implement support for loading and registering custom hooks. This involves adding
+a `hooks` option to `GeminiCliAgentOptions`.
+
+**Tasks:**
+
+1.  Define `Hook` interface and helper functions.
+2.  Add `hooks` option to `GeminiCliAgentOptions`.
+3.  Implement hook registration logic in `GeminiCliAgent`.
+
+IMPORTANT: Hook signatures should be strongly typed all the way through. You'll
+need to create a mapping of the string event name to the request/response types.

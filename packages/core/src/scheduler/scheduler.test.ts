@@ -320,6 +320,20 @@ describe('Scheduler (Orchestrator)', () => {
         ]),
       );
     });
+
+    it('should set approvalMode to PLAN when config returns PLAN', async () => {
+      mockConfig.getApprovalMode.mockReturnValue(ApprovalMode.PLAN);
+      await scheduler.schedule(req1, signal);
+
+      expect(mockStateManager.enqueue).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            status: CoreToolCallStatus.Validating,
+            approvalMode: ApprovalMode.PLAN,
+          }),
+        ]),
+      );
+    });
   });
 
   describe('Phase 2: Queue Management', () => {

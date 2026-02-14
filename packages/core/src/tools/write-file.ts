@@ -9,7 +9,7 @@ import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import * as Diff from 'diff';
-import { WRITE_FILE_TOOL_NAME } from './tool-names.js';
+import { WRITE_FILE_TOOL_NAME, WRITE_FILE_DISPLAY_NAME } from './tool-names.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 
@@ -446,7 +446,7 @@ export class WriteFileTool
   ) {
     super(
       WriteFileTool.Name,
-      'WriteFile',
+      WRITE_FILE_DISPLAY_NAME,
       WRITE_FILE_DEFINITION.base.description!,
       Kind.Edit,
       WRITE_FILE_DEFINITION.base.parametersJsonSchema,

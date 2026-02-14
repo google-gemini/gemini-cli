@@ -8,13 +8,16 @@ import type React from 'react';
 import { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import type { IndividualToolCallDisplay } from '../../types.js';
-import { ToolCallStatus } from '../../types.js';
+import { ToolCallStatus, mapCoreStatusToDisplayStatus } from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
 import { ShellToolMessage } from './ShellToolMessage.js';
 import { theme } from '../../semantic-colors.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
 import { isShellTool, isThisShellFocused } from './ToolShared.js';
-import { shouldHideAskUserTool } from '@google/gemini-cli-core';
+import {
+  CoreToolCallStatus,
+  shouldHideToolCall,
+} from '@google/gemini-cli-core';
 import { ShowMoreLines } from '../ShowMoreLines.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { OverflowProvider } from '../../contexts/OverflowContext.js';
@@ -45,11 +48,17 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   borderBottom: borderBottomOverride,
   isExpandable,
 }) => {
-  // Filter out Ask User tools that should be hidden (e.g. in-progress or errors without result)
+  // Filter out tool calls that should be hidden (e.g. in-progress Ask User, or Plan Mode operations).
   const toolCalls = useMemo(
     () =>
       allToolCalls.filter(
-        (t) => !shouldHideAskUserTool(t.name, t.status, !!t.resultDisplay),
+        (t) =>
+          !shouldHideToolCall({
+            displayName: t.name,
+            status: t.status,
+            approvalMode: t.approvalMode,
+            hasResultDisplay: !!t.resultDisplay,
+          }),
       ),
     [allToolCalls],
   );
@@ -64,11 +73,13 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   // appear in the Global Queue until they are approved and start executing.
   const visibleToolCalls = useMemo(
     () =>
-      toolCalls.filter(
-        (t) =>
-          t.status !== ToolCallStatus.Pending &&
-          t.status !== ToolCallStatus.Confirming,
-      ),
+      toolCalls.filter((t) => {
+        const displayStatus = mapCoreStatusToDisplayStatus(t.status);
+        return (
+          displayStatus !== ToolCallStatus.Pending &&
+          displayStatus !== ToolCallStatus.Confirming
+        );
+      }),
     [toolCalls],
   );
 
@@ -83,7 +94,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   );
 
   const hasPending = !visibleToolCalls.every(
-    (t) => t.status === ToolCallStatus.Success,
+    (t) => t.status === CoreToolCallStatus.Success,
   );
 
   const isShellCommand = toolCalls.some((t) => isShellTool(t.name));
