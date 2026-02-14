@@ -370,11 +370,20 @@ export class TestRig {
               fs.rmSync(dir, { recursive: true, force: true });
               return;
             } catch (err) {
-              if (i === 4) throw err;
+              if (i === 4) {
+                console.error(
+                  `Failed to clean directory ${dir} after 5 attempts:`,
+                  err,
+                );
+                throw err;
+              }
+              const delay = Math.pow(2, i) * 1000;
               const sleepCmd =
-                process.platform === 'win32' ? 'timeout /t 1' : 'sleep 1';
+                process.platform === 'win32'
+                  ? `timeout /t ${Math.max(1, Math.floor(delay / 1000))} /nobreak`
+                  : `sleep ${delay / 1000}`;
               try {
-                execSync(sleepCmd);
+                execSync(sleepCmd, { stdio: 'ignore' });
               } catch {
                 /* ignore */
               }
