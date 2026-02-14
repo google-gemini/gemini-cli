@@ -465,15 +465,17 @@ export class Scheduler {
       });
       outcome = result.outcome;
       lastDetails = result.lastDetails;
-    } else {
-      this.state.setOutcome(callId, ToolConfirmationOutcome.ProceedOnce);
     }
 
+    this.state.setOutcome(callId, outcome);
+
     // Handle Policy Updates
-    await updatePolicy(toolCall.tool, outcome, lastDetails, {
-      config: this.config,
-      messageBus: this.messageBus,
-    });
+    if (decision === PolicyDecision.ASK_USER && outcome) {
+      await updatePolicy(toolCall.tool, outcome, lastDetails, {
+        config: this.config,
+        messageBus: this.messageBus,
+      });
+    }
 
     // Handle cancellation (cascades to entire batch)
     if (outcome === ToolConfirmationOutcome.Cancel) {
