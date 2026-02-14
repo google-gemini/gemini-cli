@@ -416,7 +416,7 @@ export class CoreToolScheduler {
     signal: AbortSignal,
   ): Promise<void> {
     return runInDevTraceSpan(
-      { operation: GeminiCliOperation.ToolCall },
+      { operation: GeminiCliOperation.ScheduleToolCalls },
       async ({ metadata: spanMetadata }) => {
         spanMetadata.input = request;
         if (this.isRunning() || this.isScheduling) {
