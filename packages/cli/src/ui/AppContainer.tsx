@@ -1196,8 +1196,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ],
   );
 
+  const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
+
   const handleFinalSubmit = useCallback(
     async (submittedValue: string) => {
+      if (!constrainHeight) {
+        setConstrainHeight(true);
+        if (!isAlternateBuffer) {
+          refreshStatic();
+        }
+      }
+
       const isSlash = isSlashCommand(submittedValue.trim());
       const isIdle = streamingState === StreamingState.Idle;
 
@@ -1242,6 +1251,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       streamingState,
       messageQueue.length,
       config,
+      constrainHeight,
+      setConstrainHeight,
+      isAlternateBuffer,
+      refreshStatic,
     ],
   );
 
@@ -1400,7 +1413,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [ctrlDPressCount, setCtrlDPressCount] = useState(0);
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [ideContextState, setIdeContextState] = useState<
     IdeContext | undefined
   >();

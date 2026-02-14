@@ -12,14 +12,19 @@ import { theme } from '../semantic-colors.js';
 
 interface ShowMoreLinesProps {
   constrainHeight: boolean;
+  isOverflowing?: boolean;
 }
 
-export const ShowMoreLines = ({ constrainHeight }: ShowMoreLinesProps) => {
+export const ShowMoreLines = ({
+  constrainHeight,
+  isOverflowing: isOverflowingProp,
+}: ShowMoreLinesProps) => {
   const overflowState = useOverflowState();
   const streamingState = useStreamingContext();
 
   const isOverflowing =
-    overflowState !== undefined && overflowState.overflowingIds.size > 0;
+    isOverflowingProp ??
+    (overflowState !== undefined && overflowState.overflowingIds.size > 0);
 
   if (
     !isOverflowing ||
