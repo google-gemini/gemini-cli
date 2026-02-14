@@ -68,6 +68,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   borderDimColor,
 }) => {
   const isAlternateBuffer = useAlternateBuffer();
+
   const isThisShellFocused = checkIsShellFocused(
     name,
     status,

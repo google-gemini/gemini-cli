@@ -28,6 +28,7 @@ interface ToolGroupMessageProps {
   onShellInputSubmit?: (input: string) => void;
   borderTop?: boolean;
   borderBottom?: boolean;
+  isExpandable?: boolean;
 }
 
 // Main component renders the border and maps the tools using ToolMessage
@@ -41,6 +42,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   embeddedShellFocused,
   borderTop: borderTopOverride,
   borderBottom: borderBottomOverride,
+  isExpandable,
 }) => {
   // Filter out Ask User tools that should be hidden (e.g. in-progress or errors without result)
   const toolCalls = useMemo(
@@ -154,6 +156,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               : isFirst,
           borderColor,
           borderDimColor,
+          isExpandable,
         };
 
         return (
@@ -216,7 +219,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         )
       }
       {(borderBottomOverride ?? true) && visibleToolCalls.length > 0 && (
-        <ShowMoreLines constrainHeight={constrainHeight} />
+        <ShowMoreLines constrainHeight={constrainHeight && !!isExpandable} />
       )}
     </Box>
   );

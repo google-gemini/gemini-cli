@@ -37,6 +37,7 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
   embeddedShellFocused?: boolean;
   ptyId?: number;
   config?: Config;
+  isExpandable?: boolean;
 }
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({

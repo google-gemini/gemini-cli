@@ -52,27 +52,44 @@ export const MainContent = () => {
   } = uiState;
   const showHeaderDetails = cleanUiDetailsVisible;
 
+  const lastUserPromptIndex = useMemo(() => {
+    for (let i = uiState.history.length - 1; i >= 0; i--) {
+      const type = uiState.history[i].type;
+      if (type === 'user' || type === 'user_shell') {
+        return i;
+      }
+    }
+    return -1;
+  }, [uiState.history]);
+
   const historyItems = useMemo(
     () =>
-      uiState.history.map((h) => (
-        <MemoizedHistoryItemDisplay
-          terminalWidth={mainAreaWidth}
-          availableTerminalHeight={
-            uiState.constrainHeight ? staticAreaMaxItemHeight : undefined
-          }
-          availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
-          key={h.id}
-          item={h}
-          isPending={false}
-          commands={uiState.slashCommands}
-        />
-      )),
+      uiState.history.map((h, index) => {
+        const isExpandable = index > lastUserPromptIndex;
+        return (
+          <MemoizedHistoryItemDisplay
+            terminalWidth={mainAreaWidth}
+            availableTerminalHeight={
+              uiState.constrainHeight || !isExpandable
+                ? staticAreaMaxItemHeight
+                : undefined
+            }
+            availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
+            key={h.id}
+            item={h}
+            isPending={false}
+            commands={uiState.slashCommands}
+            isExpandable={isExpandable}
+          />
+        );
+      }),
     [
       uiState.history,
       mainAreaWidth,
       staticAreaMaxItemHeight,
       uiState.slashCommands,
       uiState.constrainHeight,
+      lastUserPromptIndex,
     ],
   );
 
@@ -93,6 +110,7 @@ export const MainContent = () => {
             isPending={true}
             activeShellPtyId={uiState.activePtyId}
             embeddedShellFocused={uiState.embeddedShellFocused}
+            isExpandable={true}
           />
         ))}
         {showConfirmationQueue && confirmingTool && (
@@ -116,10 +134,14 @@ export const MainContent = () => {
   const virtualizedData = useMemo(
     () => [
       { type: 'header' as const },
-      ...uiState.history.map((item) => ({ type: 'history' as const, item })),
+      ...uiState.history.map((item, index) => ({
+        type: 'history' as const,
+        item,
+        isExpandable: index > lastUserPromptIndex,
+      })),
       { type: 'pending' as const },
     ],
-    [uiState.history],
+    [uiState.history, lastUserPromptIndex],
   );
 
   const renderItem = useCallback(
@@ -142,6 +164,7 @@ export const MainContent = () => {
             item={item.item}
             isPending={false}
             commands={uiState.slashCommands}
+            isExpandable={item.isExpandable}
           />
         );
       } else {

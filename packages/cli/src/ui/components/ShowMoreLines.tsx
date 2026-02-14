@@ -24,7 +24,8 @@ export const ShowMoreLines = ({ constrainHeight }: ShowMoreLinesProps) => {
     !constrainHeight ||
     !(
       streamingState === StreamingState.Idle ||
-      streamingState === StreamingState.WaitingForConfirmation
+      streamingState === StreamingState.WaitingForConfirmation ||
+      streamingState === StreamingState.Responding
     )
   ) {
     return null;
