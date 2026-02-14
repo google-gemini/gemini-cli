@@ -6,7 +6,7 @@
 
 import { render } from '../../test-utils/render.js';
 import { EventEmitter } from 'node:events';
-import { useFocus } from './useFocus.js';
+import { useFocus, useFocusState } from './useFocus.js';
 import { vi, type Mock } from 'vitest';
 import { useStdin, useStdout } from 'ink';
 import { KeypressProvider } from '../contexts/KeypressContext.js';
@@ -52,6 +52,27 @@ describe('useFocus', () => {
     let hookResult: ReturnType<typeof useFocus>;
     function TestComponent() {
       hookResult = useFocus();
+      return null;
+    }
+    const { unmount } = render(
+      <KeypressProvider>
+        <TestComponent />
+      </KeypressProvider>,
+    );
+    return {
+      result: {
+        get current() {
+          return hookResult;
+        },
+      },
+      unmount,
+    };
+  };
+
+  const renderFocusStateHook = () => {
+    let hookResult: ReturnType<typeof useFocusState>;
+    function TestComponent() {
+      hookResult = useFocusState();
       return null;
     }
     const { unmount } = render(
@@ -162,5 +183,18 @@ describe('useFocus', () => {
       stdin.emit('data', 'a');
     });
     expect(result.current).toBe(true);
+  });
+
+  it('tracks whether any focus event has been received', () => {
+    const { result } = renderFocusStateHook();
+
+    expect(result.current.hasReceivedFocusEvent).toBe(false);
+
+    act(() => {
+      stdin.emit('data', '\x1b[O');
+    });
+
+    expect(result.current.hasReceivedFocusEvent).toBe(true);
+    expect(result.current.isFocused).toBe(false);
   });
 });

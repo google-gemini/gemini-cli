@@ -16,10 +16,16 @@ export const DISABLE_FOCUS_REPORTING = '\x1b[?1004l';
 export const FOCUS_IN = '\x1b[I';
 export const FOCUS_OUT = '\x1b[O';
 
-export const useFocus = () => {
+export interface FocusState {
+  isFocused: boolean;
+  hasReceivedFocusEvent: boolean;
+}
+
+export const useFocusState = (): FocusState => {
   const { stdin } = useStdin();
   const { stdout } = useStdout();
   const [isFocused, setIsFocused] = useState(true);
+  const [hasReceivedFocusEvent, setHasReceivedFocusEvent] = useState(false);
 
   useEffect(() => {
     const handleData = (data: Buffer) => {
@@ -28,8 +34,10 @@ export const useFocus = () => {
       const lastFocusOut = sequence.lastIndexOf(FOCUS_OUT);
 
       if (lastFocusIn > lastFocusOut) {
+        setHasReceivedFocusEvent(true);
         setIsFocused(true);
       } else if (lastFocusOut > lastFocusIn) {
+        setHasReceivedFocusEvent(true);
         setIsFocused(false);
       }
     };
@@ -58,5 +66,10 @@ export const useFocus = () => {
     { isActive: true },
   );
 
-  return isFocused;
+  return {
+    isFocused,
+    hasReceivedFocusEvent,
+  };
 };
+
+export const useFocus = () => useFocusState().isFocused;

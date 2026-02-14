@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { debugLogger, spawnAsync } from '@google/gemini-cli-core';
+import { debugLogger, writeToStdout } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
 
 export const MAX_MACOS_NOTIFICATION_TITLE_CHARS = 48;
@@ -12,6 +12,9 @@ export const MAX_MACOS_NOTIFICATION_SUBTITLE_CHARS = 64;
 export const MAX_MACOS_NOTIFICATION_BODY_CHARS = 180;
 
 const ELLIPSIS = '...';
+const BEL = '\x07';
+const OSC9_PREFIX = '\x1b]9;';
+const MAX_OSC9_MESSAGE_CHARS = 220;
 
 export interface MacOsNotificationContent {
   title: string;
@@ -104,18 +107,61 @@ export function isMacOsNotificationEnabled(settings: LoadedSettings): boolean {
   );
 }
 
-function escapeAppleScriptString(input: string): string {
-  return input.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+export function supportsOsc9Notifications(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  if (env['WT_SESSION']) {
+    return false;
+  }
+
+  if (env['TERM_PROGRAM'] === 'WezTerm' || env['TERM_PROGRAM'] === 'ghostty') {
+    return true;
+  }
+
+  if (env['ITERM_SESSION_ID']) {
+    return true;
+  }
+
+  return (
+    env['TERM'] === 'xterm-kitty' ||
+    env['TERM'] === 'wezterm' ||
+    env['TERM'] === 'wezterm-mux'
+  );
 }
 
-function buildAppleScript(content: MacOsNotificationContent): string {
-  const title = `"${escapeAppleScriptString(content.title)}"`;
-  const body = `"${escapeAppleScriptString(content.body)}"`;
-  const subtitlePart = content.subtitle
-    ? ` subtitle "${escapeAppleScriptString(content.subtitle)}"`
-    : '';
+function buildTerminalNotificationMessage(
+  content: MacOsNotificationContent,
+): string {
+  const pieces = [content.title, content.subtitle, content.body].filter(Boolean);
+  const combined = pieces.join(' | ');
+  return truncateForMacNotification(combined, MAX_OSC9_MESSAGE_CHARS);
+}
 
-  return `display notification ${body} with title ${title}${subtitlePart}`;
+function stripTerminalControlChars(input: string): string {
+  return input
+    .replace(/\x1b/g, '')
+    .replace(/\x07/g, '')
+    .replace(/[\r\n]+/g, ' ')
+    .trim();
+}
+
+function emitOsc9Notification(content: MacOsNotificationContent): void {
+  const message = stripTerminalControlChars(
+    buildTerminalNotificationMessage(content),
+  );
+  writeToStdout(`${OSC9_PREFIX}${message}${BEL}`);
+}
+
+function emitBellNotification(): void {
+  writeToStdout(BEL);
+}
+
+function emitTerminalNotification(content: MacOsNotificationContent): void {
+  if (supportsOsc9Notifications()) {
+    emitOsc9Notification(content);
+    return;
+  }
+  emitBellNotification();
 }
 
 export async function notifyMacOs(
@@ -127,11 +173,10 @@ export async function notifyMacOs(
   }
 
   try {
-    const script = buildAppleScript(sanitizeNotificationContent(content));
-    await spawnAsync('osascript', ['-e', script]);
+    emitTerminalNotification(sanitizeNotificationContent(content));
     return true;
   } catch (error) {
-    debugLogger.debug('Failed to show macOS notification:', error);
+    debugLogger.debug('Failed to emit terminal notification:', error);
     return false;
   }
 }
