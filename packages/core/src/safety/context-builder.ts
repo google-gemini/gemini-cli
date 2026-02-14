@@ -29,7 +29,6 @@ export class ContextBuilder {
     // ContextBuilder's responsibility is to provide the *current* context.
     // If the conversation hasn't started (history is empty), we check if there's a pending question.
     // However, if the history is NOT empty, we trust it reflects the true state.
-    // The previous logic forcefully injected `currentQuestion` if history was empty. This is correct for the very first turn.
     const currentQuestion = this.config.getQuestion();
     if (currentQuestion && history.length === 0) {
       history.push({
