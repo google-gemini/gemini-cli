@@ -122,7 +122,7 @@ import { appEvents, AppEvent, TransientMessageType } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
-import { RELAUNCH_EXIT_CODE } from '../utils/processUtils.js';
+import { RELAUNCH_EXIT_CODE, relaunchApp } from '../utils/processUtils.js';
 import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useMcpStatus } from './hooks/useMcpStatus.js';
@@ -1462,6 +1462,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
           policyUpdateConfirmationRequest.newHash,
         );
         setIsRestartingPolicyUpdate(true);
+        // Give time for the UI to render the restarting message
+        setTimeout(async () => {
+          await relaunchApp();
+        }, 250);
       } else {
         setIsPolicyUpdateDialogOpen(false);
       }
