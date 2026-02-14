@@ -46,6 +46,7 @@ import { CoreToolCallStatus } from '../scheduler/types.js';
 import { ToolExecutor } from '../scheduler/tool-executor.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getPolicyDenialError } from '../scheduler/policy.js';
+import { GeminiCliOperation } from '../telemetry/constants.js';
 
 export type {
   ToolCall,
@@ -415,7 +416,7 @@ export class CoreToolScheduler {
     signal: AbortSignal,
   ): Promise<void> {
     return runInDevTraceSpan(
-      { name: 'schedule' },
+      { operation: GeminiCliOperation.ToolCall },
       async ({ metadata: spanMetadata }) => {
         spanMetadata.input = request;
         if (this.isRunning() || this.isScheduling) {

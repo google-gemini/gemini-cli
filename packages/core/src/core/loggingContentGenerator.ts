@@ -35,6 +35,14 @@ import { toContents } from '../code_assist/converter.js';
 import { isStructuredError } from '../utils/quotaErrorDetection.js';
 import { runInDevTraceSpan, type SpanMetadata } from '../telemetry/trace.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import {
+  GEMINI_CLI_GENERATE_CONTENT_CONFIG,
+  GEMINI_CLI_GENERATE_CONTENT_USAGE,
+  GeminiCliOperation,
+  GEN_AI_PROMPT_NAME,
+  GEN_AI_REQUEST_MODEL,
+} from '../telemetry/constants.js';
+import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 
 interface StructuredError {
   status: number;
@@ -191,10 +199,15 @@ export class LoggingContentGenerator implements ContentGenerator {
   ): Promise<GenerateContentResponse> {
     return runInDevTraceSpan(
       {
-        name: 'generateContent',
+        operation: GeminiCliOperation.LLMCall,
+        attributes: {
+          [GEN_AI_REQUEST_MODEL]: req.model,
+          [GEN_AI_PROMPT_NAME]: userPromptId,
+          [GEMINI_CLI_GENERATE_CONTENT_CONFIG]: safeJsonStringify(req.config),
+        },
       },
       async ({ metadata: spanMetadata }) => {
-        spanMetadata.input = { request: req, userPromptId, model: req.model };
+        spanMetadata.input = req.contents;
 
         const startTime = Date.now();
         const contents: Content[] = toContents(req.contents);
@@ -212,10 +225,9 @@ export class LoggingContentGenerator implements ContentGenerator {
             req,
             userPromptId,
           );
-          spanMetadata.output = {
-            response,
-            usageMetadata: response.usageMetadata,
-          };
+          spanMetadata.output = response.candidates?.[0]?.content ?? null;
+          spanMetadata.attributes[GEMINI_CLI_GENERATE_CONTENT_USAGE] =
+            safeJsonStringify(response.usageMetadata);
           const durationMs = Date.now() - startTime;
           this._logApiResponse(
             contents,
@@ -262,11 +274,17 @@ export class LoggingContentGenerator implements ContentGenerator {
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     return runInDevTraceSpan(
       {
-        name: 'generateContentStream',
+        operation: GeminiCliOperation.LLMCall,
         noAutoEnd: true,
+        attributes: {
+          [GEN_AI_REQUEST_MODEL]: req.model,
+          [GEN_AI_PROMPT_NAME]: userPromptId,
+          [GEMINI_CLI_GENERATE_CONTENT_CONFIG]: safeJsonStringify(req.config),
+        },
       },
       async ({ metadata: spanMetadata, endSpan }) => {
-        spanMetadata.input = { request: req, userPromptId, model: req.model };
+        spanMetadata.input = req.contents;
+
         const startTime = Date.now();
         const serverDetails = this._getEndpointUrl(
           req,
@@ -362,13 +380,13 @@ export class LoggingContentGenerator implements ContentGenerator {
       this.config
         .refreshUserQuotaIfStale()
         .catch((e) => debugLogger.debug('quota refresh failed', e));
-      spanMetadata.output = {
-        streamChunks: responses.map((r) => ({
-          content: r.candidates?.[0]?.content ?? null,
-        })),
-        usageMetadata: lastUsageMetadata,
-        durationMs,
-      };
+      spanMetadata.output = responses
+        .map((r) => r.candidates?.[0]?.content ?? null)
+        .filter((c) => c !== null);
+      if (lastUsageMetadata) {
+        spanMetadata.attributes[GEMINI_CLI_GENERATE_CONTENT_USAGE] =
+          safeJsonStringify(lastUsageMetadata);
+      }
     } catch (error) {
       spanMetadata.error = error;
       const durationMs = Date.now() - startTime;
@@ -396,10 +414,14 @@ export class LoggingContentGenerator implements ContentGenerator {
   ): Promise<EmbedContentResponse> {
     return runInDevTraceSpan(
       {
-        name: 'embedContent',
+        operation: GeminiCliOperation.LLMCall,
+        attributes: {
+          [GEN_AI_REQUEST_MODEL]: req.model,
+          [GEMINI_CLI_GENERATE_CONTENT_CONFIG]: safeJsonStringify(req.config),
+        },
       },
       async ({ metadata: spanMetadata }) => {
-        spanMetadata.input = { request: req };
+        spanMetadata.input = req.contents;
         const output = await this.wrapped.embedContent(req);
         spanMetadata.output = output;
         return output;

@@ -33,6 +33,7 @@ import {
   ValidationRequiredError,
   coreEvents,
   CoreEvent,
+  GeminiCliOperation,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -1213,7 +1214,11 @@ export const useGeminiStream = (
       prompt_id?: string,
     ) =>
       runInDevTraceSpan(
-        { name: 'submitQuery' },
+        {
+          operation: options?.isContinuation
+            ? GeminiCliOperation.SystemPrompt
+            : GeminiCliOperation.UserPrompt,
+        },
         async ({ metadata: spanMetadata }) => {
           spanMetadata.input = query;
 
