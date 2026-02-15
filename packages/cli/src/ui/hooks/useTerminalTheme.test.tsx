@@ -138,8 +138,9 @@ describe('useTerminalTheme', () => {
   });
 
   it('should switch to dark theme when background is dark', () => {
-    // Start with light theme
+    // Start with light theme AND light background so the switch to dark is a change
     mockSettings.merged.ui.theme = 'default-light';
+    config.setTerminalBackground('#ffffff');
 
     renderHook(() => useTerminalTheme(mockHandleThemeSelect, config, vi.fn()));
 
@@ -167,5 +168,24 @@ describe('useTerminalTheme', () => {
     expect(mockQueryTerminalBackground).not.toHaveBeenCalled();
 
     mockSettings.merged.ui.autoThemeSwitching = true;
+  });
+
+  it('should NOT call refreshStatic if the background color has not changed (flicker regression test)', () => {
+    const mockRefreshStatic = vi.fn();
+    renderHook(() =>
+      useTerminalTheme(mockHandleThemeSelect, config, mockRefreshStatic),
+    );
+
+    const handler = mockSubscribe.mock.calls[0][0];
+
+    // Current background is #000000 (set in beforeEach)
+    // Simulate polling responding with the SAME color
+    handler('rgb:0000/0000/0000');
+
+    // Should NOT refresh static content
+    expect(mockRefreshStatic).not.toHaveBeenCalled();
+
+    // Verify we exited early and didn't redundantly set config
+    expect(config.setTerminalBackground).not.toHaveBeenCalled();
   });
 });

@@ -56,6 +56,12 @@ export function useTerminalTheme(
       if (!match) return;
 
       const hexColor = parseColor(match[1], match[2], match[3]);
+
+      // Avoid unnecessary re-renders (flicker) if the background hasn't changed
+      if (hexColor === config.getTerminalBackground()) {
+        return;
+      }
+
       const luminance = getLuminance(hexColor);
       config.setTerminalBackground(hexColor);
       themeManager.setTerminalBackground(hexColor);
