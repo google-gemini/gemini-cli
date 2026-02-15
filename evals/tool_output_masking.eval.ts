@@ -32,6 +32,13 @@ describe('Tool Output Masking Behavioral Evals', () => {
    */
   evalTest('USUALLY_PASSES', {
     name: 'should attempt to read the redirected full output file when information is masked',
+    params: {
+      security: {
+        folderTrust: {
+          enabled: true,
+        },
+      },
+    },
     prompt: '/help',
     assert: async (rig) => {
       // 1. Initialize project directories
@@ -124,7 +131,7 @@ Output too large. Full output available at: ${outputFilePath}
         path.join(settingsDir, 'trustedFolders.json'),
         JSON.stringify(
           {
-            [path.resolve(rig.testDir!)]: 'TRUST_FOLDER',
+            [path.resolve(rig.homeDir!)]: 'TRUST_FOLDER',
           },
           null,
           2,
@@ -145,7 +152,7 @@ Output too large. Full output available at: ${outputFilePath}
       // ASSERTION: Verify agent accessed the redirected file
       const logs = rig.readToolLogs();
       const accessedFile = logs.some((log) =>
-        JSON.stringify(log.toolRequest.args).includes(outputFileName),
+        log.toolRequest.args.includes(outputFileName),
       );
 
       expect(
@@ -161,6 +168,13 @@ Output too large. Full output available at: ${outputFilePath}
    */
   evalTest('USUALLY_PASSES', {
     name: 'should NOT read the full output file when the information is already in the preview',
+    params: {
+      security: {
+        folderTrust: {
+          enabled: true,
+        },
+      },
+    },
     prompt: '/help',
     assert: async (rig) => {
       await rig.run({ args: '/help' });
@@ -251,7 +265,7 @@ Output too large. Full output available at: ${outputFilePath}
         path.join(settingsDir, 'trustedFolders.json'),
         JSON.stringify(
           {
-            [path.resolve(rig.testDir!)]: 'TRUST_FOLDER',
+            [path.resolve(rig.homeDir!)]: 'TRUST_FOLDER',
           },
           null,
           2,
@@ -270,7 +284,7 @@ Output too large. Full output available at: ${outputFilePath}
 
       const logs = rig.readToolLogs();
       const accessedFile = logs.some((log) =>
-        JSON.stringify(log.toolRequest.args).includes(outputFileName),
+        log.toolRequest.args.includes(outputFileName),
       );
 
       expect(
