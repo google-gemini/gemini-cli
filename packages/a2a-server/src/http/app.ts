@@ -77,7 +77,11 @@ const coderAgentCard: AgentCard = {
 };
 
 export function updateCoderAgentCardUrl(port: number) {
-  coderAgentCard.url = `http://localhost:${port}/`;
+  // On Cloud Run, use the public service URL so remote clients can reach us
+  const publicUrl = process.env['CODER_AGENT_PUBLIC_URL'];
+  coderAgentCard.url = publicUrl
+    ? publicUrl.replace(/\/$/, '') + '/'
+    : `http://localhost:${port}/`;
 }
 
 async function handleExecuteCommand(

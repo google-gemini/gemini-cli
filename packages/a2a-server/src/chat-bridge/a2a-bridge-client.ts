@@ -27,6 +27,7 @@ import {
   RestTransportFactory,
   JsonRpcTransportFactory,
 } from '@a2a-js/sdk/client';
+import { GoogleAuth } from 'google-auth-library';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
 
@@ -162,17 +163,37 @@ export class A2ABridgeClient {
 
   /**
    * Initializes the client connection to the A2A server.
+   * On Cloud Run (K_SERVICE is set), wraps fetch with an identity token
+   * for service-to-service authentication.
    */
   async initialize(): Promise<void> {
     if (this.client) return;
 
-    const resolver = new DefaultAgentCardResolver({});
+    // On Cloud Run, create an authenticated fetch that adds identity tokens
+    let fetchImpl: typeof fetch = fetch;
+    if (process.env['K_SERVICE']) {
+      const auth = new GoogleAuth();
+      const idTokenClient = await auth.getIdTokenClient(this.agentUrl);
+      fetchImpl = async (input, init?) => {
+        const authHeaders = await idTokenClient.getRequestHeaders();
+        const merged = new Headers(init?.headers);
+        for (const [key, value] of Object.entries(authHeaders)) {
+          merged.set(key, value);
+        }
+        return fetch(input, { ...init, headers: merged });
+      };
+      logger.info(
+        '[ChatBridge] Using Cloud Run identity token for A2A server auth',
+      );
+    }
+
+    const resolver = new DefaultAgentCardResolver({ fetchImpl });
     const options = ClientFactoryOptions.createFrom(
       ClientFactoryOptions.default,
       {
         transports: [
-          new RestTransportFactory({}),
-          new JsonRpcTransportFactory({}),
+          new RestTransportFactory({ fetchImpl }),
+          new JsonRpcTransportFactory({ fetchImpl }),
         ],
         cardResolver: resolver,
       },

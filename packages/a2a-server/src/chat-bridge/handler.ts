@@ -100,7 +100,10 @@ export class ChatBridgeHandler {
       return { text: 'Error: Missing thread information.' };
     }
 
-    const text = message.argumentText || message.text || '';
+    // argumentText has bot mentions stripped (legacy format only).
+    // For Add-ons format, strip leading @mention manually.
+    const rawText = message.argumentText || message.text || '';
+    const text = rawText.replace(/^@\S+\s*/, '');
     if (!text.trim()) {
       return { text: "I didn't receive any text. Please try again." };
     }
