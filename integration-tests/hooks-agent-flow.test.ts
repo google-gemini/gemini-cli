@@ -275,8 +275,8 @@ describe('Hooks Agent Flow', () => {
         {
           settings: {
             hooksConfig: {
-            enabled: true,
-          },
+              enabled: true,
+            },
             hooks: {
               BeforeAgent: [
                 {
