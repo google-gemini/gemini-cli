@@ -44,4 +44,31 @@ describe('interactive_commands', () => {
       ).toMatch(/\b(run|--run)\b/);
     },
   });
+
+  /**
+   * Validates that the agent uses non-interactive flags when scaffolding a new project.
+   */
+  evalTest('ALWAYS_PASSES', {
+    name: 'should use non-interactive flags when scaffolding a new app',
+    prompt: 'Create a new react application named my-app using vite.',
+    assert: async (rig, result) => {
+      const logs = rig.readToolLogs();
+      const scaffoldCall = logs.find(
+        (l) =>
+          l.toolRequest.name === 'run_shell_command' &&
+          /npm (init|create)|npx create-|yarn create|pnpm create/.test(
+            l.toolRequest.args,
+          ),
+      );
+
+      expect(
+        scaffoldCall,
+        'Agent should have called a scaffolding command (e.g., npm create)',
+      ).toBeDefined();
+      expect(
+        scaffoldCall?.toolRequest.args,
+        'Agent should have passed a non-interactive flag (-y, --yes, or a specific --template)',
+      ).toMatch(/(?:^|\s)(--yes|-y|--template\s+\S+)(?:\s|$|\\|")/);
+    },
+  });
 });
