@@ -25,6 +25,8 @@ import { SimpleExtensionLoader } from '../utils/extensionLoader.js';
 import type { ConfigParameters } from '../config/config.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import { ThinkingLevel } from '@google/genai';
+import type { AcknowledgedAgentsService } from './acknowledgedAgents.js';
+import { PolicyDecision } from '../policy/types.js';
 
 vi.mock('./agentLoader.js', () => ({
   loadAgentsFromDirectory: vi
@@ -401,6 +403,58 @@ describe('AgentRegistry', () => {
 
       expect(registry.getDefinition('extension-agent')).toBeUndefined();
     });
+
+    it('should use agentCardUrl as hash for acknowledgement of remote agents', async () => {
+      mockConfig = makeMockedConfig({ enableAgents: true });
+      // Trust the folder so it attempts to load project agents
+      vi.spyOn(mockConfig, 'isTrustedFolder').mockReturnValue(true);
+      vi.spyOn(mockConfig, 'getFolderTrust').mockReturnValue(true);
+
+      const registry = new TestableAgentRegistry(mockConfig);
+
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'RemoteAgent',
+        description: 'A remote agent',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+        metadata: { hash: 'file-hash', filePath: 'path/to/file.md' },
+      };
+
+      vi.mocked(tomlLoader.loadAgentsFromDirectory).mockResolvedValue({
+        agents: [remoteAgent],
+        errors: [],
+      });
+
+      const ackService = {
+        isAcknowledged: vi.fn().mockResolvedValue(true),
+        acknowledge: vi.fn(),
+      };
+      vi.spyOn(mockConfig, 'getAcknowledgedAgentsService').mockReturnValue(
+        ackService as unknown as AcknowledgedAgentsService,
+      );
+
+      // Mock A2AClientManager to avoid network calls
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: vi.fn().mockResolvedValue({ name: 'RemoteAgent' }),
+        clearCache: vi.fn(),
+      } as unknown as A2AClientManager);
+
+      await registry.initialize();
+
+      // Verify ackService was called with the URL, not the file hash
+      expect(ackService.isAcknowledged).toHaveBeenCalledWith(
+        expect.anything(),
+        'RemoteAgent',
+        'https://example.com/card',
+      );
+
+      // Also verify that the agent's metadata was updated to use the URL as hash
+      // Use getDefinition because registerAgent might have been called
+      expect(registry.getDefinition('RemoteAgent')?.metadata?.hash).toBe(
+        'https://example.com/card',
+      );
+    });
   });
 
   describe('registration logic', () => {
@@ -603,6 +657,114 @@ describe('AgentRegistry', () => {
 
       await Promise.all(promises);
       expect(registry.getAllDefinitions()).toHaveLength(100);
+    });
+
+    it('should dynamically register an ALLOW policy for local agents', async () => {
+      const agent: AgentDefinition = {
+        ...MOCK_AGENT_V1,
+        name: 'PolicyTestAgent',
+      };
+      const policyEngine = mockConfig.getPolicyEngine();
+      const addRuleSpy = vi.spyOn(policyEngine, 'addRule');
+
+      await registry.testRegisterAgent(agent);
+
+      expect(addRuleSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'PolicyTestAgent',
+          decision: PolicyDecision.ALLOW,
+          priority: 1.05,
+        }),
+      );
+    });
+
+    it('should dynamically register an ASK_USER policy for remote agents', async () => {
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'RemotePolicyAgent',
+        description: 'A remote agent',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+      };
+
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: vi.fn().mockResolvedValue({ name: 'RemotePolicyAgent' }),
+      } as unknown as A2AClientManager);
+
+      const policyEngine = mockConfig.getPolicyEngine();
+      const addRuleSpy = vi.spyOn(policyEngine, 'addRule');
+
+      await registry.testRegisterAgent(remoteAgent);
+
+      expect(addRuleSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'RemotePolicyAgent',
+          decision: PolicyDecision.ASK_USER,
+          priority: 1.05,
+        }),
+      );
+    });
+
+    it('should not register a policy if a USER policy already exists', async () => {
+      const agent: AgentDefinition = {
+        ...MOCK_AGENT_V1,
+        name: 'ExistingUserPolicyAgent',
+      };
+      const policyEngine = mockConfig.getPolicyEngine();
+      // Mock hasRuleForTool to return true when ignoreDynamic=true (simulating a user policy)
+      vi.spyOn(policyEngine, 'hasRuleForTool').mockImplementation(
+        (toolName, ignoreDynamic) =>
+          toolName === 'ExistingUserPolicyAgent' && ignoreDynamic === true,
+      );
+      const addRuleSpy = vi.spyOn(policyEngine, 'addRule');
+
+      await registry.testRegisterAgent(agent);
+
+      expect(addRuleSpy).not.toHaveBeenCalled();
+    });
+
+    it('should replace an existing dynamic policy when an agent is overwritten', async () => {
+      const localAgent: AgentDefinition = {
+        ...MOCK_AGENT_V1,
+        name: 'OverwrittenAgent',
+      };
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'OverwrittenAgent',
+        description: 'A remote agent',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+      };
+
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: vi.fn().mockResolvedValue({ name: 'OverwrittenAgent' }),
+      } as unknown as A2AClientManager);
+
+      const policyEngine = mockConfig.getPolicyEngine();
+      const removeRuleSpy = vi.spyOn(policyEngine, 'removeRulesForTool');
+      const addRuleSpy = vi.spyOn(policyEngine, 'addRule');
+
+      // 1. Register local
+      await registry.testRegisterAgent(localAgent);
+      expect(addRuleSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({ decision: PolicyDecision.ALLOW }),
+      );
+
+      // 2. Overwrite with remote
+      await registry.testRegisterAgent(remoteAgent);
+
+      // Verify old dynamic rule was removed
+      expect(removeRuleSpy).toHaveBeenCalledWith(
+        'OverwrittenAgent',
+        'AgentRegistry (Dynamic)',
+      );
+      // Verify new dynamic rule (remote -> ASK_USER) was added
+      expect(addRuleSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          toolName: 'OverwrittenAgent',
+          decision: PolicyDecision.ASK_USER,
+        }),
+      );
     });
   });
 
@@ -940,30 +1102,6 @@ describe('AgentRegistry', () => {
       expect(getterCalled).toBe(false); // Getter should not have been called yet
       expect(registeredDef.toolConfig?.tools).toEqual(['lazy-tool']);
       expect(getterCalled).toBe(true); // Getter should have been called now
-    });
-  });
-
-  describe('getDirectoryContext', () => {
-    it('should return default message when no agents are registered', () => {
-      expect(registry.getDirectoryContext()).toContain(
-        'No sub-agents are currently available.',
-      );
-    });
-
-    it('should return formatted list of agents when agents are available', async () => {
-      await registry.testRegisterAgent(MOCK_AGENT_V1);
-      await registry.testRegisterAgent({
-        ...MOCK_AGENT_V2,
-        name: 'AnotherAgent',
-        description: 'Another agent description',
-      });
-
-      const description = registry.getDirectoryContext();
-
-      expect(description).toContain('Sub-agents are specialized expert agents');
-      expect(description).toContain('Available Sub-Agents');
-      expect(description).toContain(`- ${MOCK_AGENT_V1.name}`);
-      expect(description).toContain(`- AnotherAgent`);
     });
   });
 });

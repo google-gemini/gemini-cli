@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'node:fs';
+import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import * as Diff from 'diff';
 import {
@@ -26,6 +27,7 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
+import { CoreToolCallStatus } from '../scheduler/types.js';
 
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
 import {
@@ -34,15 +36,21 @@ import {
 } from './modifiable-tool.js';
 import { IdeClient } from '../ide/ide-client.js';
 import { FixLLMEditWithInstruction } from '../utils/llm-edit-fixer.js';
-import { safeLiteralReplace } from '../utils/textUtils.js';
+import { safeLiteralReplace, detectLineEnding } from '../utils/textUtils.js';
 import { EditStrategyEvent } from '../telemetry/types.js';
 import { logEditStrategy } from '../telemetry/loggers.js';
 import { EditCorrectionEvent } from '../telemetry/types.js';
 import { logEditCorrectionEvent } from '../telemetry/loggers.js';
 
 import { correctPath } from '../utils/pathCorrector.js';
-import { EDIT_TOOL_NAME, READ_FILE_TOOL_NAME } from './tool-names.js';
+import {
+  EDIT_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  EDIT_DISPLAY_NAME,
+} from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { EDIT_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 interface ReplacementContext {
   params: EditToolParams;
   currentContent: string;
@@ -166,7 +174,7 @@ async function calculateFlexibleReplacement(
     if (isMatch) {
       flexibleOccurrences++;
       const firstLineInMatch = window[0];
-      const indentationMatch = firstLineInMatch.match(/^(\s*)/);
+      const indentationMatch = firstLineInMatch.match(/^([ \t]*)/);
       const indentation = indentationMatch ? indentationMatch[1] : '';
       const newBlockWithIndent = replaceLines.map(
         (line: string) => `${indentation}${line}`,
@@ -228,7 +236,7 @@ async function calculateRegexReplacement(
 
   // The final pattern captures leading whitespace (indentation) and then matches the token pattern.
   // 'm' flag enables multi-line mode, so '^' matches the start of any line.
-  const finalPattern = `^(\\s*)${pattern}`;
+  const finalPattern = `^([ \t]*)${pattern}`;
   const flexibleRegex = new RegExp(finalPattern, 'm');
 
   const match = flexibleRegex.exec(currentContent);
@@ -256,17 +264,6 @@ async function calculateRegexReplacement(
     finalOldString: normalizedSearch,
     finalNewString: normalizedReplace,
   };
-}
-
-/**
- * Detects the line ending style of a string.
- * @param content The string content to analyze.
- * @returns '\r\n' for Windows-style, '\n' for Unix-style.
- */
-function detectLineEnding(content: string): '\r\n' | '\n' {
-  // If a Carriage Return is found, assume Windows-style endings.
-  // This is a simple but effective heuristic.
-  return content.includes('\r\n') ? '\r\n' : '\n';
 }
 
 export async function calculateReplacement(
@@ -513,7 +510,7 @@ class EditToolInvocation
       };
     }
 
-    const event = new EditCorrectionEvent('success');
+    const event = new EditCorrectionEvent(CoreToolCallStatus.Success);
     logEditCorrectionEvent(this.config, event);
 
     return {
@@ -763,6 +760,22 @@ class EditToolInvocation
    * @returns Result of the edit operation
    */
   async execute(signal: AbortSignal): Promise<ToolResult> {
+    const resolvedPath = path.resolve(
+      this.config.getTargetDir(),
+      this.params.file_path,
+    );
+    const validationError = this.config.validatePathAccess(resolvedPath);
+    if (validationError) {
+      return {
+        llmContent: validationError,
+        returnDisplay: 'Error: Path not in workspace.',
+        error: {
+          message: validationError,
+          type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+        },
+      };
+    }
+
     let editData: CalculatedEdit;
     try {
       editData = await this.calculateEdit(this.params, signal);
@@ -793,12 +806,16 @@ class EditToolInvocation
     }
 
     try {
-      this.ensureParentDirectoriesExist(this.params.file_path);
+      await this.ensureParentDirectoriesExistAsync(this.params.file_path);
       let finalContent = editData.newContent;
 
-      // Restore original line endings if they were CRLF
-      if (!editData.isNewFile && editData.originalLineEnding === '\r\n') {
-        finalContent = finalContent.replace(/\n/g, '\r\n');
+      // Restore original line endings if they were CRLF, or use OS default for new files
+      const useCRLF =
+        (!editData.isNewFile && editData.originalLineEnding === '\r\n') ||
+        (editData.isNewFile && os.EOL === '\r\n');
+
+      if (useCRLF) {
+        finalContent = finalContent.replace(/\r?\n/g, '\r\n');
       }
       await this.config
         .getFileSystemService()
@@ -868,10 +885,14 @@ class EditToolInvocation
   /**
    * Creates parent directories if they don't exist
    */
-  private ensureParentDirectoriesExist(filePath: string): void {
+  private async ensureParentDirectoriesExistAsync(
+    filePath: string,
+  ): Promise<void> {
     const dirName = path.dirname(filePath);
-    if (!fs.existsSync(dirName)) {
-      fs.mkdirSync(dirName, { recursive: true });
+    try {
+      await fsPromises.access(dirName);
+    } catch {
+      await fsPromises.mkdir(dirName, { recursive: true });
     }
   }
 }
@@ -891,64 +912,10 @@ export class EditTool
   ) {
     super(
       EditTool.Name,
-      'Edit',
-      `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool to examine the file's current content before attempting a text replacement.
-      
-      The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
-      
-      Expectation for required parameters:
-      1. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
-      2. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic and that \`old_string\` and \`new_string\` are different.
-      3. \`instruction\` is the detailed instruction of what needs to be changed. It is important to Make it specific and detailed so developers or large language models can understand what needs to be changed and perform the changes on their own if necessary. 
-      4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
-      **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.
-      5. Prefer to break down complex and long changes into multiple smaller atomic calls to this tool. Always check the content of the file after changes or not finding a string to match.
-      **Multiple replacements:** Set \`expected_replacements\` to the number of occurrences you want to replace. The tool will replace ALL occurrences that match \`old_string\` exactly. Ensure the number of replacements matches your expectation.`,
+      EDIT_DISPLAY_NAME,
+      EDIT_DEFINITION.base.description!,
       Kind.Edit,
-      {
-        properties: {
-          file_path: {
-            description: 'The path to the file to modify.',
-            type: 'string',
-          },
-          instruction: {
-            description: `A clear, semantic instruction for the code change, acting as a high-quality prompt for an expert LLM assistant. It must be self-contained and explain the goal of the change.
-
-A good instruction should concisely answer:
-1.  WHY is the change needed? (e.g., "To fix a bug where users can be null...")
-2.  WHERE should the change happen? (e.g., "...in the 'renderUserProfile' function...")
-3.  WHAT is the high-level change? (e.g., "...add a null check for the 'user' object...")
-4.  WHAT is the desired outcome? (e.g., "...so that it displays a loading spinner instead of crashing.")
-
-**GOOD Example:** "In the 'calculateTotal' function, correct the sales tax calculation by updating the 'taxRate' constant from 0.05 to 0.075 to reflect the new regional tax laws."
-
-**BAD Examples:**
-- "Change the text." (Too vague)
-- "Fix the bug." (Doesn't explain the bug or the fix)
-- "Replace the line with this new line." (Brittle, just repeats the other parameters)
-`,
-            type: 'string',
-          },
-          old_string: {
-            description:
-              'The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
-            type: 'string',
-          },
-          new_string: {
-            description:
-              'The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
-            type: 'string',
-          },
-          expected_replacements: {
-            type: 'number',
-            description:
-              'Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.',
-            minimum: 1,
-          },
-        },
-        required: ['file_path', 'instruction', 'old_string', 'new_string'],
-        type: 'object',
-      },
+      EDIT_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
@@ -978,13 +945,7 @@ A good instruction should concisely answer:
     }
     params.file_path = filePath;
 
-    const workspaceContext = this.config.getWorkspaceContext();
-    if (!workspaceContext.isPathWithinWorkspace(params.file_path)) {
-      const directories = workspaceContext.getDirectories();
-      return `File path must be within one of the workspace directories: ${directories.join(', ')}`;
-    }
-
-    return null;
+    return this.config.validatePathAccess(params.file_path);
   }
 
   protected createInvocation(
@@ -998,6 +959,10 @@ A good instruction should concisely answer:
       this.name,
       this.displayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(EDIT_DEFINITION, modelId);
   }
 
   getModifyContext(_: AbortSignal): ModifyContext<EditToolParams> {

@@ -174,6 +174,7 @@ export class HookRunner {
               typeof additionalContext === 'string' &&
               'prompt' in modifiedInput
             ) {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               (modifiedInput as BeforeAgentInput).prompt +=
                 '\n\n' + additionalContext;
             }
@@ -183,16 +184,19 @@ export class HookRunner {
         case HookEventName.BeforeModel:
           if ('llm_request' in hookOutput.hookSpecificOutput) {
             // For BeforeModel, we update the LLM request
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             const hookBeforeModelOutput = hookOutput as BeforeModelOutput;
             if (
               hookBeforeModelOutput.hookSpecificOutput?.llm_request &&
               'llm_request' in modifiedInput
             ) {
               // Merge the partial request with the existing request
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               const currentRequest = (modifiedInput as BeforeModelInput)
                 .llm_request;
               const partialRequest =
                 hookBeforeModelOutput.hookSpecificOutput.llm_request;
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               (modifiedInput as BeforeModelInput).llm_request = {
                 ...currentRequest,
                 ...partialRequest,
@@ -203,11 +207,14 @@ export class HookRunner {
 
         case HookEventName.BeforeTool:
           if ('tool_input' in hookOutput.hookSpecificOutput) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             const newToolInput = hookOutput.hookSpecificOutput[
               'tool_input'
             ] as Record<string, unknown>;
             if (newToolInput && 'tool_input' in modifiedInput) {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               (modifiedInput as BeforeToolInput).tool_input = {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                 ...(modifiedInput as BeforeToolInput).tool_input,
                 ...newToolInput,
               };
@@ -267,6 +274,7 @@ export class HookRunner {
         ...sanitizeEnvironment(process.env, this.config.sanitizationConfig),
         GEMINI_PROJECT_DIR: input.cwd,
         CLAUDE_PROJECT_DIR: input.cwd, // For compatibility
+        ...hookConfig.env,
       };
 
       const child = spawn(
@@ -354,6 +362,7 @@ export class HookRunner {
               parsed = JSON.parse(parsed);
             }
             if (parsed) {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               output = parsed as HookOutput;
             }
           } catch {

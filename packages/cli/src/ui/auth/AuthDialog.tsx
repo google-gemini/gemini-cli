@@ -88,8 +88,10 @@ export function AuthDialog({
   const defaultAuthTypeEnv = process.env['GEMINI_DEFAULT_AUTH_TYPE'];
   if (
     defaultAuthTypeEnv &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     Object.values(AuthType).includes(defaultAuthTypeEnv as AuthType)
   ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     defaultAuthType = defaultAuthTypeEnv as AuthType;
   }
 
@@ -169,18 +171,20 @@ export function AuthDialog({
         // Prevent exit if there is an error message.
         // This means they user is not authenticated yet.
         if (authError) {
-          return;
+          return true;
         }
         if (settings.merged.security.auth.selectedType === undefined) {
           // Prevent exiting if no auth method is set
           onAuthError(
             'You must select an auth method to proceed. Press Ctrl+C twice to exit.',
           );
-          return;
+          return true;
         }
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         onSelect(undefined, SettingScope.User);
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );

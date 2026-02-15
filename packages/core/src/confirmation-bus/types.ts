@@ -26,6 +26,7 @@ export enum MessageBusType {
 export interface ToolCallsUpdateMessage {
   type: MessageBusType.TOOL_CALLS_UPDATE;
   toolCalls: ToolCall[];
+  schedulerId: string;
 }
 
 export interface ToolConfirmationRequest {
@@ -64,7 +65,12 @@ export interface ToolConfirmationResponse {
  * Data-only versions of ToolCallConfirmationDetails for bus transmission.
  */
 export type SerializableConfirmationDetails =
-  | { type: 'info'; title: string; prompt: string; urls?: string[] }
+  | {
+      type: 'info';
+      title: string;
+      prompt: string;
+      urls?: string[];
+    }
   | {
       type: 'edit';
       title: string;
@@ -89,6 +95,16 @@ export type SerializableConfirmationDetails =
       serverName: string;
       toolName: string;
       toolDisplayName: string;
+    }
+  | {
+      type: 'ask_user';
+      title: string;
+      questions: Question[];
+    }
+  | {
+      type: 'exit_plan_mode';
+      title: string;
+      planPath: string;
     };
 
 export interface UpdatePolicy {
@@ -131,13 +147,13 @@ export enum QuestionType {
 export interface Question {
   question: string;
   header: string;
-  /** Question type: 'choice' renders selectable options, 'text' renders free-form input, 'yesno' renders a binary Yes/No choice. Defaults to 'choice'. */
-  type?: QuestionType;
-  /** Available choices. Required when type is 'choice' (or omitted), ignored for 'text'. */
+  /** Question type: 'choice' renders selectable options, 'text' renders free-form input, 'yesno' renders a binary Yes/No choice. */
+  type: QuestionType;
+  /** Selectable choices. REQUIRED when type='choice'. IGNORED for 'text' and 'yesno'. */
   options?: QuestionOption[];
-  /** Allow multiple selections. Only applies to 'choice' type. */
+  /** Allow multiple selections. Only applies when type='choice'. */
   multiSelect?: boolean;
-  /** Placeholder hint text for 'text' type input field. */
+  /** Placeholder hint text. For type='text', shown in the input field. For type='choice', shown in the "Other" custom input. */
   placeholder?: string;
 }
 
@@ -151,6 +167,8 @@ export interface AskUserResponse {
   type: MessageBusType.ASK_USER_RESPONSE;
   correlationId: string;
   answers: { [questionIndex: string]: string };
+  /** When true, indicates the user cancelled the dialog without submitting answers */
+  cancelled?: boolean;
 }
 
 export type Message =

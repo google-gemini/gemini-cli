@@ -11,6 +11,7 @@ import * as path from 'node:path';
 vi.mock('@google/gemini-cli-core', () => ({
   Storage: vi.fn().mockImplementation(() => ({
     getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+    initialize: vi.fn().mockResolvedValue(undefined),
   })),
   shutdownTelemetry: vi.fn(),
   isTelemetrySdkInitialized: vi.fn().mockReturnValue(false),

@@ -9,6 +9,7 @@ import path from 'node:path';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import type { ToolInvocation, ToolLocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
 
 import type { PartUnion } from '@google/genai';
 import {
@@ -20,7 +21,10 @@ import { FileOperation } from '../telemetry/metrics.js';
 import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
-import { READ_FILE_TOOL_NAME } from './tool-names.js';
+import { READ_FILE_TOOL_NAME, READ_FILE_DISPLAY_NAME } from './tool-names.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import { READ_FILE_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 /**
  * Parameters for the ReadFile tool
@@ -74,6 +78,21 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   }
 
   async execute(): Promise<ToolResult> {
+    const validationError = this.config.validatePathAccess(
+      this.resolvedPath,
+      'read',
+    );
+    if (validationError) {
+      return {
+        llmContent: validationError,
+        returnDisplay: 'Path not in workspace.',
+        error: {
+          message: validationError,
+          type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+        },
+      };
+    }
+
     const result = await processSingleFileContent(
       this.resolvedPath,
       this.config.getTargetDir(),
@@ -146,6 +165,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = READ_FILE_TOOL_NAME;
+  private readonly fileDiscoveryService: FileDiscoveryService;
 
   constructor(
     private config: Config,
@@ -153,32 +173,17 @@ export class ReadFileTool extends BaseDeclarativeTool<
   ) {
     super(
       ReadFileTool.Name,
-      'ReadFile',
-      `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
+      READ_FILE_DISPLAY_NAME,
+      READ_FILE_DEFINITION.base.description!,
       Kind.Read,
-      {
-        properties: {
-          file_path: {
-            description: 'The path to the file to read.',
-            type: 'string',
-          },
-          offset: {
-            description:
-              "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
-            type: 'number',
-          },
-          limit: {
-            description:
-              "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
-            type: 'number',
-          },
-        },
-        required: ['file_path'],
-        type: 'object',
-      },
+      READ_FILE_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true,
       false,
+    );
+    this.fileDiscoveryService = new FileDiscoveryService(
+      config.getTargetDir(),
+      config.getFileFilteringOptions(),
     );
   }
 
@@ -189,24 +194,19 @@ export class ReadFileTool extends BaseDeclarativeTool<
       return "The 'file_path' parameter must be non-empty.";
     }
 
-    const workspaceContext = this.config.getWorkspaceContext();
-    const projectTempDir = this.config.storage.getProjectTempDir();
     const resolvedPath = path.resolve(
       this.config.getTargetDir(),
       params.file_path,
     );
-    const resolvedProjectTempDir = path.resolve(projectTempDir);
-    const isWithinTempDir =
-      resolvedPath.startsWith(resolvedProjectTempDir + path.sep) ||
-      resolvedPath === resolvedProjectTempDir;
 
-    if (
-      !workspaceContext.isPathWithinWorkspace(resolvedPath) &&
-      !isWithinTempDir
-    ) {
-      const directories = workspaceContext.getDirectories();
-      return `File path must be within one of the workspace directories: ${directories.join(', ')} or within the project temp directory: ${projectTempDir}`;
+    const validationError = this.config.validatePathAccess(
+      resolvedPath,
+      'read',
+    );
+    if (validationError) {
+      return validationError;
     }
+
     if (params.offset !== undefined && params.offset < 0) {
       return 'Offset must be a non-negative number';
     }
@@ -214,9 +214,13 @@ export class ReadFileTool extends BaseDeclarativeTool<
       return 'Limit must be a positive number';
     }
 
-    const fileService = this.config.getFileService();
     const fileFilteringOptions = this.config.getFileFilteringOptions();
-    if (fileService.shouldIgnoreFile(resolvedPath, fileFilteringOptions)) {
+    if (
+      this.fileDiscoveryService.shouldIgnoreFile(
+        resolvedPath,
+        fileFilteringOptions,
+      )
+    ) {
       return `File path '${resolvedPath}' is ignored by configured ignore patterns.`;
     }
 
@@ -236,5 +240,9 @@ export class ReadFileTool extends BaseDeclarativeTool<
       _toolName,
       _toolDisplayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(READ_FILE_DEFINITION, modelId);
   }
 }

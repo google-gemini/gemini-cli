@@ -13,7 +13,7 @@ import {
   useReducer,
   useContext,
 } from 'react';
-import { Box, Text, useStdout } from 'ink';
+import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import type { Question } from '@google/gemini-cli-core';
 import { BaseSelectionList } from './shared/BaseSelectionList.js';
@@ -21,44 +21,87 @@ import type { SelectionListItem } from '../hooks/useSelectionList.js';
 import { TabHeader, type Tab } from './shared/TabHeader.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
-import { checkExhaustive } from '../../utils/checks.js';
+import { checkExhaustive } from '@google/gemini-cli-core';
 import { TextInput } from './shared/TextInput.js';
 import { useTextBuffer } from './shared/text-buffer.js';
+import { getCachedStringWidth } from '../utils/textUtils.js';
+import { useTabbedNavigation } from '../hooks/useTabbedNavigation.js';
+import { DialogFooter } from './shared/DialogFooter.js';
+import { MarkdownDisplay } from '../utils/MarkdownDisplay.js';
+import { RenderInline } from '../utils/InlineMarkdownRenderer.js';
+import { MaxSizedBox } from './shared/MaxSizedBox.js';
 import { UIStateContext } from '../contexts/UIStateContext.js';
-import { cpLen } from '../utils/textUtils.js';
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+
+/** Padding for dialog content to prevent text from touching edges. */
+const DIALOG_PADDING = 4;
+
+/**
+ * Checks if text is a single line without markdown identifiers.
+ */
+function isPlainSingleLine(text: string): boolean {
+  // Must be a single line (no newlines)
+  if (text.includes('\n') || text.includes('\r')) {
+    return false;
+  }
+
+  // Check for common markdown identifiers
+  const markdownPatterns = [
+    /^#{1,6}\s/, // Headers
+    /^[`~]{3,}/, // Code fences
+    /^[-*+]\s/, // Unordered lists
+    /^\d+\.\s/, // Ordered lists
+    /^[-*_]{3,}$/, // Horizontal rules
+    /\|/, // Tables
+    /\*\*|__/, // Bold
+    /(?<!\*)\*(?!\*)/, // Italic (single asterisk not part of bold)
+    /(?<!_)_(?!_)/, // Italic (single underscore not part of bold)
+    /`[^`]+`/, // Inline code
+    /\[.*?\]\(.*?\)/, // Links
+    /!\[/, // Images
+  ];
+
+  for (const pattern of markdownPatterns) {
+    if (pattern.test(text)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Auto-bolds plain single-line text by wrapping in **.
+ * Returns the text unchanged if it already contains markdown.
+ */
+function autoBoldIfPlain(text: string): string {
+  if (isPlainSingleLine(text)) {
+    return `**${text}**`;
+  }
+  return text;
+}
 
 interface AskUserDialogState {
-  currentQuestionIndex: number;
   answers: { [key: string]: string };
   isEditingCustomOption: boolean;
-  cursorEdge: { left: boolean; right: boolean };
   submitted: boolean;
 }
 
 type AskUserDialogAction =
   | {
-      type: 'NEXT_QUESTION';
-      payload: { maxIndex: number };
-    }
-  | { type: 'PREV_QUESTION' }
-  | {
       type: 'SET_ANSWER';
       payload: {
-        index?: number;
+        index: number;
         answer: string;
-        autoAdvance?: boolean;
-        maxIndex?: number;
+        submit?: boolean;
       };
     }
   | { type: 'SET_EDITING_CUSTOM'; payload: { isEditing: boolean } }
-  | { type: 'SET_CURSOR_EDGE'; payload: { left: boolean; right: boolean } }
   | { type: 'SUBMIT' };
 
 const initialState: AskUserDialogState = {
-  currentQuestionIndex: 0,
   answers: {},
   isEditingCustomOption: false,
-  cursorEdge: { left: true, right: true },
   submitted: false,
 };
 
@@ -71,56 +114,23 @@ function askUserDialogReducerLogic(
   }
 
   switch (action.type) {
-    case 'NEXT_QUESTION': {
-      const { maxIndex } = action.payload;
-      if (state.currentQuestionIndex < maxIndex) {
-        return {
-          ...state,
-          currentQuestionIndex: state.currentQuestionIndex + 1,
-          isEditingCustomOption: false,
-          cursorEdge: { left: true, right: true },
-        };
-      }
-      return state;
-    }
-    case 'PREV_QUESTION': {
-      if (state.currentQuestionIndex > 0) {
-        return {
-          ...state,
-          currentQuestionIndex: state.currentQuestionIndex - 1,
-          isEditingCustomOption: false,
-          cursorEdge: { left: true, right: true },
-        };
-      }
-      return state;
-    }
     case 'SET_ANSWER': {
-      const { index, answer, autoAdvance, maxIndex } = action.payload;
-      const targetIndex = index ?? state.currentQuestionIndex;
+      const { index, answer, submit } = action.payload;
       const hasAnswer =
         answer !== undefined && answer !== null && answer.trim() !== '';
       const newAnswers = { ...state.answers };
 
       if (hasAnswer) {
-        newAnswers[targetIndex] = answer;
+        newAnswers[index] = answer;
       } else {
-        delete newAnswers[targetIndex];
+        delete newAnswers[index];
       }
 
-      const newState = {
+      return {
         ...state,
         answers: newAnswers,
+        submitted: submit ? true : state.submitted,
       };
-
-      if (autoAdvance && typeof maxIndex === 'number') {
-        if (newState.currentQuestionIndex < maxIndex) {
-          newState.currentQuestionIndex += 1;
-          newState.isEditingCustomOption = false;
-          newState.cursorEdge = { left: true, right: true };
-        }
-      }
-
-      return newState;
     }
     case 'SET_EDITING_CUSTOM': {
       if (state.isEditingCustomOption === action.payload.isEditing) {
@@ -129,16 +139,6 @@ function askUserDialogReducerLogic(
       return {
         ...state,
         isEditingCustomOption: action.payload.isEditing,
-      };
-    }
-    case 'SET_CURSOR_EDGE': {
-      const { left, right } = action.payload;
-      if (state.cursorEdge.left === left && state.cursorEdge.right === right) {
-        return state;
-      }
-      return {
-        ...state,
-        cursorEdge: { left, right },
       };
     }
     case 'SUBMIT': {
@@ -175,6 +175,14 @@ interface AskUserDialogProps {
    * Useful for managing global keypress handlers.
    */
   onActiveTextInputChange?: (active: boolean) => void;
+  /**
+   * Width of the dialog.
+   */
+  width: number;
+  /**
+   * Height constraint for scrollable content.
+   */
+  availableHeight?: number;
 }
 
 interface ReviewViewProps {
@@ -198,18 +206,15 @@ const ReviewView: React.FC<ReviewViewProps> = ({
     (key: Key) => {
       if (keyMatchers[Command.RETURN](key)) {
         onSubmit();
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      paddingX={1}
-      borderColor={theme.border.default}
-    >
+    <Box flexDirection="column">
       {progressHeader}
       <Box marginBottom={1}>
         <Text bold color={theme.text.primary}>
@@ -226,20 +231,23 @@ const ReviewView: React.FC<ReviewViewProps> = ({
         </Box>
       )}
 
-      {questions.map((q, i) => (
-        <Box key={i} marginBottom={0}>
-          <Text color={theme.text.secondary}>{q.header}</Text>
-          <Text color={theme.text.secondary}> → </Text>
-          <Text color={answers[i] ? theme.text.primary : theme.status.warning}>
-            {answers[i] || '(not answered)'}
-          </Text>
-        </Box>
-      ))}
-      <Box marginTop={1}>
-        <Text color={theme.text.secondary}>
-          Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel
-        </Text>
+      <Box flexDirection="column">
+        {questions.map((q, i) => (
+          <Box key={i} marginBottom={0}>
+            <Text color={theme.text.secondary}>{q.header}</Text>
+            <Text color={theme.text.secondary}> → </Text>
+            <Text
+              color={answers[i] ? theme.text.primary : theme.status.warning}
+            >
+              {answers[i] || '(not answered)'}
+            </Text>
+          </Box>
+        ))}
       </Box>
+      <DialogFooter
+        primaryAction="Enter to submit"
+        navigationActions="Tab/Shift+Tab to edit answers"
+      />
     </Box>
   );
 };
@@ -251,7 +259,8 @@ interface TextQuestionViewProps {
   onAnswer: (answer: string) => void;
   onSelectionChange?: (answer: string) => void;
   onEditingCustomOption?: (editing: boolean) => void;
-  onCursorEdgeChange?: (edge: { left: boolean; right: boolean }) => void;
+  availableWidth: number;
+  availableHeight?: number;
   initialAnswer?: string;
   progressHeader?: React.ReactNode;
   keyboardHints?: React.ReactNode;
@@ -262,20 +271,22 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   onAnswer,
   onSelectionChange,
   onEditingCustomOption,
-  onCursorEdgeChange,
+  availableWidth,
+  availableHeight,
   initialAnswer,
   progressHeader,
   keyboardHints,
 }) => {
-  const uiState = useContext(UIStateContext);
-  const { stdout } = useStdout();
-  const terminalWidth = uiState?.terminalWidth ?? stdout?.columns ?? 80;
+  const isAlternateBuffer = useAlternateBuffer();
+  const prefix = '> ';
+  const horizontalPadding = 1; // 1 for cursor
+  const bufferWidth =
+    availableWidth - getCachedStringWidth(prefix) - horizontalPadding;
 
   const buffer = useTextBuffer({
     initialText: initialAnswer,
-    viewport: { width: terminalWidth - 10, height: 1 },
-    singleLine: true,
-    isValidPath: () => false,
+    viewport: { width: Math.max(1, bufferWidth), height: 3 },
+    singleLine: false,
   });
 
   const { text: textValue } = buffer;
@@ -289,38 +300,26 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
     }
   }, [textValue, onSelectionChange]);
 
-  // Sync cursor edge state with parent - only when it actually changes
-  const lastEdgeRef = useRef<{ left: boolean; right: boolean } | null>(null);
-  useEffect(() => {
-    const isLeft = buffer.cursor[1] === 0;
-    const isRight = buffer.cursor[1] === cpLen(buffer.lines[0] || '');
-    if (
-      !lastEdgeRef.current ||
-      isLeft !== lastEdgeRef.current.left ||
-      isRight !== lastEdgeRef.current.right
-    ) {
-      onCursorEdgeChange?.({ left: isLeft, right: isRight });
-      lastEdgeRef.current = { left: isLeft, right: isRight };
-    }
-  }, [buffer.cursor, buffer.lines, onCursorEdgeChange]);
-
   // Handle Ctrl+C to clear all text
   const handleExtraKeys = useCallback(
     (key: Key) => {
       if (keyMatchers[Command.QUIT](key)) {
+        if (textValue === '') {
+          return false;
+        }
         buffer.setText('');
+        return true;
       }
+      return false;
     },
-    [buffer],
+    [buffer, textValue],
   );
 
-  useKeypress(handleExtraKeys, { isActive: true });
+  useKeypress(handleExtraKeys, { isActive: true, priority: true });
 
   const handleSubmit = useCallback(
     (val: string) => {
-      if (val.trim()) {
-        onAnswer(val.trim());
-      }
+      onAnswer(val.trim());
     },
     [onAnswer],
   );
@@ -335,22 +334,34 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
 
   const placeholder = question.placeholder || 'Enter your response';
 
+  const HEADER_HEIGHT = progressHeader ? 2 : 0;
+  const INPUT_HEIGHT = 2; // TextInput + margin
+  const FOOTER_HEIGHT = 2; // DialogFooter + margin
+  const overhead = HEADER_HEIGHT + INPUT_HEIGHT + FOOTER_HEIGHT;
+  const questionHeight =
+    availableHeight && !isAlternateBuffer
+      ? Math.max(1, availableHeight - overhead)
+      : undefined;
+
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      paddingX={1}
-      borderColor={theme.border.default}
-    >
+    <Box flexDirection="column">
       {progressHeader}
       <Box marginBottom={1}>
-        <Text bold color={theme.text.primary}>
-          {question.question}
-        </Text>
+        <MaxSizedBox
+          maxHeight={questionHeight}
+          maxWidth={availableWidth}
+          overflowDirection="bottom"
+        >
+          <MarkdownDisplay
+            text={autoBoldIfPlain(question.question)}
+            terminalWidth={availableWidth - DIALOG_PADDING}
+            isPending={false}
+          />
+        </MaxSizedBox>
       </Box>
 
       <Box flexDirection="row" marginBottom={1}>
-        <Text color={theme.text.accent}>{'> '}</Text>
+        <Text color={theme.status.success}>{'> '}</Text>
         <TextInput
           buffer={buffer}
           placeholder={placeholder}
@@ -445,7 +456,8 @@ interface ChoiceQuestionViewProps {
   onAnswer: (answer: string) => void;
   onSelectionChange?: (answer: string) => void;
   onEditingCustomOption?: (editing: boolean) => void;
-  onCursorEdgeChange?: (edge: { left: boolean; right: boolean }) => void;
+  availableWidth: number;
+  availableHeight?: number;
   initialAnswer?: string;
   progressHeader?: React.ReactNode;
   keyboardHints?: React.ReactNode;
@@ -456,14 +468,26 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   onAnswer,
   onSelectionChange,
   onEditingCustomOption,
-  onCursorEdgeChange,
+  availableWidth,
+  availableHeight,
   initialAnswer,
   progressHeader,
   keyboardHints,
 }) => {
-  const uiState = useContext(UIStateContext);
-  const { stdout } = useStdout();
-  const terminalWidth = uiState?.terminalWidth ?? stdout?.columns ?? 80;
+  const isAlternateBuffer = useAlternateBuffer();
+  const numOptions =
+    (question.options?.length ?? 0) + (question.type !== 'yesno' ? 1 : 0);
+  const numLen = String(numOptions).length;
+  const radioWidth = 2; // "● "
+  const numberWidth = numLen + 2; // e.g., "1. "
+  const checkboxWidth = question.multiSelect ? 4 : 1; // "[x] " or " "
+  const checkmarkWidth = question.multiSelect ? 0 : 2; // "" or " ✓"
+  const cursorPadding = 1; // Extra character for cursor at end of line
+
+  const horizontalPadding =
+    radioWidth + numberWidth + checkboxWidth + checkmarkWidth + cursorPadding;
+
+  const bufferWidth = availableWidth - horizontalPadding;
 
   const questionOptions = useMemo(
     () => question.options ?? [],
@@ -537,28 +561,11 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
   const customBuffer = useTextBuffer({
     initialText: initialCustomText,
-    viewport: { width: terminalWidth - 20, height: 1 },
-    singleLine: true,
-    isValidPath: () => false,
+    viewport: { width: Math.max(1, bufferWidth), height: 3 },
+    singleLine: false,
   });
 
   const customOptionText = customBuffer.text;
-
-  // Sync cursor edge state with parent - only when it actually changes
-  const lastEdgeRef = useRef<{ left: boolean; right: boolean } | null>(null);
-  useEffect(() => {
-    const isLeft = customBuffer.cursor[1] === 0;
-    const isRight =
-      customBuffer.cursor[1] === cpLen(customBuffer.lines[0] || '');
-    if (
-      !lastEdgeRef.current ||
-      isLeft !== lastEdgeRef.current.left ||
-      isRight !== lastEdgeRef.current.right
-    ) {
-      onCursorEdgeChange?.({ left: isLeft, right: isRight });
-      lastEdgeRef.current = { left: isLeft, right: isRight };
-    }
-  }, [customBuffer.cursor, customBuffer.lines, onCursorEdgeChange]);
 
   // Helper to build answer string from selections
   const buildAnswerString = useCallback(
@@ -606,32 +613,60 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     (key: Key) => {
       // If focusing custom option, handle Ctrl+C
       if (isCustomOptionFocused && keyMatchers[Command.QUIT](key)) {
+        if (customOptionText === '') {
+          return false;
+        }
         customBuffer.setText('');
-        return;
+        return true;
       }
 
-      // Type-to-jump: if a printable character is typed and not focused, jump to custom
+      // Don't jump if a navigation or selection key is pressed
+      if (
+        keyMatchers[Command.DIALOG_NAVIGATION_UP](key) ||
+        keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key) ||
+        keyMatchers[Command.DIALOG_NEXT](key) ||
+        keyMatchers[Command.DIALOG_PREV](key) ||
+        keyMatchers[Command.MOVE_LEFT](key) ||
+        keyMatchers[Command.MOVE_RIGHT](key) ||
+        keyMatchers[Command.RETURN](key) ||
+        keyMatchers[Command.ESCAPE](key) ||
+        keyMatchers[Command.QUIT](key)
+      ) {
+        return false;
+      }
+
+      // Check if it's a numeric quick selection key (if numbers are shown)
+      const isNumeric = /^[0-9]$/.test(key.sequence);
+      if (isNumeric) {
+        return false;
+      }
+
+      // Type-to-jump: if printable characters are typed and not focused, jump to custom
       const isPrintable =
         key.sequence &&
-        key.sequence.length === 1 &&
         !key.ctrl &&
         !key.alt &&
-        key.sequence.charCodeAt(0) >= 32;
+        (key.sequence.length > 1 || key.sequence.charCodeAt(0) >= 32);
 
-      const isNumber = /^[0-9]$/.test(key.sequence);
-
-      if (isPrintable && !isCustomOptionFocused && !isNumber) {
+      if (isPrintable && !isCustomOptionFocused) {
         dispatch({ type: 'SET_CUSTOM_FOCUSED', payload: { focused: true } });
         onEditingCustomOption?.(true);
-        // We can't easily inject the first key into useTextBuffer's internal state
-        // but TextInput will handle subsequent keys once it's focused.
+        // For IME or multi-char sequences, we want to capture the whole thing.
+        // If it's a single char, we start the buffer with it.
         customBuffer.setText(key.sequence);
+        return true;
       }
+      return false;
     },
-    [isCustomOptionFocused, customBuffer, onEditingCustomOption],
+    [
+      isCustomOptionFocused,
+      customBuffer,
+      onEditingCustomOption,
+      customOptionText,
+    ],
   );
 
-  useKeypress(handleExtraKeys, { isActive: true });
+  useKeypress(handleExtraKeys, { isActive: true, priority: true });
 
   const selectionItems = useMemo((): Array<SelectionListItem<OptionItem>> => {
     const list: Array<SelectionListItem<OptionItem>> = questionOptions.map(
@@ -740,31 +775,53 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     }
   }, [customOptionText, isCustomOptionSelected, question.multiSelect]);
 
+  const HEADER_HEIGHT = progressHeader ? 2 : 0;
+  const TITLE_MARGIN = 1;
+  const FOOTER_HEIGHT = 2; // DialogFooter + margin
+  const overhead = HEADER_HEIGHT + TITLE_MARGIN + FOOTER_HEIGHT;
+  const listHeight = availableHeight
+    ? Math.max(1, availableHeight - overhead)
+    : undefined;
+  const questionHeight =
+    listHeight && !isAlternateBuffer
+      ? Math.min(15, Math.max(1, listHeight - DIALOG_PADDING))
+      : undefined;
+  const maxItemsToShow =
+    listHeight && questionHeight
+      ? Math.max(1, Math.floor((listHeight - questionHeight) / 2))
+      : selectionItems.length;
+
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      paddingX={1}
-      borderColor={theme.border.default}
-    >
+    <Box flexDirection="column">
       {progressHeader}
-      <Box marginBottom={1}>
-        <Text bold color={theme.text.primary}>
-          {question.question}
-        </Text>
+      <Box marginBottom={TITLE_MARGIN}>
+        <MaxSizedBox
+          maxHeight={questionHeight}
+          maxWidth={availableWidth}
+          overflowDirection="bottom"
+        >
+          <Box flexDirection="column">
+            <MarkdownDisplay
+              text={autoBoldIfPlain(question.question)}
+              terminalWidth={availableWidth - DIALOG_PADDING}
+              isPending={false}
+            />
+            {question.multiSelect && (
+              <Text color={theme.text.secondary} italic>
+                (Select all that apply)
+              </Text>
+            )}
+          </Box>
+        </MaxSizedBox>
       </Box>
-      {question.multiSelect && (
-        <Text color={theme.text.secondary} italic>
-          {' '}
-          (Select all that apply)
-        </Text>
-      )}
 
       <BaseSelectionList<OptionItem>
         items={selectionItems}
         onSelect={handleSelect}
         onHighlight={handleHighlight}
         focusKey={isCustomOptionFocused ? 'other' : undefined}
+        maxItemsToShow={maxItemsToShow}
+        showScrollArrows={true}
         renderItem={(item, context) => {
           const optionItem = item.value;
           const isChecked =
@@ -776,12 +833,14 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
           // Render inline text input for custom option
           if (optionItem.type === 'other') {
-            const placeholder = 'Enter a custom value';
+            const placeholder = question.placeholder || 'Enter a custom value';
             return (
               <Box flexDirection="row">
                 {showCheck && (
                   <Text
-                    color={isChecked ? theme.text.accent : theme.text.secondary}
+                    color={
+                      isChecked ? theme.status.success : theme.text.secondary
+                    }
                   >
                     [{isChecked ? 'x' : ' '}]
                   </Text>
@@ -791,9 +850,22 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
                   buffer={customBuffer}
                   placeholder={placeholder}
                   focus={context.isSelected}
-                  onSubmit={() => handleSelect(optionItem)}
+                  onSubmit={(val) => {
+                    if (question.multiSelect) {
+                      const fullAnswer = buildAnswerString(
+                        selectedIndices,
+                        true,
+                        val,
+                      );
+                      if (fullAnswer) {
+                        onAnswer(fullAnswer);
+                      }
+                    } else if (val.trim()) {
+                      onAnswer(val.trim());
+                    }
+                  }}
                 />
-                {isChecked && !question.multiSelect && (
+                {isChecked && !question.multiSelect && !context.isSelected && (
                   <Text color={theme.status.success}> ✓</Text>
                 )}
               </Box>
@@ -813,7 +885,9 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
               <Box flexDirection="row">
                 {showCheck && (
                   <Text
-                    color={isChecked ? theme.text.accent : theme.text.secondary}
+                    color={
+                      isChecked ? theme.status.success : theme.text.secondary
+                    }
                   >
                     [{isChecked ? 'x' : ' '}]
                   </Text>
@@ -829,7 +903,10 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
               {optionItem.description && (
                 <Text color={theme.text.secondary} wrap="wrap">
                   {' '}
-                  {optionItem.description}
+                  <RenderInline
+                    text={optionItem.description}
+                    defaultColor={theme.text.secondary}
+                  />
                 </Text>
               )}
             </Box>
@@ -841,42 +918,41 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   );
 };
 
-/**
- * A dialog component for asking the user a series of questions.
- * Supports multiple question types (text, choice, yes/no, multi-select),
- * navigation between questions, and a final review step.
- */
 export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   questions,
   onSubmit,
   onCancel,
   onActiveTextInputChange,
+  width,
+  availableHeight: availableHeightProp,
 }) => {
-  const [state, dispatch] = useReducer(askUserDialogReducerLogic, initialState);
-  const {
-    currentQuestionIndex,
-    answers,
-    isEditingCustomOption,
-    cursorEdge,
-    submitted,
-  } = state;
+  const uiState = useContext(UIStateContext);
+  const availableHeight =
+    availableHeightProp ??
+    (uiState?.constrainHeight !== false
+      ? uiState?.availableTerminalHeight
+      : undefined);
 
-  // Use refs for synchronous checks to prevent race conditions in handleCancel
-  const isEditingCustomOptionRef = useRef(false);
-  isEditingCustomOptionRef.current = isEditingCustomOption;
+  const [state, dispatch] = useReducer(askUserDialogReducerLogic, initialState);
+  const { answers, isEditingCustomOption, submitted } = state;
+
+  const reviewTabIndex = questions.length;
+  const tabCount =
+    questions.length > 1 ? questions.length + 1 : questions.length;
+
+  const { currentIndex, goToNextTab, goToPrevTab } = useTabbedNavigation({
+    tabCount,
+    isActive: !submitted && questions.length > 1,
+    enableArrowNavigation: false, // We'll handle arrows via textBuffer callbacks or manually
+    enableTabKey: false, // We'll handle tab manually to match existing behavior
+  });
+
+  const currentQuestionIndex = currentIndex;
 
   const handleEditingCustomOption = useCallback((isEditing: boolean) => {
     dispatch({ type: 'SET_EDITING_CUSTOM', payload: { isEditing } });
   }, []);
 
-  const handleCursorEdgeChange = useCallback(
-    (edge: { left: boolean; right: boolean }) => {
-      dispatch({ type: 'SET_CURSOR_EDGE', payload: edge });
-    },
-    [],
-  );
-
-  // Sync isEditingCustomOption state with parent for global keypress handling
   useEffect(() => {
     onActiveTextInputChange?.(isEditingCustomOption);
     return () => {
@@ -884,70 +960,61 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
     };
   }, [isEditingCustomOption, onActiveTextInputChange]);
 
-  // Handle Escape or Ctrl+C to cancel (but not Ctrl+C when editing custom option)
   const handleCancel = useCallback(
     (key: Key) => {
-      if (submitted) return;
+      if (submitted) return false;
       if (keyMatchers[Command.ESCAPE](key)) {
         onCancel();
-      } else if (
-        keyMatchers[Command.QUIT](key) &&
-        !isEditingCustomOptionRef.current
-      ) {
-        onCancel();
+        return true;
+      } else if (keyMatchers[Command.QUIT](key)) {
+        if (!isEditingCustomOption) {
+          onCancel();
+        }
+        // Return false to let ctrl-C bubble up to AppContainer for exit flow
+        return false;
       }
+      return false;
     },
-    [onCancel, submitted],
+    [onCancel, submitted, isEditingCustomOption],
   );
 
   useKeypress(handleCancel, {
     isActive: !submitted,
   });
 
-  // Review tab is at index questions.length (after all questions)
-  const reviewTabIndex = questions.length;
   const isOnReviewTab = currentQuestionIndex === reviewTabIndex;
 
-  // Bidirectional navigation between questions using custom useKeypress for consistency
   const handleNavigation = useCallback(
     (key: Key) => {
-      if (submitted) return;
+      if (submitted || questions.length <= 1) return false;
 
-      const isTab = key.name === 'tab';
-      const isShiftTab = isTab && key.shift;
-      const isPlainTab = isTab && !key.shift;
+      const isNextKey = keyMatchers[Command.DIALOG_NEXT](key);
+      const isPrevKey = keyMatchers[Command.DIALOG_PREV](key);
 
-      const isRight = key.name === 'right' && !key.ctrl && !key.alt;
-      const isLeft = key.name === 'left' && !key.ctrl && !key.alt;
+      const isRight = keyMatchers[Command.MOVE_RIGHT](key);
+      const isLeft = keyMatchers[Command.MOVE_LEFT](key);
 
-      // Tab always works. Arrows work if NOT editing OR if at the corresponding edge.
-      const shouldGoNext =
-        isPlainTab || (isRight && (!isEditingCustomOption || cursorEdge.right));
-      const shouldGoPrev =
-        isShiftTab || (isLeft && (!isEditingCustomOption || cursorEdge.left));
+      // Tab keys always trigger navigation.
+      // Arrows trigger navigation if NOT in a text input OR if the input bubbles the event (already at edge).
+      const shouldGoNext = isNextKey || isRight;
+      const shouldGoPrev = isPrevKey || isLeft;
 
       if (shouldGoNext) {
-        // Allow navigation up to Review tab for multi-question flows
-        const maxIndex =
-          questions.length > 1 ? reviewTabIndex : questions.length - 1;
-        dispatch({
-          type: 'NEXT_QUESTION',
-          payload: { maxIndex },
-        });
+        goToNextTab();
+        return true;
       } else if (shouldGoPrev) {
-        dispatch({
-          type: 'PREV_QUESTION',
-        });
+        goToPrevTab();
+        return true;
       }
+      return false;
     },
-    [isEditingCustomOption, cursorEdge, questions, reviewTabIndex, submitted],
+    [questions.length, submitted, goToNextTab, goToPrevTab],
   );
 
   useKeypress(handleNavigation, {
     isActive: questions.length > 1 && !submitted,
   });
 
-  // Effect to trigger submission when state.submitted becomes true
   useEffect(() => {
     if (submitted) {
       onSubmit(answers);
@@ -958,24 +1025,29 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
     (answer: string) => {
       if (submitted) return;
 
-      const reviewTabIndex = questions.length;
-      dispatch({
-        type: 'SET_ANSWER',
-        payload: {
-          answer,
-          autoAdvance: questions.length > 1,
-          maxIndex: reviewTabIndex,
-        },
-      });
-
-      if (questions.length === 1) {
-        dispatch({ type: 'SUBMIT' });
+      if (questions.length > 1) {
+        dispatch({
+          type: 'SET_ANSWER',
+          payload: {
+            index: currentQuestionIndex,
+            answer,
+          },
+        });
+        goToNextTab();
+      } else {
+        dispatch({
+          type: 'SET_ANSWER',
+          payload: {
+            index: currentQuestionIndex,
+            answer,
+            submit: true,
+          },
+        });
       }
     },
-    [questions.length, submitted],
+    [currentQuestionIndex, questions, submitted, goToNextTab],
   );
 
-  // Submit from Review tab
   const handleReviewSubmit = useCallback(() => {
     if (submitted) return;
     dispatch({ type: 'SUBMIT' });
@@ -987,12 +1059,12 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       dispatch({
         type: 'SET_ANSWER',
         payload: {
+          index: currentQuestionIndex,
           answer,
-          autoAdvance: false,
         },
       });
     },
-    [submitted],
+    [submitted, currentQuestionIndex],
   );
 
   const answeredIndices = useMemo(
@@ -1002,7 +1074,6 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
 
   const currentQuestion = questions[currentQuestionIndex];
 
-  // For yesno type, generate Yes/No options and force single-select
   const effectiveQuestion = useMemo(() => {
     if (currentQuestion?.type === 'yesno') {
       return {
@@ -1017,13 +1088,11 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
     return currentQuestion;
   }, [currentQuestion]);
 
-  // Build tabs array for TabHeader
   const tabs = useMemo((): Tab[] => {
     const questionTabs: Tab[] = questions.map((q, i) => ({
       key: String(i),
       header: q.header,
     }));
-    // Add review tab when there are multiple questions
     if (questions.length > 1) {
       questionTabs.push({
         key: 'review',
@@ -1043,63 +1112,76 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       />
     ) : null;
 
-  // Render Review tab when on it
   if (isOnReviewTab) {
     return (
-      <ReviewView
-        questions={questions}
-        answers={answers}
-        onSubmit={handleReviewSubmit}
-        progressHeader={progressHeader}
-      />
+      <Box aria-label="Review your answers">
+        <ReviewView
+          questions={questions}
+          answers={answers}
+          onSubmit={handleReviewSubmit}
+          progressHeader={progressHeader}
+        />
+      </Box>
     );
   }
 
-  // Safeguard for invalid question index
   if (!currentQuestion) return null;
 
   const keyboardHints = (
-    <Box marginTop={1}>
-      <Text color={theme.text.secondary}>
-        {currentQuestion.type === 'text' || isEditingCustomOption
-          ? questions.length > 1
-            ? 'Enter to submit · Tab/Shift+Tab to switch questions · Esc to cancel'
-            : 'Enter to submit · Esc to cancel'
-          : questions.length > 1
-            ? 'Enter to select · ←/→ to switch questions · Esc to cancel'
-            : 'Enter to select · ↑/↓ to navigate · Esc to cancel'}
-      </Text>
-    </Box>
+    <DialogFooter
+      primaryAction={
+        currentQuestion.type === 'text' || isEditingCustomOption
+          ? 'Enter to submit'
+          : 'Enter to select'
+      }
+      navigationActions={
+        questions.length > 1
+          ? currentQuestion.type === 'text' || isEditingCustomOption
+            ? 'Tab/Shift+Tab to switch questions'
+            : '←/→ to switch questions'
+          : currentQuestion.type === 'text' || isEditingCustomOption
+            ? undefined
+            : '↑/↓ to navigate'
+      }
+    />
   );
 
-  // Render text-type or choice-type question view
-  if (currentQuestion.type === 'text') {
-    return (
+  const questionView =
+    currentQuestion.type === 'text' ? (
       <TextQuestionView
         key={currentQuestionIndex}
         question={currentQuestion}
         onAnswer={handleAnswer}
         onSelectionChange={handleSelectionChange}
         onEditingCustomOption={handleEditingCustomOption}
-        onCursorEdgeChange={handleCursorEdgeChange}
+        availableWidth={width}
+        availableHeight={availableHeight}
+        initialAnswer={answers[currentQuestionIndex]}
+        progressHeader={progressHeader}
+        keyboardHints={keyboardHints}
+      />
+    ) : (
+      <ChoiceQuestionView
+        key={currentQuestionIndex}
+        question={effectiveQuestion}
+        onAnswer={handleAnswer}
+        onSelectionChange={handleSelectionChange}
+        onEditingCustomOption={handleEditingCustomOption}
+        availableWidth={width}
+        availableHeight={availableHeight}
         initialAnswer={answers[currentQuestionIndex]}
         progressHeader={progressHeader}
         keyboardHints={keyboardHints}
       />
     );
-  }
 
   return (
-    <ChoiceQuestionView
-      key={currentQuestionIndex}
-      question={effectiveQuestion}
-      onAnswer={handleAnswer}
-      onSelectionChange={handleSelectionChange}
-      onEditingCustomOption={handleEditingCustomOption}
-      onCursorEdgeChange={handleCursorEdgeChange}
-      initialAnswer={answers[currentQuestionIndex]}
-      progressHeader={progressHeader}
-      keyboardHints={keyboardHints}
-    />
+    <Box
+      flexDirection="column"
+      width={width}
+      aria-label={`Question ${currentQuestionIndex + 1} of ${questions.length}: ${currentQuestion.question}`}
+    >
+      {questionView}
+    </Box>
   );
 };

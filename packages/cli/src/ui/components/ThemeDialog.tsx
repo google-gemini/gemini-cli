@@ -9,7 +9,7 @@ import { useCallback, useState } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
-import { pickDefaultThemeName } from '../themes/theme.js';
+import { pickDefaultThemeName, type Theme } from '../themes/theme.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { DiffRenderer } from './messages/DiffRenderer.js';
 import { colorizeCode } from '../utils/CodeColorizer.js';
@@ -22,12 +22,14 @@ import { getScopeMessageForSetting } from '../../utils/dialogScopeUtils.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { ScopeSelector } from './shared/ScopeSelector.js';
-import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
-  onSelect: (themeName: string, scope: LoadableSettingScope) => void;
+  onSelect: (
+    themeName: string,
+    scope: LoadableSettingScope,
+  ) => void | Promise<void>;
 
   /** Callback function when the dialog is cancelled */
   onCancel: () => void;
@@ -40,24 +42,21 @@ interface ThemeDialogProps {
   terminalWidth: number;
 }
 
-import {
-  getThemeTypeFromBackgroundColor,
-  resolveColor,
-} from '../themes/color-utils.js';
+import { resolveColor } from '../themes/color-utils.js';
 
 function generateThemeItem(
   name: string,
   typeDisplay: string,
-  themeType: string,
-  themeBackground: string | undefined,
+  fullTheme: Theme | undefined,
   terminalBackgroundColor: string | undefined,
-  terminalThemeType: 'light' | 'dark' | undefined,
 ) {
-  const isCompatible =
-    themeType === 'custom' ||
-    terminalThemeType === undefined ||
-    themeType === 'ansi' ||
-    themeType === terminalThemeType;
+  const isCompatible = fullTheme
+    ? themeManager.isThemeCompatible(fullTheme, terminalBackgroundColor)
+    : true;
+
+  const themeBackground = fullTheme
+    ? resolveColor(fullTheme.colors.Background)
+    : undefined;
 
   const isBackgroundMatch =
     terminalBackgroundColor &&
@@ -85,7 +84,6 @@ export function ThemeDialog({
   terminalWidth,
 }: ThemeDialogProps): React.JSX.Element {
   const isAlternateBuffer = useAlternateBuffer();
-  const { refreshStatic } = useUIActions();
   const { terminalBackgroundColor } = useUIState();
   const [selectedScope, setSelectedScope] = useState<LoadableSettingScope>(
     SettingScope.User,
@@ -109,59 +107,28 @@ export function ThemeDialog({
     },
   );
 
-  // Generate theme items filtered by selected scope
-  const customThemes =
-    selectedScope === SettingScope.User
-      ? settings.user.settings.ui?.customThemes || {}
-      : settings.merged.ui.customThemes;
-  const builtInThemes = themeManager
-    .getAvailableThemes()
-    .filter((theme) => theme.type !== 'custom');
-  const customThemeNames = Object.keys(customThemes);
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-  const terminalThemeType = getThemeTypeFromBackgroundColor(
-    terminalBackgroundColor,
-  );
-
   // Generate theme items
-  const themeItems = [
-    ...builtInThemes.map((theme) => {
+  const themeItems = themeManager
+    .getAvailableThemes()
+    .map((theme) => {
       const fullTheme = themeManager.getTheme(theme.name);
-      const themeBackground = fullTheme
-        ? resolveColor(fullTheme.colors.Background)
-        : undefined;
 
       return generateThemeItem(
         theme.name,
         capitalize(theme.type),
-        theme.type,
-        themeBackground,
+        fullTheme,
         terminalBackgroundColor,
-        terminalThemeType,
       );
-    }),
-    ...customThemeNames.map((name) => {
-      const themeConfig = customThemes[name];
-      const bg = themeConfig.background?.primary ?? themeConfig.Background;
-      const themeBackground = bg ? resolveColor(bg) : undefined;
-
-      return generateThemeItem(
-        name,
-        'Custom',
-        'custom',
-        themeBackground,
-        terminalBackgroundColor,
-        terminalThemeType,
-      );
-    }),
-  ].sort((a, b) => {
-    // Show compatible themes first
-    if (a.isCompatible && !b.isCompatible) return -1;
-    if (!a.isCompatible && b.isCompatible) return 1;
-    // Then sort by name
-    return a.label.localeCompare(b.label);
-  });
+    })
+    .sort((a, b) => {
+      // Show compatible themes first
+      if (a.isCompatible && !b.isCompatible) return -1;
+      if (!a.isCompatible && b.isCompatible) return 1;
+      // Then sort by name
+      return a.label.localeCompare(b.label);
+    });
 
   // Find the index of the selected theme, but only if it exists in the list
   const initialThemeIndex = themeItems.findIndex(
@@ -171,11 +138,10 @@ export function ThemeDialog({
   const safeInitialThemeIndex = initialThemeIndex >= 0 ? initialThemeIndex : 0;
 
   const handleThemeSelect = useCallback(
-    (themeName: string) => {
-      onSelect(themeName, selectedScope);
-      refreshStatic();
+    async (themeName: string) => {
+      await onSelect(themeName, selectedScope);
     },
-    [onSelect, selectedScope, refreshStatic],
+    [onSelect, selectedScope],
   );
 
   const handleThemeHighlight = (themeName: string) => {
@@ -188,11 +154,10 @@ export function ThemeDialog({
   }, []);
 
   const handleScopeSelect = useCallback(
-    (scope: LoadableSettingScope) => {
-      onSelect(highlightedThemeName, scope);
-      refreshStatic();
+    async (scope: LoadableSettingScope) => {
+      await onSelect(highlightedThemeName, scope);
     },
-    [onSelect, highlightedThemeName, refreshStatic],
+    [onSelect, highlightedThemeName],
   );
 
   const [mode, setMode] = useState<'theme' | 'scope'>('theme');
@@ -201,10 +166,13 @@ export function ThemeDialog({
     (key) => {
       if (key.name === 'tab') {
         setMode((prev) => (prev === 'theme' ? 'scope' : 'theme'));
+        return true;
       }
       if (key.name === 'escape') {
         onCancel();
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );
@@ -311,9 +279,20 @@ export function ThemeDialog({
                 };
 
                 if (item.themeNameDisplay && item.themeTypeDisplay) {
+                  const match = item.themeNameDisplay.match(/^(.*) \((.*)\)$/);
+                  let themeNamePart: React.ReactNode = item.themeNameDisplay;
+                  if (match) {
+                    themeNamePart = (
+                      <>
+                        {match[1]}{' '}
+                        <Text color={theme.text.secondary}>({match[2]})</Text>
+                      </>
+                    );
+                  }
+
                   return (
                     <Text color={titleColor} wrap="truncate" key={item.key}>
-                      {item.themeNameDisplay}{' '}
+                      {themeNamePart}{' '}
                       <Text color={theme.text.secondary}>
                         {item.themeTypeDisplay}
                       </Text>

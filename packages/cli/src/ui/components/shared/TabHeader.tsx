@@ -81,30 +81,32 @@ export function TabHeader({
     if (tab.statusIcon) return tab.statusIcon;
 
     // Default icons
-    if (tab.isSpecial) return '\u2261'; // ≡
-    return isCompleted ? '\u2713' : '\u25A1'; // ✓ or □
+    if (tab.isSpecial) return '≡';
+    return isCompleted ? '✓' : '□';
   };
 
   return (
-    <Box flexDirection="row" marginBottom={1}>
-      {showArrows && <Text color={theme.text.secondary}>{'\u2190 '}</Text>}
+    <Box flexDirection="row" marginBottom={1} aria-role="tablist">
+      {showArrows && <Text color={theme.text.secondary}>{'← '}</Text>}
       {tabs.map((tab, i) => (
         <React.Fragment key={tab.key}>
-          {i > 0 && <Text color={theme.text.secondary}>{' \u2502 '}</Text>}
+          {i > 0 && <Text color={theme.text.secondary}>{' │ '}</Text>}
           {showStatusIcons && (
             <Text color={theme.text.secondary}>{getStatusIcon(tab, i)} </Text>
           )}
           <Text
             color={
-              i === currentIndex ? theme.text.accent : theme.text.secondary
+              i === currentIndex ? theme.status.success : theme.text.secondary
             }
             bold={i === currentIndex}
+            underline={i === currentIndex}
+            aria-current={i === currentIndex ? 'step' : undefined}
           >
             {tab.header}
           </Text>
         </React.Fragment>
       ))}
-      {showArrows && <Text color={theme.text.secondary}>{' \u2192'}</Text>}
+      {showArrows && <Text color={theme.text.secondary}>{' →'}</Text>}
     </Box>
   );
 }

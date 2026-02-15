@@ -7,7 +7,6 @@
 import type React from 'react';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Text } from 'ink';
-import { AsyncFzf } from 'fzf';
 import type { Key } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
 import type {
@@ -32,27 +31,17 @@ import {
   getEffectiveValue,
 } from '../../utils/settingsUtils.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
-import { getCachedStringWidth } from '../utils/textUtils.js';
 import {
   type SettingsValue,
   TOGGLE_TYPES,
 } from '../../config/settingsSchema.js';
 import { coreEvents, debugLogger } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
-import { useUIState } from '../contexts/UIStateContext.js';
-import { useTextBuffer } from './shared/text-buffer.js';
 import {
-  BaseSettingsDialog,
   type SettingsDialogItem,
+  BaseSettingsDialog,
 } from './shared/BaseSettingsDialog.js';
-
-interface FzfResult {
-  item: string;
-  start: number;
-  end: number;
-  score: number;
-  positions?: number[];
-}
+import { useFuzzyList } from '../hooks/useFuzzyList.js';
 
 interface SettingsDialogProps {
   settings: LoadedSettings;
@@ -80,60 +69,6 @@ export function SettingsDialog({
   );
 
   const [showRestartPrompt, setShowRestartPrompt] = useState(false);
-
-  // Search state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filteredKeys, setFilteredKeys] = useState<string[]>(() =>
-    getDialogSettingKeys(),
-  );
-  const { fzfInstance, searchMap } = useMemo(() => {
-    const keys = getDialogSettingKeys();
-    const map = new Map<string, string>();
-    const searchItems: string[] = [];
-
-    keys.forEach((key) => {
-      const def = getSettingDefinition(key);
-      if (def?.label) {
-        searchItems.push(def.label);
-        map.set(def.label.toLowerCase(), key);
-      }
-    });
-
-    const fzf = new AsyncFzf(searchItems, {
-      fuzzy: 'v2',
-      casing: 'case-insensitive',
-    });
-    return { fzfInstance: fzf, searchMap: map };
-  }, []);
-
-  // Perform search
-  useEffect(() => {
-    let active = true;
-    if (!searchQuery.trim() || !fzfInstance) {
-      setFilteredKeys(getDialogSettingKeys());
-      return;
-    }
-
-    const doSearch = async () => {
-      const results = await fzfInstance.find(searchQuery);
-
-      if (!active) return;
-
-      const matchedKeys = new Set<string>();
-      results.forEach((res: FzfResult) => {
-        const key = searchMap.get(res.item.toLowerCase());
-        if (key) matchedKeys.add(key);
-      });
-      setFilteredKeys(Array.from(matchedKeys));
-    };
-
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    doSearch();
-
-    return () => {
-      active = false;
-    };
-  }, [searchQuery, fzfInstance, searchMap]);
 
   // Local pending settings state for the selected scope
   const [pendingSettings, setPendingSettings] = useState<Settings>(() =>
@@ -182,50 +117,8 @@ export function SettingsDialog({
     setShowRestartPrompt(newRestartRequired.size > 0);
   }, [selectedScope, settings, globalPendingChanges]);
 
-  // Calculate max width for the left column (Label/Description) to keep values aligned or close
-  const maxLabelOrDescriptionWidth = useMemo(() => {
-    const allKeys = getDialogSettingKeys();
-    let max = 0;
-    for (const key of allKeys) {
-      const def = getSettingDefinition(key);
-      if (!def) continue;
-
-      const scopeMessage = getScopeMessageForSetting(
-        key,
-        selectedScope,
-        settings,
-      );
-      const label = def.label || key;
-      const labelFull = label + (scopeMessage ? ` ${scopeMessage}` : '');
-      const lWidth = getCachedStringWidth(labelFull);
-      const dWidth = def.description
-        ? getCachedStringWidth(def.description)
-        : 0;
-
-      max = Math.max(max, lWidth, dWidth);
-    }
-    return max;
-  }, [selectedScope, settings]);
-
-  // Get mainAreaWidth for search buffer viewport
-  const { mainAreaWidth } = useUIState();
-  const viewportWidth = mainAreaWidth - 8;
-
-  // Search input buffer
-  const searchBuffer = useTextBuffer({
-    initialText: '',
-    initialCursorOffset: 0,
-    viewport: {
-      width: viewportWidth,
-      height: 1,
-    },
-    isValidPath: () => false,
-    singleLine: true,
-    onChange: (text) => setSearchQuery(text),
-  });
-
-  // Generate items for BaseSettingsDialog
-  const settingKeys = searchQuery ? filteredKeys : getDialogSettingKeys();
+  // Generate items for SearchableList
+  const settingKeys = useMemo(() => getDialogSettingKeys(), []);
   const items: SettingsDialogItem[] = useMemo(() => {
     const scopeSettings = settings.forScope(selectedScope).settings;
     const mergedSettings = settings.merged;
@@ -260,14 +153,20 @@ export function SettingsDialog({
         key,
         label: definition?.label || key,
         description: definition?.description,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         type: type as 'boolean' | 'number' | 'string' | 'enum',
         displayValue,
         isGreyedOut,
         scopeMessage,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         rawValue: rawValue as string | number | boolean | undefined,
       };
     });
   }, [settingKeys, selectedScope, settings, modifiedSettings, pendingSettings]);
+
+  const { filteredItems, searchBuffer, maxLabelWidth } = useFuzzyList({
+    items,
+  });
 
   // Scope selection handler
   const handleScopeChange = useCallback((scope: LoadableSettingScope) => {
@@ -284,8 +183,10 @@ export function SettingsDialog({
       const currentValue = getEffectiveValue(key, pendingSettings, {});
       let newValue: SettingsValue;
       if (definition?.type === 'boolean') {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         newValue = !(currentValue as boolean);
         setPendingSettings((prev) =>
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           setPendingSettingValue(key, newValue as boolean, prev),
         );
       } else if (definition?.type === 'enum' && definition.options) {
@@ -355,10 +256,6 @@ export function SettingsDialog({
           next.delete(key);
           return next;
         });
-
-        if (key === 'general.previewFeatures') {
-          config?.setPreviewFeatures(newValue as boolean);
-        }
       } else {
         // For restart-required settings, track as modified
         setModifiedSettings((prev) => {
@@ -382,19 +279,13 @@ export function SettingsDialog({
         // Record pending change globally
         setGlobalPendingChanges((prev) => {
           const next = new Map(prev);
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           next.set(key, newValue as PendingValue);
           return next;
         });
       }
     },
-    [
-      pendingSettings,
-      settings,
-      selectedScope,
-      vimEnabled,
-      toggleVimEnabled,
-      config,
-    ],
+    [pendingSettings, settings, selectedScope, vimEnabled, toggleVimEnabled],
   );
 
   // Edit commit handler
@@ -522,12 +413,6 @@ export function SettingsDialog({
             });
           }
         }
-
-        if (key === 'general.previewFeatures') {
-          const booleanDefaultValue =
-            typeof defaultValue === 'boolean' ? defaultValue : false;
-          config?.setPreviewFeatures(booleanDefaultValue);
-        }
       }
 
       // Remove from modified sets
@@ -601,6 +486,7 @@ export function SettingsDialog({
     (key: Key, _currentItem: SettingsDialogItem | undefined): boolean => {
       // 'r' key for restart
       if (showRestartPrompt && key.sequence === 'r') {
+        saveRestartRequiredSettings();
         setShowRestartPrompt(false);
         setModifiedSettings(new Set());
         setRestartRequiredSettings(new Set());
@@ -609,80 +495,90 @@ export function SettingsDialog({
       }
       return false;
     },
-    [showRestartPrompt, onRestartRequest],
+    [showRestartPrompt, onRestartRequest, saveRestartRequiredSettings],
   );
 
   // Calculate effective max items and scope visibility based on terminal height
-  const { effectiveMaxItemsToShow, showScopeSelection } = useMemo(() => {
-    // Only show scope selector if we have a workspace
-    const hasWorkspace = settings.workspace.path !== undefined;
+  const { effectiveMaxItemsToShow, showScopeSelection, showSearch } =
+    useMemo(() => {
+      // Only show scope selector if we have a workspace
+      const hasWorkspace = settings.workspace.path !== undefined;
 
-    if (!availableTerminalHeight) {
-      return {
-        effectiveMaxItemsToShow: Math.min(MAX_ITEMS_TO_SHOW, items.length),
-        showScopeSelection: hasWorkspace,
-      };
-    }
+      // Search box is hidden when restart prompt is shown to save space and avoid key conflicts
+      const shouldShowSearch = !showRestartPrompt;
 
-    // Layout constants
-    const DIALOG_PADDING = 2; // Top and bottom borders
-    const SETTINGS_TITLE_HEIGHT = 1;
-    const SEARCH_BOX_HEIGHT = 3;
-    const SCROLL_ARROWS_HEIGHT = 2;
-    const SPACING_HEIGHT = 2;
-    const SCOPE_SELECTION_HEIGHT = 4;
-    const BOTTOM_HELP_TEXT_HEIGHT = 1;
-    const RESTART_PROMPT_HEIGHT = showRestartPrompt ? 1 : 0;
-    const ITEM_HEIGHT = 3; // Label + description + spacing
-
-    const currentAvailableHeight = availableTerminalHeight - DIALOG_PADDING;
-
-    const baseFixedHeight =
-      SETTINGS_TITLE_HEIGHT +
-      SEARCH_BOX_HEIGHT +
-      SCROLL_ARROWS_HEIGHT +
-      SPACING_HEIGHT +
-      BOTTOM_HELP_TEXT_HEIGHT +
-      RESTART_PROMPT_HEIGHT;
-
-    // Calculate max items with scope selector
-    const heightWithScope = baseFixedHeight + SCOPE_SELECTION_HEIGHT;
-    const availableForItemsWithScope = currentAvailableHeight - heightWithScope;
-    const maxItemsWithScope = Math.max(
-      1,
-      Math.floor(availableForItemsWithScope / ITEM_HEIGHT),
-    );
-
-    // Calculate max items without scope selector
-    const availableForItemsWithoutScope =
-      currentAvailableHeight - baseFixedHeight;
-    const maxItemsWithoutScope = Math.max(
-      1,
-      Math.floor(availableForItemsWithoutScope / ITEM_HEIGHT),
-    );
-
-    // In small terminals, hide scope selector if it would allow more items to show
-    let shouldShowScope = hasWorkspace;
-    let maxItems = maxItemsWithScope;
-
-    if (hasWorkspace && availableTerminalHeight < 25) {
-      // Hide scope selector if it gains us more than 1 extra item
-      if (maxItemsWithoutScope > maxItemsWithScope + 1) {
-        shouldShowScope = false;
-        maxItems = maxItemsWithoutScope;
+      if (!availableTerminalHeight) {
+        return {
+          effectiveMaxItemsToShow: Math.min(MAX_ITEMS_TO_SHOW, items.length),
+          showScopeSelection: hasWorkspace,
+          showSearch: shouldShowSearch,
+        };
       }
-    }
 
-    return {
-      effectiveMaxItemsToShow: Math.min(maxItems, items.length),
-      showScopeSelection: shouldShowScope,
-    };
-  }, [
-    availableTerminalHeight,
-    items.length,
-    settings.workspace.path,
-    showRestartPrompt,
-  ]);
+      // Layout constants based on BaseSettingsDialog structure:
+      // 4 for border (2) and padding (2)
+      const DIALOG_PADDING = 4;
+      const SETTINGS_TITLE_HEIGHT = 1;
+      // 3 for box + 1 for marginTop + 1 for spacing after
+      const SEARCH_SECTION_HEIGHT = shouldShowSearch ? 5 : 0;
+      const SCROLL_ARROWS_HEIGHT = 2;
+      const ITEMS_SPACING_AFTER = 1;
+      // 1 for Label + 3 for Scope items + 1 for spacing after
+      const SCOPE_SECTION_HEIGHT = hasWorkspace ? 5 : 0;
+      const HELP_TEXT_HEIGHT = 1;
+      const RESTART_PROMPT_HEIGHT = showRestartPrompt ? 1 : 0;
+      const ITEM_HEIGHT = 3; // Label + description + spacing
+
+      const currentAvailableHeight = availableTerminalHeight - DIALOG_PADDING;
+
+      const baseFixedHeight =
+        SETTINGS_TITLE_HEIGHT +
+        SEARCH_SECTION_HEIGHT +
+        SCROLL_ARROWS_HEIGHT +
+        ITEMS_SPACING_AFTER +
+        HELP_TEXT_HEIGHT +
+        RESTART_PROMPT_HEIGHT;
+
+      // Calculate max items with scope selector
+      const heightWithScope = baseFixedHeight + SCOPE_SECTION_HEIGHT;
+      const availableForItemsWithScope =
+        currentAvailableHeight - heightWithScope;
+      const maxItemsWithScope = Math.max(
+        1,
+        Math.floor(availableForItemsWithScope / ITEM_HEIGHT),
+      );
+
+      // Calculate max items without scope selector
+      const availableForItemsWithoutScope =
+        currentAvailableHeight - baseFixedHeight;
+      const maxItemsWithoutScope = Math.max(
+        1,
+        Math.floor(availableForItemsWithoutScope / ITEM_HEIGHT),
+      );
+
+      // In small terminals, hide scope selector if it would allow more items to show
+      let shouldShowScope = hasWorkspace;
+      let maxItems = maxItemsWithScope;
+
+      if (hasWorkspace && availableTerminalHeight < 25) {
+        // Hide scope selector if it gains us more than 1 extra item
+        if (maxItemsWithoutScope > maxItemsWithScope + 1) {
+          shouldShowScope = false;
+          maxItems = maxItemsWithoutScope;
+        }
+      }
+
+      return {
+        effectiveMaxItemsToShow: Math.min(maxItems, items.length),
+        showScopeSelection: shouldShowScope,
+        showSearch: shouldShowSearch,
+      };
+    }, [
+      availableTerminalHeight,
+      items.length,
+      settings.workspace.path,
+      showRestartPrompt,
+    ]);
 
   // Footer content for restart prompt
   const footerContent = showRestartPrompt ? (
@@ -695,14 +591,15 @@ export function SettingsDialog({
   return (
     <BaseSettingsDialog
       title="Settings"
-      searchEnabled={true}
+      borderColor={showRestartPrompt ? theme.status.warning : undefined}
+      searchEnabled={showSearch}
       searchBuffer={searchBuffer}
-      items={items}
+      items={filteredItems}
       showScopeSelector={showScopeSelection}
       selectedScope={selectedScope}
       onScopeChange={handleScopeChange}
       maxItemsToShow={effectiveMaxItemsToShow}
-      maxLabelWidth={maxLabelOrDescriptionWidth}
+      maxLabelWidth={maxLabelWidth}
       onItemToggle={handleItemToggle}
       onEditCommit={handleEditCommit}
       onItemClear={handleItemClear}

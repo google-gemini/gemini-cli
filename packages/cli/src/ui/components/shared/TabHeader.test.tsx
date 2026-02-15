@@ -34,6 +34,7 @@ describe('TabHeader', () => {
       expect(frame).toContain('Tab 1');
       expect(frame).toContain('Tab 2');
       expect(frame).toContain('Tab 3');
+      expect(frame).toMatchSnapshot();
     });
 
     it('renders separators between tabs', () => {
@@ -44,6 +45,7 @@ describe('TabHeader', () => {
       // Should have 2 separators for 3 tabs
       const separatorCount = (frame?.match(/│/g) || []).length;
       expect(separatorCount).toBe(2);
+      expect(frame).toMatchSnapshot();
     });
   });
 
@@ -55,6 +57,7 @@ describe('TabHeader', () => {
       const frame = lastFrame();
       expect(frame).toContain('←');
       expect(frame).toContain('→');
+      expect(frame).toMatchSnapshot();
     });
 
     it('hides arrows when showArrows is false', () => {
@@ -64,6 +67,7 @@ describe('TabHeader', () => {
       const frame = lastFrame();
       expect(frame).not.toContain('←');
       expect(frame).not.toContain('→');
+      expect(frame).toMatchSnapshot();
     });
   });
 
@@ -75,6 +79,7 @@ describe('TabHeader', () => {
       const frame = lastFrame();
       // Default uncompleted icon is □
       expect(frame).toContain('□');
+      expect(frame).toMatchSnapshot();
     });
 
     it('hides status icons when showStatusIcons is false', () => {
@@ -84,6 +89,7 @@ describe('TabHeader', () => {
       const frame = lastFrame();
       expect(frame).not.toContain('□');
       expect(frame).not.toContain('✓');
+      expect(frame).toMatchSnapshot();
     });
 
     it('shows checkmark for completed tabs', () => {
@@ -100,6 +106,7 @@ describe('TabHeader', () => {
       const boxCount = (frame?.match(/□/g) || []).length;
       expect(checkmarkCount).toBe(2);
       expect(boxCount).toBe(1);
+      expect(frame).toMatchSnapshot();
     });
 
     it('shows special icon for special tabs', () => {
@@ -113,6 +120,7 @@ describe('TabHeader', () => {
       const frame = lastFrame();
       // Special tab shows ≡ icon
       expect(frame).toContain('≡');
+      expect(frame).toMatchSnapshot();
     });
 
     it('uses tab statusIcon when provided', () => {
@@ -125,6 +133,7 @@ describe('TabHeader', () => {
       );
       const frame = lastFrame();
       expect(frame).toContain('★');
+      expect(frame).toMatchSnapshot();
     });
 
     it('uses custom renderStatusIcon when provided', () => {
@@ -139,6 +148,7 @@ describe('TabHeader', () => {
       const frame = lastFrame();
       const bulletCount = (frame?.match(/•/g) || []).length;
       expect(bulletCount).toBe(3);
+      expect(frame).toMatchSnapshot();
     });
 
     it('falls back to default when renderStatusIcon returns undefined', () => {
@@ -152,6 +162,7 @@ describe('TabHeader', () => {
       );
       const frame = lastFrame();
       expect(frame).toContain('□');
+      expect(frame).toMatchSnapshot();
     });
   });
 });

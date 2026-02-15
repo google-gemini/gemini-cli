@@ -1,12 +1,14 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import { EventEmitter } from 'node:events';
+import type { AgentDefinition } from '../agents/types.js';
 import type { McpClient } from '../tools/mcp-client.js';
 import type { ExtensionEvents } from './extensionLoader.js';
+import type { EditorType } from './editor.js';
 
 /**
  * Defines the severity level for user-facing feedback.
@@ -110,6 +112,41 @@ export interface RetryAttemptPayload {
   model: string;
 }
 
+/**
+ * Payload for the 'consent-request' event.
+ */
+export interface ConsentRequestPayload {
+  prompt: string;
+  onConfirm: (confirmed: boolean) => void;
+}
+
+/**
+ * Payload for the 'agents-discovered' event.
+ */
+export interface AgentsDiscoveredPayload {
+  agents: AgentDefinition[];
+}
+
+export interface SlashCommandConflict {
+  name: string;
+  renamedTo: string;
+  loserExtensionName?: string;
+  winnerExtensionName?: string;
+}
+
+export interface SlashCommandConflictsPayload {
+  conflicts: SlashCommandConflict[];
+}
+
+/**
+ * Payload for the 'quota-changed' event.
+ */
+export interface QuotaChangedPayload {
+  remaining: number | undefined;
+  limit: number | undefined;
+  resetTime?: string;
+}
+
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
   ModelChanged = 'model-changed',
@@ -125,6 +162,19 @@ export enum CoreEvent {
   AgentsRefreshed = 'agents-refreshed',
   AdminSettingsChanged = 'admin-settings-changed',
   RetryAttempt = 'retry-attempt',
+  ConsentRequest = 'consent-request',
+  AgentsDiscovered = 'agents-discovered',
+  RequestEditorSelection = 'request-editor-selection',
+  EditorSelected = 'editor-selected',
+  SlashCommandConflicts = 'slash-command-conflicts',
+  QuotaChanged = 'quota-changed',
+}
+
+/**
+ * Payload for the 'editor-selected' event.
+ */
+export interface EditorSelectedPayload {
+  editor?: EditorType;
 }
 
 export interface CoreEvents extends ExtensionEvents {
@@ -133,6 +183,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
   [CoreEvent.Output]: [OutputPayload];
   [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
+  [CoreEvent.QuotaChanged]: [QuotaChangedPayload];
   [CoreEvent.ExternalEditorClosed]: never[];
   [CoreEvent.McpClientUpdate]: Array<Map<string, McpClient> | never>;
   [CoreEvent.OauthDisplayMessage]: string[];
@@ -142,6 +193,11 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.AgentsRefreshed]: never[];
   [CoreEvent.AdminSettingsChanged]: never[];
   [CoreEvent.RetryAttempt]: [RetryAttemptPayload];
+  [CoreEvent.ConsentRequest]: [ConsentRequestPayload];
+  [CoreEvent.AgentsDiscovered]: [AgentsDiscoveredPayload];
+  [CoreEvent.RequestEditorSelection]: never[];
+  [CoreEvent.EditorSelected]: [EditorSelectedPayload];
+  [CoreEvent.SlashCommandConflicts]: [SlashCommandConflictsPayload];
 }
 
 type EventBacklogItem = {
@@ -167,14 +223,14 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
       if (this._eventBacklog.length >= CoreEventEmitter.MAX_BACKLOG_SIZE) {
         this._eventBacklog.shift();
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       this._eventBacklog.push({ event, args } as EventBacklogItem);
     } else {
-      (
-        this.emit as <K extends keyof CoreEvents>(
-          event: K,
-          ...args: CoreEvents[K]
-        ) => boolean
-      )(event, ...args);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      (this.emit as (event: K, ...args: CoreEvents[K]) => boolean)(
+        event,
+        ...args,
+      );
     }
   }
 
@@ -265,6 +321,38 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   }
 
   /**
+   * Requests consent from the user via the UI.
+   */
+  emitConsentRequest(payload: ConsentRequestPayload): void {
+    this._emitOrQueue(CoreEvent.ConsentRequest, payload);
+  }
+
+  /**
+   * Notifies subscribers that new unacknowledged agents have been discovered.
+   */
+  emitAgentsDiscovered(agents: AgentDefinition[]): void {
+    const payload: AgentsDiscoveredPayload = { agents };
+    this._emitOrQueue(CoreEvent.AgentsDiscovered, payload);
+  }
+
+  emitSlashCommandConflicts(conflicts: SlashCommandConflict[]): void {
+    const payload: SlashCommandConflictsPayload = { conflicts };
+    this._emitOrQueue(CoreEvent.SlashCommandConflicts, payload);
+  }
+
+  /**
+   * Notifies subscribers that the quota has changed.
+   */
+  emitQuotaChanged(
+    remaining: number | undefined,
+    limit: number | undefined,
+    resetTime?: string,
+  ): void {
+    const payload: QuotaChangedPayload = { remaining, limit, resetTime };
+    this.emit(CoreEvent.QuotaChanged, payload);
+  }
+
+  /**
    * Flushes buffered messages. Call this immediately after primary UI listener
    * subscribes.
    */
@@ -272,12 +360,11 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
     const backlog = [...this._eventBacklog];
     this._eventBacklog.length = 0; // Clear in-place
     for (const item of backlog) {
-      (
-        this.emit as <K extends keyof CoreEvents>(
-          event: K,
-          ...args: CoreEvents[K]
-        ) => boolean
-      )(item.event, ...item.args);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      (this.emit as (event: keyof CoreEvents, ...args: unknown[]) => boolean)(
+        item.event,
+        ...item.args,
+      );
     }
   }
 }

@@ -10,8 +10,10 @@ import type {
   ToolResult,
   ToolCallConfirmationDetails,
   FilterFilesOptions,
+  ConversationRecord,
 } from '@google/gemini-cli-core';
 import {
+  CoreToolCallStatus,
   AuthType,
   logToolCall,
   convertToFunctionResponse,
@@ -32,13 +34,15 @@ import {
   createWorkingStdio,
   startupProfiler,
   Kind,
+  partListUnionToString,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
+import { getAcpErrorMessage } from './acpErrors.js';
 import { Readable, Writable } from 'node:stream';
 import type { Content, Part, FunctionCall } from '@google/genai';
 import type { LoadedSettings } from '../config/settings.js';
-import { SettingScope } from '../config/settings.js';
+import { SettingScope, loadSettings } from '../config/settings.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
@@ -47,6 +51,10 @@ import { randomUUID } from 'node:crypto';
 import type { CliArgs } from '../config/config.js';
 import { loadCliConfig } from '../config/config.js';
 import { runExitCleanup } from '../utils/cleanup.js';
+import {
+  SessionSelector,
+  convertSessionToHistoryFormats,
+} from '../utils/sessionUtils.js';
 
 export async function runZedIntegration(
   config: Config,
@@ -55,6 +63,7 @@ export async function runZedIntegration(
 ) {
   const { stdout: workingStdout } = createWorkingStdio();
   const stdout = Writable.toWeb(workingStdout) as WritableStream;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
 
   const stream = acp.ndJsonStream(stdout, stdin);
@@ -107,7 +116,7 @@ export class GeminiAgent {
       protocolVersion: acp.PROTOCOL_VERSION,
       authMethods,
       agentCapabilities: {
-        loadSession: false,
+        loadSession: true,
         promptCapabilities: {
           image: true,
           audio: true,
@@ -133,7 +142,14 @@ export class GeminiAgent {
     // Refresh auth with the requested method
     // This will reuse existing credentials if they're valid,
     // or perform new authentication if needed
-    await this.config.refreshAuth(method);
+    try {
+      await this.config.refreshAuth(method);
+    } catch (e) {
+      throw new acp.RequestError(
+        getErrorStatus(e) || 401,
+        getAcpErrorMessage(e),
+      );
+    }
     this.settings.setValue(
       SettingScope.User,
       'security.auth.selectedType',
@@ -146,22 +162,45 @@ export class GeminiAgent {
     mcpServers,
   }: acp.NewSessionRequest): Promise<acp.NewSessionResponse> {
     const sessionId = randomUUID();
-    const config = await this.newSessionConfig(sessionId, cwd, mcpServers);
+    const loadedSettings = loadSettings(cwd);
+    const config = await this.newSessionConfig(
+      sessionId,
+      cwd,
+      mcpServers,
+      loadedSettings,
+    );
+
+    const authType =
+      loadedSettings.merged.security.auth.selectedType || AuthType.USE_GEMINI;
 
     let isAuthenticated = false;
-    if (this.settings.merged.security.auth.selectedType) {
-      try {
-        await config.refreshAuth(
-          this.settings.merged.security.auth.selectedType,
-        );
-        isAuthenticated = true;
-      } catch (e) {
-        debugLogger.error(`Authentication failed: ${e}`);
+    let authErrorMessage = '';
+    try {
+      await config.refreshAuth(authType);
+      isAuthenticated = true;
+
+      // Extra validation for Gemini API key
+      const contentGeneratorConfig = config.getContentGeneratorConfig();
+      if (
+        authType === AuthType.USE_GEMINI &&
+        (!contentGeneratorConfig || !contentGeneratorConfig.apiKey)
+      ) {
+        isAuthenticated = false;
+        authErrorMessage = 'Gemini API key is missing or not configured.';
       }
+    } catch (e) {
+      isAuthenticated = false;
+      authErrorMessage = getAcpErrorMessage(e);
+      debugLogger.error(
+        `Authentication failed: ${e instanceof Error ? e.stack : e}`,
+      );
     }
 
     if (!isAuthenticated) {
-      throw acp.RequestError.authRequired();
+      throw new acp.RequestError(
+        401,
+        authErrorMessage || 'Authentication required.',
+      );
     }
 
     if (this.clientCapabilities?.fs) {
@@ -174,6 +213,9 @@ export class GeminiAgent {
       config.setFileSystemService(acpFileSystemService);
     }
 
+    await config.initialize();
+    startupProfiler.flush(config);
+
     const geminiClient = config.getGeminiClient();
     const chat = await geminiClient.startChat();
     const session = new Session(sessionId, chat, config, this.connection);
@@ -184,12 +226,96 @@ export class GeminiAgent {
     };
   }
 
-  async newSessionConfig(
+  async loadSession({
+    sessionId,
+    cwd,
+    mcpServers,
+  }: acp.LoadSessionRequest): Promise<acp.LoadSessionResponse> {
+    const config = await this.initializeSessionConfig(
+      sessionId,
+      cwd,
+      mcpServers,
+    );
+
+    const sessionSelector = new SessionSelector(config);
+    const { sessionData, sessionPath } =
+      await sessionSelector.resolveSession(sessionId);
+
+    if (this.clientCapabilities?.fs) {
+      const acpFileSystemService = new AcpFileSystemService(
+        this.connection,
+        sessionId,
+        this.clientCapabilities.fs,
+        config.getFileSystemService(),
+      );
+      config.setFileSystemService(acpFileSystemService);
+    }
+
+    const { clientHistory } = convertSessionToHistoryFormats(
+      sessionData.messages,
+    );
+
+    const geminiClient = config.getGeminiClient();
+    await geminiClient.initialize();
+    await geminiClient.resumeChat(clientHistory, {
+      conversation: sessionData,
+      filePath: sessionPath,
+    });
+
+    const session = new Session(
+      sessionId,
+      geminiClient.getChat(),
+      config,
+      this.connection,
+    );
+    this.sessions.set(sessionId, session);
+
+    // Stream history back to client
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    session.streamHistory(sessionData.messages);
+
+    return {};
+  }
+
+  private async initializeSessionConfig(
     sessionId: string,
     cwd: string,
     mcpServers: acp.McpServer[],
   ): Promise<Config> {
-    const mergedMcpServers = { ...this.settings.merged.mcpServers };
+    const selectedAuthType = this.settings.merged.security.auth.selectedType;
+    if (!selectedAuthType) {
+      throw acp.RequestError.authRequired();
+    }
+
+    // 1. Create config WITHOUT initializing it (no MCP servers started yet)
+    const config = await this.newSessionConfig(sessionId, cwd, mcpServers);
+
+    // 2. Authenticate BEFORE initializing configuration or starting MCP servers.
+    // This satisfies the security requirement to verify the user before executing
+    // potentially unsafe server definitions.
+    try {
+      await config.refreshAuth(selectedAuthType);
+    } catch (e) {
+      debugLogger.error(`Authentication failed: ${e}`);
+      throw acp.RequestError.authRequired();
+    }
+
+    // 3. Now that we are authenticated, it is safe to initialize the config
+    // which starts the MCP servers and other heavy resources.
+    await config.initialize();
+    startupProfiler.flush(config);
+
+    return config;
+  }
+
+  async newSessionConfig(
+    sessionId: string,
+    cwd: string,
+    mcpServers: acp.McpServer[],
+    loadedSettings?: LoadedSettings,
+  ): Promise<Config> {
+    const currentSettings = loadedSettings || this.settings;
+    const mergedMcpServers = { ...currentSettings.merged.mcpServers };
 
     for (const server of mcpServers) {
       if (
@@ -224,12 +350,13 @@ export class GeminiAgent {
       }
     }
 
-    const settings = { ...this.settings.merged, mcpServers: mergedMcpServers };
+    const settings = {
+      ...currentSettings.merged,
+      mcpServers: mergedMcpServers,
+    };
 
     const config = await loadCliConfig(settings, sessionId, this.argv, { cwd });
 
-    await config.initialize();
-    startupProfiler.flush(config);
     return config;
   }
 
@@ -269,6 +396,76 @@ export class Session {
     this.pendingPrompt = null;
   }
 
+  async streamHistory(messages: ConversationRecord['messages']): Promise<void> {
+    for (const msg of messages) {
+      const contentString = partListUnionToString(msg.content);
+
+      if (msg.type === 'user') {
+        if (contentString.trim()) {
+          await this.sendUpdate({
+            sessionUpdate: 'user_message_chunk',
+            content: { type: 'text', text: contentString },
+          });
+        }
+      } else if (msg.type === 'gemini') {
+        // Thoughts
+        if (msg.thoughts) {
+          for (const thought of msg.thoughts) {
+            const thoughtText = `**${thought.subject}**\n${thought.description}`;
+            await this.sendUpdate({
+              sessionUpdate: 'agent_thought_chunk',
+              content: { type: 'text', text: thoughtText },
+            });
+          }
+        }
+
+        // Message text
+        if (contentString.trim()) {
+          await this.sendUpdate({
+            sessionUpdate: 'agent_message_chunk',
+            content: { type: 'text', text: contentString },
+          });
+        }
+
+        // Tool calls
+        if (msg.toolCalls) {
+          for (const toolCall of msg.toolCalls) {
+            const toolCallContent: acp.ToolCallContent[] = [];
+            if (toolCall.resultDisplay) {
+              if (typeof toolCall.resultDisplay === 'string') {
+                toolCallContent.push({
+                  type: 'content',
+                  content: { type: 'text', text: toolCall.resultDisplay },
+                });
+              } else if ('fileName' in toolCall.resultDisplay) {
+                toolCallContent.push({
+                  type: 'diff',
+                  path: toolCall.resultDisplay.fileName,
+                  oldText: toolCall.resultDisplay.originalContent,
+                  newText: toolCall.resultDisplay.newContent,
+                });
+              }
+            }
+
+            const tool = this.config.getToolRegistry().getTool(toolCall.name);
+
+            await this.sendUpdate({
+              sessionUpdate: 'tool_call',
+              toolCallId: toolCall.id,
+              status:
+                toolCall.status === CoreToolCallStatus.Success
+                  ? 'completed'
+                  : 'failed',
+              title: toolCall.displayName || toolCall.name,
+              content: toolCallContent,
+              kind: tool ? toAcpToolKind(tool.kind) : 'other',
+            });
+          }
+        }
+      }
+    }
+  }
+
   async prompt(params: acp.PromptRequest): Promise<acp.PromptResponse> {
     this.pendingPrompt?.abort();
     const pendingSend = new AbortController();
@@ -284,16 +481,13 @@ export class Session {
     while (nextMessage !== null) {
       if (pendingSend.signal.aborted) {
         chat.addHistory(nextMessage);
-        return { stopReason: 'cancelled' };
+        return { stopReason: CoreToolCallStatus.Cancelled };
       }
 
       const functionCalls: FunctionCall[] = [];
 
       try {
-        const model = resolveModel(
-          this.config.getModel(),
-          this.config.getPreviewFeatures(),
-        );
+        const model = resolveModel(this.config.getModel());
         const responseStream = await chat.sendMessageStream(
           { model },
           nextMessage?.parts ?? [],
@@ -304,7 +498,7 @@ export class Session {
 
         for await (const resp of responseStream) {
           if (pendingSend.signal.aborted) {
-            return { stopReason: 'cancelled' };
+            return { stopReason: CoreToolCallStatus.Cancelled };
           }
 
           if (
@@ -339,7 +533,7 @@ export class Session {
         }
 
         if (pendingSend.signal.aborted) {
-          return { stopReason: 'cancelled' };
+          return { stopReason: CoreToolCallStatus.Cancelled };
         }
       } catch (error) {
         if (getErrorStatus(error) === 429) {
@@ -353,10 +547,13 @@ export class Session {
           pendingSend.signal.aborted ||
           (error instanceof Error && error.name === 'AbortError')
         ) {
-          return { stopReason: 'cancelled' };
+          return { stopReason: CoreToolCallStatus.Cancelled };
         }
 
-        throw error;
+        throw new acp.RequestError(
+          getErrorStatus(error) || 500,
+          getAcpErrorMessage(error),
+        );
       }
 
       if (functionCalls.length > 0) {
@@ -470,7 +667,7 @@ export class Session {
 
         const output = await this.connection.requestPermission(params);
         const outcome =
-          output.outcome.outcome === 'cancelled'
+          output.outcome.outcome === CoreToolCallStatus.Cancelled
             ? ToolConfirmationOutcome.Cancel
             : z
                 .nativeEnum(ToolConfirmationOutcome)
@@ -533,6 +730,33 @@ export class Session {
         ),
       );
 
+      this.chat.recordCompletedToolCalls(this.config.getActiveModel(), [
+        {
+          status: CoreToolCallStatus.Success,
+          request: {
+            callId,
+            name: fc.name,
+            args,
+            isClientInitiated: false,
+            prompt_id: promptId,
+          },
+          tool,
+          invocation,
+          response: {
+            callId,
+            responseParts: convertToFunctionResponse(
+              fc.name,
+              callId,
+              toolResult.llmContent,
+              this.config.getActiveModel(),
+            ),
+            resultDisplay: toolResult.returnDisplay,
+            error: undefined,
+            errorType: undefined,
+          },
+        },
+      ]);
+
       return convertToFunctionResponse(
         fc.name,
         callId,
@@ -550,6 +774,35 @@ export class Session {
           { type: 'content', content: { type: 'text', text: error.message } },
         ],
       });
+
+      this.chat.recordCompletedToolCalls(this.config.getActiveModel(), [
+        {
+          status: CoreToolCallStatus.Error,
+          request: {
+            callId,
+            name: fc.name,
+            args,
+            isClientInitiated: false,
+            prompt_id: promptId,
+          },
+          tool,
+          response: {
+            callId,
+            responseParts: [
+              {
+                functionResponse: {
+                  id: callId,
+                  name: fc.name ?? '',
+                  response: { error: error.message },
+                },
+              },
+            ],
+            resultDisplay: error.message,
+            error,
+            errorType: undefined,
+          },
+        },
+      ]);
 
       return errorResponse(error);
     }
@@ -983,6 +1236,12 @@ function toPermissionOptions(
         },
         ...basicPermissionOptions,
       ];
+    case 'ask_user':
+      // askuser doesn't need "always allow" options since it's asking questions
+      return [...basicPermissionOptions];
+    case 'exit_plan_mode':
+      // exit_plan_mode doesn't need "always allow" options since it's a plan approval flow
+      return [...basicPermissionOptions];
     default: {
       const unreachable: never = confirmation;
       throw new Error(`Unexpected: ${unreachable}`);

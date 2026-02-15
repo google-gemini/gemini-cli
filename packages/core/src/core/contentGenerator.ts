@@ -56,6 +56,27 @@ export enum AuthType {
   COMPUTE_ADC = 'compute-default-credentials',
 }
 
+/**
+ * Detects the best authentication type based on environment variables.
+ *
+ * Checks in order:
+ * 1. GOOGLE_GENAI_USE_GCA=true -> LOGIN_WITH_GOOGLE
+ * 2. GOOGLE_GENAI_USE_VERTEXAI=true -> USE_VERTEX_AI
+ * 3. GEMINI_API_KEY -> USE_GEMINI
+ */
+export function getAuthTypeFromEnv(): AuthType | undefined {
+  if (process.env['GOOGLE_GENAI_USE_GCA'] === 'true') {
+    return AuthType.LOGIN_WITH_GOOGLE;
+  }
+  if (process.env['GOOGLE_GENAI_USE_VERTEXAI'] === 'true') {
+    return AuthType.USE_VERTEX_AI;
+  }
+  if (process.env['GEMINI_API_KEY']) {
+    return AuthType.USE_GEMINI;
+  }
+  return undefined;
+}
+
 export type ContentGeneratorConfig = {
   apiKey?: string;
   vertexai?: boolean;
@@ -122,16 +143,14 @@ export async function createContentGenerator(
       return new LoggingContentGenerator(fakeGenerator, gcConfig);
     }
     const version = await getVersion();
-    const model = resolveModel(
-      gcConfig.getModel(),
-      gcConfig.getPreviewFeatures(),
-    );
+    const model = resolveModel(gcConfig.getModel());
     const customHeadersEnv =
       process.env['GEMINI_CLI_CUSTOM_HEADERS'] || undefined;
     const userAgent = `GeminiCLI/${version}/${model} (${process.platform}; ${process.arch})`;
     const customHeadersMap = parseCustomHeaders(customHeadersEnv);
     const apiKeyAuthMechanism =
       process.env['GEMINI_API_KEY_AUTH_MECHANISM'] || 'x-goog-api-key';
+    const apiVersionEnv = process.env['GOOGLE_GENAI_API_VERSION'];
 
     const baseHeaders: Record<string, string> = {
       ...customHeadersMap,
@@ -181,6 +200,7 @@ export async function createContentGenerator(
         apiKey: config.apiKey === '' ? undefined : config.apiKey,
         vertexai: config.vertexai,
         httpOptions,
+        ...(apiVersionEnv && { apiVersion: apiVersionEnv }),
       });
       return new LoggingContentGenerator(googleGenAI.models, gcConfig);
     }

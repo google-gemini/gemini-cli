@@ -101,8 +101,8 @@ execution.
 
 #### Global MCP settings (`mcp`)
 
-The `mcp` object in your `settings.json` allows you to define global rules for
-all MCP servers.
+The `mcp` object in your `settings.json` lets you define global rules for all
+MCP servers.
 
 - **`mcp.serverCommand`** (string): A global command to start an MCP server.
 - **`mcp.allowed`** (array of strings): A list of MCP server names to allow. If
@@ -742,7 +742,7 @@ The MCP integration tracks several states:
 - **Sandbox compatibility:** When using sandboxing, ensure MCP servers are
   available within the sandbox environment
 - **Private data:** Using broadly scoped personal access tokens can lead to
-  information leakage between repositories
+  information leakage between repositories.
 
 ### Performance and resource management
 

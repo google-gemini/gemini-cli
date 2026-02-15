@@ -14,17 +14,25 @@ import {
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { getSessionFiles, type SessionInfo } from '../../utils/sessionUtils.js';
-import type {
-  Config,
-  ConversationRecord,
-  MessageRecord,
+import {
+  type Config,
+  type ConversationRecord,
+  type MessageRecord,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { coreEvents } from '@google/gemini-cli-core';
 
 // Mock modules
 vi.mock('fs/promises');
 vi.mock('path');
-vi.mock('../../utils/sessionUtils.js');
+vi.mock('../../utils/sessionUtils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../utils/sessionUtils.js')>();
+  return {
+    ...actual,
+    getSessionFiles: vi.fn(),
+  };
+});
 
 const MOCKED_PROJECT_TEMP_DIR = '/test/project/temp';
 const MOCKED_CHATS_DIR = '/test/project/temp/chats';
@@ -178,6 +186,30 @@ describe('convertSessionToHistoryFormats', () => {
     });
   });
 
+  it('should prioritize displayContent for UI history but use content for client history', () => {
+    const messages: MessageRecord[] = [
+      {
+        type: 'user',
+        content: [{ text: 'Expanded content' }],
+        displayContent: [{ text: 'User input' }],
+      } as MessageRecord,
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+
+    expect(result.uiHistory).toHaveLength(1);
+    expect(result.uiHistory[0]).toMatchObject({
+      type: 'user',
+      text: 'User input',
+    });
+
+    expect(result.clientHistory).toHaveLength(1);
+    expect(result.clientHistory[0]).toEqual({
+      role: 'user',
+      parts: [{ text: 'Expanded content' }],
+    });
+  });
+
   it('should filter out slash commands from client history but keep in UI', () => {
     const messages: MessageRecord[] = [
       { type: 'user', content: '/help' } as MessageRecord,
@@ -207,7 +239,7 @@ describe('convertSessionToHistoryFormats', () => {
             id: 'call_1',
             name: 'get_time',
             args: {},
-            status: 'success',
+            status: CoreToolCallStatus.Success,
             result: '12:00',
           },
         ],
@@ -227,7 +259,7 @@ describe('convertSessionToHistoryFormats', () => {
         expect.objectContaining({
           callId: 'call_1',
           name: 'get_time',
-          status: 'Success',
+          status: CoreToolCallStatus.Success,
         }),
       ],
     });
