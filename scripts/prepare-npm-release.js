@@ -35,27 +35,10 @@ if (fs.existsSync(sourceBundleDir)) {
   process.exit(1);
 }
 
-// Read native module versions from root package.json
+// Inherit optionalDependencies from root package.json, excluding dev-only packages.
 const rootPkg = readJson('package.json');
-const rootOptional = rootPkg.optionalDependencies || {};
-
-const nativeModules = [
-  '@lydell/node-pty',
-  '@lydell/node-pty-darwin-arm64',
-  '@lydell/node-pty-darwin-x64',
-  '@lydell/node-pty-linux-x64',
-  '@lydell/node-pty-win32-arm64',
-  '@lydell/node-pty-win32-x64',
-  'keytar',
-  'node-pty',
-];
-
-const optionalDependencies = {};
-for (const mod of nativeModules) {
-  if (rootOptional[mod]) {
-    optionalDependencies[mod] = rootOptional[mod];
-  }
-}
+const optionalDependencies = { ...(rootPkg.optionalDependencies || {}) };
+delete optionalDependencies['gemini-cli-devtools'];
 
 // Update @google/gemini-cli package.json for bundled npm release
 const cliPkgPath = 'packages/cli/package.json';
