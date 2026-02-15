@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   // Schema utilities
   getSettingsByCategory,
@@ -27,9 +27,6 @@ import {
   isSettingModified,
   TEST_ONLY,
   settingExistsInScope,
-  setPendingSettingValue,
-  hasRestartRequiredSettings,
-  getRestartRequiredFromModified,
   getDisplayValue,
   isDefaultValue,
   isValueInherited,
@@ -520,51 +517,35 @@ describe('SettingsUtils', () => {
 
         // Test the specific issue with fileFiltering.respectGitIgnore
         const key = 'context.fileFiltering.respectGitIgnore';
-        const initialSettings = makeMockSettings({});
-        const pendingSettings = makeMockSettings({});
 
-        // Set the nested setting to true
-        const updatedPendingSettings = setPendingSettingValue(
-          key,
-          true,
-          pendingSettings,
-        );
+        // Test that setting exists in scope when set
+        const settingsWithValue = makeMockSettings({
+          context: { fileFiltering: { respectGitIgnore: true } },
+        });
+        expect(settingExistsInScope(key, settingsWithValue)).toBe(true);
 
-        // Check if the setting exists in pending settings
-        const existsInPending = settingExistsInScope(
-          key,
-          updatedPendingSettings,
-        );
-        expect(existsInPending).toBe(true);
+        // Get the value from settings
+        const valueFromSettings = getSettingValue(key, settingsWithValue, {});
+        expect(valueFromSettings).toBe(true);
 
-        // Get the value from pending settings
-        const valueFromPending = getSettingValue(
-          key,
-          updatedPendingSettings,
-          {},
-        );
-        expect(valueFromPending).toBe(true);
-
-        // Test getDisplayValue should show the pending change
+        // Test getDisplayValue with setting in scope (shows * because it exists in scope)
         const displayValue = getDisplayValue(
           key,
-          initialSettings,
-          {},
+          settingsWithValue,
+          makeMockSettings({}),
           new Set(),
-          updatedPendingSettings,
         );
-        expect(displayValue).toBe('true'); // Should show true (no * since value matches default)
+        expect(displayValue).toBe('true*');
 
-        // Test that modified settings also show the * indicator
-        const modifiedSettings = new Set([key]);
-        const displayValueWithModified = getDisplayValue(
+        // Test that restartChangedKeys also show the * indicator
+        const restartChangedKeys = new Set([key]);
+        const displayValueWithRestart = getDisplayValue(
           key,
-          initialSettings,
-          {},
-          modifiedSettings,
-          {},
+          makeMockSettings({}),
+          makeMockSettings({}),
+          restartChangedKeys,
         );
-        expect(displayValueWithModified).toBe('true*'); // Should show true* because it's in modified settings and default is true
+        expect(displayValueWithRestart).toBe('true*'); // * because it's in restartChangedKeys
       });
     });
   });
@@ -671,93 +652,6 @@ describe('SettingsUtils', () => {
             settings,
           ),
         ).toBe(false);
-      });
-    });
-
-    describe('setPendingSettingValue', () => {
-      it('should set top-level setting value', () => {
-        const pendingSettings = makeMockSettings({});
-        const result = setPendingSettingValue(
-          'ui.hideWindowTitle',
-          true,
-          pendingSettings,
-        );
-
-        expect(result.ui?.hideWindowTitle).toBe(true);
-      });
-
-      it('should set nested setting value', () => {
-        const pendingSettings = makeMockSettings({});
-        const result = setPendingSettingValue(
-          'ui.accessibility.enableLoadingPhrases',
-          true,
-          pendingSettings,
-        );
-
-        expect(result.ui?.accessibility?.enableLoadingPhrases).toBe(true);
-      });
-
-      it('should preserve existing nested settings', () => {
-        const pendingSettings = makeMockSettings({
-          ui: { accessibility: { enableLoadingPhrases: false } },
-        });
-        const result = setPendingSettingValue(
-          'ui.accessibility.enableLoadingPhrases',
-          true,
-          pendingSettings,
-        );
-
-        expect(result.ui?.accessibility?.enableLoadingPhrases).toBe(true);
-      });
-
-      it('should not mutate original settings', () => {
-        const pendingSettings = makeMockSettings({});
-        setPendingSettingValue('ui.requiresRestart', true, pendingSettings);
-
-        expect(pendingSettings).toEqual({});
-      });
-    });
-
-    describe('hasRestartRequiredSettings', () => {
-      it('should return true when modified settings require restart', () => {
-        const modifiedSettings = new Set<string>([
-          'advanced.autoConfigureMemory',
-          'ui.requiresRestart',
-        ]);
-        expect(hasRestartRequiredSettings(modifiedSettings)).toBe(true);
-      });
-
-      it('should return false when no modified settings require restart', () => {
-        const modifiedSettings = new Set<string>(['test']);
-        expect(hasRestartRequiredSettings(modifiedSettings)).toBe(false);
-      });
-
-      it('should return false for empty set', () => {
-        const modifiedSettings = new Set<string>();
-        expect(hasRestartRequiredSettings(modifiedSettings)).toBe(false);
-      });
-    });
-
-    describe('getRestartRequiredFromModified', () => {
-      it('should return only settings that require restart', () => {
-        const modifiedSettings = new Set<string>([
-          'ui.requiresRestart',
-          'test',
-        ]);
-        const result = getRestartRequiredFromModified(modifiedSettings);
-
-        expect(result).toContain('ui.requiresRestart');
-        expect(result).not.toContain('test');
-      });
-
-      it('should return empty array when no settings require restart', () => {
-        const modifiedSettings = new Set<string>([
-          'requiresRestart',
-          'hideTips',
-        ]);
-        const result = getRestartRequiredFromModified(modifiedSettings);
-
-        expect(result).toEqual([]);
       });
     });
 
@@ -1004,24 +898,20 @@ describe('SettingsUtils', () => {
         expect(result).toBe('false'); // default value (false) without *
       });
 
-      it('should show value with * when user changes from default', () => {
+      it('should show value with * when in restartChangedKeys', () => {
         const settings = makeMockSettings({}); // setting doesn't exist in scope originally
         const mergedSettings = makeMockSettings({
           ui: { requiresRestart: false },
         });
-        const modifiedSettings = new Set<string>(['ui.requiresRestart']);
-        const pendingSettings = makeMockSettings({
-          ui: { requiresRestart: true },
-        }); // user changed to true
+        const restartChangedKeys = new Set<string>(['ui.requiresRestart']);
 
         const result = getDisplayValue(
           'ui.requiresRestart',
           settings,
           mergedSettings,
-          modifiedSettings,
-          pendingSettings,
+          restartChangedKeys,
         );
-        expect(result).toBe('true*'); // changed from default (false) to true
+        expect(result).toBe('false*'); // default value with * because it's in restartChangedKeys
       });
     });
 

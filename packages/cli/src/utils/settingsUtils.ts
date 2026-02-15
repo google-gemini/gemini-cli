@@ -4,11 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  Settings,
-  LoadedSettings,
-  LoadableSettingScope,
-} from '../config/settings.js';
+import type { Settings } from '../config/settings.js';
 import type {
   SettingDefinition,
   SettingsSchema,
@@ -126,6 +122,20 @@ export function getEffectiveDefaultValue(
 export function getRestartRequiredSettings(): string[] {
   return Object.values(getFlattenedSchema())
     .filter((definition) => definition.requiresRestart)
+    .map((definition) => definition.key);
+}
+
+/**
+ * Get restart-required setting keys that are also visible in the dialog.
+ * Non-dialog restart keys (e.g. parent container objects like mcpServers, tools)
+ * are excluded because users cannot change them through the dialog.
+ */
+export function getDialogRestartRequiredSettings(): string[] {
+  return Object.values(getFlattenedSchema())
+    .filter(
+      (definition) =>
+        definition.requiresRestart && definition.showInDialog !== false,
+    )
     .map((definition) => definition.key);
 }
 
@@ -336,134 +346,23 @@ export function settingExistsInScope(
 }
 
 /**
- * Recursively sets a value in a nested object using a key path array.
- */
-function setNestedValue(
-  obj: Record<string, unknown>,
-  path: string[],
-  value: unknown,
-): Record<string, unknown> {
-  const [first, ...rest] = path;
-  if (!first) {
-    return obj;
-  }
-
-  if (rest.length === 0) {
-    obj[first] = value;
-    return obj;
-  }
-
-  if (!obj[first] || typeof obj[first] !== 'object') {
-    obj[first] = {};
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  setNestedValue(obj[first] as Record<string, unknown>, rest, value);
-  return obj;
-}
-
-/**
- * Set a setting value in the pending settings
- */
-export function setPendingSettingValue(
-  key: string,
-  value: boolean,
-  pendingSettings: Settings,
-): Settings {
-  const path = key.split('.');
-  const newSettings = JSON.parse(JSON.stringify(pendingSettings));
-  setNestedValue(newSettings, path, value);
-  return newSettings;
-}
-
-/**
- * Generic setter: Set a setting value (boolean, number, string, etc.) in the pending settings
- */
-export function setPendingSettingValueAny(
-  key: string,
-  value: SettingsValue,
-  pendingSettings: Settings,
-): Settings {
-  const path = key.split('.');
-  const newSettings = structuredClone(pendingSettings);
-  setNestedValue(newSettings, path, value);
-  return newSettings;
-}
-
-/**
- * Check if any modified settings require a restart
- */
-export function hasRestartRequiredSettings(
-  modifiedSettings: Set<string>,
-): boolean {
-  return Array.from(modifiedSettings).some((key) => requiresRestart(key));
-}
-
-/**
- * Get the restart required settings from a set of modified settings
- */
-export function getRestartRequiredFromModified(
-  modifiedSettings: Set<string>,
-): string[] {
-  return Array.from(modifiedSettings).filter((key) => requiresRestart(key));
-}
-
-/**
- * Save modified settings to the appropriate scope
- */
-export function saveModifiedSettings(
-  modifiedSettings: Set<string>,
-  pendingSettings: Settings,
-  loadedSettings: LoadedSettings,
-  scope: LoadableSettingScope,
-): void {
-  modifiedSettings.forEach((settingKey) => {
-    const path = settingKey.split('.');
-    const value = getNestedValue(
-      pendingSettings as Record<string, unknown>,
-      path,
-    );
-
-    if (value === undefined) {
-      return;
-    }
-
-    const existsInOriginalFile = settingExistsInScope(
-      settingKey,
-      loadedSettings.forScope(scope).settings,
-    );
-
-    const isDefaultValue = value === getDefaultValue(settingKey);
-
-    if (existsInOriginalFile || !isDefaultValue) {
-      loadedSettings.setValue(scope, settingKey, value);
-    }
-  });
-}
-
-/**
  * Get the display value for a setting, showing current scope value with default change indicator
  */
 export function getDisplayValue(
   key: string,
-  settings: Settings,
-  _mergedSettings: Settings,
-  modifiedSettings: Set<string>,
-  pendingSettings?: Settings,
+  scopeSettings: Settings,
+  mergedSettings: Settings,
+  restartChangedKeys: Set<string>,
 ): string {
-  // Prioritize pending changes if user has modified this setting
   const definition = getSettingDefinition(key);
 
   let value: SettingsValue;
-  if (pendingSettings && settingExistsInScope(key, pendingSettings)) {
-    // Show the value from the pending (unsaved) edits when it exists
-    value = getEffectiveValue(key, pendingSettings, {});
-  } else if (settingExistsInScope(key, settings)) {
+  if (settingExistsInScope(key, scopeSettings)) {
     // Show the value defined at the current scope if present
-    value = getEffectiveValue(key, settings, {});
+    value = getEffectiveValue(key, scopeSettings, {});
   } else {
-    // Fall back to the schema default when the key is unset in this scope
-    value = getDefaultValue(key);
+    // Fall back to the merged/default value when unset in this scope
+    value = getEffectiveValue(key, scopeSettings, mergedSettings);
   }
 
   let valueString = String(value);
@@ -473,17 +372,9 @@ export function getDisplayValue(
     valueString = option?.label ?? `${value}`;
   }
 
-  // Check if value is different from default OR if it's in modified settings OR if there are pending changes
-  const defaultValue = getDefaultValue(key);
-  const isChangedFromDefault = value !== defaultValue;
-  const isInModifiedSettings = modifiedSettings.has(key);
-
-  // Mark as modified if setting exists in current scope OR is in modified settings
-  if (settingExistsInScope(key, settings) || isInModifiedSettings) {
-    return `${valueString}*`; // * indicates setting is set in current scope
-  }
-  if (isChangedFromDefault || isInModifiedSettings) {
-    return `${valueString}*`; // * indicates changed from default value
+  // Mark with asterisk if setting exists in current scope OR is a pending restart-required change
+  if (settingExistsInScope(key, scopeSettings) || restartChangedKeys.has(key)) {
+    return `${valueString}*`;
   }
 
   return valueString;

@@ -5,31 +5,23 @@
  */
 
 import type React from 'react';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Text } from 'ink';
 import type { Key } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
-import type {
-  LoadableSettingScope,
-  LoadedSettings,
-  Settings,
-} from '../../config/settings.js';
+import type { LoadableSettingScope } from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
 import { getScopeMessageForSetting } from '../../utils/dialogScopeUtils.js';
 import {
   getDialogSettingKeys,
-  setPendingSettingValue,
   getDisplayValue,
-  hasRestartRequiredSettings,
-  saveModifiedSettings,
   getSettingDefinition,
   isDefaultValue,
-  requiresRestart,
-  getRestartRequiredFromModified,
+  getDialogRestartRequiredSettings,
   getEffectiveDefaultValue,
-  setPendingSettingValueAny,
   getEffectiveValue,
 } from '../../utils/settingsUtils.js';
+import { useSettingsStore } from '../contexts/SettingsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import {
   type SettingsValue,
@@ -44,7 +36,6 @@ import {
 import { useFuzzyList } from '../hooks/useFuzzyList.js';
 
 interface SettingsDialogProps {
-  settings: LoadedSettings;
   onSelect: (settingName: string | undefined, scope: SettingScope) => void;
   onRestartRequest?: () => void;
   availableTerminalHeight?: number;
@@ -53,13 +44,31 @@ interface SettingsDialogProps {
 
 const MAX_ITEMS_TO_SHOW = 8;
 
+// Capture initial values of all restart-required settings for diff tracking
+function captureRestartSnapshot(
+  merged: Record<string, unknown>,
+): Map<string, string> {
+  const snapshot = new Map<string, string>();
+  // Only track dialog-visible restart settings — non-dialog keys (parent
+  // container objects like mcpServers, tools) can't be changed here.
+  // JSON.stringify for value comparison in case a future showInDialog setting
+  // has an object value (structuredClone breaks reference equality).
+  for (const key of getDialogRestartRequiredSettings()) {
+    const value = getEffectiveValue(key, {}, merged);
+    snapshot.set(key, JSON.stringify(value));
+  }
+  return snapshot;
+}
+
 export function SettingsDialog({
-  settings,
   onSelect,
   onRestartRequest,
   availableTerminalHeight,
   config,
 }: SettingsDialogProps): React.JSX.Element {
+  // Reactive settings from store (re-renders on any settings change)
+  const { settings, setSetting } = useSettingsStore();
+
   // Get vim mode context to sync vim mode changes
   const { vimEnabled, toggleVimEnabled } = useVimMode();
 
@@ -68,57 +77,29 @@ export function SettingsDialog({
     SettingScope.User,
   );
 
-  const [showRestartPrompt, setShowRestartPrompt] = useState(false);
-
-  // Local pending settings state for the selected scope
-  const [pendingSettings, setPendingSettings] = useState<Settings>(() =>
-    // Deep clone to avoid mutation
-    structuredClone(settings.forScope(selectedScope).settings),
+  // Snapshot restart-required values at mount time for diff tracking
+  const [initialRestartValues] = useState(() =>
+    captureRestartSnapshot(settings.merged),
   );
 
-  // Track which settings have been modified by the user
-  const [modifiedSettings, setModifiedSettings] = useState<Set<string>>(
-    new Set(),
-  );
-
-  // Preserve pending changes across scope switches
-  type PendingValue = boolean | number | string;
-  const [globalPendingChanges, setGlobalPendingChanges] = useState<
-    Map<string, PendingValue>
-  >(new Map());
-
-  // Track restart-required settings across scope changes
-  const [_restartRequiredSettings, setRestartRequiredSettings] = useState<
-    Set<string>
-  >(new Set());
-
-  useEffect(() => {
-    // Base settings for selected scope
-    let updated = structuredClone(settings.forScope(selectedScope).settings);
-    // Overlay globally pending (unsaved) changes so user sees their modifications in any scope
-    const newModified = new Set<string>();
-    const newRestartRequired = new Set<string>();
-    for (const [key, value] of globalPendingChanges.entries()) {
-      const def = getSettingDefinition(key);
-      if (def?.type === 'boolean' && typeof value === 'boolean') {
-        updated = setPendingSettingValue(key, value, updated);
-      } else if (
-        (def?.type === 'number' && typeof value === 'number') ||
-        (def?.type === 'string' && typeof value === 'string')
-      ) {
-        updated = setPendingSettingValueAny(key, value, updated);
+  // Derived: which restart-required keys have changed from initial values
+  const restartChangedKeys = useMemo(() => {
+    const changed = new Set<string>();
+    for (const [key, initialJson] of initialRestartValues) {
+      const currentValue = getEffectiveValue(key, {}, settings.merged);
+      if (JSON.stringify(currentValue) !== initialJson) {
+        changed.add(key);
       }
-      newModified.add(key);
-      if (requiresRestart(key)) newRestartRequired.add(key);
     }
-    setPendingSettings(updated);
-    setModifiedSettings(newModified);
-    setRestartRequiredSettings(newRestartRequired);
-    setShowRestartPrompt(newRestartRequired.size > 0);
-  }, [selectedScope, settings, globalPendingChanges]);
+    return changed;
+  }, [settings.merged, initialRestartValues]);
+
+  // Derived: whether to show restart prompt
+  const showRestartPrompt = restartChangedKeys.size > 0;
 
   // Generate items for SearchableList
   const settingKeys = useMemo(() => getDialogSettingKeys(), []);
+
   const items: SettingsDialogItem[] = useMemo(() => {
     const scopeSettings = settings.forScope(selectedScope).settings;
     const mergedSettings = settings.merged;
@@ -132,8 +113,7 @@ export function SettingsDialog({
         key,
         scopeSettings,
         mergedSettings,
-        modifiedSettings,
-        pendingSettings,
+        restartChangedKeys,
       );
 
       // Get the scope message (e.g., "(Modified in Workspace)")
@@ -147,7 +127,7 @@ export function SettingsDialog({
       const isGreyedOut = isDefaultValue(key, scopeSettings);
 
       // Get raw value for edit mode initialization
-      const rawValue = getEffectiveValue(key, pendingSettings, {});
+      const rawValue = getEffectiveValue(key, scopeSettings, mergedSettings);
 
       return {
         key,
@@ -162,7 +142,7 @@ export function SettingsDialog({
         rawValue: rawValue as string | number | boolean | undefined,
       };
     });
-  }, [settingKeys, selectedScope, settings, modifiedSettings, pendingSettings]);
+  }, [settingKeys, selectedScope, settings, restartChangedKeys]);
 
   const { filteredItems, searchBuffer, maxLabelWidth } = useFuzzyList({
     items,
@@ -180,15 +160,18 @@ export function SettingsDialog({
       if (!TOGGLE_TYPES.has(definition?.type)) {
         return;
       }
-      const currentValue = getEffectiveValue(key, pendingSettings, {});
+
+      const scopeSettings = settings.forScope(selectedScope).settings;
+      const currentValue = getEffectiveValue(
+        key,
+        scopeSettings,
+        settings.merged,
+      );
       let newValue: SettingsValue;
+
       if (definition?.type === 'boolean') {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         newValue = !(currentValue as boolean);
-        setPendingSettings((prev) =>
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          setPendingSettingValue(key, newValue as boolean, prev),
-        );
       } else if (definition?.type === 'enum' && definition.options) {
         const options = definition.options;
         const currentIndex = options?.findIndex(
@@ -199,93 +182,22 @@ export function SettingsDialog({
         } else {
           newValue = options[0].value; // loop back to start.
         }
-        setPendingSettings((prev) =>
-          setPendingSettingValueAny(key, newValue, prev),
-        );
       }
 
-      if (!requiresRestart(key)) {
-        const immediateSettings = new Set([key]);
-        const currentScopeSettings = settings.forScope(selectedScope).settings;
-        const immediateSettingsObject = setPendingSettingValueAny(
-          key,
-          newValue,
-          currentScopeSettings,
-        );
-        debugLogger.log(
-          `[DEBUG SettingsDialog] Saving ${key} immediately with value:`,
-          newValue,
-        );
-        saveModifiedSettings(
-          immediateSettings,
-          immediateSettingsObject,
-          settings,
-          selectedScope,
-        );
+      debugLogger.log(
+        `[DEBUG SettingsDialog] Saving ${key} immediately with value:`,
+        newValue,
+      );
+      setSetting(selectedScope, key, newValue);
 
-        // Special handling for vim mode to sync with VimModeContext
-        if (key === 'general.vimMode' && newValue !== vimEnabled) {
-          // Call toggleVimEnabled to sync the VimModeContext local state
-          toggleVimEnabled().catch((error) => {
-            coreEvents.emitFeedback(
-              'error',
-              'Failed to toggle vim mode:',
-              error,
-            );
-          });
-        }
-
-        // Remove from modifiedSettings since it's now saved
-        setModifiedSettings((prev) => {
-          const updated = new Set(prev);
-          updated.delete(key);
-          return updated;
-        });
-
-        // Also remove from restart-required settings if it was there
-        setRestartRequiredSettings((prev) => {
-          const updated = new Set(prev);
-          updated.delete(key);
-          return updated;
-        });
-
-        // Remove from global pending changes if present
-        setGlobalPendingChanges((prev) => {
-          if (!prev.has(key)) return prev;
-          const next = new Map(prev);
-          next.delete(key);
-          return next;
-        });
-      } else {
-        // For restart-required settings, track as modified
-        setModifiedSettings((prev) => {
-          const updated = new Set(prev).add(key);
-          const needsRestart = hasRestartRequiredSettings(updated);
-          debugLogger.log(
-            `[DEBUG SettingsDialog] Modified settings:`,
-            Array.from(updated),
-            'Needs restart:',
-            needsRestart,
-          );
-          if (needsRestart) {
-            setShowRestartPrompt(true);
-            setRestartRequiredSettings((prevRestart) =>
-              new Set(prevRestart).add(key),
-            );
-          }
-          return updated;
-        });
-
-        // Record pending change globally
-        setGlobalPendingChanges((prev) => {
-          const next = new Map(prev);
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          next.set(key, newValue as PendingValue);
-          return next;
+      // Special handling for vim mode to sync with VimModeContext
+      if (key === 'general.vimMode' && newValue !== vimEnabled) {
+        toggleVimEnabled().catch((error) => {
+          coreEvents.emitFeedback('error', 'Failed to toggle vim mode:', error);
         });
       }
     },
-    [pendingSettings, settings, selectedScope, vimEnabled, toggleVimEnabled],
+    [settings, selectedScope, setSetting, vimEnabled, toggleVimEnabled],
   );
 
   // Edit commit handler
@@ -312,190 +224,51 @@ export function SettingsDialog({
         parsed = newValue;
       }
 
-      // Update pending
-      setPendingSettings((prev) =>
-        setPendingSettingValueAny(key, parsed, prev),
-      );
-
-      if (!requiresRestart(key)) {
-        const immediateSettings = new Set([key]);
-        const currentScopeSettings = settings.forScope(selectedScope).settings;
-        const immediateSettingsObject = setPendingSettingValueAny(
-          key,
-          parsed,
-          currentScopeSettings,
-        );
-        saveModifiedSettings(
-          immediateSettings,
-          immediateSettingsObject,
-          settings,
-          selectedScope,
-        );
-
-        // Remove from modified sets if present
-        setModifiedSettings((prev) => {
-          const updated = new Set(prev);
-          updated.delete(key);
-          return updated;
-        });
-        setRestartRequiredSettings((prev) => {
-          const updated = new Set(prev);
-          updated.delete(key);
-          return updated;
-        });
-
-        // Remove from global pending since it's immediately saved
-        setGlobalPendingChanges((prev) => {
-          if (!prev.has(key)) return prev;
-          const next = new Map(prev);
-          next.delete(key);
-          return next;
-        });
-      } else {
-        // Mark as modified and needing restart
-        setModifiedSettings((prev) => {
-          const updated = new Set(prev).add(key);
-          const needsRestart = hasRestartRequiredSettings(updated);
-          if (needsRestart) {
-            setShowRestartPrompt(true);
-            setRestartRequiredSettings((prevRestart) =>
-              new Set(prevRestart).add(key),
-            );
-          }
-          return updated;
-        });
-
-        // Record pending change globally for persistence across scopes
-        setGlobalPendingChanges((prev) => {
-          const next = new Map(prev);
-          next.set(key, parsed as PendingValue);
-          return next;
-        });
-      }
+      setSetting(selectedScope, key, parsed);
     },
-    [settings, selectedScope],
+    [selectedScope, setSetting],
   );
 
   // Clear/reset handler - removes the value from settings.json so it falls back to default
   const handleItemClear = useCallback(
     (key: string, _item: SettingsDialogItem) => {
-      const defaultValue = getEffectiveDefaultValue(key, config);
+      setSetting(selectedScope, key, undefined);
 
-      // Update local pending state to show the default value
-      if (typeof defaultValue === 'boolean') {
-        setPendingSettings((prev) =>
-          setPendingSettingValue(key, defaultValue, prev),
-        );
-      } else if (
-        typeof defaultValue === 'number' ||
-        typeof defaultValue === 'string'
-      ) {
-        setPendingSettings((prev) =>
-          setPendingSettingValueAny(key, defaultValue, prev),
-        );
-      }
-
-      // Clear the value from settings.json (set to undefined to remove the key)
-      if (!requiresRestart(key)) {
-        settings.setValue(selectedScope, key, undefined);
-
-        // Special handling for vim mode
-        if (key === 'general.vimMode') {
-          const booleanDefaultValue =
-            typeof defaultValue === 'boolean' ? defaultValue : false;
-          if (booleanDefaultValue !== vimEnabled) {
-            toggleVimEnabled().catch((error) => {
-              coreEvents.emitFeedback(
-                'error',
-                'Failed to toggle vim mode:',
-                error,
-              );
-            });
-          }
+      // Special handling for vim mode
+      if (key === 'general.vimMode') {
+        const defaultValue = getEffectiveDefaultValue(key, config);
+        const booleanDefaultValue =
+          typeof defaultValue === 'boolean' ? defaultValue : false;
+        if (booleanDefaultValue !== vimEnabled) {
+          toggleVimEnabled().catch((error) => {
+            coreEvents.emitFeedback(
+              'error',
+              'Failed to toggle vim mode:',
+              error,
+            );
+          });
         }
       }
-
-      // Remove from modified sets
-      setModifiedSettings((prev) => {
-        const updated = new Set(prev);
-        updated.delete(key);
-        return updated;
-      });
-      setRestartRequiredSettings((prev) => {
-        const updated = new Set(prev);
-        updated.delete(key);
-        return updated;
-      });
-      setGlobalPendingChanges((prev) => {
-        if (!prev.has(key)) return prev;
-        const next = new Map(prev);
-        next.delete(key);
-        return next;
-      });
-
-      // Update restart prompt
-      setShowRestartPrompt((_prev) => {
-        const remaining = getRestartRequiredFromModified(modifiedSettings);
-        return remaining.filter((k) => k !== key).length > 0;
-      });
     },
-    [
-      config,
-      settings,
-      selectedScope,
-      vimEnabled,
-      toggleVimEnabled,
-      modifiedSettings,
-    ],
+    [config, selectedScope, setSetting, vimEnabled, toggleVimEnabled],
   );
-
-  const saveRestartRequiredSettings = useCallback(() => {
-    const restartRequiredSettings =
-      getRestartRequiredFromModified(modifiedSettings);
-    const restartRequiredSet = new Set(restartRequiredSettings);
-
-    if (restartRequiredSet.size > 0) {
-      saveModifiedSettings(
-        restartRequiredSet,
-        pendingSettings,
-        settings,
-        selectedScope,
-      );
-
-      // Remove saved keys from global pending changes
-      setGlobalPendingChanges((prev) => {
-        if (prev.size === 0) return prev;
-        const next = new Map(prev);
-        for (const key of restartRequiredSet) {
-          next.delete(key);
-        }
-        return next;
-      });
-    }
-  }, [modifiedSettings, pendingSettings, settings, selectedScope]);
 
   // Close handler
   const handleClose = useCallback(() => {
-    // Save any restart-required settings before closing
-    saveRestartRequiredSettings();
     onSelect(undefined, selectedScope as SettingScope);
-  }, [saveRestartRequiredSettings, onSelect, selectedScope]);
+  }, [onSelect, selectedScope]);
 
   // Custom key handler for restart key
   const handleKeyPress = useCallback(
     (key: Key, _currentItem: SettingsDialogItem | undefined): boolean => {
       // 'r' key for restart
       if (showRestartPrompt && key.sequence === 'r') {
-        saveRestartRequiredSettings();
-        setShowRestartPrompt(false);
-        setModifiedSettings(new Set());
-        setRestartRequiredSettings(new Set());
         if (onRestartRequest) onRestartRequest();
         return true;
       }
       return false;
     },
-    [showRestartPrompt, onRestartRequest, saveRestartRequiredSettings],
+    [showRestartPrompt, onRestartRequest],
   );
 
   // Calculate effective max items and scope visibility based on terminal height
