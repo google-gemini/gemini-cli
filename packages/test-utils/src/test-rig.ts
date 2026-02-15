@@ -345,6 +345,7 @@ export class TestRig {
   originalFakeResponsesPath?: string;
   private _interactiveRuns: InteractiveRun[] = [];
   private _spawnedProcesses: ChildProcess[] = [];
+  private _initialized = false;
 
   setup(
     testName: string,
@@ -359,6 +360,14 @@ export class TestRig {
       env['INTEGRATION_TEST_FILE_DIR'] || join(os.tmpdir(), 'gemini-cli-tests');
     this.testDir = join(testFileDir, sanitizedName);
     this.homeDir = join(testFileDir, sanitizedName + '-home');
+
+    if (!this._initialized) {
+      // Clean up existing directories from previous runs (e.g. retries)
+      this._cleanDir(this.testDir);
+      this._cleanDir(this.homeDir);
+      this._initialized = true;
+    }
+
     mkdirSync(this.testDir, { recursive: true });
     mkdirSync(this.homeDir, { recursive: true });
     if (options.fakeResponsesPath) {
@@ -371,6 +380,36 @@ export class TestRig {
 
     // Create a settings file to point the CLI to the local collector
     this._createSettingsFile(options.settings);
+  }
+
+  private _cleanDir(dir: string) {
+    if (fs.existsSync(dir)) {
+      for (let i = 0; i < 10; i++) {
+        try {
+          fs.rmSync(dir, { recursive: true, force: true });
+          return;
+        } catch (err) {
+          if (i === 9) {
+            console.error(
+              `Failed to clean directory ${dir} after 10 attempts:`,
+              err,
+            );
+            throw err;
+          }
+          const delay = Math.min(Math.pow(2, i) * 1000, 10000); // Max 10s delay
+          try {
+            const sharedBuffer = new Int32Array(new SharedArrayBuffer(4));
+            Atomics.wait(sharedBuffer, 0, 0, delay);
+          } catch {
+            // Fallback for environments where SharedArrayBuffer might be restricted
+            const start = Date.now();
+            while (Date.now() - start < delay) {
+              /* busy wait */
+            }
+          }
+        }
+      }
+    }
   }
 
   private _createSettingsFile(overrideSettings?: Record<string, unknown>) {
@@ -474,6 +513,17 @@ export class TestRig {
     return { command, initialArgs };
   }
 
+  createScript(fileName: string, content: string) {
+    if (!this.testDir) {
+      throw new Error(
+        'TestRig.setup must be called before creating files or scripts',
+      );
+    }
+    const scriptPath = join(this.testDir, fileName);
+    writeFileSync(scriptPath, content);
+    return normalizePath(scriptPath);
+  }
+
   private _getCleanEnv(
     extraEnv?: Record<string, string | undefined>,
   ): Record<string, string | undefined> {
@@ -499,6 +549,7 @@ export class TestRig {
     return {
       ...cleanEnv,
       GEMINI_CLI_HOME: this.homeDir!,
+      GEMINI_PTY_INFO: 'child_process',
       ...extraEnv,
     };
   }
@@ -801,6 +852,13 @@ export class TestRig {
     // Kill any interactive runs that are still active
     for (const run of this._interactiveRuns) {
       try {
+        if (process.platform === 'win32') {
+          // @ts-ignore - access private ptyProcess
+          const pid = run.ptyProcess?.pid;
+          if (pid) {
+            execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore' });
+          }
+        }
         await run.kill();
       } catch (error) {
         if (env['VERBOSE'] === 'true') {
@@ -814,6 +872,9 @@ export class TestRig {
     for (const child of this._spawnedProcesses) {
       if (child.exitCode === null && child.signalCode === null) {
         try {
+          if (process.platform === 'win32' && child.pid) {
+            execSync(`taskkill /F /T /PID ${child.pid}`, { stdio: 'ignore' });
+          }
           child.kill('SIGKILL');
         } catch (error) {
           if (env['VERBOSE'] === 'true') {
@@ -836,21 +897,21 @@ export class TestRig {
     // Clean up test directory and home directory
     if (this.testDir && !env['KEEP_OUTPUT']) {
       try {
-        fs.rmSync(this.testDir, { recursive: true, force: true });
+        this._cleanDir(this.testDir);
       } catch (error) {
         // Ignore cleanup errors
-        if (env['VERBOSE'] === 'true') {
-          console.warn('Cleanup warning:', (error as Error).message);
+        if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+          console.warn('Cleanup warning (testDir):', (error as Error).message);
         }
       }
     }
     if (this.homeDir && !env['KEEP_OUTPUT']) {
       try {
-        fs.rmSync(this.homeDir, { recursive: true, force: true });
+        this._cleanDir(this.homeDir);
       } catch (error) {
         // Ignore cleanup errors
-        if (env['VERBOSE'] === 'true') {
-          console.warn('Cleanup warning:', (error as Error).message);
+        if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+          console.warn('Cleanup warning (homeDir):', (error as Error).message);
         }
       }
     }
@@ -1282,6 +1343,23 @@ export class TestRig {
 
     const envVars = this._getCleanEnv(options?.env);
 
+    // node-pty on windows often needs these to spawn correctly
+    if (process.platform === 'win32') {
+      const windowsCriticalVars = [
+        'SystemRoot',
+        'COMSPEC',
+        'windir',
+        'PATHEXT',
+        'TEMP',
+        'TMP',
+      ];
+      for (const v of windowsCriticalVars) {
+        if (process.env[v] && !envVars[v]) {
+          envVars[v] = process.env[v]!;
+        }
+      }
+    }
+
     const ptyOptions: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
@@ -1363,4 +1441,12 @@ export class TestRig {
     }
     throw new Error(`pollCommand timed out after ${timeout}ms`);
   }
+}
+
+/**
+ * Normalizes a path for cross-platform matching (replaces backslashes with forward slashes).
+ */
+export function normalizePath(p: string | undefined): string | undefined {
+  if (!p) return p;
+  return p.replace(/\\/g, '/');
 }
