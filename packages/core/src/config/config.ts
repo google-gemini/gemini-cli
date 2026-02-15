@@ -56,6 +56,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   isAutoModel,
+  isGemini2Model,
   isPreviewModel,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
@@ -809,9 +810,9 @@ export class Config {
       params.truncateToolOutputThreshold ??
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
     // // TODO(joshualitt): Re-evaluate the todo tool for 3 family.
-    this.useWriteTodos = isPreviewModel(this.model)
-      ? false
-      : (params.useWriteTodos ?? true);
+    this.useWriteTodos = isGemini2Model(this.model)
+      ? (params.useWriteTodos ?? true)
+      : false;
     this.enableHooksUI = params.enableHooksUI ?? true;
     this.enableHooks = params.enableHooks ?? true;
     this.disabledHooks = params.disabledHooks ?? [];
