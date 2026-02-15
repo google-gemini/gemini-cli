@@ -602,6 +602,27 @@ describe('EditTool', () => {
         '  if (newCond) {\n    setup(); // comment\n    foo();\n  }';
       expect(result.newContent).toBe(expected);
     });
+
+    it('should handle non-overlapping replacements correctly (aba in ababa)', async () => {
+      const currentContent = 'ababa';
+      const old_string = 'aba';
+      const new_string = 'c';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string,
+          new_string,
+        },
+        currentContent,
+        abortSignal,
+      });
+
+      // Standard non-overlapping replaceAll("aba", "c") on "ababa" should give "cba"
+      // Match 1: 0-2 (aba). Skip to index 3. No more matches.
+      expect(result.newContent).toBe('cba');
+      expect(result.occurrences).toBe(1);
+    });
   });
 
   describe('validateToolParams', () => {
