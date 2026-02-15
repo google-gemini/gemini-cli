@@ -43,6 +43,9 @@ export class TerminalCapabilityManager {
   private static readonly TERMINAL_NAME_QUERY = '\x1b[>q';
   private static readonly DEVICE_ATTRIBUTES_QUERY = '\x1b[c';
   private static readonly MODIFY_OTHER_KEYS_QUERY = '\x1b[>4;?m';
+  private static readonly HIDDEN_MODE = '\x1b[8m';
+  private static readonly CLEAR_LINE_AND_RETURN = '\x1b[2K\r';
+  private static readonly RESET_ATTRIBUTES = '\x1b[0m';
 
   /**
    * Triggers a terminal background color query.
@@ -224,14 +227,14 @@ export class TerminalCapabilityManager {
           // This can happen on some terminals that might echo the query or
           // malform the response. We hide the output, send queries, then
           // immediately clear the line and reset attributes.
-          '\x1b[8m' +
+          TerminalCapabilityManager.HIDDEN_MODE +
             TerminalCapabilityManager.KITTY_QUERY +
             TerminalCapabilityManager.OSC_11_QUERY +
             TerminalCapabilityManager.TERMINAL_NAME_QUERY +
             TerminalCapabilityManager.MODIFY_OTHER_KEYS_QUERY +
             TerminalCapabilityManager.DEVICE_ATTRIBUTES_QUERY +
-            '\x1b[2K\r' +
-            '\x1b[0m',
+            TerminalCapabilityManager.CLEAR_LINE_AND_RETURN +
+            TerminalCapabilityManager.RESET_ATTRIBUTES,
         );
       } catch (e) {
         debugLogger.warn('Failed to write terminal capability queries:', e);
