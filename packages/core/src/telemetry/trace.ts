@@ -14,6 +14,7 @@ import {
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import type { GeminiCliOperation } from './constants.js';
 import {
+  GEMINI_CLI_SESSION_ID,
   GEN_AI_AGENT_DESCRIPTION,
   GEN_AI_AGENT_NAME,
   GEN_AI_INPUT_MESSAGES,
@@ -22,6 +23,7 @@ import {
   SERVICE_DESCRIPTION,
   SERVICE_NAME,
 } from './constants.js';
+import { sessionId } from '../utils/session.js';
 
 const TRACER_NAME = 'gemini-cli';
 const TRACER_VERSION = 'v1';
@@ -91,6 +93,7 @@ export async function runInDevTraceSpan<R>(
         [GEN_AI_OPERATION_NAME]: operation,
         [GEN_AI_AGENT_NAME]: SERVICE_NAME,
         [GEN_AI_AGENT_DESCRIPTION]: SERVICE_DESCRIPTION,
+        [GEMINI_CLI_SESSION_ID]: sessionId,
       },
     };
     const endSpan = () => {
