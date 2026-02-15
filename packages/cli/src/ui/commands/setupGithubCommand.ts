@@ -42,18 +42,18 @@ const REPO_DOWNLOAD_URL =
 const SOURCE_DIR = 'examples/workflows';
 
 // Verifies if github name is command-execution safe
-function isValidGitHubOwner(name: string): boolean {
+export function isValidGitHubOwner(name: string): boolean {
   return /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i.test(name);
 }
 
 // does the same for repo name
-function isValidGitHubRepoName(name: string): boolean {
+export function isValidGitHubRepoName(name: string): boolean {
   if (name === '.' || name === '..') return false;
   return /^[a-z0-9_.-]+$/i.test(name);
 }
 
 // Generate OS-specific commands to open the GitHub pages needed for setup.
-function getOpenUrlsCommands(readmeUrl: string): string[] {
+export function getOpenUrlsCommands(readmeUrl: string): string[] {
   // Determine the OS-specific command to open URLs, ex: 'open', 'xdg-open', etc
   const openCmd = getUrlOpenCommand();
 
