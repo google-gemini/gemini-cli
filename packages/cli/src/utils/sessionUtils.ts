@@ -8,6 +8,7 @@ import {
   checkExhaustive,
   partListUnionToString,
   SESSION_FILE_PREFIX,
+  CoreToolCallStatus,
   type Config,
   type ConversationRecord,
   type MessageRecord,
@@ -16,11 +17,7 @@ import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { stripUnsafeCharacters } from '../ui/utils/textUtils.js';
 import type { Part } from '@google/genai';
-import {
-  MessageType,
-  ToolCallStatus,
-  type HistoryItemWithoutId,
-} from '../ui/types.js';
+import { MessageType, type HistoryItemWithoutId } from '../ui/types.js';
 
 /**
  * Constant for the resume "latest" identifier.
@@ -585,8 +582,8 @@ export function convertSessionToHistoryFormats(
           renderOutputAsMarkdown: tool.renderOutputAsMarkdown ?? true,
           status:
             tool.status === 'success'
-              ? ToolCallStatus.Success
-              : ToolCallStatus.Error,
+              ? CoreToolCallStatus.Success
+              : CoreToolCallStatus.Error,
           resultDisplay: tool.resultDisplay,
           confirmationDetails: undefined,
         })),
