@@ -218,6 +218,7 @@ export async function createApp() {
         projectNumber: process.env['CHAT_PROJECT_NUMBER'],
         debug: process.env['CHAT_BRIDGE_DEBUG'] === 'true',
         gcsBucket: process.env['GCS_BUCKET_NAME'],
+        serviceAccountKeyPath: process.env['CHAT_SA_KEY_PATH'],
       });
       expressApp.use(chatRoutes);
       logger.info(

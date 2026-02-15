@@ -11,7 +11,14 @@
  * core/agents/remote-invocation.ts.
  */
 
-import type { Message, Task, Part, MessageSendParams } from '@a2a-js/sdk';
+import type {
+  Message,
+  Task,
+  Part,
+  MessageSendParams,
+  TaskStatusUpdateEvent,
+  TaskArtifactUpdateEvent,
+} from '@a2a-js/sdk';
 import {
   type Client,
   ClientFactory,
@@ -25,6 +32,11 @@ import { logger } from '../utils/logger.js';
 import { A2UI_EXTENSION_URI, A2UI_MIME_TYPE } from '../a2ui/a2ui-extension.js';
 
 export type A2AResponse = Message | Task;
+export type A2AStreamEventData =
+  | Message
+  | Task
+  | TaskStatusUpdateEvent
+  | TaskArtifactUpdateEvent;
 
 /**
  * Extracts contextId and taskId from an A2A response.
@@ -208,6 +220,36 @@ export class A2ABridgeClient {
     };
 
     return this.client.sendMessage(params);
+  }
+
+  /**
+   * Sends a text message and returns a streaming async generator.
+   * Each yielded event is a Message, Task, TaskStatusUpdateEvent,
+   * or TaskArtifactUpdateEvent.
+   */
+  sendMessageStream(
+    text: string,
+    options: { contextId?: string; taskId?: string },
+  ): AsyncGenerator<A2AStreamEventData, void, undefined> {
+    if (!this.client) {
+      throw new Error('A2A client not initialized. Call initialize() first.');
+    }
+
+    const params: MessageSendParams = {
+      message: {
+        kind: 'message',
+        role: 'user',
+        messageId: uuidv4(),
+        parts: [{ kind: 'text', text }],
+        contextId: options.contextId,
+        taskId: options.taskId,
+        metadata: {
+          extensions: [A2UI_EXTENSION_URI],
+        },
+      },
+    };
+
+    return this.client.sendMessageStream(params);
   }
 
   /**

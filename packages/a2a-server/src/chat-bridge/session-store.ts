@@ -37,6 +37,8 @@ export interface SessionInfo {
   pendingToolApproval?: PendingToolApproval;
   /** When true, all tool calls are auto-approved. */
   yoloMode?: boolean;
+  /** When true, an async task is currently processing. */
+  asyncProcessing?: boolean;
 }
 
 /** Serializable subset of SessionInfo for GCS persistence. */

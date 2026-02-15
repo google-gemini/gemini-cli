@@ -21,8 +21,10 @@ import type {
   ChatCardSection,
   ChatWidget,
 } from './types.js';
+import type { Part } from '@a2a-js/sdk';
 import {
   type A2AResponse,
+  type A2AStreamEventData,
   extractAllParts,
   extractTextFromParts,
   extractA2UIParts,
@@ -409,5 +411,97 @@ function renderToolApprovalCard(approval: ToolApprovalInfo): ChatCardV2 {
       },
       sections,
     },
+  };
+}
+
+/**
+ * Extracts text and tool approval info from a single streaming event.
+ * Works with TaskStatusUpdateEvent, Task, and Message events.
+ */
+export function extractFromStreamEvent(event: A2AStreamEventData): {
+  text: string;
+  toolApprovals: ToolApprovalInfo[];
+  state?: string;
+  taskId?: string;
+  contextId?: string;
+} {
+  const toolApprovals: ToolApprovalInfo[] = [];
+  const agentResponses: AgentResponseInfo[] = [];
+  const thoughts: Array<{ subject: string; description: string }> = [];
+  let state: string | undefined;
+  let taskId: string | undefined;
+  let contextId: string | undefined;
+
+  if (event.kind === 'status-update') {
+    state = event.status?.state;
+    taskId = event.taskId;
+    contextId = event.contextId;
+
+    // Extract parts from the status message
+    const parts: Part[] = event.status?.message?.parts ?? [];
+    const a2uiGroups = extractA2UIParts(parts);
+    for (const messages of a2uiGroups) {
+      parseA2UIMessages(messages, toolApprovals, agentResponses, thoughts);
+    }
+
+    // Also extract plain text
+    const plainText = extractTextFromParts(parts);
+    if (plainText) {
+      agentResponses.push({ text: plainText, status: '' });
+    }
+  } else if (event.kind === 'task') {
+    state = event.status?.state;
+    taskId = event.id;
+    contextId = event.contextId;
+
+    const parts = extractAllParts(event);
+    const a2uiGroups = extractA2UIParts(parts);
+    for (const messages of a2uiGroups) {
+      parseA2UIMessages(messages, toolApprovals, agentResponses, thoughts);
+    }
+
+    const plainText = extractTextFromParts(parts);
+    if (plainText) {
+      agentResponses.push({ text: plainText, status: '' });
+    }
+  } else if (event.kind === 'message') {
+    contextId = event.contextId;
+    taskId = event.taskId;
+
+    const parts: Part[] = event.parts ?? [];
+    const a2uiGroups = extractA2UIParts(parts);
+    for (const messages of a2uiGroups) {
+      parseA2UIMessages(messages, toolApprovals, agentResponses, thoughts);
+    }
+
+    const plainText = extractTextFromParts(parts);
+    if (plainText) {
+      agentResponses.push({ text: plainText, status: '' });
+    }
+  }
+
+  // Build text from the last non-empty agent response
+  let text = '';
+  for (let i = agentResponses.length - 1; i >= 0; i--) {
+    if (agentResponses[i].text) {
+      text = agentResponses[i].text;
+      break;
+    }
+  }
+
+  // Add thought summaries
+  if (thoughts.length > 0) {
+    const thoughtText = thoughts
+      .map((t) => `_${t.subject}_: ${t.description}`)
+      .join('\n');
+    text = text ? `${thoughtText}\n\n${text}` : thoughtText;
+  }
+
+  return {
+    text,
+    toolApprovals: deduplicateToolApprovals(toolApprovals),
+    state,
+    taskId,
+    contextId,
   };
 }

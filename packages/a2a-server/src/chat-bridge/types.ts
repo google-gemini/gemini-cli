@@ -138,4 +138,6 @@ export interface ChatBridgeConfig {
   debug?: boolean;
   /** GCS bucket name for session persistence (optional) */
   gcsBucket?: string;
+  /** Path to service account key for Chat API auth (optional, uses ADC if not set) */
+  serviceAccountKeyPath?: string;
 }

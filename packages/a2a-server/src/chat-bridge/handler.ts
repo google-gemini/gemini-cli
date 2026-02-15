@@ -6,36 +6,55 @@
 
 /**
  * Google Chat webhook handler.
- * Processes incoming Google Chat events, forwards them to the A2A server,
- * and converts responses back to Google Chat format.
+ * Responds immediately with "Processing..." and streams results
+ * from the A2A server, pushing updates to Chat via the REST API.
  */
 
 import type { ChatEvent, ChatResponse, ChatBridgeConfig } from './types.js';
+import type { SessionInfo } from './session-store.js';
 import { SessionStore } from './session-store.js';
 import {
   A2ABridgeClient,
   extractIdsFromResponse,
 } from './a2a-bridge-client.js';
-import { renderResponse, extractToolApprovals } from './response-renderer.js';
+import { ChatApiClient } from './chat-api-client.js';
+import { renderResponse, extractFromStreamEvent } from './response-renderer.js';
 import { logger } from '../utils/logger.js';
+
+const TERMINAL_STATES = new Set([
+  'completed',
+  'failed',
+  'canceled',
+  'rejected',
+]);
 
 export class ChatBridgeHandler {
   private sessionStore: SessionStore;
   private a2aClient: A2ABridgeClient;
+  private chatApiClient: ChatApiClient;
   private initialized = false;
 
-  constructor(private config: ChatBridgeConfig) {
+  constructor(
+    private config: ChatBridgeConfig,
+    chatApiClient?: ChatApiClient,
+  ) {
     this.sessionStore = new SessionStore(config.gcsBucket);
     this.a2aClient = new A2ABridgeClient(config.a2aServerUrl);
+    this.chatApiClient =
+      chatApiClient ??
+      new ChatApiClient({
+        serviceAccountKeyPath: config.serviceAccountKeyPath,
+      });
   }
 
   /**
-   * Initializes the A2A client connection and restores persisted sessions.
-   * Must be called before handling events.
+   * Initializes the A2A client connection, Chat API client,
+   * and restores persisted sessions. Must be called before handling events.
    */
   async initialize(): Promise<void> {
     if (this.initialized) return;
     await this.a2aClient.initialize();
+    await this.chatApiClient.initialize();
     await this.sessionStore.restore();
     this.initialized = true;
     logger.info(
@@ -72,6 +91,8 @@ export class ChatBridgeHandler {
 
   /**
    * Handles a MESSAGE event: user sent a text message in Chat.
+   * Returns an immediate "Processing..." response and processes
+   * the A2A request asynchronously, pushing results via Chat API.
    */
   private async handleMessage(event: ChatEvent): Promise<ChatResponse> {
     const message = event.message;
@@ -87,7 +108,7 @@ export class ChatBridgeHandler {
     const threadName = message.thread.name;
     const spaceName = event.space.name;
 
-    // Handle slash commands
+    // Handle slash commands synchronously (fast, no A2A call)
     const trimmed = text.trim().toLowerCase();
     if (
       trimmed === '/reset' ||
@@ -120,104 +141,231 @@ export class ChatBridgeHandler {
       `[ChatBridge] MESSAGE from ${event.user.displayName}: "${text.substring(0, 100)}"`,
     );
 
-    // Handle text-based tool approval responses
-    const lowerText = trimmed;
-    if (
-      session.pendingToolApproval &&
-      (lowerText === 'approve' ||
-        lowerText === 'yes' ||
-        lowerText === 'y' ||
-        lowerText === 'reject' ||
-        lowerText === 'no' ||
-        lowerText === 'n' ||
-        lowerText === 'always allow')
-    ) {
-      const approval = session.pendingToolApproval;
-      const isReject =
-        lowerText === 'reject' || lowerText === 'no' || lowerText === 'n';
-      const isAlwaysAllow = lowerText === 'always allow';
-      const outcome = isReject
-        ? 'cancel'
-        : isAlwaysAllow
-          ? 'proceed_always_tool'
-          : 'proceed_once';
-
-      logger.info(
-        `[ChatBridge] Text-based tool ${outcome}: callId=${approval.callId}, taskId=${approval.taskId}`,
-      );
-
-      session.pendingToolApproval = undefined;
-
-      try {
-        const response = await this.a2aClient.sendToolConfirmation(
-          approval.callId,
-          outcome,
-          approval.taskId,
-          { contextId: session.contextId },
-        );
-
-        const { contextId: newCtxId, taskId: newTaskId } =
-          extractIdsFromResponse(response);
-        if (newCtxId) session.contextId = newCtxId;
-        this.sessionStore.updateTaskId(threadName, newTaskId);
-
-        const threadKey = message.thread.threadKey || threadName;
-        return renderResponse(response, threadKey, threadName);
-      } catch (error) {
-        const errorMsg =
-          error instanceof Error ? error.message : 'Unknown error';
-        logger.error(
-          `[ChatBridge] Error sending tool confirmation: ${errorMsg}`,
-          error,
-        );
-        return { text: `Error processing tool confirmation: ${errorMsg}` };
-      }
+    // Handle text-based tool approval responses synchronously
+    // (sendToolConfirmation is fast — no need for async)
+    if (session.pendingToolApproval && this.isToolApprovalText(trimmed)) {
+      return this.handleToolApprovalText(event, session, trimmed);
     }
 
+    // Guard against overlapping async requests
+    if (session.asyncProcessing) {
+      return {
+        text: 'Still processing your previous request. Please wait...',
+        thread: { name: threadName },
+      };
+    }
+
+    // Fire-and-forget async processing
+    this.processMessageAsync(event, session, text).catch((err) => {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      logger.error(`[ChatBridge] Async processing failed: ${msg}`, err);
+    });
+
+    // Return immediate acknowledgment
+    return {
+      text: '_Processing your request..._',
+      thread: {
+        threadKey: message.thread.threadKey || threadName,
+        name: threadName,
+      },
+    };
+  }
+
+  /**
+   * Checks if text is a tool approval command.
+   */
+  private isToolApprovalText(text: string): boolean {
+    return (
+      text === 'approve' ||
+      text === 'yes' ||
+      text === 'y' ||
+      text === 'reject' ||
+      text === 'no' ||
+      text === 'n' ||
+      text === 'always allow'
+    );
+  }
+
+  /**
+   * Handles text-based tool approval responses synchronously.
+   */
+  private async handleToolApprovalText(
+    event: ChatEvent,
+    session: SessionInfo,
+    trimmed: string,
+  ): Promise<ChatResponse> {
+    const message = event.message!;
+    const threadName = message.thread.name;
+    const approval = session.pendingToolApproval!;
+
+    const isReject =
+      trimmed === 'reject' || trimmed === 'no' || trimmed === 'n';
+    const isAlwaysAllow = trimmed === 'always allow';
+    const outcome = isReject
+      ? 'cancel'
+      : isAlwaysAllow
+        ? 'proceed_always_tool'
+        : 'proceed_once';
+
+    logger.info(
+      `[ChatBridge] Text-based tool ${outcome}: callId=${approval.callId}, taskId=${approval.taskId}`,
+    );
+
+    session.pendingToolApproval = undefined;
+
     try {
-      const response = await this.a2aClient.sendMessage(text, {
-        contextId: session.contextId,
-        taskId: session.taskId,
-      });
+      const response = await this.a2aClient.sendToolConfirmation(
+        approval.callId,
+        outcome,
+        approval.taskId,
+        { contextId: session.contextId },
+      );
 
-      // Update session with new IDs from response
-      const { contextId, taskId } = extractIdsFromResponse(response);
-      if (contextId) {
-        session.contextId = contextId;
-      }
-      this.sessionStore.updateTaskId(threadName, taskId);
+      const { contextId: newCtxId, taskId: newTaskId } =
+        extractIdsFromResponse(response);
+      if (newCtxId) session.contextId = newCtxId;
+      this.sessionStore.updateTaskId(threadName, newTaskId);
 
-      // Check for pending tool approvals and store for text-based confirmation
-      const approvals = extractToolApprovals(response);
-      if (approvals.length > 0) {
-        const firstApproval = approvals[0];
-        session.pendingToolApproval = {
-          callId: firstApproval.callId,
-          taskId: firstApproval.taskId,
-          toolName: firstApproval.displayName || firstApproval.name,
-        };
-        logger.info(
-          `[ChatBridge] Pending tool approval: ${firstApproval.displayName || firstApproval.name} callId=${firstApproval.callId}`,
-        );
-      } else {
-        session.pendingToolApproval = undefined;
-      }
-
-      // Convert A2A response to Chat format
       const threadKey = message.thread.threadKey || threadName;
       return renderResponse(response, threadKey, threadName);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`[ChatBridge] Error handling message: ${errorMsg}`, error);
-      return {
-        text: `Sorry, I encountered an error processing your request: ${errorMsg}`,
-      };
+      logger.error(
+        `[ChatBridge] Error sending tool confirmation: ${errorMsg}`,
+        error,
+      );
+      return { text: `Error processing tool confirmation: ${errorMsg}` };
+    }
+  }
+
+  /**
+   * Processes a message asynchronously using A2A streaming.
+   * Pushes results to Google Chat via the REST API.
+   */
+  private async processMessageAsync(
+    event: ChatEvent,
+    session: SessionInfo,
+    text: string,
+  ): Promise<void> {
+    const message = event.message!;
+    const threadName = message.thread.name;
+    const spaceName = event.space.name;
+
+    session.asyncProcessing = true;
+
+    try {
+      const stream = this.a2aClient.sendMessageStream(text, {
+        contextId: session.contextId,
+        taskId: session.taskId,
+      });
+
+      let lastText = '';
+      let lastTaskId: string | undefined;
+      let lastContextId: string | undefined;
+      let lastState: string | undefined;
+      let sentFinalResponse = false;
+
+      for await (const streamEvent of stream) {
+        const extracted = extractFromStreamEvent(streamEvent);
+
+        if (extracted.taskId) lastTaskId = extracted.taskId;
+        if (extracted.contextId) lastContextId = extracted.contextId;
+        if (extracted.state) lastState = extracted.state;
+
+        // Check for tool approvals needing user input
+        const pendingApprovals = extracted.toolApprovals.filter(
+          (a) => a.status === 'awaiting_approval',
+        );
+        if (pendingApprovals.length > 0) {
+          const firstApproval = pendingApprovals[0];
+          session.pendingToolApproval = {
+            callId: firstApproval.callId,
+            taskId: firstApproval.taskId,
+            toolName: firstApproval.displayName || firstApproval.name,
+          };
+
+          // Push tool approval card to Chat
+          const approvalResponse = renderResponse(
+            {
+              kind: 'task',
+              id: firstApproval.taskId,
+              contextId: lastContextId ?? session.contextId,
+              status: {
+                state: 'input-required',
+                timestamp: new Date().toISOString(),
+                message:
+                  streamEvent.kind === 'status-update'
+                    ? streamEvent.status?.message
+                    : undefined,
+              },
+              history: [],
+              artifacts: [],
+            },
+            message.thread.threadKey || threadName,
+            threadName,
+          );
+
+          await this.chatApiClient.sendMessage(spaceName, threadName, {
+            text: approvalResponse.text,
+            cardsV2: approvalResponse.cardsV2,
+          });
+          sentFinalResponse = true;
+
+          logger.info(
+            `[ChatBridge] Pushed tool approval card: ${firstApproval.displayName || firstApproval.name}`,
+          );
+        }
+
+        // Track latest text content
+        if (extracted.text) {
+          lastText = extracted.text;
+        }
+
+        // On terminal or input-required state, stop streaming
+        if (
+          extracted.state &&
+          (TERMINAL_STATES.has(extracted.state) ||
+            extracted.state === 'input-required')
+        ) {
+          break;
+        }
+      }
+
+      // Update session IDs
+      if (lastContextId) session.contextId = lastContextId;
+      // Clear taskId on terminal states so next message starts a fresh task
+      const isTerminal = lastState ? TERMINAL_STATES.has(lastState) : false;
+      this.sessionStore.updateTaskId(
+        threadName,
+        isTerminal ? undefined : lastTaskId,
+      );
+
+      // Push final text response if we haven't already pushed a tool approval
+      if (lastText && !sentFinalResponse) {
+        await this.chatApiClient.sendMessage(spaceName, threadName, {
+          text: lastText,
+        });
+        logger.info(
+          `[ChatBridge] Pushed final response (${lastText.length} chars)`,
+        );
+      } else if (!lastText && !sentFinalResponse) {
+        await this.chatApiClient.sendMessage(spaceName, threadName, {
+          text: '_Agent completed without generating a response._',
+        });
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      logger.error(`[ChatBridge] Async processing error: ${errorMsg}`, error);
+      await this.chatApiClient.sendMessage(spaceName, threadName, {
+        text: `Sorry, I encountered an error: ${errorMsg}`,
+      });
+    } finally {
+      session.asyncProcessing = false;
     }
   }
 
   /**
    * Handles a CARD_CLICKED event: user clicked a button on a card.
-   * Used for tool approval/rejection flows.
    */
   private async handleCardClicked(event: ChatEvent): Promise<ChatResponse> {
     const action = event.action;
@@ -323,7 +471,6 @@ export class ChatBridgeHandler {
    */
   private handleRemovedFromSpace(event: ChatEvent): ChatResponse {
     logger.info(`[ChatBridge] Bot removed from space: ${event.space.name}`);
-    // Clean up any sessions for this space
     return {};
   }
 }
