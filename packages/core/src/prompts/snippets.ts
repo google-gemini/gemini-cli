@@ -203,6 +203,8 @@ Sub-agents are specialized expert agents. Each sub-agent is available as a tool 
 ${subAgentsXml}
 </available_subagents>
 
+**Parallelism:** When a user request implies changes across multiple independent directories (e.g., "fix linter errors in multiple projects"), you MUST call the appropriate sub-agent tool multiple times in parallel (once for each directory) to ensure isolation and efficiency.
+
 Remember that the closest relevant sub-agent should still be used even if its expertise is broader than the given task.
 
 For example:
@@ -534,13 +536,11 @@ function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
   if (options.enableWriteTodosTool) {
     return `2. **Strategy:** Formulate a grounded plan based on your research.${
       options.interactive ? ' Share a concise summary of your strategy.' : ''
-    } For complex tasks, break them down into smaller, manageable subtasks and use the ${formatToolName(
-      WRITE_TODOS_TOOL_NAME,
-    )} tool to track your progress. When these subtasks are independent, leverage the 'generalist' agent to execute them in parallel, increasing efficiency.`;
+    } For complex tasks, break them down into smaller, manageable subtasks and use the ${formatToolName(WRITE_TODOS_TOOL_NAME)} tool to track your progress.`;
   }
   return `2. **Strategy:** Formulate a grounded plan based on your research.${
     options.interactive ? ' Share a concise summary of your strategy.' : ''
-  } For tasks that can be broken down into independent sub-tasks, leverage the 'generalist' agent to parallelize their execution.`;
+  }`;
 }
 
 function workflowVerifyStandardsSuffix(interactive: boolean): string {
