@@ -150,6 +150,66 @@ describe('sandbox', () => {
       );
     });
 
+    it('should pass proxy environment variables to sandbox-exec', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.spyOn(process, 'on').mockReturnValue(process);
+      vi.spyOn(process, 'off').mockReturnValue(process);
+
+      const config: SandboxConfig = {
+        command: 'sandbox-exec',
+        image: 'some-image',
+      };
+      process.env['GEMINI_SANDBOX_PROXY_COMMAND'] = 'proxy-cmd';
+
+      interface MockProcess extends EventEmitter {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+        pid: number;
+        unref?: () => void;
+      }
+      const mockProxyProcess = new EventEmitter() as MockProcess;
+      mockProxyProcess.stdout = new EventEmitter();
+      mockProxyProcess.stderr = new EventEmitter();
+      mockProxyProcess.pid = 111;
+      mockProxyProcess.unref = vi.fn();
+
+      const mockSandboxProcess = new EventEmitter() as MockProcess;
+      mockSandboxProcess.stdout = new EventEmitter();
+      mockSandboxProcess.stderr = new EventEmitter();
+      mockSandboxProcess.pid = 222;
+
+      // Mock spawn to return distinct processes
+      vi.mocked(spawn).mockImplementation((command) => {
+        if (command === 'proxy-cmd') {
+          return mockProxyProcess as unknown as ReturnType<typeof spawn>;
+        }
+        if (command === 'sandbox-exec') {
+          return mockSandboxProcess as unknown as ReturnType<typeof spawn>;
+        }
+        return new EventEmitter() as unknown as ReturnType<typeof spawn>;
+      });
+
+      const promise = start_sandbox(config, [], undefined, ['arg1']);
+
+      setTimeout(() => {
+        mockSandboxProcess.emit('close', 0);
+      }, 10);
+
+      await expect(promise).resolves.toBe(0);
+      expect(spawn).toHaveBeenCalledWith(
+        'sandbox-exec',
+        expect.anything(),
+        expect.objectContaining({
+          env: expect.objectContaining({
+            HTTPS_PROXY: 'http://localhost:8877',
+            HTTP_PROXY: 'http://localhost:8877',
+            http_proxy: 'http://localhost:8877',
+            https_proxy: 'http://localhost:8877',
+          }),
+        }),
+      );
+    });
+
     it('should throw FatalSandboxError if seatbelt profile is missing', async () => {
       vi.mocked(os.platform).mockReturnValue('darwin');
       vi.mocked(fs.existsSync).mockReturnValue(false);
