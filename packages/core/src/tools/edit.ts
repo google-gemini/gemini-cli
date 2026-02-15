@@ -61,6 +61,8 @@ interface ReplacementResult {
   occurrences: number;
   finalOldString: string;
   finalNewString: string;
+  strategy?: 'exact' | 'flexible' | 'regex' | 'fuzzy';
+  matchRanges?: Array<{ start: number; end: number }>;
 }
 
 export function applyReplacement(
@@ -402,6 +404,8 @@ interface CalculatedEdit {
   error?: { display: string; raw: string; type: ToolErrorType };
   isNewFile: boolean;
   originalLineEnding: '\r\n' | '\n';
+  strategy?: 'exact' | 'flexible' | 'regex' | 'fuzzy';
+  matchRanges?: Array<{ start: number; end: number }>;
 }
 
 class EditToolInvocation
@@ -527,6 +531,8 @@ class EditToolInvocation
       isNewFile: false,
       error: undefined,
       originalLineEnding,
+      strategy: secondAttemptResult.strategy,
+      matchRanges: secondAttemptResult.matchRanges,
     };
   }
 
@@ -640,6 +646,8 @@ class EditToolInvocation
         isNewFile: false,
         error: undefined,
         originalLineEnding,
+        strategy: replacementResult.strategy,
+        matchRanges: replacementResult.matchRanges,
       };
     }
 
@@ -866,6 +874,10 @@ class EditToolInvocation
           ? `Created new file: ${this.params.file_path} with provided content.`
           : `Successfully modified file: ${this.params.file_path} (${editData.occurrences} replacements).`,
       ];
+      const fuzzyFeedback = getFuzzyMatchFeedback(editData);
+      if (fuzzyFeedback) {
+        llmSuccessMessageParts.push(fuzzyFeedback);
+      }
       if (this.params.modified_by_user) {
         llmSuccessMessageParts.push(
           `User modified the \`new_string\` content to be: ${this.params.new_string}.`,
@@ -1073,6 +1085,20 @@ function stripWhitespace(str: string): string {
   return str.replace(/\s/g, '');
 }
 
+function getFuzzyMatchFeedback(editData: CalculatedEdit): string | null {
+  if (
+    editData.strategy === 'fuzzy' &&
+    editData.matchRanges &&
+    editData.matchRanges.length > 0
+  ) {
+    const ranges = editData.matchRanges
+      .map((r) => (r.start === r.end ? `${r.start}` : `${r.start}-${r.end}`))
+      .join(', ');
+    return `Applied fuzzy match at line${editData.matchRanges.length > 1 ? 's' : ''} ${ranges}.`;
+  }
+  return null;
+}
+
 async function calculateFuzzyReplacement(
   config: Config,
   context: ReplacementContext,
@@ -1158,6 +1184,12 @@ async function calculateFuzzyReplacement(
     const event = new EditStrategyEvent('fuzzy');
     logEditStrategy(config, event);
 
+    // Calculate match ranges before sorting for replacement
+    // Indices in selectedMatches are 0-based line indices
+    const matchRanges = selectedMatches
+      .map((m) => ({ start: m.index + 1, end: m.index + N }))
+      .sort((a, b) => a.start - b.start);
+
     // Sort matches by index descending to apply replacements from bottom to top
     // so that indices remain valid
     selectedMatches.sort((a, b) => b.index - a.index);
@@ -1192,6 +1224,8 @@ async function calculateFuzzyReplacement(
       occurrences: selectedMatches.length,
       finalOldString: normalizedSearch,
       finalNewString: normalizedReplace,
+      strategy: 'fuzzy',
+      matchRanges,
     };
   }
 
