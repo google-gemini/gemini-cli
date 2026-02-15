@@ -27,6 +27,7 @@ export const GEMINI_CLI_GENERATE_CONTENT_CONFIG =
   'gemini_cli.generate_content.config';
 export const GEMINI_CLI_GENERATE_CONTENT_USAGE =
   'gemini_cli.generate_content.usage';
+export const GEMINI_CLI_SESSION_ID = 'gemini_cli.session_id';
 
 // Gemini CLI specific operations
 export enum GeminiCliOperation {
