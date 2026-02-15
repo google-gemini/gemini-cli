@@ -43,7 +43,11 @@ import { EditCorrectionEvent } from '../telemetry/types.js';
 import { logEditCorrectionEvent } from '../telemetry/loggers.js';
 
 import { correctPath } from '../utils/pathCorrector.js';
-import { EDIT_TOOL_NAME, READ_FILE_TOOL_NAME } from './tool-names.js';
+import {
+  EDIT_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  EDIT_DISPLAY_NAME,
+} from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { EDIT_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
@@ -908,7 +912,7 @@ export class EditTool
   ) {
     super(
       EditTool.Name,
-      'Edit',
+      EDIT_DISPLAY_NAME,
       EDIT_DEFINITION.base.description!,
       Kind.Edit,
       EDIT_DEFINITION.base.parametersJsonSchema,
