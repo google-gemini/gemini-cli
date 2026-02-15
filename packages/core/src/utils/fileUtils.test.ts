@@ -1078,13 +1078,13 @@ describe('fileUtils', () => {
       );
     });
 
-    it('should return an error if the file size exceeds 20MB', async () => {
+    it('should return an error if the file size exceeds 100MB', async () => {
       // Create a small test file
       actualNodeFs.writeFileSync(testTextFilePath, 'test content');
 
       // Spy on fs.promises.stat to return a large file size
       const statSpy = vi.spyOn(fs.promises, 'stat').mockResolvedValueOnce({
-        size: 21 * 1024 * 1024,
+        size: 101 * 1024 * 1024,
         isDirectory: () => false,
       } as fs.Stats);
 
@@ -1095,11 +1095,13 @@ describe('fileUtils', () => {
           new StandardFileSystemService(),
         );
 
-        expect(result.error).toContain('File size exceeds the 20MB limit');
+        expect(result.error).toContain('File size exceeds the 100MB limit');
         expect(result.returnDisplay).toContain(
-          'File size exceeds the 20MB limit',
+          'File size exceeds the 100MB limit',
         );
-        expect(result.llmContent).toContain('File size exceeds the 20MB limit');
+        expect(result.llmContent).toContain(
+          'File size exceeds the 100MB limit',
+        );
       } finally {
         statSpy.mockRestore();
       }
