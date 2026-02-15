@@ -29,7 +29,10 @@ import {
 } from '@a2a-js/sdk/client';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
-import { A2UI_EXTENSION_URI, A2UI_MIME_TYPE } from '../a2ui/a2ui-extension.js';
+
+// Inline A2UI constants so the chat bridge has no dependency on ../a2ui/
+const A2UI_EXTENSION_URI = 'https://a2ui.org/a2a-extension/a2ui/v0.10';
+const A2UI_MIME_TYPE = 'application/json+a2ui';
 
 export type A2AResponse = Message | Task;
 export type A2AStreamEventData =

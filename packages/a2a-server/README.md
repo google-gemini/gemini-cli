@@ -14,16 +14,18 @@ Google Chat  ──webhook──>  Chat Bridge  ──A2A──>  A2A Server  �
                                └── Chat REST API (push responses back to Chat)
 ```
 
-The server runs as a single Cloud Run container with two logical components:
+This package contains two independently deployable services:
 
-1. **A2A Server** - Standard A2A protocol endpoint (JSON-RPC + SSE streaming)
-   that wraps the Gemini CLI agent
-2. **Chat Bridge** - Translates between Google Chat webhook events and A2A
-   protocol, pushing streamed results back via the Chat REST API
+1. **A2A Server** (`src/http/server.ts`) - Standard A2A protocol endpoint
+   (JSON-RPC + SSE streaming) that wraps the Gemini CLI agent. Heavy workload —
+   deploy with `concurrency=1`.
+2. **Chat Bridge** (`src/chat-bridge/server.ts`) - Lightweight proxy that
+   translates Google Chat webhooks into A2A protocol calls. Connects to the A2A
+   server over HTTP. Deploy with high concurrency (`concurrency=80`).
 
 The Chat Bridge responds immediately to webhooks with "Processing..." (avoiding
 Google Chat's 30s timeout), then streams results from the A2A agent and pushes
-them to Chat as they arrive.
+them to Chat via the REST API.
 
 ## Prerequisites
 
@@ -39,19 +41,28 @@ them to Chat as they arrive.
 
 ## Environment Variables
 
-| Variable                     | Required | Description                                                                                          |
-| ---------------------------- | -------- | ---------------------------------------------------------------------------------------------------- |
-| `GEMINI_API_KEY`             | Yes      | Gemini API key for the agent                                                                         |
-| `CODER_AGENT_PORT`           | No       | Server port (default: `8080`)                                                                        |
-| `CODER_AGENT_HOST`           | No       | Bind host (default: `localhost`, set `0.0.0.0` for containers)                                       |
-| `CODER_AGENT_WORKSPACE_PATH` | No       | Agent workspace directory (default: `/workspace`)                                                    |
-| `GCS_BUCKET_NAME`            | No       | GCS bucket for task & session persistence                                                            |
-| `GEMINI_YOLO_MODE`           | No       | Set `true` to auto-approve all tool calls                                                            |
-| `CHAT_BRIDGE_A2A_URL`        | No       | A2A server URL for the Chat bridge (e.g. `http://localhost:8080`). Presence enables the Chat bridge. |
-| `CHAT_PROJECT_NUMBER`        | No       | Google Chat project number for JWT verification                                                      |
-| `CHAT_SA_KEY_PATH`           | No       | Path to service account key for Chat API auth (uses ADC if not set)                                  |
-| `CHAT_BRIDGE_DEBUG`          | No       | Set `true` for verbose bridge logging                                                                |
-| `GIT_TERMINAL_PROMPT`        | No       | Set `0` to prevent git credential prompts in headless environments                                   |
+### A2A Server
+
+| Variable                     | Required | Description                                                    |
+| ---------------------------- | -------- | -------------------------------------------------------------- |
+| `GEMINI_API_KEY`             | Yes      | Gemini API key for the agent                                   |
+| `CODER_AGENT_PORT`           | No       | Server port (default: `8080`)                                  |
+| `CODER_AGENT_HOST`           | No       | Bind host (default: `localhost`, set `0.0.0.0` for containers) |
+| `CODER_AGENT_WORKSPACE_PATH` | No       | Agent workspace directory (default: `/workspace`)              |
+| `GCS_BUCKET_NAME`            | No       | GCS bucket for task persistence                                |
+| `GEMINI_YOLO_MODE`           | No       | Set `true` to auto-approve all tool calls                      |
+| `GIT_TERMINAL_PROMPT`        | No       | Set `0` to prevent git credential prompts in headless env      |
+
+### Chat Bridge
+
+| Variable              | Required | Description                                                    |
+| --------------------- | -------- | -------------------------------------------------------------- |
+| `A2A_SERVER_URL`      | Yes      | URL of the A2A agent server (e.g. `http://localhost:8080`)     |
+| `PORT`                | No       | Server port (default: `8080`)                                  |
+| `CHAT_PROJECT_NUMBER` | No       | Google Chat project number for JWT verification                |
+| `CHAT_SA_KEY_PATH`    | No       | Path to service account key for Chat API (uses ADC if not set) |
+| `GCS_BUCKET_NAME`     | No       | GCS bucket for session persistence                             |
+| `CHAT_BRIDGE_DEBUG`   | No       | Set `true` for verbose bridge logging                          |
 
 ## Local Development
 
@@ -64,14 +75,22 @@ npm install
 npm run build
 ```
 
-### Run
+### Run the A2A Server
 
 ```bash
 export GEMINI_API_KEY="your-api-key"
 export CODER_AGENT_PORT=8080
-export CHAT_BRIDGE_A2A_URL=http://localhost:8080
 
 node packages/a2a-server/dist/src/http/server.js
+```
+
+### Run the Chat Bridge (separate terminal)
+
+```bash
+export A2A_SERVER_URL=http://localhost:8080
+export PORT=8090
+
+node packages/a2a-server/dist/src/chat-bridge/server.js
 ```
 
 ### Test the A2A endpoint
@@ -143,21 +162,27 @@ gcloud artifacts repositories create gemini-a2a \
 gsutil mb -l $REGION gs://gemini-a2a-sessions-$PROJECT_ID
 ```
 
-### 3. Build with Cloud Build
+### 3. Build both images
 
 ```bash
+# Build A2A agent server
 gcloud builds submit \
   --config=packages/a2a-server/cloudbuild.yaml \
   --project=$PROJECT_ID
+
+# Build Chat bridge
+gcloud builds submit \
+  --config=packages/a2a-server/cloudbuild-chat-bridge.yaml \
+  --project=$PROJECT_ID
 ```
 
-### 4. Deploy to Cloud Run
+### 4. Deploy A2A agent server
 
 ```bash
-export IMAGE=us-central1-docker.pkg.dev/$PROJECT_ID/gemini-a2a/a2a-server:latest
+export AGENT_IMAGE=us-central1-docker.pkg.dev/$PROJECT_ID/gemini-a2a/a2a-server:latest
 
 gcloud run deploy gemini-a2a-server \
-  --image=$IMAGE \
+  --image=$AGENT_IMAGE \
   --region=$REGION \
   --project=$PROJECT_ID \
   --platform=managed \
@@ -167,14 +192,38 @@ gcloud run deploy gemini-a2a-server \
   --timeout=300 \
   --concurrency=1 \
   --max-instances=1 \
-  --set-env-vars="GEMINI_YOLO_MODE=true,GCS_BUCKET_NAME=gemini-a2a-sessions-$PROJECT_ID,CHAT_BRIDGE_A2A_URL=http://localhost:8080" \
+  --set-env-vars="GEMINI_YOLO_MODE=true,GCS_BUCKET_NAME=gemini-a2a-sessions-$PROJECT_ID" \
   --set-secrets="GEMINI_API_KEY=gemini-api-key:latest"
+```
+
+### 5. Deploy Chat bridge
+
+Get the A2A server URL first:
+
+```bash
+export A2A_URL=$(gcloud run services describe gemini-a2a-server \
+  --region=$REGION --project=$PROJECT_ID --format='value(status.url)')
+
+export BRIDGE_IMAGE=us-central1-docker.pkg.dev/$PROJECT_ID/gemini-a2a/chat-bridge:latest
+
+gcloud run deploy gemini-chat-bridge \
+  --image=$BRIDGE_IMAGE \
+  --region=$REGION \
+  --project=$PROJECT_ID \
+  --platform=managed \
+  --allow-unauthenticated \
+  --memory=512Mi \
+  --cpu=1 \
+  --timeout=60 \
+  --concurrency=80 \
+  --max-instances=5 \
+  --set-env-vars="A2A_SERVER_URL=$A2A_URL,GCS_BUCKET_NAME=gemini-a2a-sessions-$PROJECT_ID"
 ```
 
 > **Important**: After initial deployment, always use `--update-env-vars`
 > instead of `--set-env-vars` to avoid wiping existing environment variables.
 
-### 5. Update an existing deployment
+### 6. Update an existing deployment
 
 ```bash
 # Update env vars without replacing existing ones
@@ -218,9 +267,9 @@ the Chat app's service account.
    [Google Cloud Console > APIs & Services > Google Chat API > Configuration](https://console.cloud.google.com/apis/api/chat.googleapis.com/hangouts-chat)
 2. Set **App name** and **Description**
 3. Under **Connection settings**, select **HTTP endpoint URL**
-4. Set the URL to your Cloud Run service URL + `/chat/webhook`:
+4. Set the URL to your **Chat bridge** Cloud Run service URL + `/chat/webhook`:
    ```
-   https://gemini-a2a-server-HASH-uc.a.run.app/chat/webhook
+   https://gemini-chat-bridge-HASH-uc.a.run.app/chat/webhook
    ```
 5. Under **Authentication Audience**, select **HTTP endpoint URL**
 6. Under **Visibility**, choose who can use the app
@@ -235,7 +284,7 @@ If your Cloud Run service requires authentication (recommended):
 # Get the Chat service account
 # It's usually chat@system.gserviceaccount.com
 
-gcloud run services add-iam-policy-binding gemini-a2a-server \
+gcloud run services add-iam-policy-binding gemini-chat-bridge \
   --region=$REGION \
   --project=$PROJECT_ID \
   --member="serviceAccount:chat@system.gserviceaccount.com" \
@@ -259,10 +308,15 @@ When messaging the bot in Google Chat:
 
 ### "Gemini CLI Agent is not responding" in Google Chat
 
-This usually means the agent hit Google Chat's 30-second webhook timeout before
-the bridge could return "Processing...". Check Cloud Run logs:
+This usually means the bridge couldn't return "Processing..." within Google
+Chat's 30-second timeout. Check Cloud Run logs for both services:
 
 ```bash
+# Chat bridge logs
+gcloud run services logs read gemini-chat-bridge \
+  --region=$REGION --project=$PROJECT_ID --limit=50
+
+# A2A agent logs
 gcloud run services logs read gemini-a2a-server \
   --region=$REGION --project=$PROJECT_ID --limit=50
 ```

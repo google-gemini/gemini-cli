@@ -1,0 +1,23 @@
+# Standalone Google Chat bridge server.
+# Connects to the A2A agent server over HTTP — no agent dependencies needed.
+FROM docker.io/library/node:20-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  ca-certificates \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy pre-installed node_modules and pre-built dist
+COPY package.json package-lock.json ./
+COPY node_modules/ node_modules/
+COPY packages/a2a-server/ packages/a2a-server/
+
+USER node
+
+ENV PORT=8080
+ENV NODE_ENV=production
+
+EXPOSE 8080
+
+CMD ["node", "packages/a2a-server/dist/src/chat-bridge/server.js"]

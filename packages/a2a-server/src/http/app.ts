@@ -29,7 +29,6 @@ import { debugLogger, SimpleExtensionLoader } from '@google/gemini-cli-core';
 import type { Command, CommandArgument } from '../commands/types.js';
 import { GitService } from '@google/gemini-cli-core';
 import { getA2UIAgentExtension } from '../a2ui/a2ui-extension.js';
-import { createChatBridgeRoutes } from '../chat-bridge/routes.js';
 
 type CommandResponse = {
   name: string;
@@ -203,29 +202,8 @@ export async function createApp() {
       requestStorage.run({ req }, next);
     });
 
-    // Mount Google Chat bridge routes BEFORE A2A SDK routes.
-    // The A2A SDK's setupRoutes registers a catch-all jsonRpcHandler middleware
-    // at baseUrl="" that intercepts ALL POST requests and returns 400 for
-    // non-JSON-RPC payloads. Chat bridge must be registered first.
-    const chatBridgeUrl =
-      process.env['CHAT_BRIDGE_A2A_URL'] || process.env['CODER_AGENT_PORT']
-        ? `http://localhost:${process.env['CODER_AGENT_PORT'] || '8080'}`
-        : undefined;
-    if (chatBridgeUrl) {
-      expressApp.use(express.json());
-      const chatRoutes = createChatBridgeRoutes({
-        a2aServerUrl: chatBridgeUrl,
-        projectNumber: process.env['CHAT_PROJECT_NUMBER'],
-        debug: process.env['CHAT_BRIDGE_DEBUG'] === 'true',
-        gcsBucket: process.env['GCS_BUCKET_NAME'],
-        serviceAccountKeyPath: process.env['CHAT_SA_KEY_PATH'],
-      });
-      expressApp.use(chatRoutes);
-      logger.info(
-        `[CoreAgent] Google Chat bridge enabled at /chat/webhook (A2A: ${chatBridgeUrl})`,
-      );
-    }
-
+    // Google Chat bridge runs as a separate service (src/chat-bridge/server.ts).
+    // It connects to this A2A server over HTTP.
     const appBuilder = new A2AExpressApp(requestHandler);
     expressApp = appBuilder.setupRoutes(expressApp, '');
     expressApp.use(express.json());
