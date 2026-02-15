@@ -623,6 +623,27 @@ describe('EditTool', () => {
       expect(result.newContent).toBe('cba');
       expect(result.occurrences).toBe(1);
     });
+
+    it('should handle multiple multi-line exact replacements consistently', async () => {
+      const currentContent = '  START\n  END\n  START\n  END';
+      const old_string = 'START\n  END';
+      const new_string = 'NEW_START\nNEW_END';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string,
+          new_string,
+          expected_replacements: 2,
+        },
+        currentContent,
+        abortSignal,
+      });
+
+      const expected = '  NEW_START\n  NEW_END\n  NEW_START\n  NEW_END';
+      expect(result.newContent).toBe(expected);
+      expect(result.occurrences).toBe(2);
+    });
   });
 
   describe('validateToolParams', () => {

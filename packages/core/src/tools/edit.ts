@@ -176,7 +176,10 @@ async function calculateExactReplacement(
     const beforeMatch = currentContent.substring(0, matchIdx);
     const linePrefix = beforeMatch.substring(beforeMatch.lastIndexOf('\n') + 1);
 
-    if (/^[ \t]*$/.test(linePrefix)) {
+    if (
+      /^[ \t]*$/.test(linePrefix) &&
+      matchIdx - linePrefix.length >= lastOffset
+    ) {
       const afterMatch = currentContent.substring(
         matchIdx + normalizedSearch.length,
       );
