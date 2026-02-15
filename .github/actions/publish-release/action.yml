@@ -181,6 +181,13 @@ runs:
         --workspace="${{ inputs.a2a-package-name }}" \
         --save-exact
 
+    - name: '📦 Prepare bundled CLI for npm release'
+      if: "inputs.npm-registry-url != 'https://npm.pkg.github.com/'"
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      run: |
+        node ${{ github.workspace }}/scripts/prepare-npm-release.js
+
     - name: 'Get CLI Token'
       uses: './.github/actions/npm-auth-token'
       id: 'cli-token'
