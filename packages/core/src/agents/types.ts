@@ -43,7 +43,7 @@ export const DEFAULT_QUERY_STRING = 'Get Started!';
 /**
  * The default maximum number of conversational turns for an agent.
  */
-export const DEFAULT_MAX_TURNS = 15;
+export const DEFAULT_MAX_TURNS = 50;
 
 /**
  * The default maximum execution time for an agent in minutes.
@@ -200,7 +200,7 @@ export interface RunConfig {
   maxTimeMinutes?: number;
   /**
    * The maximum number of conversational turns.
-   * If not specified, defaults to DEFAULT_MAX_TURNS (15).
+   * If not specified, defaults to DEFAULT_MAX_TURNS (50).
    */
   maxTurns?: number;
 }

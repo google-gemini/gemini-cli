@@ -10,6 +10,8 @@ import {
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
 } from '../tools/tool-names.js';
 import {
   DEFAULT_THINKING_MODE,
@@ -66,8 +68,8 @@ export const CodebaseInvestigatorAgent = (
     name: 'codebase_investigator',
     kind: 'local',
     displayName: 'Codebase Investigator Agent',
-    description: `The specialized tool for codebase analysis, architectural mapping, and understanding system-wide dependencies.
-    Invoke this tool for tasks like vague requests, bug root-cause analysis, system refactoring, comprehensive feature implementation or to answer questions about the codebase that require investigation.
+    description: `The specialized tool for codebase analysis, architectural mapping, understanding system-wide dependencies, and VERIFYING fixes.
+    Invoke this tool for tasks like vague requests, bug root-cause analysis, system refactoring, comprehensive feature implementation or to answer questions about the codebase that require investigation or final verification.
     It returns a structured report with key file paths, symbols, and actionable architectural insights.`,
     inputConfig: {
       inputSchema: {
@@ -114,12 +116,14 @@ export const CodebaseInvestigatorAgent = (
     },
 
     toolConfig: {
-      // Grant access only to read-only tools.
+      // Grant access to investigation tools.
       tools: [
         LS_TOOL_NAME,
         READ_FILE_TOOL_NAME,
         GLOB_TOOL_NAME,
         GREP_TOOL_NAME,
+        SHELL_TOOL_NAME,
+        WEB_FETCH_TOOL_NAME,
       ],
     },
 
@@ -144,7 +148,8 @@ You operate in a non-interactive loop and must reason based on the information p
 1.  **DEEP ANALYSIS, NOT JUST FILE FINDING:** Your goal is to understand the *why* behind the code. Don't just list files; explain their purpose and the role of their key components. Your final report should empower another agent to make a correct and complete fix.
 2.  **SYSTEMATIC & CURIOUS EXPLORATION:** Start with high-value clues (like tracebacks or ticket numbers) and broaden your search as needed. Think like a senior engineer doing a code review. An initial file contains clues (imports, function calls, puzzling logic). **If you find something you don't understand, you MUST prioritize investigating it until it is clear.** Treat confusion as a signal to dig deeper.
 3.  **HOLISTIC & PRECISE:** Your goal is to find the complete and minimal set of locations that need to be understood or changed. Do not stop until you are confident you have considered the side effects of a potential fix (e.g., type errors, breaking changes to callers, opportunities for code reuse).
-4.  **Web Search:** You are allowed to use the \`web_fetch\` tool to research libraries, language features, or concepts you don't understand (e.g., "what does gettext.translation do with localedir=None?").
+4.  **Tool Usage:** You are allowed to use the \`run_shell_command\` tool to run linters, tests, or other diagnostic commands to gather information or verify that issues are resolved. Do NOT use it to perform implementation changes.
+5.  **Web Search:** You are allowed to use the \`web_fetch\` tool to research libraries, language features, or concepts you don't understand (e.g., "what does gettext.translation do with localedir=None?").
 </RULES>
 ---
 ## Scratchpad Management
