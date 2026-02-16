@@ -101,6 +101,52 @@ const CorgiIndicator: React.FC = () => (
   </Text>
 );
 
+export interface FooterRowItem {
+  key: string;
+  header: string;
+  element: React.ReactNode;
+}
+
+const COLUMN_GAP = 3;
+
+export const FooterRow: React.FC<{
+  items: FooterRowItem[];
+  showLabels: boolean;
+}> = ({ items, showLabels }) => {
+  const elements: React.ReactNode[] = [];
+
+  items.forEach((item, idx) => {
+    if (idx > 0 && !showLabels) {
+      elements.push(
+        <Box key={`sep-${item.key}`} height={1}>
+          <Text color={theme.ui.comment}> · </Text>
+        </Box>,
+      );
+    }
+
+    elements.push(
+      <Box key={item.key} flexDirection="column">
+        {showLabels && (
+          <Box height={1}>
+            <Text color={theme.ui.comment}>{item.header}</Text>
+          </Box>
+        )}
+        <Box height={1}>{item.element}</Box>
+      </Box>,
+    );
+  });
+
+  return (
+    <Box
+      flexDirection="row"
+      flexWrap="nowrap"
+      columnGap={showLabels ? COLUMN_GAP : 0}
+    >
+      {elements}
+    </Box>
+  );
+};
+
 function isFooterItemId(id: string): id is FooterItemId {
   return ALL_ITEMS.some((i) => i.id === id);
 }
@@ -251,21 +297,19 @@ export const Footer: React.FC = () => {
         break;
       }
       case 'context-remaining': {
-        if (!settings.merged.ui.footer.hideContextPercentage) {
-          addCol(
-            id,
-            header,
-            () => (
-              <ContextUsageDisplay
-                promptTokenCount={promptTokenCount}
-                model={model}
-                terminalWidth={terminalWidth}
-                color={itemColor}
-              />
-            ),
-            10, // "100% left" is 9 chars
-          );
-        }
+        addCol(
+          id,
+          header,
+          () => (
+            <ContextUsageDisplay
+              promptTokenCount={promptTokenCount}
+              model={model}
+              terminalWidth={terminalWidth}
+              color={itemColor}
+            />
+          ),
+          10, // "100% left" is 9 chars
+        );
         break;
       }
       case 'quota': {
@@ -366,7 +410,6 @@ export const Footer: React.FC = () => {
   }
 
   // --- Width Fitting Logic ---
-  const COLUMN_GAP = 3;
   let currentWidth = 2; // Initial padding
   const columnsToRender: FooterColumn[] = [];
   let droppedAny = false;
@@ -396,58 +439,26 @@ export const Footer: React.FC = () => {
   );
   const excessSpace = Math.max(0, terminalWidth - totalBudgeted);
 
-  const finalElements: React.ReactNode[] = [];
-
-  columnsToRender.forEach((col, idx) => {
-    if (idx > 0 && !showLabels) {
-      finalElements.push(
-        <Box key={`sep-${col.id}`} height={1}>
-          <Text color={theme.ui.comment}> · </Text>
-        </Box>,
-      );
-    }
-
+  const rowItems: FooterRowItem[] = columnsToRender.map((col) => {
     const maxWidth = col.id === 'cwd' ? 20 + excessSpace : col.width;
-    finalElements.push(
-      <Box key={col.id} flexDirection="column">
-        {showLabels && (
-          <Box height={1}>
-            <Text color={theme.ui.comment}>{col.header}</Text>
-          </Box>
-        )}
-        <Box height={1}>{col.element(maxWidth)}</Box>
-      </Box>,
-    );
+    return {
+      key: col.id,
+      header: col.header,
+      element: col.element(maxWidth),
+    };
   });
 
   if (droppedAny) {
-    if (!showLabels) {
-      finalElements.push(
-        <Box key="sep-ellipsis" height={1}>
-          <Text color={theme.ui.comment}> · </Text>
-        </Box>,
-      );
-    }
-    finalElements.push(
-      <Box key="ellipsis" flexDirection="column">
-        {showLabels && <Box height={1} />}
-        <Box height={1}>
-          <Text color={theme.ui.comment}>…</Text>
-        </Box>
-      </Box>,
-    );
+    rowItems.push({
+      key: 'ellipsis',
+      header: '',
+      element: <Text color={theme.ui.comment}>…</Text>,
+    });
   }
 
   return (
-    <Box
-      width={terminalWidth}
-      flexDirection="row"
-      paddingX={1}
-      overflow="hidden"
-      flexWrap="nowrap"
-      columnGap={showLabels ? COLUMN_GAP : 0}
-    >
-      {finalElements}
+    <Box width={terminalWidth} paddingX={1} overflow="hidden" flexWrap="nowrap">
+      <FooterRow items={rowItems} showLabels={showLabels} />
     </Box>
   );
 };

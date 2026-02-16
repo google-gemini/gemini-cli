@@ -14,6 +14,7 @@ import { keyMatchers, Command } from '../keyMatchers.js';
 import { TextInput } from './shared/TextInput.js';
 import { useFuzzyList } from '../hooks/useFuzzyList.js';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
+import { FooterRow, type FooterRowItem } from './Footer.js';
 import {
   ALL_ITEMS,
   DEFAULT_ORDER,
@@ -316,98 +317,47 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
     const getColor = (id: string, defaultColor?: string) =>
       id === activeId ? 'white' : defaultColor || itemColor;
 
-    // Mock values for preview
-    const mockValues: Record<
-      string,
-      { header: string; data: React.ReactNode }
-    > = {
-      cwd: {
-        header: 'Path',
-        data: <Text color={getColor('cwd', itemColor)}>~/project/path</Text>,
-      },
-      'git-branch': {
-        header: 'Branch',
-        data: <Text color={getColor('git-branch', itemColor)}>main</Text>,
-      },
-      'sandbox-status': {
-        header: '/docs',
-        data: <Text color={getColor('sandbox-status', 'green')}>docker</Text>,
-      },
-      'model-name': {
-        header: '/model',
-        data: (
-          <Text color={getColor('model-name', itemColor)}>gemini-2.5-pro</Text>
-        ),
-      },
-      'context-remaining': {
-        header: 'Context',
-        data: (
-          <Text color={getColor('context-remaining', itemColor)}>85% left</Text>
-        ),
-      },
-      quota: {
-        header: '/stats',
-        data: <Text color={getColor('quota', itemColor)}>daily 97%</Text>,
-      },
-      'memory-usage': {
-        header: 'Memory',
-        data: <MemoryUsageDisplay color={itemColor} />,
-      },
-      'session-id': {
-        header: 'Session',
-        data: <Text color={getColor('session-id', itemColor)}>769992f9</Text>,
-      },
-      'code-changes': {
-        header: 'Diff',
-        data: (
-          <Box flexDirection="row">
-            <Text color={getColor('code-changes', theme.status.success)}>
-              +12
-            </Text>
-            <Text color={getColor('code-changes')}> </Text>
-            <Text color={getColor('code-changes', theme.status.error)}>-4</Text>
-          </Box>
-        ),
-      },
-      'token-count': {
-        header: 'Tokens',
-        data: (
-          <Text color={getColor('token-count', itemColor)}>1.5k tokens</Text>
-        ),
-      },
+    // Mock data for preview (headers come from ALL_ITEMS)
+    const mockData: Record<string, React.ReactNode> = {
+      cwd: <Text color={getColor('cwd', itemColor)}>~/project/path</Text>,
+      'git-branch': <Text color={getColor('git-branch', itemColor)}>main</Text>,
+      'sandbox-status': (
+        <Text color={getColor('sandbox-status', 'green')}>docker</Text>
+      ),
+      'model-name': (
+        <Text color={getColor('model-name', itemColor)}>gemini-2.5-pro</Text>
+      ),
+      'context-remaining': (
+        <Text color={getColor('context-remaining', itemColor)}>85% left</Text>
+      ),
+      quota: <Text color={getColor('quota', itemColor)}>daily 97%</Text>,
+      'memory-usage': <MemoryUsageDisplay color={itemColor} />,
+      'session-id': (
+        <Text color={getColor('session-id', itemColor)}>769992f9</Text>
+      ),
+      'code-changes': (
+        <Box flexDirection="row">
+          <Text color={getColor('code-changes', theme.status.success)}>
+            +12
+          </Text>
+          <Text color={getColor('code-changes')}> </Text>
+          <Text color={getColor('code-changes', theme.status.error)}>-4</Text>
+        </Box>
+      ),
+      'token-count': (
+        <Text color={getColor('token-count', itemColor)}>1.5k tokens</Text>
+      ),
     };
 
-    const previewElements: React.ReactNode[] = [];
+    const rowItems: FooterRowItem[] = itemsToPreview
+      .filter((id: string) => mockData[id])
+      .map((id: string) => ({
+        key: id,
+        header: ALL_ITEMS.find((i) => i.id === id)?.header ?? id,
+        element: mockData[id],
+      }));
 
-    itemsToPreview.forEach((id: string, idx: number) => {
-      const mock = mockValues[id];
-      if (!mock) return;
-
-      if (idx > 0 && !showLabels) {
-        previewElements.push(
-          <Box key={`sep-${id}`} height={1}>
-            <Text color={theme.ui.comment}> · </Text>
-          </Box>,
-        );
-      }
-
-      previewElements.push(
-        <Box key={id} flexDirection="column">
-          {showLabels && (
-            <Box height={1}>
-              <Text color={theme.ui.comment}>{mock.header}</Text>
-            </Box>
-          )}
-          <Box height={1}>{mock.data}</Box>
-        </Box>,
-      );
-    });
-
-    return (
-      <Box flexDirection="row" flexWrap="nowrap" columnGap={showLabels ? 3 : 0}>
-        {previewElements}
-      </Box>
-    );
+    return <FooterRow items={rowItems} showLabels={showLabels} />;
   }, [orderedIds, selectedIds, activeId, isResetFocused, showLabels]);
 
   return (

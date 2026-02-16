@@ -61,12 +61,6 @@ export const ALL_ITEMS = [
 
 export type FooterItemId = (typeof ALL_ITEMS)[number]['id'];
 
-export interface FooterItem {
-  id: string;
-  header: string;
-  description: string;
-}
-
 export const DEFAULT_ORDER = [
   'cwd',
   'git-branch',
