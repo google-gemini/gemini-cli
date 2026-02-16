@@ -509,7 +509,7 @@ describe('EditTool', () => {
       // Occurrence 1: Rebased +2, suffix preserved on next line with prefix
       // Occurrence 2: Rebased +2
       const expected =
-        '  bar();\n\n    baz();\n   suffix();\n\n  bar();\n\n    baz();';
+        '  bar();\n\n    baz();\n  suffix();\n\n  bar();\n\n    baz();';
       expect(result.newContent).toBe(expected);
     });
 

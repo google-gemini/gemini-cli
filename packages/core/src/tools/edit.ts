@@ -175,14 +175,13 @@ async function calculateExactReplacement(
   while (matchIdx !== -1) {
     const beforeMatch = currentContent.substring(0, matchIdx);
     const linePrefix = beforeMatch.substring(beforeMatch.lastIndexOf('\n') + 1);
+    let matchEndOffset = matchIdx + normalizedSearch.length;
 
     if (
       /^[ \t]*$/.test(linePrefix) &&
       matchIdx - linePrefix.length >= lastOffset
     ) {
-      const afterMatch = currentContent.substring(
-        matchIdx + normalizedSearch.length,
-      );
+      const afterMatch = currentContent.substring(matchEndOffset);
       const nextNewline = afterMatch.indexOf('\n');
       const lineSuffix =
         nextNewline === -1 ? afterMatch : afterMatch.substring(0, nextNewline);
@@ -192,8 +191,10 @@ async function calculateExactReplacement(
       rebased = handleTrailingSpaces(rebased, trailingSpaces);
 
       if (lineSuffix.trim().length > 0) {
-        if (rebased === '') rebased = linePrefix;
-        else if (rebased.endsWith('\n')) rebased += linePrefix;
+        if (rebased === '' || rebased.endsWith('\n')) {
+          rebased = (rebased === '' ? '' : rebased) + linePrefix;
+          matchEndOffset += trailingSpaces.length;
+        }
       }
 
       parts.push(
@@ -207,7 +208,7 @@ async function calculateExactReplacement(
       );
     }
 
-    lastOffset = matchIdx + normalizedSearch.length;
+    lastOffset = matchEndOffset;
     matchIdx = currentContent.indexOf(normalizedSearch, lastOffset);
   }
 
