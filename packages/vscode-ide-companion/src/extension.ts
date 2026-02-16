@@ -8,6 +8,7 @@ import * as vscode from 'vscode';
 import { IDEServer } from './ide-server.js';
 import { DiffContentProvider, DiffManager } from './diff-manager.js';
 import { createLogger } from './utils/logger.js';
+import { computeGenesisHash } from './genesis.js';
 
 const INFO_MESSAGE_SHOWN_KEY = 'geminiCliInfoMessageShown';
 const IDE_WORKSPACE_PATH_ENV_VAR = 'GEMINI_CLI_IDE_WORKSPACE_PATH';
@@ -37,6 +38,11 @@ function updateWorkspacePath(context: vscode.ExtensionContext) {
 export async function activate(context: vscode.ExtensionContext) {
   logger = vscode.window.createOutputChannel('Gemini CLI IDE Companion');
   log = createLogger(context, logger);
+
+  // TAS Genesis: Anchor Runtime to DNA
+  const genesisHash = await computeGenesisHash(context);
+  log(`[TAS] Genesis Hash: ${genesisHash}`);
+
   log('Extension activated');
 
   updateWorkspacePath(context);
