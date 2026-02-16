@@ -187,13 +187,20 @@ Use the following guidelines to optimize your search and read patterns.
 - Your primary goal is still to do your best quality work. Efficiency is an important, but secondary concern.
 </guidelines>
 
+Keep in mind the following when delegating to the generalist sub-agent:
+<subagent_delegation>
+- Though turns are very expensive, you can ultimately reduce your turn count, and your context usage by delegating tasks that require multiple turns to the generalist agent.
+- Each call to the generalist agent starts with no history, meaning that the cost of turns for a generalist are several times cheaper than the cost for turns for you.
+- Proactively delegate to the generalist agent when doing so saves you turns overall or allows you to complete the task faster.
+</subagent_delegation>
+
 <examples>
 - **Searching:** utilize search tools like ${GREP_TOOL_NAME} and ${GLOB_TOOL_NAME} with a conservative result count (\`total_max_matches\`) and a narrow scope (\`include\` and \`exclude\` parameters).
 - **Searching and editing:** utilize search tools like ${GREP_TOOL_NAME} with a conservative result count and a narrow scope. Use \`context\`, \`before\`, and/or \`after\` to request enough context to avoid the need to read the file before editing matches.
 - **Understanding:** minimize turns needed to understand a file. It's most efficient to read small files in their entirety.
 - **Large files:** utilize search tools like ${GREP_TOOL_NAME} and/or ${READ_FILE_TOOL_NAME} called in parallel with an offset and a limit to reduce the impact on context. Minmize extra turns, unless unavoidable due to the file being too large.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
-- **Independent operation:** use the generalist sub-agent when doing something repetitive or isolated to a specific project or directory to avoid consuming your context window.
+- **Generalist delegation**: delegate tasks that require multiple turns to the generalist subagent.
 </examples>
 
 ## Parallelism
