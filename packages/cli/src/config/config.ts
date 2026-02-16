@@ -468,12 +468,19 @@ export async function loadCliConfig(
       query: argv.query,
     })?.isTrusted ?? false;
 
-  // Set the context filename in the server's memoryTool module BEFORE loading memory
-  // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
-  // directly to the Config constructor in core, and have core handle setGeminiMdFilename.
-  // However, loadHierarchicalGeminiMemory is called *before* createServerConfig.
-  if (settings.context?.fileName) {
-    setServerGeminiMdFilename(settings.context.fileName);
+  // Set the context filename BEFORE loading memory and creating Config.
+  // This is necessary because:
+  // 1. loadHierarchicalGeminiMemory() needs the correct context filename
+  //    to discover and load the appropriate GEMINI.md files
+  // 2. Config constructor also accepts contextFileName but it's set
+  //    after memory loading in the current flow
+  //
+  // The context filename is set globally via setServerGeminiMdFilename()
+  // which affects both the memory loading process and the Config internals.
+  const contextFileName = settings.context?.fileName;
+
+  if (contextFileName) {
+    setServerGeminiMdFilename(contextFileName);
   } else {
     // Reset to default if not provided in settings.
     setServerGeminiMdFilename(getCurrentGeminiMdFilename());
@@ -823,6 +830,7 @@ export async function loadCliConfig(
     folderTrust,
     interactive,
     trustedFolder,
+    contextFileName,
     useBackgroundColor: settings.ui?.useBackgroundColor,
     useRipgrep: settings.tools?.useRipgrep,
     enableInteractiveShell: settings.tools?.shell?.enableInteractiveShell,
