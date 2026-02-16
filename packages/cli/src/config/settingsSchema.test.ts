@@ -353,9 +353,8 @@ describe('SettingsSchema', () => {
       ).toBe('Show the "? for shortcuts" hint above the input.');
     });
 
-    it('should have enableMacOsNotifications setting in schema', () => {
-      const setting =
-        getSettingsSchema().general.properties.enableMacOsNotifications;
+    it('should have enableNotifications setting in schema', () => {
+      const setting = getSettingsSchema().general.properties.enableNotifications;
       expect(setting).toBeDefined();
       expect(setting.type).toBe('boolean');
       expect(setting.category).toBe('General');

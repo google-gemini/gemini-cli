@@ -156,12 +156,8 @@ import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useTimedMessage } from './hooks/useTimedMessage.js';
 import { shouldDismissShortcutsHelpOnHotkey } from './utils/shortcutsHelp.js';
 import { useSuspend } from './hooks/useSuspend.js';
-import { getPendingAttentionNotification } from './utils/pendingAttentionNotification.js';
-import {
-  buildMacNotificationContent,
-  isMacOsNotificationEnabled,
-  notifyMacOs,
-} from '../utils/macosNotifications.js';
+import { useRunEventNotifications } from './hooks/useRunEventNotifications.js';
+import { isNotificationsEnabled } from '../utils/terminalNotifications.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -211,12 +207,11 @@ const SHELL_WIDTH_FRACTION = 0.89;
  * for the shell. This provides vertical padding and space for other UI elements.
  */
 const SHELL_HEIGHT_PADDING = 10;
-const ATTENTION_NOTIFICATION_COOLDOWN_MS = 20_000;
 
 export const AppContainer = (props: AppContainerProps) => {
   const { config, initializationResult, resumedSessionData } = props;
   const settings = useSettings();
-  const notificationsEnabled = isMacOsNotificationEnabled(settings);
+  const notificationsEnabled = isNotificationsEnabled(settings);
 
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
@@ -1850,6 +1845,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const nightly = props.version.includes('nightly');
 
+  
   const dialogsVisible =
     (shouldShowRetentionWarning && retentionCheckComplete) ||
     shouldShowIdePrompt ||
@@ -1915,125 +1911,20 @@ Logging in with Google... Restarting Gemini CLI to continue.
     allowPlanMode,
   });
 
-  const pendingAttentionNotification = useMemo(
-    () =>
-      getPendingAttentionNotification(
-        pendingHistoryItems,
-        commandConfirmationRequest,
-        authConsentRequest,
-        permissionConfirmationRequest,
-        hasConfirmUpdateExtensionRequests,
-        hasLoopDetectionConfirmationRequest,
-      ),
-    [
-      pendingHistoryItems,
-      commandConfirmationRequest,
-      authConsentRequest,
-      permissionConfirmationRequest,
-      hasConfirmUpdateExtensionRequests,
-      hasLoopDetectionConfirmationRequest,
-    ],
-  );
-
-  const hadPendingAttentionRef = useRef(false);
-  const previousFocusedRef = useRef(isFocused);
-  const previousStreamingStateRef = useRef(streamingState);
-  const lastSentAttentionNotificationRef = useRef<{
-    key: string;
-    sentAt: number;
-  } | null>(null);
-
-  useEffect(() => {
-    if (!notificationsEnabled) {
-      return;
-    }
-
-    const wasFocused = previousFocusedRef.current;
-    previousFocusedRef.current = isFocused;
-
-    const hasPendingAttention = pendingAttentionNotification !== null;
-    const hadPendingAttention = hadPendingAttentionRef.current;
-    hadPendingAttentionRef.current = hasPendingAttention;
-
-    const shouldSuppressForFocus = hasReceivedFocusEvent && isFocused;
-    if (!hasPendingAttention || shouldSuppressForFocus) {
-      return;
-    }
-
-    const justEnteredAttentionState = !hadPendingAttention;
-    const justLostFocus = wasFocused && !isFocused;
-    const now = Date.now();
-    const currentKey = pendingAttentionNotification.key;
-    const lastSent = lastSentAttentionNotificationRef.current;
-    const keyChanged = !lastSent || lastSent.key !== currentKey;
-    const onCooldown =
-      !!lastSent &&
-      lastSent.key === currentKey &&
-      now - lastSent.sentAt < ATTENTION_NOTIFICATION_COOLDOWN_MS;
-
-    const shouldNotifyByStateChange = hasReceivedFocusEvent
-      ? justEnteredAttentionState || justLostFocus || keyChanged
-      : justEnteredAttentionState || keyChanged;
-
-    if (!shouldNotifyByStateChange) {
-      return;
-    }
-
-    if (onCooldown) {
-      return;
-    }
-
-    lastSentAttentionNotificationRef.current = {
-      key: currentKey,
-      sentAt: now,
-    };
-
-    void notifyMacOs(
-      notificationsEnabled,
-      buildMacNotificationContent(pendingAttentionNotification.event),
-    );
-  }, [
+  useRunEventNotifications({
+    notificationsEnabled,
     isFocused,
     hasReceivedFocusEvent,
-    notificationsEnabled,
-    pendingAttentionNotification,
-  ]);
-
-  useEffect(() => {
-    if (!notificationsEnabled) {
-      return;
-    }
-
-    const previousStreamingState = previousStreamingStateRef.current;
-    previousStreamingStateRef.current = streamingState;
-
-    const justCompletedTurn =
-      previousStreamingState === StreamingState.Responding &&
-      streamingState === StreamingState.Idle;
-
-    const shouldSuppressForFocus = hasReceivedFocusEvent && isFocused;
-    if (
-      !justCompletedTurn ||
-      shouldSuppressForFocus ||
-      pendingAttentionNotification
-    ) {
-      return;
-    }
-
-    void notifyMacOs(
-      notificationsEnabled,
-      buildMacNotificationContent({
-        type: 'session_complete',
-        detail: 'Gemini CLI finished responding.',
-      }),
-    );
-  }, [
     streamingState,
-    isFocused,
-    hasReceivedFocusEvent,
-    notificationsEnabled,
-    pendingAttentionNotification,
-  ]);
+    hasPendingActionRequired,
+    pendingHistoryItems,
+    commandConfirmationRequest,
+    authConsentRequest,
+    permissionConfirmationRequest,
+    hasConfirmUpdateExtensionRequests,
+    hasLoopDetectionConfirmationRequest,
+    terminalName: terminalCapabilityManager.getTerminalName(),
+  });
 
   const isPassiveShortcutsHelpState =
     isInputActive &&

@@ -4,37 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type MacOsNotificationEvent } from '../../utils/macosNotifications.js';
-import { CoreToolCallStatus } from '@google/gemini-cli-core';
 import {
   type ConfirmationRequest,
   type HistoryItemWithoutId,
-  type IndividualToolCallDisplay,
   type PermissionConfirmationRequest,
 } from '../types.js';
+import { type ReactNode } from 'react';
+import { type RunEventNotificationEvent } from '../../utils/terminalNotifications.js';
+import { getConfirmingToolState } from './confirmingTool.js';
 
 export interface PendingAttentionNotification {
   key: string;
-  event: MacOsNotificationEvent;
+  event: RunEventNotificationEvent;
 }
 
-function getFirstConfirmingTool(
-  pendingHistoryItems: HistoryItemWithoutId[],
-): IndividualToolCallDisplay | null {
-  for (const item of pendingHistoryItems) {
-    if (item.type !== 'tool_group') {
-      continue;
-    }
-
-    const confirmingTool = item.tools.find(
-      (tool) => tool.status === CoreToolCallStatus.AwaitingApproval,
-    );
-    if (confirmingTool) {
-      return confirmingTool;
-    }
+function keyFromReactNode(node: ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') {
+    return String(node);
   }
-
-  return null;
+  if (Array.isArray(node)) {
+    return node.map((item) => keyFromReactNode(item)).join('|');
+  }
+  return 'react-node';
 }
 
 export function getPendingAttentionNotification(
@@ -45,13 +36,13 @@ export function getPendingAttentionNotification(
   hasConfirmUpdateExtensionRequests: boolean,
   hasLoopDetectionConfirmationRequest: boolean,
 ): PendingAttentionNotification | null {
-  const confirmingTool = getFirstConfirmingTool(pendingHistoryItems);
-  if (confirmingTool) {
-    const details = confirmingTool.confirmationDetails;
+  const confirmingToolState = getConfirmingToolState(pendingHistoryItems);
+  if (confirmingToolState) {
+    const details = confirmingToolState.tool.confirmationDetails;
     if (details?.type === 'ask_user') {
       const firstQuestion = details.questions.at(0)?.header;
       return {
-        key: `ask_user:${confirmingTool.callId}`,
+        key: `ask_user:${confirmingToolState.tool.callId}`,
         event: {
           type: 'attention',
           heading: 'Answer requested by agent',
@@ -60,9 +51,9 @@ export function getPendingAttentionNotification(
       };
     }
 
-    const toolTitle = details?.title || confirmingTool.description;
+    const toolTitle = details?.title || confirmingToolState.tool.description;
     return {
-      key: `tool_confirmation:${confirmingTool.callId}`,
+      key: `tool_confirmation:${confirmingToolState.tool.callId}`,
       event: {
         type: 'attention',
         heading: 'Approval required',
@@ -74,8 +65,9 @@ export function getPendingAttentionNotification(
   }
 
   if (commandConfirmationRequest) {
+    const promptKey = keyFromReactNode(commandConfirmationRequest.prompt);
     return {
-      key: 'command_confirmation',
+      key: `command_confirmation:${promptKey}`,
       event: {
         type: 'attention',
         heading: 'Confirmation required',
@@ -85,8 +77,9 @@ export function getPendingAttentionNotification(
   }
 
   if (authConsentRequest) {
+    const promptKey = keyFromReactNode(authConsentRequest.prompt);
     return {
-      key: 'auth_consent',
+      key: `auth_consent:${promptKey}`,
       event: {
         type: 'attention',
         heading: 'Authentication confirmation required',
@@ -96,8 +89,9 @@ export function getPendingAttentionNotification(
   }
 
   if (permissionConfirmationRequest) {
+    const filesKey = permissionConfirmationRequest.files.join('|');
     return {
-      key: 'filesystem_permission_confirmation',
+      key: `filesystem_permission_confirmation:${filesKey}`,
       event: {
         type: 'attention',
         heading: 'Filesystem permission required',

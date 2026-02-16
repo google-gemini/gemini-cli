@@ -81,10 +81,10 @@
           "default": true,
           "type": "boolean"
         },
-        "enableMacOsNotifications": {
-          "title": "Enable macOS Notifications",
-          "description": "Enable macOS native notifications for action-required prompts and session completion. macOS only.",
-          "markdownDescription": "Enable macOS native notifications for action-required prompts and session completion. macOS only.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+        "enableNotifications": {
+          "title": "Enable Notifications",
+          "description": "Enable run-event notifications for action-required prompts and session completion. Currently macOS only.",
+          "markdownDescription": "Enable run-event notifications for action-required prompts and session completion. Currently macOS only.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },

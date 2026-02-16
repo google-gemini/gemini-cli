@@ -49,10 +49,10 @@ const mockIdeClient = vi.hoisted(() => ({
 const mocks = vi.hoisted(() => ({
   mockStdout: { write: vi.fn() },
 }));
-const macOsNotificationsMocks = vi.hoisted(() => ({
-  notifyMacOs: vi.fn().mockResolvedValue(true),
-  isMacOsNotificationEnabled: vi.fn(() => true),
-  buildMacNotificationContent: vi.fn((event) => ({
+const terminalNotificationsMocks = vi.hoisted(() => ({
+  notifyViaTerminal: vi.fn().mockResolvedValue(true),
+  isNotificationsEnabled: vi.fn(() => true),
+  buildRunEventNotificationContent: vi.fn((event) => ({
     title: 'Mock Notification',
     subtitle: 'Mock Subtitle',
     body: JSON.stringify(event),
@@ -174,12 +174,12 @@ vi.mock('./hooks/useShellInactivityStatus.js', () => ({
     inactivityStatus: 'none',
   })),
 }));
-vi.mock('../utils/macosNotifications.js', () => ({
-  notifyMacOs: macOsNotificationsMocks.notifyMacOs,
-  isMacOsNotificationEnabled:
-    macOsNotificationsMocks.isMacOsNotificationEnabled,
-  buildMacNotificationContent:
-    macOsNotificationsMocks.buildMacNotificationContent,
+vi.mock('../utils/terminalNotifications.js', () => ({
+  notifyViaTerminal: terminalNotificationsMocks.notifyViaTerminal,
+  isNotificationsEnabled:
+    terminalNotificationsMocks.isNotificationsEnabled,
+  buildRunEventNotificationContent:
+    terminalNotificationsMocks.buildRunEventNotificationContent,
 }));
 vi.mock('./hooks/useTerminalTheme.js', () => ({
   useTerminalTheme: vi.fn(),
@@ -584,10 +584,10 @@ describe('AppContainer State Management', () => {
       });
 
       await waitFor(() =>
-        expect(macOsNotificationsMocks.notifyMacOs).toHaveBeenCalled(),
+        expect(terminalNotificationsMocks.notifyViaTerminal).toHaveBeenCalled(),
       );
       expect(
-        macOsNotificationsMocks.buildMacNotificationContent,
+        terminalNotificationsMocks.buildRunEventNotificationContent,
       ).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'attention',
@@ -635,7 +635,7 @@ describe('AppContainer State Management', () => {
         unmount = rendered.unmount;
       });
 
-      expect(macOsNotificationsMocks.notifyMacOs).not.toHaveBeenCalled();
+      expect(terminalNotificationsMocks.notifyViaTerminal).not.toHaveBeenCalled();
 
       await act(async () => {
         unmount?.();
@@ -679,7 +679,7 @@ describe('AppContainer State Management', () => {
       });
 
       await waitFor(() =>
-        expect(macOsNotificationsMocks.notifyMacOs).toHaveBeenCalled(),
+        expect(terminalNotificationsMocks.notifyViaTerminal).toHaveBeenCalled(),
       );
 
       await act(async () => {
@@ -714,7 +714,7 @@ describe('AppContainer State Management', () => {
 
       await waitFor(() =>
         expect(
-          macOsNotificationsMocks.buildMacNotificationContent,
+          terminalNotificationsMocks.buildRunEventNotificationContent,
         ).toHaveBeenCalledWith(
           expect.objectContaining({
             type: 'session_complete',
@@ -722,7 +722,7 @@ describe('AppContainer State Management', () => {
           }),
         ),
       );
-      expect(macOsNotificationsMocks.notifyMacOs).toHaveBeenCalled();
+      expect(terminalNotificationsMocks.notifyViaTerminal).toHaveBeenCalled();
 
       await act(async () => {
         unmount?.();
@@ -756,12 +756,137 @@ describe('AppContainer State Management', () => {
 
       await waitFor(() =>
         expect(
-          macOsNotificationsMocks.buildMacNotificationContent,
+          terminalNotificationsMocks.buildRunEventNotificationContent,
         ).toHaveBeenCalledWith(
           expect.objectContaining({
             type: 'session_complete',
             detail: 'Gemini CLI finished responding.',
           }),
+        ),
+      );
+
+      await act(async () => {
+        unmount?.();
+      });
+    });
+
+    it('does not send completion notification when another action-required dialog is pending', async () => {
+      mockedUseFocusState.mockReturnValue({
+        isFocused: false,
+        hasReceivedFocusEvent: true,
+      });
+      mockedUseQuotaAndFallback.mockReturnValue({
+        proQuotaRequest: { kind: 'upgrade' },
+        handleProQuotaChoice: vi.fn(),
+      });
+      let currentStreamingState: 'idle' | 'responding' = 'responding';
+      mockedUseGeminiStream.mockImplementation(() => ({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: currentStreamingState,
+      }));
+
+      let unmount: (() => void) | undefined;
+      let rerender: ((tree: ReactElement) => void) | undefined;
+
+      await act(async () => {
+        const rendered = renderAppContainer();
+        unmount = rendered.unmount;
+        rerender = rendered.rerender;
+      });
+
+      currentStreamingState = 'idle';
+      await act(async () => {
+        rerender?.(getAppContainer());
+      });
+
+      expect(terminalNotificationsMocks.notifyViaTerminal).not.toHaveBeenCalled();
+
+      await act(async () => {
+        unmount?.();
+      });
+    });
+
+    it('can send repeated attention notifications for the same key after pending state clears', async () => {
+      mockedUseFocusState.mockReturnValue({
+        isFocused: false,
+        hasReceivedFocusEvent: true,
+      });
+
+      let pendingHistoryItems = [
+        {
+          type: 'tool_group',
+          tools: [
+            {
+              callId: 'repeat-key-call',
+              name: 'run_shell_command',
+              description: 'Run command',
+              resultDisplay: undefined,
+              status: CoreToolCallStatus.AwaitingApproval,
+              confirmationDetails: {
+                type: 'exec',
+                title: 'Run shell command',
+                command: 'ls',
+                rootCommand: 'ls',
+                rootCommands: ['ls'],
+              },
+            },
+          ],
+        },
+      ];
+
+      mockedUseGeminiStream.mockImplementation(() => ({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        pendingHistoryItems,
+      }));
+
+      let unmount: (() => void) | undefined;
+      let rerender: ((tree: ReactElement) => void) | undefined;
+
+      await act(async () => {
+        const rendered = renderAppContainer();
+        unmount = rendered.unmount;
+        rerender = rendered.rerender;
+      });
+
+      await waitFor(() =>
+        expect(terminalNotificationsMocks.notifyViaTerminal).toHaveBeenCalledTimes(
+          1,
+        ),
+      );
+
+      pendingHistoryItems = [];
+      await act(async () => {
+        rerender?.(getAppContainer());
+      });
+
+      pendingHistoryItems = [
+        {
+          type: 'tool_group',
+          tools: [
+            {
+              callId: 'repeat-key-call',
+              name: 'run_shell_command',
+              description: 'Run command',
+              resultDisplay: undefined,
+              status: CoreToolCallStatus.AwaitingApproval,
+              confirmationDetails: {
+                type: 'exec',
+                title: 'Run shell command',
+                command: 'ls',
+                rootCommand: 'ls',
+                rootCommands: ['ls'],
+              },
+            },
+          ],
+        },
+      ];
+      await act(async () => {
+        rerender?.(getAppContainer());
+      });
+
+      await waitFor(() =>
+        expect(terminalNotificationsMocks.notifyViaTerminal).toHaveBeenCalledTimes(
+          2,
         ),
       );
 

@@ -4,16 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  buildMacNotificationContent,
-  MAX_MACOS_NOTIFICATION_BODY_CHARS,
-  MAX_MACOS_NOTIFICATION_SUBTITLE_CHARS,
-  MAX_MACOS_NOTIFICATION_TITLE_CHARS,
-  notifyMacOs,
+  buildRunEventNotificationContent,
+  MAX_NOTIFICATION_BODY_CHARS,
+  MAX_NOTIFICATION_SUBTITLE_CHARS,
+  MAX_NOTIFICATION_TITLE_CHARS,
+  notifyViaTerminal,
   supportsOsc9Notifications,
-  truncateForMacNotification,
-} from './macosNotifications.js';
+  truncateForNotification,
+} from './terminalNotifications.js';
 
 const writeToStdout = vi.hoisted(() => vi.fn());
 const debugLogger = vi.hoisted(() => ({
@@ -25,19 +25,12 @@ vi.mock('@google/gemini-cli-core', () => ({
   debugLogger,
 }));
 
-describe('macOS notifications', () => {
+describe('terminal notifications', () => {
   const originalPlatform = process.platform;
-  const originalTermProgram = process.env['TERM_PROGRAM'];
-  const originalTerm = process.env['TERM'];
-  const originalItTermSessionId = process.env['ITERM_SESSION_ID'];
-  const originalWtSession = process.env['WT_SESSION'];
 
   beforeEach(() => {
     vi.resetAllMocks();
-    delete process.env['TERM_PROGRAM'];
-    delete process.env['TERM'];
-    delete process.env['ITERM_SESSION_ID'];
-    delete process.env['WT_SESSION'];
+    vi.unstubAllEnvs();
     Object.defineProperty(process, 'platform', {
       value: 'darwin',
       configurable: true,
@@ -45,23 +38,20 @@ describe('macOS notifications', () => {
   });
 
   afterEach(() => {
-    process.env['TERM_PROGRAM'] = originalTermProgram;
-    process.env['TERM'] = originalTerm;
-    process.env['ITERM_SESSION_ID'] = originalItTermSessionId;
-    process.env['WT_SESSION'] = originalWtSession;
+    vi.unstubAllEnvs();
     Object.defineProperty(process, 'platform', {
       value: originalPlatform,
       configurable: true,
     });
   });
 
-  it('returns false without spawning on non-macOS platforms', async () => {
+  it('returns false without writing on non-macOS platforms', async () => {
     Object.defineProperty(process, 'platform', {
       value: 'linux',
       configurable: true,
     });
 
-    const shown = await notifyMacOs(true, {
+    const shown = await notifyViaTerminal(true, {
       title: 't',
       body: 'b',
     });
@@ -70,8 +60,8 @@ describe('macOS notifications', () => {
     expect(writeToStdout).not.toHaveBeenCalled();
   });
 
-  it('returns false without spawning when disabled in settings', async () => {
-    const shown = await notifyMacOs(false, {
+  it('returns false without writing when disabled', async () => {
+    const shown = await notifyViaTerminal(false, {
       title: 't',
       body: 'b',
     });
@@ -81,9 +71,9 @@ describe('macOS notifications', () => {
   });
 
   it('emits OSC 9 notification when supported terminal is detected', async () => {
-    process.env['ITERM_SESSION_ID'] = 'iterm-123';
+    vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
 
-    const shown = await notifyMacOs(true, {
+    const shown = await notifyViaTerminal(true, {
       title: 'Title "quoted"',
       subtitle: 'Sub\\title',
       body: 'Body',
@@ -96,8 +86,28 @@ describe('macOS notifications', () => {
     expect(emitted.endsWith('\x07')).toBe(true);
   });
 
-  it('emits BEL notification when OSC 9 is not supported', async () => {
-    const shown = await notifyMacOs(true, {
+  it('uses terminal capability-query terminalName when available', async () => {
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+
+    const shown = await notifyViaTerminal(
+      true,
+      {
+        title: 'Title',
+        body: 'Body',
+      },
+      'WezTerm 20240203',
+    );
+
+    expect(shown).toBe(true);
+    const emitted = String(writeToStdout.mock.calls[0][0]);
+    expect(emitted.startsWith('\x1b]9;')).toBe(true);
+  });
+
+  it('emits BEL fallback when OSC 9 is not supported', async () => {
+    vi.stubEnv('TERM_PROGRAM', '');
+    vi.stubEnv('TERM', '');
+
+    const shown = await notifyViaTerminal(true, {
       title: 'Title',
       subtitle: 'Subtitle',
       body: 'Body',
@@ -107,11 +117,11 @@ describe('macOS notifications', () => {
     expect(writeToStdout).toHaveBeenCalledWith('\x07');
   });
 
-  it('uses BEL fallback when WT_SESSION is set even with OSC-capable terminal hints', async () => {
-    process.env['WT_SESSION'] = '1';
-    process.env['TERM_PROGRAM'] = 'WezTerm';
+  it('uses BEL fallback when WT_SESSION is set', async () => {
+    vi.stubEnv('WT_SESSION', '1');
+    vi.stubEnv('TERM_PROGRAM', 'WezTerm');
 
-    const shown = await notifyMacOs(true, {
+    const shown = await notifyViaTerminal(true, {
       title: 'Title',
       body: 'Body',
     });
@@ -126,7 +136,7 @@ describe('macOS notifications', () => {
     });
 
     await expect(
-      notifyMacOs(true, {
+      notifyViaTerminal(true, {
         title: 'Title',
         body: 'Body',
       }),
@@ -134,22 +144,23 @@ describe('macOS notifications', () => {
     expect(debugLogger.debug).toHaveBeenCalledTimes(1);
   });
 
-  it('detects OSC 9 support using terminal env hints', () => {
+  it('detects OSC 9 support using terminal signatures', () => {
     expect(supportsOsc9Notifications({ TERM_PROGRAM: 'WezTerm' })).toBe(true);
     expect(supportsOsc9Notifications({ TERM_PROGRAM: 'ghostty' })).toBe(true);
-    expect(supportsOsc9Notifications({ ITERM_SESSION_ID: 'abc' })).toBe(true);
+    expect(supportsOsc9Notifications({ TERM_PROGRAM: 'iTerm.app' })).toBe(true);
     expect(supportsOsc9Notifications({ TERM: 'xterm-kitty' })).toBe(true);
     expect(supportsOsc9Notifications({ TERM: 'wezterm' })).toBe(true);
+    expect(supportsOsc9Notifications({}, 'WezTerm 20240203')).toBe(true);
     expect(
       supportsOsc9Notifications({ TERM_PROGRAM: 'WezTerm', WT_SESSION: '1' }),
     ).toBe(false);
     expect(supportsOsc9Notifications({})).toBe(false);
   });
 
-  it('strips ANSI escape sequences and newlines from notification payload text', async () => {
-    process.env['ITERM_SESSION_ID'] = 'iterm-123';
+  it('strips terminal control sequences and newlines from payload text', async () => {
+    vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
 
-    const shown = await notifyMacOs(true, {
+    const shown = await notifyViaTerminal(true, {
       title: 'Title',
       body: '\x1b[32mGreen\x1b[0m\nLine',
     });
@@ -166,32 +177,28 @@ describe('macOS notifications', () => {
 
   it('truncates notification text with ellipsis', () => {
     const input = 'x'.repeat(300);
-    const truncated = truncateForMacNotification(input, 12);
+    const truncated = truncateForNotification(input, 12);
     expect(truncated).toHaveLength(12);
     expect(truncated.endsWith('...')).toBe(true);
   });
 
-  it('truncates by grapheme clusters without splitting emoji sequences', () => {
-    const family = '👨‍👩‍👧‍👦';
-    const truncated = truncateForMacNotification(family.repeat(6), 4);
-    expect(truncated).toBe(`${family}...`);
+  it('handles unicode truncation via shared code-point helpers', () => {
+    const input = 'a🙂b🙂c🙂d🙂e';
+    const truncated = truncateForNotification(input, 8);
+    expect(truncated.endsWith('...')).toBe(true);
   });
 
   it('builds bounded attention notification content', () => {
-    const content = buildMacNotificationContent({
+    const content = buildRunEventNotificationContent({
       type: 'attention',
       heading: 'h'.repeat(400),
       detail: 'd'.repeat(400),
     });
 
-    expect(content.title.length).toBeLessThanOrEqual(
-      MAX_MACOS_NOTIFICATION_TITLE_CHARS,
-    );
+    expect(content.title.length).toBeLessThanOrEqual(MAX_NOTIFICATION_TITLE_CHARS);
     expect((content.subtitle ?? '').length).toBeLessThanOrEqual(
-      MAX_MACOS_NOTIFICATION_SUBTITLE_CHARS,
+      MAX_NOTIFICATION_SUBTITLE_CHARS,
     );
-    expect(content.body.length).toBeLessThanOrEqual(
-      MAX_MACOS_NOTIFICATION_BODY_CHARS,
-    );
+    expect(content.body.length).toBeLessThanOrEqual(MAX_NOTIFICATION_BODY_CHARS);
   });
 });
