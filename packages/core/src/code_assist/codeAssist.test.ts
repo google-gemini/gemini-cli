@@ -64,6 +64,7 @@ describe('codeAssist', () => {
       expect(setupUser).toHaveBeenCalledWith(
         mockAuthClient,
         mockValidationHandler,
+        httpOptions,
       );
       expect(MockedCodeAssistServer).toHaveBeenCalledWith(
         mockAuthClient,
@@ -93,6 +94,7 @@ describe('codeAssist', () => {
       expect(setupUser).toHaveBeenCalledWith(
         mockAuthClient,
         mockValidationHandler,
+        httpOptions,
       );
       expect(MockedCodeAssistServer).toHaveBeenCalledWith(
         mockAuthClient,
