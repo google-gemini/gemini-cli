@@ -32,7 +32,6 @@ import {
   type HistoryItem,
   type HistoryItemWithoutId,
   type HistoryItemToolGroup,
-  type IndividualToolCallDisplay,
   AuthState,
   type ConfirmationRequest,
   type PermissionConfirmationRequest,
@@ -157,10 +156,11 @@ import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useTimedMessage } from './hooks/useTimedMessage.js';
 import { shouldDismissShortcutsHelpOnHotkey } from './utils/shortcutsHelp.js';
 import { useSuspend } from './hooks/useSuspend.js';
+import { getPendingAttentionNotification } from './utils/pendingAttentionNotification.js';
 import {
   buildMacNotificationContent,
+  isMacOsNotificationEnabled,
   notifyMacOs,
-  type MacOsNotificationEvent,
 } from '../utils/macosNotifications.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
@@ -213,128 +213,10 @@ const SHELL_WIDTH_FRACTION = 0.89;
 const SHELL_HEIGHT_PADDING = 10;
 const ATTENTION_NOTIFICATION_COOLDOWN_MS = 20_000;
 
-interface PendingAttentionNotification {
-  key: string;
-  event: MacOsNotificationEvent;
-}
-
-function getFirstConfirmingTool(
-  pendingHistoryItems: HistoryItemWithoutId[],
-): IndividualToolCallDisplay | null {
-  for (const item of pendingHistoryItems) {
-    if (item.type !== 'tool_group') {
-      continue;
-    }
-
-    const confirmingTool = item.tools.find(
-      (tool) => tool.status === ToolCallStatus.Confirming,
-    );
-    if (confirmingTool) {
-      return confirmingTool;
-    }
-  }
-
-  return null;
-}
-
-function getPendingAttentionNotification(
-  pendingHistoryItems: HistoryItemWithoutId[],
-  commandConfirmationRequest: ConfirmationRequest | null,
-  authConsentRequest: ConfirmationRequest | null,
-  permissionConfirmationRequest: PermissionConfirmationRequest | null,
-  hasConfirmUpdateExtensionRequests: boolean,
-  hasLoopDetectionConfirmationRequest: boolean,
-): PendingAttentionNotification | null {
-  const confirmingTool = getFirstConfirmingTool(pendingHistoryItems);
-  if (confirmingTool) {
-    const details = confirmingTool.confirmationDetails;
-    if (details?.type === 'ask_user') {
-      const firstQuestion = details.questions.at(0)?.header;
-      return {
-        key: `ask_user:${confirmingTool.callId}`,
-        event: {
-          type: 'attention',
-          heading: 'Answer requested by agent',
-          detail:
-            firstQuestion || 'The agent needs your response to continue.',
-        },
-      };
-    }
-
-    const toolTitle = details?.title || confirmingTool.description;
-    return {
-      key: `tool_confirmation:${confirmingTool.callId}`,
-      event: {
-        type: 'attention',
-        heading: 'Approval required',
-        detail: toolTitle
-          ? `Approve tool action: ${toolTitle}`
-          : 'Approve a pending tool action to continue.',
-      },
-    };
-  }
-
-  if (commandConfirmationRequest) {
-    return {
-      key: 'command_confirmation',
-      event: {
-        type: 'attention',
-        heading: 'Confirmation required',
-        detail: 'A command is waiting for your confirmation.',
-      },
-    };
-  }
-
-  if (authConsentRequest) {
-    return {
-      key: 'auth_consent',
-      event: {
-        type: 'attention',
-        heading: 'Authentication confirmation required',
-        detail: 'Authentication is waiting for your confirmation.',
-      },
-    };
-  }
-
-  if (permissionConfirmationRequest) {
-    return {
-      key: 'filesystem_permission_confirmation',
-      event: {
-        type: 'attention',
-        heading: 'Filesystem permission required',
-        detail: 'Read-only path access is waiting for your confirmation.',
-      },
-    };
-  }
-
-  if (hasConfirmUpdateExtensionRequests) {
-    return {
-      key: 'extension_update_confirmation',
-      event: {
-        type: 'attention',
-        heading: 'Extension update confirmation required',
-        detail: 'An extension update is waiting for your confirmation.',
-      },
-    };
-  }
-
-  if (hasLoopDetectionConfirmationRequest) {
-    return {
-      key: 'loop_detection_confirmation',
-      event: {
-        type: 'attention',
-        heading: 'Loop detection confirmation required',
-        detail: 'A loop detection prompt is waiting for your response.',
-      },
-    };
-  }
-
-  return null;
-}
-
 export const AppContainer = (props: AppContainerProps) => {
   const { config, initializationResult, resumedSessionData } = props;
   const settings = useSettings();
+  const notificationsEnabled = isMacOsNotificationEnabled(settings);
 
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
@@ -995,7 +877,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleDebugProfiler,
       setShortcutsHelpVisible,
       stableSetText,
-      settings,
     ],
   );
 
@@ -2063,6 +1944,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
   } | null>(null);
 
   useEffect(() => {
+    if (!notificationsEnabled) {
+      return;
+    }
+
     const wasFocused = previousFocusedRef.current;
     previousFocusedRef.current = isFocused;
 
@@ -2104,12 +1989,21 @@ Logging in with Google... Restarting Gemini CLI to continue.
     };
 
     void notifyMacOs(
-      settings,
+      notificationsEnabled,
       buildMacNotificationContent(pendingAttentionNotification.event),
     );
-  }, [isFocused, hasReceivedFocusEvent, pendingAttentionNotification, settings]);
+  }, [
+    isFocused,
+    hasReceivedFocusEvent,
+    notificationsEnabled,
+    pendingAttentionNotification,
+  ]);
 
   useEffect(() => {
+    if (!notificationsEnabled) {
+      return;
+    }
+
     const previousStreamingState = previousStreamingStateRef.current;
     previousStreamingStateRef.current = streamingState;
 
@@ -2127,10 +2021,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
     }
 
     void notifyMacOs(
-      settings,
+      notificationsEnabled,
       buildMacNotificationContent({
-        type: 'attention',
-        heading: 'Response ready',
+        type: 'session_complete',
         detail: 'Gemini CLI finished responding.',
       }),
     );
@@ -2138,8 +2031,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     streamingState,
     isFocused,
     hasReceivedFocusEvent,
+    notificationsEnabled,
     pendingAttentionNotification,
-    settings,
   ]);
 
   const isPassiveShortcutsHelpState =

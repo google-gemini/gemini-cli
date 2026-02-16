@@ -66,7 +66,8 @@ const macOsNotificationMocks = vi.hoisted(() => ({
 }));
 vi.mock('./utils/macosNotifications.js', () => ({
   notifyMacOs: macOsNotificationMocks.notifyMacOs,
-  buildMacNotificationContent: macOsNotificationMocks.buildMacNotificationContent,
+  buildMacNotificationContent:
+    macOsNotificationMocks.buildMacNotificationContent,
 }));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -850,7 +851,9 @@ describe('gemini.tsx main function kitty protocol', () => {
     expect(runNonInteractive).toHaveBeenCalled();
     const callArgs = vi.mocked(runNonInteractive).mock.calls[0][0];
     expect(callArgs.input).toBe('stdin-data\n\ntest-question');
-    expect(macOsNotificationMocks.buildMacNotificationContent).not.toHaveBeenCalled();
+    expect(
+      macOsNotificationMocks.buildMacNotificationContent,
+    ).not.toHaveBeenCalled();
     expect(macOsNotificationMocks.notifyMacOs).not.toHaveBeenCalled();
     expect(processExitSpy).toHaveBeenCalledWith(0);
     processExitSpy.mockRestore();

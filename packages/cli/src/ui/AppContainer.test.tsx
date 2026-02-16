@@ -52,6 +52,7 @@ const mocks = vi.hoisted(() => ({
 }));
 const macOsNotificationsMocks = vi.hoisted(() => ({
   notifyMacOs: vi.fn().mockResolvedValue(true),
+  isMacOsNotificationEnabled: vi.fn(() => true),
   buildMacNotificationContent: vi.fn((event) => ({
     title: 'Mock Notification',
     subtitle: 'Mock Subtitle',
@@ -176,7 +177,10 @@ vi.mock('./hooks/useShellInactivityStatus.js', () => ({
 }));
 vi.mock('../utils/macosNotifications.js', () => ({
   notifyMacOs: macOsNotificationsMocks.notifyMacOs,
-  buildMacNotificationContent: macOsNotificationsMocks.buildMacNotificationContent,
+  isMacOsNotificationEnabled:
+    macOsNotificationsMocks.isMacOsNotificationEnabled,
+  buildMacNotificationContent:
+    macOsNotificationsMocks.buildMacNotificationContent,
 }));
 vi.mock('./hooks/useTerminalTheme.js', () => ({
   useTerminalTheme: vi.fn(),
@@ -714,8 +718,8 @@ describe('AppContainer State Management', () => {
           macOsNotificationsMocks.buildMacNotificationContent,
         ).toHaveBeenCalledWith(
           expect.objectContaining({
-            type: 'attention',
-            heading: 'Response ready',
+            type: 'session_complete',
+            detail: 'Gemini CLI finished responding.',
           }),
         ),
       );
@@ -756,8 +760,8 @@ describe('AppContainer State Management', () => {
           macOsNotificationsMocks.buildMacNotificationContent,
         ).toHaveBeenCalledWith(
           expect.objectContaining({
-            type: 'attention',
-            heading: 'Response ready',
+            type: 'session_complete',
+            detail: 'Gemini CLI finished responding.',
           }),
         ),
       );

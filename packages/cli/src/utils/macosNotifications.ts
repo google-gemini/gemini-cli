@@ -15,6 +15,38 @@ const ELLIPSIS = '...';
 const BEL = '\x07';
 const OSC9_PREFIX = '\x1b]9;';
 const MAX_OSC9_MESSAGE_CHARS = 220;
+const ESC = '\x1b';
+const ESC_CODE = ESC.charCodeAt(0);
+const BEL_CODE = BEL.charCodeAt(0);
+const ESC_BACKSLASH = '\\';
+const OSC_START_CODE = ']'.charCodeAt(0);
+const CSI_START_CODE = '['.charCodeAt(0);
+const DCS_START_CODE = 'P'.charCodeAt(0);
+const PM_START_CODE = '^'.charCodeAt(0);
+const APC_START_CODE = '_'.charCodeAt(0);
+
+let graphemeSegmenter: Intl.Segmenter | undefined;
+function getGraphemeSegmenter(): Intl.Segmenter | undefined {
+  if (graphemeSegmenter !== undefined) {
+    return graphemeSegmenter;
+  }
+
+  if (typeof Intl !== 'undefined' && 'Segmenter' in Intl) {
+    graphemeSegmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
+    return graphemeSegmenter;
+  }
+
+  return undefined;
+}
+
+function splitIntoGraphemes(input: string): string[] {
+  const segmenter = getGraphemeSegmenter();
+  if (!segmenter) {
+    return Array.from(input);
+  }
+
+  return Array.from(segmenter.segment(input), (segment) => segment.segment);
+}
 
 export interface MacOsNotificationContent {
   title: string;
@@ -46,7 +78,8 @@ export function truncateForMacNotification(
   }
 
   const normalized = normalizeText(input);
-  if (normalized.length <= maxChars) {
+  const graphemes = splitIntoGraphemes(normalized);
+  if (graphemes.length <= maxChars) {
     return normalized;
   }
 
@@ -54,7 +87,7 @@ export function truncateForMacNotification(
     return ELLIPSIS.slice(0, maxChars);
   }
 
-  return `${normalized.slice(0, maxChars - ELLIPSIS.length)}${ELLIPSIS}`;
+  return `${graphemes.slice(0, maxChars - ELLIPSIS.length).join('')}${ELLIPSIS}`;
 }
 
 function sanitizeNotificationContent(
@@ -132,17 +165,78 @@ export function supportsOsc9Notifications(
 function buildTerminalNotificationMessage(
   content: MacOsNotificationContent,
 ): string {
-  const pieces = [content.title, content.subtitle, content.body].filter(Boolean);
+  const pieces = [content.title, content.subtitle, content.body].filter(
+    Boolean,
+  );
   const combined = pieces.join(' | ');
   return truncateForMacNotification(combined, MAX_OSC9_MESSAGE_CHARS);
 }
 
 function stripTerminalControlChars(input: string): string {
-  return input
-    .replace(/\x1b/g, '')
-    .replace(/\x07/g, '')
-    .replace(/[\r\n]+/g, ' ')
-    .trim();
+  let output = '';
+  let i = 0;
+
+  while (i < input.length) {
+    const code = input.charCodeAt(i);
+
+    if (code === BEL_CODE) {
+      i += 1;
+      continue;
+    }
+
+    if (code !== ESC_CODE) {
+      output += input[i];
+      i += 1;
+      continue;
+    }
+
+    const nextCode = input.charCodeAt(i + 1);
+
+    // CSI: ESC [ ... final-byte
+    if (nextCode === CSI_START_CODE) {
+      i += 2;
+      while (i < input.length) {
+        const c = input.charCodeAt(i);
+        if (c >= 0x40 && c <= 0x7e) {
+          i += 1;
+          break;
+        }
+        i += 1;
+      }
+      continue;
+    }
+
+    // OSC/DCS/PM/APC: ESC ]|P|^|_ ... BEL or ESC \
+    if (
+      nextCode === OSC_START_CODE ||
+      nextCode === DCS_START_CODE ||
+      nextCode === PM_START_CODE ||
+      nextCode === APC_START_CODE
+    ) {
+      i += 2;
+      while (i < input.length) {
+        const c = input.charCodeAt(i);
+        if (c === BEL_CODE) {
+          i += 1;
+          break;
+        }
+        if (
+          c === ESC_CODE &&
+          input.charCodeAt(i + 1) === ESC_BACKSLASH.charCodeAt(0)
+        ) {
+          i += 2;
+          break;
+        }
+        i += 1;
+      }
+      continue;
+    }
+
+    // Other two-byte ESC sequences.
+    i += 2;
+  }
+
+  return output.replace(/[\r\n]+/g, ' ').trim();
 }
 
 function emitOsc9Notification(content: MacOsNotificationContent): void {
@@ -165,10 +259,10 @@ function emitTerminalNotification(content: MacOsNotificationContent): void {
 }
 
 export async function notifyMacOs(
-  settings: LoadedSettings,
+  notificationsEnabled: boolean,
   content: MacOsNotificationContent,
 ): Promise<boolean> {
-  if (!isMacOsNotificationEnabled(settings)) {
+  if (!notificationsEnabled || process.platform !== 'darwin') {
     return false;
   }
 

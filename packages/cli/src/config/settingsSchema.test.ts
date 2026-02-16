@@ -354,8 +354,8 @@ describe('SettingsSchema', () => {
     });
 
     it('should have enableMacOsNotifications setting in schema', () => {
-      const setting = getSettingsSchema().general.properties
-        .enableMacOsNotifications;
+      const setting =
+        getSettingsSchema().general.properties.enableMacOsNotifications;
       expect(setting).toBeDefined();
       expect(setting.type).toBe('boolean');
       expect(setting.category).toBe('General');

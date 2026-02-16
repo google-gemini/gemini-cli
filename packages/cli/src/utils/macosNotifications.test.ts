@@ -5,7 +5,6 @@
  */
 
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import type { LoadedSettings } from '../config/settings.js';
 import {
   buildMacNotificationContent,
   MAX_MACOS_NOTIFICATION_BODY_CHARS,
@@ -32,17 +31,6 @@ describe('macOS notifications', () => {
   const originalTerm = process.env['TERM'];
   const originalItTermSessionId = process.env['ITERM_SESSION_ID'];
   const originalWtSession = process.env['WT_SESSION'];
-
-  const settings = (
-    enabled: boolean = true,
-  ): LoadedSettings =>
-    ({
-      merged: {
-        general: {
-          enableMacOsNotifications: enabled,
-        },
-      },
-    }) as LoadedSettings;
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -73,7 +61,7 @@ describe('macOS notifications', () => {
       configurable: true,
     });
 
-    const shown = await notifyMacOs(settings(true), {
+    const shown = await notifyMacOs(true, {
       title: 't',
       body: 'b',
     });
@@ -83,7 +71,7 @@ describe('macOS notifications', () => {
   });
 
   it('returns false without spawning when disabled in settings', async () => {
-    const shown = await notifyMacOs(settings(false), {
+    const shown = await notifyMacOs(false, {
       title: 't',
       body: 'b',
     });
@@ -95,7 +83,7 @@ describe('macOS notifications', () => {
   it('emits OSC 9 notification when supported terminal is detected', async () => {
     process.env['ITERM_SESSION_ID'] = 'iterm-123';
 
-    const shown = await notifyMacOs(settings(true), {
+    const shown = await notifyMacOs(true, {
       title: 'Title "quoted"',
       subtitle: 'Sub\\title',
       body: 'Body',
@@ -103,13 +91,13 @@ describe('macOS notifications', () => {
 
     expect(shown).toBe(true);
     expect(writeToStdout).toHaveBeenCalledTimes(1);
-    expect(writeToStdout).toHaveBeenCalledWith(
-      expect.stringMatching(/^\x1b\]9;.*\x07$/),
-    );
+    const emitted = String(writeToStdout.mock.calls[0][0]);
+    expect(emitted.startsWith('\x1b]9;')).toBe(true);
+    expect(emitted.endsWith('\x07')).toBe(true);
   });
 
   it('emits BEL notification when OSC 9 is not supported', async () => {
-    const shown = await notifyMacOs(settings(true), {
+    const shown = await notifyMacOs(true, {
       title: 'Title',
       subtitle: 'Subtitle',
       body: 'Body',
@@ -123,7 +111,7 @@ describe('macOS notifications', () => {
     process.env['WT_SESSION'] = '1';
     process.env['TERM_PROGRAM'] = 'WezTerm';
 
-    const shown = await notifyMacOs(settings(true), {
+    const shown = await notifyMacOs(true, {
       title: 'Title',
       body: 'Body',
     });
@@ -138,7 +126,7 @@ describe('macOS notifications', () => {
     });
 
     await expect(
-      notifyMacOs(settings(true), {
+      notifyMacOs(true, {
         title: 'Title',
         body: 'Body',
       }),
@@ -158,11 +146,35 @@ describe('macOS notifications', () => {
     expect(supportsOsc9Notifications({})).toBe(false);
   });
 
+  it('strips ANSI escape sequences and newlines from notification payload text', async () => {
+    process.env['ITERM_SESSION_ID'] = 'iterm-123';
+
+    const shown = await notifyMacOs(true, {
+      title: 'Title',
+      body: '\x1b[32mGreen\x1b[0m\nLine',
+    });
+
+    expect(shown).toBe(true);
+    const emitted = String(writeToStdout.mock.calls[0][0]);
+    const payload = emitted.slice('\x1b]9;'.length, -1);
+    expect(payload).toContain('Green');
+    expect(payload).toContain('Line');
+    expect(payload).not.toContain('[32m');
+    expect(payload).not.toContain('\n');
+    expect(payload).not.toContain('\r');
+  });
+
   it('truncates notification text with ellipsis', () => {
     const input = 'x'.repeat(300);
     const truncated = truncateForMacNotification(input, 12);
     expect(truncated).toHaveLength(12);
     expect(truncated.endsWith('...')).toBe(true);
+  });
+
+  it('truncates by grapheme clusters without splitting emoji sequences', () => {
+    const family = '👨‍👩‍👧‍👦';
+    const truncated = truncateForMacNotification(family.repeat(6), 4);
+    expect(truncated).toBe(`${family}...`);
   });
 
   it('builds bounded attention notification content', () => {
