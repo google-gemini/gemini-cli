@@ -13,7 +13,6 @@ import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import { TextInput } from './shared/TextInput.js';
 import { useFuzzyList } from '../hooks/useFuzzyList.js';
-import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { FooterRow, type FooterRowItem } from './Footer.js';
 import { ALL_ITEMS, resolveFooterState } from '../../config/footerItems.js';
 import { SettingScope } from '../../config/settings.js';
@@ -292,7 +291,9 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
         <Text color={getColor('context-remaining', itemColor)}>85% left</Text>
       ),
       quota: <Text color={getColor('quota', itemColor)}>daily 97%</Text>,
-      'memory-usage': <MemoryUsageDisplay color={itemColor} />,
+      'memory-usage': (
+        <Text color={getColor('memory-usage', itemColor)}>260 MB</Text>
+      ),
       'session-id': (
         <Text color={getColor('session-id', itemColor)}>769992f9</Text>
       ),
