@@ -870,6 +870,22 @@ describe('SettingsUtils', () => {
         expect(result).toBe('false'); // shows default value
       });
 
+      it('should show schema default (not inherited merged value) when key is not in scope', () => {
+        const settings = makeMockSettings({}); // no setting in current scope
+        const mergedSettings = makeMockSettings({
+          ui: { requiresRestart: true },
+        }); // inherited merged value differs from schema default (false)
+        const restartChangedKeys = new Set<string>();
+
+        const result = getDisplayValue(
+          'ui.requiresRestart',
+          settings,
+          mergedSettings,
+          restartChangedKeys,
+        );
+        expect(result).toBe('false');
+      });
+
       it('should show value with * when setting exists in scope and differs from default', () => {
         const settings = makeMockSettings({ ui: { requiresRestart: true } }); // true is different from default (false)
         const mergedSettings = makeMockSettings({

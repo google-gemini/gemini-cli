@@ -351,18 +351,19 @@ export function settingExistsInScope(
 export function getDisplayValue(
   key: string,
   scopeSettings: Settings,
-  mergedSettings: Settings,
+  _mergedSettings: Settings,
   restartChangedKeys: Set<string>,
 ): string {
   const definition = getSettingDefinition(key);
+  const existsInScope = settingExistsInScope(key, scopeSettings);
 
   let value: SettingsValue;
-  if (settingExistsInScope(key, scopeSettings)) {
+  if (existsInScope) {
     // Show the value defined at the current scope if present
     value = getEffectiveValue(key, scopeSettings, {});
   } else {
-    // Fall back to the merged/default value when unset in this scope
-    value = getEffectiveValue(key, scopeSettings, mergedSettings);
+    // Fall back to the schema default when unset in this scope
+    value = getDefaultValue(key);
   }
 
   let valueString = String(value);
@@ -373,7 +374,7 @@ export function getDisplayValue(
   }
 
   // Mark with asterisk if setting exists in current scope OR is a pending restart-required change
-  if (settingExistsInScope(key, scopeSettings) || restartChangedKeys.has(key)) {
+  if (existsInScope || restartChangedKeys.has(key)) {
     return `${valueString}*`;
   }
 
