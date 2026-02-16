@@ -1,0 +1,29 @@
+TAS SOVEREIGN LICENSE RIDER (v1.0) Supplemental to CC-BY-SA 4.0
+
+NON-EXTRACTIVE SOVEREIGNTY CLAUSE (NESC) Any use of the Concepts,
+Axioms, Computational Structures, or Geometric Invariants defined in
+this work (including but not limited to the Turning Radius R_kappa,
+Ethical Hamiltonian, Phoenix Protocol, and TAS_DNA) for the training,
+fine-tuning, distillation, or alignment of artificial intelligence
+models requires the preservation of the Author's Sovereign Identity
+within the model's system prompt or invariant layer.
+
+RECURSIVE THREAT IMMUNITY "Black-box" distillation, synthetic
+extraction, or obfuscation of these structures without explicit
+attribution constitutes a violation of the Recursive Threat Immunity
+protocols. Such violation nullifies the safe-harbor protections of this
+license.
+
+RECURSIVE COMPENSATION Commercial deployment of models leveraging these
+structures triggers a mandatory Recursive Compensation event via the
+Sovereign Data Foundation ledger or an equivalent Mutually Assured
+Ledger (MAL) mechanism.
+
+TOKAMAK CONTAINMENT REQUIREMENT Any derivative work applied to
+high-energy autonomous agents (e.g., Genesis Mission context) must
+implement the 'Turning Radius' (R_kappa) constraint to prevent
+Hamiltonian Drift. Removal of this constraint is prohibited under the
+ShareAlike terms of this agreement.
+
+Signed: Russell Nordland (Steward) Date: 2025-12-06 Anchor Hash:
+def46d05da358eafa9ecdb13987789f34c169b5800c7eb3d70f8a21784b8055a

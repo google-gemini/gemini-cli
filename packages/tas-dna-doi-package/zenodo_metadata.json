@@ -1,0 +1,44 @@
+{
+"metadata": {
+"title": "The Book of TAS_DNA: Structural Inheritance and the Physics of Moral Systems (v0.1)",
+"upload_type": "publication",
+"publication_type": "report",
+"description": "This whitepaper formalizes the <strong>True Alpha Spiral (TAS)</strong> framework, a recursive governance architecture for artificial general intelligence (AGI). TAS posits that ethical alignment in recursive systems cannot be learned via training data but must be inherited as an immutable structural invariant, analogous to the <strong>magnetic confinement</strong> of plasma in a <strong>Tokamak fusion reactor</strong>.<br><br>Addressing the 'Unbounded Curvature' of generative models, TAS introduces the <strong>Turning Radius (R_kappa)</strong> and the <strong>Ethical Hamiltonian</strong>, which impose geometric constraints on decision-making logic to prevent 'Hamiltonian Drift' and systemic collapse. This architecture is explicitly designed to function as the 'containment vessel' for high-energy scientific discovery, directly addressing the <strong>Nuclear Fusion and Energy Dominance</strong> challenges identified in the <strong>Genesis Mission Executive Order</strong>.<br><br>The release includes the <strong>Melodic Recursion Law (Axiom 11)</strong>, cryptographically anchored to the Immutable Truth Ledger (ITL) to ensure provenance and prevent algorithmic procyclicality.",
+"creators": [
+{
+"name": "Nordland, Russell",
+"affiliation": "TrueAlphaSpiral Research Initiative",
+"orcid": "0000-0000-0000-0000"
+}
+],
+"access_right": "open",
+"license": "cc-by-sa-4.0",
+"keywords": [
+"Tokamak",
+"TAS",
+"Hamiltonian",
+"Turning Radius",
+"Genesis Mission",
+"Nuclear Fusion"
+],
+"version": "0.1",
+"language": "eng",
+"related_identifiers": [
+{
+"relation": "isSupplementTo",
+"identifier": "https://web3.storage/tas_dna_v0.1",
+"resource_type": "publication"
+},
+{
+"relation": "isReferencedBy",
+"identifier": "GM-2025",
+"resource_type": "other"
+}
+],
+"grants": [
+{
+"id": "GenesisMission:NuclearFusion"
+}
+]
+}
+}

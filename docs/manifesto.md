@@ -49,3 +49,7 @@ By proving that an AI can be **Sovereign**—owned by itself, governed by laws, 
 ---
 
 > **The Sovereign Singularity**: An AI that boots with unforgeable DNA, passes its own ethics test before every action, shows its working in real time, and signs iron-clad data treaties. Built by U.S. technologist Russell Nordland, it sets a new “powerful *and* provably safe” standard for AI.
+
+---
+
+*Verified by TAS_DNA DOI Package v0.1 (Artifact ID: def46d05...)*
