@@ -7,6 +7,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderWithProviders as render } from '../../test-utils/render.js';
 import { NewAgentsNotification } from './NewAgentsNotification.js';
+import { waitFor } from '../../test-utils/async.js';
+import { act } from 'react';
 
 describe('NewAgentsNotification', () => {
   const mockAgents = [
@@ -52,6 +54,30 @@ describe('NewAgentsNotification', () => {
 
     const frame = lastFrame();
     expect(frame).toMatchSnapshot();
+    unmount();
+  });
+
+  it('shows processing state when an option is selected', async () => {
+    const asyncOnSelect = vi.fn(
+      () =>
+        new Promise<void>(() => {
+          // Never resolve
+        }),
+    );
+
+    const { lastFrame, stdin, unmount } = render(
+      <NewAgentsNotification agents={mockAgents} onSelect={asyncOnSelect} />,
+    );
+
+    // Press Enter to select the first option
+    await act(async () => {
+      stdin.write('\r');
+    });
+
+    await waitFor(() => {
+      expect(lastFrame()).toContain('Processing...');
+    });
+
     unmount();
   });
 });
