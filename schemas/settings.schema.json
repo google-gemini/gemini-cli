@@ -327,6 +327,22 @@
           "default": {},
           "type": "object",
           "properties": {
+            "items": {
+              "title": "Footer Items",
+              "description": "List of item IDs to display in the footer. Rendered in order",
+              "markdownDescription": "List of item IDs to display in the footer. Rendered in order\n\n- Category: `UI`\n- Requires restart: `no`",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "showLabels": {
+              "title": "Show Footer Labels",
+              "description": "Display a second line above the footer items with descriptive headers (e.g., /model).",
+              "markdownDescription": "Display a second line above the footer items with descriptive headers (e.g., /model).\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
             "hideCWD": {
               "title": "Hide CWD",
               "description": "Hide the current working directory path in the footer.",
