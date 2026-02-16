@@ -347,17 +347,13 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
     <Box flexDirection="column">
       {progressHeader}
       <Box marginBottom={1}>
-        <MaxSizedBox
-          maxHeight={questionHeight}
-          maxWidth={availableWidth}
-          overflowDirection="bottom"
-        >
+        <Box flexDirection="column" width={availableWidth}>
           <MarkdownDisplay
             text={autoBoldIfPlain(question.question)}
             terminalWidth={availableWidth - DIALOG_PADDING}
             isPending={false}
           />
-        </MaxSizedBox>
+        </Box>
       </Box>
 
       <Box flexDirection="row" marginBottom={1}>
@@ -795,11 +791,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     <Box flexDirection="column">
       {progressHeader}
       <Box marginBottom={TITLE_MARGIN}>
-        <MaxSizedBox
-          maxHeight={questionHeight}
-          maxWidth={availableWidth}
-          overflowDirection="bottom"
-        >
+        <Box flexDirection="column" width={availableWidth}>
           <Box flexDirection="column">
             <MarkdownDisplay
               text={autoBoldIfPlain(question.question)}
@@ -812,7 +804,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
               </Text>
             )}
           </Box>
-        </MaxSizedBox>
+        </Box>
       </Box>
 
       <BaseSelectionList<OptionItem>
