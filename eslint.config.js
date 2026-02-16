@@ -52,6 +52,7 @@ export default tseslint.config(
       'packages/test-utils/**',
       '.gemini/skills/**',
       '**/*.d.ts',
+      'packages/core/src/teleportation/trajectory_teleporter.min.js',
     ],
   },
   eslint.configs.recommended,
