@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Text, Box } from 'ink';
+import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 
 interface ConsoleSummaryDisplayProps {
