@@ -365,7 +365,6 @@ describe('<Footer />', () => {
         settings: createMockSettings({
           ui: {
             footer: {
-              items: ['model-name', 'context-remaining'],
               hideContextPercentage: true,
             },
           },
@@ -387,7 +386,6 @@ describe('<Footer />', () => {
         settings: createMockSettings({
           ui: {
             footer: {
-              items: ['model-name', 'context-remaining'],
               hideContextPercentage: false,
             },
           },
