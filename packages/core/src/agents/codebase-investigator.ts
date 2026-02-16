@@ -15,7 +15,7 @@ import {
   DEFAULT_THINKING_MODE,
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
-  isPreviewModel,
+  supportsModernFeatures,
 } from '../config/models.js';
 import { z } from 'zod';
 import type { Config } from '../config/config.js';
@@ -51,9 +51,9 @@ const CodebaseInvestigationReportSchema = z.object({
 export const CodebaseInvestigatorAgent = (
   config: Config,
 ): LocalAgentDefinition<typeof CodebaseInvestigationReportSchema> => {
-  // Use Preview Flash model if the main model is any of the preview models.
-  // If the main model is not a preview model, use the default pro model.
-  const model = isPreviewModel(config.getModel())
+  // Use Preview Flash model if the main model supports modern features.
+  // If the main model is not a modern model, use the default pro model.
+  const model = supportsModernFeatures(config.getModel())
     ? PREVIEW_GEMINI_FLASH_MODEL
     : DEFAULT_GEMINI_MODEL;
 
@@ -96,7 +96,7 @@ export const CodebaseInvestigatorAgent = (
       generateContentConfig: {
         temperature: 0.1,
         topP: 0.95,
-        thinkingConfig: isPreviewModel(model)
+        thinkingConfig: supportsModernFeatures(model)
           ? {
               includeThoughts: true,
               thinkingLevel: ThinkingLevel.HIGH,
