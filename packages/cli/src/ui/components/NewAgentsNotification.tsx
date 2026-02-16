@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { useState } from 'react';
 import { Box, Text } from 'ink';
 import { type AgentDefinition } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
@@ -11,6 +12,7 @@ import {
   RadioButtonSelect,
   type RadioSelectItem,
 } from './shared/RadioButtonSelect.js';
+import { CliSpinner } from './CliSpinner.js';
 
 export enum NewAgentsChoice {
   ACKNOWLEDGE = 'acknowledge',
@@ -19,13 +21,15 @@ export enum NewAgentsChoice {
 
 interface NewAgentsNotificationProps {
   agents: AgentDefinition[];
-  onSelect: (choice: NewAgentsChoice) => void;
+  onSelect: (choice: NewAgentsChoice) => void | Promise<void>;
 }
 
 export const NewAgentsNotification = ({
   agents,
   onSelect,
 }: NewAgentsNotificationProps) => {
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const options: Array<RadioSelectItem<NewAgentsChoice>> = [
     {
       label: 'Acknowledge and Enable',
@@ -38,6 +42,15 @@ export const NewAgentsNotification = ({
       key: 'ignore',
     },
   ];
+
+  const handleSelect = async (choice: NewAgentsChoice) => {
+    setIsProcessing(true);
+    try {
+      await onSelect(choice);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   // Limit display to 5 agents to avoid overflow, show count for rest
   const MAX_DISPLAYED_AGENTS = 5;
@@ -85,11 +98,18 @@ export const NewAgentsNotification = ({
           </Box>
         </Box>
 
-        <RadioButtonSelect
-          items={options}
-          onSelect={onSelect}
-          isFocused={true}
-        />
+        {isProcessing ? (
+          <Box>
+            <CliSpinner />
+            <Text color={theme.text.primary}> Processing...</Text>
+          </Box>
+        ) : (
+          <RadioButtonSelect
+            items={options}
+            onSelect={handleSelect}
+            isFocused={true}
+          />
+        )}
       </Box>
     </Box>
   );

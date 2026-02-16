@@ -79,14 +79,12 @@ describe('ThemeDialog Snapshots', () => {
     });
   });
 
-  it('should call refreshStatic when a theme is selected', async () => {
-    const mockRefreshStatic = vi.fn();
+  it('should call onSelect when a theme is selected', async () => {
     const settings = createMockSettings();
     const { stdin } = renderWithProviders(
       <ThemeDialog {...baseProps} settings={settings} />,
       {
         settings,
-        uiActions: { refreshStatic: mockRefreshStatic },
       },
     );
 
@@ -96,7 +94,6 @@ describe('ThemeDialog Snapshots', () => {
     });
 
     await waitFor(() => {
-      expect(mockRefreshStatic).toHaveBeenCalled();
       expect(baseProps.onSelect).toHaveBeenCalled();
     });
   });

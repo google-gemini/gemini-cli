@@ -6,6 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders } from '../../../test-utils/render.js';
+import type { Text } from 'ink';
+import { Box } from 'ink';
 import type React from 'react';
 import {
   RadioButtonSelect,
@@ -144,9 +146,16 @@ describe('RadioButtonSelect', () => {
 
       const result = renderItem(item, mockContext);
 
-      expect(result?.props?.color).toBe(mockContext.titleColor);
-      expect(result?.props?.children).toBe('Option 1');
-      expect(result?.props?.wrap).toBe('truncate');
+      expect(result.type).toBe(Box);
+      const props = result.props as { children: React.ReactNode };
+      const textComponent = (props.children as React.ReactElement[])[0];
+      const textProps = textComponent?.props as React.ComponentProps<
+        typeof Text
+      >;
+
+      expect(textProps?.color).toBe(mockContext.titleColor);
+      expect(textProps?.children).toBe('Option 1');
+      expect(textProps?.wrap).toBe('truncate');
     });
 
     it('should render the special theme display when theme props are present', () => {
@@ -192,7 +201,13 @@ describe('RadioButtonSelect', () => {
 
       const result = renderItem(partialThemeItem, mockContext);
 
-      expect(result?.props?.children).toBe('Incomplete Theme');
+      expect(result.type).toBe(Box);
+      const props = result.props as { children: React.ReactNode };
+      const textComponent = (props.children as React.ReactElement[])[0];
+      const textProps = textComponent?.props as React.ComponentProps<
+        typeof Text
+      >;
+      expect(textProps?.children).toBe('Incomplete Theme');
     });
   });
 });

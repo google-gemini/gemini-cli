@@ -52,7 +52,7 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
 
   return (
     <HalfLinePaddedBox
-      backgroundBaseColor={theme.border.default}
+      backgroundBaseColor={theme.text.secondary}
       backgroundOpacity={DEFAULT_BACKGROUND_OPACITY}
       useBackgroundColor={useBackgroundColor}
     >

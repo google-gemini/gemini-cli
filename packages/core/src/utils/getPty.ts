@@ -18,6 +18,9 @@ export interface PtyProcess {
 }
 
 export const getPty = async (): Promise<PtyImplementation> => {
+  if (process.env['GEMINI_PTY_INFO'] === 'child_process') {
+    return null;
+  }
   try {
     const lydell = '@lydell/node-pty';
     const module = await import(lydell);

@@ -13,84 +13,66 @@ describe('ThinkingMessage', () => {
     const { lastFrame } = renderWithProviders(
       <ThinkingMessage
         thought={{ subject: 'Planning', description: 'test' }}
-        terminalWidth={80}
       />,
     );
 
-    expect(lastFrame()).toContain('Planning');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('uses description when subject is empty', () => {
     const { lastFrame } = renderWithProviders(
       <ThinkingMessage
         thought={{ subject: '', description: 'Processing details' }}
-        terminalWidth={80}
       />,
     );
 
-    expect(lastFrame()).toContain('Processing details');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders full mode with left vertical rule and full text', () => {
+  it('renders full mode with left border and full text', () => {
     const { lastFrame } = renderWithProviders(
       <ThinkingMessage
         thought={{
           subject: 'Planning',
           description: 'I am planning the solution.',
         }}
-        terminalWidth={80}
       />,
     );
 
-    expect(lastFrame()).toContain('│');
-    expect(lastFrame()).not.toContain('┌');
-    expect(lastFrame()).not.toContain('┐');
-    expect(lastFrame()).not.toContain('└');
-    expect(lastFrame()).not.toContain('┘');
-    expect(lastFrame()).toContain('Planning');
-    expect(lastFrame()).toContain('I am planning the solution.');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('starts left rule below the bold summary line in full mode', () => {
+  it('indents summary line correctly', () => {
     const { lastFrame } = renderWithProviders(
       <ThinkingMessage
         thought={{
           subject: 'Summary line',
           description: 'First body line',
         }}
-        terminalWidth={80}
       />,
     );
 
-    const lines = (lastFrame() ?? '').split('\n');
-    expect(lines[0] ?? '').toContain('Summary line');
-    expect(lines[0] ?? '').not.toContain('│');
-    expect(lines.slice(1).join('\n')).toContain('│');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('normalizes escaped newline tokens so literal \\n\\n is not shown', () => {
+  it('normalizes escaped newline tokens', () => {
     const { lastFrame } = renderWithProviders(
       <ThinkingMessage
         thought={{
           subject: 'Matching the Blocks',
-          description: '\\n\\n',
+          description: '\\n\\nSome more text',
         }}
-        terminalWidth={80}
       />,
     );
 
-    expect(lastFrame()).toContain('Matching the Blocks');
-    expect(lastFrame()).not.toContain('\\n\\n');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders empty state gracefully', () => {
     const { lastFrame } = renderWithProviders(
-      <ThinkingMessage
-        thought={{ subject: '', description: '' }}
-        terminalWidth={80}
-      />,
+      <ThinkingMessage thought={{ subject: '', description: '' }} />,
     );
 
-    expect(lastFrame()).not.toContain('Planning');
+    expect(lastFrame()).toBe('');
   });
 });

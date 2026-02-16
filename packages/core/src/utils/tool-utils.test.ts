@@ -5,10 +5,100 @@
  */
 
 import { expect, describe, it } from 'vitest';
-import { doesToolInvocationMatch, getToolSuggestion } from './tool-utils.js';
+import {
+  doesToolInvocationMatch,
+  getToolSuggestion,
+  shouldHideToolCall,
+} from './tool-utils.js';
 import type { AnyToolInvocation, Config } from '../index.js';
-import { ReadFileTool } from '../tools/read-file.js';
+import {
+  ReadFileTool,
+  ApprovalMode,
+  CoreToolCallStatus,
+  ASK_USER_DISPLAY_NAME,
+  WRITE_FILE_DISPLAY_NAME,
+  EDIT_DISPLAY_NAME,
+  READ_FILE_DISPLAY_NAME,
+} from '../index.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+
+describe('shouldHideToolCall', () => {
+  it.each([
+    {
+      status: CoreToolCallStatus.Scheduled,
+      hasResult: true,
+      shouldHide: true,
+    },
+    {
+      status: CoreToolCallStatus.Executing,
+      hasResult: true,
+      shouldHide: true,
+    },
+    {
+      status: CoreToolCallStatus.AwaitingApproval,
+      hasResult: true,
+      shouldHide: true,
+    },
+    {
+      status: CoreToolCallStatus.Validating,
+      hasResult: true,
+      shouldHide: true,
+    },
+    {
+      status: CoreToolCallStatus.Success,
+      hasResult: true,
+      shouldHide: false,
+    },
+    {
+      status: CoreToolCallStatus.Error,
+      hasResult: false,
+      shouldHide: true,
+    },
+    {
+      status: CoreToolCallStatus.Error,
+      hasResult: true,
+      shouldHide: false,
+    },
+  ])(
+    'AskUser: status=$status, hasResult=$hasResult -> hide=$shouldHide',
+    ({ status, hasResult, shouldHide }) => {
+      expect(
+        shouldHideToolCall({
+          displayName: ASK_USER_DISPLAY_NAME,
+          status,
+          hasResultDisplay: hasResult,
+        }),
+      ).toBe(shouldHide);
+    },
+  );
+
+  it.each([
+    {
+      name: WRITE_FILE_DISPLAY_NAME,
+      mode: ApprovalMode.PLAN,
+      visible: false,
+    },
+    { name: EDIT_DISPLAY_NAME, mode: ApprovalMode.PLAN, visible: false },
+    {
+      name: WRITE_FILE_DISPLAY_NAME,
+      mode: ApprovalMode.DEFAULT,
+      visible: true,
+    },
+    { name: READ_FILE_DISPLAY_NAME, mode: ApprovalMode.PLAN, visible: true },
+  ])(
+    'Plan Mode: tool=$name, mode=$mode -> visible=$visible',
+    ({ name, mode, visible }) => {
+      expect(
+        shouldHideToolCall({
+          displayName: name,
+          status: CoreToolCallStatus.Success,
+          approvalMode: mode,
+          hasResultDisplay: true,
+        }),
+      ).toBe(!visible);
+    },
+  );
+});
 
 describe('getToolSuggestion', () => {
   it('should suggest the top N closest tool names for a typo', () => {

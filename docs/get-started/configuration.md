@@ -96,6 +96,13 @@ their corresponding top-level category object in your `settings.json` file.
 
 <!-- SETTINGS-AUTOGEN:START -->
 
+#### `policyPaths`
+
+- **`policyPaths`** (array):
+  - **Description:** Additional policy files or directories to load.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
 #### `general`
 
 - **`general.preferredEditor`** (string):
@@ -105,6 +112,13 @@ their corresponding top-level category object in your `settings.json` file.
 - **`general.vimMode`** (boolean):
   - **Description:** Enable Vim keybindings
   - **Default:** `false`
+
+- **`general.defaultApprovalMode`** (enum):
+  - **Description:** The default approval mode for tool execution. 'default'
+    prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is
+    read-only mode. 'yolo' is not supported yet.
+  - **Default:** `"default"`
+  - **Values:** `"default"`, `"auto_edit"`, `"plan"`
 
 - **`general.devtools`** (boolean):
   - **Description:** Enable DevTools inspector on launch.
@@ -143,8 +157,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`general.sessionRetention.maxAge`** (string):
-  - **Description:** Maximum age of sessions to keep (e.g., "30d", "7d", "24h",
-    "1w")
+  - **Description:** Automatically delete chats older than this time period
+    (e.g., "30d", "7d", "24h", "1w")
   - **Default:** `undefined`
 
 - **`general.sessionRetention.maxCount`** (number):
@@ -155,6 +169,11 @@ their corresponding top-level category object in your `settings.json` file.
 - **`general.sessionRetention.minRetention`** (string):
   - **Description:** Minimum retention period (safety limit, defaults to "1d")
   - **Default:** `"1d"`
+
+- **`general.sessionRetention.warningAcknowledged`** (boolean):
+  - **Description:** INTERNAL: Whether the user has acknowledged the session
+    retention warning
+  - **Default:** `false`
 
 #### `output`
 
@@ -212,6 +231,10 @@ their corresponding top-level category object in your `settings.json` file.
 - **`ui.hideTips`** (boolean):
   - **Description:** Hide helpful tips in the UI
   - **Default:** `false`
+
+- **`ui.showShortcutsHint`** (boolean):
+  - **Description:** Show the "? for shortcuts" hint above the input.
+  - **Default:** `true`
 
 - **`ui.hideBanner`** (boolean):
   - **Description:** Hide the application banner
@@ -436,6 +459,12 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-2.5-flash"
         }
       },
+      "gemini-3-flash-base": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-3-flash-preview"
+        }
+      },
       "classifier": {
         "extends": "base",
         "modelConfig": {
@@ -491,7 +520,7 @@ their corresponding top-level category object in your `settings.json` file.
         }
       },
       "web-search": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {
           "generateContentConfig": {
             "tools": [
@@ -503,7 +532,7 @@ their corresponding top-level category object in your `settings.json` file.
         }
       },
       "web-fetch": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {
           "generateContentConfig": {
             "tools": [
@@ -515,25 +544,25 @@ their corresponding top-level category object in your `settings.json` file.
         }
       },
       "web-fetch-fallback": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {}
       },
       "loop-detection": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {}
       },
       "loop-detection-double-check": {
         "extends": "base",
         "modelConfig": {
-          "model": "gemini-2.5-pro"
+          "model": "gemini-3-pro-preview"
         }
       },
       "llm-edit-fixer": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {}
       },
       "next-speaker-checker": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {}
       },
       "chat-compression-3-pro": {
@@ -563,7 +592,7 @@ their corresponding top-level category object in your `settings.json` file.
       },
       "chat-compression-default": {
         "modelConfig": {
-          "model": "gemini-2.5-pro"
+          "model": "gemini-3-pro-preview"
         }
       }
     }
@@ -680,13 +709,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable shell output efficiency optimizations for better
     performance.
   - **Default:** `true`
-
-- **`tools.approvalMode`** (enum):
-  - **Description:** The default approval mode for tool execution. 'default'
-    prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is
-    read-only mode. 'yolo' is not supported yet.
-  - **Default:** `"default"`
-  - **Values:** `"default"`, `"auto_edit"`, `"plan"`
 
 - **`tools.core`** (array):
   - **Description:** Restrict the set of built-in tools with an allowlist. Match
@@ -848,6 +870,28 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `experimental`
 
+- **`experimental.toolOutputMasking.enabled`** (boolean):
+  - **Description:** Enables tool output masking to save tokens.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`experimental.toolOutputMasking.toolProtectionThreshold`** (number):
+  - **Description:** Minimum number of tokens to protect from masking (most
+    recent tool outputs).
+  - **Default:** `50000`
+  - **Requires restart:** Yes
+
+- **`experimental.toolOutputMasking.minPrunableTokensThreshold`** (number):
+  - **Description:** Minimum prunable tokens required to trigger a masking pass.
+  - **Default:** `30000`
+  - **Requires restart:** Yes
+
+- **`experimental.toolOutputMasking.protectLatestTurn`** (boolean):
+  - **Description:** Ensures the absolute latest turn is never masked,
+    regardless of token count.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
 - **`experimental.enableAgents`** (boolean):
   - **Description:** Enable local and remote subagents. Warning: Experimental
     feature, uses YOLO mode for subagents
@@ -862,6 +906,11 @@ their corresponding top-level category object in your `settings.json` file.
 - **`experimental.extensionConfig`** (boolean):
   - **Description:** Enable requesting and fetching of extension settings.
   - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`experimental.extensionRegistry`** (boolean):
+  - **Description:** Enable extension registry explore UI.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`experimental.extensionReloading`** (boolean):
@@ -1253,7 +1302,10 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
     few other folders, see
     `packages/cli/src/utils/sandbox-macos-permissive-open.sb`) but allows other
     operations.
-  - `strict`: Uses a strict profile that declines operations by default.
+  - `restrictive-open`: Declines operations by default, allows network.
+  - `strict-open`: Restricts both reads and writes to the working directory,
+    allows network.
+  - `strict-proxied`: Same as `strict-open` but routes network through proxy.
   - `<profile_name>`: Uses a custom profile. To define a custom profile, create
     a file named `sandbox-macos-<profile_name>.sb` in your project's `.gemini/`
     directory (e.g., `my-project/.gemini/sandbox-macos-custom.sb`).
@@ -1327,10 +1379,9 @@ for that specific session.
   - Specifies the Gemini model to use for this session.
   - Example: `npm start -- --model gemini-3-pro-preview`
 - **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
+  - **Deprecated:** Use positional arguments instead.
   - Used to pass a prompt directly to the command. This invokes Gemini CLI in a
     non-interactive mode.
-  - For scripting examples, use the `--output-format json` flag to get
-    structured output.
 - **`--prompt-interactive <your_prompt>`** (**`-i <your_prompt>`**):
   - Starts an interactive session with the provided prompt as the initial input.
   - The prompt is processed within the interactive session, not before it.

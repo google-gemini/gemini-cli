@@ -7,7 +7,11 @@
 import { debugLogger } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 import WebSocket from 'ws';
-import { initActivityLogger, addNetworkTransport } from './activityLogger.js';
+import {
+  initActivityLogger,
+  addNetworkTransport,
+  ActivityLogger,
+} from './activityLogger.js';
 
 interface IDevTools {
   start(): Promise<string>;
@@ -20,6 +24,8 @@ const DEFAULT_DEVTOOLS_PORT = 25417;
 const DEFAULT_DEVTOOLS_HOST = '127.0.0.1';
 const MAX_PROMOTION_ATTEMPTS = 3;
 let promotionAttempts = 0;
+let serverStartPromise: Promise<string> | null = null;
+let connectedUrl: string | null = null;
 
 /**
  * Probe whether a DevTools server is already listening on the given host:port.
@@ -110,70 +116,145 @@ async function handlePromotion(config: Config) {
 }
 
 /**
- * Registers the activity logger.
- * Captures network and console logs via DevTools WebSocket or to a file.
- *
- * Environment variable GEMINI_CLI_ACTIVITY_LOG_TARGET controls the output:
- * - file path (e.g., "/tmp/logs.jsonl") → file mode
- * - not set → auto-start DevTools (reuses existing instance if already running)
- *
- * @param config The CLI configuration
+ * Initializes the activity logger.
+ * Interception starts immediately in buffering mode.
+ * If an existing DevTools server is found, attaches transport eagerly.
  */
-export async function registerActivityLogger(config: Config) {
+export async function setupInitialActivityLogger(config: Config) {
   const target = process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET'];
 
-  if (!target) {
-    // No explicit target: try connecting to existing DevTools, then start new one
-    const onReconnectFailed = () => handlePromotion(config);
+  if (target) {
+    if (!config.storage) return;
+    initActivityLogger(config, { mode: 'file', filePath: target });
+  } else {
+    // Start in buffering mode (no transport attached yet)
+    initActivityLogger(config, { mode: 'buffer' });
 
-    // Probe for an existing DevTools server
-    const existing = await probeDevTools(
-      DEFAULT_DEVTOOLS_HOST,
-      DEFAULT_DEVTOOLS_PORT,
-    );
-    if (existing) {
-      debugLogger.log(
-        `DevTools (existing) at: http://${DEFAULT_DEVTOOLS_HOST}:${DEFAULT_DEVTOOLS_PORT}`,
+    // Eagerly probe for an existing DevTools server
+    try {
+      const existing = await probeDevTools(
+        DEFAULT_DEVTOOLS_HOST,
+        DEFAULT_DEVTOOLS_PORT,
       );
-      initActivityLogger(config, {
-        mode: 'network',
-        host: DEFAULT_DEVTOOLS_HOST,
-        port: DEFAULT_DEVTOOLS_PORT,
-        onReconnectFailed,
-      });
-      return;
+      if (existing) {
+        const onReconnectFailed = () => handlePromotion(config);
+        addNetworkTransport(
+          config,
+          DEFAULT_DEVTOOLS_HOST,
+          DEFAULT_DEVTOOLS_PORT,
+          onReconnectFailed,
+        );
+        ActivityLogger.getInstance().enableNetworkLogging();
+        connectedUrl = `http://localhost:${DEFAULT_DEVTOOLS_PORT}`;
+        debugLogger.log(`DevTools (existing) at startup: ${connectedUrl}`);
+      }
+    } catch {
+      // Probe failed silently — stay in buffer mode
     }
+  }
+}
 
+/**
+ * Starts the DevTools server and opens the UI in the browser.
+ * Returns the URL to the DevTools UI.
+ * Deduplicates concurrent calls — returns the same promise if already in flight.
+ */
+export function startDevToolsServer(config: Config): Promise<string> {
+  if (connectedUrl) return Promise.resolve(connectedUrl);
+  if (serverStartPromise) return serverStartPromise;
+  serverStartPromise = startDevToolsServerImpl(config).catch((err) => {
+    serverStartPromise = null;
+    throw err;
+  });
+  return serverStartPromise;
+}
+
+async function startDevToolsServerImpl(config: Config): Promise<string> {
+  const onReconnectFailed = () => handlePromotion(config);
+
+  // Probe for an existing DevTools server
+  const existing = await probeDevTools(
+    DEFAULT_DEVTOOLS_HOST,
+    DEFAULT_DEVTOOLS_PORT,
+  );
+
+  let host = DEFAULT_DEVTOOLS_HOST;
+  let port = DEFAULT_DEVTOOLS_PORT;
+
+  if (existing) {
+    debugLogger.log(
+      `DevTools (existing) at: http://${DEFAULT_DEVTOOLS_HOST}:${DEFAULT_DEVTOOLS_PORT}`,
+    );
+  } else {
     // No existing server — start (or join if we lose the race)
     try {
       const result = await startOrJoinDevTools(
         DEFAULT_DEVTOOLS_HOST,
         DEFAULT_DEVTOOLS_PORT,
       );
-      initActivityLogger(config, {
-        mode: 'network',
-        host: result.host,
-        port: result.port,
-        onReconnectFailed,
-      });
-      return;
+      host = result.host;
+      port = result.port;
     } catch (err) {
-      debugLogger.debug(
-        'Failed to start DevTools, falling back to file logging:',
-        err,
-      );
+      debugLogger.debug('Failed to start DevTools:', err);
+      throw err;
     }
   }
 
-  // File mode fallback
-  if (!config.storage) {
+  // Promote the activity logger to use the network transport
+  addNetworkTransport(config, host, port, onReconnectFailed);
+  const capture = ActivityLogger.getInstance();
+  capture.enableNetworkLogging();
+
+  const url = `http://localhost:${port}`;
+  connectedUrl = url;
+  return url;
+}
+
+/**
+ * Handles the F12 key toggle for the DevTools panel.
+ * Starts the DevTools server, attempts to open the browser.
+ * If the panel is already open, it closes it.
+ * If the panel is closed:
+ * - Attempts to open the browser.
+ * - If browser opening is successful, the panel remains closed.
+ * - If browser opening fails or is not possible, the panel is opened.
+ */
+export async function toggleDevToolsPanel(
+  config: Config,
+  isOpen: boolean,
+  toggle: () => void,
+  setOpen: () => void,
+): Promise<void> {
+  if (isOpen) {
+    toggle();
     return;
   }
 
-  initActivityLogger(config, { mode: 'file', filePath: target });
+  try {
+    const { openBrowserSecurely, shouldLaunchBrowser } = await import(
+      '@google/gemini-cli-core'
+    );
+    const url = await startDevToolsServer(config);
+    if (shouldLaunchBrowser()) {
+      try {
+        await openBrowserSecurely(url);
+        // Browser opened successfully, don't open drawer.
+        return;
+      } catch (e) {
+        debugLogger.warn('Failed to open browser securely:', e);
+      }
+    }
+    // If we can't launch browser or it failed, open drawer.
+    setOpen();
+  } catch (e) {
+    setOpen();
+    debugLogger.error('Failed to start DevTools server:', e);
+  }
 }
 
 /** Reset module-level state — test only. */
 export function resetForTesting() {
   promotionAttempts = 0;
+  serverStartPromise = null;
+  connectedUrl = null;
 }

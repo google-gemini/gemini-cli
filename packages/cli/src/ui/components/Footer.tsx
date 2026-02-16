@@ -14,7 +14,6 @@ import {
 } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
-import { ThemedGradient } from './ThemedGradient.js';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { QuotaDisplay } from './QuotaDisplay.js';
@@ -41,7 +40,6 @@ export const Footer: React.FC = () => {
     errorCount,
     showErrorDetails,
     promptTokenCount,
-    nightly,
     isTrustedFolder,
     terminalWidth,
     quotaStats,
@@ -55,7 +53,6 @@ export const Footer: React.FC = () => {
     errorCount: uiState.errorCount,
     showErrorDetails: uiState.showErrorDetails,
     promptTokenCount: uiState.sessionStats.lastPromptTokenCount,
-    nightly: uiState.nightly,
     isTrustedFolder: uiState.isTrustedFolder,
     terminalWidth: uiState.terminalWidth,
     quotaStats: uiState.quota.stats,
@@ -90,20 +87,14 @@ export const Footer: React.FC = () => {
           {displayVimMode && (
             <Text color={theme.text.secondary}>[{displayVimMode}] </Text>
           )}
-          {!hideCWD &&
-            (nightly ? (
-              <ThemedGradient>
-                {displayPath}
-                {branchName && <Text> ({branchName}*)</Text>}
-              </ThemedGradient>
-            ) : (
-              <Text color={theme.text.link}>
-                {displayPath}
-                {branchName && (
-                  <Text color={theme.text.secondary}> ({branchName}*)</Text>
-                )}
-              </Text>
-            ))}
+          {!hideCWD && (
+            <Text color={theme.text.primary}>
+              {displayPath}
+              {branchName && (
+                <Text color={theme.text.secondary}> ({branchName}*)</Text>
+              )}
+            </Text>
+          )}
           {debugMode && (
             <Text color={theme.status.error}>
               {' ' + (debugMessage || '--debug')}
@@ -149,9 +140,9 @@ export const Footer: React.FC = () => {
       {!hideModelInfo && (
         <Box alignItems="center" justifyContent="flex-end">
           <Box alignItems="center">
-            <Text color={theme.text.accent}>
+            <Text color={theme.text.primary}>
+              <Text color={theme.text.secondary}>/model </Text>
               {getDisplayString(model)}
-              <Text color={theme.text.secondary}> /model</Text>
               {!hideContextPercentage && (
                 <>
                   {' '}

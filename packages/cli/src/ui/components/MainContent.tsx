@@ -8,7 +8,6 @@ import { Box, Static } from 'ink';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useAppContext } from '../contexts/AppContext.js';
-import { useSettings } from '../contexts/SettingsContext.js';
 import { AppHeader } from './AppHeader.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import {
@@ -20,8 +19,6 @@ import { useMemo, memo, useCallback, useEffect, useRef } from 'react';
 import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
-import { useConfig } from '../contexts/ConfigContext.js';
-import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
@@ -33,13 +30,10 @@ const MemoizedAppHeader = memo(AppHeader);
 export const MainContent = () => {
   const { version } = useAppContext();
   const uiState = useUIState();
-  const settings = useSettings();
-  const config = useConfig();
   const isAlternateBuffer = useAlternateBuffer();
 
   const confirmingTool = useConfirmingTool();
-  const showConfirmationQueue =
-    config.isEventDrivenSchedulerEnabled() && confirmingTool !== null;
+  const showConfirmationQueue = confirmingTool !== null;
 
   const scrollableListRef = useRef<VirtualizedListRef<unknown>>(null);
 
@@ -54,9 +48,9 @@ export const MainContent = () => {
     mainAreaWidth,
     staticAreaMaxItemHeight,
     availableTerminalHeight,
+    cleanUiDetailsVisible,
   } = uiState;
-
-  const inlineThinkingMode = getInlineThinkingMode(settings);
+  const showHeaderDetails = cleanUiDetailsVisible;
 
   const historyItems = useMemo(
     () =>
@@ -69,7 +63,6 @@ export const MainContent = () => {
           item={h}
           isPending={false}
           commands={uiState.slashCommands}
-          inlineThinkingMode={inlineThinkingMode}
         />
       )),
     [
@@ -77,7 +70,6 @@ export const MainContent = () => {
       mainAreaWidth,
       staticAreaMaxItemHeight,
       uiState.slashCommands,
-      inlineThinkingMode,
     ],
   );
 
@@ -96,10 +88,8 @@ export const MainContent = () => {
             terminalWidth={mainAreaWidth}
             item={{ ...item, id: 0 }}
             isPending={true}
-            isFocused={!uiState.isEditorDialogOpen}
             activeShellPtyId={uiState.activePtyId}
             embeddedShellFocused={uiState.embeddedShellFocused}
-            inlineThinkingMode={inlineThinkingMode}
           />
         ))}
         {showConfirmationQueue && confirmingTool && (
@@ -113,8 +103,6 @@ export const MainContent = () => {
       isAlternateBuffer,
       availableTerminalHeight,
       mainAreaWidth,
-      inlineThinkingMode,
-      uiState.isEditorDialogOpen,
       uiState.activePtyId,
       uiState.embeddedShellFocused,
       showConfirmationQueue,
@@ -134,7 +122,13 @@ export const MainContent = () => {
   const renderItem = useCallback(
     ({ item }: { item: (typeof virtualizedData)[number] }) => {
       if (item.type === 'header') {
-        return <MemoizedAppHeader key="app-header" version={version} />;
+        return (
+          <MemoizedAppHeader
+            key="app-header"
+            version={version}
+            showDetails={showHeaderDetails}
+          />
+        );
       } else if (item.type === 'history') {
         return (
           <MemoizedHistoryItemDisplay
@@ -145,7 +139,6 @@ export const MainContent = () => {
             item={item.item}
             isPending={false}
             commands={uiState.slashCommands}
-            inlineThinkingMode={inlineThinkingMode}
           />
         );
       } else {
@@ -153,10 +146,10 @@ export const MainContent = () => {
       }
     },
     [
+      showHeaderDetails,
       version,
       mainAreaWidth,
       uiState.slashCommands,
-      inlineThinkingMode,
       pendingItems,
     ],
   );

@@ -29,6 +29,11 @@ vi.mock('ink', () => ({
   useStdin: () => ({
     stdin: mockStdin,
   }),
+  useStdout: () => ({
+    stdout: {
+      write: vi.fn(),
+    },
+  }),
 }));
 
 const TestComponent = ({ onColor }: { onColor: (c: string) => void }) => {

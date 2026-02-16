@@ -21,7 +21,7 @@ import { FileOperation } from '../telemetry/metrics.js';
 import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
-import { READ_FILE_TOOL_NAME } from './tool-names.js';
+import { READ_FILE_TOOL_NAME, READ_FILE_DISPLAY_NAME } from './tool-names.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { READ_FILE_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
@@ -173,7 +173,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
   ) {
     super(
       ReadFileTool.Name,
-      'ReadFile',
+      READ_FILE_DISPLAY_NAME,
       READ_FILE_DEFINITION.base.description!,
       Kind.Read,
       READ_FILE_DEFINITION.base.parametersJsonSchema,

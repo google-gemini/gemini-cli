@@ -127,6 +127,17 @@ export interface AgentsDiscoveredPayload {
   agents: AgentDefinition[];
 }
 
+export interface SlashCommandConflict {
+  name: string;
+  renamedTo: string;
+  loserExtensionName?: string;
+  winnerExtensionName?: string;
+}
+
+export interface SlashCommandConflictsPayload {
+  conflicts: SlashCommandConflict[];
+}
+
 /**
  * Payload for the 'quota-changed' event.
  */
@@ -155,6 +166,7 @@ export enum CoreEvent {
   AgentsDiscovered = 'agents-discovered',
   RequestEditorSelection = 'request-editor-selection',
   EditorSelected = 'editor-selected',
+  SlashCommandConflicts = 'slash-command-conflicts',
   QuotaChanged = 'quota-changed',
 }
 
@@ -185,6 +197,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.AgentsDiscovered]: [AgentsDiscoveredPayload];
   [CoreEvent.RequestEditorSelection]: never[];
   [CoreEvent.EditorSelected]: [EditorSelectedPayload];
+  [CoreEvent.SlashCommandConflicts]: [SlashCommandConflictsPayload];
 }
 
 type EventBacklogItem = {
@@ -320,6 +333,11 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   emitAgentsDiscovered(agents: AgentDefinition[]): void {
     const payload: AgentsDiscoveredPayload = { agents };
     this._emitOrQueue(CoreEvent.AgentsDiscovered, payload);
+  }
+
+  emitSlashCommandConflicts(conflicts: SlashCommandConflict[]): void {
+    const payload: SlashCommandConflictsPayload = { conflicts };
+    this._emitOrQueue(CoreEvent.SlashCommandConflicts, payload);
   }
 
   /**
