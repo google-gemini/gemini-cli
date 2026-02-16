@@ -8,7 +8,8 @@
 
 ## `Simple Example`
 
-> **Status:** Implemented. `GeminiCliAgent` supports `cwd` and `sendStream`.
+> **Status:** Implemented. `GeminiCliAgent` supports `session()` and
+> `resumeSession()`.
 
 Equivalent to `gemini -p "what does this project do?"`. Loads all workspace and
 user settings.
@@ -20,10 +21,14 @@ const simpleAgent = new GeminiCliAgent({
   cwd: '/path/to/some/dir',
 });
 
-for await (const chunk of simpleAgent.sendStream(
-  'what does this project do?',
-)) {
-  console.log(chunk); // equivalent to JSON streaming chunks (probably?) for now
+// Create a new empty session
+const session = simpleAgent.session();
+
+// Resume most recent session (optional: pass a specific session ID)
+// const session = await simpleAgent.resumeSession();
+
+for await (const chunk of session.sendStream('what does this project do?')) {
+  console.log(chunk); // equivalent to JSON streaming chunks
 }
 ```
 
@@ -268,8 +273,9 @@ export interface SessionContext {
   // helpers to access files and run shell commands while adhering to policies/validation
   fs: AgentFilesystem;
   shell: AgentShell;
-  // the agent itself is passed as context
+  // the agent and session are passed as context
   agent: GeminiCliAgent;
+  session: GeminiCliSession;
 }
 
 export interface AgentFilesystem {
