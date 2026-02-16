@@ -55,12 +55,6 @@ powerful tool for developers.
   prompting updates, skip `preflight` at the end of the task and wait for PR
   validation.)
 - **Individual Checks:** `npm run lint` / `npm run format` / `npm run typecheck`
-- **Settings Docs Parity:** `npm run check:docs:settings` (Runs settings schema
-  + docs generation in check mode to catch CI docs drift locally.)
-- **CLI/UI CI-Parity Checks (Local):** For `packages/cli` and UI changes, run
-  targeted workspace tests for touched areas plus
-  `npm run check:docs:settings` before pushing. Use this instead of trying to
-  run the full CI matrix locally.
 
 ## Development Conventions
 
