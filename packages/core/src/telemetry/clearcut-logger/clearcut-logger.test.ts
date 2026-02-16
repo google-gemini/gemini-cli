@@ -438,6 +438,26 @@ describe('ClearcutLogger', () => {
       });
     });
 
+    it('handles empty cpus array gracefully', async () => {
+      const os = await import('node:os');
+      vi.mocked(os.cpus).mockReturnValueOnce([]);
+
+      const { logger, loggerConfig } = setup({});
+      await logger?.logStartSessionEvent(new StartSessionEvent(loggerConfig));
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const metadata = event?.event_metadata[0];
+
+      const cpuInfoEntry = metadata?.find(
+        (m) => m.gemini_cli_key === EventMetadataKey.GEMINI_CLI_CPU_INFO,
+      );
+      const cpuCoresEntry = metadata?.find(
+        (m) => m.gemini_cli_key === EventMetadataKey.GEMINI_CLI_CPU_CORES,
+      );
+      expect(cpuInfoEntry?.value).toBe('Unknown');
+      expect(cpuCoresEntry?.value).toBe('0');
+    });
+
     type SurfaceDetectionTestCase = {
       name: string;
       env: Record<string, string | undefined>;
