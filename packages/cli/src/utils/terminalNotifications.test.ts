@@ -195,10 +195,14 @@ describe('terminal notifications', () => {
       detail: 'd'.repeat(400),
     });
 
-    expect(content.title.length).toBeLessThanOrEqual(MAX_NOTIFICATION_TITLE_CHARS);
+    expect(content.title.length).toBeLessThanOrEqual(
+      MAX_NOTIFICATION_TITLE_CHARS,
+    );
     expect((content.subtitle ?? '').length).toBeLessThanOrEqual(
       MAX_NOTIFICATION_SUBTITLE_CHARS,
     );
-    expect(content.body.length).toBeLessThanOrEqual(MAX_NOTIFICATION_BODY_CHARS);
+    expect(content.body.length).toBeLessThanOrEqual(
+      MAX_NOTIFICATION_BODY_CHARS,
+    );
   });
 });

@@ -176,8 +176,7 @@ vi.mock('./hooks/useShellInactivityStatus.js', () => ({
 }));
 vi.mock('../utils/terminalNotifications.js', () => ({
   notifyViaTerminal: terminalNotificationsMocks.notifyViaTerminal,
-  isNotificationsEnabled:
-    terminalNotificationsMocks.isNotificationsEnabled,
+  isNotificationsEnabled: terminalNotificationsMocks.isNotificationsEnabled,
   buildRunEventNotificationContent:
     terminalNotificationsMocks.buildRunEventNotificationContent,
 }));
@@ -635,7 +634,9 @@ describe('AppContainer State Management', () => {
         unmount = rendered.unmount;
       });
 
-      expect(terminalNotificationsMocks.notifyViaTerminal).not.toHaveBeenCalled();
+      expect(
+        terminalNotificationsMocks.notifyViaTerminal,
+      ).not.toHaveBeenCalled();
 
       await act(async () => {
         unmount?.();
@@ -799,7 +800,9 @@ describe('AppContainer State Management', () => {
         rerender?.(getAppContainer());
       });
 
-      expect(terminalNotificationsMocks.notifyViaTerminal).not.toHaveBeenCalled();
+      expect(
+        terminalNotificationsMocks.notifyViaTerminal,
+      ).not.toHaveBeenCalled();
 
       await act(async () => {
         unmount?.();
@@ -849,9 +852,9 @@ describe('AppContainer State Management', () => {
       });
 
       await waitFor(() =>
-        expect(terminalNotificationsMocks.notifyViaTerminal).toHaveBeenCalledTimes(
-          1,
-        ),
+        expect(
+          terminalNotificationsMocks.notifyViaTerminal,
+        ).toHaveBeenCalledTimes(1),
       );
 
       pendingHistoryItems = [];
@@ -885,9 +888,9 @@ describe('AppContainer State Management', () => {
       });
 
       await waitFor(() =>
-        expect(terminalNotificationsMocks.notifyViaTerminal).toHaveBeenCalledTimes(
-          2,
-        ),
+        expect(
+          terminalNotificationsMocks.notifyViaTerminal,
+        ).toHaveBeenCalledTimes(2),
       );
 
       await act(async () => {

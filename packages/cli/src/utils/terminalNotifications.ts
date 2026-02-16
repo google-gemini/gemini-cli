@@ -6,7 +6,11 @@
 
 import { debugLogger, writeToStdout } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
-import { cpLen, cpSlice, stripUnsafeCharacters } from '../ui/utils/textUtils.js';
+import {
+  cpLen,
+  cpSlice,
+  stripUnsafeCharacters,
+} from '../ui/utils/textUtils.js';
 
 export const MAX_NOTIFICATION_TITLE_CHARS = 48;
 export const MAX_NOTIFICATION_SUBTITLE_CHARS = 64;
@@ -43,7 +47,10 @@ function normalizeText(input: string): string {
   return stripUnsafeCharacters(input).replace(/\s+/g, ' ').trim();
 }
 
-export function truncateForNotification(input: string, maxChars: number): string {
+export function truncateForNotification(
+  input: string,
+  maxChars: number,
+): string {
   if (maxChars <= 0) {
     return '';
   }
@@ -63,11 +70,17 @@ export function truncateForNotification(input: string, maxChars: number): string
 function sanitizeNotificationContent(
   content: RunEventNotificationContent,
 ): RunEventNotificationContent {
-  const title = truncateForNotification(content.title, MAX_NOTIFICATION_TITLE_CHARS);
+  const title = truncateForNotification(
+    content.title,
+    MAX_NOTIFICATION_TITLE_CHARS,
+  );
   const subtitle = content.subtitle
     ? truncateForNotification(content.subtitle, MAX_NOTIFICATION_SUBTITLE_CHARS)
     : undefined;
-  const body = truncateForNotification(content.body, MAX_NOTIFICATION_BODY_CHARS);
+  const body = truncateForNotification(
+    content.body,
+    MAX_NOTIFICATION_BODY_CHARS,
+  );
 
   return {
     title: title || 'Gemini CLI',
@@ -141,12 +154,17 @@ export function supportsOsc9Notifications(
 function buildTerminalNotificationMessage(
   content: RunEventNotificationContent,
 ): string {
-  const pieces = [content.title, content.subtitle, content.body].filter(Boolean);
+  const pieces = [content.title, content.subtitle, content.body].filter(
+    Boolean,
+  );
   const combined = pieces.join(OSC9_SEPARATOR);
   return truncateForNotification(combined, MAX_OSC9_MESSAGE_CHARS);
 }
 
-function emitOsc9Notification(content: RunEventNotificationContent, terminalName?: string): void {
+function emitOsc9Notification(
+  content: RunEventNotificationContent,
+  terminalName?: string,
+): void {
   const message = buildTerminalNotificationMessage(content);
   if (!supportsOsc9Notifications(process.env, terminalName)) {
     writeToStdout(BEL);

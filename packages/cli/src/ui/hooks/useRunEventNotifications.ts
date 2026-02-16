@@ -148,7 +148,11 @@ export function useRunEventNotifications({
       streamingState === StreamingState.Idle;
     const shouldSuppressForFocus = hasReceivedFocusEvent && isFocused;
 
-    if (!justCompletedTurn || shouldSuppressForFocus || hasPendingActionRequired) {
+    if (
+      !justCompletedTurn ||
+      shouldSuppressForFocus ||
+      hasPendingActionRequired
+    ) {
       return;
     }
 
