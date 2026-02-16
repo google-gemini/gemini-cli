@@ -9,6 +9,7 @@ import type { Config } from '../config/config.js';
 import { getCoreSystemPrompt } from '../core/prompts.js';
 import type { LocalAgentDefinition } from './types.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import { GENERALIST_TOOL_NAME } from '../tools/tool-names.js';
 
 const GeneralistAgentSchema = z.object({
   response: z.string().describe('The final response from the agent.'),
@@ -22,7 +23,7 @@ export const GeneralistAgent = (
   config: Config,
 ): LocalAgentDefinition<typeof GeneralistAgentSchema> => ({
   kind: 'local',
-  name: 'generalist',
+  name: GENERALIST_TOOL_NAME,
   displayName: 'Generalist Agent',
   description: `A general-purpose AI agent with access to all tools.
     - ALWAYS use it to break up and parallelize independent pieces of a larger task, when possible.

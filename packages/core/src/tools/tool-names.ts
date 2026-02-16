@@ -43,6 +43,7 @@ export const ASK_USER_TOOL_NAME = 'ask_user';
 export const ASK_USER_DISPLAY_NAME = 'Ask User';
 export const EXIT_PLAN_MODE_TOOL_NAME = 'exit_plan_mode';
 export const ENTER_PLAN_MODE_TOOL_NAME = 'enter_plan_mode';
+export const GENERALIST_TOOL_NAME = 'generalist';
 
 /**
  * Mapping of legacy tool names to their current names.

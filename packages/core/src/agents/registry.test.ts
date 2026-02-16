@@ -27,6 +27,7 @@ import type { ToolRegistry } from '../tools/tool-registry.js';
 import { ThinkingLevel } from '@google/genai';
 import type { AcknowledgedAgentsService } from './acknowledgedAgents.js';
 import { PolicyDecision } from '../policy/types.js';
+import { GENERALIST_TOOL_NAME } from '../tools/tool-names.js';
 
 vi.mock('./agentLoader.js', () => ({
   loadAgentsFromDirectory: vi
@@ -302,14 +303,14 @@ describe('AgentRegistry', () => {
 
       await registry.initialize();
 
-      expect(registry.getDefinition('generalist')).toBeUndefined();
+      expect(registry.getDefinition(GENERALIST_TOOL_NAME)).toBeUndefined();
     });
 
     it('should register generalist agent if explicitly enabled via override', async () => {
       const config = makeMockedConfig({
         agents: {
           overrides: {
-            generalist: { enabled: true },
+            [GENERALIST_TOOL_NAME]: { enabled: true },
           },
         },
       });
@@ -317,7 +318,7 @@ describe('AgentRegistry', () => {
 
       await registry.initialize();
 
-      expect(registry.getDefinition('generalist')).toBeDefined();
+      expect(registry.getDefinition(GENERALIST_TOOL_NAME)).toBeDefined();
     });
 
     it('should NOT register a non-experimental agent if enabled is false', async () => {
@@ -340,7 +341,7 @@ describe('AgentRegistry', () => {
       const config = makeMockedConfig({
         agents: {
           overrides: {
-            generalist: { enabled: false },
+            [GENERALIST_TOOL_NAME]: { enabled: false },
           },
         },
       });
@@ -348,7 +349,7 @@ describe('AgentRegistry', () => {
 
       await registry.initialize();
 
-      expect(registry.getDefinition('generalist')).toBeUndefined();
+      expect(registry.getDefinition(GENERALIST_TOOL_NAME)).toBeUndefined();
     });
 
     it('should load agents from active extensions', async () => {

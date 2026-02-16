@@ -10,6 +10,7 @@ import { makeFakeConfig } from '../test-utils/config.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import type { AgentRegistry } from './registry.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import { GENERALIST_TOOL_NAME } from '../tools/tool-names.js';
 
 describe('GeneralistAgent', () => {
   it('should create a valid generalist agent definition', () => {
@@ -30,7 +31,7 @@ describe('GeneralistAgent', () => {
 
     const agent = GeneralistAgent(config);
 
-    expect(agent.name).toBe('generalist');
+    expect(agent.name).toBe(GENERALIST_TOOL_NAME);
     expect(agent.kind).toBe('local');
     expect(agent.modelConfig.model).toBe('inherit');
     expect(agent.toolConfig?.tools).toBeDefined();

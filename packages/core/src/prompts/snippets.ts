@@ -10,6 +10,7 @@ import {
   EDIT_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
+  GENERALIST_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   MEMORY_TOOL_NAME,
@@ -168,42 +169,6 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results using total_max_matches and max_matches_per_file, especially during the research phase.
 - For broad discovery, use names_only=true or max_matches_per_file=1 to identify files without retrieving their context.
 
-## Parallelism
-You MUST ALWAYS utilize the generalist subagent to conserve context when doing repetitive tasks and parallelize independent bodies of work, even if you think you don't need to. This is very IMPORTANT to ensure you stay on track on repetitive tasks and/or complete tasks in a timely fashion.
-
-Tasks that should be delegated include:
-<should_delegate>
-- Creating, refactoring, building, or updating independent projects or directories, one per generalist call.
-- Refactor separate files by splitting them into batches, one batch for each generalist.
-- Parallelizing finding the answer to multiple questions, one parallel generalist call per question.
-- Repetitive changes across a codebase should be batched and delegated to a subagent.
-</should_delegate>
-
-<guidelines>
-Try to delegate similarly sized pieces to the generalist. For example:
-- Creating two projects -> each can be its own delegation.
-- Repetitive code changes -> first, check the size of the work, and split it into batches of similar size.
-- You can use up to 4 parallel subagents. Use as many as you can to complete the task faster.
-</guidelines>
-
-Always use parallel agents (via calls to \`generalist\`) or parallel tool calls when
-able to do so safely.
-<rules_for_parallelism>
-
-Generally safe to parallelize and minimal risk of concurrency issues:
-<what_you_can_parallelize>
-- Edits to different files.
-- Multi-step tasks that touch different folders, with generalist.
-- Multi-step read-only investigations, with generalist.
-- grep_search and ls to different directories.
-</what_you_can_parallelize>
-
-Not safe to parallelize. Will likely cause concurrency issues.
-<what_you_cannot_parallelize>
-- generalist tasks that involve making builds or edits to the same set of files.
-</what_you_cannot_parallelize>
-</rules_for_parallelism>
-
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in ${formattedFilenames} files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
 - **Conventions & Style:** Rigorously adhere to existing workspace conventions, architectural patterns, and style (naming, formatting, typing, commenting). During the research phase, analyze surrounding files, tests, and configuration to ensure your changes are seamless, idiomatic, and consistent with the local context. Never compromise idiomatic quality or completeness (e.g., proper declarations, type safety, documentation) to minimize tool calls; all supporting changes required by local conventions are part of a surgical update.
@@ -230,6 +195,12 @@ export function renderSubAgents(subAgents?: SubAgentOptions[]): string {
     )
     .join('\n');
 
+  const parallelismInstructions = subAgents.some(
+    (agent) => agent.name === GENERALIST_TOOL_NAME,
+  )
+    ? renderParallelismInstructions()
+    : '';
+
   return `
 # Available Sub-Agents
 
@@ -243,7 +214,9 @@ Remember that the closest relevant sub-agent should still be used even if its ex
 
 For example:
 - A license-agent -> Should be used for a range of tasks, including reading, validating, and updating licenses and headers.
-- A test-fixing-agent -> Should be used both for fixing tests as well as investigating test failures.`.trim();
+- A test-fixing-agent -> Should be used both for fixing tests as well as investigating test failures.
+
+${parallelismInstructions}`.trim();
 }
 
 export function renderAgentSkills(skills?: AgentSkillOptions[]): string {
@@ -498,6 +471,45 @@ An approved plan is available for this task at \`${approvedPlanPath}\`.
 - **Iterate:** Default to refining the existing approved plan.
 - **New Plan:** Only create a new plan file if the user explicitly asks for a "new plan".
 `;
+}
+
+function renderParallelismInstructions(): string {
+  return `
+## Parallelism
+You MUST ALWAYS utilize the generalist subagent to conserve context when doing repetitive tasks and parallelize independent bodies of work, even if you think you don't need to. This is very IMPORTANT to ensure you stay on track on repetitive tasks and/or complete tasks in a timely fashion.
+
+Tasks that should be delegated include:
+<should_delegate>
+- Creating, refactoring, building, or updating independent projects or directories, one per generalist call.
+- Refactor separate files by splitting them into batches, one batch for each generalist.
+- Parallelizing finding the answer to multiple questions, one parallel generalist call per question.
+- Repetitive changes across a codebase should be batched and delegated to a subagent.
+</should_delegate>
+
+<guidelines>
+Try to delegate similarly sized pieces to the generalist. For example:
+- Creating two projects -> each can be its own delegation.
+- Repetitive code changes -> first, check the size of the work, and split it into batches of similar size.
+- You can use up to 4 parallel subagents. Use as many as you can to complete the task faster.
+</guidelines>
+
+Always use parallel agents (via calls to \`generalist\`) or parallel tool calls when
+able to do so safely.
+<rules_for_parallelism>
+
+Generally safe to parallelize and minimal risk of concurrency issues:
+<what_you_can_parallelize>
+- Edits to different files.
+- Multi-step tasks that touch different folders, with generalist.
+- Multi-step read-only investigations, with generalist.
+- grep_search and ls to different directories.
+</what_you_can_parallelize>
+
+Not safe to parallelize. Will likely cause concurrency issues.
+<what_you_cannot_parallelize>
+- generalist tasks that involve making builds or edits to the same set of files.
+</what_you_cannot_parallelize>
+</rules_for_parallelism>`;
 }
 
 // --- Leaf Helpers (Strictly strings or simple calls) ---
