@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { Footer } from './Footer.js';
 import { createMockSettings } from '../../test-utils/settings.js';
@@ -210,6 +210,10 @@ describe('<Footer />', () => {
   });
 
   describe('sandbox and trust info', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
     it('should display untrusted when isTrustedFolder is false', () => {
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 120,
@@ -540,13 +544,7 @@ describe('<Footer />', () => {
           },
           ui: {
             footer: {
-              items: [
-                'vim-mode',
-                'cwd',
-                'git-branch',
-                'sandbox-status',
-                'model-name',
-              ],
+              items: ['cwd', 'git-branch', 'sandbox-status', 'model-name'],
             },
           },
         }),

@@ -12,70 +12,60 @@ export const ALL_ITEMS = [
     header: 'Path',
     label: 'cwd',
     description: 'Current directory path',
-    defaultEnabled: true,
   },
   {
     id: 'git-branch',
     header: 'Branch',
     label: 'git-branch',
     description: 'Current git branch name',
-    defaultEnabled: true,
   },
   {
     id: 'sandbox-status',
     header: '/docs',
     label: 'sandbox-status',
     description: 'Sandbox type and trust indicator',
-    defaultEnabled: true,
   },
   {
     id: 'model-name',
     header: '/model',
     label: 'model-name',
     description: 'Current model identifier',
-    defaultEnabled: true,
   },
   {
     id: 'context-remaining',
     header: 'Context',
     label: 'context-remaining',
     description: 'Percentage of context window remaining',
-    defaultEnabled: false,
   },
   {
     id: 'quota',
     header: '/stats',
     label: 'quota',
     description: 'Remaining usage on daily limit',
-    defaultEnabled: true,
   },
   {
     id: 'memory-usage',
     header: 'Memory',
     label: 'memory-usage',
     description: 'Node.js heap memory usage',
-    defaultEnabled: false,
   },
   {
     id: 'session-id',
     header: 'Session',
     label: 'session-id',
     description: 'Unique identifier for the current session',
-    defaultEnabled: false,
   },
   {
     id: 'code-changes',
     header: 'Diff',
     label: 'code-changes',
     description: 'Lines added/removed in the session',
-    defaultEnabled: true,
   },
   {
     id: 'token-count',
     header: 'Tokens',
     label: 'token-count',
     description: 'Total tokens used in the session',
-    defaultEnabled: false,
   },
 ] as const;
 
@@ -86,7 +76,6 @@ export interface FooterItem {
   header: string;
   label: string;
   description: string;
-  defaultEnabled: boolean;
 }
 
 export const DEFAULT_ORDER = [
