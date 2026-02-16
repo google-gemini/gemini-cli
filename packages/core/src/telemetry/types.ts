@@ -394,8 +394,12 @@ export class ApiRequestEvent implements BaseTelemetryEvent {
       'event.timestamp': this['event.timestamp'],
       model: this.model,
       prompt_id: this.prompt.prompt_id,
-      request_text: this.request_text,
     };
+    // user prompts are contained in request text as session conversation histories,
+    // so omit `request_text` from log if `logPrompts` is false.
+    if (config.getTelemetryLogPromptsEnabled() && this.request_text) {
+      attributes['request_text'] = this.request_text;
+    }
     return { body: `API request to ${this.model}.`, attributes };
   }
 
