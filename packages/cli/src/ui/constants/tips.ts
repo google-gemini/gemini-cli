@@ -76,7 +76,6 @@ export const INFORMATIVE_TIPS = [
   'Set the number of lines to keep when truncating outputs (/settings)…',
   'Enable policy-based tool confirmation via message bus (/settings)…',
   'Enable write_todos_list tool to generate task lists (/settings)…',
-  'Enable model routing based on complexity (/settings)…',
   'Enable experimental subagents for task delegation (/settings)…',
   'Enable extension management features (settings.json)…',
   'Enable extension reloading within the CLI session (settings.json)…',
