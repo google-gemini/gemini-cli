@@ -152,21 +152,21 @@ export const DialogManager = ({
       />
     );
   }
-  if (uiState.overageMenuRequest) {
+  if (uiState.quota.overageMenuRequest) {
     return (
       <OverageMenuDialog
-        failedModel={uiState.overageMenuRequest.failedModel}
-        resetTime={uiState.overageMenuRequest.resetTime}
-        creditBalance={uiState.overageMenuRequest.creditBalance}
+        failedModel={uiState.quota.overageMenuRequest.failedModel}
+        resetTime={uiState.quota.overageMenuRequest.resetTime}
+        creditBalance={uiState.quota.overageMenuRequest.creditBalance}
         onChoice={uiActions.handleOverageMenuChoice}
       />
     );
   }
-  if (uiState.emptyWalletRequest) {
+  if (uiState.quota.emptyWalletRequest) {
     return (
       <EmptyWalletDialog
-        failedModel={uiState.emptyWalletRequest.failedModel}
-        resetTime={uiState.emptyWalletRequest.resetTime}
+        failedModel={uiState.quota.emptyWalletRequest.failedModel}
+        resetTime={uiState.quota.emptyWalletRequest.resetTime}
         onChoice={uiActions.handleEmptyWalletChoice}
       />
     );
