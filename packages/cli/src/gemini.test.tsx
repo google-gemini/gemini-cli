@@ -1318,6 +1318,7 @@ describe('startInteractiveUI', () => {
 
     // Verify all startup tasks were called
     expect(getVersion).toHaveBeenCalledTimes(1);
+    // 4 cleanups: mouseEvents, consolePatcher, instance.unmount, and TTY check
     expect(registerCleanup).toHaveBeenCalledTimes(4);
 
     // Verify cleanup handler is registered with unmount function
