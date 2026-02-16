@@ -57,5 +57,5 @@ export interface SessionContext {
   fs: AgentFilesystem;
   shell: AgentShell;
   agent: GeminiCliAgent;
-  session?: GeminiCliSession;
+  session: GeminiCliSession;
 }
