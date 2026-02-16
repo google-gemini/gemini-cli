@@ -69,5 +69,6 @@ export const modelCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   subCommands: [manageModelCommand, setModelCommand],
-  action: async (context: CommandContext, args: string) => manageModelCommand.action!(context, args),
+  action: async (context: CommandContext, args: string) =>
+    manageModelCommand.action!(context, args),
 };
