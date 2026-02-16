@@ -13,6 +13,7 @@ import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import { TextInput } from './shared/TextInput.js';
 import { useFuzzyList } from '../hooks/useFuzzyList.js';
+import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import {
   ALL_ITEMS,
   DEFAULT_ORDER,
@@ -55,7 +56,7 @@ function footerConfigReducer(
   switch (action.type) {
     case 'MOVE_UP': {
       const { filteredCount, maxToShow } = action;
-      const totalSlots = filteredCount + 1;
+      const totalSlots = filteredCount + 2; // +1 for showLabels, +1 for reset
       const newIndex =
         state.activeIndex > 0 ? state.activeIndex - 1 : totalSlots - 1;
       let newOffset = state.scrollOffset;
@@ -71,7 +72,7 @@ function footerConfigReducer(
     }
     case 'MOVE_DOWN': {
       const { filteredCount, maxToShow } = action;
-      const totalSlots = filteredCount + 1;
+      const totalSlots = filteredCount + 2;
       const newIndex =
         state.activeIndex < totalSlots - 1 ? state.activeIndex + 1 : 0;
       let newOffset = state.scrollOffset;
@@ -108,8 +109,8 @@ function footerConfigReducer(
       return { ...state, orderedIds: newOrderedIds, activeIndex: newIndex };
     }
     case 'TOGGLE_ITEM': {
-      const isResetFocused = state.activeIndex === action.filteredItems.length;
-      if (isResetFocused) return state; // Handled by separate effect/callback if needed, or we can add a RESET_DEFAULTS action
+      const isSystemFocused = state.activeIndex >= action.filteredItems.length;
+      if (isSystemFocused) return state;
 
       const item = action.filteredItems[state.activeIndex];
       if (!item) return state;
@@ -209,7 +210,8 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
     dispatch({ type: 'RESET_INDEX' });
   }, [searchQuery]);
 
-  const isResetFocused = activeIndex === filteredItems.length;
+  const isResetFocused = activeIndex === filteredItems.length + 1;
+  const isShowLabelsFocused = activeIndex === filteredItems.length;
 
   const handleResetToDefaults = useCallback(() => {
     setSetting(SettingScope.User, 'ui.footer.items', undefined);
@@ -230,6 +232,11 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
       },
     });
   }, [setSetting, settings.merged]);
+
+  const handleToggleLabels = useCallback(() => {
+    const current = settings.merged.ui.footer.showLabels !== false;
+    setSetting(SettingScope.User, 'ui.footer.showLabels', !current);
+  }, [setSetting, settings.merged.ui.footer.showLabels]);
 
   useKeypress(
     (key: Key) => {
@@ -269,6 +276,8 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
       if (keyMatchers[Command.RETURN](key)) {
         if (isResetFocused) {
           handleResetToDefaults();
+        } else if (isShowLabelsFocused) {
+          handleToggleLabels();
         } else {
           dispatch({ type: 'TOGGLE_ITEM', filteredItems });
         }
@@ -286,12 +295,13 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
   );
 
   const activeId = filteredItems[activeIndex]?.key;
+  const showLabels = settings.merged.ui.footer.showLabels !== false;
 
   // Preview logic
-  const previewText = useMemo(() => {
+  const previewContent = useMemo(() => {
     if (isResetFocused) {
       return (
-        <Text color={theme.text.secondary} italic>
+        <Text color={theme.ui.comment} italic>
           Default footer (uses legacy settings)
         </Text>
       );
@@ -302,53 +312,103 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
     );
     if (itemsToPreview.length === 0) return null;
 
+    const itemColor = showLabels ? theme.text.primary : theme.ui.comment;
     const getColor = (id: string, defaultColor?: string) =>
-      id === activeId ? 'white' : defaultColor || theme.text.secondary;
+      id === activeId ? 'white' : defaultColor || itemColor;
 
     // Mock values for preview
-    const mockValues: Record<string, React.ReactNode> = {
-      cwd: <Text color={getColor('cwd')}>~/project/path</Text>,
-      'git-branch': <Text color={getColor('git-branch')}>main*</Text>,
-      'sandbox-status': (
-        <Text color={getColor('sandbox-status', 'green')}>docker</Text>
-      ),
-      'model-name': (
-        <Box flexDirection="row">
-          <Text color={getColor('model-name')}>gemini-2.5-pro</Text>
-        </Box>
-      ),
-      'context-remaining': (
-        <Text color={getColor('context-remaining')}>85% context left</Text>
-      ),
-      quota: <Text color={getColor('quota')}>daily 97%</Text>,
-      'memory-usage': <Text color={getColor('memory-usage')}>124MB</Text>,
-      'session-id': <Text color={getColor('session-id')}>769992f9</Text>,
-      'code-changes': (
-        <Box flexDirection="row">
-          <Text color={getColor('code-changes', theme.status.success)}>
-            +12
-          </Text>
-          <Text color={getColor('code-changes')}> </Text>
-          <Text color={getColor('code-changes', theme.status.error)}>-4</Text>
-        </Box>
-      ),
-      'token-count': <Text color={getColor('token-count')}>1.5k tokens</Text>,
+    const mockValues: Record<
+      string,
+      { header: string; data: React.ReactNode }
+    > = {
+      cwd: {
+        header: 'Path',
+        data: <Text color={getColor('cwd', itemColor)}>~/project/path</Text>,
+      },
+      'git-branch': {
+        header: 'Branch',
+        data: <Text color={getColor('git-branch', itemColor)}>main*</Text>,
+      },
+      'sandbox-status': {
+        header: '/docs',
+        data: <Text color={getColor('sandbox-status', 'green')}>docker</Text>,
+      },
+      'model-name': {
+        header: '/model',
+        data: (
+          <Text color={getColor('model-name', itemColor)}>gemini-2.5-pro</Text>
+        ),
+      },
+      'context-remaining': {
+        header: 'Context',
+        data: (
+          <Text color={getColor('context-remaining', itemColor)}>85% left</Text>
+        ),
+      },
+      quota: {
+        header: '/stats',
+        data: <Text color={getColor('quota', itemColor)}>daily 97%</Text>,
+      },
+      'memory-usage': {
+        header: 'Memory',
+        data: <MemoryUsageDisplay color={itemColor} />,
+      },
+      'session-id': {
+        header: 'Session',
+        data: <Text color={getColor('session-id', itemColor)}>769992f9</Text>,
+      },
+      'code-changes': {
+        header: 'Diff',
+        data: (
+          <Box flexDirection="row">
+            <Text color={getColor('code-changes', theme.status.success)}>
+              +12
+            </Text>
+            <Text color={getColor('code-changes')}> </Text>
+            <Text color={getColor('code-changes', theme.status.error)}>-4</Text>
+          </Box>
+        ),
+      },
+      'token-count': {
+        header: 'Tokens',
+        data: (
+          <Text color={getColor('token-count', itemColor)}>1.5k tokens</Text>
+        ),
+      },
     };
 
-    const elements: React.ReactNode[] = [];
+    const previewElements: React.ReactNode[] = [];
+
     itemsToPreview.forEach((id: string, idx: number) => {
-      if (idx > 0) {
-        elements.push(
-          <Text key={`sep-${id}`} color={theme.text.secondary}>
-            {' | '}
-          </Text>,
+      const mock = mockValues[id];
+      if (!mock) return;
+
+      if (idx > 0 && !showLabels) {
+        previewElements.push(
+          <Box key={`sep-${id}`} height={1}>
+            <Text color={theme.ui.comment}> · </Text>
+          </Box>,
         );
       }
-      elements.push(<Box key={id}>{mockValues[id] || id}</Box>);
+
+      previewElements.push(
+        <Box key={id} flexDirection="column">
+          {showLabels && (
+            <Box height={1}>
+              <Text color={theme.ui.comment}>{mock.header}</Text>
+            </Box>
+          )}
+          <Box height={1}>{mock.data}</Box>
+        </Box>,
+      );
     });
 
-    return elements;
-  }, [orderedIds, selectedIds, activeId, isResetFocused]);
+    return (
+      <Box flexDirection="row" flexWrap="nowrap" columnGap={showLabels ? 3 : 0}>
+        {previewElements}
+      </Box>
+    );
+  }, [orderedIds, selectedIds, activeId, isResetFocused, showLabels]);
 
   return (
     <Box
@@ -403,13 +463,25 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
         )}
       </Box>
 
-      <Box marginTop={1}>
-        <Text
-          color={isResetFocused ? theme.status.warning : theme.text.secondary}
-        >
-          {isResetFocused ? '> ' : '  '}
-          Reset to default footer
-        </Text>
+      <Box marginTop={1} flexDirection="column">
+        <Box flexDirection="row">
+          <Text color={isShowLabelsFocused ? theme.status.success : undefined}>
+            {isShowLabelsFocused ? '> ' : '  '}
+          </Text>
+          <Text color={isShowLabelsFocused ? theme.status.success : undefined}>
+            [{showLabels ? '✓' : ' '}] Show footer labels
+          </Text>
+        </Box>
+        <Box flexDirection="row">
+          <Text color={isResetFocused ? theme.status.warning : undefined}>
+            {isResetFocused ? '> ' : '  '}
+          </Text>
+          <Text
+            color={isResetFocused ? theme.status.warning : theme.text.secondary}
+          >
+            Reset to default footer
+          </Text>
+        </Box>
       </Box>
 
       <Box marginTop={1} flexDirection="column">
@@ -431,7 +503,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
         flexDirection="column"
       >
         <Text bold>Preview:</Text>
-        <Box flexDirection="row">{previewText}</Box>
+        <Box flexDirection="row">{previewContent}</Box>
       </Box>
     </Box>
   );

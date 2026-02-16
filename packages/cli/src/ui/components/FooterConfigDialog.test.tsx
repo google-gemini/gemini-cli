@@ -83,8 +83,10 @@ describe('<FooterConfigDialog />', () => {
 
     // Initial order: cwd, git-branch, ...
     const output = lastFrame();
-    const cwdIdx = output!.indexOf('cwd');
-    const branchIdx = output!.indexOf('git-branch');
+    const cwdIdx = output!.indexOf('] cwd');
+    const branchIdx = output!.indexOf('] git-branch');
+    expect(cwdIdx).toBeGreaterThan(-1);
+    expect(branchIdx).toBeGreaterThan(-1);
     expect(cwdIdx).toBeLessThan(branchIdx);
 
     // Move cwd down (right arrow)
@@ -94,8 +96,10 @@ describe('<FooterConfigDialog />', () => {
 
     await waitFor(() => {
       const outputAfter = lastFrame();
-      const cwdIdxAfter = outputAfter!.indexOf('cwd');
-      const branchIdxAfter = outputAfter!.indexOf('git-branch');
+      const cwdIdxAfter = outputAfter!.indexOf('] cwd');
+      const branchIdxAfter = outputAfter!.indexOf('] git-branch');
+      expect(cwdIdxAfter).toBeGreaterThan(-1);
+      expect(branchIdxAfter).toBeGreaterThan(-1);
       expect(branchIdxAfter).toBeLessThan(cwdIdxAfter);
     });
   });
@@ -142,7 +146,7 @@ describe('<FooterConfigDialog />', () => {
       { settings },
     );
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 10; i++) {
       act(() => {
         stdin.write('\r'); // Toggle (deselect)
         stdin.write('\u001b[B'); // Down arrow

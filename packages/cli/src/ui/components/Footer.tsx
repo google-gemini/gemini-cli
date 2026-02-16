@@ -17,23 +17,24 @@ import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
-import { QuotaDisplay } from './QuotaDisplay.js';
 import {
-  getStatusColor,
   QUOTA_THRESHOLD_HIGH,
   QUOTA_THRESHOLD_MEDIUM,
 } from '../utils/displayUtils.js';
 import { DebugProfiler } from './DebugProfiler.js';
-import { isDevelopment } from '../../utils/installationInfo.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
-import { ALL_ITEMS, type FooterItemId } from '../../config/footerItems.js';
+import {
+  ALL_ITEMS,
+  type FooterItemId,
+  deriveItemsFromLegacySettings,
+} from '../../config/footerItems.js';
 
 interface CwdIndicatorProps {
   targetDir: string;
-  terminalWidth: number;
+  maxWidth: number;
   debugMode?: boolean;
   debugMessage?: string;
   color?: string;
@@ -41,21 +42,19 @@ interface CwdIndicatorProps {
 
 const CwdIndicator: React.FC<CwdIndicatorProps> = ({
   targetDir,
-  terminalWidth,
+  maxWidth,
   debugMode,
   debugMessage,
   color = theme.text.primary,
 }) => {
-  const pathLength = Math.max(20, Math.floor(terminalWidth * 0.25));
-  const displayPath = shortenPath(tildeifyPath(targetDir), pathLength);
+  const debugSuffix = debugMode ? ' ' + (debugMessage || '--debug') : '';
+  const availableForPath = Math.max(10, maxWidth - debugSuffix.length);
+  const displayPath = shortenPath(tildeifyPath(targetDir), availableForPath);
+
   return (
     <Text color={color}>
       {displayPath}
-      {debugMode && (
-        <Text color={theme.status.error}>
-          {' ' + (debugMessage || '--debug')}
-        </Text>
-      )}
+      {debugMode && <Text color={theme.status.error}>{debugSuffix}</Text>}
     </Text>
   );
 };
@@ -63,13 +62,15 @@ const CwdIndicator: React.FC<CwdIndicatorProps> = ({
 interface BranchIndicatorProps {
   branchName: string;
   showParentheses?: boolean;
+  color?: string;
 }
 
 const BranchIndicator: React.FC<BranchIndicatorProps> = ({
   branchName,
   showParentheses = true,
+  color = theme.text.primary,
 }) => (
-  <Text color={theme.text.secondary}>
+  <Text color={color}>
     {showParentheses ? `(${branchName}*)` : `${branchName}*`}
   </Text>
 );
@@ -100,7 +101,7 @@ const SandboxIndicator: React.FC<SandboxIndicatorProps> = ({
     return (
       <Text color={theme.status.warning}>
         macOS Seatbelt{' '}
-        <Text color={theme.text.secondary}>
+        <Text color={theme.ui.comment}>
           ({process.env['SEATBELT_PROFILE']})
         </Text>
       </Text>
@@ -141,6 +142,14 @@ function isFooterItemId(id: string): id is FooterItemId {
   return ALL_ITEMS.some((i) => i.id === id);
 }
 
+interface FooterColumn {
+  id: string;
+  header: string;
+  element: (maxWidth: number) => React.ReactNode;
+  width: number;
+  isHighPriority: boolean;
+}
+
 export const Footer: React.FC = () => {
   const uiState = useUIState();
   const config = useConfig();
@@ -176,264 +185,213 @@ export const Footer: React.FC = () => {
   };
 
   const displayVimMode = vimEnabled ? vimMode : undefined;
+  const items =
+    settings.merged.ui.footer.items ??
+    deriveItemsFromLegacySettings(settings.merged);
+  const showLabels = settings.merged.ui.footer.showLabels !== false;
+  const itemColor = showLabels ? theme.text.primary : theme.ui.comment;
 
-  const hasCustomItems = settings.merged.ui.footer.items != null;
+  const potentialColumns: FooterColumn[] = [];
 
-  if (!hasCustomItems) {
-    const showMemoryUsage =
-      config.getDebugMode() || settings.merged.ui.showMemoryUsage;
-    const hideCWD = settings.merged.ui.footer.hideCWD;
-    const hideSandboxStatus = settings.merged.ui.footer.hideSandboxStatus;
-    const hideModelInfo = settings.merged.ui.footer.hideModelInfo;
-    const hideContextPercentage =
-      settings.merged.ui.footer.hideContextPercentage;
-
-    const justifyContent =
-      hideCWD && hideModelInfo ? 'center' : 'space-between';
-
-    const showDebugProfiler = debugMode || isDevelopment;
-
-    return (
-      <Box
-        justifyContent={justifyContent}
-        width={terminalWidth}
-        flexDirection="row"
-        alignItems="center"
-        paddingX={1}
-      >
-        {(showDebugProfiler || displayVimMode || !hideCWD) && (
-          <Box>
-            {showDebugProfiler && <DebugProfiler />}
-            {displayVimMode && (
-              <Text color={theme.text.secondary}>[{displayVimMode}] </Text>
-            )}
-            {!hideCWD && (
-              <Box flexDirection="row">
-                <CwdIndicator
-                  targetDir={targetDir}
-                  terminalWidth={terminalWidth}
-                  debugMode={debugMode}
-                  debugMessage={debugMessage}
-                />
-                {branchName && (
-                  <>
-                    <Text> </Text>
-                    <BranchIndicator branchName={branchName} />
-                  </>
-                )}
-              </Box>
-            )}
-          </Box>
-        )}
-
-        {/* Middle Section: Centered Trust/Sandbox Info */}
-        {!hideSandboxStatus && (
-          <Box
-            flexGrow={1}
-            alignItems="center"
-            justifyContent="center"
-            display="flex"
-          >
-            <SandboxIndicator
-              isTrustedFolder={isTrustedFolder}
-              terminalWidth={terminalWidth}
-              showDocsHint={true}
-            />
-          </Box>
-        )}
-
-        {/* Right Section: Gemini Label and Console Summary */}
-        {!hideModelInfo && (
-          <Box alignItems="center" justifyContent="flex-end">
-            <Box alignItems="center">
-              <Text color={theme.text.primary}>
-                <Text color={theme.text.secondary}>/model </Text>
-                {getDisplayString(model)}
-                {!hideContextPercentage && (
-                  <>
-                    {' '}
-                    <ContextUsageDisplay
-                      promptTokenCount={promptTokenCount}
-                      model={model}
-                      terminalWidth={terminalWidth}
-                    />
-                  </>
-                )}
-                {quotaStats && (
-                  <>
-                    {' '}
-                    <QuotaDisplay
-                      remaining={quotaStats.remaining}
-                      limit={quotaStats.limit}
-                      resetTime={quotaStats.resetTime}
-                      terse={true}
-                    />
-                  </>
-                )}
-              </Text>
-              {showMemoryUsage && (
-                <>
-                  <Text color={theme.text.secondary}> | </Text>
-                  <MemoryUsageDisplay />
-                </>
-              )}
-            </Box>
-            <Box alignItems="center">
-              {corgiMode && (
-                <Box paddingLeft={1} flexDirection="row">
-                  <Text color={theme.ui.symbol}>| </Text>
-                  <CorgiIndicator />
-                </Box>
-              )}
-              {!showErrorDetails && errorCount > 0 && (
-                <Box paddingLeft={1} flexDirection="row">
-                  <Text color={theme.ui.comment}>| </Text>
-                  <ErrorIndicator errorCount={errorCount} />
-                </Box>
-              )}
-            </Box>
-          </Box>
-        )}
-      </Box>
-    );
-  }
-
-  // Items-based rendering path
-  const items = settings.merged.ui.footer.items ?? [];
-  const elements: React.ReactNode[] = [];
-
-  const addElement = (id: string, element: React.ReactNode) => {
-    if (elements.length > 0) {
-      elements.push(
-        <Text key={`sep-${id}`} color={theme.text.secondary}>
-          {' | '}
-        </Text>,
-      );
-    }
-    elements.push(<Box key={id}>{element}</Box>);
+  const addCol = (
+    id: string,
+    header: string,
+    element: (maxWidth: number) => React.ReactNode,
+    dataWidth: number,
+    isHighPriority = false,
+  ) => {
+    potentialColumns.push({
+      id,
+      header: showLabels ? header : '',
+      element,
+      width: Math.max(dataWidth, showLabels ? header.length : 0),
+      isHighPriority,
+    });
   };
 
-  // Prepend Vim mode if enabled
+  // 1. System Indicators (Far Left, high priority)
+  if (uiState.showDebugProfiler) {
+    addCol('debug', '', () => <DebugProfiler />, 45, true);
+  }
   if (displayVimMode) {
-    elements.push(
-      <Box key="vim-mode-static">
-        <Text color={theme.text.secondary}>[{displayVimMode}] </Text>
-      </Box>,
+    const vimStr = `[${displayVimMode}]`;
+    addCol(
+      'vim',
+      '',
+      () => <Text color={theme.text.accent}>{vimStr}</Text>,
+      vimStr.length,
+      true,
     );
   }
 
+  // 2. Main Configurable Items
   for (const id of items) {
-    if (!isFooterItemId(id)) {
-      continue;
-    }
+    if (!isFooterItemId(id)) continue;
+    const itemConfig = ALL_ITEMS.find((i) => i.id === id);
+    const header = itemConfig?.header ?? id;
 
     switch (id) {
       case 'cwd': {
-        addElement(
+        const fullPath = tildeifyPath(targetDir);
+        const debugSuffix = debugMode ? ' ' + (debugMessage || '--debug') : '';
+        addCol(
           id,
-          <CwdIndicator
-            targetDir={targetDir}
-            terminalWidth={terminalWidth}
-            debugMode={debugMode}
-            debugMessage={debugMessage}
-            color={theme.text.secondary}
-          />,
+          header,
+          (maxWidth) => (
+            <CwdIndicator
+              targetDir={targetDir}
+              maxWidth={maxWidth}
+              debugMode={debugMode}
+              debugMessage={debugMessage}
+              color={itemColor}
+            />
+          ),
+          fullPath.length + debugSuffix.length,
         );
         break;
       }
       case 'git-branch': {
         if (branchName) {
-          addElement(
+          const str = `${branchName}*`;
+          addCol(
             id,
-            <BranchIndicator branchName={branchName} showParentheses={false} />,
+            header,
+            () => (
+              <BranchIndicator
+                branchName={branchName}
+                showParentheses={false}
+                color={itemColor}
+              />
+            ),
+            str.length,
           );
         }
         break;
       }
       case 'sandbox-status': {
-        addElement(
+        let str = 'no sandbox';
+        const sandbox = process.env['SANDBOX'];
+        if (isTrustedFolder === false) str = 'untrusted';
+        else if (sandbox === 'sandbox-exec')
+          str = `macOS Seatbelt (${process.env['SEATBELT_PROFILE']})`;
+        else if (sandbox) str = sandbox.replace(/^gemini-(?:cli-)?/, '');
+
+        addCol(
           id,
-          <SandboxIndicator
-            isTrustedFolder={isTrustedFolder}
-            terminalWidth={terminalWidth}
-          />,
+          header,
+          () => (
+            <SandboxIndicator
+              isTrustedFolder={isTrustedFolder}
+              terminalWidth={terminalWidth}
+            />
+          ),
+          str.length,
         );
         break;
       }
       case 'model-name': {
-        addElement(
+        const str = getDisplayString(model);
+        addCol(
           id,
-          <Text color={theme.text.secondary}>{getDisplayString(model)}</Text>,
+          header,
+          () => <Text color={itemColor}>{str}</Text>,
+          str.length,
         );
         break;
       }
       case 'context-remaining': {
-        addElement(
-          id,
-          <ContextUsageDisplay
-            promptTokenCount={promptTokenCount}
-            model={model}
-            terminalWidth={terminalWidth}
-          />,
-        );
+        if (!settings.merged.ui.footer.hideContextPercentage) {
+          addCol(
+            id,
+            header,
+            () => (
+              <ContextUsageDisplay
+                promptTokenCount={promptTokenCount}
+                model={model}
+                terminalWidth={terminalWidth}
+                color={itemColor}
+              />
+            ),
+            10, // "100% left" is 9 chars
+          );
+        }
         break;
       }
       case 'quota': {
-        if (
-          quotaStats &&
-          quotaStats.remaining !== undefined &&
-          quotaStats.limit
-        ) {
+        if (quotaStats?.remaining !== undefined && quotaStats.limit) {
           const percentage = (quotaStats.remaining / quotaStats.limit) * 100;
-          const color = getStatusColor(percentage, {
-            green: QUOTA_THRESHOLD_HIGH,
-            yellow: QUOTA_THRESHOLD_MEDIUM,
-          });
+          let color = itemColor;
+          if (percentage < QUOTA_THRESHOLD_MEDIUM) {
+            color = theme.status.error;
+          } else if (percentage < QUOTA_THRESHOLD_HIGH) {
+            color = theme.status.warning;
+          }
           const text =
             quotaStats.remaining === 0
               ? 'limit reached'
               : `daily ${percentage.toFixed(0)}%`;
-          addElement(id, <Text color={color}>{text}</Text>);
+          addCol(
+            id,
+            header,
+            () => <Text color={color}>{text}</Text>,
+            text.length,
+          );
         }
         break;
       }
       case 'memory-usage': {
-        addElement(id, <MemoryUsageDisplay />);
+        addCol(id, header, () => <MemoryUsageDisplay color={itemColor} />, 10);
         break;
       }
       case 'session-id': {
-        const idShort = uiState.sessionStats.sessionId.slice(0, 8);
-        addElement(id, <Text color={theme.text.secondary}>{idShort}</Text>);
+        addCol(
+          id,
+          header,
+          () => (
+            <Text color={itemColor}>
+              {uiState.sessionStats.sessionId.slice(0, 8)}
+            </Text>
+          ),
+          8,
+        );
         break;
       }
       case 'code-changes': {
         const added = uiState.sessionStats.metrics.files.totalLinesAdded;
         const removed = uiState.sessionStats.metrics.files.totalLinesRemoved;
         if (added > 0 || removed > 0) {
-          addElement(
+          const str = `+${added} -${removed}`;
+          addCol(
             id,
-            <Text>
-              <Text color={theme.status.success}>+{added}</Text>{' '}
-              <Text color={theme.status.error}>-{removed}</Text>
-            </Text>,
+            header,
+            () => (
+              <Text>
+                <Text color={theme.status.success}>+{added}</Text>{' '}
+                <Text color={theme.status.error}>-{removed}</Text>
+              </Text>
+            ),
+            str.length,
           );
         }
         break;
       }
       case 'token-count': {
-        let totalTokens = 0;
-        for (const m of Object.values(uiState.sessionStats.metrics.models)) {
-          totalTokens += m.tokens.total;
-        }
-        if (totalTokens > 0) {
-          const formatter = new Intl.NumberFormat('en-US', {
-            notation: 'compact',
-            maximumFractionDigits: 1,
-          });
-          const formatted = formatter.format(totalTokens).toLowerCase();
-          addElement(
+        let total = 0;
+        for (const m of Object.values(uiState.sessionStats.metrics.models))
+          total += m.tokens.total;
+        if (total > 0) {
+          const formatted =
+            new Intl.NumberFormat('en-US', {
+              notation: 'compact',
+              maximumFractionDigits: 1,
+            })
+              .format(total)
+              .toLowerCase() + ' tokens';
+          addCol(
             id,
-            <Text color={theme.text.secondary}>{formatted} tokens</Text>,
+            header,
+            () => <Text color={itemColor}>{formatted}</Text>,
+            formatted.length,
           );
         }
         break;
@@ -444,14 +402,88 @@ export const Footer: React.FC = () => {
     }
   }
 
-  if (corgiMode) {
-    addElement('corgi-transient', <CorgiIndicator />);
+  // 3. Transients
+  if (corgiMode) addCol('corgi', '', () => <CorgiIndicator />, 5);
+  if (!showErrorDetails && errorCount > 0) {
+    addCol(
+      'error-count',
+      '',
+      () => <ErrorIndicator errorCount={errorCount} />,
+      12,
+      true,
+    );
   }
 
-  if (!showErrorDetails && errorCount > 0) {
-    addElement(
-      'error-count-transient',
-      <ErrorIndicator errorCount={errorCount} />,
+  // --- Width Fitting Logic ---
+  const COLUMN_GAP = 3;
+  let currentWidth = 2; // Initial padding
+  const columnsToRender: FooterColumn[] = [];
+  let droppedAny = false;
+
+  for (let i = 0; i < potentialColumns.length; i++) {
+    const col = potentialColumns[i];
+    const gap = columnsToRender.length > 0 ? (showLabels ? COLUMN_GAP : 3) : 0; // Use 3 for dot separator width
+    const budgetWidth = col.id === 'cwd' ? 20 : col.width;
+
+    if (
+      col.isHighPriority ||
+      currentWidth + gap + budgetWidth <= terminalWidth - 2
+    ) {
+      columnsToRender.push(col);
+      currentWidth += gap + budgetWidth;
+    } else {
+      droppedAny = true;
+    }
+  }
+
+  const totalBudgeted = columnsToRender.reduce(
+    (sum, c, idx) =>
+      sum +
+      (c.id === 'cwd' ? 20 : c.width) +
+      (idx > 0 ? (showLabels ? COLUMN_GAP : 3) : 0),
+    2,
+  );
+  const excessSpace = Math.max(0, terminalWidth - totalBudgeted);
+
+  const finalElements: React.ReactNode[] = [];
+
+  columnsToRender.forEach((col, idx) => {
+    if (idx > 0 && !showLabels) {
+      finalElements.push(
+        <Box key={`sep-${col.id}`} height={1}>
+          <Text color={theme.ui.comment}> · </Text>
+        </Box>,
+      );
+    }
+
+    const maxWidth = col.id === 'cwd' ? 20 + excessSpace : col.width;
+    finalElements.push(
+      <Box key={col.id} flexDirection="column">
+        {showLabels && (
+          <Box height={1}>
+            <Text color={theme.ui.comment}>{col.header}</Text>
+          </Box>
+        )}
+        <Box height={1}>{col.element(maxWidth)}</Box>
+      </Box>,
+    );
+  });
+
+  if (droppedAny) {
+    if (!showLabels) {
+      finalElements.push(
+        <Box key="sep-ellipsis" height={1}>
+          <Text color={theme.ui.comment}> · </Text>
+        </Box>,
+      );
+    }
+    finalElements.push(
+      <Box key="ellipsis" flexDirection="column">
+        {showLabels && <Box height={1} />}
+        <Box height={1}>
+          <Text color={theme.ui.comment}>…</Text>
+        </Box>
+      </Box>,
     );
   }
 
@@ -459,12 +491,12 @@ export const Footer: React.FC = () => {
     <Box
       width={terminalWidth}
       flexDirection="row"
-      alignItems="center"
       paddingX={1}
-      flexWrap="nowrap"
       overflow="hidden"
+      flexWrap="nowrap"
+      columnGap={showLabels ? COLUMN_GAP : 0}
     >
-      {elements}
+      {finalElements}
     </Box>
   );
 };

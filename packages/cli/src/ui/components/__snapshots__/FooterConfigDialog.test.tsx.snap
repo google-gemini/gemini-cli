@@ -22,13 +22,15 @@ exports[`<FooterConfigDialog /> > renders correctly with default settings 1`] = 
 │    [ ] code-changes                               Lines added/removed in the session                                 │
 │    [ ] token-count                                Total tokens used in the session                                   │
 │                                                                                                                      │
+│    [✓] Show footer labels                                                                                            │
 │    Reset to default footer                                                                                           │
 │                                                                                                                      │
 │  ↑/↓ navigate · ←/→ reorder · enter select · esc close                                                               │
 │                                                                                                                      │
 │  ┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐  │
 │  │ Preview:                                                                                                       │  │
-│  │ ~/project/path | main* | docker | gemini-2.5-pro | daily 97%                                                   │  │
+│  │ Path             Branch   /docs    /model           /stats                                                     │  │
+│  │ ~/project/path   main*    docker   gemini-2.5-pro   daily 97%                                                  │  │
 │  └────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
