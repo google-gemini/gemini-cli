@@ -317,6 +317,7 @@ export class DevTools extends EventEmitter {
         }
       });
     }, 10000);
+    this.heartbeatTimer.unref();
   }
 
   private handleWebSocketMessage(

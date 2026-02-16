@@ -1364,14 +1364,7 @@ function BodyView({
 
   const copyJson = () => {
     navigator.clipboard.writeText(getFormattedJson()).catch(() => {
-      const ta = document.createElement('textarea');
-      ta.value = getFormattedJson();
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
+      // Clipboard API unavailable — silently ignore
     });
   };
 
@@ -1640,14 +1633,15 @@ function highlightLine(text: string, t: ThemeColors): React.ReactNode {
         </span>,
       );
     } else if (str) {
-      // Unescape JSON string escapes so \n renders as actual newlines
-      const unescaped = full
-        .slice(1, -1)
-        .replace(/\\n/g, '\n')
-        .replace(/\\t/g, '\t')
-        .replace(/\\r/g, '\r')
-        .replace(/\\\\/g, '\\')
-        .replace(/\\"/g, '"');
+      // Unescape JSON string escapes so \n renders as actual newlines.
+      // Use JSON.parse to handle all escape sequences correctly in one pass
+      // (manual chained .replace() can double-unescape e.g. \\n → \<newline>).
+      let unescaped: string;
+      try {
+        unescaped = JSON.parse(full) as string;
+      } catch {
+        unescaped = full.slice(1, -1);
+      }
       const strLines = unescaped.split('\n');
       if (strLines.length <= 1) {
         parts.push(
