@@ -114,10 +114,14 @@ export function ThemeDialog({
     .getAvailableThemes()
     .map((theme) => {
       const fullTheme = themeManager.getTheme(theme.name);
+      const capitalizedType = capitalize(theme.type);
+      const typeDisplay = theme.name.endsWith(capitalizedType)
+        ? ''
+        : capitalizedType;
 
       return generateThemeItem(
         theme.name,
-        capitalize(theme.type),
+        typeDisplay,
         fullTheme,
         terminalBackgroundColor,
       );
