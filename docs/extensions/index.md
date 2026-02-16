@@ -1,8 +1,8 @@
 # Gemini CLI extensions
 
-Gemini CLI extensions package prompts, MCP servers, custom commands, hooks,
-sub-agents, and agent skills into a familiar and user-friendly format. With
-extensions, you can expand the capabilities of Gemini CLI and share those
+Gemini CLI extensions package prompts, MCP servers, custom commands, themes,
+hooks, sub-agents, and agent skills into a familiar and user-friendly format.
+With extensions, you can expand the capabilities of Gemini CLI and share those
 capabilities with others. They are designed to be easily installable and
 shareable.
 
