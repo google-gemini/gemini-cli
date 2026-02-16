@@ -110,3 +110,23 @@ export function deriveItemsFromLegacySettings(
 
   return items;
 }
+
+const VALID_IDS: Set<string> = new Set(ALL_ITEMS.map((i) => i.id));
+
+/**
+ * Resolves the ordered list and selected set of footer items from settings.
+ * Used by FooterConfigDialog to initialize and reset state.
+ */
+export function resolveFooterState(settings: MergedSettings): {
+  orderedIds: string[];
+  selectedIds: Set<string>;
+} {
+  const source = (
+    settings.ui?.footer?.items ?? deriveItemsFromLegacySettings(settings)
+  ).filter((id: string) => VALID_IDS.has(id));
+  const others = DEFAULT_ORDER.filter((id) => !source.includes(id));
+  return {
+    orderedIds: [...source, ...others],
+    selectedIds: new Set(source),
+  };
+}

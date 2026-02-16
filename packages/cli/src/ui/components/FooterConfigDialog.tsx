@@ -15,11 +15,7 @@ import { TextInput } from './shared/TextInput.js';
 import { useFuzzyList } from '../hooks/useFuzzyList.js';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { FooterRow, type FooterRowItem } from './Footer.js';
-import {
-  ALL_ITEMS,
-  DEFAULT_ORDER,
-  deriveItemsFromLegacySettings,
-} from '../../config/footerItems.js';
+import { ALL_ITEMS, resolveFooterState } from '../../config/footerItems.js';
 import { SettingScope } from '../../config/settings.js';
 
 interface FooterConfigDialogProps {
@@ -139,38 +135,11 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
   const { settings, setSetting } = useSettingsStore();
   const maxItemsToShow = 10;
 
-  const [state, dispatch] = useReducer(footerConfigReducer, undefined, () => {
-    const validIds = new Set(ALL_ITEMS.map((i: { id: string }) => i.id));
-    let ordered: string[];
-    let selected: Set<string>;
-
-    if (settings.merged.ui?.footer?.items) {
-      const savedItems = settings.merged.ui.footer.items.filter((id: string) =>
-        validIds.has(id),
-      );
-      const others = DEFAULT_ORDER.filter(
-        (id: string) => !savedItems.includes(id),
-      );
-      ordered = [...savedItems, ...others];
-      selected = new Set(savedItems);
-    } else {
-      const derived = deriveItemsFromLegacySettings(settings.merged).filter(
-        (id: string) => validIds.has(id),
-      );
-      const others = DEFAULT_ORDER.filter(
-        (id: string) => !derived.includes(id),
-      );
-      ordered = [...derived, ...others];
-      selected = new Set(derived);
-    }
-
-    return {
-      orderedIds: ordered,
-      selectedIds: selected,
-      activeIndex: 0,
-      scrollOffset: 0,
-    };
-  });
+  const [state, dispatch] = useReducer(footerConfigReducer, undefined, () => ({
+    ...resolveFooterState(settings.merged),
+    activeIndex: 0,
+    scrollOffset: 0,
+  }));
 
   const { orderedIds, selectedIds, activeIndex, scrollOffset } = state;
 
@@ -216,18 +185,10 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
 
   const handleResetToDefaults = useCallback(() => {
     setSetting(SettingScope.User, 'ui.footer.items', undefined);
-
-    const validIds = new Set(ALL_ITEMS.map((i: { id: string }) => i.id));
-    const derived = deriveItemsFromLegacySettings(settings.merged).filter(
-      (id: string) => validIds.has(id),
-    );
-    const others = DEFAULT_ORDER.filter((id: string) => !derived.includes(id));
-
     dispatch({
       type: 'SET_STATE',
       payload: {
-        orderedIds: [...derived, ...others],
-        selectedIds: new Set(derived),
+        ...resolveFooterState(settings.merged),
         activeIndex: 0,
         scrollOffset: 0,
       },
