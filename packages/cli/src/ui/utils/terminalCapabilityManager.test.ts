@@ -11,6 +11,7 @@ import {
   enableKittyKeyboardProtocol,
   enableModifyOtherKeys,
 } from '@google/gemini-cli-core';
+import * as fs from 'node:fs';
 
 // Mock fs
 vi.mock('node:fs', () => ({
@@ -288,6 +289,17 @@ describe('TerminalCapabilityManager', () => {
 
       expect(manager.isKittyProtocolEnabled()).toBe(false);
       expect(enableModifyOtherKeys).not.toHaveBeenCalled();
+    });
+
+    it('should wrap queries in hidden/clear sequence', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      void manager.detectCapabilities();
+
+      expect(fs.writeSync).toHaveBeenCalledWith(
+        expect.anything(),
+        // eslint-disable-next-line no-control-regex
+        expect.stringMatching(/^\x1b\[8m.*\x1b\[2K\r\x1b\[0m$/s),
+      );
     });
   });
 });

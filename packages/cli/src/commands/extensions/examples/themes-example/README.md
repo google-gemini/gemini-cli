@@ -10,11 +10,14 @@ This is an example of a Gemini CLI extension that adds a custom theme.
     gemini extensions link packages/cli/src/commands/extensions/examples/themes-example
     ```
 
-2.  Set the theme in your settings file (`~/.gemini/config.yaml`):
+2.  Set the theme in your settings file (`~/.gemini/settings.json`):
 
-    ```yaml
-    ui:
-      theme: 'shades-of-green-theme (themes-example)'
+    ```json
+    {
+      "ui": {
+        "theme": "shades-of-green (themes-example)"
+      }
+    }
     ```
 
     Alternatively, you can set it through the UI by running `gemini` and then
