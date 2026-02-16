@@ -10,12 +10,12 @@ export const ALL_ITEMS = [
   {
     id: 'cwd',
     header: 'Path',
-    description: 'Current directory path',
+    description: 'Current working directory',
   },
   {
     id: 'git-branch',
     header: 'Branch',
-    description: 'Current git branch name',
+    description: 'Current git branch name (not shown when unavailable)',
   },
   {
     id: 'sandbox-status',
@@ -33,14 +33,14 @@ export const ALL_ITEMS = [
     description: 'Percentage of context window remaining',
   },
   {
-    id: 'quota',
+    id: 'usage-limit',
     header: '/stats',
-    description: 'Remaining usage on daily limit',
+    description: 'Remaining usage on daily limit (not shown when unavailable)',
   },
   {
     id: 'memory-usage',
     header: 'Memory',
-    description: 'Node.js heap memory usage',
+    description: 'Memory used by the application',
   },
   {
     id: 'session-id',
@@ -50,12 +50,12 @@ export const ALL_ITEMS = [
   {
     id: 'code-changes',
     header: 'Diff',
-    description: 'Lines added/removed in the session',
+    description: 'Lines added/removed in the session (not shown when zero)',
   },
   {
     id: 'token-count',
     header: 'Tokens',
-    description: 'Total tokens used in the session',
+    description: 'Total tokens used in the session (not shown when zero)',
   },
 ] as const;
 
@@ -67,7 +67,7 @@ export const DEFAULT_ORDER = [
   'sandbox-status',
   'model-name',
   'context-remaining',
-  'quota',
+  'usage-limit',
   'memory-usage',
   'session-id',
   'code-changes',
@@ -82,7 +82,7 @@ export function deriveItemsFromLegacySettings(
     'git-branch',
     'sandbox-status',
     'model-name',
-    'quota',
+    'usage-limit',
   ];
   const items = [...defaults];
 
@@ -96,7 +96,7 @@ export function deriveItemsFromLegacySettings(
   if (settings.ui.footer.hideModelInfo) {
     remove(items, 'model-name');
     remove(items, 'context-remaining');
-    remove(items, 'quota');
+    remove(items, 'usage-limit');
   }
   if (
     !settings.ui.footer.hideContextPercentage &&

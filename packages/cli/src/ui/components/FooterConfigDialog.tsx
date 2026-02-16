@@ -11,8 +11,6 @@ import { theme } from '../semantic-colors.js';
 import { useSettingsStore } from '../contexts/SettingsContext.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
-import { TextInput } from './shared/TextInput.js';
-import { useFuzzyList } from '../hooks/useFuzzyList.js';
 import { FooterRow, type FooterRowItem } from './Footer.js';
 import { ALL_ITEMS, resolveFooterState } from '../../config/footerItems.js';
 import { SettingScope } from '../../config/settings.js';
@@ -29,19 +27,17 @@ interface FooterConfigState {
 }
 
 type FooterConfigAction =
-  | { type: 'MOVE_UP'; filteredCount: number; maxToShow: number }
-  | { type: 'MOVE_DOWN'; filteredCount: number; maxToShow: number }
+  | { type: 'MOVE_UP'; itemCount: number; maxToShow: number }
+  | { type: 'MOVE_DOWN'; itemCount: number; maxToShow: number }
   | {
       type: 'MOVE_LEFT';
-      searchQuery: string;
-      filteredItems: Array<{ key: string }>;
+      items: Array<{ key: string }>;
     }
   | {
       type: 'MOVE_RIGHT';
-      searchQuery: string;
-      filteredItems: Array<{ key: string }>;
+      items: Array<{ key: string }>;
     }
-  | { type: 'TOGGLE_ITEM'; filteredItems: Array<{ key: string }> }
+  | { type: 'TOGGLE_ITEM'; items: Array<{ key: string }> }
   | { type: 'SET_STATE'; payload: Partial<FooterConfigState> }
   | { type: 'RESET_INDEX' };
 
@@ -51,15 +47,15 @@ function footerConfigReducer(
 ): FooterConfigState {
   switch (action.type) {
     case 'MOVE_UP': {
-      const { filteredCount, maxToShow } = action;
-      const totalSlots = filteredCount + 2; // +1 for showLabels, +1 for reset
+      const { itemCount, maxToShow } = action;
+      const totalSlots = itemCount + 2; // +1 for showLabels, +1 for reset
       const newIndex =
         state.activeIndex > 0 ? state.activeIndex - 1 : totalSlots - 1;
       let newOffset = state.scrollOffset;
 
-      if (newIndex < filteredCount) {
-        if (newIndex === filteredCount - 1) {
-          newOffset = Math.max(0, filteredCount - maxToShow);
+      if (newIndex < itemCount) {
+        if (newIndex === itemCount - 1) {
+          newOffset = Math.max(0, itemCount - maxToShow);
         } else if (newIndex < state.scrollOffset) {
           newOffset = newIndex;
         }
@@ -67,8 +63,8 @@ function footerConfigReducer(
       return { ...state, activeIndex: newIndex, scrollOffset: newOffset };
     }
     case 'MOVE_DOWN': {
-      const { filteredCount, maxToShow } = action;
-      const totalSlots = filteredCount + 2;
+      const { itemCount, maxToShow } = action;
+      const totalSlots = itemCount + 2;
       const newIndex =
         state.activeIndex < totalSlots - 1 ? state.activeIndex + 1 : 0;
       let newOffset = state.scrollOffset;
@@ -76,7 +72,7 @@ function footerConfigReducer(
       if (newIndex === 0) {
         newOffset = 0;
       } else if (
-        newIndex < filteredCount &&
+        newIndex < itemCount &&
         newIndex >= state.scrollOffset + maxToShow
       ) {
         newOffset = newIndex - maxToShow + 1;
@@ -85,9 +81,8 @@ function footerConfigReducer(
     }
     case 'MOVE_LEFT':
     case 'MOVE_RIGHT': {
-      if (action.searchQuery) return state;
       const direction = action.type === 'MOVE_LEFT' ? -1 : 1;
-      const currentItem = action.filteredItems[state.activeIndex];
+      const currentItem = action.items[state.activeIndex];
       if (!currentItem) return state;
 
       const currentId = currentItem.key;
@@ -105,10 +100,10 @@ function footerConfigReducer(
       return { ...state, orderedIds: newOrderedIds, activeIndex: newIndex };
     }
     case 'TOGGLE_ITEM': {
-      const isSystemFocused = state.activeIndex >= action.filteredItems.length;
+      const isSystemFocused = state.activeIndex >= action.items.length;
       if (isSystemFocused) return state;
 
-      const item = action.filteredItems[state.activeIndex];
+      const item = action.items[state.activeIndex];
       if (!item) return state;
 
       const nextSelected = new Set(state.selectedIds);
@@ -142,7 +137,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
 
   const { orderedIds, selectedIds, activeIndex, scrollOffset } = state;
 
-  // Prepare items for fuzzy list
+  // Prepare items
   const listItems = useMemo(
     () =>
       orderedIds
@@ -159,10 +154,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
     [orderedIds],
   );
 
-  const { filteredItems, searchBuffer, searchQuery, maxLabelWidth } =
-    useFuzzyList({
-      items: listItems,
-    });
+  const maxLabelWidth = useMemo(() => listItems.reduce((max, item) => Math.max(max, item.label.length), 0), [listItems]);
 
   // Save settings when orderedIds or selectedIds change
   useEffect(() => {
@@ -174,13 +166,8 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
     }
   }, [orderedIds, selectedIds, setSetting, settings.merged.ui?.footer?.items]);
 
-  // Reset index when search changes
-  useEffect(() => {
-    dispatch({ type: 'RESET_INDEX' });
-  }, [searchQuery]);
-
-  const isResetFocused = activeIndex === filteredItems.length + 1;
-  const isShowLabelsFocused = activeIndex === filteredItems.length;
+  const isResetFocused = activeIndex === listItems.length + 1;
+  const isShowLabelsFocused = activeIndex === listItems.length;
 
   const handleResetToDefaults = useCallback(() => {
     setSetting(SettingScope.User, 'ui.footer.items', undefined);
@@ -209,7 +196,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
       if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
         dispatch({
           type: 'MOVE_UP',
-          filteredCount: filteredItems.length,
+          itemCount: listItems.length,
           maxToShow: maxItemsToShow,
         });
         return true;
@@ -218,19 +205,19 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
       if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
         dispatch({
           type: 'MOVE_DOWN',
-          filteredCount: filteredItems.length,
+          itemCount: listItems.length,
           maxToShow: maxItemsToShow,
         });
         return true;
       }
 
       if (keyMatchers[Command.MOVE_LEFT](key)) {
-        dispatch({ type: 'MOVE_LEFT', searchQuery, filteredItems });
+        dispatch({ type: 'MOVE_LEFT', items: listItems });
         return true;
       }
 
       if (keyMatchers[Command.MOVE_RIGHT](key)) {
-        dispatch({ type: 'MOVE_RIGHT', searchQuery, filteredItems });
+        dispatch({ type: 'MOVE_RIGHT', items: listItems });
         return true;
       }
 
@@ -240,7 +227,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
         } else if (isShowLabelsFocused) {
           handleToggleLabels();
         } else {
-          dispatch({ type: 'TOGGLE_ITEM', filteredItems });
+          dispatch({ type: 'TOGGLE_ITEM', items: listItems });
         }
         return true;
       }
@@ -250,12 +237,12 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
     { isActive: true, priority: true },
   );
 
-  const visibleItems = filteredItems.slice(
+  const visibleItems = listItems.slice(
     scrollOffset,
     scrollOffset + maxItemsToShow,
   );
 
-  const activeId = filteredItems[activeIndex]?.key;
+  const activeId = listItems[activeIndex]?.key;
   const showLabels = settings.merged.ui.footer.showLabels !== false;
 
   // Preview logic
@@ -290,7 +277,9 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
       'context-remaining': (
         <Text color={getColor('context-remaining', itemColor)}>85% left</Text>
       ),
-      quota: <Text color={getColor('quota', itemColor)}>daily 97%</Text>,
+      'usage-limit': (
+        <Text color={getColor('usage-limit', itemColor)}>daily 97%</Text>
+      ),
       'memory-usage': (
         <Text color={getColor('memory-usage', itemColor)}>260 MB</Text>
       ),
@@ -331,22 +320,10 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
       paddingY={1}
       width="100%"
     >
-      <Text bold>Configure Footer</Text>
+      <Text bold>Configure Footer{'\n'}</Text>
       <Text color={theme.text.secondary}>
         Select which items to display in the footer.
       </Text>
-
-      <Box marginTop={1} flexDirection="column">
-        <Text color={theme.text.secondary}>Type to search</Text>
-        <Box
-          borderStyle="round"
-          borderColor={theme.border.focused}
-          paddingX={1}
-          height={3}
-        >
-          {searchBuffer && <TextInput buffer={searchBuffer} focus={true} />}
-        </Box>
-      </Box>
 
       <Box flexDirection="column" marginTop={1} minHeight={maxItemsToShow}>
         {visibleItems.length === 0 ? (
@@ -400,11 +377,6 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
         <Text color={theme.text.secondary}>
           ↑/↓ navigate · ←/→ reorder · enter select · esc close
         </Text>
-        {searchQuery && (
-          <Text color={theme.status.warning}>
-            Reordering is disabled when searching.
-          </Text>
-        )}
       </Box>
 
       <Box

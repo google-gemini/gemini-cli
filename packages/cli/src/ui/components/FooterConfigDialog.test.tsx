@@ -56,24 +56,6 @@ describe('<FooterConfigDialog />', () => {
     });
   });
 
-  it('filters items when typing in search', async () => {
-    const settings = createMockSettings();
-    const { lastFrame, stdin } = renderWithProviders(
-      <FooterConfigDialog onClose={mockOnClose} />,
-      { settings },
-    );
-
-    act(() => {
-      stdin.write('session');
-    });
-
-    await waitFor(() => {
-      const output = lastFrame();
-      expect(output).toContain('session-id');
-      expect(output).not.toContain('model-name');
-    });
-  });
-
   it('reorders items with arrow keys', async () => {
     const settings = createMockSettings();
     const { lastFrame, stdin } = renderWithProviders(

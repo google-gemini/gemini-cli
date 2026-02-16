@@ -312,7 +312,7 @@ export const Footer: React.FC = () => {
         );
         break;
       }
-      case 'quota': {
+      case 'usage-limit': {
         if (quotaStats?.remaining !== undefined && quotaStats.limit) {
           const percentage = (quotaStats.remaining / quotaStats.limit) * 100;
           let color = itemColor;
