@@ -182,7 +182,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
           if (!item) return null;
           return {
             key: id,
-            label: item.id as string,
+            label: id,
             description: item.description as string,
           };
         })
@@ -327,7 +327,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
       },
       'git-branch': {
         header: 'Branch',
-        data: <Text color={getColor('git-branch', itemColor)}>main*</Text>,
+        data: <Text color={getColor('git-branch', itemColor)}>main</Text>,
       },
       'sandbox-status': {
         header: '/docs',

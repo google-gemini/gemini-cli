@@ -135,7 +135,7 @@ describe('<FooterConfigDialog />', () => {
     });
 
     await waitFor(() => {
-      expect(lastFrame()).toContain('main*');
+      expect(lastFrame()).toContain('main');
     });
   });
 
@@ -157,7 +157,6 @@ describe('<FooterConfigDialog />', () => {
       const output = lastFrame();
       expect(output).toContain('Preview:');
       expect(output).not.toContain('~/project/path');
-      expect(output).not.toContain('main*');
       expect(output).not.toContain('docker');
       expect(output).not.toContain('gemini-2.5-pro');
       expect(output).not.toContain('1.2k left');

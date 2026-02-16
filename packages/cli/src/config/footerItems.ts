@@ -10,61 +10,51 @@ export const ALL_ITEMS = [
   {
     id: 'cwd',
     header: 'Path',
-    label: 'cwd',
     description: 'Current directory path',
   },
   {
     id: 'git-branch',
     header: 'Branch',
-    label: 'git-branch',
     description: 'Current git branch name',
   },
   {
     id: 'sandbox-status',
     header: '/docs',
-    label: 'sandbox-status',
     description: 'Sandbox type and trust indicator',
   },
   {
     id: 'model-name',
     header: '/model',
-    label: 'model-name',
     description: 'Current model identifier',
   },
   {
     id: 'context-remaining',
     header: 'Context',
-    label: 'context-remaining',
     description: 'Percentage of context window remaining',
   },
   {
     id: 'quota',
     header: '/stats',
-    label: 'quota',
     description: 'Remaining usage on daily limit',
   },
   {
     id: 'memory-usage',
     header: 'Memory',
-    label: 'memory-usage',
     description: 'Node.js heap memory usage',
   },
   {
     id: 'session-id',
     header: 'Session',
-    label: 'session-id',
     description: 'Unique identifier for the current session',
   },
   {
     id: 'code-changes',
     header: 'Diff',
-    label: 'code-changes',
     description: 'Lines added/removed in the session',
   },
   {
     id: 'token-count',
     header: 'Tokens',
-    label: 'token-count',
     description: 'Total tokens used in the session',
   },
 ] as const;
@@ -74,7 +64,6 @@ export type FooterItemId = (typeof ALL_ITEMS)[number]['id'];
 export interface FooterItem {
   id: string;
   header: string;
-  label: string;
   description: string;
 }
 

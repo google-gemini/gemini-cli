@@ -558,7 +558,7 @@ describe('<Footer />', () => {
       expect(output).toContain('/docs');
       expect(output).toContain('/model');
       // Data should be present
-      expect(output).toContain('main*');
+      expect(output).toContain('main');
       expect(output).toContain('gemini-pro');
     });
 

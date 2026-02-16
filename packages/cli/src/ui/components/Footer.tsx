@@ -59,32 +59,12 @@ const CwdIndicator: React.FC<CwdIndicatorProps> = ({
   );
 };
 
-interface BranchIndicatorProps {
-  branchName: string;
-  showParentheses?: boolean;
-  color?: string;
-}
-
-const BranchIndicator: React.FC<BranchIndicatorProps> = ({
-  branchName,
-  showParentheses = true,
-  color = theme.text.primary,
-}) => (
-  <Text color={color}>
-    {showParentheses ? `(${branchName}*)` : `${branchName}*`}
-  </Text>
-);
-
 interface SandboxIndicatorProps {
   isTrustedFolder: boolean | undefined;
-  terminalWidth: number;
-  showDocsHint?: boolean;
 }
 
 const SandboxIndicator: React.FC<SandboxIndicatorProps> = ({
   isTrustedFolder,
-  terminalWidth,
-  showDocsHint = false,
 }) => {
   if (isTrustedFolder === false) {
     return <Text color={theme.status.warning}>untrusted</Text>;
@@ -108,14 +88,7 @@ const SandboxIndicator: React.FC<SandboxIndicatorProps> = ({
     );
   }
 
-  return (
-    <Text color={theme.status.error}>
-      no sandbox
-      {showDocsHint && terminalWidth >= 100 && (
-        <Text color={theme.text.secondary}> (see /docs)</Text>
-      )}
-    </Text>
-  );
+  return <Text color={theme.status.error}>no sandbox</Text>;
 };
 
 const CorgiIndicator: React.FC = () => (
@@ -126,16 +99,6 @@ const CorgiIndicator: React.FC = () => (
     <Text color={theme.text.primary}>`)</Text>
     <Text color={theme.status.error}>▼</Text>
   </Text>
-);
-
-interface ErrorIndicatorProps {
-  errorCount: number;
-}
-
-const ErrorIndicator: React.FC<ErrorIndicatorProps> = ({ errorCount }) => (
-  <Box flexDirection="row">
-    <ConsoleSummaryDisplay errorCount={errorCount} />
-  </Box>
 );
 
 function isFooterItemId(id: string): id is FooterItemId {
@@ -252,18 +215,11 @@ export const Footer: React.FC = () => {
       }
       case 'git-branch': {
         if (branchName) {
-          const str = `${branchName}*`;
           addCol(
             id,
             header,
-            () => (
-              <BranchIndicator
-                branchName={branchName}
-                showParentheses={false}
-                color={itemColor}
-              />
-            ),
-            str.length,
+            () => <Text color={itemColor}>{branchName}</Text>,
+            branchName.length,
           );
         }
         break;
@@ -279,12 +235,7 @@ export const Footer: React.FC = () => {
         addCol(
           id,
           header,
-          () => (
-            <SandboxIndicator
-              isTrustedFolder={isTrustedFolder}
-              terminalWidth={terminalWidth}
-            />
-          ),
+          () => <SandboxIndicator isTrustedFolder={isTrustedFolder} />,
           str.length,
         );
         break;
@@ -408,7 +359,7 @@ export const Footer: React.FC = () => {
     addCol(
       'error-count',
       '',
-      () => <ErrorIndicator errorCount={errorCount} />,
+      () => <ConsoleSummaryDisplay errorCount={errorCount} />,
       12,
       true,
     );
