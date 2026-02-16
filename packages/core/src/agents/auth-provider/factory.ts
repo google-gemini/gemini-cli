@@ -10,6 +10,7 @@ import type {
   A2AAuthProvider,
   AuthValidationResult,
 } from './types.js';
+import { ApiKeyAuthProvider, HttpAuthProvider } from './providers.js';
 
 export interface CreateAuthProviderOptions {
   /** Required for OAuth/OIDC token storage. */
@@ -43,13 +44,22 @@ export class A2AAuthProviderFactory {
         // TODO: Implement
         throw new Error('google-credentials auth provider not yet implemented');
 
-      case 'apiKey':
-        // TODO: Implement
-        throw new Error('apiKey auth provider not yet implemented');
+      case 'apiKey': {
+        const provider = new ApiKeyAuthProvider(
+          authConfig,
+          A2AAuthProviderFactory.extractApiKeyDefaults(
+            agentCard?.securitySchemes,
+          ),
+        );
+        await provider.initialize();
+        return provider;
+      }
 
-      case 'http':
-        // TODO: Implement
-        throw new Error('http auth provider not yet implemented');
+      case 'http': {
+        const provider = new HttpAuthProvider(authConfig);
+        await provider.initialize();
+        return provider;
+      }
 
       case 'oauth2':
         // TODO: Implement
@@ -199,6 +209,29 @@ export class A2AAuthProviderFactory {
     }
 
     return { matched: false, missingConfig };
+  }
+
+  /**
+   * Extract default API key configuration from AgentCard security schemes.
+   */
+  private static extractApiKeyDefaults(
+    securitySchemes: Record<string, SecurityScheme> | undefined,
+  ): { location?: 'header' | 'query' | 'cookie'; name?: string } {
+    if (!securitySchemes) {
+      return {};
+    }
+
+    // Find the first apiKey scheme to extract defaults
+    for (const scheme of Object.values(securitySchemes)) {
+      if (scheme.type === 'apiKey') {
+        return {
+          location: scheme.in,
+          name: scheme.name,
+        };
+      }
+    }
+
+    return {};
   }
 
   /** Get human-readable description of required auth for error messages. */
