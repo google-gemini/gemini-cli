@@ -550,7 +550,7 @@ describe('ToolRegistry', () => {
       expect(result.error?.type).toBe(
         ToolErrorType.DISCOVERED_TOOL_EXECUTION_ERROR,
       );
-      expect(result.llmContent).toContain('Stderr: Something went wrong');
+      expect(result.llmContent).toContain('Output: Something went wrong');
       expect(result.llmContent).toContain('Exit Code: 1');
     });
 

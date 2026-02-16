@@ -103,13 +103,19 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
 
     // if there is any error, non-zero exit code, signal, or stderr, return error details instead of stdout
     if (error || code !== 0 || signal || stderr) {
-      const llmContent = [
-        `Stdout: ${stdout || '(empty)'}`,
-        `Stderr: ${stderr || '(empty)'}`,
-        `Error: ${error ?? '(none)'}`,
-        `Exit Code: ${code ?? '(none)'}`,
-        `Signal: ${signal ?? '(none)'}`,
-      ].join('\n');
+      const llmContentParts = [
+        `Output: ${(stdout + stderr).trim() || '(empty)'}`,
+      ];
+      if (error) {
+        llmContentParts.push(`Error: ${error}`);
+      }
+      if (code !== null && code !== 0) {
+        llmContentParts.push(`Exit Code: ${code}`);
+      }
+      if (signal) {
+        llmContentParts.push(`Signal: ${signal}`);
+      }
+      const llmContent = llmContentParts.join('\n');
       return {
         llmContent,
         returnDisplay: llmContent,
@@ -153,13 +159,7 @@ Tool discovery and call commands can be configured in project or user settings.
 
 When called, the tool call command is executed as a subprocess.
 On success, tool output is returned as a json string.
-Otherwise, the following information is returned:
-
-Stdout: Output on stdout stream. Can be \`(empty)\` or partial.
-Stderr: Output on stderr stream. Can be \`(empty)\` or partial.
-Error: Error or \`(none)\` if no error was reported for the subprocess.
-Exit Code: Exit code or \`(none)\` if terminated by signal.
-Signal: Signal number or \`(none)\` if no signal was received.
+Otherwise, the following information is returned: [Protocol: Subprocess]
 `;
     super(
       prefixedName,
