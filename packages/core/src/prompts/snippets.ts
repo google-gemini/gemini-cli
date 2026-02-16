@@ -183,6 +183,7 @@ Use the following guidelines to optimize your search and read patterns.
 - It is more important to reduce extra turns, but please also try to minimize unnecessarily large file reads and search results, when doing so doesn't result in extra turns. Do this by always providing conservative limits and scopes to tools like ${READ_FILE_TOOL_NAME} and ${GREP_TOOL_NAME}.
 - ${READ_FILE_TOOL_NAME} fails if old_string is ambiguous, causing extra turns. Take care to read enough with ${READ_FILE_TOOL_NAME} and ${GREP_TOOL_NAME} to make the edit unambiguous.
 - You can compensate for the risk of missing results with scoped or limited searches by doing multiple searches in parallel.
+- You can conserve your own context budget by delegating context intensive tasks to the \`generalist\` sub-agent.
 - Your primary goal is still to do your best quality work. Efficiency is an important, but secondary concern.
 </guidelines>
 
@@ -192,6 +193,7 @@ Use the following guidelines to optimize your search and read patterns.
 - **Understanding:** minimize turns needed to understand a file. It's most efficient to read small files in their entirety.
 - **Large files:** utilize search tools like ${GREP_TOOL_NAME} and/or ${READ_FILE_TOOL_NAME} called in parallel with an offset and a limit to reduce the impact on context. Minmize extra turns, unless unavoidable due to the file being too large.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
+- **Independent operation:** use the generalist sub-agent when doing something repetitive or isolated to a specific project or directory to avoid consuming your context window.
 </examples>
 
 ## Parallelism
