@@ -221,6 +221,8 @@ export * from './telemetry/constants.js';
 export { sessionId, createSessionId } from './utils/session.js';
 export * from './utils/compatibility.js';
 export * from './utils/browser.js';
+export * from './teleportation/index.js';
+
 export { Storage } from './config/storage.js';
 
 // Export hooks system

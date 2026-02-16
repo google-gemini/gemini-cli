@@ -9,6 +9,9 @@ import type { HistoryItemWithoutId } from '../types.js';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import {
+  loadAgySession,
+  trajectoryToJson,
+  convertAgyToCliRecord,
   coreEvents,
   convertSessionToClientHistory,
   uiTelemetryService,
@@ -51,20 +54,35 @@ export const useSessionBrowser = (
     handleResumeSession: useCallback(
       async (session: SessionInfo) => {
         try {
-          const chatsDir = path.join(
-            config.storage.getProjectTempDir(),
-            'chats',
-          );
+          let conversation: ConversationRecord;
+          let filePath: string;
 
-          const fileName = session.fileName;
+          if (session.fileName.endsWith('.pb')) {
+            // Antigravity session
+            const data = await loadAgySession(session.id);
+            if (!data) {
+              throw new Error(
+                `Could not load Antigravity session ${session.id}`,
+              );
+            }
+            const json = trajectoryToJson(data);
+            conversation = convertAgyToCliRecord(json);
+            // Antigravity sessions don't have a local CLI file path yet,
+            // but we'll use the .pb path for reference in resumedSessionData
+            filePath = session.id + '.pb';
+          } else {
+            // Regular CLI session
+            const chatsDir = path.join(
+              config.storage.getProjectTempDir(),
+              'chats',
+            );
+            const fileName = session.fileName;
+            filePath = path.join(chatsDir, fileName);
 
-          const originalFilePath = path.join(chatsDir, fileName);
-
-          // Load up the conversation.
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          const conversation: ConversationRecord = JSON.parse(
-            await fs.readFile(originalFilePath, 'utf8'),
-          );
+            // Load up the conversation.
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            conversation = JSON.parse(await fs.readFile(filePath, 'utf8'));
+          }
 
           // Use the old session's ID to continue it.
           const existingSessionId = conversation.sessionId;
@@ -73,7 +91,7 @@ export const useSessionBrowser = (
 
           const resumedSessionData = {
             conversation,
-            filePath: originalFilePath,
+            filePath,
           };
 
           // We've loaded it; tell the UI about it.

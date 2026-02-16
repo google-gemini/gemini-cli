@@ -5,15 +5,30 @@
       {
         "label": "Get started",
         "items": [
-          { "label": "Overview", "slug": "docs" },
-          { "label": "Quickstart", "slug": "docs/get-started" },
-          { "label": "Installation", "slug": "docs/get-started/installation" },
+          {
+            "label": "Overview",
+            "slug": "docs"
+          },
+          {
+            "label": "Quickstart",
+            "slug": "docs/get-started"
+          },
+          {
+            "label": "Installation",
+            "slug": "docs/get-started/installation"
+          },
           {
             "label": "Authentication",
             "slug": "docs/get-started/authentication"
           },
-          { "label": "Examples", "slug": "docs/get-started/examples" },
-          { "label": "CLI cheatsheet", "slug": "docs/cli/cli-reference" },
+          {
+            "label": "Examples",
+            "slug": "docs/get-started/examples"
+          },
+          {
+            "label": "CLI cheatsheet",
+            "slug": "docs/cli/cli-reference"
+          },
           {
             "label": "Gemini 3 on Gemini CLI",
             "slug": "docs/get-started/gemini-3"
@@ -60,12 +75,23 @@
             "label": "Set up an MCP server",
             "slug": "docs/cli/tutorials/mcp-setup"
           },
-          { "label": "Automate tasks", "slug": "docs/cli/tutorials/automation" }
+          {
+            "label": "Automate tasks",
+            "slug": "docs/cli/tutorials/automation"
+          }
         ]
       },
       {
         "label": "Features",
         "items": [
+          {
+            "label": "Agent Skills",
+            "slug": "docs/cli/skills"
+          },
+          {
+            "label": "Checkpointing",
+            "slug": "docs/cli/checkpointing"
+          },
           {
             "label": "Extensions",
             "collapsed": true,
@@ -96,21 +122,40 @@
               }
             ]
           },
-          { "label": "Agent Skills", "slug": "docs/cli/skills" },
-          { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
-          { "label": "Headless mode", "slug": "docs/cli/headless" },
+          {
+            "label": "Headless mode",
+            "slug": "docs/cli/headless"
+          },
           {
             "label": "Hooks",
             "collapsed": true,
             "items": [
-              { "label": "Overview", "slug": "docs/hooks" },
-              { "label": "Reference", "slug": "docs/hooks/reference" }
+              {
+                "label": "Overview",
+                "slug": "docs/hooks"
+              },
+              {
+                "label": "Reference",
+                "slug": "docs/hooks/reference"
+              }
             ]
           },
-          { "label": "IDE integration", "slug": "docs/ide-integration" },
-          { "label": "MCP servers", "slug": "docs/tools/mcp-server" },
-          { "label": "Model routing", "slug": "docs/cli/model-routing" },
-          { "label": "Model selection", "slug": "docs/cli/model" },
+          {
+            "label": "IDE integration",
+            "slug": "docs/ide-integration"
+          },
+          {
+            "label": "MCP servers",
+            "slug": "docs/tools/mcp-server"
+          },
+          {
+            "label": "Model routing",
+            "slug": "docs/cli/model-routing"
+          },
+          {
+            "label": "Model selection",
+            "slug": "docs/cli/model"
+          },
           {
             "label": "Model steering",
             "badge": "🔬",
@@ -121,28 +166,54 @@
             "badge": "🔬",
             "slug": "docs/cli/notifications"
           },
-          { "label": "Plan mode", "slug": "docs/cli/plan-mode" },
           {
-            "label": "Subagents",
+            "label": "Plan mode",
             "badge": "🔬",
-            "slug": "docs/core/subagents"
+            "slug": "docs/cli/plan-mode"
           },
           {
             "label": "Remote subagents",
             "badge": "🔬",
             "slug": "docs/core/remote-agents"
           },
-          { "label": "Rewind", "slug": "docs/cli/rewind" },
-          { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
-          { "label": "Settings", "slug": "docs/cli/settings" },
-          { "label": "Telemetry", "slug": "docs/cli/telemetry" },
-          { "label": "Token caching", "slug": "docs/cli/token-caching" }
+          {
+            "label": "Rewind",
+            "slug": "docs/cli/rewind"
+          },
+          {
+            "label": "Sandboxing",
+            "slug": "docs/cli/sandbox"
+          },
+          {
+            "label": "Settings",
+            "slug": "docs/cli/settings"
+          },
+          {
+            "label": "Subagents",
+            "badge": "🔬",
+            "slug": "docs/core/subagents"
+          },
+          {
+            "label": "Telemetry",
+            "slug": "docs/cli/telemetry"
+          },
+          {
+            "label": "Teleportation",
+            "slug": "docs/core/teleportation"
+          },
+          {
+            "label": "Token caching",
+            "slug": "docs/cli/token-caching"
+          }
         ]
       },
       {
         "label": "Configuration",
         "items": [
-          { "label": "Custom commands", "slug": "docs/cli/custom-commands" },
+          {
+            "label": "Custom commands",
+            "slug": "docs/cli/custom-commands"
+          },
           {
             "label": "Enterprise configuration",
             "slug": "docs/cli/enterprise"
@@ -159,26 +230,47 @@
             "label": "Project context (GEMINI.md)",
             "slug": "docs/cli/gemini-md"
           },
-          { "label": "Settings", "slug": "docs/cli/settings" },
+          {
+            "label": "Settings",
+            "slug": "docs/cli/settings"
+          },
           {
             "label": "System prompt override",
             "slug": "docs/cli/system-prompt"
           },
-          { "label": "Themes", "slug": "docs/cli/themes" },
-          { "label": "Trusted folders", "slug": "docs/cli/trusted-folders" }
+          {
+            "label": "Themes",
+            "slug": "docs/cli/themes"
+          },
+          {
+            "label": "Trusted folders",
+            "slug": "docs/cli/trusted-folders"
+          }
         ]
       },
       {
         "label": "Development",
         "items": [
-          { "label": "Contribution guide", "slug": "docs/contributing" },
-          { "label": "Integration testing", "slug": "docs/integration-tests" },
+          {
+            "label": "Contribution guide",
+            "slug": "docs/contributing"
+          },
+          {
+            "label": "Integration testing",
+            "slug": "docs/integration-tests"
+          },
           {
             "label": "Issue and PR automation",
             "slug": "docs/issue-and-pr-automation"
           },
-          { "label": "Local development", "slug": "docs/local-development" },
-          { "label": "NPM package structure", "slug": "docs/npm" }
+          {
+            "label": "Local development",
+            "slug": "docs/local-development"
+          },
+          {
+            "label": "NPM package structure",
+            "slug": "docs/npm"
+          }
         ]
       }
     ]
@@ -189,7 +281,10 @@
       {
         "label": "Reference",
         "items": [
-          { "label": "Command reference", "slug": "docs/reference/commands" },
+          {
+            "label": "Command reference",
+            "slug": "docs/reference/commands"
+          },
           {
             "label": "Configuration reference",
             "slug": "docs/reference/configuration"
@@ -202,8 +297,14 @@
             "label": "Memory import processor",
             "slug": "docs/reference/memport"
           },
-          { "label": "Policy engine", "slug": "docs/reference/policy-engine" },
-          { "label": "Tools reference", "slug": "docs/reference/tools" }
+          {
+            "label": "Policy engine",
+            "slug": "docs/reference/policy-engine"
+          },
+          {
+            "label": "Tools reference",
+            "slug": "docs/reference/tools"
+          }
         ]
       }
     ]
@@ -214,7 +315,10 @@
       {
         "label": "Resources",
         "items": [
-          { "label": "FAQ", "slug": "docs/resources/faq" },
+          {
+            "label": "FAQ",
+            "slug": "docs/resources/faq"
+          },
           {
             "label": "Quota and pricing",
             "slug": "docs/resources/quota-and-pricing"
@@ -227,7 +331,10 @@
             "label": "Troubleshooting",
             "slug": "docs/resources/troubleshooting"
           },
-          { "label": "Uninstall", "slug": "docs/resources/uninstall" }
+          {
+            "label": "Uninstall",
+            "slug": "docs/resources/uninstall"
+          }
         ]
       }
     ]
@@ -238,9 +345,18 @@
       {
         "label": "Releases",
         "items": [
-          { "label": "Release notes", "slug": "docs/changelogs/" },
-          { "label": "Stable release", "slug": "docs/changelogs/latest" },
-          { "label": "Preview release", "slug": "docs/changelogs/preview" }
+          {
+            "label": "Release notes",
+            "slug": "docs/changelogs/"
+          },
+          {
+            "label": "Stable release",
+            "slug": "docs/changelogs/latest"
+          },
+          {
+            "label": "Preview release",
+            "slug": "docs/changelogs/preview"
+          }
         ]
       }
     ]
