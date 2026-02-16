@@ -45,7 +45,11 @@ export const NewAgentsNotification = ({
 
   const handleSelect = async (choice: NewAgentsChoice) => {
     setIsProcessing(true);
-    await onSelect(choice);
+    try {
+      await onSelect(choice);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // Limit display to 5 agents to avoid overflow, show count for rest
