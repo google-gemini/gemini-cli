@@ -103,19 +103,19 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
 
     // if there is any error, non-zero exit code, signal, or stderr, return error details instead of stdout
     if (error || code !== 0 || signal || stderr) {
-      const llmContentParts = [
-        `Output: ${(stdout + stderr).trim() || '(empty)'}`,
+      const parts = [
+        `<output>${(stdout + stderr).trim() || '(empty)'}</output>`,
       ];
       if (error) {
-        llmContentParts.push(`Error: ${error}`);
+        parts.push(`<error>${error}</error>`);
       }
       if (code !== null && code !== 0) {
-        llmContentParts.push(`Exit Code: ${code}`);
+        parts.push(`<exit_code>${code}</exit_code>`);
       }
       if (signal) {
-        llmContentParts.push(`Signal: ${signal}`);
+        parts.push(`<signal>${signal}</signal>`);
       }
-      const llmContent = llmContentParts.join('\n');
+      const llmContent = `<subprocess_result>\n${parts.map((p) => `  ${p}`).join('\n')}\n</subprocess_result>`;
       return {
         llmContent,
         returnDisplay: llmContent,
@@ -159,7 +159,6 @@ Tool discovery and call commands can be configured in project or user settings.
 
 When called, the tool call command is executed as a subprocess.
 On success, tool output is returned as a json string.
-Otherwise, the following information is returned: [Protocol: Subprocess]
 `;
     super(
       prefixedName,

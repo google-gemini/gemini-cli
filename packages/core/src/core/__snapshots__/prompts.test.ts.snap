@@ -631,17 +631,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly without excessive justification. Offer alternatives if appropriate.
 
-## Standard Subprocess Protocol
-
-For any tool that executes a subprocess (including shell commands and project-specific discovered tools), the following information is returned:
-
-- **Output:** The combined content of stdout and stderr. Can be \`(empty)\` or partial on error or for unwaited background processes.
-- **Exit Code:** The numeric exit code of the process. Only included if non-zero (indicating failure).
-- **Error:** A descriptive message if a process-level error occurred (e.g., command not found).
-- **Signal:** The name or number of the signal that terminated the process (if applicable).
-- **Background PIDs:** A list of PIDs for any background processes started by the command.
-- **Process Group PGID:** The process group ID, which can be used to terminate the process group if needed.
-
 ## Security and Safety Rules
 - **Explain Critical Commands:** Before executing commands with \`run_shell_command\` that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
 - **Security First:** Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.
@@ -780,17 +769,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly without excessive justification. Offer alternatives if appropriate.
 
-## Standard Subprocess Protocol
-
-For any tool that executes a subprocess (including shell commands and project-specific discovered tools), the following information is returned:
-
-- **Output:** The combined content of stdout and stderr. Can be \`(empty)\` or partial on error or for unwaited background processes.
-- **Exit Code:** The numeric exit code of the process. Only included if non-zero (indicating failure).
-- **Error:** A descriptive message if a process-level error occurred (e.g., command not found).
-- **Signal:** The name or number of the signal that terminated the process (if applicable).
-- **Background PIDs:** A list of PIDs for any background processes started by the command.
-- **Process Group PGID:** The process group ID, which can be used to terminate the process group if needed.
-
 ## Security and Safety Rules
 - **Explain Critical Commands:** Before executing commands with \`run_shell_command\` that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
 - **Security First:** Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.
@@ -911,17 +889,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly without excessive justification. Offer alternatives if appropriate.
-
-## Standard Subprocess Protocol
-
-For any tool that executes a subprocess (including shell commands and project-specific discovered tools), the following information is returned:
-
-- **Output:** The combined content of stdout and stderr. Can be \`(empty)\` or partial on error or for unwaited background processes.
-- **Exit Code:** The numeric exit code of the process. Only included if non-zero (indicating failure).
-- **Error:** A descriptive message if a process-level error occurred (e.g., command not found).
-- **Signal:** The name or number of the signal that terminated the process (if applicable).
-- **Background PIDs:** A list of PIDs for any background processes started by the command.
-- **Process Group PGID:** The process group ID, which can be used to terminate the process group if needed.
 
 ## Security and Safety Rules
 - **Explain Critical Commands:** Before executing commands with \`run_shell_command\` that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
@@ -1543,17 +1510,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly without excessive justification. Offer alternatives if appropriate.
 
-## Standard Subprocess Protocol
-
-For any tool that executes a subprocess (including shell commands and project-specific discovered tools), the following information is returned:
-
-- **Output:** The combined content of stdout and stderr. Can be \`(empty)\` or partial on error or for unwaited background processes.
-- **Exit Code:** The numeric exit code of the process. Only included if non-zero (indicating failure).
-- **Error:** A descriptive message if a process-level error occurred (e.g., command not found).
-- **Signal:** The name or number of the signal that terminated the process (if applicable).
-- **Background PIDs:** A list of PIDs for any background processes started by the command.
-- **Process Group PGID:** The process group ID, which can be used to terminate the process group if needed.
-
 ## Security and Safety Rules
 - **Explain Critical Commands:** Before executing commands with \`run_shell_command\` that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
 - **Security First:** Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.
@@ -1691,17 +1647,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly without excessive justification. Offer alternatives if appropriate.
-
-## Standard Subprocess Protocol
-
-For any tool that executes a subprocess (including shell commands and project-specific discovered tools), the following information is returned:
-
-- **Output:** The combined content of stdout and stderr. Can be \`(empty)\` or partial on error or for unwaited background processes.
-- **Exit Code:** The numeric exit code of the process. Only included if non-zero (indicating failure).
-- **Error:** A descriptive message if a process-level error occurred (e.g., command not found).
-- **Signal:** The name or number of the signal that terminated the process (if applicable).
-- **Background PIDs:** A list of PIDs for any background processes started by the command.
-- **Process Group PGID:** The process group ID, which can be used to terminate the process group if needed.
 
 ## Security and Safety Rules
 - **Explain Critical Commands:** Before executing commands with \`run_shell_command\` that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
@@ -1844,17 +1789,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly without excessive justification. Offer alternatives if appropriate.
-
-## Standard Subprocess Protocol
-
-For any tool that executes a subprocess (including shell commands and project-specific discovered tools), the following information is returned:
-
-- **Output:** The combined content of stdout and stderr. Can be \`(empty)\` or partial on error or for unwaited background processes.
-- **Exit Code:** The numeric exit code of the process. Only included if non-zero (indicating failure).
-- **Error:** A descriptive message if a process-level error occurred (e.g., command not found).
-- **Signal:** The name or number of the signal that terminated the process (if applicable).
-- **Background PIDs:** A list of PIDs for any background processes started by the command.
-- **Process Group PGID:** The process group ID, which can be used to terminate the process group if needed.
 
 ## Security and Safety Rules
 - **Explain Critical Commands:** Before executing commands with \`run_shell_command\` that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
@@ -2136,17 +2070,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly without excessive justification. Offer alternatives if appropriate.
 
-## Standard Subprocess Protocol
-
-For any tool that executes a subprocess (including shell commands and project-specific discovered tools), the following information is returned:
-
-- **Output:** The combined content of stdout and stderr. Can be \`(empty)\` or partial on error or for unwaited background processes.
-- **Exit Code:** The numeric exit code of the process. Only included if non-zero (indicating failure).
-- **Error:** A descriptive message if a process-level error occurred (e.g., command not found).
-- **Signal:** The name or number of the signal that terminated the process (if applicable).
-- **Background PIDs:** A list of PIDs for any background processes started by the command.
-- **Process Group PGID:** The process group ID, which can be used to terminate the process group if needed.
-
 ## Security and Safety Rules
 - **Explain Critical Commands:** Before executing commands with \`run_shell_command\` that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
 - **Security First:** Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.
@@ -2283,17 +2206,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly without excessive justification. Offer alternatives if appropriate.
-
-## Standard Subprocess Protocol
-
-For any tool that executes a subprocess (including shell commands and project-specific discovered tools), the following information is returned:
-
-- **Output:** The combined content of stdout and stderr. Can be \`(empty)\` or partial on error or for unwaited background processes.
-- **Exit Code:** The numeric exit code of the process. Only included if non-zero (indicating failure).
-- **Error:** A descriptive message if a process-level error occurred (e.g., command not found).
-- **Signal:** The name or number of the signal that terminated the process (if applicable).
-- **Background PIDs:** A list of PIDs for any background processes started by the command.
-- **Process Group PGID:** The process group ID, which can be used to terminate the process group if needed.
 
 ## Security and Safety Rules
 - **Explain Critical Commands:** Before executing commands with \`run_shell_command\` that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
@@ -2432,17 +2344,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly without excessive justification. Offer alternatives if appropriate.
-
-## Standard Subprocess Protocol
-
-For any tool that executes a subprocess (including shell commands and project-specific discovered tools), the following information is returned:
-
-- **Output:** The combined content of stdout and stderr. Can be \`(empty)\` or partial on error or for unwaited background processes.
-- **Exit Code:** The numeric exit code of the process. Only included if non-zero (indicating failure).
-- **Error:** A descriptive message if a process-level error occurred (e.g., command not found).
-- **Signal:** The name or number of the signal that terminated the process (if applicable).
-- **Background PIDs:** A list of PIDs for any background processes started by the command.
-- **Process Group PGID:** The process group ID, which can be used to terminate the process group if needed.
 
 ## Security and Safety Rules
 - **Explain Critical Commands:** Before executing commands with \`run_shell_command\` that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
@@ -2821,17 +2722,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly without excessive justification. Offer alternatives if appropriate.
 
-## Standard Subprocess Protocol
-
-For any tool that executes a subprocess (including shell commands and project-specific discovered tools), the following information is returned:
-
-- **Output:** The combined content of stdout and stderr. Can be \`(empty)\` or partial on error or for unwaited background processes.
-- **Exit Code:** The numeric exit code of the process. Only included if non-zero (indicating failure).
-- **Error:** A descriptive message if a process-level error occurred (e.g., command not found).
-- **Signal:** The name or number of the signal that terminated the process (if applicable).
-- **Background PIDs:** A list of PIDs for any background processes started by the command.
-- **Process Group PGID:** The process group ID, which can be used to terminate the process group if needed.
-
 ## Security and Safety Rules
 - **Explain Critical Commands:** Before executing commands with \`run_shell_command\` that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
 - **Security First:** Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.
@@ -2969,17 +2859,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly without excessive justification. Offer alternatives if appropriate.
-
-## Standard Subprocess Protocol
-
-For any tool that executes a subprocess (including shell commands and project-specific discovered tools), the following information is returned:
-
-- **Output:** The combined content of stdout and stderr. Can be \`(empty)\` or partial on error or for unwaited background processes.
-- **Exit Code:** The numeric exit code of the process. Only included if non-zero (indicating failure).
-- **Error:** A descriptive message if a process-level error occurred (e.g., command not found).
-- **Signal:** The name or number of the signal that terminated the process (if applicable).
-- **Background PIDs:** A list of PIDs for any background processes started by the command.
-- **Process Group PGID:** The process group ID, which can be used to terminate the process group if needed.
 
 ## Security and Safety Rules
 - **Explain Critical Commands:** Before executing commands with \`run_shell_command\` that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
@@ -3230,17 +3109,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly without excessive justification. Offer alternatives if appropriate.
 
-## Standard Subprocess Protocol
-
-For any tool that executes a subprocess (including shell commands and project-specific discovered tools), the following information is returned:
-
-- **Output:** The combined content of stdout and stderr. Can be \`(empty)\` or partial on error or for unwaited background processes.
-- **Exit Code:** The numeric exit code of the process. Only included if non-zero (indicating failure).
-- **Error:** A descriptive message if a process-level error occurred (e.g., command not found).
-- **Signal:** The name or number of the signal that terminated the process (if applicable).
-- **Background PIDs:** A list of PIDs for any background processes started by the command.
-- **Process Group PGID:** The process group ID, which can be used to terminate the process group if needed.
-
 ## Security and Safety Rules
 - **Explain Critical Commands:** Before executing commands with \`run_shell_command\` that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
 - **Security First:** Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.
@@ -3378,17 +3246,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly without excessive justification. Offer alternatives if appropriate.
-
-## Standard Subprocess Protocol
-
-For any tool that executes a subprocess (including shell commands and project-specific discovered tools), the following information is returned:
-
-- **Output:** The combined content of stdout and stderr. Can be \`(empty)\` or partial on error or for unwaited background processes.
-- **Exit Code:** The numeric exit code of the process. Only included if non-zero (indicating failure).
-- **Error:** A descriptive message if a process-level error occurred (e.g., command not found).
-- **Signal:** The name or number of the signal that terminated the process (if applicable).
-- **Background PIDs:** A list of PIDs for any background processes started by the command.
-- **Process Group PGID:** The process group ID, which can be used to terminate the process group if needed.
 
 ## Security and Safety Rules
 - **Explain Critical Commands:** Before executing commands with \`run_shell_command\` that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).

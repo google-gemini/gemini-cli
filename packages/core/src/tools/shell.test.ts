@@ -278,7 +278,9 @@ describe('ShellTool', () => {
         false,
         { pager: 'cat', sanitizationConfig: {} },
       );
-      expect(result.llmContent).toContain('Background PIDs: 54322');
+      expect(result.llmContent).toContain(
+        '<background_pids>54322</background_pids>',
+      );
       // The file should be deleted by the tool
       expect(fs.existsSync(tmpFile)).toBe(false);
     });
@@ -390,7 +392,9 @@ describe('ShellTool', () => {
       });
 
       const result = await promise;
-      expect(result.llmContent).toContain('Error: wrapped command failed');
+      expect(result.llmContent).toContain(
+        '<error>wrapped command failed</error>',
+      );
       expect(result.llmContent).not.toContain('pgrep');
     });
 
@@ -689,7 +693,7 @@ describe('ShellTool', () => {
       resolveShellExecution({ output: 'hello', exitCode: 0 });
 
       const result = await promise;
-      expect(result.llmContent).not.toContain('Exit Code:');
+      expect(result.llmContent).not.toContain('<exit_code>');
     });
 
     it('should include Exit Code when command fails (non-zero exit code)', async () => {
@@ -698,7 +702,7 @@ describe('ShellTool', () => {
       resolveShellExecution({ output: '', exitCode: 1 });
 
       const result = await promise;
-      expect(result.llmContent).toContain('Exit Code: 1');
+      expect(result.llmContent).toContain('<exit_code>1</exit_code>');
     });
 
     it('should not include Error when there is no process error', async () => {
@@ -707,7 +711,7 @@ describe('ShellTool', () => {
       resolveShellExecution({ output: 'hello', exitCode: 0, error: null });
 
       const result = await promise;
-      expect(result.llmContent).not.toContain('Error:');
+      expect(result.llmContent).not.toContain('<error>');
     });
 
     it('should include Error when there is a process error', async () => {
@@ -720,7 +724,7 @@ describe('ShellTool', () => {
       });
 
       const result = await promise;
-      expect(result.llmContent).toContain('Error: spawn ENOENT');
+      expect(result.llmContent).toContain('<error>spawn ENOENT</error>');
     });
 
     it('should not include Signal when there is no signal', async () => {
@@ -729,7 +733,7 @@ describe('ShellTool', () => {
       resolveShellExecution({ output: 'hello', exitCode: 0, signal: null });
 
       const result = await promise;
-      expect(result.llmContent).not.toContain('Signal:');
+      expect(result.llmContent).not.toContain('<signal>');
     });
 
     it('should include Signal when process was killed by signal', async () => {
@@ -742,7 +746,7 @@ describe('ShellTool', () => {
       });
 
       const result = await promise;
-      expect(result.llmContent).toContain('Signal: 9');
+      expect(result.llmContent).toContain('<signal>9</signal>');
     });
 
     it('should not include Background PIDs when there are none', async () => {
@@ -751,7 +755,7 @@ describe('ShellTool', () => {
       resolveShellExecution({ output: 'hello', exitCode: 0 });
 
       const result = await promise;
-      expect(result.llmContent).not.toContain('Background PIDs:');
+      expect(result.llmContent).not.toContain('<background_pids>');
     });
 
     it('should not include Process Group PGID when pid is not set', async () => {
@@ -760,7 +764,7 @@ describe('ShellTool', () => {
       resolveShellExecution({ output: 'hello', exitCode: 0, pid: undefined });
 
       const result = await promise;
-      expect(result.llmContent).not.toContain('Process Group PGID:');
+      expect(result.llmContent).not.toContain('<process_group_pgid>');
     });
 
     it('should have minimal output for successful command', async () => {
@@ -769,8 +773,9 @@ describe('ShellTool', () => {
       resolveShellExecution({ output: 'hello', exitCode: 0, pid: undefined });
 
       const result = await promise;
-      // Should only contain Output field
-      expect(result.llmContent).toBe('Output: hello');
+      // Should only contain subprocess_result and output
+      expect(result.llmContent).toContain('<subprocess_result>');
+      expect(result.llmContent).toContain('<output>hello</output>');
     });
   });
 

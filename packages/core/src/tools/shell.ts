@@ -354,31 +354,36 @@ export class ShellToolInvocation extends BaseToolInvocation<
       } else {
         // Create a formatted error string for display, replacing the wrapper command
         // with the user-facing command.
-        const llmContentParts = [`Output: ${result.output || '(empty)'}`];
+        const output = result.output || '(empty)';
+        const parts = [`<output>${output}</output>`];
 
         if (result.error) {
           const finalError = result.error.message.replaceAll(
             commandToExecute,
             this.params.command,
           );
-          llmContentParts.push(`Error: ${finalError}`);
+          parts.push(`<error>${finalError}</error>`);
         }
 
         if (result.exitCode !== null && result.exitCode !== 0) {
-          llmContentParts.push(`Exit Code: ${result.exitCode}`);
+          parts.push(`<exit_code>${result.exitCode}</exit_code>`);
         }
 
         if (result.signal) {
-          llmContentParts.push(`Signal: ${result.signal}`);
+          parts.push(`<signal>${result.signal}</signal>`);
         }
         if (backgroundPIDs.length) {
-          llmContentParts.push(`Background PIDs: ${backgroundPIDs.join(', ')}`);
+          parts.push(
+            `<background_pids>${backgroundPIDs.join(', ')}</background_pids>`,
+          );
         }
         if (result.pid) {
-          llmContentParts.push(`Process Group PGID: ${result.pid}`);
+          parts.push(`<process_group_pgid>${result.pid}</process_group_pgid>`);
         }
 
-        llmContent = llmContentParts.join('\n');
+        llmContent = `<subprocess_result>\n${parts
+          .map((p) => `  ${p}`)
+          .join('\n')}\n</subprocess_result>`;
       }
 
       let returnDisplayMessage = '';

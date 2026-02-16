@@ -5,9 +5,7 @@ exports[`ShellTool > getDescription > should return the non-windows description 
 
       Efficiency Guidelines:
       - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
-
-      The following information is returned: [Protocol: Subprocess]"
+      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`)."
 `;
 
 exports[`ShellTool > getDescription > should return the windows description when on windows 1`] = `
@@ -15,9 +13,7 @@ exports[`ShellTool > getDescription > should return the windows description when
 
       Efficiency Guidelines:
       - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
-
-      The following information is returned: [Protocol: Subprocess]"
+      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`)."
 `;
 
 exports[`ShellTool > getSchema > should return the base schema when no modelId is provided 1`] = `
@@ -25,9 +21,7 @@ exports[`ShellTool > getSchema > should return the base schema when no modelId i
 
       Efficiency Guidelines:
       - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
-
-      The following information is returned: [Protocol: Subprocess]"
+      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`)."
 `;
 
 exports[`ShellTool > getSchema > should return the schema from the resolver when modelId is provided 1`] = `
@@ -35,7 +29,5 @@ exports[`ShellTool > getSchema > should return the schema from the resolver when
 
       Efficiency Guidelines:
       - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
-
-      The following information is returned: [Protocol: Subprocess]"
+      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`)."
 `;

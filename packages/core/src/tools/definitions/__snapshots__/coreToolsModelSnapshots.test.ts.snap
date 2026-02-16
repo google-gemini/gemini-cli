@@ -572,9 +572,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 
       Efficiency Guidelines:
       - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
-
-      The following information is returned: [Protocol: Subprocess]",
+      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).",
   "name": "run_shell_command",
   "parametersJsonSchema": {
     "properties": {
@@ -1354,9 +1352,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
       Efficiency Guidelines:
       - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
-
-      The following information is returned: [Protocol: Subprocess]",
+      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).",
   "name": "run_shell_command",
   "parametersJsonSchema": {
     "properties": {
