@@ -181,6 +181,98 @@ ${reason.stack}`
   });
 }
 
+/**
+ * Sets up signal handlers to ensure graceful shutdown and prevent orphaned
+ * processes from consuming 100% CPU when the terminal is closed.
+ *
+ * Handles:
+ * - SIGHUP: Terminal hangup (terminal window closed)
+ * - SIGTERM: Termination request
+ * - SIGINT: Interrupt (Ctrl+C) - as fallback, Ink handles this in interactive mode
+ *
+ * @see https://github.com/google-gemini/gemini-cli/issues/15874
+ */
+let isShuttingDown = false;
+export function setupSignalHandlers() {
+  const gracefulShutdown = async (signal: string) => {
+    // Prevent multiple concurrent shutdown attempts
+    if (isShuttingDown) {
+      return;
+    }
+    isShuttingDown = true;
+
+    debugLogger.debug(`Received ${signal}, shutting down gracefully...`);
+    try {
+      await runExitCleanup();
+    } catch (err) {
+      debugLogger.debug(`Error during cleanup on ${signal}:`, err);
+    }
+    process.exit(ExitCodes.SUCCESS);
+  };
+
+  // SIGHUP is sent when terminal is closed - critical for preventing orphans
+  process.on('SIGHUP', () => gracefulShutdown('SIGHUP'));
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  // SIGINT is handled by Ink in interactive mode, but we need it for non-interactive
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+}
+
+/**
+ * Sets up periodic TTY check to detect lost controlling terminal.
+ * This is a defense-in-depth measure for cases where SIGHUP is not received
+ * or not processed correctly (e.g., certain terminal emulators, tmux detach).
+ *
+ * @returns Cleanup function to stop the TTY check interval
+ */
+export function setupTtyCheck(): () => void {
+  let intervalId: ReturnType<typeof setInterval> | null = null;
+  let isCheckingTty = false;
+
+  intervalId = setInterval(async () => {
+    // Prevent concurrent TTY checks
+    if (isCheckingTty || isShuttingDown) {
+      return;
+    }
+
+    // Skip check in sandbox mode or if explicitly running non-interactively
+    if (process.env['SANDBOX'] || process.env['GEMINI_NON_INTERACTIVE']) {
+      return;
+    }
+
+    // Check if we've lost both stdin and stdout TTY
+    if (!process.stdin.isTTY && !process.stdout.isTTY) {
+      isCheckingTty = true;
+
+      // Clear interval BEFORE starting cleanup to prevent race condition
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+
+      debugLogger.warn(
+        'Lost controlling terminal (stdin and stdout are not TTY), exiting...',
+      );
+
+      try {
+        await runExitCleanup();
+      } catch (err) {
+        debugLogger.debug('Error during TTY loss cleanup:', err);
+      }
+      process.exit(ExitCodes.SUCCESS);
+    }
+  }, 5000);
+
+  // Don't keep the process alive just for this interval
+  intervalId.unref();
+
+  return () => {
+    if (intervalId) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+  };
+}
+
 export async function startInteractiveUI(
   config: Config,
   settings: LoadedSettings,
@@ -319,6 +411,11 @@ export async function startInteractiveUI(
     });
 
   registerCleanup(() => instance.unmount());
+
+  // Set up TTY check for interactive mode as defense-in-depth
+  // against orphaned processes when terminal closes without sending SIGHUP
+  const stopTtyCheck = setupTtyCheck();
+  registerCleanup(stopTtyCheck);
 }
 
 export async function main() {
@@ -339,6 +436,8 @@ export async function main() {
   });
 
   setupUnhandledRejectionHandler();
+
+  setupSignalHandlers();
 
   const slashCommandConflictHandler = new SlashCommandConflictHandler();
   slashCommandConflictHandler.start();
@@ -645,11 +744,9 @@ export async function main() {
       // input showing up in the output.
       process.stdin.setRawMode(true);
 
-      // This cleanup isn't strictly needed but may help in certain situations.
-      process.on('SIGTERM', () => {
-        process.stdin.setRawMode(wasRaw);
-      });
-      process.on('SIGINT', () => {
+      // Register raw mode restoration for cleanup on exit
+      // This ensures terminal is restored even on signal-induced exits
+      registerSyncCleanup(() => {
         process.stdin.setRawMode(wasRaw);
       });
     }
