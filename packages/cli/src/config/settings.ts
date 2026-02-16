@@ -797,11 +797,11 @@ export function loadSettings(
       readOnly: false,
     },
     {
-      path: workspaceSettingsPath,
+      path: realWorkspaceDir === realHomeDir ? '' : workspaceSettingsPath,
       settings: workspaceSettings,
       originalSettings: workspaceOriginalSettings,
       rawJson: workspaceResult.rawJson,
-      readOnly: false,
+      readOnly: realWorkspaceDir === realHomeDir,
     },
     isTrusted,
     settingsErrors,
