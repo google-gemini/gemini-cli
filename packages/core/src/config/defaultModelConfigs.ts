@@ -237,3 +237,28 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
   ],
 };
+
+/**
+ * Merges user-provided model config service configuration with defaults.
+ * This function only fills in missing values from defaults; it does not
+ * merge them. This preserves the original behavior where user-provided
+ * values completely replace defaults.
+ *
+ * @param userConfig - The user-provided configuration (may be partial)
+ * @returns A complete configuration with defaults filled in for missing values
+ */
+export function mergeModelConfigWithDefaults(
+  userConfig: ModelConfigServiceConfig | undefined,
+): ModelConfigServiceConfig {
+  if (!userConfig) {
+    return DEFAULT_MODEL_CONFIGS;
+  }
+
+  return {
+    // Only use default aliases if user didn't provide any
+    aliases: userConfig.aliases ?? DEFAULT_MODEL_CONFIGS.aliases,
+
+    // Only use default overrides if user didn't provide any
+    overrides: userConfig.overrides ?? DEFAULT_MODEL_CONFIGS.overrides,
+  };
+}

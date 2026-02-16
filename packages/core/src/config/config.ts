@@ -87,7 +87,7 @@ import type {
   ModelConfigServiceConfig,
 } from '../services/modelConfigService.js';
 import { ModelConfigService } from '../services/modelConfigService.js';
-import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
+import { mergeModelConfigWithDefaults } from './defaultModelConfigs.js';
 import { ContextManager } from '../services/contextManager.js';
 import type { GenerateContentParameters } from '@google/genai';
 
@@ -881,32 +881,14 @@ export class Config {
     this.geminiClient = new GeminiClient(this);
     this.modelRouterService = new ModelRouterService(this);
 
-    // HACK: The settings loading logic doesn't currently merge the default
-    // generation config with the user's settings. This means if a user provides
-    // any `generation` settings (e.g., just `overrides`), the default `aliases`
-    // are lost. This hack manually merges the default aliases back in if they
-    // are missing from the user's config.
-    // TODO(12593): Fix the settings loading logic to properly merge defaults and
-    // remove this hack.
-    let modelConfigServiceConfig = params.modelConfigServiceConfig;
-    if (modelConfigServiceConfig) {
-      if (!modelConfigServiceConfig.aliases) {
-        modelConfigServiceConfig = {
-          ...modelConfigServiceConfig,
-          aliases: DEFAULT_MODEL_CONFIGS.aliases,
-        };
-      }
-      if (!modelConfigServiceConfig.overrides) {
-        modelConfigServiceConfig = {
-          ...modelConfigServiceConfig,
-          overrides: DEFAULT_MODEL_CONFIGS.overrides,
-        };
-      }
-    }
-
-    this.modelConfigService = new ModelConfigService(
-      modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
+    // Properly merge user model config with defaults to ensure partial
+    // configurations don't lose default values (e.g., default aliases
+    // when only overrides are specified).
+    const modelConfigServiceConfig = mergeModelConfigWithDefaults(
+      params.modelConfigServiceConfig,
     );
+
+    this.modelConfigService = new ModelConfigService(modelConfigServiceConfig);
   }
 
   isInitialized(): boolean {
