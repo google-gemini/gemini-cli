@@ -22,7 +22,7 @@ export const GenesisIntegrityProof = z.object({
   tas_dna_hash: z.string().length(128).regex(/^[a-f0-9]+$/, "Invalid SHA-512 Hash"),
 
   // The Temporal Invariant: Prevention of replay attacks
-  timestamp: z.number().max(Date.now() + 1000, "Temporal Drift Detected: Timestamp in future"), // Added small buffer for test stability
+  timestamp: z.number().refine((val) => val <= Date.now() + 1000, "Temporal Drift Detected: Timestamp in future"),
 
   // The Audit Trace: Link to the previous action (Blockchain-style linkage)
   previous_action_hash: z.string().length(64),

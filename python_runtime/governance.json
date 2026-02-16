@@ -1,0 +1,47 @@
+{
+  "$ref": "#/definitions/SovereignToolInvocation",
+  "definitions": {
+    "SovereignToolInvocation": {
+      "type": "object",
+      "properties": {
+        "tool_name": {
+          "type": "string",
+          "enum": [
+            "create_file",
+            "analyze_trace",
+            "verify_hash"
+          ]
+        },
+        "arguments": {
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "justification": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 500
+        },
+        "genesis_proof": {
+          "type": "string"
+        },
+        "stewardship_level": {
+          "type": "string",
+          "enum": [
+            "LOW",
+            "MEDIUM",
+            "HIGH",
+            "CRITICAL"
+          ],
+          "default": "LOW"
+        }
+      },
+      "required": [
+        "tool_name",
+        "arguments",
+        "justification"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
