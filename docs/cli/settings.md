@@ -22,15 +22,16 @@ they appear in the UI.
 
 ### General
 
-| UI Label                 | Setting                            | Description                                                                                                                                                                    | Default     |
-| ------------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
-| Vim Mode                 | `general.vimMode`                  | Enable Vim keybindings                                                                                                                                                         | `false`     |
-| Default Approval Mode    | `general.defaultApprovalMode`      | The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet. | `"default"` |
-| Enable Auto Update       | `general.enableAutoUpdate`         | Enable automatic updates.                                                                                                                                                      | `true`      |
-| Enable Prompt Completion | `general.enablePromptCompletion`   | Enable AI-powered prompt completion suggestions while typing.                                                                                                                  | `false`     |
-| Debug Keystroke Logging  | `general.debugKeystrokeLogging`    | Enable debug logging of keystrokes to the console.                                                                                                                             | `false`     |
-| Enable Session Cleanup   | `general.sessionRetention.enabled` | Enable automatic session cleanup                                                                                                                                               | `false`     |
-| Keep chat history        | `general.sessionRetention.maxAge`  | Automatically delete chats older than this time period (e.g., "30d", "7d", "24h", "1w")                                                                                        | `undefined` |
+| UI Label                   | Setting                            | Description                                                                                                                                                                    | Default     |
+| -------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
+| Vim Mode                   | `general.vimMode`                  | Enable Vim keybindings                                                                                                                                                         | `false`     |
+| Default Approval Mode      | `general.defaultApprovalMode`      | The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet. | `"default"` |
+| Enable Auto Update         | `general.enableAutoUpdate`         | Enable automatic updates.                                                                                                                                                      | `true`      |
+| Enable macOS Notifications | `general.enableMacOsNotifications` | Enable macOS native notifications for action-required prompts and session completion. macOS only.                                                                              | `false`     |
+| Enable Prompt Completion   | `general.enablePromptCompletion`   | Enable AI-powered prompt completion suggestions while typing.                                                                                                                  | `false`     |
+| Debug Keystroke Logging    | `general.debugKeystrokeLogging`    | Enable debug logging of keystrokes to the console.                                                                                                                             | `false`     |
+| Enable Session Cleanup     | `general.sessionRetention.enabled` | Enable automatic session cleanup                                                                                                                                               | `false`     |
+| Keep chat history          | `general.sessionRetention.maxAge`  | Automatically delete chats older than this time period (e.g., "30d", "7d", "24h", "1w")                                                                                        | `undefined` |
 
 ### Output
 

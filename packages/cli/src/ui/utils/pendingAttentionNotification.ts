@@ -5,12 +5,12 @@
  */
 
 import { type MacOsNotificationEvent } from '../../utils/macosNotifications.js';
+import { CoreToolCallStatus } from '@google/gemini-cli-core';
 import {
   type ConfirmationRequest,
   type HistoryItemWithoutId,
   type IndividualToolCallDisplay,
   type PermissionConfirmationRequest,
-  ToolCallStatus,
 } from '../types.js';
 
 export interface PendingAttentionNotification {
@@ -27,7 +27,7 @@ function getFirstConfirmingTool(
     }
 
     const confirmingTool = item.tools.find(
-      (tool) => tool.status === ToolCallStatus.Confirming,
+      (tool) => tool.status === CoreToolCallStatus.AwaitingApproval,
     );
     if (confirmingTool) {
       return confirmingTool;
