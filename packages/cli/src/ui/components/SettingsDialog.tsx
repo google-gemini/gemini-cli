@@ -24,6 +24,7 @@ import {
 import { useSettingsStore } from '../contexts/SettingsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import {
+  type SettingsType,
   type SettingsValue,
   TOGGLE_TYPES,
 } from '../../config/settingsSchema.js';
@@ -43,6 +44,97 @@ interface SettingsDialogProps {
 }
 
 const MAX_ITEMS_TO_SHOW = 8;
+
+type ParseEditResult = { valid: true; value: SettingsValue } | { valid: false };
+
+function getEditValue(
+  type: SettingsType,
+  rawValue: SettingsValue,
+): string | undefined {
+  if (rawValue === undefined) {
+    return undefined;
+  }
+
+  if (type === 'array' && Array.isArray(rawValue)) {
+    return rawValue.join(', ');
+  }
+
+  if (type === 'object' && rawValue !== null && typeof rawValue === 'object') {
+    return JSON.stringify(rawValue);
+  }
+
+  return undefined;
+}
+
+function parseStringArrayValue(input: string): string[] {
+  const trimmed = input.trim();
+  if (trimmed === '') {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (
+      Array.isArray(parsed) &&
+      parsed.every((item) => typeof item === 'string')
+    ) {
+      return parsed;
+    }
+  } catch {
+    // Fall through to comma-delimited parsing.
+  }
+
+  return input
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
+function parseEditedValue(
+  type: SettingsType,
+  newValue: string,
+): ParseEditResult {
+  if (type === 'number') {
+    if (newValue.trim() === '') {
+      return { valid: false };
+    }
+
+    const numParsed = Number(newValue.trim());
+    if (Number.isNaN(numParsed)) {
+      return { valid: false };
+    }
+
+    return { valid: true, value: numParsed };
+  }
+
+  if (type === 'array') {
+    return { valid: true, value: parseStringArrayValue(newValue) };
+  }
+
+  if (type === 'object') {
+    const trimmed = newValue.trim();
+    if (trimmed === '') {
+      return { valid: false };
+    }
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (
+        parsed !== null &&
+        typeof parsed === 'object' &&
+        !Array.isArray(parsed)
+      ) {
+        return { valid: true, value: parsed };
+      }
+    } catch {
+      // Invalid JSON object input.
+    }
+
+    return { valid: false };
+  }
+
+  return { valid: true, value: newValue };
+}
 
 // Capture initial values of all restart-required settings for diff tracking
 function captureRestartSnapshot(
@@ -106,7 +198,7 @@ export function SettingsDialog({
 
     return settingKeys.map((key) => {
       const definition = getSettingDefinition(key);
-      const type = definition?.type ?? 'string';
+      const type: SettingsType = definition?.type ?? 'string';
 
       // Get the display value (with * indicator if modified)
       const displayValue = getDisplayValue(
@@ -128,18 +220,18 @@ export function SettingsDialog({
 
       // Get raw value for edit mode initialization
       const rawValue = getEffectiveValue(key, scopeSettings, mergedSettings);
+      const editValue = getEditValue(type, rawValue);
 
       return {
         key,
         label: definition?.label || key,
         description: definition?.description,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        type: type as 'boolean' | 'number' | 'string' | 'enum',
+        type,
         displayValue,
         isGreyedOut,
         scopeMessage,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        rawValue: rawValue as string | number | boolean | undefined,
+        rawValue,
+        editValue,
       };
     });
   }, [settingKeys, selectedScope, settings, restartChangedKeys]);
@@ -170,10 +262,15 @@ export function SettingsDialog({
       let newValue: SettingsValue;
 
       if (definition?.type === 'boolean') {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        newValue = !(currentValue as boolean);
+        if (typeof currentValue !== 'boolean') {
+          return;
+        }
+        newValue = !currentValue;
       } else if (definition?.type === 'enum' && definition.options) {
         const options = definition.options;
+        if (options.length === 0) {
+          return;
+        }
         const currentIndex = options?.findIndex(
           (opt) => opt.value === currentValue,
         );
@@ -182,6 +279,8 @@ export function SettingsDialog({
         } else {
           newValue = options[0].value; // loop back to start.
         }
+      } else {
+        return;
       }
 
       debugLogger.log(
@@ -204,27 +303,14 @@ export function SettingsDialog({
   const handleEditCommit = useCallback(
     (key: string, newValue: string, _item: SettingsDialogItem) => {
       const definition = getSettingDefinition(key);
-      const type = definition?.type;
+      const type: SettingsType = definition?.type ?? 'string';
+      const parsed = parseEditedValue(type, newValue);
 
-      if (newValue.trim() === '' && type === 'number') {
-        // Nothing entered for a number; cancel edit
+      if (!parsed.valid) {
         return;
       }
 
-      let parsed: string | number;
-      if (type === 'number') {
-        const numParsed = Number(newValue.trim());
-        if (Number.isNaN(numParsed)) {
-          // Invalid number; cancel edit
-          return;
-        }
-        parsed = numParsed;
-      } else {
-        // For strings, use the buffer as is.
-        parsed = newValue;
-      }
-
-      setSetting(selectedScope, key, parsed);
+      setSetting(selectedScope, key, parsed.value);
     },
     [selectedScope, setSetting],
   );

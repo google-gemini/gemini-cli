@@ -124,6 +124,62 @@ const ENUM_FAKE_SCHEMA: SettingsSchemaType = {
   },
 } as unknown as SettingsSchemaType;
 
+const ARRAY_FAKE_SCHEMA: SettingsSchemaType = {
+  context: {
+    type: 'object',
+    label: 'Context',
+    category: 'Context',
+    requiresRestart: false,
+    default: {},
+    description: 'Context settings.',
+    showInDialog: false,
+    properties: {
+      fileFiltering: {
+        type: 'object',
+        label: 'File Filtering',
+        category: 'Context',
+        requiresRestart: false,
+        default: {},
+        description: 'File filtering settings.',
+        showInDialog: false,
+        properties: {
+          customIgnoreFilePaths: {
+            type: 'array',
+            label: 'Custom Ignore File Paths',
+            category: 'Context',
+            requiresRestart: false,
+            default: [] as string[],
+            description: 'Additional ignore file paths.',
+            showInDialog: true,
+            items: { type: 'string' },
+          },
+        },
+      },
+    },
+  },
+  security: {
+    type: 'object',
+    label: 'Security',
+    category: 'Security',
+    requiresRestart: false,
+    default: {},
+    description: 'Security settings.',
+    showInDialog: false,
+    properties: {
+      allowedExtensions: {
+        type: 'array',
+        label: 'Extension Source Regex Allowlist',
+        category: 'Security',
+        requiresRestart: false,
+        default: [] as string[],
+        description: 'Allowed extension source regex patterns.',
+        showInDialog: true,
+        items: { type: 'string' },
+      },
+    },
+  },
+} as unknown as SettingsSchemaType;
+
 const TOOLS_SHELL_FAKE_SCHEMA: SettingsSchemaType = {
   tools: {
     type: 'object',
@@ -1160,6 +1216,74 @@ describe('SettingsDialog', () => {
 
       await waitFor(() => {
         expect(onSelect).toHaveBeenCalledWith(undefined, 'User');
+      });
+
+      unmount();
+    });
+  });
+
+  describe('Array Settings Editing', () => {
+    const typeInput = async (
+      stdin: { write: (data: string) => void },
+      input: string,
+    ) => {
+      for (const ch of input) {
+        await act(async () => {
+          stdin.write(ch);
+        });
+      }
+    };
+
+    it('should parse comma-separated input as string arrays', async () => {
+      vi.mocked(getSettingsSchema).mockReturnValue(ARRAY_FAKE_SCHEMA);
+      const settings = createMockSettings();
+      const setValueSpy = vi.spyOn(settings, 'setValue');
+
+      const { stdin, unmount } = renderDialog(settings, vi.fn());
+
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER as string); // Start editing first array setting
+      });
+      await typeInput(stdin, 'first/path, second/path,third/path');
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER as string); // Commit
+      });
+
+      await waitFor(() => {
+        expect(setValueSpy).toHaveBeenCalledWith(
+          SettingScope.User,
+          'context.fileFiltering.customIgnoreFilePaths',
+          ['first/path', 'second/path', 'third/path'],
+        );
+      });
+
+      unmount();
+    });
+
+    it('should parse JSON array input for allowedExtensions', async () => {
+      vi.mocked(getSettingsSchema).mockReturnValue(ARRAY_FAKE_SCHEMA);
+      const settings = createMockSettings();
+      const setValueSpy = vi.spyOn(settings, 'setValue');
+
+      const { stdin, unmount } = renderDialog(settings, vi.fn());
+
+      await act(async () => {
+        stdin.write(TerminalKeys.DOWN_ARROW as string); // Move to second array setting
+      });
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER as string); // Start editing
+      });
+      await typeInput(stdin, '["^github\\\\.com/.*$", "^gitlab\\\\.com/.*$"]');
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER as string); // Commit
+      });
+
+      await waitFor(() => {
+        expect(setValueSpy).toHaveBeenCalledWith(
+          SettingScope.User,
+          'security.allowedExtensions',
+          ['^github\\.com/.*$', '^gitlab\\.com/.*$'],
+        );
       });
 
       unmount();

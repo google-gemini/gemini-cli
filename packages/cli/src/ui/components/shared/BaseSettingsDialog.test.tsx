@@ -471,6 +471,35 @@ describe('BaseSettingsDialog', () => {
   });
 
   describe('edit mode', () => {
+    it('should prioritize editValue over rawValue stringification', async () => {
+      const objectItem: SettingsDialogItem = {
+        key: 'object-setting',
+        label: 'Object Setting',
+        description: 'A complex object setting',
+        displayValue: '{"foo":"bar"}',
+        type: 'object',
+        rawValue: { foo: 'bar' },
+        editValue: '{"foo":"bar"}',
+      };
+      const { stdin } = renderDialog({ items: [objectItem] });
+
+      // Enter edit mode and immediately commit
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+
+      await waitFor(() => {
+        expect(mockOnEditCommit).toHaveBeenCalledWith(
+          'object-setting',
+          '{"foo":"bar"}',
+          expect.objectContaining({ type: 'object' }),
+        );
+      });
+    });
+
     it('should commit edit on Enter', async () => {
       const items = createMockItems(4);
       const stringItem = items.find((i) => i.type === 'string')!;

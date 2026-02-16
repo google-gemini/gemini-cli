@@ -13,6 +13,7 @@ import type {
   LoadedSettings,
 } from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
+import type { SettingsValue } from '../../config/settingsSchema.js';
 import type { AgentDefinition, AgentOverride } from '@google/gemini-cli-core';
 import { getCachedStringWidth } from '../utils/textUtils.js';
 import {
@@ -199,6 +200,17 @@ function getFieldDefaultFromDefinition(
   return field.defaultValue;
 }
 
+function isSettingsValue(value: unknown): value is SettingsValue {
+  if (value === undefined) return true;
+  if (typeof value === 'boolean') return true;
+  if (typeof value === 'string') return true;
+  if (typeof value === 'number') return true;
+  if (Array.isArray(value)) {
+    return value.every((item) => typeof item === 'string');
+  }
+  return value !== null && typeof value === 'object';
+}
+
 export function AgentConfigDialog({
   agentName,
   displayName,
@@ -293,8 +305,11 @@ export function AgentConfigDialog({
         }
 
         // Get raw value for edit mode
-        const rawValue =
+        const rawValueCandidate =
           currentValue !== undefined ? currentValue : effectiveValue;
+        const rawValue = isSettingsValue(rawValueCandidate)
+          ? rawValueCandidate
+          : undefined;
 
         return {
           key: field.key,
@@ -304,8 +319,7 @@ export function AgentConfigDialog({
           displayValue,
           isGreyedOut: currentValue === undefined,
           scopeMessage: undefined,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          rawValue: rawValue as string | number | boolean | undefined,
+          rawValue,
         };
       }),
     [pendingOverride, definition, modifiedFields],

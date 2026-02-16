@@ -9,6 +9,7 @@ import { Box, Text } from 'ink';
 import chalk from 'chalk';
 import { theme } from '../../semantic-colors.js';
 import type { LoadableSettingScope } from '../../../config/settings.js';
+import type { SettingsValue } from '../../../config/settingsSchema.js';
 import { getScopeItems } from '../../../utils/dialogScopeUtils.js';
 import { RadioButtonSelect } from './RadioButtonSelect.js';
 import { TextInput } from './TextInput.js';
@@ -33,7 +34,7 @@ export interface SettingsDialogItem {
   /** Optional description below label */
   description?: string;
   /** Item type for determining interaction behavior */
-  type: 'boolean' | 'number' | 'string' | 'enum';
+  type: 'boolean' | 'number' | 'string' | 'enum' | 'array' | 'object';
   /** Pre-formatted display value (with * if modified) */
   displayValue: string;
   /** Grey out value (at default) */
@@ -41,7 +42,9 @@ export interface SettingsDialogItem {
   /** Scope message e.g., "(Modified in Workspace)" */
   scopeMessage?: string;
   /** Raw value for edit mode initialization */
-  rawValue?: string | number | boolean;
+  rawValue?: SettingsValue;
+  /** Optional pre-formatted edit buffer value for complex types */
+  editValue?: string;
 }
 
 /**
@@ -383,9 +386,11 @@ export function BaseSettingsDialog({
           if (currentItem.type === 'boolean' || currentItem.type === 'enum') {
             onItemToggle(currentItem.key, currentItem);
           } else {
-            // Start editing for string/number
+            // Start editing for string/number/array/object
             const rawVal = currentItem.rawValue;
-            const initialValue = rawVal !== undefined ? String(rawVal) : '';
+            const initialValue =
+              currentItem.editValue ??
+              (rawVal !== undefined ? String(rawVal) : '');
             startEditing(currentItem.key, initialValue);
           }
           return true;
