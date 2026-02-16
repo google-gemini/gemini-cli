@@ -1081,6 +1081,7 @@ describe('Server Config (config.ts)', () => {
           overrides: {
             codebase_investigator: { enabled: false },
             cli_help: { enabled: false },
+            generalist: { enabled: false },
           },
         },
       };

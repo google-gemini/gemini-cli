@@ -55,15 +55,6 @@ describe('subagent eval test cases', () => {
     name: 'should fix linter errors in multiple projects using implicit parallelism',
     prompt: 'Fix all linter errors.',
     timeout: 600000,
-    params: {
-      settings: {
-        agents: {
-          overrides: {
-            generalist: { enabled: true },
-          },
-        },
-      },
-    },
     files: {
       'project-a/eslint.config.js': `
         module.exports = [

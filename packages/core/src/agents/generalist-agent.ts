@@ -27,7 +27,6 @@ export const GeneralistAgent = (
   description: `A general-purpose AI agent with access to all tools.
     - ALWAYS use it to break up and parallelize independent pieces of a larger task, when possible.
     `,
-  experimental: true,
   inputConfig: {
     inputSchema: {
       type: 'object',

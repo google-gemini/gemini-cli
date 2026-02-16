@@ -2468,7 +2468,8 @@ export class Config {
     if (
       this.isAgentsEnabled() ||
       agentsOverrides['codebase_investigator']?.enabled !== false ||
-      agentsOverrides['cli_help']?.enabled !== false
+      agentsOverrides['cli_help']?.enabled !== false ||
+      agentsOverrides['generalist']?.enabled !== false
     ) {
       const definitions = this.agentRegistry.getAllDefinitions();
 
