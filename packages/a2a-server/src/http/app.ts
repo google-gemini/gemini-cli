@@ -206,6 +206,33 @@ export async function createApp() {
 
     expressApp.post('/tasks', async (req, res) => {
       try {
+        if (req.body.contextId !== undefined && typeof req.body.contextId !== 'string') {
+          res.status(400).json({ error: '"contextId" must be a string.' });
+          return;
+        }
+
+        if (req.body.agentSettings !== undefined) {
+          if (
+            typeof req.body.agentSettings !== 'object' ||
+            req.body.agentSettings === null ||
+            Array.isArray(req.body.agentSettings)
+          ) {
+            res.status(400).json({ error: '"agentSettings" must be an object.' });
+            return;
+          }
+          if (typeof req.body.agentSettings.workspacePath !== 'string') {
+            res.status(400).json({ error: '"agentSettings.workspacePath" must be a string.' });
+            return;
+          }
+          if (
+            req.body.agentSettings.autoExecute !== undefined &&
+            typeof req.body.agentSettings.autoExecute !== 'boolean'
+          ) {
+            res.status(400).json({ error: '"agentSettings.autoExecute" must be a boolean.' });
+            return;
+          }
+        }
+
         const taskId = uuidv4();
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const agentSettings = req.body.agentSettings as
@@ -305,6 +332,10 @@ export async function createApp() {
 
     expressApp.get('/tasks/:taskId/metadata', async (req, res) => {
       const taskId = req.params.taskId;
+      if (!taskId || typeof taskId !== 'string' || taskId.length > 256) {
+        res.status(400).json({ error: 'Invalid "taskId" parameter.' });
+        return;
+      }
       let wrapper = agentExecutor.getTask(taskId);
       if (!wrapper) {
         const sdkTask = await taskStoreForExecutor.load(taskId);
