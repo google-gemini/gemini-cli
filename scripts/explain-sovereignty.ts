@@ -21,17 +21,22 @@ async function typeWriter(text: string, delay: number = 10) {
 }
 
 async function explain() {
-  const manifestoPath = path.resolve(__dirname, '../docs/manifesto.md');
+  const args = process.argv.slice(2);
+  const useWine = args.includes('--wine') || args.includes('--winery');
+
+  const fileName = useWine ? '../docs/the-winery.md' : '../docs/manifesto.md';
+  const manifestoPath = path.resolve(__dirname, fileName);
 
   if (!fs.existsSync(manifestoPath)) {
-    console.error(`Error: Manifesto not found at ${manifestoPath}`);
+    console.error(`Error: Document not found at ${manifestoPath}`);
     process.exit(1);
   }
 
   const content = fs.readFileSync(manifestoPath, 'utf-8');
   const sections = content.split('###'); // Split by headers for paging
 
-  console.log('\n🌟 INITIATING SOVEREIGN EXPLANATION PROTOCOL 🌟\n');
+  const title = useWine ? '🍇 INITIATING WINERY PROTOCOL (THE PHYSICS OF TRUTH) 🍷' : '🌟 INITIATING SOVEREIGN EXPLANATION PROTOCOL 🌟';
+  console.log(`\n${title}\n`);
   await new Promise(resolve => setTimeout(resolve, 1000));
 
   for (const section of sections) {
@@ -57,7 +62,11 @@ async function explain() {
     await new Promise(resolve => setTimeout(resolve, 1200));
   }
 
-  console.log('\n🇺🇸 SYSTEM VERIFIED. THE STANDARD IS SET. 🇺🇸\n');
+  if (useWine) {
+      console.log('\n🍷 FERMENTATION COMPLETE. VINTAGE SECURED. 🍷\n');
+  } else {
+      console.log('\n🇺🇸 SYSTEM VERIFIED. THE STANDARD IS SET. 🇺🇸\n');
+  }
 }
 
 explain().catch(console.error);
