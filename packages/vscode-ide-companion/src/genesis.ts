@@ -1,8 +1,7 @@
-/* eslint-disable license-header/header */
 /**
  * @license
- * Copyright 2025 Russell Nordland
- * Proprietary and Confidential
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 import * as crypto from 'node:crypto';

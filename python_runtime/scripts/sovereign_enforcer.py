@@ -13,23 +13,60 @@ class SovereignEnforcer(ast.NodeVisitor):
         self.filename = normalize(filename)
         self.errors = []
 
+    def visit_Import(self, node):
+        self.check_imports(node)
+        self.generic_visit(node)
+
     def visit_ImportFrom(self, node):
+        self.check_imports(node)
         # RULE 1: Block access to the raw nervous system
-        # Only wrapper files (src/tools/*.py) are allowed to touch _raw
         if node.module and "_raw" in node.module:
             is_wrapper_file = is_under(self.filename, "/src/tools/") and not is_under(self.filename, "/src/tools/_raw/")
             if not is_wrapper_file:
-                self.errors.append(f"{self.filename}:{node.lineno} SOVEREIGNTY VIOLATION: Direct access to raw tools is forbidden.")
+                self.errors.append(f"{self.filename}:{node.lineno} SOVEREIGNTY VIOLATION: Direct access to raw tools is forbidden (Rule 1).")
         self.generic_visit(node)
+
+    def check_imports(self, node):
+        # Identify imported modules
+        modules = []
+        if isinstance(node, ast.Import):
+            modules = [n.name for n in node.names]
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                modules = [node.module]
+
+        # Sensitive Modules (The "Hand" Tools)
+        SENSITIVE_MODULES = {'os', 'subprocess', 'socket', 'sys'}
+
+        # Contexts
+        is_raw_dir = is_under(self.filename, "/src/tools/_raw/")
+        is_public_tools_dir = is_under(self.filename, "/src/tools/") and not is_raw_dir
+        is_interface = self.filename.endswith("/src/main.py")
+
+        for module in modules:
+            base_module = module.split('.')[0]
+
+            # RULE 3: Import Guardian - Block sensitive modules in Public Tools (The Conscience)
+            if is_public_tools_dir:
+                if base_module in SENSITIVE_MODULES:
+                    self.errors.append(f"{self.filename}:{node.lineno} SOVEREIGNTY VIOLATION: Public tools cannot import sensitive module '{base_module}'. Use the Raw layer (Rule 3).")
+
+            # RULE 4: Raw Layer Restrictions
+            if is_raw_dir:
+                if base_module == 'subprocess':
+                    self.errors.append(f"{self.filename}:{node.lineno} SOVEREIGNTY WARNING: Raw tool imports 'subprocess'. Manual review required (Rule 4).")
+
+            # RULE 5: Interface Restrictions
+            if is_interface:
+                if "_raw" in module:
+                     self.errors.append(f"{self.filename}:{node.lineno} SOVEREIGNTY VIOLATION: Interface cannot import from '_raw' directly (Rule 5).")
+
 
     def visit_Assign(self, node):
         # RULE 2: Mandate the Kernel Gate
-        # Only enforce this in the public tools directory
         if not is_under(self.filename, "/src/tools/") or is_under(self.filename, "/src/tools/_raw/"):
             return
 
-        # Check if the assignment is an export (top-level)
-        # Simplified check: All assignments in tools/ must be wrapped
         if isinstance(node.value, ast.Call):
             func_name = ""
             if isinstance(node.value.func, ast.Name):
@@ -38,10 +75,8 @@ class SovereignEnforcer(ast.NodeVisitor):
             if func_name == "with_sovereign_gate":
                 return # Safe
 
-        # If we assign a function or callable that isn't wrapped
-        # This is a basic heuristic for the prototype
-        # Real impl would check if the assigned value is a function from _raw
-        pass # To be fully strict we'd need type inference, but this covers the "wrapper" call structure
+        # Heuristic check: if we are exporting a function (assigning to variable), it should likely be wrapped.
+        # This is a loose check for the prototype.
 
 def run_enforcer(target_dir):
     all_errors = []
@@ -50,10 +85,13 @@ def run_enforcer(target_dir):
             if file.endswith(".py"):
                 path = os.path.join(root, file)
                 with open(path, "r", encoding="utf-8") as f:
-                    tree = ast.parse(f.read(), filename=path)
-                    enforcer = SovereignEnforcer(path)
-                    enforcer.visit(tree)
-                    all_errors.extend(enforcer.errors)
+                    try:
+                        tree = ast.parse(f.read(), filename=path)
+                        enforcer = SovereignEnforcer(path)
+                        enforcer.visit(tree)
+                        all_errors.extend(enforcer.errors)
+                    except SyntaxError as e:
+                        all_errors.append(f"{path}: SyntaxError - {e}")
 
     if all_errors:
         print("SOVEREIGNTY VIOLATIONS DETECTED:")

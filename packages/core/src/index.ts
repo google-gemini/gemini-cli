@@ -101,4 +101,5 @@ export * from './utils/browser.js';
 export * from './alpha/loop.js';
 export * from './ethics/axiom.js';
 export * from './ethics/auditor.js';
+export * from './governance/doe-schemas.js';
 // Note: telemetry/tracer.ts is internal or can be exported if needed

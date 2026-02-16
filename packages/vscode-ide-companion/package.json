@@ -98,7 +98,7 @@
   "scripts": {
     "vscode:prepublish": "npm run generate:notices && npm run check-types && npm run lint && node esbuild.js --production",
     "build": "npm run compile",
-    "compile": "npm run lint && node esbuild.js",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",

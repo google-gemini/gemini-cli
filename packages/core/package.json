@@ -50,7 +50,8 @@
     "simple-git": "^3.28.0",
     "strip-ansi": "^7.1.0",
     "undici": "^7.10.0",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@google/gemini-cli-test-utils": "file:../test-utils",
