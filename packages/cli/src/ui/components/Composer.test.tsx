@@ -672,5 +672,27 @@ describe('Composer', () => {
 
       expect(lastFrame()).toContain('ShortcutsHint');
     });
+
+    it('hides shortcuts hint when hideShortcutsHint setting is true', () => {
+      const uiState = createMockUIState();
+      const settings = createMockSettings({
+        ui: { hideShortcutsHint: true },
+      });
+
+      const { lastFrame } = renderComposer(uiState, settings);
+
+      expect(lastFrame()).not.toContain('ShortcutsHint');
+    });
+
+    it('shows shortcuts hint when hideShortcutsHint setting is false', () => {
+      const uiState = createMockUIState();
+      const settings = createMockSettings({
+        ui: { hideShortcutsHint: false },
+      });
+
+      const { lastFrame } = renderComposer(uiState, settings);
+
+      expect(lastFrame()).toContain('ShortcutsHint');
+    });
   });
 });

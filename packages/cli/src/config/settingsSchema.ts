@@ -471,6 +471,15 @@ const SETTINGS_SCHEMA = {
         description: 'Hide the application banner',
         showInDialog: true,
       },
+      hideShortcutsHint: {
+        type: 'boolean',
+        label: 'Hide Shortcuts Hint',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description: 'Hide the "? for shortcuts" hint above the input.',
+        showInDialog: true,
+      },
       hideContextSummary: {
         type: 'boolean',
         label: 'Hide Context Summary',
