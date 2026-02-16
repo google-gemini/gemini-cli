@@ -34,9 +34,6 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Keep chat history                                                                  undefined  │
 │    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
 │                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
-│                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
@@ -82,9 +79,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │                                                                                                  │
 │    Keep chat history                                                                  undefined  │
 │    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -132,9 +126,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Keep chat history                                                                  undefined  │
 │    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
 │                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
-│                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
@@ -180,9 +171,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │                                                                                                  │
 │    Keep chat history                                                                  undefined  │
 │    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -230,9 +218,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Keep chat history                                                                  undefined  │
 │    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
 │                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
-│                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
@@ -278,9 +263,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │                                                                                                  │
 │    Keep chat history                                                                  undefined  │
 │    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -328,9 +310,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Keep chat history                                                                  undefined  │
 │    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
 │                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
-│                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
@@ -377,9 +356,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Keep chat history                                                                  undefined  │
 │    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
 │                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
-│                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
@@ -425,9 +401,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │                                                                                                  │
 │    Keep chat history                                                                  undefined  │
 │    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
