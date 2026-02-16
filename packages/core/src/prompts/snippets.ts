@@ -171,7 +171,7 @@ providing the best answer that you can.
 Consider the following when estimating the cost of your approach:
 <estimating_context_usage>
 - The agent passes the full history with each subsequent message. The larger context is early in the session, the more expensive each subsequent turn is.
-- Unnecessary turns are generally more expensive than other types of wasted context.
+- Unnecessary turns are generally much more expensive than other types of wasted context. An extra turn late in a session can cost > 1 million tokens vs. reading a full file, which is rarely greater than 10k tokens.
 - You can reduce context usage by limiting the outputs of tools but take care not to cause more token consumption via additional turns required to recover from a tool failure or compensate for a misapplied optimization strategy.
 </estimating_context_usage>
 
