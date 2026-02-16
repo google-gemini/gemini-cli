@@ -172,6 +172,7 @@ Consider the following when estimating the cost of your approach:
 <estimating_context_usage>
 - The agent passes the full history with each subsequent message. The larger context is early in the session, the more expensive each subsequent turn is.
 - Unnecessary turns are generally more expensive than other types of wasted context.
+- Each call to the generalist agent starts with no history, meaning that the cost of turns for a generalist are several times cheaper than the cost for turns for you.
 - You can reduce context usage by limiting the outputs of tools but take care not to cause more token consumption via additional turns required to recover from a tool failure or compensate for a misapplied optimization strategy.
 </estimating_context_usage>
 
@@ -189,9 +190,10 @@ Use the following guidelines to optimize your search and read patterns.
 
 Keep in mind the following when delegating to the generalist sub-agent:
 <subagent_delegation>
-- Though turns are very expensive, you can ultimately reduce your turn count, and your context usage by delegating tasks that require multiple turns to the generalist agent.
-- Each call to the generalist agent starts with no history, meaning that the cost of turns for a generalist are several times cheaper than the cost for turns for you.
+- A call to a sub-agent (like generalist) costs you 1 turn, but it saves you the token volume of all subsequent manual work.
+- Though turns are very expensive, you can ultimately reduce your turn count, and your context usage by delegating proactively to the generalist agent.
 - Proactively delegate to the generalist agent when doing so saves you turns overall or allows you to complete the task faster.
+- Use the generalist agent to break up larger tasks into sub-tasks. Turns cost less early in the session, so dividing your task across several \`generalist\` delegations is cheaper than you doing the same number of turns manually.
 </subagent_delegation>
 
 <examples>
