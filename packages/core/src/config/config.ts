@@ -751,7 +751,7 @@ export class Config {
     this.model = params.model;
     this.disableLoopDetection = params.disableLoopDetection ?? false;
     this._activeModel = params.model;
-    this.enableAgents = params.enableAgents ?? false;
+    this.enableAgents = params.enableAgents ?? true;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
@@ -2357,6 +2357,7 @@ export class Config {
     const maybeRegister = (
       toolClass: { name: string; Name?: string },
       registerFn: () => void,
+      defaultEnabled = true,
     ) => {
       const className = toolClass.name;
       const toolName = toolClass.Name || className;
@@ -2364,7 +2365,7 @@ export class Config {
       // On some platforms, the className can be minified to _ClassName.
       const normalizedClassName = className.replace(/^_+/, '');
 
-      let isEnabled = true; // Enabled by default if coreTools is not set.
+      let isEnabled = defaultEnabled; // Use provided default if coreTools is not set.
       if (coreTools) {
         isEnabled = coreTools.some(
           (tool) =>
@@ -2396,18 +2397,24 @@ export class Config {
         errorString = String(error);
       }
       if (useRipgrep) {
-        maybeRegister(RipGrepTool, () =>
-          registry.registerTool(new RipGrepTool(this, this.messageBus)),
+        maybeRegister(
+          RipGrepTool,
+          () => registry.registerTool(new RipGrepTool(this, this.messageBus)),
+          false,
         );
       } else {
         logRipgrepFallback(this, new RipgrepFallbackEvent(errorString));
-        maybeRegister(GrepTool, () =>
-          registry.registerTool(new GrepTool(this, this.messageBus)),
+        maybeRegister(
+          GrepTool,
+          () => registry.registerTool(new GrepTool(this, this.messageBus)),
+          false,
         );
       }
     } else {
-      maybeRegister(GrepTool, () =>
-        registry.registerTool(new GrepTool(this, this.messageBus)),
+      maybeRegister(
+        GrepTool,
+        () => registry.registerTool(new GrepTool(this, this.messageBus)),
+        false,
       );
     }
 
