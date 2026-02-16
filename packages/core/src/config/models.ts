@@ -142,6 +142,29 @@ export function isGemini2Model(model: string): boolean {
 }
 
 /**
+ * Checks if the model is a "custom" model (not Gemini branded).
+ *
+ * @param model The model name to check.
+ * @returns True if the model is not a Gemini branded model.
+ */
+export function isCustomModel(model: string): boolean {
+  const resolved = resolveModel(model);
+  return !resolved.startsWith('gemini-');
+}
+
+/**
+ * Checks if the model should be treated as a modern model.
+ * This includes Gemini 3 models and any custom models.
+ *
+ * @param model The model name to check.
+ * @returns True if the model supports modern features like thoughts.
+ */
+export function supportsModernFeatures(model: string): boolean {
+  if (isGemini3Model(model)) return true;
+  return isCustomModel(model);
+}
+
+/**
  * Checks if the model is an auto model.
  *
  * @param model The model name to check.
