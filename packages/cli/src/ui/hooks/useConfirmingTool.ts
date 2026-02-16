@@ -6,10 +6,10 @@
 
 import { useMemo } from 'react';
 import { useUIState } from '../contexts/UIStateContext.js';
-import {
-  getConfirmingToolState,
-  type ConfirmingToolState,
-} from '../utils/confirmingTool.js';
+import { getConfirmingToolState } from '../utils/confirmingTool.js';
+import type { ConfirmingToolState } from '../utils/confirmingTool.js';
+
+export type { ConfirmingToolState } from '../utils/confirmingTool.js';
 
 /**
  * Selects the "Head" of the confirmation queue.
