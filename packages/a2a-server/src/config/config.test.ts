@@ -208,8 +208,10 @@ describe('loadConfig', () => {
   it('should set customIgnoreFilePaths when settings.fileFiltering.customIgnoreFilePaths is present', async () => {
     const testPath = '/settings/ignore';
     const settings: Settings = {
-      fileFiltering: {
-        customIgnoreFilePaths: [testPath],
+      context: {
+        fileFiltering: {
+          customIgnoreFilePaths: [testPath],
+        },
       },
     };
     const config = await loadConfig(settings, mockExtensionLoader, taskId);
@@ -224,8 +226,10 @@ describe('loadConfig', () => {
     const settingsPath = '/settings/ignore';
     process.env['CUSTOM_IGNORE_FILE_PATHS'] = envPath;
     const settings: Settings = {
-      fileFiltering: {
-        customIgnoreFilePaths: [settingsPath],
+      context: {
+        fileFiltering: {
+          customIgnoreFilePaths: [settingsPath],
+        },
       },
     };
     const config = await loadConfig(settings, mockExtensionLoader, taskId);
@@ -254,8 +258,10 @@ describe('loadConfig', () => {
     const testPath = '/tmp/ignore';
     process.env['CUSTOM_IGNORE_FILE_PATHS'] = testPath;
     const settings: Settings = {
-      fileFiltering: {
-        respectGitIgnore: false,
+      context: {
+        fileFiltering: {
+          respectGitIgnore: false,
+        },
       },
     };
 

@@ -41,12 +41,12 @@ export async function loadConfig(
   const adcFilePath = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
 
   const folderTrust =
-    settings.folderTrust === true ||
+    settings.security?.folderTrust === true ||
     process.env['GEMINI_FOLDER_TRUST'] === 'true';
 
   let checkpointing = process.env['CHECKPOINTING']
     ? process.env['CHECKPOINTING'] === 'true'
-    : settings.checkpointing?.enabled;
+    : settings.general?.checkpointing?.enabled;
 
   if (checkpointing) {
     if (!(await GitService.verifyGitAvailability())) {
@@ -66,9 +66,9 @@ export async function loadConfig(
     debugMode: process.env['DEBUG'] === 'true' || false,
     question: '', // Not used in server mode directly like CLI
 
-    coreTools: settings.coreTools || undefined,
-    excludeTools: settings.excludeTools || undefined,
-    showMemoryUsage: settings.showMemoryUsage || false,
+    coreTools: settings.tools?.core || undefined,
+    excludeTools: settings.tools?.exclude || undefined,
+    showMemoryUsage: settings.ui?.showMemoryUsage || false,
     approvalMode:
       process.env['GEMINI_YOLO_MODE'] === 'true'
         ? ApprovalMode.YOLO
@@ -86,12 +86,12 @@ export async function loadConfig(
     },
     // Git-aware file filtering settings
     fileFiltering: {
-      respectGitIgnore: settings.fileFiltering?.respectGitIgnore,
-      respectGeminiIgnore: settings.fileFiltering?.respectGeminiIgnore,
+      respectGitIgnore: settings.context?.fileFiltering?.respectGitIgnore,
+      respectGeminiIgnore: settings.context?.fileFiltering?.respectGeminiIgnore,
       enableRecursiveFileSearch:
-        settings.fileFiltering?.enableRecursiveFileSearch,
+        settings.context?.fileFiltering?.enableRecursiveFileSearch,
       customIgnoreFilePaths: [
-        ...(settings.fileFiltering?.customIgnoreFilePaths || []),
+        ...(settings.context?.fileFiltering?.customIgnoreFilePaths || []),
         ...(process.env['CUSTOM_IGNORE_FILE_PATHS']
           ? process.env['CUSTOM_IGNORE_FILE_PATHS'].split(path.delimiter)
           : []),
