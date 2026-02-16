@@ -69,23 +69,5 @@ export const modelCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   subCommands: [manageModelCommand, setModelCommand],
-  action: async (context: CommandContext, args: string) => {
-    if (args.trim().length > 0) {
-      // If there are args, they might be for a sub-command.
-      // The CLI router usually handles this, but just in case:
-      const parts = args.trim().split(/\s+/);
-      const subCommandName = parts[0];
-      const subCommand =
-        setModelCommand.name === subCommandName
-          ? setModelCommand
-          : manageModelCommand.name === subCommandName
-            ? manageModelCommand
-            : null;
-      if (subCommand && subCommand.action) {
-        return subCommand.action(context, parts.slice(1).join(' '));
-      }
-    }
-
-    return manageModelCommand.action!(context, args);
-  },
+  action: async (context: CommandContext, args: string) => manageModelCommand.action!(context, args),
 };
