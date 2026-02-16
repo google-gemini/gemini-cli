@@ -24,7 +24,11 @@ export async function createCodeAssistContentGenerator(
     authType === AuthType.COMPUTE_ADC
   ) {
     const authClient = await getOauthClient(authType, config);
-    const userData = await setupUser(authClient, config.getValidationHandler());
+    const userData = await setupUser(
+      authClient,
+      config.getValidationHandler(),
+      httpOptions,
+    );
     return new CodeAssistServer(
       authClient,
       userData.projectId,

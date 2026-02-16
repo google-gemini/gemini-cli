@@ -12,6 +12,7 @@ import type {
   OnboardUserRequest,
 } from './types.js';
 import { UserTierId, IneligibleTierReasonCode } from './types.js';
+import type { HttpOptions } from './server.js';
 import { CodeAssistServer } from './server.js';
 import type { AuthClient } from 'google-auth-library';
 import type { ValidationHandler } from '../fallback/types.js';
@@ -77,6 +78,7 @@ export interface UserData {
 export async function setupUser(
   client: AuthClient,
   validationHandler?: ValidationHandler,
+  httpOptions: HttpOptions = {},
 ): Promise<UserData> {
   const projectId =
     process.env['GOOGLE_CLOUD_PROJECT'] ||
@@ -85,7 +87,7 @@ export async function setupUser(
   const caServer = new CodeAssistServer(
     client,
     projectId,
-    {},
+    httpOptions,
     '',
     undefined,
     undefined,
