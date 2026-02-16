@@ -194,6 +194,7 @@ Keep in mind the following when delegating to the generalist sub-agent:
 - Though turns are very expensive, you can ultimately reduce your turn count, and your context usage by delegating proactively to the generalist agent.
 - Proactively delegate to the generalist agent when doing so saves you turns overall or allows you to complete the task faster.
 - Use the generalist agent to break up larger tasks into sub-tasks. Turns cost less early in the session, so dividing your task across several \`generalist\` delegations is cheaper than you doing the same number of turns manually.
+- You can use the generalist to avoid polluting your context window with steps taken to find context.
 </subagent_delegation>
 
 <examples>
