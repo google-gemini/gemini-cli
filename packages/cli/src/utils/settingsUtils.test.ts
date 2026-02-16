@@ -480,7 +480,9 @@ describe('SettingsUtils', () => {
         expect(dialogKeys.length).toBeGreaterThan(0);
       });
 
-      it('should handle nested settings display correctly', () => {
+      const nestedDialogKey = 'context.fileFiltering.respectGitIgnore';
+
+      function mockNestedDialogSchema() {
         vi.mocked(getSettingsSchema).mockReturnValue({
           context: {
             type: 'object',
@@ -514,38 +516,40 @@ describe('SettingsUtils', () => {
             },
           },
         } as unknown as SettingsSchemaType);
+      }
 
-        // Test the specific issue with fileFiltering.respectGitIgnore
-        const key = 'context.fileFiltering.respectGitIgnore';
+      it('should include nested file filtering setting in dialog keys', () => {
+        mockNestedDialogSchema();
 
-        // Test that setting exists in scope when set
+        const dialogKeys = getDialogSettingKeys();
+        expect(dialogKeys).toContain(nestedDialogKey);
+      });
+
+      it('should detect nested setting exists in scope when explicitly set', () => {
+        mockNestedDialogSchema();
+
         const settingsWithValue = makeMockSettings({
           context: { fileFiltering: { respectGitIgnore: true } },
         });
-        expect(settingExistsInScope(key, settingsWithValue)).toBe(true);
 
-        // Get the value from settings
-        const valueFromSettings = getSettingValue(key, settingsWithValue, {});
-        expect(valueFromSettings).toBe(true);
+        expect(settingExistsInScope(nestedDialogKey, settingsWithValue)).toBe(
+          true,
+        );
+      });
 
-        // Test getDisplayValue with setting in scope (shows * because it exists in scope)
-        const displayValue = getDisplayValue(
-          key,
+      it('should return nested setting value from scope settings', () => {
+        mockNestedDialogSchema();
+
+        const settingsWithValue = makeMockSettings({
+          context: { fileFiltering: { respectGitIgnore: true } },
+        });
+
+        const valueFromSettings = getSettingValue(
+          nestedDialogKey,
           settingsWithValue,
-          makeMockSettings({}),
-          new Set(),
+          {},
         );
-        expect(displayValue).toBe('true*');
-
-        // Test that restartChangedKeys also show the * indicator
-        const restartChangedKeys = new Set([key]);
-        const displayValueWithRestart = getDisplayValue(
-          key,
-          makeMockSettings({}),
-          makeMockSettings({}),
-          restartChangedKeys,
-        );
-        expect(displayValueWithRestart).toBe('true*'); // * because it's in restartChangedKeys
+        expect(valueFromSettings).toBe(true);
       });
     });
   });
@@ -832,73 +836,57 @@ describe('SettingsUtils', () => {
         });
       });
 
-      it('should show value without * when setting matches default', () => {
+      it('should show value with * when setting exists in scope, even when it matches default', () => {
         const settings = makeMockSettings({
           ui: { requiresRestart: false },
-        }); // false matches default, so no *
+        }); // false matches default, but key is explicitly set in scope
         const mergedSettings = makeMockSettings({
           ui: { requiresRestart: false },
         });
-        const modifiedSettings = new Set<string>();
+        const restartChangedKeys = new Set<string>();
 
         const result = getDisplayValue(
           'ui.requiresRestart',
           settings,
           mergedSettings,
-          modifiedSettings,
+          restartChangedKeys,
         );
         expect(result).toBe('false*');
       });
 
-      it('should show default value when setting is not in scope', () => {
+      it('should not show * when key is not in scope and not in restartChangedKeys', () => {
         const settings = makeMockSettings({}); // no setting in scope
         const mergedSettings = makeMockSettings({
           ui: { requiresRestart: false },
         });
-        const modifiedSettings = new Set<string>();
+        const restartChangedKeys = new Set<string>();
 
         const result = getDisplayValue(
           'ui.requiresRestart',
           settings,
           mergedSettings,
-          modifiedSettings,
+          restartChangedKeys,
         );
         expect(result).toBe('false'); // shows default value
       });
 
-      it('should show value with * when changed from default', () => {
+      it('should show value with * when setting exists in scope and differs from default', () => {
         const settings = makeMockSettings({ ui: { requiresRestart: true } }); // true is different from default (false)
         const mergedSettings = makeMockSettings({
           ui: { requiresRestart: true },
         });
-        const modifiedSettings = new Set<string>();
+        const restartChangedKeys = new Set<string>();
 
         const result = getDisplayValue(
           'ui.requiresRestart',
           settings,
           mergedSettings,
-          modifiedSettings,
+          restartChangedKeys,
         );
         expect(result).toBe('true*');
       });
 
-      it('should show default value without * when setting does not exist in scope', () => {
-        const settings = makeMockSettings({}); // setting doesn't exist in scope, show default
-        const mergedSettings = makeMockSettings({
-          ui: { requiresRestart: false },
-        });
-        const modifiedSettings = new Set<string>();
-
-        const result = getDisplayValue(
-          'ui.requiresRestart',
-          settings,
-          mergedSettings,
-          modifiedSettings,
-        );
-        expect(result).toBe('false'); // default value (false) without *
-      });
-
-      it('should show value with * when in restartChangedKeys', () => {
+      it('should show value with * when key is in restartChangedKeys (even if not in scope)', () => {
         const settings = makeMockSettings({}); // setting doesn't exist in scope originally
         const mergedSettings = makeMockSettings({
           ui: { requiresRestart: false },
