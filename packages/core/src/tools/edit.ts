@@ -47,6 +47,11 @@ import { EDIT_TOOL_NAME, READ_FILE_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { EDIT_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import levenshtein from 'fast-levenshtein';
+
+const ENABLE_FUZZY_MATCH_RECOVERY = true;
+const FUZZY_MATCH_THRESHOLD = 0.1; // Allow up to 10% weighted difference
+const WHITESPACE_PENALTY_FACTOR = 0.1; // Whitespace differences cost 10% of a character difference
 interface ReplacementContext {
   params: EditToolParams;
   currentContent: string;
@@ -58,6 +63,8 @@ interface ReplacementResult {
   occurrences: number;
   finalOldString: string;
   finalNewString: string;
+  strategy?: 'exact' | 'flexible' | 'regex' | 'fuzzy';
+  matchRanges?: Array<{ start: number; end: number }>;
 }
 
 export function applyReplacement(
@@ -301,6 +308,14 @@ export async function calculateReplacement(
     return regexResult;
   }
 
+  let fuzzyResult;
+  if (
+    ENABLE_FUZZY_MATCH_RECOVERY &&
+    (fuzzyResult = await calculateFuzzyReplacement(config, context))
+  ) {
+    return fuzzyResult;
+  }
+
   return {
     newContent: currentContent,
     occurrences: 0,
@@ -391,6 +406,8 @@ interface CalculatedEdit {
   error?: { display: string; raw: string; type: ToolErrorType };
   isNewFile: boolean;
   originalLineEnding: '\r\n' | '\n';
+  strategy?: 'exact' | 'flexible' | 'regex' | 'fuzzy';
+  matchRanges?: Array<{ start: number; end: number }>;
 }
 
 class EditToolInvocation
@@ -516,6 +533,8 @@ class EditToolInvocation
       isNewFile: false,
       error: undefined,
       originalLineEnding,
+      strategy: secondAttemptResult.strategy,
+      matchRanges: secondAttemptResult.matchRanges,
     };
   }
 
@@ -629,6 +648,8 @@ class EditToolInvocation
         isNewFile: false,
         error: undefined,
         originalLineEnding,
+        strategy: replacementResult.strategy,
+        matchRanges: replacementResult.matchRanges,
       };
     }
 
@@ -855,6 +876,10 @@ class EditToolInvocation
           ? `Created new file: ${this.params.file_path} with provided content.`
           : `Successfully modified file: ${this.params.file_path} (${editData.occurrences} replacements).`,
       ];
+      const fuzzyFeedback = getFuzzyMatchFeedback(editData);
+      if (fuzzyFeedback) {
+        llmSuccessMessageParts.push(fuzzyFeedback);
+      }
       if (this.params.modified_by_user) {
         llmSuccessMessageParts.push(
           `User modified the \`new_string\` content to be: ${this.params.new_string}.`,
@@ -1006,4 +1031,155 @@ export class EditTool
       },
     };
   }
+}
+
+function stripWhitespace(str: string): string {
+  return str.replace(/\s/g, '');
+}
+
+function getFuzzyMatchFeedback(editData: CalculatedEdit): string | null {
+  if (
+    editData.strategy === 'fuzzy' &&
+    editData.matchRanges &&
+    editData.matchRanges.length > 0
+  ) {
+    const ranges = editData.matchRanges
+      .map((r) => (r.start === r.end ? `${r.start}` : `${r.start}-${r.end}`))
+      .join(', ');
+    return `Applied fuzzy match at line${editData.matchRanges.length > 1 ? 's' : ''} ${ranges}.`;
+  }
+  return null;
+}
+
+async function calculateFuzzyReplacement(
+  config: Config,
+  context: ReplacementContext,
+): Promise<ReplacementResult | null> {
+  const { currentContent, params } = context;
+  const { old_string, new_string } = params;
+
+  // Pre-check: Don't fuzzy match very short strings to avoid false positives
+  if (old_string.length < 10) {
+    return null;
+  }
+
+  const normalizedCode = currentContent.replace(/\r\n/g, '\n');
+  const normalizedSearch = old_string.replace(/\r\n/g, '\n');
+  const normalizedReplace = new_string.replace(/\r\n/g, '\n');
+
+  const sourceLines = normalizedCode.match(/.*(?:\n|$)/g)?.slice(0, -1) ?? [];
+  const searchLines = normalizedSearch
+    .match(/.*(?:\n|$)/g)
+    ?.slice(0, -1)
+    .map((l) => l.trimEnd()); // Trim end of search lines to be more robust
+
+  if (!searchLines || searchLines.length === 0) {
+    return null;
+  }
+
+  const N = searchLines.length;
+  const candidates: Array<{ index: number; score: number }> = [];
+  const searchBlock = searchLines.join('\n');
+
+  // Sliding window
+  for (let i = 0; i <= sourceLines.length - N; i++) {
+    const windowLines = sourceLines.slice(i, i + N);
+    const windowText = windowLines.map((l) => l.trimEnd()).join('\n'); // Normalized join for comparison
+
+    // Length Heuristic Optimization
+    const lengthDiff = Math.abs(windowText.length - searchBlock.length);
+    if (
+      lengthDiff / searchBlock.length >
+      FUZZY_MATCH_THRESHOLD / WHITESPACE_PENALTY_FACTOR
+    ) {
+      continue;
+    }
+
+    // Tiered Scoring
+    const d_raw = levenshtein.get(windowText, searchBlock);
+    const d_norm = levenshtein.get(
+      stripWhitespace(windowText),
+      stripWhitespace(searchBlock),
+    );
+
+    const weightedDist = d_norm + (d_raw - d_norm) * WHITESPACE_PENALTY_FACTOR;
+    const score = weightedDist / searchBlock.length;
+
+    if (score <= FUZZY_MATCH_THRESHOLD) {
+      candidates.push({ index: i, score });
+    }
+  }
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  // Select best non-overlapping matches
+  // Sort by score ascending. If scores equal, prefer earlier index (stable sort).
+  candidates.sort((a, b) => a.score - b.score || a.index - b.index);
+
+  const selectedMatches: Array<{ index: number; score: number }> = [];
+  for (const candidate of candidates) {
+    // Check for overlap with already selected matches
+    // Two windows overlap if their start indices are within N lines of each other
+    // (Assuming window size N. Actually overlap is |i - j| < N)
+    const overlaps = selectedMatches.some(
+      (m) => Math.abs(m.index - candidate.index) < N,
+    );
+    if (!overlaps) {
+      selectedMatches.push(candidate);
+    }
+  }
+
+  // If we found matches, apply them
+  if (selectedMatches.length > 0) {
+    const event = new EditStrategyEvent('fuzzy');
+    logEditStrategy(config, event);
+
+    // Calculate match ranges before sorting for replacement
+    // Indices in selectedMatches are 0-based line indices
+    const matchRanges = selectedMatches
+      .map((m) => ({ start: m.index + 1, end: m.index + N }))
+      .sort((a, b) => a.start - b.start);
+
+    // Sort matches by index descending to apply replacements from bottom to top
+    // so that indices remain valid
+    selectedMatches.sort((a, b) => b.index - a.index);
+
+    const newLines = normalizedReplace.split('\n');
+
+    for (const match of selectedMatches) {
+      // If we want to preserve the indentation of the first line of the match:
+      const firstLineMatch = sourceLines[match.index];
+      const indentationMatch = firstLineMatch.match(/^([ \t]*)/);
+      const indentation = indentationMatch ? indentationMatch[1] : '';
+
+      const indentedReplaceLines = newLines.map(
+        (line) => `${indentation}${line}`,
+      );
+
+      let replacementText = indentedReplaceLines.join('\n');
+      // If the last line of the match had a newline, preserve it in the replacement
+      // to avoid merging with the next line or losing a blank line separator.
+      if (sourceLines[match.index + N - 1].endsWith('\n')) {
+        replacementText += '\n';
+      }
+
+      sourceLines.splice(match.index, N, replacementText);
+    }
+
+    let modifiedCode = sourceLines.join('');
+    modifiedCode = restoreTrailingNewline(currentContent, modifiedCode);
+
+    return {
+      newContent: modifiedCode,
+      occurrences: selectedMatches.length,
+      finalOldString: normalizedSearch,
+      finalNewString: normalizedReplace,
+      strategy: 'fuzzy',
+      matchRanges,
+    };
+  }
+
+  return null;
 }

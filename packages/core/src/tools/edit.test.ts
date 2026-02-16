@@ -373,6 +373,101 @@ describe('EditTool', () => {
       expect(result.occurrences).toBe(1);
     });
 
+    it('should perform a fuzzy replacement when exact match fails but similarity is high', async () => {
+      const content =
+        'const myConfig = {\n  enableFeature: true,\n  retries: 3\n};';
+      // Typo: missing comma after true
+      const oldString =
+        'const myConfig = {\n  enableFeature: true\n  retries: 3\n};';
+      const newString =
+        'const myConfig = {\n  enableFeature: false,\n  retries: 5\n};';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'config.ts',
+          instruction: 'update config',
+          old_string: oldString,
+          new_string: newString,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.occurrences).toBe(1);
+      expect(result.newContent).toBe(newString);
+    });
+
+    it('should NOT perform a fuzzy replacement when similarity is below threshold', async () => {
+      const content =
+        'const myConfig = {\n  enableFeature: true,\n  retries: 3\n};';
+      // Completely different string
+      const oldString = 'function somethingElse() {\n  return false;\n}';
+      const newString =
+        'const myConfig = {\n  enableFeature: false,\n  retries: 5\n};';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'config.ts',
+          instruction: 'update config',
+          old_string: oldString,
+          new_string: newString,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.occurrences).toBe(0);
+      expect(result.newContent).toBe(content);
+    });
+
+    it('should perform multiple fuzzy replacements if multiple valid matches are found', async () => {
+      const content = `
+function doIt() {
+  console.log("hello");
+}
+
+function doIt() {
+  console.log("hello");
+}
+`;
+      // old_string uses single quotes, file uses double.
+      // This is a fuzzy match (quote difference).
+      const oldString = `
+function doIt() {
+  console.log('hello');
+}
+`.trim();
+
+      const newString = `
+function doIt() {
+  console.log("bye");
+}
+`.trim();
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          instruction: 'update',
+          old_string: oldString,
+          new_string: newString,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.occurrences).toBe(2);
+      const expectedContent = `
+function doIt() {
+  console.log("bye");
+}
+
+function doIt() {
+  console.log("bye");
+}
+`;
+      expect(result.newContent).toBe(expectedContent);
+    });
+
     it('should NOT insert extra newlines when replacing a block preceded by a blank line (regression)', async () => {
       const content = '\n  function oldFunc() {\n    // some code\n  }';
       const result = await calculateReplacement(mockConfig, {
