@@ -73,6 +73,7 @@ export class GeminiCliSession {
       skillsSupport: true,
       adminSkillsEnabled: true,
       policyEngineConfig: {
+        // TODO: Revisit this default when we have a mechanism for wiring up approvals
         defaultDecision: PolicyDecision.ALLOW,
       },
     };
@@ -189,14 +190,9 @@ export class GeminiCliSession {
           agent: this.agent,
           session: this,
         };
-        try {
-          const newInstructions = await this.instructions(context);
-          this.config.setUserMemory(newInstructions);
-          client.updateSystemInstruction();
-        } catch (e) {
-          // eslint-disable-next-line no-console
-          console.error('Error resolving dynamic instructions:', e);
-        }
+        const newInstructions = await this.instructions(context);
+        this.config.setUserMemory(newInstructions);
+        client.updateSystemInstruction();
       }
 
       const stream = client.sendMessageStream(request, abortSignal, sessionId);
