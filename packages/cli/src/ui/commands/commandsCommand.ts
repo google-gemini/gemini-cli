@@ -69,6 +69,7 @@ export const commandsCommand: SlashCommand = {
   subCommands: [
     {
       name: 'reload',
+      altNames: ['refresh'],
       description:
         'Reload custom command definitions from .toml files. Usage: /commands reload',
       kind: CommandKind.BUILT_IN,
