@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -85,53 +85,6 @@ describe('<AppHeader />', () => {
     );
 
     expect(lastFrame()).not.toContain('Banner');
-    expect(lastFrame()).toMatchSnapshot();
-    unmount();
-  });
-
-  it('should render the banner when previewFeatures is disabled', () => {
-    const mockConfig = makeFakeConfig({ previewFeatures: false });
-    const uiState = {
-      history: [],
-      bannerData: {
-        defaultText: 'This is the default banner',
-        warningText: '',
-      },
-      bannerVisible: true,
-    };
-
-    const { lastFrame, unmount } = renderWithProviders(
-      <AppHeader version="1.0.0" />,
-      {
-        config: mockConfig,
-        uiState,
-      },
-    );
-
-    expect(lastFrame()).toContain('This is the default banner');
-    expect(lastFrame()).toMatchSnapshot();
-    unmount();
-  });
-
-  it('should not render the banner when previewFeatures is enabled', () => {
-    const mockConfig = makeFakeConfig({ previewFeatures: true });
-    const uiState = {
-      history: [],
-      bannerData: {
-        defaultText: 'This is the default banner',
-        warningText: '',
-      },
-    };
-
-    const { lastFrame, unmount } = renderWithProviders(
-      <AppHeader version="1.0.0" />,
-      {
-        config: mockConfig,
-        uiState,
-      },
-    );
-
-    expect(lastFrame()).not.toContain('This is the default banner');
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });

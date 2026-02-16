@@ -11,6 +11,7 @@ import type { ToolResult } from '../tools/tools.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 import type { ScheduledToolCall } from './types.js';
+import { CoreToolCallStatus } from './types.js';
 import type { AnyToolInvocation } from '../index.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import * as fileUtils from '../utils/fileUtils.js';
@@ -44,7 +45,6 @@ describe('ToolExecutor', () => {
     // Default mock implementation
     vi.mocked(fileUtils.saveTruncatedToolOutput).mockResolvedValue({
       outputFile: '/tmp/truncated_output.txt',
-      totalLines: 100,
     });
     vi.mocked(fileUtils.formatTruncatedToolOutput).mockReturnValue(
       'TruncatedContent...',
@@ -72,7 +72,7 @@ describe('ToolExecutor', () => {
     } as ToolResult);
 
     const scheduledCall: ScheduledToolCall = {
-      status: 'scheduled',
+      status: CoreToolCallStatus.Scheduled,
       request: {
         callId: 'call-1',
         name: 'testTool',
@@ -92,8 +92,8 @@ describe('ToolExecutor', () => {
       onUpdateToolCall,
     });
 
-    expect(result.status).toBe('success');
-    if (result.status === 'success') {
+    expect(result.status).toBe(CoreToolCallStatus.Success);
+    if (result.status === CoreToolCallStatus.Success) {
       const response = result.response.responseParts[0]?.functionResponse
         ?.response as Record<string, unknown>;
       expect(response).toEqual({ output: 'Tool output' });
@@ -112,7 +112,7 @@ describe('ToolExecutor', () => {
     );
 
     const scheduledCall: ScheduledToolCall = {
-      status: 'scheduled',
+      status: CoreToolCallStatus.Scheduled,
       request: {
         callId: 'call-2',
         name: 'failTool',
@@ -131,8 +131,8 @@ describe('ToolExecutor', () => {
       onUpdateToolCall: vi.fn(),
     });
 
-    expect(result.status).toBe('error');
-    if (result.status === 'error') {
+    expect(result.status).toBe(CoreToolCallStatus.Error);
+    if (result.status === CoreToolCallStatus.Error) {
       expect(result.response.error?.message).toBe('Tool Failed');
     }
   });
@@ -152,7 +152,7 @@ describe('ToolExecutor', () => {
     );
 
     const scheduledCall: ScheduledToolCall = {
-      status: 'scheduled',
+      status: CoreToolCallStatus.Scheduled,
       request: {
         callId: 'call-3',
         name: 'slowTool',
@@ -175,14 +175,13 @@ describe('ToolExecutor', () => {
     controller.abort();
     const result = await promise;
 
-    expect(result.status).toBe('cancelled');
+    expect(result.status).toBe(CoreToolCallStatus.Cancelled);
   });
 
   it('should truncate large shell output', async () => {
     // 1. Setup Config for Truncation
-    vi.spyOn(config, 'getEnableToolOutputTruncation').mockReturnValue(true);
     vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(10);
-    vi.spyOn(config, 'getTruncateToolOutputLines').mockReturnValue(5);
+    vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue('/tmp');
 
     const mockTool = new MockTool({ name: SHELL_TOOL_NAME });
     const invocation = mockTool.build({});
@@ -195,7 +194,7 @@ describe('ToolExecutor', () => {
     });
 
     const scheduledCall: ScheduledToolCall = {
-      status: 'scheduled',
+      status: CoreToolCallStatus.Scheduled,
       request: {
         callId: 'call-trunc',
         name: SHELL_TOOL_NAME,
@@ -221,16 +220,17 @@ describe('ToolExecutor', () => {
       SHELL_TOOL_NAME,
       'call-trunc',
       expect.any(String), // temp dir
+      'test-session-id', // session id from makeFakeConfig
     );
 
     expect(fileUtils.formatTruncatedToolOutput).toHaveBeenCalledWith(
       longOutput,
       '/tmp/truncated_output.txt',
-      5, // lines
+      10, // threshold (maxChars)
     );
 
-    expect(result.status).toBe('success');
-    if (result.status === 'success') {
+    expect(result.status).toBe(CoreToolCallStatus.Success);
+    if (result.status === CoreToolCallStatus.Success) {
       const response = result.response.responseParts[0]?.functionResponse
         ?.response as Record<string, unknown>;
       // The content should be the *truncated* version returned by the mock formatTruncatedToolOutput
@@ -263,7 +263,7 @@ describe('ToolExecutor', () => {
     );
 
     const scheduledCall: ScheduledToolCall = {
-      status: 'scheduled',
+      status: CoreToolCallStatus.Scheduled,
       request: {
         callId: 'call-pid',
         name: SHELL_TOOL_NAME,
@@ -288,7 +288,7 @@ describe('ToolExecutor', () => {
     // 4. Verify PID was reported
     expect(onUpdateToolCall).toHaveBeenCalledWith(
       expect.objectContaining({
-        status: 'executing',
+        status: CoreToolCallStatus.Executing,
         pid: testPid,
       }),
     );

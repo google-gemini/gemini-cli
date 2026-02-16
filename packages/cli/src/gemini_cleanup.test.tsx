@@ -38,6 +38,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     disableMouseEvents: vi.fn(),
     enterAlternateScreen: vi.fn(),
     disableLineWrapping: vi.fn(),
+    ProjectRegistry: vi.fn().mockImplementation(() => ({
+      initialize: vi.fn(),
+      getShortId: vi.fn().mockReturnValue('project-slug'),
+    })),
   };
 });
 
@@ -73,6 +77,7 @@ vi.mock('./config/config.js', () => ({
     getSandbox: vi.fn(() => false),
     getQuestion: vi.fn(() => ''),
     isInteractive: () => false,
+    storage: { initialize: vi.fn().mockResolvedValue(undefined) },
   } as unknown as Config),
   parseArguments: vi.fn().mockResolvedValue({}),
   isDebugMode: vi.fn(() => false),
@@ -191,6 +196,7 @@ describe('gemini.tsx main function cleanup', () => {
       getEnableHooks: vi.fn(() => false),
       getHookSystem: () => undefined,
       initialize: vi.fn(),
+      storage: { initialize: vi.fn().mockResolvedValue(undefined) },
       getContentGeneratorConfig: vi.fn(),
       getMcpServers: () => ({}),
       getMcpClientManager: vi.fn(),

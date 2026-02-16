@@ -20,6 +20,7 @@ import {
   ApprovalMode,
   parseAndFormatApiError,
   ToolConfirmationOutcome,
+  MessageBusType,
   promptIdContext,
   tokenLimit,
   debugLogger,
@@ -32,6 +33,7 @@ import {
   ValidationRequiredError,
   coreEvents,
   CoreEvent,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -46,22 +48,23 @@ import type {
   ToolCallResponseInfo,
   GeminiErrorEventValue,
   RetryAttemptPayload,
-  ToolCallConfirmationDetails,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
   HistoryItem,
+  HistoryItemThinking,
   HistoryItemWithoutId,
   HistoryItemToolGroup,
   IndividualToolCallDisplay,
   SlashCommandProcessorResult,
   HistoryItemModel,
 } from '../types.js';
-import { StreamingState, MessageType, ToolCallStatus } from '../types.js';
+import { StreamingState, MessageType } from '../types.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
+import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
@@ -124,16 +127,18 @@ function calculateStreamingState(
   isResponding: boolean,
   toolCalls: TrackedToolCall[],
 ): StreamingState {
-  if (toolCalls.some((tc) => tc.status === 'awaiting_approval')) {
+  if (
+    toolCalls.some((tc) => tc.status === CoreToolCallStatus.AwaitingApproval)
+  ) {
     return StreamingState.WaitingForConfirmation;
   }
 
   const isAnyToolActive = toolCalls.some((tc) => {
     // These statuses indicate active processing
     if (
-      tc.status === 'executing' ||
-      tc.status === 'scheduled' ||
-      tc.status === 'validating'
+      tc.status === CoreToolCallStatus.Executing ||
+      tc.status === CoreToolCallStatus.Scheduled ||
+      tc.status === CoreToolCallStatus.Validating
     ) {
       return true;
     }
@@ -141,9 +146,9 @@ function calculateStreamingState(
     // Terminal statuses (success, error, cancelled) still count as "Responding"
     // if the result hasn't been submitted back to Gemini yet.
     if (
-      tc.status === 'success' ||
-      tc.status === 'error' ||
-      tc.status === 'cancelled'
+      tc.status === CoreToolCallStatus.Success ||
+      tc.status === CoreToolCallStatus.Error ||
+      tc.status === CoreToolCallStatus.Cancelled
     ) {
       return !(tc as TrackedCompletedToolCall | TrackedCancelledToolCall)
         .responseSubmittedToGemini;
@@ -193,9 +198,11 @@ export const useGeminiStream = (
   const turnCancelledRef = useRef(false);
   const activeQueryIdRef = useRef<string | null>(null);
   const [isResponding, setIsResponding] = useState<boolean>(false);
-  const [thought, setThought] = useState<ThoughtSummary | null>(null);
+  const [thought, thoughtRef, setThought] =
+    useStateAndRef<ThoughtSummary | null>(null);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
+
   const [lastGeminiActivityTime, setLastGeminiActivityTime] =
     useState<number>(0);
   const [pushedToolCallIds, pushedToolCallIdsRef, setPushedToolCallIds] =
@@ -389,7 +396,6 @@ export const useGeminiStream = (
       toolCalls.length > 0 &&
       toolCalls.every((tc) => pushedToolCallIds.has(tc.request.callId));
 
-    const isEventDriven = config.isEventDrivenSchedulerEnabled();
     const anyVisibleInHistory = pushedToolCallIds.size > 0;
     const anyVisibleInPending = remainingTools.some((tc) => {
       // AskUser tools are rendered by AskUserDialog, not ToolGroupMessage
@@ -400,7 +406,6 @@ export const useGeminiStream = (
       if (tc.request.name === ASK_USER_TOOL_NAME && isInProgress) {
         return false;
       }
-      if (!isEventDriven) return true;
       return (
         tc.status !== 'scheduled' &&
         tc.status !== 'validating' &&
@@ -422,13 +427,14 @@ export const useGeminiStream = (
     }
 
     return items;
-  }, [toolCalls, pushedToolCallIds, config]);
+  }, [toolCalls, pushedToolCallIds]);
 
   const activeToolPtyId = useMemo(() => {
     const executingShellTool = toolCalls.find(
       (tc) =>
         tc.status === 'executing' && tc.request.name === 'run_shell_command',
     );
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return (executingShellTool as TrackedExecutingToolCall | undefined)?.pid;
   }, [toolCalls]);
 
@@ -473,12 +479,6 @@ export const useGeminiStream = (
   );
 
   const activePtyId = activeShellPtyId || activeToolPtyId;
-
-  useEffect(() => {
-    if (!activePtyId) {
-      setShellInputFocused(false);
-    }
-  }, [activePtyId, setShellInputFocused]);
 
   const prevActiveShellPtyIdRef = useRef<number | null>(null);
   useEffect(() => {
@@ -559,12 +559,13 @@ export const useGeminiStream = (
       // If it is a shell command, we update the status to Canceled and clear the output
       // to avoid artifacts, then add it to history immediately.
       if (isShellCommand) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const toolGroup = pendingHistoryItemRef.current as HistoryItemToolGroup;
         const updatedTools = toolGroup.tools.map((tool) => {
           if (tool.name === SHELL_COMMAND_NAME) {
             return {
               ...tool,
-              status: ToolCallStatus.Canceled,
+              status: CoreToolCallStatus.Cancelled,
               resultDisplay: tool.resultDisplay,
             };
           }
@@ -760,6 +761,7 @@ export const useGeminiStream = (
         pendingHistoryItemRef.current?.type !== 'gemini' &&
         pendingHistoryItemRef.current?.type !== 'gemini_content'
       ) {
+        // Flush any pending item before starting gemini content
         if (pendingHistoryItemRef.current) {
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         }
@@ -772,6 +774,7 @@ export const useGeminiStream = (
       if (splitPoint === newGeminiMessageBuffer.length) {
         // Update the existing message with accumulated content
         setPendingHistoryItem((item) => ({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           type: item?.type as 'gemini' | 'gemini_content',
           text: newGeminiMessageBuffer,
         }));
@@ -788,6 +791,7 @@ export const useGeminiStream = (
         const afterText = newGeminiMessageBuffer.substring(splitPoint);
         addItem(
           {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             type: pendingHistoryItemRef.current?.type as
               | 'gemini'
               | 'gemini_content',
@@ -803,6 +807,23 @@ export const useGeminiStream = (
     [addItem, pendingHistoryItemRef, setPendingHistoryItem],
   );
 
+  const handleThoughtEvent = useCallback(
+    (eventValue: ThoughtSummary, userMessageTimestamp: number) => {
+      setThought(eventValue);
+
+      if (getInlineThinkingMode(settings) === 'full') {
+        addItem(
+          {
+            type: 'thinking',
+            thought: eventValue,
+          } as HistoryItemThinking,
+          userMessageTimestamp,
+        );
+      }
+    },
+    [addItem, settings, setThought],
+  );
+
   const handleUserCancelledEvent = useCallback(
     (userMessageTimestamp: number) => {
       if (turnCancelledRef.current) {
@@ -812,12 +833,14 @@ export const useGeminiStream = (
         if (pendingHistoryItemRef.current.type === 'tool_group') {
           const updatedTools = pendingHistoryItemRef.current.tools.map(
             (tool) =>
-              tool.status === ToolCallStatus.Pending ||
-              tool.status === ToolCallStatus.Confirming ||
-              tool.status === ToolCallStatus.Executing
-                ? { ...tool, status: ToolCallStatus.Canceled }
+              tool.status === CoreToolCallStatus.Validating ||
+              tool.status === CoreToolCallStatus.Scheduled ||
+              tool.status === CoreToolCallStatus.AwaitingApproval ||
+              tool.status === CoreToolCallStatus.Executing
+                ? { ...tool, status: CoreToolCallStatus.Cancelled }
                 : tool,
           );
+
           const pendingItem: HistoryItemToolGroup = {
             ...pendingHistoryItemRef.current,
             tools: updatedTools,
@@ -1072,10 +1095,17 @@ export const useGeminiStream = (
       let geminiMessageBuffer = '';
       const toolCallRequests: ToolCallRequestInfo[] = [];
       for await (const event of stream) {
+        if (
+          event.type !== ServerGeminiEventType.Thought &&
+          thoughtRef.current !== null
+        ) {
+          setThought(null);
+        }
+
         switch (event.type) {
           case ServerGeminiEventType.Thought:
             setLastGeminiActivityTime(Date.now());
-            setThought(event.value);
+            handleThoughtEvent(event.value, userMessageTimestamp);
             break;
           case ServerGeminiEventType.Content:
             setLastGeminiActivityTime(Date.now());
@@ -1162,6 +1192,8 @@ export const useGeminiStream = (
     },
     [
       handleContentEvent,
+      handleThoughtEvent,
+      thoughtRef,
       handleUserCancelledEvent,
       handleErrorEvent,
       scheduleToolCalls,
@@ -1176,6 +1208,7 @@ export const useGeminiStream = (
       addItem,
       pendingHistoryItemRef,
       setPendingHistoryItem,
+      setThought,
     ],
   );
   const submitQuery = useCallback(
@@ -1356,6 +1389,7 @@ export const useGeminiStream = (
       config,
       startNewPrompt,
       getPromptCount,
+      setThought,
     ],
   );
 
@@ -1380,13 +1414,15 @@ export const useGeminiStream = (
 
         // Process pending tool calls sequentially to reduce UI chaos
         for (const call of awaitingApprovalCalls) {
-          if (
-            (call.confirmationDetails as ToolCallConfirmationDetails)?.onConfirm
-          ) {
+          if (call.correlationId) {
             try {
-              await (
-                call.confirmationDetails as ToolCallConfirmationDetails
-              ).onConfirm(ToolConfirmationOutcome.ProceedOnce);
+              await config.getMessageBus().publish({
+                type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+                correlationId: call.correlationId,
+                confirmed: true,
+                requiresUserConfirmation: false,
+                outcome: ToolConfirmationOutcome.ProceedOnce,
+              });
             } catch (error) {
               debugLogger.warn(
                 `Failed to auto-approve tool call ${call.request.callId}:`,
@@ -1397,7 +1433,7 @@ export const useGeminiStream = (
         }
       }
     },
-    [toolCalls],
+    [config, toolCalls],
   );
 
   const handleCompletedTools = useCallback(
@@ -1452,7 +1488,9 @@ export const useGeminiStream = (
         const pid = data?.pid;
 
         if (isShell && pid) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const command = (data?.['command'] as string) ?? 'shell';
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const initialOutput = (data?.['initialOutput'] as string) ?? '';
 
           registerBackgroundShell(pid, command, initialOutput);
@@ -1497,7 +1535,7 @@ export const useGeminiStream = (
 
       // If all the tools were cancelled, don't submit a response to Gemini.
       const allToolsCancelled = geminiTools.every(
-        (tc) => tc.status === 'cancelled',
+        (tc) => tc.status === CoreToolCallStatus.Cancelled,
       );
 
       if (allToolsCancelled) {
@@ -1585,7 +1623,7 @@ export const useGeminiStream = (
       const restorableToolCalls = toolCalls.filter(
         (toolCall) =>
           EDIT_TOOL_NAMES.has(toolCall.request.name) &&
-          toolCall.status === 'awaiting_approval',
+          toolCall.status === CoreToolCallStatus.AwaitingApproval,
       );
 
       if (restorableToolCalls.length > 0) {

@@ -12,7 +12,7 @@ import {
   type SafetyCheckerRule,
   InProcessCheckerType,
 } from './types.js';
-import { buildArgsPatterns } from './utils.js';
+import { buildArgsPatterns, isSafeRegExp } from './utils.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import toml from '@iarna/toml';
@@ -202,56 +202,67 @@ function transformPriority(priority: number, tier: number): number {
 }
 
 /**
- * Loads and parses policies from TOML files in the specified directories.
+ * Loads and parses policies from TOML files in the specified paths (directories or individual files).
  *
  * This function:
- * 1. Scans directories for .toml files
+ * 1. Scans paths for .toml files (if directory) or processes individual files
  * 2. Parses and validates each file
  * 3. Transforms rules (commandPrefix, arrays, mcpName, priorities)
  * 4. Collects detailed error information for any failures
  *
- * @param policyDirs Array of directory paths to scan for policy files
- * @param getPolicyTier Function to determine tier (1-3) for a directory
+ * @param policyPaths Array of paths (directories or files) to scan for policy files
+ * @param getPolicyTier Function to determine tier (1-3) for a path
  * @returns Object containing successfully parsed rules and any errors encountered
  */
 export async function loadPoliciesFromToml(
-  policyDirs: string[],
-  getPolicyTier: (dir: string) => number,
+  policyPaths: string[],
+  getPolicyTier: (path: string) => number,
 ): Promise<PolicyLoadResult> {
   const rules: PolicyRule[] = [];
   const checkers: SafetyCheckerRule[] = [];
   const errors: PolicyFileError[] = [];
 
-  for (const dir of policyDirs) {
-    const tier = getPolicyTier(dir);
+  for (const p of policyPaths) {
+    const tier = getPolicyTier(p);
     const tierName = getTierName(tier);
 
-    // Scan directory for all .toml files
-    let filesToLoad: string[];
+    let filesToLoad: string[] = [];
+    let baseDir = '';
+
     try {
-      const dirEntries = await fs.readdir(dir, { withFileTypes: true });
-      filesToLoad = dirEntries
-        .filter((entry) => entry.isFile() && entry.name.endsWith('.toml'))
-        .map((entry) => entry.name);
+      const stats = await fs.stat(p);
+      if (stats.isDirectory()) {
+        baseDir = p;
+        const dirEntries = await fs.readdir(p, { withFileTypes: true });
+        filesToLoad = dirEntries
+          .filter((entry) => entry.isFile() && entry.name.endsWith('.toml'))
+          .map((entry) => entry.name);
+      } else if (stats.isFile() && p.endsWith('.toml')) {
+        baseDir = path.dirname(p);
+        filesToLoad = [path.basename(p)];
+      }
+      // Other file types or non-.toml files are silently ignored
+      // for consistency with directory scanning behavior.
     } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as NodeJS.ErrnoException;
       if (error.code === 'ENOENT') {
-        // Directory doesn't exist, skip it (not an error)
+        // Path doesn't exist, skip it (not an error)
         continue;
       }
       errors.push({
-        filePath: dir,
-        fileName: path.basename(dir),
+        filePath: p,
+        fileName: path.basename(p),
         tier: tierName,
         errorType: 'file_read',
-        message: `Failed to read policy directory`,
+        message: `Failed to read policy path`,
         details: error.message,
       });
       continue;
     }
 
     for (const file of filesToLoad) {
-      const filePath = path.join(dir, file);
+      const filePath = path.join(baseDir, file);
 
       try {
         // Read file
@@ -262,6 +273,7 @@ export async function loadPoliciesFromToml(
         try {
           parsed = toml.parse(fileContent);
         } catch (e) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const error = e as Error;
           errors.push({
             filePath,
@@ -354,8 +366,9 @@ export async function loadPoliciesFromToml(
                 // Compile regex pattern
                 if (argsPattern) {
                   try {
-                    policyRule.argsPattern = new RegExp(argsPattern);
+                    new RegExp(argsPattern);
                   } catch (e) {
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                     const error = e as Error;
                     errors.push({
                       filePath,
@@ -367,9 +380,24 @@ export async function loadPoliciesFromToml(
                       suggestion:
                         'Check regex syntax for errors like unmatched brackets or invalid escape sequences',
                     });
-                    // Skip this rule if regex compilation fails
                     return null;
                   }
+
+                  if (!isSafeRegExp(argsPattern)) {
+                    errors.push({
+                      filePath,
+                      fileName: file,
+                      tier: tierName,
+                      errorType: 'regex_compilation',
+                      message: 'Unsafe regex pattern (potential ReDoS)',
+                      details: `Pattern: ${argsPattern}`,
+                      suggestion:
+                        'Avoid nested quantifiers or extremely long patterns',
+                    });
+                    return null;
+                  }
+
+                  policyRule.argsPattern = new RegExp(argsPattern);
                 }
 
                 return policyRule;
@@ -411,14 +439,16 @@ export async function loadPoliciesFromToml(
                 const safetyCheckerRule: SafetyCheckerRule = {
                   toolName: effectiveToolName,
                   priority: checker.priority,
+                  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                   checker: checker.checker as SafetyCheckerConfig,
                   modes: checker.modes,
                 };
 
                 if (argsPattern) {
                   try {
-                    safetyCheckerRule.argsPattern = new RegExp(argsPattern);
+                    new RegExp(argsPattern);
                   } catch (e) {
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                     const error = e as Error;
                     errors.push({
                       filePath,
@@ -430,6 +460,21 @@ export async function loadPoliciesFromToml(
                     });
                     return null;
                   }
+
+                  if (!isSafeRegExp(argsPattern)) {
+                    errors.push({
+                      filePath,
+                      fileName: file,
+                      tier: tierName,
+                      errorType: 'regex_compilation',
+                      message:
+                        'Unsafe regex pattern in safety checker (potential ReDoS)',
+                      details: `Pattern: ${argsPattern}`,
+                    });
+                    return null;
+                  }
+
+                  safetyCheckerRule.argsPattern = new RegExp(argsPattern);
                 }
 
                 return safetyCheckerRule;
@@ -440,6 +485,7 @@ export async function loadPoliciesFromToml(
 
         checkers.push(...parsedCheckers);
       } catch (e) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const error = e as NodeJS.ErrnoException;
         // Catch-all for unexpected errors
         if (error.code !== 'ENOENT') {

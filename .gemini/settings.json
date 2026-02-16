@@ -1,0 +1,9 @@
+{
+  "experimental": {
+    "plan": true,
+    "extensionReloading": true
+  },
+  "general": {
+    "devtools": true
+  }
+}

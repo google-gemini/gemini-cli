@@ -8,8 +8,9 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import {
   debugLogger,
+  sanitizeFilenamePart,
   Storage,
-  TOOL_OUTPUT_DIR,
+  TOOL_OUTPUTS_DIR,
   type Config,
 } from '@google/gemini-cli-core';
 import type { Settings, SessionRetentionSettings } from '../config/settings.js';
@@ -101,6 +102,19 @@ export async function cleanupExpiredSessions(
           } catch {
             /* ignore if log doesn't exist */
           }
+
+          // ALSO cleanup tool outputs for this session
+          const safeSessionId = sanitizeFilenamePart(sessionId);
+          const toolOutputDir = path.join(
+            config.storage.getProjectTempDir(),
+            TOOL_OUTPUTS_DIR,
+            `session-${safeSessionId}`,
+          );
+          try {
+            await fs.rm(toolOutputDir, { recursive: true, force: true });
+          } catch {
+            /* ignore if doesn't exist */
+          }
         }
 
         if (config.getDebugMode()) {
@@ -160,7 +174,10 @@ export async function cleanupExpiredSessions(
 /**
  * Identifies sessions that should be deleted (corrupted or expired based on retention policy)
  */
-async function identifySessionsToDelete(
+/**
+ * Identifies sessions that should be deleted (corrupted or expired based on retention policy)
+ */
+export async function identifySessionsToDelete(
   allFiles: SessionFileEntry[],
   retentionConfig: SessionRetentionSettings,
 ): Promise<SessionFileEntry[]> {
@@ -259,6 +276,7 @@ function parseRetentionPeriod(period: string): number {
     );
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return value * MULTIPLIERS[unit as keyof typeof MULTIPLIERS];
 }
 
@@ -279,6 +297,7 @@ function validateRetentionConfig(
     try {
       maxAgeMs = parseRetentionPeriod(retentionConfig.maxAge);
     } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return (error as Error | string).toString();
     }
 
@@ -348,9 +367,13 @@ export async function cleanupToolOutputFiles(
     }
 
     const retentionConfig = settings.general.sessionRetention;
-    const tempDir =
-      projectTempDir ?? new Storage(process.cwd()).getProjectTempDir();
-    const toolOutputDir = path.join(tempDir, TOOL_OUTPUT_DIR);
+    let tempDir = projectTempDir;
+    if (!tempDir) {
+      const storage = new Storage(process.cwd());
+      await storage.initialize();
+      tempDir = storage.getProjectTempDir();
+    }
+    const toolOutputDir = path.join(tempDir, TOOL_OUTPUTS_DIR);
 
     // Check if directory exists
     try {
@@ -360,14 +383,15 @@ export async function cleanupToolOutputFiles(
       return result;
     }
 
-    // Get all files in the tool_output directory
+    // Get all entries in the tool-outputs directory
     const entries = await fs.readdir(toolOutputDir, { withFileTypes: true });
-    const files = entries.filter((e) => e.isFile());
-    result.scanned = files.length;
+    result.scanned = entries.length;
 
-    if (files.length === 0) {
+    if (entries.length === 0) {
       return result;
     }
+
+    const files = entries.filter((e) => e.isFile());
 
     // Get file stats for age-based cleanup (parallel for better performance)
     const fileStatsResults = await Promise.all(
@@ -427,6 +451,43 @@ export async function cleanupToolOutputFiles(
         for (let i = 0; i < excessCount; i++) {
           filesToDelete.push(remainingFiles[i].name);
         }
+      }
+    }
+
+    // For now, continue to cleanup individual files in the root tool-outputs dir
+    // but also scan and cleanup expired session subdirectories.
+    const subdirs = entries.filter(
+      (e) => e.isDirectory() && e.name.startsWith('session-'),
+    );
+    for (const subdir of subdirs) {
+      try {
+        // Security: Validate that the subdirectory name is a safe filename part
+        // and doesn't attempt path traversal.
+        if (subdir.name !== sanitizeFilenamePart(subdir.name)) {
+          debugLogger.debug(
+            `Skipping unsafe tool-output subdirectory: ${subdir.name}`,
+          );
+          continue;
+        }
+
+        const subdirPath = path.join(toolOutputDir, subdir.name);
+        const stat = await fs.stat(subdirPath);
+
+        let shouldDelete = false;
+        if (retentionConfig.maxAge) {
+          const maxAgeMs = parseRetentionPeriod(retentionConfig.maxAge);
+          const cutoffDate = new Date(now.getTime() - maxAgeMs);
+          if (stat.mtime < cutoffDate) {
+            shouldDelete = true;
+          }
+        }
+
+        if (shouldDelete) {
+          await fs.rm(subdirPath, { recursive: true, force: true });
+          result.deleted++; // Count as one "unit" of deletion for stats
+        }
+      } catch (error) {
+        debugLogger.debug(`Failed to cleanup subdir ${subdir.name}: ${error}`);
       }
     }
 

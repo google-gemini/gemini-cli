@@ -7,7 +7,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync } from 'node:fs';
 import * as path from 'node:path';
-import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
+import {
+  TestRig,
+  printDebugInfo,
+  assertModelHasOutput,
+  checkModelOutputContent,
+} from './test-helper.js';
 
 describe('file-system', () => {
   let rig: TestRig;
@@ -43,8 +48,11 @@ describe('file-system', () => {
       'Expected to find a read_file tool call',
     ).toBeTruthy();
 
-    // Validate model output - will throw if no output, warn if missing expected content
-    validateModelOutput(result, 'hello world', 'File read test');
+    assertModelHasOutput(result);
+    checkModelOutputContent(result, {
+      expectedContent: 'hello world',
+      testName: 'File read test',
+    });
   });
 
   it('should be able to write a file', async () => {
@@ -74,8 +82,8 @@ describe('file-system', () => {
       'Expected to find a write_file, edit, or replace tool call',
     ).toBeTruthy();
 
-    // Validate model output - will throw if no output
-    validateModelOutput(result, null, 'File write test');
+    assertModelHasOutput(result);
+    checkModelOutputContent(result, { testName: 'File write test' });
 
     const fileContent = rig.readFile('test.txt');
 

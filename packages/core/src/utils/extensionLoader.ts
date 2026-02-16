@@ -113,6 +113,7 @@ export abstract class ExtensionLoader {
       await refreshServerHierarchicalMemory(this.config);
       await this.config.getHookSystem()?.initialize();
       await this.config.getAgentRegistry().reload();
+      await this.config.reloadSkills();
     }
   }
 

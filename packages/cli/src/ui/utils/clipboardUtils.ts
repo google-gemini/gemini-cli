@@ -5,13 +5,12 @@
  */
 
 import * as fs from 'node:fs/promises';
-import { createWriteStream } from 'node:fs';
+import { createWriteStream, existsSync, statSync } from 'node:fs';
 import { execSync, spawn } from 'node:child_process';
 import * as path from 'node:path';
 import {
   debugLogger,
   spawnAsync,
-  unescapePath,
   escapePath,
   Storage,
 } from '@google/gemini-cli-core';
@@ -256,8 +255,11 @@ const saveFileWithXclip = async (tempFilePath: string) => {
  * @param targetDir The root directory of the current project.
  * @returns The absolute path to the images directory.
  */
-function getProjectClipboardImagesDir(targetDir: string): string {
+async function getProjectClipboardImagesDir(
+  targetDir: string,
+): Promise<string> {
   const storage = new Storage(targetDir);
+  await storage.initialize();
   const baseDir = storage.getProjectTempDir();
   return path.join(baseDir, 'images');
 }
@@ -271,7 +273,7 @@ export async function saveClipboardImage(
   targetDir: string,
 ): Promise<string | null> {
   try {
-    const tempDir = getProjectClipboardImagesDir(targetDir);
+    const tempDir = await getProjectClipboardImagesDir(targetDir);
     await fs.mkdir(tempDir, { recursive: true });
 
     // Generate a unique filename with timestamp
@@ -396,7 +398,7 @@ export async function cleanupOldClipboardImages(
   targetDir: string,
 ): Promise<void> {
   try {
-    const tempDir = getProjectClipboardImagesDir(targetDir);
+    const tempDir = await getProjectClipboardImagesDir(targetDir);
     const files = await fs.readdir(tempDir);
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
 
@@ -415,86 +417,113 @@ export async function cleanupOldClipboardImages(
     debugLogger.debug('Failed to clean up old clipboard images:', e);
   }
 }
-
 /**
- * Splits text into individual path segments, respecting escaped spaces.
- * Unescaped spaces act as separators between paths, while "\ " is preserved
- * as part of a filename.
+ * Splits a pasted text block up into escaped path segements if it's a legal
+ * drag-and-drop string.
  *
- * Example: "/img1.png /path/my\ image.png" → ["/img1.png", "/path/my\ image.png"]
+ * There are multiple ways drag-and-drop paths might be escaped:
+ *  - Bare (only if there are no special chars): /path/to/myfile.png
+ *  - Wrapped in double quotes (Windows only): "/path/to/my file~!.png"
+ *  - Escaped with backslashes (POSIX only): /path/to/my\ file~!.png
+ *  - Wrapped in single quotes: '/path/to/my file~!.png'
  *
- * @param text The text to split
- * @returns Array of path segments (still escaped)
+ * When wrapped in single quotes, actual single quotes in the filename are
+ * escaped with "'\''". For example: '/path/to/my '\''fancy file'\''.png'
+ *
+ * When wrapped in double quotes, actual double quotes are not an issue becuase
+ * windows doesn't allow them in filenames.
+ *
+ * On all systems, a single drag-and-drop may include both wrapped and bare
+ * paths, so we need to handle both simultaneously.
+ *
+ * @param text
+ * @returns An iterable of escaped paths
  */
-export function splitEscapedPaths(text: string): string[] {
-  const paths: string[] = [];
+export function* splitDragAndDropPaths(text: string): Generator<string> {
   let current = '';
-  let i = 0;
+  let mode: 'NORMAL' | 'DOUBLE' | 'SINGLE' = 'NORMAL';
+  const isWindows = process.platform === 'win32';
 
+  let i = 0;
   while (i < text.length) {
     const char = text[i];
 
-    if (char === '\\' && i + 1 < text.length && text[i + 1] === ' ') {
-      // Escaped space - part of filename, preserve the escape sequence
-      current += '\\ ';
-      i += 2;
-    } else if (char === ' ') {
-      // Unescaped space - path separator
-      if (current.trim()) {
-        paths.push(current.trim());
+    if (mode === 'NORMAL') {
+      if (char === ' ') {
+        if (current.length > 0) {
+          yield current;
+          current = '';
+        }
+      } else if (char === '"') {
+        mode = 'DOUBLE';
+      } else if (char === "'") {
+        mode = 'SINGLE';
+      } else if (char === '\\' && !isWindows) {
+        // POSIX escape in normal mode
+        if (i + 1 < text.length) {
+          const next = text[i + 1];
+          current += next;
+          i++;
+        }
+      } else {
+        current += char;
       }
-      current = '';
-      i++;
-    } else {
-      current += char;
-      i++;
+    } else if (mode === 'DOUBLE') {
+      if (char === '"') {
+        mode = 'NORMAL';
+      } else {
+        current += char;
+      }
+    } else if (mode === 'SINGLE') {
+      if (char === "'") {
+        mode = 'NORMAL';
+      } else {
+        current += char;
+      }
     }
+
+    i++;
   }
 
-  // Don't forget the last segment
-  if (current.trim()) {
-    paths.push(current.trim());
+  if (current.length > 0) {
+    yield current;
   }
-
-  return paths;
 }
 
 /**
- * Processes pasted text containing file paths, adding @ prefix to valid paths.
- * Handles both single and multiple space-separated paths.
- *
- * @param text The pasted text (potentially space-separated paths)
- * @param isValidPath Function to validate if a path exists/is valid
- * @returns Processed string with @ prefixes on valid paths, or null if no valid paths
+ * Helper to validate if a path exists and is a file.
  */
-export function parsePastedPaths(
-  text: string,
-  isValidPath: (path: string) => boolean,
-): string | null {
+function isValidFilePath(p: string): boolean {
+  try {
+    return PATH_PREFIX_PATTERN.test(p) && existsSync(p) && statSync(p).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Processes pasted text containing file paths (like those from drag and drop),
+ * adding @ prefix to valid paths and escaping them in a standard way.
+ *
+ * @param text The pasted text
+ * @returns Processed string with @ prefixes or null if any paths are invalid
+ */
+export function parsePastedPaths(text: string): string | null {
   // First, check if the entire text is a single valid path
-  if (PATH_PREFIX_PATTERN.test(text) && isValidPath(text)) {
+  if (isValidFilePath(text)) {
     return `@${escapePath(text)} `;
   }
 
-  // Otherwise, try splitting on unescaped spaces
-  const segments = splitEscapedPaths(text);
-  if (segments.length === 0) {
+  const validPaths = [];
+  for (const segment of splitDragAndDropPaths(text)) {
+    if (isValidFilePath(segment)) {
+      validPaths.push(`@${escapePath(segment)}`);
+    } else {
+      return null; // If any segment is invalid, return null for the whole string
+    }
+  }
+  if (validPaths.length === 0) {
     return null;
   }
-
-  let anyValidPath = false;
-  const processedPaths = segments.map((segment) => {
-    // Quick rejection: skip segments that can't be paths
-    if (!PATH_PREFIX_PATTERN.test(segment)) {
-      return segment;
-    }
-    const unescaped = unescapePath(segment);
-    if (isValidPath(unescaped)) {
-      anyValidPath = true;
-      return `@${segment}`;
-    }
-    return segment;
-  });
-
-  return anyValidPath ? processedPaths.join(' ') + ' ' : null;
+  return validPaths.join(' ') + ' ';
 }

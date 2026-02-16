@@ -21,7 +21,11 @@ import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
-import { DISCOVERED_TOOL_PREFIX, TOOL_LEGACY_ALIASES } from './tool-names.js';
+import {
+  DISCOVERED_TOOL_PREFIX,
+  TOOL_LEGACY_ALIASES,
+  getToolAliases,
+} from './tool-names.js';
 
 type ToolParams = Record<string, unknown>;
 
@@ -261,7 +265,9 @@ export class ToolRegistry {
         }
 
         if (priorityA === 2) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const serverA = (toolA as DiscoveredMCPTool).serverName;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const serverB = (toolB as DiscoveredMCPTool).serverName;
           return serverA.localeCompare(serverB);
         }
@@ -315,6 +321,7 @@ export class ToolRegistry {
           'Tool discovery command is empty or contains only whitespace.',
         );
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const proc = spawn(cmdParts[0] as string, cmdParts.slice(1) as string[]);
       let stdout = '';
       const stdoutDecoder = new StringDecoder('utf8');
@@ -394,6 +401,7 @@ export class ToolRegistry {
           } else if (Array.isArray(tool['functionDeclarations'])) {
             functions.push(...tool['functionDeclarations']);
           } else if (tool['name']) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             functions.push(tool as FunctionDeclaration);
           }
         }
@@ -416,6 +424,7 @@ export class ToolRegistry {
             func.name,
             DISCOVERED_TOOL_PREFIX + func.name,
             func.description ?? '',
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             parameters as Record<string, unknown>,
             this.messageBus,
           ),
@@ -431,7 +440,9 @@ export class ToolRegistry {
    * @returns All the tools that are not excluded.
    */
   private getActiveTools(): AnyDeclarativeTool[] {
-    const excludedTools = this.config.getExcludeTools() ?? new Set([]);
+    const excludedTools =
+      this.expandExcludeToolsWithAliases(this.config.getExcludeTools()) ??
+      new Set([]);
     const activeTools: AnyDeclarativeTool[] = [];
     for (const tool of this.allKnownTools.values()) {
       if (this.isActiveTool(tool, excludedTools)) {
@@ -439,6 +450,26 @@ export class ToolRegistry {
       }
     }
     return activeTools;
+  }
+
+  /**
+   * Expands an excludeTools set to include all legacy aliases.
+   * For example, if 'search_file_content' is excluded and it's an alias for
+   * 'grep_search', both names will be in the returned set.
+   */
+  private expandExcludeToolsWithAliases(
+    excludeTools: Set<string> | undefined,
+  ): Set<string> | undefined {
+    if (!excludeTools || excludeTools.size === 0) {
+      return excludeTools;
+    }
+    const expanded = new Set<string>();
+    for (const name of excludeTools) {
+      for (const alias of getToolAliases(name)) {
+        expanded.add(alias);
+      }
+    }
+    return expanded;
   }
 
   /**
@@ -450,7 +481,9 @@ export class ToolRegistry {
     tool: AnyDeclarativeTool,
     excludeTools?: Set<string>,
   ): boolean {
-    excludeTools ??= this.config.getExcludeTools() ?? new Set([]);
+    excludeTools ??=
+      this.expandExcludeToolsWithAliases(this.config.getExcludeTools()) ??
+      new Set([]);
     const normalizedClassName = tool.constructor.name.replace(/^_+/, '');
     const possibleNames = [tool.name, normalizedClassName];
     if (tool instanceof DiscoveredMCPTool) {
@@ -470,12 +503,13 @@ export class ToolRegistry {
    * Retrieves the list of tool schemas (FunctionDeclaration array).
    * Extracts the declarations from the ToolListUnion structure.
    * Includes discovered (vs registered) tools if configured.
+   * @param modelId Optional model identifier to get model-specific schemas.
    * @returns An array of FunctionDeclarations.
    */
-  getFunctionDeclarations(): FunctionDeclaration[] {
+  getFunctionDeclarations(modelId?: string): FunctionDeclaration[] {
     const declarations: FunctionDeclaration[] = [];
     this.getActiveTools().forEach((tool) => {
-      declarations.push(tool.schema);
+      declarations.push(tool.getSchema(modelId));
     });
     return declarations;
   }
@@ -483,14 +517,18 @@ export class ToolRegistry {
   /**
    * Retrieves a filtered list of tool schemas based on a list of tool names.
    * @param toolNames - An array of tool names to include.
+   * @param modelId Optional model identifier to get model-specific schemas.
    * @returns An array of FunctionDeclarations for the specified tools.
    */
-  getFunctionDeclarationsFiltered(toolNames: string[]): FunctionDeclaration[] {
+  getFunctionDeclarationsFiltered(
+    toolNames: string[],
+    modelId?: string,
+  ): FunctionDeclaration[] {
     const declarations: FunctionDeclaration[] = [];
     for (const name of toolNames) {
       const tool = this.getTool(name);
       if (tool) {
-        declarations.push(tool.schema);
+        declarations.push(tool.getSchema(modelId));
       }
     }
     return declarations;
@@ -519,6 +557,7 @@ export class ToolRegistry {
   getToolsByServer(serverName: string): AnyDeclarativeTool[] {
     const serverTools: AnyDeclarativeTool[] = [];
     for (const tool of this.getActiveTools()) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       if ((tool as DiscoveredMCPTool)?.serverName === serverName) {
         serverTools.push(tool);
       }

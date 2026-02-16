@@ -11,7 +11,6 @@ import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 import {
   type SerializableConfirmationDetails,
-  type ToolCallConfirmationDetails,
   type Config,
   type ToolConfirmationPayload,
   ToolConfirmationOutcome,
@@ -34,12 +33,11 @@ import {
   REDIRECTION_WARNING_TIP_TEXT,
 } from '../../textConstants.js';
 import { AskUserDialog } from '../AskUserDialog.js';
+import { ExitPlanModeDialog } from '../ExitPlanModeDialog.js';
 
 export interface ToolConfirmationMessageProps {
   callId: string;
-  confirmationDetails:
-    | ToolCallConfirmationDetails
-    | SerializableConfirmationDetails;
+  confirmationDetails: SerializableConfirmationDetails;
   config: Config;
   isFocused?: boolean;
   availableTerminalHeight?: number;
@@ -62,7 +60,9 @@ export const ToolConfirmationMessage: React.FC<
   const allowPermanentApproval =
     settings.merged.security.enablePermanentToolApproval;
 
-  const handlesOwnUI = confirmationDetails.type === 'ask_user';
+  const handlesOwnUI =
+    confirmationDetails.type === 'ask_user' ||
+    confirmationDetails.type === 'exit_plan_mode';
   const isTrustedFolder = config.isTrustedFolder();
 
   const handleConfirm = useCallback(
@@ -266,6 +266,32 @@ export const ToolConfirmationMessage: React.FC<
           questions={confirmationDetails.questions}
           onSubmit={(answers) => {
             handleConfirm(ToolConfirmationOutcome.ProceedOnce, { answers });
+          }}
+          onCancel={() => {
+            handleConfirm(ToolConfirmationOutcome.Cancel);
+          }}
+          width={terminalWidth}
+          availableHeight={availableBodyContentHeight()}
+        />
+      );
+      return { question: '', bodyContent, options: [] };
+    }
+
+    if (confirmationDetails.type === 'exit_plan_mode') {
+      bodyContent = (
+        <ExitPlanModeDialog
+          planPath={confirmationDetails.planPath}
+          onApprove={(approvalMode) => {
+            handleConfirm(ToolConfirmationOutcome.ProceedOnce, {
+              approved: true,
+              approvalMode,
+            });
+          }}
+          onFeedback={(feedback) => {
+            handleConfirm(ToolConfirmationOutcome.ProceedOnce, {
+              approved: false,
+              feedback,
+            });
           }}
           onCancel={() => {
             handleConfirm(ToolConfirmationOutcome.Cancel);

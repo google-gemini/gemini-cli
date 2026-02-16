@@ -52,15 +52,24 @@ powerful tool for developers.
 
 ## Development Conventions
 
+- **Legacy Snippets:** `packages/core/src/prompts/snippets.legacy.ts` is a
+  snapshot of an older system prompt. Avoid changing the prompting verbiage to
+  preserve its historical behavior; however, structural changes to ensure
+  compilation or simplify the code are permitted.
 - **Contributions:** Follow the process outlined in `CONTRIBUTING.md`. Requires
   signing the Google CLA.
 - **Pull Requests:** Keep PRs small, focused, and linked to an existing issue.
+  Always activate the `pr-creator` skill for PR generation, even when using the
+  `gh` CLI.
 - **Commit Messages:** Follow the
   [Conventional Commits](https://www.conventionalcommits.org/) standard.
 - **Coding Style:** Adhere to existing patterns in `packages/cli` (React/Ink)
   and `packages/core` (Backend logic).
 - **Imports:** Use specific imports and avoid restricted relative imports
   between packages (enforced by ESLint).
+- **License Headers:** For all new source code files (`.ts`, `.tsx`, `.js`),
+  include the Apache-2.0 license header with the current year. (e.g.,
+  `Copyright 2026 Google LLC`). This is enforced by ESLint.
 
 ## Testing Conventions
 

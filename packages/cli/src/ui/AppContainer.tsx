@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -12,7 +12,14 @@ import {
   useRef,
   useLayoutEffect,
 } from 'react';
-import { type DOMElement, measureElement } from 'ink';
+import {
+  type DOMElement,
+  measureElement,
+  useApp,
+  useStdout,
+  useStdin,
+  type AppProps,
+} from 'ink';
 import { App } from './App.js';
 import { AppContext } from './contexts/AppContext.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
@@ -23,12 +30,14 @@ import {
 import { ConfigContext } from './contexts/ConfigContext.js';
 import {
   type HistoryItem,
-  ToolCallStatus,
   type HistoryItemWithoutId,
   type HistoryItemToolGroup,
   AuthState,
   type ConfirmationRequest,
+  type PermissionConfirmationRequest,
+  type QuotaStats,
 } from './types.js';
+import { checkPermissions } from './hooks/atCommandProcessor.js';
 import { MessageType, StreamingState } from './types.js';
 import { ToolActionsProvider } from './contexts/ToolActionsContext.js';
 import {
@@ -39,12 +48,12 @@ import {
   type UserTierId,
   type UserFeedbackPayload,
   type AgentDefinition,
+  type ApprovalMode,
   IdeClient,
   ideContextStore,
   getErrorMessage,
   getAllGeminiMdFilenames,
   AuthType,
-  UserAccountManager,
   clearCachedCredentialFile,
   type ResumedSessionData,
   recordExitFail,
@@ -54,6 +63,7 @@ import {
   coreEvents,
   CoreEvent,
   refreshServerHierarchicalMemory,
+  flattenMemory,
   type MemoryChangedPayload,
   writeToStdout,
   disableMouseEvents,
@@ -68,6 +78,7 @@ import {
   type ConsentRequestPayload,
   type AgentsDiscoveredPayload,
   ChangeAuthRequestedError,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -84,10 +95,8 @@ import { useVimMode } from './contexts/VimModeContext.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
-import { useApp, useStdout, useStdin } from 'ink';
 import { calculateMainAreaWidth } from './utils/ui-sizing.js';
 import ansiEscapes from 'ansi-escapes';
-import * as fs from 'node:fs';
 import { basename } from 'node:path';
 import { computeTerminalTitle } from '../utils/windowTitle.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
@@ -99,13 +108,14 @@ import { type LoadableSettingScope, SettingScope } from '../config/settings.js';
 import { type InitializationResult } from '../core/initializer.js';
 import { useFocus } from './hooks/useFocus.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
+import { KeypressPriority } from './contexts/KeypressContext.js';
 import { keyMatchers, Command } from './keyMatchers.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
 import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
 import { type IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
-import { appEvents, AppEvent } from '../utils/events.js';
+import { appEvents, AppEvent, TransientMessageType } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
@@ -124,8 +134,10 @@ import { ShellFocusContext } from './contexts/ShellFocusContext.js';
 import { type ExtensionManager } from '../config/extension-manager.js';
 import { requestConsentInteractive } from '../config/extensions/consent.js';
 import { useSessionBrowser } from './hooks/useSessionBrowser.js';
+import { persistentState } from '../utils/persistentState.js';
 import { useSessionResume } from './hooks/useSessionResume.js';
 import { useIncludeDirsTrust } from './hooks/useIncludeDirsTrust.js';
+import { useSessionRetentionCheck } from './hooks/useSessionRetentionCheck.js';
 import { isWorkspaceTrusted } from '../config/trustedFolders.js';
 import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
@@ -142,12 +154,15 @@ import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialo
 import { NewAgentsChoice } from './components/NewAgentsNotification.js';
 import { isSlashCommand } from './utils/commandUtils.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
+import { useTimedMessage } from './hooks/useTimedMessage.js';
+import { shouldDismissShortcutsHelpOnHotkey } from './utils/shortcutsHelp.js';
+import { useSuspend } from './hooks/useSuspend.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
     if (item && item.type === 'tool_group') {
       return item.tools.some(
-        (tool) => ToolCallStatus.Executing === tool.status,
+        (tool) => CoreToolCallStatus.Executing === tool.status,
       );
     }
     return false;
@@ -160,7 +175,9 @@ function isToolAwaitingConfirmation(
   return pendingHistoryItems
     .filter((item): item is HistoryItemToolGroup => item.type === 'tool_group')
     .some((item) =>
-      item.tools.some((tool) => ToolCallStatus.Confirming === tool.status),
+      item.tools.some(
+        (tool) => CoreToolCallStatus.AwaitingApproval === tool.status,
+      ),
     );
 }
 
@@ -171,6 +188,9 @@ interface AppContainerProps {
   initializationResult: InitializationResult;
   resumedSessionData?: ResumedSessionData;
 }
+
+const APPROVAL_MODE_REVEAL_DURATION_MS = 1200;
+const FOCUS_UI_ENABLED_STATE_KEY = 'focusUiEnabled';
 
 /**
  * The fraction of the terminal width to allocate to the shell.
@@ -191,55 +211,11 @@ export const AppContainer = (props: AppContainerProps) => {
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
   });
-  const { addItem } = historyManager;
-
-  const authCheckPerformed = useRef(false);
-  useEffect(() => {
-    if (authCheckPerformed.current) return;
-    authCheckPerformed.current = true;
-
-    if (resumedSessionData || settings.merged.ui.showUserIdentity === false) {
-      return;
-    }
-    const authType = config.getContentGeneratorConfig()?.authType;
-
-    // Run this asynchronously to avoid blocking the event loop.
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    (async () => {
-      try {
-        const userAccountManager = new UserAccountManager();
-        const email = userAccountManager.getCachedGoogleAccount();
-        const tierName = config.getUserTierName();
-
-        if (authType) {
-          let message =
-            authType === AuthType.LOGIN_WITH_GOOGLE
-              ? email
-                ? `Logged in with Google: ${email}`
-                : 'Logged in with Google'
-              : `Authenticated with ${authType}`;
-          if (tierName) {
-            message += ` (Plan: ${tierName})`;
-          }
-          addItem({
-            type: MessageType.INFO,
-            text: message,
-          });
-        }
-      } catch (_e) {
-        // Ignore errors during initial auth check
-      }
-    })();
-  }, [
-    config,
-    resumedSessionData,
-    settings.merged.ui.showUserIdentity,
-    addItem,
-  ]);
 
   useMemoryMonitor(historyManager);
   const isAlternateBuffer = useAlternateBuffer();
   const [corgiMode, setCorgiMode] = useState(false);
+  const [forceRerenderKey, setForceRerenderKey] = useState(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [quittingMessages, setQuittingMessages] = useState<
     HistoryItem[] | null
@@ -270,7 +246,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const activeHooks = useHookDisplayState();
   const [updateInfo, setUpdateInfo] = useState<UpdateObject | null>(null);
   const [isTrustedFolder, setIsTrustedFolder] = useState<boolean | undefined>(
-    isWorkspaceTrusted(settings.merged).isTrusted,
+    () => isWorkspaceTrusted(settings.merged).isTrusted,
   );
 
   const [queueErrorMessage, setQueueErrorMessage] = useState<string | null>(
@@ -291,8 +267,9 @@ export const AppContainer = (props: AppContainerProps) => {
     [defaultBannerText, warningBannerText],
   );
 
-  const { bannerText } = useBanner(bannerData, config);
+  const { bannerText } = useBanner(bannerData);
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const extensionManager = config.getExtensionLoader() as ExtensionManager;
   // We are in the interactive CLI, update how we request consent and settings.
   extensionManager.setRequestConsent((description) =>
@@ -364,6 +341,16 @@ export const AppContainer = (props: AppContainerProps) => {
   const [currentModel, setCurrentModel] = useState(config.getModel());
 
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
+  const [quotaStats, setQuotaStats] = useState<QuotaStats | undefined>(() => {
+    const remaining = config.getQuotaRemaining();
+    const limit = config.getQuotaLimit();
+    const resetTime = config.getQuotaResetTime();
+    return remaining !== undefined ||
+      limit !== undefined ||
+      resetTime !== undefined
+      ? { remaining, limit, resetTime }
+      : undefined;
+  });
 
   const [isConfigInitialized, setConfigInitialized] = useState(false);
 
@@ -375,7 +362,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const { columns: terminalWidth, rows: terminalHeight } = useTerminalSize();
   const { stdin, setRawMode } = useStdin();
   const { stdout } = useStdout();
-  const app = useApp();
+  const app: AppProps = useApp();
 
   // Additional hooks moved from App.tsx
   const { stats: sessionStats } = useSessionStats();
@@ -393,7 +380,9 @@ export const AppContainer = (props: AppContainerProps) => {
     (async () => {
       // Note: the program will not work if this fails so let errors be
       // handled by the global catch.
-      await config.initialize();
+      if (!config.isInitialized()) {
+        await config.initialize();
+      }
       setConfigInitialized(true);
       startupProfiler.flush(config);
 
@@ -466,9 +455,23 @@ export const AppContainer = (props: AppContainerProps) => {
       setCurrentModel(config.getModel());
     };
 
+    const handleQuotaChanged = (payload: {
+      remaining: number | undefined;
+      limit: number | undefined;
+      resetTime?: string;
+    }) => {
+      setQuotaStats({
+        remaining: payload.remaining,
+        limit: payload.limit,
+        resetTime: payload.resetTime,
+      });
+    };
+
     coreEvents.on(CoreEvent.ModelChanged, handleModelChanged);
+    coreEvents.on(CoreEvent.QuotaChanged, handleQuotaChanged);
     return () => {
       coreEvents.off(CoreEvent.ModelChanged, handleModelChanged);
+      coreEvents.off(CoreEvent.QuotaChanged, handleQuotaChanged);
     };
   }, [config]);
 
@@ -496,7 +499,7 @@ export const AppContainer = (props: AppContainerProps) => {
       );
       coreEvents.off(CoreEvent.AgentsDiscovered, handleAgentsDiscovered);
     };
-  }, []);
+  }, [settings]);
 
   const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
     useConsoleMessages();
@@ -511,15 +514,8 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
 
-  const isValidPath = useCallback((filePath: string): boolean => {
-    try {
-      return fs.existsSync(filePath) && fs.statSync(filePath).isFile();
-    } catch (_e) {
-      return false;
-    }
-  }, []);
-
   const getPreferredEditor = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     () => settings.merged.general.preferredEditor as EditorType,
     [settings.merged.general.preferredEditor],
   );
@@ -529,7 +525,7 @@ export const AppContainer = (props: AppContainerProps) => {
     viewport: { height: 10, width: inputWidth },
     stdin,
     setRawMode,
-    isValidPath,
+    escapePastedPaths: true,
     shellModeActive,
     getPreferredEditor,
   });
@@ -555,10 +551,13 @@ export const AppContainer = (props: AppContainerProps) => {
     setHistoryRemountKey((prev) => prev + 1);
   }, [setHistoryRemountKey, isAlternateBuffer, stdout]);
 
+  const shouldUseAlternateScreen = shouldEnterAlternateScreen(
+    isAlternateBuffer,
+    config.getScreenReader(),
+  );
+
   const handleEditorClose = useCallback(() => {
-    if (
-      shouldEnterAlternateScreen(isAlternateBuffer, config.getScreenReader())
-    ) {
+    if (shouldUseAlternateScreen) {
       // The editor may have exited alternate buffer mode so we need to
       // enter it again to be safe.
       enterAlternateScreen();
@@ -568,14 +567,24 @@ export const AppContainer = (props: AppContainerProps) => {
     }
     terminalCapabilityManager.enableSupportedModes();
     refreshStatic();
-  }, [refreshStatic, isAlternateBuffer, app, config]);
+  }, [refreshStatic, shouldUseAlternateScreen, app]);
+
+  const [editorError, setEditorError] = useState<string | null>(null);
+  const {
+    isEditorDialogOpen,
+    openEditorDialog,
+    handleEditorSelect,
+    exitEditorDialog,
+  } = useEditorSettings(settings, setEditorError, historyManager.addItem);
 
   useEffect(() => {
     coreEvents.on(CoreEvent.ExternalEditorClosed, handleEditorClose);
+    coreEvents.on(CoreEvent.RequestEditorSelection, openEditorDialog);
     return () => {
       coreEvents.off(CoreEvent.ExternalEditorClosed, handleEditorClose);
+      coreEvents.off(CoreEvent.RequestEditorSelection, openEditorDialog);
     };
-  }, [handleEditorClose]);
+  }, [handleEditorClose, openEditorDialog]);
 
   useEffect(() => {
     if (
@@ -589,6 +598,9 @@ export const AppContainer = (props: AppContainerProps) => {
     }
   }, [bannerVisible, bannerText, settings, config, refreshStatic]);
 
+  const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
+    useSettingsCommand();
+
   const {
     isThemeDialogOpen,
     openThemeDialog,
@@ -600,11 +612,10 @@ export const AppContainer = (props: AppContainerProps) => {
     setThemeError,
     historyManager.addItem,
     initializationResult.themeError,
+    refreshStatic,
   );
-
   // Poll for terminal background color changes to auto-switch theme
-  useTerminalTheme(handleThemeSelect, config);
-
+  useTerminalTheme(handleThemeSelect, config, refreshStatic);
   const {
     authState,
     setAuthState,
@@ -784,17 +795,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     onAuthError,
   ]);
 
-  const [editorError, setEditorError] = useState<string | null>(null);
-  const {
-    isEditorDialogOpen,
-    openEditorDialog,
-    handleEditorSelect,
-    exitEditorDialog,
-  } = useEditorSettings(settings, setEditorError, historyManager.addItem);
-
-  const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
-    useSettingsCommand();
-
   const { isModelDialogOpen, openModelDialog, closeModelDialog } =
     useModelCommand();
 
@@ -803,6 +803,65 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const setIsBackgroundShellListOpenRef = useRef<(open: boolean) => void>(
     () => {},
   );
+  const [focusUiEnabledByDefault] = useState(
+    () => persistentState.get(FOCUS_UI_ENABLED_STATE_KEY) === true,
+  );
+  const [shortcutsHelpVisible, setShortcutsHelpVisible] = useState(false);
+  const [cleanUiDetailsVisible, setCleanUiDetailsVisibleState] = useState(
+    !focusUiEnabledByDefault,
+  );
+  const modeRevealTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const cleanUiDetailsPinnedRef = useRef(!focusUiEnabledByDefault);
+
+  const clearModeRevealTimeout = useCallback(() => {
+    if (modeRevealTimeoutRef.current) {
+      clearTimeout(modeRevealTimeoutRef.current);
+      modeRevealTimeoutRef.current = null;
+    }
+  }, []);
+
+  const persistFocusUiPreference = useCallback((isFullUiVisible: boolean) => {
+    persistentState.set(FOCUS_UI_ENABLED_STATE_KEY, !isFullUiVisible);
+  }, []);
+
+  const setCleanUiDetailsVisible = useCallback(
+    (visible: boolean) => {
+      clearModeRevealTimeout();
+      cleanUiDetailsPinnedRef.current = visible;
+      setCleanUiDetailsVisibleState(visible);
+      persistFocusUiPreference(visible);
+    },
+    [clearModeRevealTimeout, persistFocusUiPreference],
+  );
+
+  const toggleCleanUiDetailsVisible = useCallback(() => {
+    clearModeRevealTimeout();
+    setCleanUiDetailsVisibleState((visible) => {
+      const nextVisible = !visible;
+      cleanUiDetailsPinnedRef.current = nextVisible;
+      persistFocusUiPreference(nextVisible);
+      return nextVisible;
+    });
+  }, [clearModeRevealTimeout, persistFocusUiPreference]);
+
+  const revealCleanUiDetailsTemporarily = useCallback(
+    (durationMs: number = APPROVAL_MODE_REVEAL_DURATION_MS) => {
+      if (cleanUiDetailsPinnedRef.current) {
+        return;
+      }
+      clearModeRevealTimeout();
+      setCleanUiDetailsVisibleState(true);
+      modeRevealTimeoutRef.current = setTimeout(() => {
+        if (!cleanUiDetailsPinnedRef.current) {
+          setCleanUiDetailsVisibleState(false);
+        }
+        modeRevealTimeoutRef.current = null;
+      }, durationMs);
+    },
+    [clearModeRevealTimeout],
+  );
+
+  useEffect(() => () => clearModeRevealTimeout(), [clearModeRevealTimeout]);
 
   const slashCommandActions = useMemo(
     () => ({
@@ -838,6 +897,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           }
         }
       },
+      toggleShortcutsHelp: () => setShortcutsHelpVisible((visible) => !visible),
       setText: stableSetText,
     }),
     [
@@ -856,6 +916,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openPermissionsDialog,
       addConfirmUpdateExtensionRequest,
       toggleDebugProfiler,
+      setShortcutsHelpVisible,
       stableSetText,
     ],
   );
@@ -884,6 +945,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const [authConsentRequest, setAuthConsentRequest] =
     useState<ConfirmationRequest | null>(null);
+  const [permissionConfirmationRequest, setPermissionConfirmationRequest] =
+    useState<PermissionConfirmationRequest | null>(null);
 
   useEffect(() => {
     const handleConsentRequest = (payload: ConsentRequestPayload) => {
@@ -914,12 +977,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
       const { memoryContent, fileCount } =
         await refreshServerHierarchicalMemory(config);
 
+      const flattenedMemory = flattenMemory(memoryContent);
+
       historyManager.addItem(
         {
           type: MessageType.INFO,
           text: `Memory refreshed successfully. ${
-            memoryContent.length > 0
-              ? `Loaded ${memoryContent.length} characters from ${fileCount} file(s).`
+            flattenedMemory.length > 0
+              ? `Loaded ${flattenedMemory.length} characters from ${fileCount} file(s).`
               : 'No memory content found.'
           }`,
         },
@@ -927,7 +992,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       );
       if (config.getDebugMode()) {
         debugLogger.log(
-          `[DEBUG] Refreshed memory content in config: ${memoryContent.substring(
+          `[DEBUG] Refreshed memory content in config: ${flattenedMemory.substring(
             0,
             200,
           )}...`,
@@ -1057,11 +1122,25 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const shouldShowActionRequiredTitle = inactivityStatus === 'action_required';
   const shouldShowSilentWorkingTitle = inactivityStatus === 'silent_working';
 
+  const handleApprovalModeChangeWithUiReveal = useCallback(
+    (mode: ApprovalMode) => {
+      void handleApprovalModeChange(mode);
+      if (!cleanUiDetailsVisible) {
+        revealCleanUiDetailsTemporarily(APPROVAL_MODE_REVEAL_DURATION_MS);
+      }
+    },
+    [
+      handleApprovalModeChange,
+      cleanUiDetailsVisible,
+      revealCleanUiDetailsTemporarily,
+    ],
+  );
+
   // Auto-accept indicator
   const showApprovalModeIndicator = useApprovalModeIndicator({
     config,
     addItem: historyManager.addItem,
-    onApprovalModeChange: handleApprovalModeChange,
+    onApprovalModeChange: handleApprovalModeChangeWithUiReveal,
     isActive: !embeddedShellFocused,
   });
 
@@ -1118,11 +1197,30 @@ Logging in with Google... Restarting Gemini CLI to continue.
   );
 
   const handleFinalSubmit = useCallback(
-    (submittedValue: string) => {
+    async (submittedValue: string) => {
       const isSlash = isSlashCommand(submittedValue.trim());
       const isIdle = streamingState === StreamingState.Idle;
 
       if (isSlash || (isIdle && isMcpReady)) {
+        if (!isSlash) {
+          const permissions = await checkPermissions(submittedValue, config);
+          if (permissions.length > 0) {
+            setPermissionConfirmationRequest({
+              files: permissions,
+              onComplete: (result) => {
+                setPermissionConfirmationRequest(null);
+                if (result.allowed) {
+                  permissions.forEach((p) =>
+                    config.getWorkspaceContext().addReadOnlyPath(p),
+                  );
+                }
+                void submitQuery(submittedValue);
+              },
+            });
+            addInput(submittedValue);
+            return;
+          }
+        }
         void submitQuery(submittedValue);
       } else {
         // Check messageQueue.length === 0 to only notify on the first queued item
@@ -1143,6 +1241,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isMcpReady,
       streamingState,
       messageQueue.length,
+      config,
     ],
   );
 
@@ -1177,11 +1276,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useLayoutEffect(() => {
     if (mainControlsRef.current) {
       const fullFooterMeasurement = measureElement(mainControlsRef.current);
-      if (
-        fullFooterMeasurement.height > 0 &&
-        fullFooterMeasurement.height !== controlsHeight
-      ) {
-        setControlsHeight(fullFooterMeasurement.height);
+      const roundedHeight = Math.round(fullFooterMeasurement.height);
+      if (roundedHeight > 0 && roundedHeight !== controlsHeight) {
+        setControlsHeight(roundedHeight);
       }
     }
   }, [buffer, terminalWidth, terminalHeight, controlsHeight]);
@@ -1261,7 +1358,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       !showPrivacyNotice &&
       geminiClient?.isInitialized?.()
     ) {
-      handleFinalSubmit(initialPrompt);
+      void handleFinalSubmit(initialPrompt);
       initialPromptSubmitted.current = true;
     }
   }, [
@@ -1309,7 +1406,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
   >();
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
-  const [warningMessage, setWarningMessage] = useState<string | null>(null);
+
+  const [transientMessage, showTransientMessage] = useTimedMessage<{
+    text: string;
+    type: TransientMessageType;
+  }>(WARNING_PROMPT_DURATION_MS);
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
     useFolderTrust(settings, setIsTrustedFolder, historyManager.addItem);
@@ -1321,39 +1422,85 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
 
-  const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const handleAutoEnableRetention = useCallback(() => {
+    const userSettings = settings.forScope(SettingScope.User).settings;
+    const currentRetention = userSettings.general?.sessionRetention ?? {};
+
+    settings.setValue(SettingScope.User, 'general.sessionRetention', {
+      ...currentRetention,
+      enabled: true,
+      maxAge: '30d',
+      warningAcknowledged: true,
+    });
+  }, [settings]);
+
+  const {
+    shouldShowWarning: shouldShowRetentionWarning,
+    checkComplete: retentionCheckComplete,
+    sessionsToDeleteCount,
+  } = useSessionRetentionCheck(
+    config,
+    settings.merged,
+    handleAutoEnableRetention,
+  );
+
   const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleWarning = useCallback((message: string) => {
-    setWarningMessage(message);
-    if (warningTimeoutRef.current) {
-      clearTimeout(warningTimeoutRef.current);
-    }
-    warningTimeoutRef.current = setTimeout(() => {
-      setWarningMessage(null);
-    }, WARNING_PROMPT_DURATION_MS);
-  }, []);
-
   useEffect(() => {
+    const handleTransientMessage = (payload: {
+      message: string;
+      type: TransientMessageType;
+    }) => {
+      showTransientMessage({ text: payload.message, type: payload.type });
+    };
+
     const handleSelectionWarning = () => {
-      handleWarning('Press Ctrl-S to enter selection mode to copy text.');
+      showTransientMessage({
+        text: 'Press Ctrl-S to enter selection mode to copy text.',
+        type: TransientMessageType.Warning,
+      });
     };
     const handlePasteTimeout = () => {
-      handleWarning('Paste Timed out. Possibly due to slow connection.');
+      showTransientMessage({
+        text: 'Paste Timed out. Possibly due to slow connection.',
+        type: TransientMessageType.Warning,
+      });
     };
+
+    appEvents.on(AppEvent.TransientMessage, handleTransientMessage);
     appEvents.on(AppEvent.SelectionWarning, handleSelectionWarning);
     appEvents.on(AppEvent.PasteTimeout, handlePasteTimeout);
+
     return () => {
+      appEvents.off(AppEvent.TransientMessage, handleTransientMessage);
       appEvents.off(AppEvent.SelectionWarning, handleSelectionWarning);
       appEvents.off(AppEvent.PasteTimeout, handlePasteTimeout);
-      if (warningTimeoutRef.current) {
-        clearTimeout(warningTimeoutRef.current);
-      }
       if (tabFocusTimeoutRef.current) {
         clearTimeout(tabFocusTimeoutRef.current);
       }
+      if (modeRevealTimeoutRef.current) {
+        clearTimeout(modeRevealTimeoutRef.current);
+      }
     };
-  }, [handleWarning]);
+  }, [showTransientMessage]);
+
+  const handleWarning = useCallback(
+    (message: string) => {
+      showTransientMessage({
+        text: message,
+        type: TransientMessageType.Warning,
+      });
+    },
+    [showTransientMessage],
+  );
+
+  const { handleSuspend } = useSuspend({
+    handleWarning,
+    setRawMode,
+    refreshStatic,
+    setForceRerenderKey,
+    shouldUseAlternateScreen,
+  });
 
   useEffect(() => {
     if (ideNeedsRestart) {
@@ -1453,17 +1600,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (result.userSelection === 'yes') {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleSlashCommand('/ide install');
-        settings.setValue(
-          SettingScope.User,
-          'hasSeenIdeIntegrationNudge',
-          true,
-        );
+        settings.setValue(SettingScope.User, 'ide.hasSeenNudge', true);
       } else if (result.userSelection === 'dismiss') {
-        settings.setValue(
-          SettingScope.User,
-          'hasSeenIdeIntegrationNudge',
-          true,
-        );
+        settings.setValue(SettingScope.User, 'ide.hasSeenNudge', true);
       }
       setIdePromptAnswered(true);
     },
@@ -1478,16 +1617,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const handleGlobalKeypress = useCallback(
     (key: Key): boolean => {
-      if (copyModeEnabled) {
-        setCopyModeEnabled(false);
-        enableMouseEvents();
-        // We don't want to process any other keys if we're in copy mode.
-        return true;
-      }
-
       // Debug log keystrokes if enabled
       if (settings.merged.general.debugKeystrokeLogging) {
         debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
+      }
+
+      if (shortcutsHelpVisible && shouldDismissShortcutsHelpOnHotkey(key)) {
+        setShortcutsHelpVisible(false);
       }
 
       if (isAlternateBuffer && keyMatchers[Command.TOGGLE_COPY_MODE](key)) {
@@ -1506,6 +1642,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
       } else if (keyMatchers[Command.EXIT](key)) {
         setCtrlDPressCount((prev) => prev + 1);
         return true;
+      } else if (keyMatchers[Command.SUSPEND_APP](key)) {
+        handleSuspend();
+      } else if (
+        keyMatchers[Command.TOGGLE_COPY_MODE](key) &&
+        !isAlternateBuffer
+      ) {
+        showTransientMessage({
+          text: 'Use Ctrl+O to expand and collapse blocks of content.',
+          type: TransientMessageType.Warning,
+        });
+        return true;
       }
 
       let enteringConstrainHeightMode = false;
@@ -1515,10 +1662,21 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
 
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
-        setShowErrorDetails((prev) => !prev);
-        return true;
-      } else if (keyMatchers[Command.SUSPEND_APP](key)) {
-        handleWarning('Undo has been moved to Cmd + Z or Alt/Opt + Z');
+        if (settings.merged.general.devtools) {
+          void (async () => {
+            const { toggleDevToolsPanel } = await import(
+              '../utils/devtoolsService.js'
+            );
+            await toggleDevToolsPanel(
+              config,
+              showErrorDetails,
+              () => setShowErrorDetails((prev) => !prev),
+              () => setShowErrorDetails(true),
+            );
+          })();
+        } else {
+          setShowErrorDetails((prev) => !prev);
+        }
         return true;
       } else if (keyMatchers[Command.SHOW_FULL_TODOS](key)) {
         setShowFullTodos((prev) => !prev);
@@ -1546,71 +1704,63 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setConstrainHeight(false);
         return true;
       } else if (
-        keyMatchers[Command.FOCUS_SHELL_INPUT](key) &&
+        (keyMatchers[Command.FOCUS_SHELL_INPUT](key) ||
+          keyMatchers[Command.UNFOCUS_BACKGROUND_SHELL_LIST](key)) &&
         (activePtyId || (isBackgroundShellVisible && backgroundShells.size > 0))
       ) {
-        if (key.name === 'tab' && key.shift) {
-          // Always change focus
+        if (embeddedShellFocused) {
+          const capturedTime = lastOutputTimeRef.current;
+          if (tabFocusTimeoutRef.current)
+            clearTimeout(tabFocusTimeoutRef.current);
+          tabFocusTimeoutRef.current = setTimeout(() => {
+            if (lastOutputTimeRef.current === capturedTime) {
+              setEmbeddedShellFocused(false);
+            } else {
+              showTransientMessage({
+                text: 'Use Shift+Tab to unfocus',
+                type: TransientMessageType.Warning,
+              });
+            }
+          }, 150);
+          return false;
+        }
+
+        const isIdle = Date.now() - lastOutputTimeRef.current >= 100;
+
+        if (isIdle && !activePtyId && !isBackgroundShellVisible) {
+          if (tabFocusTimeoutRef.current)
+            clearTimeout(tabFocusTimeoutRef.current);
+          toggleBackgroundShell();
+          setEmbeddedShellFocused(true);
+          if (backgroundShells.size > 1) setIsBackgroundShellListOpen(true);
+          return true;
+        }
+
+        setEmbeddedShellFocused(true);
+        return true;
+      } else if (
+        keyMatchers[Command.UNFOCUS_SHELL_INPUT](key) ||
+        keyMatchers[Command.UNFOCUS_BACKGROUND_SHELL](key)
+      ) {
+        if (embeddedShellFocused) {
           setEmbeddedShellFocused(false);
           return true;
         }
-
-        if (embeddedShellFocused) {
-          handleWarning('Press Shift+Tab to focus out.');
-          return true;
-        }
-
-        const now = Date.now();
-        // If the shell hasn't produced output in the last 100ms, it's considered idle.
-        const isIdle = now - lastOutputTimeRef.current >= 100;
-        if (isIdle && !activePtyId) {
-          if (tabFocusTimeoutRef.current) {
-            clearTimeout(tabFocusTimeoutRef.current);
-          }
-          toggleBackgroundShell();
-          if (!isBackgroundShellVisible) {
-            // We are about to show it, so focus it
-            setEmbeddedShellFocused(true);
-            if (backgroundShells.size > 1) {
-              setIsBackgroundShellListOpen(true);
-            }
-          } else {
-            // We are about to hide it
-            tabFocusTimeoutRef.current = setTimeout(() => {
-              tabFocusTimeoutRef.current = null;
-              // If the shell produced output since the tab press, we assume it handled the tab
-              // (e.g. autocomplete) so we should not toggle focus.
-              if (lastOutputTimeRef.current > now) {
-                handleWarning('Press Shift+Tab to focus out.');
-                return;
-              }
-              setEmbeddedShellFocused(false);
-            }, 100);
-          }
-          return true;
-        }
-
-        // Not idle, just focus it
-        setEmbeddedShellFocused(true);
-        return true;
+        return false;
       } else if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
         if (activePtyId) {
           backgroundCurrentShell();
           // After backgrounding, we explicitly do NOT show or focus the background UI.
         } else {
-          if (isBackgroundShellVisible && !embeddedShellFocused) {
+          toggleBackgroundShell();
+          // Toggle focus based on intent: if we were hiding, unfocus; if showing, focus.
+          if (!isBackgroundShellVisible && backgroundShells.size > 0) {
             setEmbeddedShellFocused(true);
-          } else {
-            toggleBackgroundShell();
-            // Toggle focus based on intent: if we were hiding, unfocus; if showing, focus.
-            if (!isBackgroundShellVisible && backgroundShells.size > 0) {
-              setEmbeddedShellFocused(true);
-              if (backgroundShells.size > 1) {
-                setIsBackgroundShellListOpen(true);
-              }
-            } else {
-              setEmbeddedShellFocused(false);
+            if (backgroundShells.size > 1) {
+              setIsBackgroundShellListOpen(true);
             }
+          } else {
+            setEmbeddedShellFocused(false);
           }
         }
         return true;
@@ -1636,24 +1786,41 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleSlashCommand,
       cancelOngoingRequest,
       activePtyId,
+      handleSuspend,
       embeddedShellFocused,
       settings.merged.general.debugKeystrokeLogging,
       refreshStatic,
       setCopyModeEnabled,
-      copyModeEnabled,
+      tabFocusTimeoutRef,
       isAlternateBuffer,
+      shortcutsHelpVisible,
       backgroundCurrentShell,
       toggleBackgroundShell,
       backgroundShells,
       isBackgroundShellVisible,
       setIsBackgroundShellListOpen,
       lastOutputTimeRef,
-      tabFocusTimeoutRef,
-      handleWarning,
+      showTransientMessage,
+      settings.merged.general.devtools,
+      showErrorDetails,
     ],
   );
 
-  useKeypress(handleGlobalKeypress, { isActive: true });
+  useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
+
+  useKeypress(
+    () => {
+      setCopyModeEnabled(false);
+      enableMouseEvents();
+      return true;
+    },
+    {
+      isActive: copyModeEnabled,
+      // We need to receive keypresses first so they do not bubble to other
+      // handlers.
+      priority: KeypressPriority.Critical,
+    },
+  );
 
   useEffect(() => {
     // Respect hideWindowTitle settings
@@ -1755,11 +1922,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const nightly = props.version.includes('nightly');
 
   const dialogsVisible =
+    (shouldShowRetentionWarning && retentionCheckComplete) ||
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
     adminSettingsChanged ||
     !!commandConfirmationRequest ||
     !!authConsentRequest ||
+    !!permissionConfirmationRequest ||
     !!customDialog ||
     confirmUpdateExtensionRequests.length > 0 ||
     !!loopDetectionConfirmationRequest ||
@@ -1783,6 +1952,36 @@ Logging in with Google... Restarting Gemini CLI to continue.
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
     [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
   );
+
+  const hasPendingToolConfirmation = useMemo(
+    () => isToolAwaitingConfirmation(pendingHistoryItems),
+    [pendingHistoryItems],
+  );
+
+  const hasPendingActionRequired =
+    hasPendingToolConfirmation ||
+    !!commandConfirmationRequest ||
+    !!authConsentRequest ||
+    confirmUpdateExtensionRequests.length > 0 ||
+    !!loopDetectionConfirmationRequest ||
+    !!proQuotaRequest ||
+    !!validationRequest ||
+    !!customDialog;
+
+  const isPassiveShortcutsHelpState =
+    isInputActive &&
+    streamingState === StreamingState.Idle &&
+    !hasPendingActionRequired;
+
+  useEffect(() => {
+    if (shortcutsHelpVisible && !isPassiveShortcutsHelpState) {
+      setShortcutsHelpVisible(false);
+    }
+  }, [
+    shortcutsHelpVisible,
+    isPassiveShortcutsHelpState,
+    setShortcutsHelpVisible,
+  ]);
 
   const allToolCalls = useMemo(
     () =>
@@ -1812,7 +2011,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
     const fetchBannerTexts = async () => {
       const [defaultBanner, warningBanner] = await Promise.all([
-        config.getBannerTextNoCapacityIssues(),
+        // TODO: temporarily disabling the banner, it will be re-added.
+        '',
         config.getBannerTextCapacityIssues(),
       ]);
 
@@ -1820,15 +2020,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setDefaultBannerText(defaultBanner);
         setWarningBannerText(warningBanner);
         setBannerVisible(true);
-        const authType = config.getContentGeneratorConfig()?.authType;
-        if (
-          authType === AuthType.USE_GEMINI ||
-          authType === AuthType.USE_VERTEX_AI
-        ) {
-          setDefaultBannerText(
-            'Gemini 3 Flash and Pro are now available. \nEnable "Preview features" in /settings. \nLearn more at https://goo.gle/enable-preview-features',
-          );
-        }
       }
     };
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -1844,6 +2035,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       history: historyManager.history,
       historyManager,
       isThemeDialogOpen,
+      shouldShowRetentionWarning:
+        shouldShowRetentionWarning && retentionCheckComplete,
+      sessionsToDeleteCount: sessionsToDeleteCount ?? 0,
       themeError,
       isAuthenticating,
       isConfigInitialized,
@@ -1873,6 +2067,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       authConsentRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
+      permissionConfirmationRequest,
       geminiMdFileCount,
       streamingState,
       initError,
@@ -1897,6 +2092,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ctrlCPressedOnce: ctrlCPressCount >= 1,
       ctrlDPressedOnce: ctrlDPressCount >= 1,
       showEscapePrompt,
+      shortcutsHelpVisible,
+      cleanUiDetailsVisible,
       isFocused,
       elapsedTime,
       currentLoadingPhrase,
@@ -1906,9 +2103,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
       queueErrorMessage,
       showApprovalModeIndicator,
       currentModel,
-      userTier,
-      proQuotaRequest,
-      validationRequest,
+      quota: {
+        userTier,
+        stats: quotaStats,
+        proQuotaRequest,
+        validationRequest,
+      },
       contextFileNames,
       errorCount,
       availableTerminalHeight,
@@ -1937,7 +2137,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       showDebugProfiler,
       customDialog,
       copyModeEnabled,
-      warningMessage,
+      transientMessage,
       bannerData,
       bannerVisible,
       terminalBackgroundColor: config.getTerminalBackground(),
@@ -1951,6 +2151,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
     }),
     [
       isThemeDialogOpen,
+      shouldShowRetentionWarning,
+      retentionCheckComplete,
+      sessionsToDeleteCount,
       themeError,
       isAuthenticating,
       isConfigInitialized,
@@ -1978,6 +2181,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       authConsentRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
+      permissionConfirmationRequest,
       geminiMdFileCount,
       streamingState,
       initError,
@@ -2002,6 +2206,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ctrlCPressCount,
       ctrlDPressCount,
       showEscapePrompt,
+      shortcutsHelpVisible,
+      cleanUiDetailsVisible,
       isFocused,
       elapsedTime,
       currentLoadingPhrase,
@@ -2011,6 +2217,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       queueErrorMessage,
       showApprovalModeIndicator,
       userTier,
+      quotaStats,
       proQuotaRequest,
       validationRequest,
       contextFileNames,
@@ -2045,7 +2252,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       apiKeyDefaultValue,
       authState,
       copyModeEnabled,
-      warningMessage,
+      transientMessage,
       bannerData,
       bannerVisible,
       config,
@@ -2101,6 +2308,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeySubmit,
       handleApiKeyCancel,
       setBannerVisible,
+      setShortcutsHelpVisible,
+      setCleanUiDetailsVisible,
+      toggleCleanUiDetailsVisible,
+      revealCleanUiDetailsTemporarily,
       handleWarning,
       setEmbeddedShellFocused,
       dismissBackgroundShell,
@@ -2177,6 +2388,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeySubmit,
       handleApiKeyCancel,
       setBannerVisible,
+      setShortcutsHelpVisible,
+      setCleanUiDetailsVisible,
+      toggleCleanUiDetailsVisible,
+      revealCleanUiDetailsTemporarily,
       handleWarning,
       setEmbeddedShellFocused,
       dismissBackgroundShell,
@@ -2213,7 +2428,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           >
             <ToolActionsProvider config={config} toolCalls={allToolCalls}>
               <ShellFocusContext.Provider value={isFocused}>
-                <App />
+                <App key={`app-${forceRerenderKey}`} />
               </ShellFocusContext.Provider>
             </ToolActionsProvider>
           </AppContext.Provider>

@@ -6,15 +6,17 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
-import { type HistoryItem, ToolCallStatus } from '../types.js';
+import { type HistoryItem } from '../types.js';
 import { MessageType } from '../types.js';
 import { SessionStatsProvider } from '../contexts/SessionContext.js';
-import type {
-  Config,
-  ToolExecuteConfirmationDetails,
+import {
+  type Config,
+  type ToolExecuteConfirmationDetails,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 
 // Mock child components
 vi.mock('./messages/ToolGroupMessage.js', () => ({
@@ -202,14 +204,13 @@ describe('<HistoryItemDisplay />', () => {
           name: 'run_shell_command',
           description: 'Run a shell command',
           resultDisplay: 'blank',
-          status: ToolCallStatus.Confirming,
+          status: CoreToolCallStatus.AwaitingApproval,
           confirmationDetails: {
             type: 'exec',
             title: 'Run Shell Command',
             command: 'echo "\u001b[31mhello\u001b[0m"',
             rootCommand: 'echo',
             rootCommands: ['echo'],
-            onConfirm: async () => {},
           },
         },
       ],
@@ -230,6 +231,44 @@ describe('<HistoryItemDisplay />', () => {
     expect(confirmationDetails.command).toBe(
       'echo "\\u001b[31mhello\\u001b[0m"',
     );
+  });
+
+  describe('thinking items', () => {
+    it('renders thinking item when enabled', () => {
+      const item: HistoryItem = {
+        ...baseItem,
+        type: 'thinking',
+        thought: { subject: 'Thinking', description: 'test' },
+      };
+      const { lastFrame } = renderWithProviders(
+        <HistoryItemDisplay {...baseItem} item={item} />,
+        {
+          settings: createMockSettings({
+            merged: { ui: { inlineThinkingMode: 'full' } },
+          }),
+        },
+      );
+
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
+    it('does not render thinking item when disabled', () => {
+      const item: HistoryItem = {
+        ...baseItem,
+        type: 'thinking',
+        thought: { subject: 'Thinking', description: 'test' },
+      };
+      const { lastFrame } = renderWithProviders(
+        <HistoryItemDisplay {...baseItem} item={item} />,
+        {
+          settings: createMockSettings({
+            merged: { ui: { inlineThinkingMode: 'off' } },
+          }),
+        },
+      );
+
+      expect(lastFrame()).toBe('');
+    });
   });
 
   describe.each([true, false])(

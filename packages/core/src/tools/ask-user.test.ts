@@ -5,10 +5,45 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { AskUserTool } from './ask-user.js';
+import { AskUserTool, isCompletedAskUserTool } from './ask-user.js';
 import { QuestionType, type Question } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolConfirmationOutcome } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
+import { ASK_USER_DISPLAY_NAME } from './tool-names.js';
+
+describe('AskUserTool Helpers', () => {
+  describe('isCompletedAskUserTool', () => {
+    it('returns false for non-AskUser tools', () => {
+      expect(isCompletedAskUserTool('other-tool', 'Success')).toBe(false);
+    });
+
+    it('returns true for Success status', () => {
+      expect(isCompletedAskUserTool(ASK_USER_DISPLAY_NAME, 'Success')).toBe(
+        true,
+      );
+    });
+
+    it('returns true for Error status', () => {
+      expect(isCompletedAskUserTool(ASK_USER_DISPLAY_NAME, 'Error')).toBe(true);
+    });
+
+    it('returns true for Canceled status', () => {
+      expect(isCompletedAskUserTool(ASK_USER_DISPLAY_NAME, 'Canceled')).toBe(
+        true,
+      );
+    });
+
+    it('returns false for in-progress statuses', () => {
+      expect(isCompletedAskUserTool(ASK_USER_DISPLAY_NAME, 'Executing')).toBe(
+        false,
+      );
+      expect(isCompletedAskUserTool(ASK_USER_DISPLAY_NAME, 'Pending')).toBe(
+        false,
+      );
+    });
+  });
+});
 
 describe('AskUserTool', () => {
   let mockMessageBus: MessageBus;
@@ -44,6 +79,7 @@ describe('AskUserTool', () => {
       const questions = Array(5).fill({
         question: 'Test?',
         header: 'Test',
+        type: QuestionType.CHOICE,
         options: [
           { label: 'A', description: 'A' },
           { label: 'B', description: 'B' },
@@ -69,9 +105,15 @@ describe('AskUserTool', () => {
 
     it('should return error if header exceeds max length', () => {
       const result = tool.validateToolParams({
-        questions: [{ question: 'Test?', header: 'This is way too long' }],
+        questions: [
+          {
+            question: 'Test?',
+            header: 'This is way too long',
+            type: QuestionType.CHOICE,
+          },
+        ],
       });
-      expect(result).toContain('must NOT have more than 12 characters');
+      expect(result).toContain('must NOT have more than 16 characters');
     });
 
     it('should return error if options has fewer than 2 items', () => {
@@ -80,6 +122,7 @@ describe('AskUserTool', () => {
           {
             question: 'Test?',
             header: 'Test',
+            type: QuestionType.CHOICE,
             options: [{ label: 'A', description: 'A' }],
           },
         ],
@@ -95,6 +138,7 @@ describe('AskUserTool', () => {
           {
             question: 'Test?',
             header: 'Test',
+            type: QuestionType.CHOICE,
             options: [
               { label: 'A', description: 'A' },
               { label: 'B', description: 'B' },
@@ -114,6 +158,7 @@ describe('AskUserTool', () => {
           {
             question: 'Which approach?',
             header: 'Approach',
+            type: QuestionType.CHOICE,
             options: [
               { label: 'A', description: 'Option A' },
               { label: 'B', description: 'Option B' },
@@ -137,18 +182,16 @@ describe('AskUserTool', () => {
       expect(result).toContain("type='choice' requires 'options'");
     });
 
-    it('should return error if type is omitted and options missing (defaults to choice)', () => {
+    it('should return error if type is missing', () => {
       const result = tool.validateToolParams({
         questions: [
           {
             question: 'Pick one?',
             header: 'Choice',
-            // type omitted, defaults to 'choice'
-            // options missing
-          },
+          } as unknown as Question,
         ],
       });
-      expect(result).toContain("type='choice' requires 'options'");
+      expect(result).toContain("must have required property 'type'");
     });
 
     it('should accept text type without options', () => {
@@ -201,6 +244,7 @@ describe('AskUserTool', () => {
           {
             question: 'Pick one?',
             header: 'Choice',
+            type: QuestionType.CHOICE,
             options: [
               { label: '', description: 'Empty label' },
               { label: 'B', description: 'Option B' },
@@ -217,6 +261,7 @@ describe('AskUserTool', () => {
           {
             question: 'Pick one?',
             header: 'Choice',
+            type: QuestionType.CHOICE,
             options: [
               { label: 'A' } as { label: string; description: string },
               { label: 'B', description: 'Option B' },
@@ -228,12 +273,70 @@ describe('AskUserTool', () => {
     });
   });
 
+  describe('validateBuildAndExecute', () => {
+    it('should hide validation errors from returnDisplay', async () => {
+      const params = {
+        questions: [
+          {
+            question: 'Test?',
+            header: 'This is way too long',
+            type: QuestionType.TEXT,
+          },
+        ],
+      };
+
+      const result = await tool.validateBuildAndExecute(
+        params,
+        new AbortController().signal,
+      );
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe(ToolErrorType.INVALID_TOOL_PARAMS);
+      expect(result.returnDisplay).toBe('');
+    });
+
+    it('should NOT hide non-validation errors (if any were to occur)', async () => {
+      const validateParamsSpy = vi
+        .spyOn(tool, 'validateToolParams')
+        .mockReturnValue(null);
+
+      const params = {
+        questions: [
+          { question: 'Valid?', header: 'Valid', type: QuestionType.TEXT },
+        ],
+      };
+
+      const mockInvocation = {
+        execute: vi.fn().mockRejectedValue(new Error('Some execution error')),
+        params,
+        getDescription: vi.fn().mockReturnValue(''),
+        toolLocations: vi.fn().mockReturnValue([]),
+        shouldConfirmExecute: vi.fn().mockResolvedValue(false),
+      };
+
+      const buildSpy = vi.spyOn(tool, 'build').mockReturnValue(mockInvocation);
+
+      const result = await tool.validateBuildAndExecute(
+        params,
+        new AbortController().signal,
+      );
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe(ToolErrorType.EXECUTION_FAILED);
+      expect(result.returnDisplay).toBe('Some execution error');
+
+      buildSpy.mockRestore();
+      validateParamsSpy.mockRestore();
+    });
+  });
+
   describe('shouldConfirmExecute', () => {
     it('should return confirmation details with normalized questions', async () => {
-      const questions = [
+      const questions: Question[] = [
         {
           question: 'How should we proceed with this task?',
           header: 'Approach',
+          type: QuestionType.CHOICE,
           options: [
             {
               label: 'Quick fix (Recommended)',
@@ -258,12 +361,7 @@ describe('AskUserTool', () => {
       expect(details).not.toBe(false);
       if (details && details.type === 'ask_user') {
         expect(details.title).toBe('Ask User');
-        expect(details.questions).toEqual(
-          questions.map((q) => ({
-            ...q,
-            type: QuestionType.CHOICE,
-          })),
-        );
+        expect(details.questions).toEqual(questions);
         expect(typeof details.onConfirm).toBe('function');
       } else {
         // Type guard for TypeScript
@@ -271,11 +369,12 @@ describe('AskUserTool', () => {
       }
     });
 
-    it('should normalize question type to CHOICE when omitted', async () => {
-      const questions = [
+    it('should use provided question type', async () => {
+      const questions: Question[] = [
         {
           question: 'Which approach?',
           header: 'Approach',
+          type: QuestionType.CHOICE,
           options: [
             { label: 'Option A', description: 'First option' },
             { label: 'Option B', description: 'Second option' },
@@ -296,10 +395,11 @@ describe('AskUserTool', () => {
 
   describe('execute', () => {
     it('should return user answers after confirmation', async () => {
-      const questions = [
+      const questions: Question[] = [
         {
           question: 'How should we proceed with this task?',
           header: 'Approach',
+          type: QuestionType.CHOICE,
           options: [
             {
               label: 'Quick fix (Recommended)',
@@ -337,13 +437,22 @@ describe('AskUserTool', () => {
       expect(JSON.parse(result.llmContent as string)).toEqual({
         answers: { '0': 'Quick fix (Recommended)' },
       });
+      expect(result.data).toEqual({
+        ask_user: {
+          question_types: [QuestionType.CHOICE],
+          dismissed: false,
+          empty_submission: false,
+          answer_count: 1,
+        },
+      });
     });
 
     it('should display message when user submits without answering', async () => {
-      const questions = [
+      const questions: Question[] = [
         {
           question: 'Which approach?',
           header: 'Approach',
+          type: QuestionType.CHOICE,
           options: [
             { label: 'Option A', description: 'First option' },
             { label: 'Option B', description: 'Second option' },
@@ -368,6 +477,14 @@ describe('AskUserTool', () => {
         'User submitted without answering questions.',
       );
       expect(JSON.parse(result.llmContent as string)).toEqual({ answers: {} });
+      expect(result.data).toEqual({
+        ask_user: {
+          question_types: [QuestionType.CHOICE],
+          dismissed: false,
+          empty_submission: true,
+          answer_count: 0,
+        },
+      });
     });
 
     it('should handle cancellation', async () => {
@@ -376,6 +493,7 @@ describe('AskUserTool', () => {
           {
             question: 'Which sections of the documentation should be updated?',
             header: 'Docs',
+            type: QuestionType.CHOICE,
             options: [
               {
                 label: 'User Guide',
@@ -405,6 +523,12 @@ describe('AskUserTool', () => {
       expect(result.llmContent).toBe(
         'User dismissed ask_user dialog without answering.',
       );
+      expect(result.data).toEqual({
+        ask_user: {
+          question_types: [QuestionType.CHOICE],
+          dismissed: true,
+        },
+      });
     });
   });
 });

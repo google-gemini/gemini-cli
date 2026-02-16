@@ -19,6 +19,8 @@ import {
   checkExhaustive,
   coreEvents,
   debugLogger,
+  logRewind,
+  RewindEvent,
   type ChatRecordingService,
   type GeminiClient,
 } from '@google/gemini-cli-core';
@@ -144,6 +146,9 @@ export const rewindCommand: SlashCommand = {
             context.ui.removeComponent();
           }}
           onRewind={async (messageId, newText, outcome) => {
+            if (outcome !== RewindOutcome.Cancel) {
+              logRewind(config, new RewindEvent(outcome));
+            }
             switch (outcome) {
               case RewindOutcome.Cancel:
                 context.ui.removeComponent();
