@@ -1065,7 +1065,7 @@ describe('InputPrompt', () => {
     unmount();
   });
 
-  it('should NOT submit on Enter when an @-path is a perfect match', async () => {
+  it('should submit on Enter when an @-path is a perfect match', async () => {
     mockedUseCommandCompletion.mockReturnValue({
       ...mockCommandCompletion,
       showSuggestions: true,
@@ -1085,9 +1085,36 @@ describe('InputPrompt', () => {
     });
 
     await waitFor(() => {
-      // Should handle autocomplete but NOT submit
-      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
-      expect(props.onSubmit).not.toHaveBeenCalled();
+      // Should submit directly on perfect match
+      expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
+      expect(props.onSubmit).toHaveBeenCalledWith('@file.txt');
+    });
+    unmount();
+  });
+
+  it('should submit on Enter when an @-path is a perfect match directory', async () => {
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [{ label: 'foo/bar/', value: 'foo/bar/' }],
+      activeSuggestionIndex: 0,
+      isPerfectMatch: true,
+      completionMode: CompletionMode.AT,
+    });
+    props.buffer.text = '@foo/bar/';
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\r');
+    });
+
+    await waitFor(() => {
+      // Should submit directly on perfect match
+      expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
+      expect(props.onSubmit).toHaveBeenCalledWith('@foo/bar/');
     });
     unmount();
   });
