@@ -126,6 +126,8 @@ import {
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath } from '../utils/paths.js';
 
+const QUOTA_REFRESH_THROTTLE_MS = 60000;
+
 export interface AccessibilitySettings {
   enableLoadingPhrases?: boolean;
   screenReader?: boolean;
@@ -558,6 +560,8 @@ export class Config {
   private model: string;
   private readonly disableLoopDetection: boolean;
   private hasAccessToPreviewModel: boolean = false;
+  private cachedQuota?: RetrieveUserQuotaResponse;
+  private lastQuotaAttemptTime?: number;
   private readonly noBrowser: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
@@ -1399,7 +1403,24 @@ export class Config {
     this.hasAccessToPreviewModel = hasAccess;
   }
 
-  async refreshUserQuota(): Promise<RetrieveUserQuotaResponse | undefined> {
+  getCachedQuota(): RetrieveUserQuotaResponse | undefined {
+    return this.cachedQuota;
+  }
+
+  async refreshUserQuota(
+    force: boolean = false,
+  ): Promise<RetrieveUserQuotaResponse | undefined> {
+    const now = Date.now();
+
+    if (
+      !force &&
+      this.cachedQuota &&
+      this.lastQuotaAttemptTime &&
+      now - this.lastQuotaAttemptTime < QUOTA_REFRESH_THROTTLE_MS
+    ) {
+      return this.cachedQuota;
+    }
+
     const codeAssistServer = getCodeAssistServer(this);
     if (!codeAssistServer || !codeAssistServer.projectId) {
       return undefined;
@@ -1440,8 +1461,13 @@ export class Config {
       const hasAccess =
         quota.buckets?.some((b) => b.modelId === PREVIEW_GEMINI_MODEL) ?? false;
       this.setHasAccessToPreviewModel(hasAccess);
+
+      this.cachedQuota = quota;
+      this.lastQuotaAttemptTime = now;
+
       return quota;
     } catch (e) {
+      this.lastQuotaAttemptTime = now;
       debugLogger.debug('Failed to retrieve user quota', e);
       return undefined;
     }
