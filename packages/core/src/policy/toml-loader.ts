@@ -13,6 +13,12 @@ import {
   InProcessCheckerType,
 } from './types.js';
 import { buildArgsPatterns, isSafeRegExp } from './utils.js';
+import {
+  isValidToolName,
+  ALL_BUILTIN_TOOL_NAMES,
+} from '../tools/tool-names.js';
+import { getToolSuggestion } from '../utils/tool-utils.js';
+import levenshtein from 'fast-levenshtein';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import toml from '@iarna/toml';
@@ -97,7 +103,8 @@ export type PolicyFileErrorType =
   | 'toml_parse'
   | 'schema_validation'
   | 'rule_validation'
-  | 'regex_compilation';
+  | 'regex_compilation'
+  | 'tool_name_warning';
 
 /**
  * Detailed error information for policy file loading failures.
@@ -111,6 +118,7 @@ export interface PolicyFileError {
   message: string;
   details?: string;
   suggestion?: string;
+  severity?: 'error' | 'warning';
 }
 
 /**
@@ -187,6 +195,39 @@ function validateShellCommandSyntax(
   }
 
   return null;
+}
+
+/**
+ * Maximum Levenshtein distance to consider a name a likely typo of a built-in tool.
+ * Names further from all built-in tools are assumed to be intentional
+ * (e.g., dynamically registered agent tools) and are not warned about.
+ */
+const MAX_TYPO_DISTANCE = 3;
+
+/**
+ * Validates that a tool name is recognized.
+ * Returns a warning message if the tool name is a likely typo of a built-in
+ * tool name, or null if valid or not close to any built-in name.
+ */
+function validateToolName(name: string, ruleIndex: number): string | null {
+  if (isValidToolName(name, { allowWildcards: true })) {
+    return null;
+  }
+
+  // Only warn if the name is close to a built-in name (likely typo).
+  // Names that are very different from all built-in names are likely
+  // intentional (dynamic tools, agent tools, etc.).
+  const allNames = [...ALL_BUILTIN_TOOL_NAMES];
+  const minDistance = Math.min(
+    ...allNames.map((n) => levenshtein.get(name, n)),
+  );
+
+  if (minDistance > MAX_TYPO_DISTANCE) {
+    return null;
+  }
+
+  const suggestion = getToolSuggestion(name, allNames);
+  return `Rule #${ruleIndex + 1}: Unrecognized tool name "${name}".${suggestion}`;
 }
 
 /**
@@ -324,6 +365,35 @@ export async function loadPoliciesFromToml(
           }
         }
 
+        // Validate tool names in rules
+        for (let i = 0; i < tomlRules.length; i++) {
+          const rule = tomlRules[i];
+          // Skip MCP-scoped rules — MCP tool names are server-defined and dynamic
+          if (rule.mcpName) continue;
+
+          const toolNames: string[] = rule.toolName
+            ? Array.isArray(rule.toolName)
+              ? rule.toolName
+              : [rule.toolName]
+            : [];
+
+          for (const name of toolNames) {
+            const warning = validateToolName(name, i);
+            if (warning) {
+              errors.push({
+                filePath,
+                fileName: file,
+                tier: tierName,
+                ruleIndex: i,
+                errorType: 'tool_name_warning',
+                message: 'Unrecognized tool name',
+                details: warning,
+                severity: 'warning',
+              });
+            }
+          }
+        }
+
         // Transform rules
         const parsedRules: PolicyRule[] = (validationResult.data.rule ?? [])
           .flatMap((rule) => {
@@ -407,6 +477,35 @@ export async function loadPoliciesFromToml(
           .filter((rule): rule is PolicyRule => rule !== null);
 
         rules.push(...parsedRules);
+
+        // Validate tool names in safety checker rules
+        const tomlCheckerRules = validationResult.data.safety_checker ?? [];
+        for (let i = 0; i < tomlCheckerRules.length; i++) {
+          const checker = tomlCheckerRules[i];
+          if (checker.mcpName) continue;
+
+          const checkerToolNames: string[] = checker.toolName
+            ? Array.isArray(checker.toolName)
+              ? checker.toolName
+              : [checker.toolName]
+            : [];
+
+          for (const name of checkerToolNames) {
+            const warning = validateToolName(name, i);
+            if (warning) {
+              errors.push({
+                filePath,
+                fileName: file,
+                tier: tierName,
+                ruleIndex: i,
+                errorType: 'tool_name_warning',
+                message: 'Unrecognized tool name in safety checker',
+                details: warning,
+                severity: 'warning',
+              });
+            }
+          }
+        }
 
         // Transform checkers
         const parsedCheckers: SafetyCheckerRule[] = (
@@ -503,4 +602,56 @@ export async function loadPoliciesFromToml(
   }
 
   return { rules, checkers, errors };
+}
+
+/**
+ * Validates MCP tool names in policy rules against actually discovered MCP tools.
+ * Called after an MCP server connects and its tools are discovered.
+ *
+ * For each policy rule that references the given MCP server, checks if the
+ * tool name matches any discovered tool. Emits warnings for likely typos
+ * using Levenshtein distance.
+ *
+ * @param serverName The MCP server name (e.g., "google-workspace")
+ * @param discoveredToolNames The tool names discovered from this server (simple names, not fully qualified)
+ * @param policyRules The current set of policy rules to validate against
+ * @returns Array of warning messages for unrecognized MCP tool names
+ */
+export function validateMcpPolicyToolNames(
+  serverName: string,
+  discoveredToolNames: string[],
+  policyRules: ReadonlyArray<{ toolName?: string; source?: string }>,
+): string[] {
+  const prefix = `${serverName}__`;
+  const warnings: string[] = [];
+
+  for (const rule of policyRules) {
+    if (!rule.toolName) continue;
+    if (!rule.toolName.startsWith(prefix)) continue;
+
+    const toolPart = rule.toolName.slice(prefix.length);
+
+    // Skip wildcards
+    if (toolPart === '*') continue;
+
+    // Check if the tool exists
+    if (discoveredToolNames.includes(toolPart)) continue;
+
+    // Tool not found — check if it's a likely typo
+    if (discoveredToolNames.length === 0) continue;
+
+    const minDistance = Math.min(
+      ...discoveredToolNames.map((n) => levenshtein.get(toolPart, n)),
+    );
+
+    if (minDistance > MAX_TYPO_DISTANCE) continue;
+
+    const suggestion = getToolSuggestion(toolPart, discoveredToolNames);
+    const source = rule.source ? ` (from ${rule.source})` : '';
+    warnings.push(
+      `Unrecognized MCP tool "${toolPart}" for server "${serverName}"${source}.${suggestion}`,
+    );
+  }
+
+  return warnings;
 }
