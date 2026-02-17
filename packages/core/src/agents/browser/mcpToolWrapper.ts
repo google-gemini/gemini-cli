@@ -80,12 +80,24 @@ class McpToolInvocation extends BaseToolInvocation<
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
     try {
-      // Call the MCP tool via BrowserManager's isolated client
-      const result: McpToolCallResult = await this.browserManager.callTool(
+      const callToolPromise = this.browserManager.callTool(
         this.toolName,
         this.params,
         signal,
       );
+
+      const result: McpToolCallResult = await (signal.aborted
+        ? Promise.reject(signal.reason ?? new Error('Operation cancelled'))
+        : Promise.race([
+            callToolPromise,
+            new Promise<never>((_resolve, reject) => {
+              signal.addEventListener(
+                'abort',
+                () => reject(signal.reason ?? new Error('Operation cancelled')),
+                { once: true },
+              );
+            }),
+          ]));
 
       // Extract text content from MCP response
       let textContent = '';
@@ -180,13 +192,21 @@ class TypeTextInvocation extends BaseToolInvocation<
     };
   }
 
-  override async execute(): Promise<ToolResult> {
+  override async execute(signal: AbortSignal): Promise<ToolResult> {
     try {
       const chars = [...this.text]; // Handle Unicode correctly
       let successCount = 0;
       let lastError: string | undefined;
 
       for (const char of chars) {
+        if (signal.aborted) {
+          return {
+            llmContent: `Error: Operation cancelled after typing ${successCount}/${chars.length} characters.`,
+            returnDisplay: `Operation cancelled after typing ${successCount}/${chars.length} characters.`,
+            error: { message: 'Operation cancelled' },
+          };
+        }
+
         // Map special characters to key names
         const key = char === ' ' ? 'Space' : char;
         const result: McpToolCallResult = await this.browserManager.callTool(

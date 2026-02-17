@@ -23,9 +23,8 @@ import type { Tool as McpTool } from '@modelcontextprotocol/sdk/types.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import type { Config } from '../../config/config.js';
 
-// Pin chrome-devtools-mcp version for reproducibility
-// v0.13.0+ required for --experimental-vision support
-const CHROME_DEVTOOLS_MCP_VERSION = '0.13.0';
+// Pin chrome-devtools-mcp version for reproducibility.
+const CHROME_DEVTOOLS_MCP_VERSION = '0.17.1';
 
 // Default timeout for MCP operations
 const MCP_TIMEOUT_MS = 60_000;
@@ -276,6 +275,19 @@ export class BrowserManager {
       command: 'npx',
       args: mcpArgs,
     });
+
+    this.mcpTransport.onclose = () => {
+      debugLogger.error(
+        'chrome-devtools-mcp transport closed unexpectedly. ' +
+          'The MCP server process may have crashed.',
+      );
+      this.rawMcpClient = undefined;
+    };
+    this.mcpTransport.onerror = (error: Error) => {
+      debugLogger.error(
+        `chrome-devtools-mcp transport error: ${error.message}`,
+      );
+    };
 
     // Connect to MCP server — use a shorter timeout for 'existing' mode
     // since it should connect quickly if remote debugging is enabled.

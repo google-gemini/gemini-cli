@@ -133,6 +133,7 @@ describe('BrowserManager', () => {
 
       expect(result).toEqual({
         content: [{ type: 'text', text: 'Tool result' }],
+        isError: false,
       });
     });
   });
@@ -280,7 +281,9 @@ describe('BrowserManager', () => {
       await expect(manager.ensureConnection()).rejects.toThrow(
         /Failed to connect to existing Chrome instance/,
       );
-      await expect(manager.ensureConnection()).rejects.toThrow(
+      // Create a fresh manager to verify the error message includes remediation steps
+      const manager2 = new BrowserManager(existingConfig);
+      await expect(manager2.ensureConnection()).rejects.toThrow(
         /chrome:\/\/inspect\/#remote-debugging/,
       );
     });
