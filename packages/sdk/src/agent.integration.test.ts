@@ -131,4 +131,33 @@ describe('GeminiCliAgent Integration', () => {
 
     expect(responseText).toContain('BANANA');
   }, 30000);
+
+  it('throws on invalid instructions', () => {
+    // Missing instructions should be fine
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(() => new GeminiCliAgent({} as any).session()).not.toThrow();
+
+    expect(() =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      new GeminiCliAgent({ instructions: 123 as any }).session(),
+    ).toThrow('Instructions must be a string or a function.');
+  });
+
+  it('propagates errors from dynamic instructions', async () => {
+    const agent = new GeminiCliAgent({
+      instructions: () => {
+        throw new Error('Dynamic instruction failure');
+      },
+      model: 'gemini-2.0-flash',
+    });
+
+    const session = agent.session();
+    const stream = session.sendStream('Say hello.');
+
+    await expect(async () => {
+      for await (const _event of stream) {
+        // Just consume the stream
+      }
+    }).rejects.toThrow('Dynamic instruction failure');
+  });
 });

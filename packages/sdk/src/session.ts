@@ -54,8 +54,12 @@ export class GeminiCliSession {
     this.tools = options.tools || [];
     this.skillRefs = options.skills || [];
 
-    const initialMemory =
-      typeof this.instructions === 'string' ? this.instructions : '';
+    let initialMemory = '';
+    if (typeof this.instructions === 'string') {
+      initialMemory = this.instructions;
+    } else if (this.instructions && typeof this.instructions !== 'function') {
+      throw new Error('Instructions must be a string or a function.');
+    }
 
     const configParams: ConfigParameters = {
       sessionId: this.sessionId,
