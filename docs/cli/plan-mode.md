@@ -61,7 +61,7 @@ Other ways to start in Plan Mode:
 You can enter Plan Mode in three ways:
 
 1.  **Keyboard Shortcut:** Press `Shift+Tab` to cycle through approval modes
-    (`Default` -> `Plan` -> `Auto-Edit`).
+    (`Default` -> `Auto-Edit` -> `Plan`).
 2.  **Command:** Type `/plan` in the input box.
 3.  **Natural Language:** Ask the agent to "start a plan for...". The agent will
     then call the [`enter_plan_mode`] tool to switch modes.
