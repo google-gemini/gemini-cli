@@ -138,7 +138,6 @@ describe('ScrollableList Demo Behavior', () => {
     let listRef: ScrollableListRef<Item> | null = null;
     let lastFrame: (options?: { allowEmpty?: boolean }) => string | undefined;
     let waitUntilReady: () => Promise<void>;
-    let unmount: () => void;
 
     let result: ReturnType<typeof render>;
 
@@ -155,7 +154,6 @@ describe('ScrollableList Demo Behavior', () => {
       );
       lastFrame = result.lastFrame;
       waitUntilReady = result.waitUntilReady;
-      unmount = result.unmount;
     });
 
     await waitUntilReady!();
@@ -259,12 +257,12 @@ describe('ScrollableList Demo Behavior', () => {
     };
 
     let lastFrame: () => string | undefined;
+    let waitUntilReady: () => Promise<void>;
     let result: ReturnType<typeof render>;
     await act(async () => {
       result = render(<StickyTestComponent />);
       lastFrame = result.lastFrame;
       waitUntilReady = result.waitUntilReady;
-      unmount = result.unmount;
     });
 
     await waitUntilReady!();
@@ -322,7 +320,6 @@ describe('ScrollableList Demo Behavior', () => {
       let lastFrame: (options?: { allowEmpty?: boolean }) => string | undefined;
       let stdin: { write: (data: string) => void };
       let waitUntilReady: () => Promise<void>;
-      let unmount: () => void;
 
       const items = Array.from({ length: 50 }, (_, i) => ({
         id: String(i),
@@ -354,7 +351,6 @@ describe('ScrollableList Demo Behavior', () => {
         lastFrame = result.lastFrame;
         stdin = result.stdin;
         waitUntilReady = result.waitUntilReady;
-        unmount = result.unmount;
       });
 
       await waitUntilReady!();
@@ -437,7 +433,6 @@ describe('ScrollableList Demo Behavior', () => {
       const items = [{ id: '1', title: 'Item 1' }];
       let lastFrame: (options?: { allowEmpty?: boolean }) => string | undefined;
       let waitUntilReady: () => Promise<void>;
-      let unmount: () => void;
 
       let result: ReturnType<typeof render>;
       await act(async () => {
@@ -461,7 +456,6 @@ describe('ScrollableList Demo Behavior', () => {
         );
         lastFrame = result.lastFrame;
         waitUntilReady = result.waitUntilReady;
-        unmount = result.unmount;
       });
 
       await waitUntilReady!();

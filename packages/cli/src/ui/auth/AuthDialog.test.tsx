@@ -15,7 +15,6 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
-import { act } from 'react';
 import { AuthDialog } from './AuthDialog.js';
 import { AuthType, type Config, debugLogger } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';

@@ -11,7 +11,7 @@ import { ApprovalMode } from '@google/gemini-cli-core';
 
 describe('ApprovalModeIndicator', () => {
   it('renders correctly for AUTO_EDIT mode', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady } = render(
       <ApprovalModeIndicator approvalMode={ApprovalMode.AUTO_EDIT} />,
     );
     await waitUntilReady();
@@ -19,7 +19,7 @@ describe('ApprovalModeIndicator', () => {
   });
 
   it('renders correctly for AUTO_EDIT mode with plan enabled', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady } = render(
       <ApprovalModeIndicator
         approvalMode={ApprovalMode.AUTO_EDIT}
         allowPlanMode={true}
@@ -30,7 +30,7 @@ describe('ApprovalModeIndicator', () => {
   });
 
   it('renders correctly for PLAN mode', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady } = render(
       <ApprovalModeIndicator approvalMode={ApprovalMode.PLAN} />,
     );
     await waitUntilReady();
@@ -38,7 +38,7 @@ describe('ApprovalModeIndicator', () => {
   });
 
   it('renders correctly for YOLO mode', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady } = render(
       <ApprovalModeIndicator approvalMode={ApprovalMode.YOLO} />,
     );
     await waitUntilReady();
@@ -46,7 +46,7 @@ describe('ApprovalModeIndicator', () => {
   });
 
   it('renders correctly for DEFAULT mode', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady } = render(
       <ApprovalModeIndicator approvalMode={ApprovalMode.DEFAULT} />,
     );
     await waitUntilReady();
@@ -54,7 +54,7 @@ describe('ApprovalModeIndicator', () => {
   });
 
   it('renders correctly for DEFAULT mode with plan enabled', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady } = render(
       <ApprovalModeIndicator
         approvalMode={ApprovalMode.DEFAULT}
         allowPlanMode={true}
