@@ -237,14 +237,24 @@ export class BrowserManager {
 
     // Build args for chrome-devtools-mcp
     const browserConfig = this.config.getBrowserAgentConfig();
-    const sessionMode = browserConfig.customConfig.sessionMode ?? 'isolated';
+    const sessionMode = browserConfig.customConfig.sessionMode ?? 'persistent';
 
     const mcpArgs = [
       '-y',
       `chrome-devtools-mcp@${CHROME_DEVTOOLS_MCP_VERSION}`,
-      sessionMode === 'existing' ? '--existing' : '--isolated',
       '--experimental-vision',
     ];
+
+    // Session mode determines how the browser is managed:
+    // - "isolated": Temp profile, cleaned up after session (--isolated)
+    // - "persistent": Persistent profile at ~/.cache/chrome-devtools-mcp/ (default)
+    // - "existing": Connect to already-running Chrome (--autoConnect, requires
+    //   remote debugging enabled at chrome://inspect/#remote-debugging)
+    if (sessionMode === 'isolated') {
+      mcpArgs.push('--isolated');
+    } else if (sessionMode === 'existing') {
+      mcpArgs.push('--autoConnect');
+    }
 
     // Add optional settings from config
     if (browserConfig.customConfig.headless) {
@@ -252,7 +262,7 @@ export class BrowserManager {
     }
     if (browserConfig.customConfig.chromeProfilePath) {
       mcpArgs.push(
-        '--profile-path',
+        '--userDataDir',
         browserConfig.customConfig.chromeProfilePath,
       );
     }
@@ -267,12 +277,50 @@ export class BrowserManager {
       args: mcpArgs,
     });
 
-    // Connect to MCP server
-    await this.rawMcpClient.connect(this.mcpTransport);
-    debugLogger.log('MCP client connected to chrome-devtools-mcp');
+    // Connect to MCP server — use a shorter timeout for 'existing' mode
+    // since it should connect quickly if remote debugging is enabled.
+    const connectTimeoutMs =
+      sessionMode === 'existing' ? 15_000 : MCP_TIMEOUT_MS;
 
-    // Discover tools from the MCP server
-    await this.discoverTools();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        (async () => {
+          await this.rawMcpClient!.connect(this.mcpTransport!);
+          debugLogger.log('MCP client connected to chrome-devtools-mcp');
+          await this.discoverTools();
+        })(),
+        new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(
+            () =>
+              reject(
+                new Error(
+                  `Timed out connecting to chrome-devtools-mcp (${connectTimeoutMs}ms)`,
+                ),
+              ),
+            connectTimeoutMs,
+          );
+        }),
+      ]);
+    } catch (error) {
+      // Provide actionable error for 'existing' mode failures
+      if (sessionMode === 'existing') {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `Failed to connect to existing Chrome instance: ${message}\n\n` +
+            `To use sessionMode "existing", you must:\n` +
+            `  1. Open Chrome (version 144+)\n` +
+            `  2. Navigate to chrome://inspect/#remote-debugging\n` +
+            `  3. Enable remote debugging\n\n` +
+            `Alternatively, use sessionMode "persistent" (default) to launch a dedicated browser.`,
+        );
+      }
+      throw error;
+    } finally {
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+    }
   }
 
   /**

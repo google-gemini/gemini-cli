@@ -270,8 +270,14 @@ export interface CustomTheme {
  * Used in agents.overrides.browser_agent.customConfig
  */
 export interface BrowserAgentCustomConfig {
-  /** Session mode: 'isolated' (launch new browser) or 'existing' (attach to Chrome M144+). Default: 'isolated' */
-  sessionMode?: 'isolated' | 'existing';
+  /**
+   * Session mode:
+   * - 'persistent': Launch Chrome with a persistent profile at ~/.cache/chrome-devtools-mcp/ (default)
+   * - 'isolated': Launch Chrome with a temporary profile, cleaned up after session
+   * - 'existing': Attach to an already-running Chrome instance (requires remote debugging
+   *   enabled at chrome://inspect/#remote-debugging)
+   */
+  sessionMode?: 'isolated' | 'persistent' | 'existing';
   /** Run browser in headless mode. Default: false */
   headless?: boolean;
   /** Path to Chrome profile directory for session persistence. */
@@ -2539,7 +2545,7 @@ export class Config {
       enabled: override?.enabled ?? false,
       model: override?.modelConfig?.model,
       customConfig: {
-        sessionMode: customConfig.sessionMode ?? 'isolated',
+        sessionMode: customConfig.sessionMode ?? 'persistent',
         headless: customConfig.headless ?? false,
         chromeProfilePath: customConfig.chromeProfilePath,
         visualModel: customConfig.visualModel,

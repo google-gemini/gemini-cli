@@ -1331,7 +1331,7 @@ describe('Server Config (config.ts)', () => {
 
       expect(browserConfig.enabled).toBe(false);
       expect(browserConfig.model).toBeUndefined();
-      expect(browserConfig.customConfig.sessionMode).toBe('isolated');
+      expect(browserConfig.customConfig.sessionMode).toBe('persistent');
       expect(browserConfig.customConfig.headless).toBe(false);
       expect(browserConfig.customConfig.chromeProfilePath).toBeUndefined();
       expect(browserConfig.customConfig.visualModel).toBeUndefined();
@@ -1390,7 +1390,7 @@ describe('Server Config (config.ts)', () => {
       expect(browserConfig.enabled).toBe(true);
       expect(browserConfig.customConfig.headless).toBe(true);
       // Defaults for unspecified fields
-      expect(browserConfig.customConfig.sessionMode).toBe('isolated');
+      expect(browserConfig.customConfig.sessionMode).toBe('persistent');
     });
   });
 });

@@ -138,7 +138,7 @@ describe('BrowserManager', () => {
   });
 
   describe('MCP connection', () => {
-    it('should spawn npx chrome-devtools-mcp with --isolated and --experimental-vision', async () => {
+    it('should spawn npx chrome-devtools-mcp with --experimental-vision (persistent mode by default)', async () => {
       const manager = new BrowserManager(mockConfig);
       await manager.ensureConnection();
 
@@ -148,10 +148,13 @@ describe('BrowserManager', () => {
         args: expect.arrayContaining([
           '-y',
           expect.stringMatching(/chrome-devtools-mcp@/),
-          '--isolated',
           '--experimental-vision',
         ]),
       });
+      // Persistent mode should NOT include --isolated or --autoConnect
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]?.args as string[];
+      expect(args).not.toContain('--isolated');
+      expect(args).not.toContain('--autoConnect');
     });
 
     it('should pass headless flag when configured', async () => {
@@ -177,7 +180,7 @@ describe('BrowserManager', () => {
       });
     });
 
-    it('should pass chromeProfilePath when configured', async () => {
+    it('should pass chromeProfilePath as --userDataDir when configured', async () => {
       const profileConfig = makeFakeConfig({
         agents: {
           overrides: {
@@ -196,8 +199,89 @@ describe('BrowserManager', () => {
 
       expect(StdioClientTransport).toHaveBeenCalledWith({
         command: 'npx',
-        args: expect.arrayContaining(['--profile-path', '/path/to/profile']),
+        args: expect.arrayContaining(['--userDataDir', '/path/to/profile']),
       });
+    });
+
+    it('should pass --isolated when sessionMode is isolated', async () => {
+      const isolatedConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+              customConfig: {
+                sessionMode: 'isolated',
+              },
+            },
+          },
+        },
+      });
+
+      const manager = new BrowserManager(isolatedConfig);
+      await manager.ensureConnection();
+
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]?.args as string[];
+      expect(args).toContain('--isolated');
+      expect(args).not.toContain('--autoConnect');
+    });
+
+    it('should pass --autoConnect when sessionMode is existing', async () => {
+      const existingConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+              customConfig: {
+                sessionMode: 'existing',
+              },
+            },
+          },
+        },
+      });
+
+      const manager = new BrowserManager(existingConfig);
+      await manager.ensureConnection();
+
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]?.args as string[];
+      expect(args).toContain('--autoConnect');
+      expect(args).not.toContain('--isolated');
+    });
+
+    it('should throw actionable error when existing mode connection fails', async () => {
+      // Make the Client mock's connect method reject
+      vi.mocked(Client).mockImplementation(
+        () =>
+          ({
+            connect: vi
+              .fn()
+              .mockRejectedValue(new Error('Connection refused')),
+            close: vi.fn().mockResolvedValue(undefined),
+            listTools: vi.fn(),
+            callTool: vi.fn(),
+          }) as unknown as InstanceType<typeof Client>,
+      );
+
+      const existingConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+              customConfig: {
+                sessionMode: 'existing',
+              },
+            },
+          },
+        },
+      });
+
+      const manager = new BrowserManager(existingConfig);
+
+      await expect(manager.ensureConnection()).rejects.toThrow(
+        /Failed to connect to existing Chrome instance/,
+      );
+      await expect(manager.ensureConnection()).rejects.toThrow(
+        /chrome:\/\/inspect\/#remote-debugging/,
+      );
     });
   });
 
