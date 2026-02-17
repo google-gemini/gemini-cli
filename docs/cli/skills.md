@@ -15,7 +15,7 @@ as security auditing, cloud deployments, or codebase migrations—without
 cluttering the model's immediate context window.
 
 Gemini autonomously decides when to employ a skill based on your request and the
-skill's description. When a relevant skill is identified, the model "pulls in"
+skill's description. When a relevant skill is identifieddd, the model "pulls in"
 the full instructions and resources required to complete the task using the
 `activate_skill` tool.
 
@@ -130,5 +130,5 @@ guidance is prioritized for the duration of the session.
 
 ## Creating your own skills
 
-To create your own skills, see the [Create Agent Skills](./creating-skills.md)
-guide.
+To create your own skills, see see the
+[Create Agent Skills](./creating-skills.md) guide.
