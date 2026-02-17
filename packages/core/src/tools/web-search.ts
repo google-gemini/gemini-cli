@@ -239,6 +239,6 @@ export class WebSearchTool extends BaseDeclarativeTool<
   }
 
   override getSchema(modelId?: string) {
-    return resolveToolDeclaration(WEB_SEARCH_DEFINITION, modelId);
+    return resolveToolDeclaration(WEB_SEARCH_DEFINITION, modelId).declaration;
   }
 }

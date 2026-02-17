@@ -660,6 +660,6 @@ export class RipGrepTool extends BaseDeclarativeTool<
   }
 
   override getSchema(modelId?: string) {
-    return resolveToolDeclaration(RIP_GREP_DEFINITION, modelId);
+    return resolveToolDeclaration(RIP_GREP_DEFINITION, modelId).declaration;
   }
 }

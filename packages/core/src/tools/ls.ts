@@ -322,6 +322,6 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
   }
 
   override getSchema(modelId?: string) {
-    return resolveToolDeclaration(LS_DEFINITION, modelId);
+    return resolveToolDeclaration(LS_DEFINITION, modelId).declaration;
   }
 }

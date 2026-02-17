@@ -502,7 +502,7 @@ export class WriteFileTool
   }
 
   override getSchema(modelId?: string) {
-    return resolveToolDeclaration(WRITE_FILE_DEFINITION, modelId);
+    return resolveToolDeclaration(WRITE_FILE_DEFINITION, modelId).declaration;
   }
 
   getModifyContext(

@@ -313,7 +313,7 @@ export class MemoryTool
   }
 
   override getSchema(modelId?: string) {
-    return resolveToolDeclaration(MEMORY_DEFINITION, modelId);
+    return resolveToolDeclaration(MEMORY_DEFINITION, modelId).declaration;
   }
 
   getModifyContext(_abortSignal: AbortSignal): ModifyContext<SaveMemoryParams> {

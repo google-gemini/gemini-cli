@@ -743,6 +743,6 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
   }
 
   override getSchema(modelId?: string) {
-    return resolveToolDeclaration(GREP_DEFINITION, modelId);
+    return resolveToolDeclaration(GREP_DEFINITION, modelId).declaration;
   }
 }

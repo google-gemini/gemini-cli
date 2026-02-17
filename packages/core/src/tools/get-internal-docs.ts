@@ -183,6 +183,7 @@ export class GetInternalDocsTool extends BaseDeclarativeTool<
   }
 
   override getSchema(modelId?: string) {
-    return resolveToolDeclaration(GET_INTERNAL_DOCS_DEFINITION, modelId);
+    return resolveToolDeclaration(GET_INTERNAL_DOCS_DEFINITION, modelId)
+      .declaration;
   }
 }

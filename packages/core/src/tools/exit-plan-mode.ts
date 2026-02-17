@@ -112,7 +112,8 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
 
   override getSchema(modelId?: string) {
     const plansDir = this.config.storage.getProjectTempPlansDir();
-    return resolveToolDeclaration(getExitPlanModeDefinition(plansDir), modelId);
+    return resolveToolDeclaration(getExitPlanModeDefinition(plansDir), modelId)
+      .declaration;
   }
 }
 

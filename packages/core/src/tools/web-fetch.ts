@@ -461,6 +461,6 @@ export class WebFetchTool extends BaseDeclarativeTool<
   }
 
   override getSchema(modelId?: string) {
-    return resolveToolDeclaration(WEB_FETCH_DEFINITION, modelId);
+    return resolveToolDeclaration(WEB_FETCH_DEFINITION, modelId).declaration;
   }
 }

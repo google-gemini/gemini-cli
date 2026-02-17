@@ -57,7 +57,8 @@ export class EnterPlanModeTool extends BaseDeclarativeTool<
   }
 
   override getSchema(modelId?: string) {
-    return resolveToolDeclaration(ENTER_PLAN_MODE_DEFINITION, modelId);
+    return resolveToolDeclaration(ENTER_PLAN_MODE_DEFINITION, modelId)
+      .declaration;
   }
 }
 

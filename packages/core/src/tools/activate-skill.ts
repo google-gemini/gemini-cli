@@ -201,6 +201,6 @@ export class ActivateSkillTool extends BaseDeclarativeTool<
     return resolveToolDeclaration(
       getActivateSkillDefinition(skillNames),
       modelId,
-    );
+    ).declaration;
   }
 }

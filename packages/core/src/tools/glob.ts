@@ -339,6 +339,6 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
   }
 
   override getSchema(modelId?: string) {
-    return resolveToolDeclaration(GLOB_DEFINITION, modelId);
+    return resolveToolDeclaration(GLOB_DEFINITION, modelId).declaration;
   }
 }

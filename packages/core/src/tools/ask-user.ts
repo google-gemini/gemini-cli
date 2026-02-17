@@ -111,7 +111,7 @@ export class AskUserTool extends BaseDeclarativeTool<
   }
 
   override getSchema(modelId?: string) {
-    return resolveToolDeclaration(ASK_USER_DEFINITION, modelId);
+    return resolveToolDeclaration(ASK_USER_DEFINITION, modelId).declaration;
   }
 }
 
