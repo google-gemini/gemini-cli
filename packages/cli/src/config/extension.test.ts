@@ -205,7 +205,13 @@ describe('extension tests', () => {
     });
     vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
     const settings = loadSettings(tempWorkspaceDir).merged;
-    settings.experimental.extensionConfig = true;
+    if (settings.features) {
+      (settings.features as Record<string, unknown>)['extensionConfig'] = true;
+    } else {
+      (settings as unknown as Record<string, unknown>)['features'] = {
+        extensionConfig: true,
+      };
+    }
     extensionManager = new ExtensionManager({
       workspaceDir: tempWorkspaceDir,
       requestConsent: mockRequestConsent,

@@ -2571,6 +2571,62 @@ describe('loadCliConfig approval mode', () => {
     );
   });
 
+  describe('Feature Gates', () => {
+    it('should parse --feature-gates CLI flag', async () => {
+      process.argv = [
+        'node',
+        'script.js',
+        '--feature-gates',
+        'plan=true,enableAgents=false',
+      ];
+      const argv = await parseArguments(createTestMergedSettings());
+      expect(argv.featureGates).toBe('plan=true,enableAgents=false');
+    });
+
+    it('should respect "features" setting in loadCliConfig', async () => {
+      process.argv = ['node', 'script.js'];
+      const settings = createTestMergedSettings({
+        features: { plan: true },
+      });
+      const argv = await parseArguments(settings);
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.isFeatureEnabled('plan')).toBe(true);
+    });
+
+    it('should prioritize --feature-gates flag over settings', async () => {
+      process.argv = ['node', 'script.js', '--feature-gates', 'plan=true'];
+      const settings = createTestMergedSettings({
+        features: { plan: false },
+      });
+      const argv = await parseArguments(settings);
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.isFeatureEnabled('plan')).toBe(true);
+    });
+
+    it('should allow plan approval mode when features.plan is enabled', async () => {
+      process.argv = ['node', 'script.js', '--approval-mode', 'plan'];
+      const settings = createTestMergedSettings({
+        features: { plan: true },
+      });
+      const argv = await parseArguments(settings);
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.PLAN);
+    });
+
+    it('should throw error when --approval-mode=plan is used but features.plan is disabled', async () => {
+      process.argv = ['node', 'script.js', '--approval-mode', 'plan'];
+      const settings = createTestMergedSettings({
+        features: { plan: false },
+      });
+      const argv = await parseArguments(settings);
+      await expect(
+        loadCliConfig(settings, 'test-session', argv),
+      ).rejects.toThrow(
+        'Approval mode "plan" is only available when experimental.plan is enabled.',
+      );
+    });
+  });
+
   // --- Untrusted Folder Scenarios ---
   describe('when folder is NOT trusted', () => {
     beforeEach(() => {

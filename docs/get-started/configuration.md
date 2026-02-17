@@ -94,6 +94,16 @@ contain other project-specific files related to Gemini CLI's operation, such as:
 Settings are organized into categories. All settings should be placed within
 their corresponding top-level category object in your `settings.json` file.
 
+#### Feature Lifecycle
+
+Gemini CLI uses a feature lifecycle management system to manage experimental and
+optional features. Features are categorized by their stability stage (`ALPHA`,
+`BETA`, `GA`, `DEPRECATED`).
+
+For a detailed explanation of feature stages and a list of all available
+features, see the
+[Feature Lifecycle documentation](/docs/cli/feature-lifecycle.md).
+
 <!-- SETTINGS-AUTOGEN:START -->
 
 #### `policyPaths`
@@ -886,71 +896,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Configuration for the bug report command.
   - **Default:** `undefined`
 
-#### `experimental`
-
-- **`experimental.toolOutputMasking.enabled`** (boolean):
-  - **Description:** Enables tool output masking to save tokens.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
-- **`experimental.toolOutputMasking.toolProtectionThreshold`** (number):
-  - **Description:** Minimum number of tokens to protect from masking (most
-    recent tool outputs).
-  - **Default:** `50000`
-  - **Requires restart:** Yes
-
-- **`experimental.toolOutputMasking.minPrunableTokensThreshold`** (number):
-  - **Description:** Minimum prunable tokens required to trigger a masking pass.
-  - **Default:** `30000`
-  - **Requires restart:** Yes
-
-- **`experimental.toolOutputMasking.protectLatestTurn`** (boolean):
-  - **Description:** Ensures the absolute latest turn is never masked,
-    regardless of token count.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
-- **`experimental.enableAgents`** (boolean):
-  - **Description:** Enable local and remote subagents. Warning: Experimental
-    feature, uses YOLO mode for subagents
-  - **Default:** `false`
-  - **Requires restart:** Yes
-
-- **`experimental.extensionManagement`** (boolean):
-  - **Description:** Enable extension management features.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
-- **`experimental.extensionConfig`** (boolean):
-  - **Description:** Enable requesting and fetching of extension settings.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
-- **`experimental.extensionRegistry`** (boolean):
-  - **Description:** Enable extension registry explore UI.
-  - **Default:** `false`
-  - **Requires restart:** Yes
-
-- **`experimental.extensionReloading`** (boolean):
-  - **Description:** Enables extension loading/unloading within the CLI session.
-  - **Default:** `false`
-  - **Requires restart:** Yes
-
-- **`experimental.jitContext`** (boolean):
-  - **Description:** Enable Just-In-Time (JIT) context loading.
-  - **Default:** `false`
-  - **Requires restart:** Yes
-
-- **`experimental.useOSC52Paste`** (boolean):
-  - **Description:** Use OSC 52 sequence for pasting instead of clipboardy
-    (useful for remote sessions).
-  - **Default:** `false`
-
-- **`experimental.plan`** (boolean):
-  - **Description:** Enable planning features (Plan Mode and tools).
-  - **Default:** `false`
-  - **Requires restart:** Yes
-
 #### `skills`
 
 - **`skills.enabled`** (boolean):
@@ -1059,6 +1004,77 @@ their corresponding top-level category object in your `settings.json` file.
 - **`admin.skills.enabled`** (boolean):
   - **Description:** If false, disallows agent skills from being used.
   - **Default:** `true`
+
+#### `features`
+
+- **`features.allAlpha`** (boolean):
+  - **Description:** Enable all Alpha features by default.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`features.allBeta`** (boolean):
+  - **Description:** Enable all Beta features by default.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`features.toolOutputMasking`** (boolean):
+  - **Description:** Enables tool output masking to save tokens.
+  - **Default:** `true`
+  - **Stage:** BETA
+  - **Requires restart:** Yes
+
+- **`features.enableAgents`** (boolean):
+  - **Description:** Enable local and remote subagents.
+  - **Default:** `false`
+  - **Stage:** ALPHA
+  - **Requires restart:** Yes
+
+- **`features.extensionManagement`** (boolean):
+  - **Description:** Enable extension management features.
+  - **Default:** `true`
+  - **Stage:** BETA
+  - **Requires restart:** Yes
+
+- **`features.extensionConfig`** (boolean):
+  - **Description:** Enable requesting and fetching of extension settings.
+  - **Default:** `true`
+  - **Stage:** BETA
+  - **Requires restart:** Yes
+
+- **`features.extensionRegistry`** (boolean):
+  - **Description:** Enable extension registry explore UI.
+  - **Default:** `false`
+  - **Stage:** ALPHA
+  - **Requires restart:** Yes
+
+- **`features.extensionReloading`** (boolean):
+  - **Description:** Enables extension loading/unloading within the CLI session.
+  - **Default:** `false`
+  - **Stage:** ALPHA
+  - **Requires restart:** Yes
+
+- **`features.jitContext`** (boolean):
+  - **Description:** Enable Just-In-Time (JIT) context loading.
+  - **Default:** `false`
+  - **Stage:** ALPHA
+  - **Requires restart:** Yes
+
+- **`features.useOSC52Paste`** (boolean):
+  - **Description:** Use OSC 52 sequence for pasting.
+  - **Default:** `false`
+  - **Stage:** ALPHA
+
+- **`features.plan`** (boolean):
+  - **Description:** Enable planning features (Plan Mode and tools).
+  - **Default:** `false`
+  - **Stage:** ALPHA
+  - **Requires restart:** Yes
+
+- **`features.zedIntegration`** (boolean):
+  - **Description:** Enable Zed integration.
+  - **Default:** `false`
+  - **Stage:** ALPHA
+  - **Requires restart:** Yes
   <!-- SETTINGS-AUTOGEN:END -->
 
 #### `mcpServers`
@@ -1210,8 +1226,8 @@ within your user's home folder.
 Environment variables are a common way to configure applications, especially for
 sensitive information like API keys or for settings that might change between
 environments. For authentication setup, see the
-[Authentication documentation](./authentication.md) which covers all available
-authentication methods.
+[Authentication documentation](/docs/get-started/authentication.md) which covers
+all available authentication methods.
 
 The CLI automatically loads environment variables from an `.env` file. The
 loading order is:
@@ -1237,6 +1253,10 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Specifies the default Gemini model to use.
   - Overrides the hardcoded default
   - Example: `export GEMINI_MODEL="gemini-3-flash-preview"`
+- **`GEMINI_FEATURE_GATES`**:
+  - Specifies a comma-separated list of feature key-value pairs to override the
+    default feature states.
+  - Example: `export GEMINI_FEATURE_GATES="plan=true,enableAgents=false"`
 - **`GEMINI_CLI_HOME`**:
   - Specifies the root directory for Gemini CLI's user-level configuration and
     storage.
@@ -1430,13 +1450,17 @@ for that specific session.
     - `auto_edit`: Automatically approve edit tools (replace, write_file) while
       prompting for others
     - `yolo`: Automatically approve all tool calls (equivalent to `--yolo`)
-    - `plan`: Read-only mode for tool calls (requires experimental planning to
-      be enabled).
+    - `plan`: Read-only mode for tool calls (requires planning feature to be
+      enabled).
       > **Note:** This mode is currently under development and not yet fully
       > functional.
   - Cannot be used together with `--yolo`. Use `--approval-mode=yolo` instead of
     `--yolo` for the new unified approach.
   - Example: `gemini --approval-mode auto_edit`
+- **`--feature-gates <key1=val1,key2=val2,...>`**:
+  - A comma-separated list of feature key-value pairs to override the default
+    feature states for this session.
+  - Example: `gemini --feature-gates "plan=true,enableAgents=false"`
 - **`--allowed-tools <tool1,tool2,...>`**:
   - A comma-separated list of tool names that will bypass the confirmation
     dialog.

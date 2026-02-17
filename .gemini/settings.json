@@ -1,7 +1,6 @@
 {
-  "experimental": {
-    "plan": true,
-    "extensionReloading": true
+  "features": {
+    "allAlpha": true
   },
   "general": {
     "devtools": true

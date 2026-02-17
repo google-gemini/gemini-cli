@@ -49,6 +49,7 @@ import {
   type MergedSettings,
   saveModelChange,
   loadSettings,
+  isFeatureEnabled,
 } from './settings.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
@@ -79,6 +80,7 @@ export interface CliArgs {
   allowedMcpServerNames: string[] | undefined;
   allowedTools: string[] | undefined;
   experimentalAcp: boolean | undefined;
+  featureGates?: string | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
@@ -177,6 +179,12 @@ export async function parseArguments(
         .option('experimental-acp', {
           type: 'boolean',
           description: 'Starts the agent in ACP mode',
+        })
+        .option('feature-gates', {
+          type: 'string',
+          nargs: 1,
+          description:
+            'Comma-separated list of feature key-value pairs (e.g. "Foo=true,Bar=false")',
         })
         .option('allowed-mcp-server-names', {
           type: 'array',
@@ -324,7 +332,7 @@ export async function parseArguments(
       return true;
     });
 
-  if (settings.experimental?.extensionManagement) {
+  if (isFeatureEnabled(settings, 'extensionManagement')) {
     yargsInstance.command(extensionsCommand);
   }
 
@@ -508,7 +516,7 @@ export async function loadCliConfig(
   });
   await extensionManager.loadExtensions();
 
-  const experimentalJitContext = settings.experimental?.jitContext ?? false;
+  const experimentalJitContext = isFeatureEnabled(settings, 'jitContext');
 
   let memoryContent: string | HierarchicalMemory = '';
   let fileCount = 0;
@@ -554,7 +562,7 @@ export async function loadCliConfig(
         approvalMode = ApprovalMode.AUTO_EDIT;
         break;
       case 'plan':
-        if (!(settings.experimental?.plan ?? false)) {
+        if (!isFeatureEnabled(settings, 'plan')) {
           throw new Error(
             'Approval mode "plan" is only available when experimental.plan is enabled.',
           );
@@ -804,19 +812,26 @@ export async function loadCliConfig(
     model: resolvedModel,
     maxSessionTurns: settings.model?.maxSessionTurns,
     experimentalZedIntegration: argv.experimentalAcp || false,
+    features: settings.features,
+    featureGates: argv.featureGates,
     listExtensions: argv.listExtensions || false,
     listSessions: argv.listSessions || false,
     deleteSession: argv.deleteSession,
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
-    enableExtensionReloading: settings.experimental?.extensionReloading,
-    enableAgents: settings.experimental?.enableAgents,
-    plan: settings.experimental?.plan,
+    enableExtensionReloading: isFeatureEnabled(settings, 'extensionReloading'),
+    enableAgents: isFeatureEnabled(settings, 'enableAgents'),
+    plan: isFeatureEnabled(settings, 'plan'),
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
-    experimentalJitContext: settings.experimental?.jitContext,
-    toolOutputMasking: settings.experimental?.toolOutputMasking,
+    experimentalJitContext: isFeatureEnabled(settings, 'jitContext'),
+    toolOutputMasking:
+      (settings.features as Record<string, unknown> | undefined)?.[
+        'toolOutputMasking'
+      ] !== undefined
+        ? { enabled: isFeatureEnabled(settings, 'toolOutputMasking') }
+        : settings.experimental?.toolOutputMasking,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,

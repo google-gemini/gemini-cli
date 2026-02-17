@@ -1940,7 +1940,102 @@ describe('Config setExperiments logging', () => {
   });
 });
 
-describe('Availability Service Integration', () => {
+describe('FeatureGate Integration', () => {
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    targetDir: '/path/to/target',
+    debugMode: false,
+    sessionId: 'test-session-id',
+    model: 'gemini-pro',
+    usageStatisticsEnabled: false,
+  };
+
+  it('should initialize FeatureGate with defaults', () => {
+    const config = new Config(baseParams);
+    // Assuming 'plan' is Alpha and defaults to false
+    expect(config.isFeatureEnabled('plan')).toBe(false);
+  });
+
+  it('should respect "features" setting', () => {
+    const params = {
+      ...baseParams,
+      features: { plan: true },
+    };
+    const config = new Config(params);
+    expect(config.isFeatureEnabled('plan')).toBe(true);
+  });
+
+  it('should respect "featureGates" CLI flag', () => {
+    const params = {
+      ...baseParams,
+      featureGates: 'plan=true',
+    };
+    const config = new Config(params);
+    expect(config.isFeatureEnabled('plan')).toBe(true);
+  });
+
+  it('should respect "featureGates" CLI flag overriding settings', () => {
+    const params = {
+      ...baseParams,
+      features: { plan: false },
+      featureGates: 'plan=true',
+    };
+    const config = new Config(params);
+    expect(config.isFeatureEnabled('plan')).toBe(true);
+  });
+
+  it('should respect legacy "experimental" settings if feature is not explicitly set', () => {
+    const params = {
+      ...baseParams,
+      plan: true, // legacy experimental param for plan
+    };
+    const config = new Config(params);
+    expect(config.isFeatureEnabled('plan')).toBe(true);
+  });
+
+  it('should prioritize "features" over legacy settings', () => {
+    const params = {
+      ...baseParams,
+      plan: true, // legacy enabled
+      features: { plan: false }, // new disabled
+    };
+    const config = new Config(params);
+    expect(config.isFeatureEnabled('plan')).toBe(false);
+  });
+
+  it('should respect stage-based toggles from settings', () => {
+    const params = {
+      ...baseParams,
+      features: { allAlpha: true },
+    };
+    const config = new Config(params);
+    // 'plan' is Alpha
+    expect(config.isFeatureEnabled('plan')).toBe(true);
+  });
+
+  it('should resolve specific feature accessors using FeatureGate', () => {
+    const config = new Config({
+      ...baseParams,
+      features: {
+        jitContext: true,
+        toolOutputMasking: false,
+        extensionManagement: true,
+        plan: true,
+        enableAgents: true,
+        zedIntegration: true,
+      },
+    });
+
+    expect(config.isJitContextEnabled()).toBe(true);
+    expect(config.getToolOutputMaskingEnabled()).toBe(false);
+    expect(config.getExtensionManagement()).toBe(true);
+    expect(config.isPlanEnabled()).toBe(true);
+    expect(config.isAgentsEnabled()).toBe(true);
+    expect(config.getExperimentalZedIntegration()).toBe(true);
+  });
+});
+
+describe('refreshAuth', () => {
   const baseModel = 'test-model';
   const baseParams: ConfigParameters = {
     sessionId: 'test',

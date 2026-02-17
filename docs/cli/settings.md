@@ -124,14 +124,6 @@ they appear in the UI.
 | --------------------------------- | ------------------------------ | --------------------------------------------- | ------- |
 | Auto Configure Max Old Space Size | `advanced.autoConfigureMemory` | Automatically configure Node.js memory limits | `false` |
 
-### Experimental
-
-| UI Label                   | Setting                                  | Description                                                                         | Default |
-| -------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------- | ------- |
-| Enable Tool Output Masking | `experimental.toolOutputMasking.enabled` | Enables tool output masking to save tokens.                                         | `true`  |
-| Use OSC 52 Paste           | `experimental.useOSC52Paste`             | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false` |
-| Plan                       | `experimental.plan`                      | Enable planning features (Plan Mode and tools).                                     | `false` |
-
 ### Skills
 
 | UI Label            | Setting          | Description          | Default |
@@ -144,5 +136,22 @@ they appear in the UI.
 | ------------------ | --------------------------- | -------------------------------------------------------------------------------- | ------- |
 | Enable Hooks       | `hooksConfig.enabled`       | Canonical toggle for the hooks system. When disabled, no hooks will be executed. | `true`  |
 | Hook Notifications | `hooksConfig.notifications` | Show visual indicators when hooks are executing.                                 | `true`  |
+
+### Features
+
+| UI Label                      | Setting                        | Description                                                 | Default | Stage   |
+| ----------------------------- | ------------------------------ | ----------------------------------------------------------- | ------- | ------- |
+| Enable all Alpha features     | `features.allAlpha`            | Enable all Alpha features by default.                       | `false` | -       |
+| Enable all Beta features      | `features.allBeta`             | Enable all Beta features by default.                        | `true`  | -       |
+| Tool Output Masking           | `features.toolOutputMasking`   | Enables tool output masking to save tokens.                 | `true`  | `BETA`  |
+| Enable Agents                 | `features.enableAgents`        | Enable local and remote subagents.                          | `false` | `ALPHA` |
+| Extension Management          | `features.extensionManagement` | Enable extension management features.                       | `true`  | `BETA`  |
+| Extension Configuration       | `features.extensionConfig`     | Enable requesting and fetching of extension settings.       | `true`  | `BETA`  |
+| Extension Registry Explore UI | `features.extensionRegistry`   | Enable extension registry explore UI.                       | `false` | `ALPHA` |
+| Extension Reloading           | `features.extensionReloading`  | Enables extension loading/unloading within the CLI session. | `false` | `ALPHA` |
+| JIT Context Loading           | `features.jitContext`          | Enable Just-In-Time (JIT) context loading.                  | `false` | `ALPHA` |
+| Use OSC 52 Paste              | `features.useOSC52Paste`       | Use OSC 52 sequence for pasting.                            | `false` | `ALPHA` |
+| Plan Mode                     | `features.plan`                | Enable planning features (Plan Mode and tools).             | `false` | `ALPHA` |
+| Zed Integration               | `features.zedIntegration`      | Enable Zed integration.                                     | `false` | `ALPHA` |
 
 <!-- SETTINGS-AUTOGEN:END -->

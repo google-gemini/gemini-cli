@@ -352,7 +352,7 @@ describe('SettingsDialog', () => {
 
       await waitFor(() => {
         // Should wrap to last setting (without relying on exact bullet character)
-        expect(lastFrame()).toContain('Hook Notifications');
+        expect(lastFrame()).toContain('Zed Integration');
       });
 
       unmount();
@@ -687,6 +687,33 @@ describe('SettingsDialog', () => {
   });
 
   describe('Specific Settings Behavior', () => {
+    it('should render feature stage badges', async () => {
+      const featureSettings = createMockSettings({
+        'features.allAlpha': false,
+        'features.allBeta': true,
+      });
+
+      const onSelect = vi.fn();
+      const { lastFrame, stdin } = render(
+        <KeypressProvider>
+          <SettingsDialog
+            settings={featureSettings}
+            onSelect={onSelect}
+            availableTerminalHeight={100}
+          />
+        </KeypressProvider>,
+      );
+
+      act(() => {
+        stdin.write('Plan');
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Plan Mode');
+        expect(lastFrame()).toContain('[ALPHA]');
+      });
+    });
+
     it('should show correct display values for settings with different states', () => {
       const settings = createMockSettings({
         user: {

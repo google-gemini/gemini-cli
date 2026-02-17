@@ -1486,8 +1486,8 @@
     },
     "experimental": {
       "title": "Experimental",
-      "description": "Setting to enable experimental features",
-      "markdownDescription": "Setting to enable experimental features\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+      "description": "DEPRECATED: Use the \"features\" object instead. Setting to enable experimental features",
+      "markdownDescription": "DEPRECATED: Use the \"features\" object instead. Setting to enable experimental features\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
       "default": {},
       "type": "object",
       "properties": {
@@ -1843,6 +1843,100 @@
             }
           },
           "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "features": {
+      "title": "Features",
+      "description": "Feature Lifecycle Management settings.",
+      "markdownDescription": "Feature Lifecycle Management settings.\n\n- Category: `Features`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "allAlpha": {
+          "title": "Enable all Alpha features",
+          "description": "Enable all Alpha features by default.",
+          "markdownDescription": "Enable all Alpha features by default.\n\n- Category: `Features`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "allBeta": {
+          "title": "Enable all Beta features",
+          "description": "Enable all Beta features by default.",
+          "markdownDescription": "Enable all Beta features by default.\n\n- Category: `Features`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "toolOutputMasking": {
+          "title": "Tool Output Masking",
+          "description": "Enables tool output masking to save tokens.",
+          "markdownDescription": "Enables tool output masking to save tokens.\n\n- Category: `Features`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "enableAgents": {
+          "title": "Enable Agents",
+          "description": "Enable local and remote subagents.",
+          "markdownDescription": "Enable local and remote subagents.\n\n- Category: `Features`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "extensionManagement": {
+          "title": "Extension Management",
+          "description": "Enable extension management features.",
+          "markdownDescription": "Enable extension management features.\n\n- Category: `Features`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "extensionConfig": {
+          "title": "Extension Configuration",
+          "description": "Enable requesting and fetching of extension settings.",
+          "markdownDescription": "Enable requesting and fetching of extension settings.\n\n- Category: `Features`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "extensionRegistry": {
+          "title": "Extension Registry Explore UI",
+          "description": "Enable extension registry explore UI.",
+          "markdownDescription": "Enable extension registry explore UI.\n\n- Category: `Features`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "extensionReloading": {
+          "title": "Extension Reloading",
+          "description": "Enables extension loading/unloading within the CLI session.",
+          "markdownDescription": "Enables extension loading/unloading within the CLI session.\n\n- Category: `Features`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "jitContext": {
+          "title": "JIT Context Loading",
+          "description": "Enable Just-In-Time (JIT) context loading.",
+          "markdownDescription": "Enable Just-In-Time (JIT) context loading.\n\n- Category: `Features`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "useOSC52Paste": {
+          "title": "Use OSC 52 Paste",
+          "description": "Use OSC 52 sequence for pasting.",
+          "markdownDescription": "Use OSC 52 sequence for pasting.\n\n- Category: `Features`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "plan": {
+          "title": "Plan Mode",
+          "description": "Enable planning features (Plan Mode and tools).",
+          "markdownDescription": "Enable planning features (Plan Mode and tools).\n\n- Category: `Features`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "zedIntegration": {
+          "title": "Zed Integration",
+          "description": "Enable Zed integration.",
+          "markdownDescription": "Enable Zed integration.\n\n- Category: `Features`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false

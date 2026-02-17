@@ -18,6 +18,8 @@ import {
   coreEvents,
   homedir,
   type AdminControlsSettings,
+  DefaultFeatureGate,
+  type FeatureGate,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -42,6 +44,57 @@ export {
   type SettingDefinition,
   getSettingsSchema,
 };
+
+const featureGateCache = new WeakMap<MergedSettings, FeatureGate>();
+
+/**
+ * Returns true if the feature is enabled in the given settings.
+ * Checks "features" first, then falls back to "experimental".
+ */
+export function isFeatureEnabled(
+  settings: MergedSettings,
+  featureName: string,
+): boolean {
+  let gate = featureGateCache.get(settings);
+  if (!gate) {
+    const mutableGate = DefaultFeatureGate.deepCopy();
+    const overrides: Record<string, boolean> = {};
+
+    // 1. Experimental (Low Priority)
+    const experimental = settings.experimental as Record<string, unknown>;
+    if (experimental) {
+      for (const [key, value] of Object.entries(experimental)) {
+        if (typeof value === 'boolean') {
+          overrides[key] = value;
+        }
+      }
+      // Handle nested toolOutputMasking legacy structure
+      const toolOutputMasking = experimental['toolOutputMasking'];
+      if (
+        toolOutputMasking &&
+        typeof toolOutputMasking === 'object' &&
+        'enabled' in toolOutputMasking &&
+        typeof (toolOutputMasking as Record<string, unknown>)['enabled'] ===
+          'boolean'
+      ) {
+        overrides['toolOutputMasking'] = Boolean(
+          (toolOutputMasking as Record<string, unknown>)['enabled'],
+        );
+      }
+    }
+
+    // 2. Features (High Priority)
+    if (settings.features) {
+      Object.assign(overrides, settings.features);
+    }
+
+    mutableGate.setFromMap(overrides);
+    gate = mutableGate;
+    featureGateCache.set(settings, gate);
+  }
+
+  return gate.enabled(featureName);
+}
 
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { customDeepMerge } from '../utils/deepMerge.js';

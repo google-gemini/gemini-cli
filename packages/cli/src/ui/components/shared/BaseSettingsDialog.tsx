@@ -21,6 +21,7 @@ import {
 } from '../../utils/textUtils.js';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
+import { FeatureStage } from '@google/gemini-cli-core';
 
 /**
  * Represents a single item in the settings dialog.
@@ -42,6 +43,8 @@ export interface SettingsDialogItem {
   scopeMessage?: string;
   /** Raw value for edit mode initialization */
   rawValue?: string | number | boolean;
+  /** Feature stage (e.g. ALPHA, BETA) */
+  stage?: string;
 }
 
 /**
@@ -543,6 +546,20 @@ export function BaseSettingsDialog({
                           }
                         >
                           {item.label}
+                          {item.stage && item.stage !== FeatureStage.GA && (
+                            <Text
+                              color={
+                                item.stage === FeatureStage.Deprecated
+                                  ? theme.status.error
+                                  : item.stage === FeatureStage.Beta
+                                    ? theme.text.accent
+                                    : theme.status.warning
+                              }
+                            >
+                              {' '}
+                              [{item.stage}]{' '}
+                            </Text>
+                          )}
                           {item.scopeMessage && (
                             <Text color={theme.text.secondary}>
                               {' '}

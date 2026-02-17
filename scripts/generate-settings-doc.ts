@@ -22,6 +22,11 @@ import type {
   SettingsSchemaType,
 } from '../packages/cli/src/config/settingsSchema.js';
 
+import {
+  FeatureDefinitions,
+  FeatureStage,
+} from '../packages/core/src/config/features.js';
+
 const START_MARKER = '<!-- SETTINGS-AUTOGEN:START -->';
 const END_MARKER = '<!-- SETTINGS-AUTOGEN:END -->';
 
@@ -36,6 +41,7 @@ interface DocEntry {
   defaultValue: string;
   requiresRestart: boolean;
   enumValues?: string[];
+  stage?: string;
 }
 
 export async function main(argv = process.argv.slice(2)) {
@@ -49,6 +55,10 @@ export async function main(argv = process.argv.slice(2)) {
   );
   const docPath = path.join(repoRoot, 'docs/get-started/configuration.md');
   const cliSettingsDocPath = path.join(repoRoot, 'docs/cli/settings.md');
+  const featureGatesDocPath = path.join(
+    repoRoot,
+    'docs/cli/feature-lifecycle.md',
+  );
 
   const { getSettingsSchema } = await loadSettingsSchemaModule();
   const schema = getSettingsSchema();
@@ -59,21 +69,31 @@ export async function main(argv = process.argv.slice(2)) {
 
   const generatedBlock = renderSections(allSettingsSections);
   const generatedTableBlock = renderTableSections(filteredSettingsSections);
+  const generatedFeatureGatesBlock = renderFeatureGatesTable();
 
   await updateFile(docPath, generatedBlock, checkOnly);
   await updateFile(cliSettingsDocPath, generatedTableBlock, checkOnly);
+  await updateFile(
+    featureGatesDocPath,
+    generatedFeatureGatesBlock,
+    checkOnly,
+    '<!-- FEATURES-AUTOGEN:START -->',
+    '<!-- FEATURES-AUTOGEN:END -->',
+  );
 }
 
 async function updateFile(
   filePath: string,
   newContent: string,
   checkOnly: boolean,
+  startMarker = START_MARKER,
+  endMarker = END_MARKER,
 ) {
   const doc = await readFile(filePath, 'utf8');
   const injectedDoc = injectBetweenMarkers({
     document: doc,
-    startMarker: START_MARKER,
-    endMarker: END_MARKER,
+    startMarker,
+    endMarker,
     newContent: newContent,
     paddingBefore: '\n',
     paddingAfter: '\n',
@@ -142,19 +162,31 @@ function collectEntries(
           sections.set(sectionKey, []);
         }
 
+        let defaultValue = definition.default;
+        let stage: string | undefined;
+        if (sectionKey === 'features' && FeatureDefinitions[key]) {
+          const specs = FeatureDefinitions[key];
+          const latest = specs[specs.length - 1];
+          stage = latest.preRelease;
+          defaultValue =
+            latest.default ??
+            (stage === FeatureStage.Beta || stage === FeatureStage.GA);
+        }
+
         sections.get(sectionKey)!.push({
           path: newPathSegments.join('.'),
           type: formatType(definition),
           label: definition.label,
           category: definition.category,
           description: formatDescription(definition),
-          defaultValue: formatDefaultValue(definition.default, {
+          defaultValue: formatDefaultValue(defaultValue, {
             quoteStrings: true,
           }),
           requiresRestart: Boolean(definition.requiresRestart),
           enumValues: definition.options?.map((option) =>
             formatDefaultValue(option.value, { quoteStrings: true }),
           ),
+          stage,
         });
       }
 
@@ -225,6 +257,10 @@ function renderSections(sections: Map<string, DocEntry[]>) {
         lines.push('  - **Values:** ' + values);
       }
 
+      if (entry.stage) {
+        lines.push('  - **Stage:** ' + entry.stage);
+      }
+
       if (entry.requiresRestart) {
         lines.push('  - **Requires restart:** Yes');
       }
@@ -252,29 +288,64 @@ function renderTableSections(sections: Map<string, DocEntry[]>) {
     }
     lines.push(`### ${title}`);
     lines.push('');
-    lines.push('| UI Label | Setting | Description | Default |');
-    lines.push('| --- | --- | --- | --- |');
+    if (section === 'features') {
+      lines.push('| UI Label | Setting | Description | Default | Stage |');
+      lines.push('| --- | --- | --- | --- | --- |');
+    } else {
+      lines.push('| UI Label | Setting | Description | Default |');
+      lines.push('| --- | --- | --- | --- |');
+    }
 
     for (const entry of entries) {
       const val = entry.defaultValue.replace(/\n/g, ' ');
       const defaultVal = '`' + escapeBackticks(val) + '`';
-      lines.push(
+      let row =
         '| ' +
-          entry.label +
-          ' | `' +
-          entry.path +
-          '` | ' +
-          entry.description +
-          ' | ' +
-          defaultVal +
-          ' |',
-      );
+        entry.label +
+        ' | `' +
+        entry.path +
+        '` | ' +
+        entry.description +
+        ' | ' +
+        defaultVal +
+        ' |';
+
+      if (section === 'features') {
+        const stageVal = entry.stage ? '`' + entry.stage + '`' : '-';
+        row += ' ' + stageVal + ' |';
+      }
+
+      lines.push(row);
     }
 
     lines.push('');
   }
 
   return lines.join('\n').trimEnd();
+}
+
+function renderFeatureGatesTable() {
+  let markdown = '| Feature | Stage | Default | Since | Description |\n';
+  markdown += '| --- | --- | --- | --- | --- |\n';
+
+  const sortedFeatures = Object.entries(FeatureDefinitions).sort(
+    ([keyA], [keyB]) => keyA.localeCompare(keyB),
+  );
+
+  for (const [key, specs] of sortedFeatures) {
+    const latest = specs[specs.length - 1];
+    const stage = latest.preRelease;
+    const isEnabled =
+      latest.default ??
+      (stage === FeatureStage.Beta || stage === FeatureStage.GA);
+    const defaultValue = isEnabled ? 'Enabled' : 'Disabled';
+    const since = latest.since || '-';
+    const description = latest.description || '-';
+
+    markdown += `| \`${key}\` | ${stage} | ${defaultValue} | ${since} | ${description} |\n`;
+  }
+
+  return markdown;
 }
 
 if (process.argv[1]) {

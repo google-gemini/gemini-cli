@@ -12,7 +12,7 @@ import {
   configureSpecificSetting,
   getExtensionManager,
 } from './utils.js';
-import { loadSettings } from '../../config/settings.js';
+import { loadSettings, isFeatureEnabled } from '../../config/settings.js';
 import { coreEvents, debugLogger } from '@google/gemini-cli-core';
 import { exitCli } from '../utils.js';
 
@@ -45,10 +45,10 @@ export const configureCommand: CommandModule<object, ConfigureArgs> = {
     const { name, setting, scope } = args;
     const settings = loadSettings(process.cwd()).merged;
 
-    if (!(settings.experimental?.extensionConfig ?? true)) {
+    if (!isFeatureEnabled(settings, 'extensionConfig')) {
       coreEvents.emitFeedback(
         'error',
-        'Extension configuration is currently disabled. Enable it by setting "experimental.extensionConfig" to true.',
+        'Extension configuration is currently disabled. Enable it by setting "features.extensionConfig" to true.',
       );
       await exitCli();
       return;

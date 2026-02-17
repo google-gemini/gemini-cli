@@ -75,6 +75,8 @@ import {
   SettingScope,
   LoadedSettings,
   sanitizeEnvVar,
+  isFeatureEnabled,
+  type MergedSettings,
 } from './settings.js';
 import {
   FatalConfigError,
@@ -2974,6 +2976,52 @@ describe('LoadedSettings Isolation and Serializability', () => {
       expect(() => {
         loadedSettings.setValue(SettingScope.User, 'test', circular);
       }).toThrow(/Maximum call stack size exceeded/);
+    });
+  });
+
+  describe('isFeatureEnabled', () => {
+    it('should return true if feature is enabled in "features"', () => {
+      const settings = {
+        features: { plan: true },
+      } as unknown as Settings; // Casting for simplicity
+      expect(
+        isFeatureEnabled(settings as unknown as MergedSettings, 'plan'),
+      ).toBe(true);
+    });
+
+    it('should return false if feature is disabled in "features"', () => {
+      const settings = {
+        features: { plan: false },
+      } as unknown as Settings;
+      expect(
+        isFeatureEnabled(settings as unknown as MergedSettings, 'plan'),
+      ).toBe(false);
+    });
+
+    it('should fallback to "experimental" if feature is not in "features"', () => {
+      const settings = {
+        experimental: { plan: true },
+      } as unknown as Settings;
+      expect(
+        isFeatureEnabled(settings as unknown as MergedSettings, 'plan'),
+      ).toBe(true);
+    });
+
+    it('should prioritize "features" over "experimental"', () => {
+      const settings = {
+        features: { plan: false },
+        experimental: { plan: true },
+      } as unknown as Settings;
+      expect(
+        isFeatureEnabled(settings as unknown as MergedSettings, 'plan'),
+      ).toBe(false);
+    });
+
+    it('should return false if neither is set', () => {
+      const settings = {} as unknown as Settings;
+      expect(
+        isFeatureEnabled(settings as unknown as MergedSettings, 'plan'),
+      ).toBe(false);
     });
   });
 });

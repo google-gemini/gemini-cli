@@ -35,7 +35,11 @@ import {
   type SettingsValue,
   TOGGLE_TYPES,
 } from '../../config/settingsSchema.js';
-import { coreEvents, debugLogger } from '@google/gemini-cli-core';
+import {
+  coreEvents,
+  debugLogger,
+  FeatureDefinitions,
+} from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 import {
   type SettingsDialogItem,
@@ -149,6 +153,14 @@ export function SettingsDialog({
       // Get raw value for edit mode initialization
       const rawValue = getEffectiveValue(key, pendingSettings, {});
 
+      let stage: string | undefined;
+      const definitionKey = key.replace(/^features\./, '');
+      if (key.startsWith('features.') && FeatureDefinitions[definitionKey]) {
+        const specs = FeatureDefinitions[definitionKey];
+        const latest = specs[specs.length - 1];
+        stage = latest.preRelease;
+      }
+
       return {
         key,
         label: definition?.label || key,
@@ -160,6 +172,7 @@ export function SettingsDialog({
         scopeMessage,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         rawValue: rawValue as string | number | boolean | undefined,
+        stage,
       };
     });
   }, [settingKeys, selectedScope, settings, modifiedSettings, pendingSettings]);
