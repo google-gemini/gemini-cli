@@ -1,0 +1,42 @@
+--- [TASCTL] PROVISIONING RESOURCE ---
+Target: 64 nodes | Memory: 32GB
+[SEC] PQC Tunnel: ESTABLISHED (Kyber-1024)
+[LEDGER] Sealed manifest to: /app/python_runtime/ledger/20260217T000833_JOB-REPUBLIC-001.yaml
+>>> RESOURCES ALLOCATED. Ledger Anchor: 20260217T000833_JOB-REPUBLIC-001.yaml
+
+--- [VERIFY] LEDGER ANCHOR CONTENT ---
+manifest:
+  clearance_level: !!python/object/apply:src.governance.sovereign_manifest.SecurityClearanceLevel
+  - SOVEREIGN
+  compute_request:
+    memory_limit: 32GB
+    node_count: 64
+    pqc_encryption_required: true
+  executable_path: _raw/simulated_workload.py
+  genesis_hash: SHA512-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  job_id: JOB-REPUBLIC-001
+  justification: 'CLI Provisioning Request via tasctl. Authorization Code: ALPHA-OMEGA-99.
+    Requesting full allocation for Genesis Simulation.'
+  witnesses:
+  - key_id: TAS-KEY-1111222233334444
+    role: !!python/object/apply:src.governance.sovereign_manifest.WitnessRole
+    - ACTOR
+    signature: sig_1
+    timestamp: now
+  - key_id: TAS-KEY-AAAABBBBCCCCDDDD
+    role: !!python/object/apply:src.governance.sovereign_manifest.WitnessRole
+    - WITNESS_ENFORCER
+    signature: sig_2
+    timestamp: now
+meta:
+  runtime_version: TAS_V1_PYTHON
+  seal_type: GENESIS_ANCHOR
+  sealed_at: '2026-02-17T00:08:33.333436'
+
+--- [TASCTL] SOVEREIGN WAVE MONITOR: JOB-REPUBLIC-001 ---
+Connecting to audit stream...
+[STREAM] Connected. Listening for pulse events.
+[PULSE] Node 001: Bond Verified (H=8f4a...)
+[PULSE] Node 002: Invariant Held (I=True)
+[PULSE] Node 003: Complexity < Threshold
+[PULSE] Node 004: Sovereignty Confirmed
