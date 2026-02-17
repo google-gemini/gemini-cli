@@ -468,6 +468,55 @@ function doIt() {
       expect(result.newContent).toBe(expectedContent);
     });
 
+    it('should correctly rebase indentation in flexible replacement without double-indenting', async () => {
+      const content = '    if (a) {\n        foo();\n    }\n';
+      // old_string and new_string are unindented. They should be rebased to 4-space.
+      const oldString = 'if (a) {\n    foo();\n}';
+      const newString = 'if (a) {\n    bar();\n}';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string: oldString,
+          new_string: newString,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.occurrences).toBe(1);
+      // foo() was at 8 spaces (4 base + 4 indent).
+      // newString has bar() at 4 spaces (0 base + 4 indent).
+      // Rebased to 4 base, it should be 4 + 4 = 8 spaces.
+      const expectedContent = '    if (a) {\n        bar();\n    }\n';
+      expect(result.newContent).toBe(expectedContent);
+    });
+
+    it('should correctly rebase indentation in fuzzy replacement without double-indenting', async () => {
+      const content =
+        '    const myConfig = {\n      enableFeature: true,\n      retries: 3\n    };';
+      // Typo: missing comma. old_string/new_string are unindented.
+      const fuzzyOld =
+        'const myConfig = {\n  enableFeature: true\n  retries: 3\n};';
+      const fuzzyNew =
+        'const myConfig = {\n  enableFeature: false,\n  retries: 5\n};';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string: fuzzyOld,
+          new_string: fuzzyNew,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.strategy).toBe('fuzzy');
+      const expectedContent =
+        '    const myConfig = {\n      enableFeature: false,\n      retries: 5\n    };';
+      expect(result.newContent).toBe(expectedContent);
+    });
+
     it('should NOT insert extra newlines when replacing a block preceded by a blank line (regression)', async () => {
       const content = '\n  function oldFunc() {\n    // some code\n  }';
       const result = await calculateReplacement(mockConfig, {

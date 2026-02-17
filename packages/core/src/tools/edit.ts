@@ -183,9 +183,7 @@ async function calculateFlexibleReplacement(
       const firstLineInMatch = window[0];
       const indentationMatch = firstLineInMatch.match(/^([ \t]*)/);
       const indentation = indentationMatch ? indentationMatch[1] : '';
-      const newBlockWithIndent = replaceLines.map(
-        (line: string) => `${indentation}${line}`,
-      );
+      const newBlockWithIndent = applyIndentation(replaceLines, indentation);
       sourceLines.splice(
         i,
         searchLinesStripped.length,
@@ -254,9 +252,7 @@ async function calculateRegexReplacement(
 
   const indentation = match[1] || '';
   const newLines = normalizedReplace.split('\n');
-  const newBlockWithIndent = newLines
-    .map((line) => `${indentation}${line}`)
-    .join('\n');
+  const newBlockWithIndent = applyIndentation(newLines, indentation).join('\n');
 
   // Use replace with the regex to substitute the matched content.
   // Since the regex doesn't have the 'g' flag, it will only replace the first occurrence.
@@ -1041,6 +1037,33 @@ function stripWhitespace(str: string): string {
   return str.replace(/\s/g, '');
 }
 
+/**
+ * Applies the target indentation to the lines, while preserving relative indentation.
+ * It identifies the common indentation of the provided lines and replaces it with the target indentation.
+ */
+function applyIndentation(
+  lines: string[],
+  targetIndentation: string,
+): string[] {
+  if (lines.length === 0) return [];
+
+  // Use the first line as the reference for indentation, even if it's empty/whitespace.
+  // This is because flexible/fuzzy matching identifies the indentation of the START of the match.
+  const referenceLine = lines[0];
+  const refIndentMatch = referenceLine.match(/^([ \t]*)/);
+  const refIndent = refIndentMatch ? refIndentMatch[1] : '';
+
+  return lines.map((line) => {
+    if (line.trim() === '') {
+      return '';
+    }
+    if (line.startsWith(refIndent)) {
+      return targetIndentation + line.slice(refIndent.length);
+    }
+    return targetIndentation + line.trimStart();
+  });
+}
+
 function getFuzzyMatchFeedback(editData: CalculatedEdit): string | null {
   if (
     editData.strategy === 'fuzzy' &&
@@ -1158,9 +1181,7 @@ async function calculateFuzzyReplacement(
       const indentationMatch = firstLineMatch.match(/^([ \t]*)/);
       const indentation = indentationMatch ? indentationMatch[1] : '';
 
-      const indentedReplaceLines = newLines.map(
-        (line) => `${indentation}${line}`,
-      );
+      const indentedReplaceLines = applyIndentation(newLines, indentation);
 
       let replacementText = indentedReplaceLines.join('\n');
       // If the last line of the match had a newline, preserve it in the replacement
