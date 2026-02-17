@@ -10,6 +10,7 @@ import { Box } from 'ink';
 import type React from 'react';
 import { Terminal } from '@xterm/headless';
 import { vi } from 'vitest';
+import stripAnsi from 'strip-ansi';
 import { act, useState } from 'react';
 import os from 'node:os';
 import { LoadedSettings } from '../config/settings.js';
@@ -61,8 +62,12 @@ type TerminalState = {
 class XtermStdout extends EventEmitter {
   private state: TerminalState;
   private pendingWrites = 0;
+  private renderCount = 0;
   private queue: { promise: Promise<void> };
   isTTY = true;
+
+  private lastRenderOutput = '';
+  private lastRenderStaticContent = '';
 
   constructor(state: TerminalState, queue: { promise: Promise<void> }) {
     super();
@@ -100,6 +105,13 @@ class XtermStdout extends EventEmitter {
     this.state.terminal.dispose();
   };
 
+  onRender = (staticContent: string, output: string) => {
+    this.renderCount++;
+    this.lastRenderStaticContent = staticContent;
+    this.lastRenderOutput = output;
+    this.emit('render');
+  };
+
   lastFrame = (options: { allowEmpty?: boolean } = {}) => {
     const buffer = this.state.terminal.buffer.active;
     const allLines: string[] = [];
@@ -122,6 +134,7 @@ class XtermStdout extends EventEmitter {
   };
 
   async waitUntilReady() {
+    const startRenderCount = this.renderCount;
     if (!vi.isFakeTimers()) {
       await new Promise((resolve) => setImmediate(resolve));
     }
@@ -129,10 +142,38 @@ class XtermStdout extends EventEmitter {
       if (vi.isFakeTimers()) {
         await vi.advanceTimersByTimeAsync(50);
       } else {
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        // Wait for at least one render to be called, but don't wait forever.
+        if (this.renderCount === startRenderCount) {
+          const renderPromise = new Promise((resolve) =>
+            this.once('render', resolve),
+          );
+          const timeoutPromise = new Promise((resolve) =>
+            setTimeout(resolve, 50),
+          );
+          await Promise.race([renderPromise, timeoutPromise]);
+        }
       }
     });
-    while (this.pendingWrites > 0) {
+
+    const isMatch = () => {
+      const currentFrame = this.lastFrame({ allowEmpty: true }).trim();
+      const expectedFrame = stripAnsi(
+        this.lastRenderStaticContent + this.lastRenderOutput,
+      ).trim();
+
+      // We strip ANSI from both to compare plain text content
+      const strippedCurrent = stripAnsi(currentFrame);
+      return (
+        strippedCurrent.includes(expectedFrame) ||
+        expectedFrame === '' ||
+        // Sometimes static content might be rendered as just "..." or similar if there's a lot
+        expectedFrame === '...'
+      );
+    };
+
+    let attempts = 0;
+    while ((this.pendingWrites > 0 || !isMatch()) && attempts < 10) {
+      attempts++;
       await act(async () => {
         if (vi.isFakeTimers()) {
           await vi.advanceTimersByTimeAsync(10);
@@ -253,6 +294,9 @@ export const render = (
       debug: false,
       exitOnCtrlC: false,
       patchConsole: false,
+      onRender: (metrics: { output: string; staticOutput?: string }) => {
+        stdout.onRender(metrics.staticOutput ?? '', metrics.output);
+      },
     });
   });
 
