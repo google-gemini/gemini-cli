@@ -10,7 +10,7 @@
  */
 
 import type { ToolDefinition, CoreToolSet } from './types.js';
-import { ModelFamilyService } from './modelFamilyService.js';
+import { getToolFamily } from './modelFamilyService.js';
 import { DEFAULT_LEGACY_SET } from './model-family-sets/default-legacy.js';
 import { GEMINI_3_SET } from './model-family-sets/gemini-3.js';
 import {
@@ -48,7 +48,7 @@ export { GEMINI_3_SET } from './model-family-sets/gemini-3.js';
  * Resolves the appropriate tool set for a given model ID.
  */
 export function getToolSet(modelId?: string): CoreToolSet {
-  const family = ModelFamilyService.getToolFamily(modelId);
+  const family = getToolFamily(modelId);
 
   switch (family) {
     case 'gemini-3':
