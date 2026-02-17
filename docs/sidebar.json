@@ -52,44 +52,42 @@
   {
     "label": "Features",
     "items": [
+      { "label": "Agent Skills", "slug": "docs/cli/skills" },
       {
-        "label": "/auth - Authentication",
+        "label": "Authentication",
         "slug": "docs/get-started/authentication"
       },
+      { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
       {
-        "label": "/extensions - Manage extensions",
+        "label": "Extensions",
         "slug": "docs/extensions/index"
       },
-      { "label": "/help - Show help", "link": "/docs/cli/commands/#help-or" },
-      { "label": "/hooks - Hooks", "slug": "docs/hooks" },
-      { "label": "/ide - IDE integration", "slug": "docs/ide-integration" },
-      { "label": "/mcp - MCP servers", "slug": "docs/tools/mcp-server" },
+      { "label": "Headless mode", "slug": "docs/cli/headless" },
+      { "label": "Help", "link": "/docs/cli/commands/#help-or" },
+      { "label": "Hooks", "slug": "docs/hooks" },
+      { "label": "IDE integration", "slug": "docs/ide-integration" },
+      { "label": "MCP servers", "slug": "docs/tools/mcp-server" },
       {
-        "label": "/memory - Manage memory",
+        "label": "Memory management",
         "link": "/docs/cli/commands/#memory"
       },
-      { "label": "/model - Model selection", "slug": "docs/cli/model" },
-      { "label": "/restore - Restore files", "slug": "docs/cli/checkpointing" },
-      { "label": "/rewind - Rewind", "slug": "docs/cli/rewind" },
-      { "label": "/settings - Settings", "slug": "docs/cli/settings" },
+      { "label": "Model routing", "slug": "docs/cli/model-routing" },
+      { "label": "Model selection", "slug": "docs/cli/model" },
+      { "label": "Plan mode (experimental)", "slug": "docs/cli/plan-mode" },
+      { "label": "Rewind", "slug": "docs/cli/rewind" },
+      { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
+      { "label": "Settings", "slug": "docs/cli/settings" },
       {
-        "label": "/shells - Manage processes",
+        "label": "Shell",
         "link": "/docs/cli/commands/#shells-or-bashes"
       },
-      { "label": "/skills - Agent skills", "slug": "docs/cli/skills" },
       {
-        "label": "/stats - Session statistics",
+        "label": "Stats",
         "link": "/docs/cli/commands/#stats"
       },
-      { "label": "/theme - Themes", "slug": "docs/cli/themes" },
-      { "label": "/tools - List tools", "link": "/docs/cli/commands/#tools" },
-      { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
-      { "label": "Headless mode", "slug": "docs/cli/headless" },
-      { "label": "Model routing", "slug": "docs/cli/model-routing" },
-      { "label": "Plan mode (experimental)", "slug": "docs/cli/plan-mode" },
-      { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
       { "label": "Telemetry", "slug": "docs/cli/telemetry" },
-      { "label": "Token caching", "slug": "docs/cli/token-caching" }
+      { "label": "Token caching", "slug": "docs/cli/token-caching" },
+      { "label": "Tools", "link": "/docs/cli/commands/#tools" }
     ]
   },
   {
@@ -121,7 +119,7 @@
       },
       {
         "label": "User guide: Install and manage",
-        "slug": "docs/extensions/index#manage-extensions"
+        "slug": "docs/extensions/index"
       },
       {
         "label": "Developer guide: Build extensions",
