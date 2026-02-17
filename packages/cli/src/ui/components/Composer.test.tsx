@@ -24,9 +24,13 @@ vi.mock('../contexts/VimModeContext.js', () => ({
     vimMode: 'INSERT',
   })),
 }));
-import { ApprovalMode, tokenLimit } from '@google/gemini-cli-core';
+import {
+  ApprovalMode,
+  tokenLimit,
+  CoreToolCallStatus,
+} from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
-import { StreamingState, ToolCallStatus } from '../types.js';
+import { StreamingState } from '../types.js';
 import { TransientMessageType } from '../../utils/events.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { SessionMetrics } from '../contexts/SessionContext.js';
@@ -426,7 +430,7 @@ describe('Composer', () => {
                 callId: 'call-1',
                 name: 'edit',
                 description: 'edit file',
-                status: ToolCallStatus.Confirming,
+                status: CoreToolCallStatus.AwaitingApproval,
                 resultDisplay: undefined,
                 confirmationDetails: undefined,
               },
@@ -453,6 +457,23 @@ describe('Composer', () => {
 
       const output = lastFrame();
       expect(output).toContain('LoadingIndicator');
+    });
+
+    it('renders both LoadingIndicator and ApprovalModeIndicator when streaming in full UI mode', () => {
+      const uiState = createMockUIState({
+        streamingState: StreamingState.Responding,
+        thought: {
+          subject: 'Thinking',
+          description: '',
+        },
+        showApprovalModeIndicator: ApprovalMode.PLAN,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      const output = lastFrame();
+      expect(output).toContain('LoadingIndicator: Thinking');
+      expect(output).toContain('ApprovalModeIndicator');
     });
 
     it('does NOT render LoadingIndicator when embedded shell is focused and background shell is NOT visible', () => {
@@ -935,6 +956,52 @@ describe('Composer', () => {
       const { lastFrame } = renderComposer(uiState);
 
       expect(lastFrame()).not.toContain('ShortcutsHelp');
+    });
+  });
+
+  describe('Snapshots', () => {
+    it('matches snapshot in idle state', () => {
+      const uiState = createMockUIState();
+      const { lastFrame } = renderComposer(uiState);
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
+    it('matches snapshot while streaming', () => {
+      const uiState = createMockUIState({
+        streamingState: StreamingState.Responding,
+        thought: {
+          subject: 'Thinking',
+          description: 'Thinking about the meaning of life...',
+        },
+      });
+      const { lastFrame } = renderComposer(uiState);
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
+    it('matches snapshot in narrow view', () => {
+      const uiState = createMockUIState({
+        terminalWidth: 40,
+      });
+      const { lastFrame } = renderComposer(uiState);
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
+    it('matches snapshot in minimal UI mode', () => {
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+      });
+      const { lastFrame } = renderComposer(uiState);
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
+    it('matches snapshot in minimal UI mode while loading', () => {
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+        streamingState: StreamingState.Responding,
+        elapsedTime: 1000,
+      });
+      const { lastFrame } = renderComposer(uiState);
+      expect(lastFrame()).toMatchSnapshot();
     });
   });
 });

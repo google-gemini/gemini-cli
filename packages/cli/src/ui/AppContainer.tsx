@@ -30,7 +30,6 @@ import {
 import { ConfigContext } from './contexts/ConfigContext.js';
 import {
   type HistoryItem,
-  ToolCallStatus,
   type HistoryItemWithoutId,
   type HistoryItemToolGroup,
   AuthState,
@@ -79,6 +78,7 @@ import {
   type ConsentRequestPayload,
   type AgentsDiscoveredPayload,
   ChangeAuthRequestedError,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -134,9 +134,9 @@ import { ShellFocusContext } from './contexts/ShellFocusContext.js';
 import { type ExtensionManager } from '../config/extension-manager.js';
 import { requestConsentInteractive } from '../config/extensions/consent.js';
 import { useSessionBrowser } from './hooks/useSessionBrowser.js';
-import { persistentState } from '../utils/persistentState.js';
 import { useSessionResume } from './hooks/useSessionResume.js';
 import { useIncludeDirsTrust } from './hooks/useIncludeDirsTrust.js';
+import { useSessionRetentionCheck } from './hooks/useSessionRetentionCheck.js';
 import { isWorkspaceTrusted } from '../config/trustedFolders.js';
 import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
@@ -161,7 +161,7 @@ function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
     if (item && item.type === 'tool_group') {
       return item.tools.some(
-        (tool) => ToolCallStatus.Executing === tool.status,
+        (tool) => CoreToolCallStatus.Executing === tool.status,
       );
     }
     return false;
@@ -174,7 +174,9 @@ function isToolAwaitingConfirmation(
   return pendingHistoryItems
     .filter((item): item is HistoryItemToolGroup => item.type === 'tool_group')
     .some((item) =>
-      item.tools.some((tool) => ToolCallStatus.Confirming === tool.status),
+      item.tools.some(
+        (tool) => CoreToolCallStatus.AwaitingApproval === tool.status,
+      ),
     );
 }
 
@@ -186,8 +188,11 @@ interface AppContainerProps {
   resumedSessionData?: ResumedSessionData;
 }
 
-const APPROVAL_MODE_REVEAL_DURATION_MS = 1200;
-const FOCUS_UI_ENABLED_STATE_KEY = 'focusUiEnabled';
+import { useRepeatedKeyPress } from './hooks/useRepeatedKeyPress.js';
+import {
+  useVisibilityToggle,
+  APPROVAL_MODE_REVEAL_DURATION_MS,
+} from './hooks/useVisibilityToggle.js';
 
 /**
  * The fraction of the terminal width to allocate to the shell.
@@ -609,11 +614,10 @@ export const AppContainer = (props: AppContainerProps) => {
     setThemeError,
     historyManager.addItem,
     initializationResult.themeError,
+    refreshStatic,
   );
-
   // Poll for terminal background color changes to auto-switch theme
   useTerminalTheme(handleThemeSelect, config, refreshStatic);
-
   const {
     authState,
     setAuthState,
@@ -801,65 +805,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const setIsBackgroundShellListOpenRef = useRef<(open: boolean) => void>(
     () => {},
   );
-  const [focusUiEnabledByDefault] = useState(
-    () => persistentState.get(FOCUS_UI_ENABLED_STATE_KEY) === true,
-  );
   const [shortcutsHelpVisible, setShortcutsHelpVisible] = useState(false);
-  const [cleanUiDetailsVisible, setCleanUiDetailsVisibleState] = useState(
-    !focusUiEnabledByDefault,
-  );
-  const modeRevealTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const cleanUiDetailsPinnedRef = useRef(!focusUiEnabledByDefault);
 
-  const clearModeRevealTimeout = useCallback(() => {
-    if (modeRevealTimeoutRef.current) {
-      clearTimeout(modeRevealTimeoutRef.current);
-      modeRevealTimeoutRef.current = null;
-    }
-  }, []);
-
-  const persistFocusUiPreference = useCallback((isFullUiVisible: boolean) => {
-    persistentState.set(FOCUS_UI_ENABLED_STATE_KEY, !isFullUiVisible);
-  }, []);
-
-  const setCleanUiDetailsVisible = useCallback(
-    (visible: boolean) => {
-      clearModeRevealTimeout();
-      cleanUiDetailsPinnedRef.current = visible;
-      setCleanUiDetailsVisibleState(visible);
-      persistFocusUiPreference(visible);
-    },
-    [clearModeRevealTimeout, persistFocusUiPreference],
-  );
-
-  const toggleCleanUiDetailsVisible = useCallback(() => {
-    clearModeRevealTimeout();
-    setCleanUiDetailsVisibleState((visible) => {
-      const nextVisible = !visible;
-      cleanUiDetailsPinnedRef.current = nextVisible;
-      persistFocusUiPreference(nextVisible);
-      return nextVisible;
-    });
-  }, [clearModeRevealTimeout, persistFocusUiPreference]);
-
-  const revealCleanUiDetailsTemporarily = useCallback(
-    (durationMs: number = APPROVAL_MODE_REVEAL_DURATION_MS) => {
-      if (cleanUiDetailsPinnedRef.current) {
-        return;
-      }
-      clearModeRevealTimeout();
-      setCleanUiDetailsVisibleState(true);
-      modeRevealTimeoutRef.current = setTimeout(() => {
-        if (!cleanUiDetailsPinnedRef.current) {
-          setCleanUiDetailsVisibleState(false);
-        }
-        modeRevealTimeoutRef.current = null;
-      }, durationMs);
-    },
-    [clearModeRevealTimeout],
-  );
-
-  useEffect(() => () => clearModeRevealTimeout(), [clearModeRevealTimeout]);
+  const {
+    cleanUiDetailsVisible,
+    setCleanUiDetailsVisible,
+    toggleCleanUiDetailsVisible,
+    revealCleanUiDetailsTemporarily,
+  } = useVisibilityToggle();
 
   const slashCommandActions = useMemo(
     () => ({
@@ -1394,10 +1347,29 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const [showFullTodos, setShowFullTodos] = useState<boolean>(false);
   const [renderMarkdown, setRenderMarkdown] = useState<boolean>(true);
 
-  const [ctrlCPressCount, setCtrlCPressCount] = useState(0);
-  const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [ctrlDPressCount, setCtrlDPressCount] = useState(0);
-  const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const handleExitRepeat = useCallback(
+    (count: number) => {
+      if (count > 2) {
+        recordExitFail(config);
+      }
+      if (count > 1) {
+        void handleSlashCommand('/quit', undefined, undefined, false);
+      }
+    },
+    [config, handleSlashCommand],
+  );
+
+  const { pressCount: ctrlCPressCount, handlePress: handleCtrlCPress } =
+    useRepeatedKeyPress({
+      windowMs: WARNING_PROMPT_DURATION_MS,
+      onRepeat: handleExitRepeat,
+    });
+
+  const { pressCount: ctrlDPressCount, handlePress: handleCtrlDPress } =
+    useRepeatedKeyPress({
+      windowMs: WARNING_PROMPT_DURATION_MS,
+      onRepeat: handleExitRepeat,
+    });
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [ideContextState, setIdeContextState] = useState<
     IdeContext | undefined
@@ -1419,6 +1391,28 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const isInitialMount = useRef(true);
 
   useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
+
+  const handleAutoEnableRetention = useCallback(() => {
+    const userSettings = settings.forScope(SettingScope.User).settings;
+    const currentRetention = userSettings.general?.sessionRetention ?? {};
+
+    settings.setValue(SettingScope.User, 'general.sessionRetention', {
+      ...currentRetention,
+      enabled: true,
+      maxAge: '30d',
+      warningAcknowledged: true,
+    });
+  }, [settings]);
+
+  const {
+    shouldShowWarning: shouldShowRetentionWarning,
+    checkComplete: retentionCheckComplete,
+    sessionsToDeleteCount,
+  } = useSessionRetentionCheck(
+    config,
+    settings.merged,
+    handleAutoEnableRetention,
+  );
 
   const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -1453,9 +1447,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       appEvents.off(AppEvent.PasteTimeout, handlePasteTimeout);
       if (tabFocusTimeoutRef.current) {
         clearTimeout(tabFocusTimeoutRef.current);
-      }
-      if (modeRevealTimeoutRef.current) {
-        clearTimeout(modeRevealTimeoutRef.current);
       }
     };
   }, [showTransientMessage]);
@@ -1529,44 +1520,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     };
   }, [config]);
 
-  useEffect(() => {
-    if (ctrlCTimerRef.current) {
-      clearTimeout(ctrlCTimerRef.current);
-      ctrlCTimerRef.current = null;
-    }
-    if (ctrlCPressCount > 2) {
-      recordExitFail(config);
-    }
-    if (ctrlCPressCount > 1) {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      handleSlashCommand('/quit', undefined, undefined, false);
-    } else if (ctrlCPressCount > 0) {
-      ctrlCTimerRef.current = setTimeout(() => {
-        setCtrlCPressCount(0);
-        ctrlCTimerRef.current = null;
-      }, WARNING_PROMPT_DURATION_MS);
-    }
-  }, [ctrlCPressCount, config, setCtrlCPressCount, handleSlashCommand]);
-
-  useEffect(() => {
-    if (ctrlDTimerRef.current) {
-      clearTimeout(ctrlDTimerRef.current);
-      ctrlCTimerRef.current = null;
-    }
-    if (ctrlDPressCount > 2) {
-      recordExitFail(config);
-    }
-    if (ctrlDPressCount > 1) {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      handleSlashCommand('/quit', undefined, undefined, false);
-    } else if (ctrlDPressCount > 0) {
-      ctrlDTimerRef.current = setTimeout(() => {
-        setCtrlDPressCount(0);
-        ctrlDTimerRef.current = null;
-      }, WARNING_PROMPT_DURATION_MS);
-    }
-  }, [ctrlDPressCount, config, setCtrlDPressCount, handleSlashCommand]);
-
   const handleEscapePromptChange = useCallback((showPrompt: boolean) => {
     setShowEscapePrompt(showPrompt);
   }, []);
@@ -1613,10 +1566,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
         // This should happen regardless of the count.
         cancelOngoingRequest?.();
 
-        setCtrlCPressCount((prev) => prev + 1);
+        handleCtrlCPress();
         return true;
       } else if (keyMatchers[Command.EXIT](key)) {
-        setCtrlDPressCount((prev) => prev + 1);
+        handleCtrlDPress();
         return true;
       } else if (keyMatchers[Command.SUSPEND_APP](key)) {
         handleSuspend();
@@ -1757,8 +1710,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setShowErrorDetails,
       config,
       ideContextState,
-      setCtrlCPressCount,
-      setCtrlDPressCount,
+      handleCtrlCPress,
+      handleCtrlDPress,
       handleSlashCommand,
       cancelOngoingRequest,
       activePtyId,
@@ -1898,6 +1851,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const nightly = props.version.includes('nightly');
 
   const dialogsVisible =
+    (shouldShowRetentionWarning && retentionCheckComplete) ||
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
     adminSettingsChanged ||
@@ -2010,6 +1964,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       history: historyManager.history,
       historyManager,
       isThemeDialogOpen,
+      shouldShowRetentionWarning:
+        shouldShowRetentionWarning && retentionCheckComplete,
+      sessionsToDeleteCount: sessionsToDeleteCount ?? 0,
       themeError,
       isAuthenticating,
       isConfigInitialized,
@@ -2123,6 +2080,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
     }),
     [
       isThemeDialogOpen,
+      shouldShowRetentionWarning,
+      retentionCheckComplete,
+      sessionsToDeleteCount,
       themeError,
       isAuthenticating,
       isConfigInitialized,

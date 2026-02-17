@@ -7,11 +7,15 @@
 import type React from 'react';
 import { ToolMessage, type ToolMessageProps } from './ToolMessage.js';
 import { describe, it, expect, vi } from 'vitest';
-import { StreamingState, ToolCallStatus } from '../../types.js';
+import { StreamingState } from '../../types.js';
 import { Text } from 'ink';
-import type { AnsiOutput } from '@google/gemini-cli-core';
+import { type AnsiOutput, CoreToolCallStatus } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { tryParseJSON } from '../../../utils/jsonoutput.js';
+
+vi.mock('../GeminiRespondingSpinner.js', () => ({
+  GeminiRespondingSpinner: () => <Text>MockRespondingSpinner</Text>,
+}));
 
 vi.mock('../TerminalOutput.js', () => ({
   TerminalOutput: function MockTerminalOutput({
@@ -33,7 +37,7 @@ describe('<ToolMessage />', () => {
     name: 'test-tool',
     description: 'A tool for testing',
     resultDisplay: 'Test result',
-    status: ToolCallStatus.Success,
+    status: CoreToolCallStatus.Success,
     terminalWidth: 80,
     confirmationDetails: undefined,
     emphasis: 'medium',
@@ -195,7 +199,7 @@ describe('<ToolMessage />', () => {
   describe('ToolStatusIndicator rendering', () => {
     it('shows ✓ for Success status', () => {
       const { lastFrame } = renderWithContext(
-        <ToolMessage {...baseProps} status={ToolCallStatus.Success} />,
+        <ToolMessage {...baseProps} status={CoreToolCallStatus.Success} />,
         StreamingState.Idle,
       );
       expect(lastFrame()).toMatchSnapshot();
@@ -203,7 +207,7 @@ describe('<ToolMessage />', () => {
 
     it('shows o for Pending status', () => {
       const { lastFrame } = renderWithContext(
-        <ToolMessage {...baseProps} status={ToolCallStatus.Pending} />,
+        <ToolMessage {...baseProps} status={CoreToolCallStatus.Scheduled} />,
         StreamingState.Idle,
       );
       expect(lastFrame()).toMatchSnapshot();
@@ -211,7 +215,10 @@ describe('<ToolMessage />', () => {
 
     it('shows ? for Confirming status', () => {
       const { lastFrame } = renderWithContext(
-        <ToolMessage {...baseProps} status={ToolCallStatus.Confirming} />,
+        <ToolMessage
+          {...baseProps}
+          status={CoreToolCallStatus.AwaitingApproval}
+        />,
         StreamingState.Idle,
       );
       expect(lastFrame()).toMatchSnapshot();
@@ -219,7 +226,7 @@ describe('<ToolMessage />', () => {
 
     it('shows - for Canceled status', () => {
       const { lastFrame } = renderWithContext(
-        <ToolMessage {...baseProps} status={ToolCallStatus.Canceled} />,
+        <ToolMessage {...baseProps} status={CoreToolCallStatus.Cancelled} />,
         StreamingState.Idle,
       );
       expect(lastFrame()).toMatchSnapshot();
@@ -227,7 +234,7 @@ describe('<ToolMessage />', () => {
 
     it('shows x for Error status', () => {
       const { lastFrame } = renderWithContext(
-        <ToolMessage {...baseProps} status={ToolCallStatus.Error} />,
+        <ToolMessage {...baseProps} status={CoreToolCallStatus.Error} />,
         StreamingState.Idle,
       );
       expect(lastFrame()).toMatchSnapshot();
@@ -235,7 +242,7 @@ describe('<ToolMessage />', () => {
 
     it('shows paused spinner for Executing status when streamingState is Idle', () => {
       const { lastFrame } = renderWithContext(
-        <ToolMessage {...baseProps} status={ToolCallStatus.Executing} />,
+        <ToolMessage {...baseProps} status={CoreToolCallStatus.Executing} />,
         StreamingState.Idle,
       );
       expect(lastFrame()).toMatchSnapshot();
@@ -243,7 +250,7 @@ describe('<ToolMessage />', () => {
 
     it('shows paused spinner for Executing status when streamingState is WaitingForConfirmation', () => {
       const { lastFrame } = renderWithContext(
-        <ToolMessage {...baseProps} status={ToolCallStatus.Executing} />,
+        <ToolMessage {...baseProps} status={CoreToolCallStatus.Executing} />,
         StreamingState.WaitingForConfirmation,
       );
       expect(lastFrame()).toMatchSnapshot();
@@ -251,7 +258,7 @@ describe('<ToolMessage />', () => {
 
     it('shows MockRespondingSpinner for Executing status when streamingState is Responding', () => {
       const { lastFrame } = renderWithContext(
-        <ToolMessage {...baseProps} status={ToolCallStatus.Executing} />,
+        <ToolMessage {...baseProps} status={CoreToolCallStatus.Executing} />,
         StreamingState.Responding, // Simulate app still responding
       );
       expect(lastFrame()).toMatchSnapshot();
