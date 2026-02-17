@@ -9,23 +9,6 @@ import { ModelFamilyService } from './modelFamilyService.js';
 import { DEFAULT_LEGACY_SET } from './model-family-sets/default-legacy.js';
 import { GEMINI_3_SET } from './model-family-sets/gemini-3.js';
 import {
-  READ_FILE_BASE,
-  WRITE_FILE_BASE,
-  GREP_BASE,
-  RIP_GREP_BASE,
-  GLOB_BASE,
-  LS_BASE,
-  EDIT_BASE,
-  WEB_SEARCH_BASE,
-  WEB_FETCH_BASE,
-  READ_MANY_FILES_BASE,
-  MEMORY_BASE,
-  WRITE_TODOS_BASE,
-  GET_INTERNAL_DOCS_BASE,
-  ASK_USER_BASE,
-  ENTER_PLAN_MODE_BASE,
-} from './base-declarations.js';
-import {
   getShellDeclaration,
   getExitPlanModeDeclaration,
   getActivateSkillDeclaration,
@@ -77,105 +60,105 @@ export function getToolSet(modelId?: string): CoreToolSet {
 
 export const READ_FILE_DEFINITION: ToolDefinition = {
   get base() {
-    return READ_FILE_BASE;
+    return DEFAULT_LEGACY_SET.read_file;
   },
   overrides: (modelId) => getToolSet(modelId).read_file,
 };
 
 export const WRITE_FILE_DEFINITION: ToolDefinition = {
   get base() {
-    return WRITE_FILE_BASE;
+    return DEFAULT_LEGACY_SET.write_file;
   },
   overrides: (modelId) => getToolSet(modelId).write_file,
 };
 
 export const GREP_DEFINITION: ToolDefinition = {
   get base() {
-    return GREP_BASE;
+    return DEFAULT_LEGACY_SET.grep_search;
   },
   overrides: (modelId) => getToolSet(modelId).grep_search,
 };
 
 export const RIP_GREP_DEFINITION: ToolDefinition = {
   get base() {
-    return RIP_GREP_BASE;
+    return DEFAULT_LEGACY_SET.grep_search_ripgrep;
   },
   overrides: (modelId) => getToolSet(modelId).grep_search_ripgrep,
 };
 
 export const WEB_SEARCH_DEFINITION: ToolDefinition = {
   get base() {
-    return WEB_SEARCH_BASE;
+    return DEFAULT_LEGACY_SET.google_web_search;
   },
   overrides: (modelId) => getToolSet(modelId).google_web_search,
 };
 
 export const EDIT_DEFINITION: ToolDefinition = {
   get base() {
-    return EDIT_BASE;
+    return DEFAULT_LEGACY_SET.replace;
   },
   overrides: (modelId) => getToolSet(modelId).replace,
 };
 
 export const GLOB_DEFINITION: ToolDefinition = {
   get base() {
-    return GLOB_BASE;
+    return DEFAULT_LEGACY_SET.glob;
   },
   overrides: (modelId) => getToolSet(modelId).glob,
 };
 
 export const LS_DEFINITION: ToolDefinition = {
   get base() {
-    return LS_BASE;
+    return DEFAULT_LEGACY_SET.list_directory;
   },
   overrides: (modelId) => getToolSet(modelId).list_directory,
 };
 
 export const WEB_FETCH_DEFINITION: ToolDefinition = {
   get base() {
-    return WEB_FETCH_BASE;
+    return DEFAULT_LEGACY_SET.web_fetch;
   },
   overrides: (modelId) => getToolSet(modelId).web_fetch,
 };
 
 export const READ_MANY_FILES_DEFINITION: ToolDefinition = {
   get base() {
-    return READ_MANY_FILES_BASE;
+    return DEFAULT_LEGACY_SET.read_many_files;
   },
   overrides: (modelId) => getToolSet(modelId).read_many_files,
 };
 
 export const MEMORY_DEFINITION: ToolDefinition = {
   get base() {
-    return MEMORY_BASE;
+    return DEFAULT_LEGACY_SET.save_memory;
   },
   overrides: (modelId) => getToolSet(modelId).save_memory,
 };
 
 export const WRITE_TODOS_DEFINITION: ToolDefinition = {
   get base() {
-    return WRITE_TODOS_BASE;
+    return DEFAULT_LEGACY_SET.write_todos;
   },
   overrides: (modelId) => getToolSet(modelId).write_todos,
 };
 
 export const GET_INTERNAL_DOCS_DEFINITION: ToolDefinition = {
   get base() {
-    return GET_INTERNAL_DOCS_BASE;
+    return DEFAULT_LEGACY_SET.get_internal_docs;
   },
   overrides: (modelId) => getToolSet(modelId).get_internal_docs,
 };
 
 export const ASK_USER_DEFINITION: ToolDefinition = {
   get base() {
-    return ASK_USER_BASE;
+    return DEFAULT_LEGACY_SET.ask_user;
   },
   overrides: (modelId) => getToolSet(modelId).ask_user,
 };
 
 export const ENTER_PLAN_MODE_DEFINITION: ToolDefinition = {
   get base() {
-    return ENTER_PLAN_MODE_BASE;
+    return DEFAULT_LEGACY_SET.enter_plan_mode;
   },
   overrides: (modelId) => getToolSet(modelId).enter_plan_mode,
 };
