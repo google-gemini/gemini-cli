@@ -89,52 +89,39 @@ export async function createBrowserAgentDefinition(
     (t) => !availableToolNames.includes(t),
   );
 
-  // Check if visual agent model is available for current auth type.
-  // The visual agent model (computer-use) is only available via Gemini API key
-  // or Vertex AI, not via GCA/OAuth or Cloud Shell.
-  const isVisualModelAvailable = (() => {
+  // Check whether vision can be enabled; returns undefined if all gates pass.
+  function getVisionDisabledReason(): string | undefined {
+    const browserConfig = config.getBrowserAgentConfig();
+    if (!browserConfig.customConfig.visualModel) {
+      return 'No visualModel configured.';
+    }
+    if (missingVisualTools.length > 0) {
+      return (
+        `Visual tools missing (${missingVisualTools.join(', ')}). ` +
+        `Ensure chrome-devtools-mcp is started with --experimental-vision.`
+      );
+    }
     const authType = config.getContentGeneratorConfig()?.authType;
-    if (
-      authType === AuthType.LOGIN_WITH_GOOGLE ||
-      authType === AuthType.LEGACY_CLOUD_SHELL ||
-      authType === AuthType.COMPUTE_ADC
-    ) {
-      return false;
+    const blockedAuthTypes = new Set([
+      AuthType.LOGIN_WITH_GOOGLE,
+      AuthType.LEGACY_CLOUD_SHELL,
+      AuthType.COMPUTE_ADC,
+    ]);
+    if (authType && blockedAuthTypes.has(authType)) {
+      return 'Visual agent model not available for current auth type.';
     }
-    return true;
-  })();
+    return undefined;
+  }
 
-  // Create all tools - visual delegation only if visual tools are available
   const allTools: AnyDeclarativeTool[] = [...mcpTools];
+  const visionDisabledReason = getVisionDisabledReason();
 
-  if (missingVisualTools.length > 0) {
-    debugLogger.log(
-      `Visual tools missing (${missingVisualTools.join(', ')}). ` +
-        `Visual agent delegation disabled. Ensure chrome-devtools-mcp is started with --experimental-vision.`,
-    );
-    if (printOutput) {
-      printOutput(
-        `⚠️ Visual tools unavailable - coordinate-based actions disabled.`,
-      );
-    }
-  } else if (!isVisualModelAvailable) {
-    debugLogger.log(
-      `Visual agent model not available for current auth type. ` +
-        `Visual agent delegation disabled.`,
-    );
-    if (printOutput) {
-      printOutput(
-        `⚠️ Visual agent unavailable for current auth type - coordinate-based actions disabled.`,
-      );
-    }
+  if (visionDisabledReason) {
+    debugLogger.log(`Vision disabled: ${visionDisabledReason}`);
   } else {
-    // Create visual analysis tool only if visual tools are available
-    const visualDelegationTool = createAnalyzeScreenshotTool(
-      browserManager,
-      config,
-      messageBus,
+    allTools.push(
+      createAnalyzeScreenshotTool(browserManager, config, messageBus),
     );
-    allTools.push(visualDelegationTool);
   }
 
   debugLogger.log(

@@ -152,7 +152,8 @@ describe('BrowserManager', () => {
         ]),
       });
       // Persistent mode should NOT include --isolated or --autoConnect
-      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]?.args as string[];
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+        ?.args as string[];
       expect(args).not.toContain('--isolated');
       expect(args).not.toContain('--autoConnect');
     });
@@ -220,7 +221,8 @@ describe('BrowserManager', () => {
       const manager = new BrowserManager(isolatedConfig);
       await manager.ensureConnection();
 
-      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]?.args as string[];
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+        ?.args as string[];
       expect(args).toContain('--isolated');
       expect(args).not.toContain('--autoConnect');
     });
@@ -242,7 +244,8 @@ describe('BrowserManager', () => {
       const manager = new BrowserManager(existingConfig);
       await manager.ensureConnection();
 
-      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]?.args as string[];
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+        ?.args as string[];
       expect(args).toContain('--autoConnect');
       expect(args).not.toContain('--isolated');
     });
@@ -252,9 +255,7 @@ describe('BrowserManager', () => {
       vi.mocked(Client).mockImplementation(
         () =>
           ({
-            connect: vi
-              .fn()
-              .mockRejectedValue(new Error('Connection refused')),
+            connect: vi.fn().mockRejectedValue(new Error('Connection refused')),
             close: vi.fn().mockResolvedValue(undefined),
             listTools: vi.fn(),
             callTool: vi.fn(),
