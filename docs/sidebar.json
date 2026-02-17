@@ -197,6 +197,7 @@
     "label": "resources_tab",
     "items": [
       {
+      {
         "label": "Resources",
         "items": [
           { "label": "FAQ", "slug": "docs/resources/faq" },
@@ -215,6 +216,7 @@
           { "label": "Uninstall", "slug": "docs/resources/uninstall" }
         ]
       }
+
     ]
   },
   {
