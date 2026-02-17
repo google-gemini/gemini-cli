@@ -90,16 +90,21 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
     ([, metrics]) => metrics.tokens.cached > 0,
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const allRoles = [
     ...new Set(
       activeModels.flatMap(([, metrics]) => Object.keys(metrics.roles ?? {})),
     ),
-  ].sort((a, b) => {
-    if (a === LlmRole.MAIN) return -1;
-    if (b === LlmRole.MAIN) return 1;
-    return a.localeCompare(b);
-  }) as LlmRole[];
+  ]
+    .filter((role): role is LlmRole => {
+      const validRoles: string[] = Object.values(LlmRole);
+      return validRoles.includes(role);
+    })
+    .sort((a, b) => {
+      if (a === b) return 0;
+      if (a === LlmRole.MAIN) return -1;
+      if (b === LlmRole.MAIN) return 1;
+      return a.localeCompare(b);
+    });
 
   // Helper to create a row with values for each model
   const createRow = (

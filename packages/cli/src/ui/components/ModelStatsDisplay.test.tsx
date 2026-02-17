@@ -531,9 +531,10 @@ describe('<ModelStatsDisplay />', () => {
     expect(output).toContain('Pro');
   });
 
-  it('should handle long metric names with truncation', () => {
-    const longRoleName =
-      'this_is_a_very_long_role_name_that_should_be_truncated' as LlmRole;
+  it('should handle long role name layout', () => {
+    // Use the longest valid role name to test layout
+    const longRoleName = LlmRole.UTILITY_LOOP_DETECTOR;
+
     const { lastFrame } = renderWithMockedStats({
       models: {
         'gemini-2.5-pro': {
@@ -584,6 +585,66 @@ describe('<ModelStatsDisplay />', () => {
       },
     });
 
-    expect(lastFrame()).toMatchSnapshot();
+    const output = lastFrame();
+    expect(output).toContain(longRoleName);
+    expect(output).toMatchSnapshot();
+  });
+
+  it('should filter out invalid role names', () => {
+    const invalidRoleName =
+      'this_is_a_very_long_role_name_that_should_be_wrapped' as LlmRole;
+    const { lastFrame } = renderWithMockedStats({
+      models: {
+        'gemini-2.5-pro': {
+          api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
+          tokens: {
+            input: 10,
+            prompt: 10,
+            candidates: 20,
+            total: 30,
+            cached: 0,
+            thoughts: 0,
+            tool: 0,
+          },
+          roles: {
+            [invalidRoleName]: {
+              totalRequests: 1,
+              totalErrors: 0,
+              totalLatencyMs: 100,
+              tokens: {
+                input: 10,
+                prompt: 10,
+                candidates: 20,
+                total: 30,
+                cached: 0,
+                thoughts: 0,
+                tool: 0,
+              },
+            },
+          },
+        },
+      },
+      tools: {
+        totalCalls: 0,
+        totalSuccess: 0,
+        totalFail: 0,
+        totalDurationMs: 0,
+        totalDecisions: {
+          accept: 0,
+          reject: 0,
+          modify: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
+        },
+        byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
+      },
+    });
+
+    const output = lastFrame();
+    expect(output).not.toContain(invalidRoleName);
+    expect(output).toMatchSnapshot();
   });
 });
