@@ -241,6 +241,18 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toMatchSnapshot();
   });
 
+  it('should include mandate to distinguish between Directives and Inquiries', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('Distinguish between **Directives**');
+    expect(prompt).toContain('and **Inquiries**');
+    expect(prompt).toContain(
+      'Assume all requests are Inquiries unless they contain an explicit instruction to perform a task.',
+    );
+    expect(prompt).toMatchSnapshot();
+  });
+
   it.each([
     ['empty string', ''],
     ['whitespace only', '   \n  \t '],
