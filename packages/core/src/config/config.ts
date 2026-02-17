@@ -974,7 +974,7 @@ export class Config {
       }
     });
 
-    if (!this.interactive) {
+    if (!this.interactive || this.experimentalZedIntegration) {
       await mcpInitialization;
     }
 
