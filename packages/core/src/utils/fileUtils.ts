@@ -431,13 +431,13 @@ export async function processSingleFileContent(
         errorType: ToolErrorType.TARGET_IS_DIRECTORY,
       };
     }
-
+    const MAX_FILE_SIZE_MB = 100;
     const fileSizeInMB = stats.size / (1024 * 1024);
-    if (fileSizeInMB > 100) {
+    if (fileSizeInMB > MAX_FILE_SIZE_MB) {
       return {
-        llmContent: 'File size exceeds the 100MB limit.',
-        returnDisplay: 'File size exceeds the 100MB limit.',
-        error: `File size exceeds the 100MB limit: ${filePath} (${fileSizeInMB.toFixed(2)}MB)`,
+        llmContent: `File size exceeds the ${MAX_FILE_SIZE_MB}MB limit.`,
+        returnDisplay: `File size exceeds the ${MAX_FILE_SIZE_MB}MB limit.`,
+        error: `File size exceeds the ${MAX_FILE_SIZE_MB}MB limit: ${filePath} (${fileSizeInMB.toFixed(2)}MB)`,
         errorType: ToolErrorType.FILE_TOO_LARGE,
       };
     }
