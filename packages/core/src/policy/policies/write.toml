@@ -5,11 +5,11 @@
 #
 # Priority bands (tiers):
 # - Default policies (TOML): 1 + priority/1000 (e.g., priority 100 → 1.100)
-# - Project policies (TOML): 2 + priority/1000 (e.g., priority 100 → 2.100)
+# - Workspace policies (TOML): 2 + priority/1000 (e.g., priority 100 → 2.100)
 # - User policies (TOML): 3 + priority/1000 (e.g., priority 100 → 3.100)
 # - Admin policies (TOML): 4 + priority/1000 (e.g., priority 100 → 4.100)
 #
-# This ensures Admin > User > Project > Default hierarchy is always preserved,
+# This ensures Admin > User > Workspace > Default hierarchy is always preserved,
 # while allowing user-specified priorities to work within each tier.
 #
 # Settings-based and dynamic rules (all in user tier 3.x):

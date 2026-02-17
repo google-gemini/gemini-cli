@@ -18,7 +18,7 @@ import { type Settings } from './settings.js';
 export async function createPolicyEngineConfig(
   settings: Settings,
   approvalMode: ApprovalMode,
-  projectPoliciesDir?: string,
+  workspacePoliciesDir?: string,
 ): Promise<PolicyEngineConfig> {
   // Explicitly construct PolicySettings from Settings to ensure type safety
   // and avoid accidental leakage of other settings properties.
@@ -33,7 +33,7 @@ export async function createPolicyEngineConfig(
     policySettings,
     approvalMode,
     undefined,
-    projectPoliciesDir,
+    workspacePoliciesDir,
   );
 }
 

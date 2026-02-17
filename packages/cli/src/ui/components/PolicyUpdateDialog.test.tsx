@@ -23,14 +23,14 @@ describe('PolicyUpdateDialog', () => {
     const { lastFrame } = renderWithProviders(
       <PolicyUpdateDialog
         onSelect={onSelect}
-        scope="project"
+        scope="workspace"
         identifier="/test/path"
         isRestarting={false}
       />,
     );
 
     const output = lastFrame();
-    expect(output).toContain('New or changed project policies detected');
+    expect(output).toContain('New or changed workspace policies detected');
     expect(output).toContain('Location: /test/path');
     expect(output).toContain('Accept and Load');
     expect(output).toContain('Ignore');
@@ -41,7 +41,7 @@ describe('PolicyUpdateDialog', () => {
     const { stdin } = renderWithProviders(
       <PolicyUpdateDialog
         onSelect={onSelect}
-        scope="project"
+        scope="workspace"
         identifier="/test/path"
         isRestarting={false}
       />,
@@ -62,7 +62,7 @@ describe('PolicyUpdateDialog', () => {
     const { stdin } = renderWithProviders(
       <PolicyUpdateDialog
         onSelect={onSelect}
-        scope="project"
+        scope="workspace"
         identifier="/test/path"
         isRestarting={false}
       />,
@@ -86,7 +86,7 @@ describe('PolicyUpdateDialog', () => {
     const { stdin } = renderWithProviders(
       <PolicyUpdateDialog
         onSelect={onSelect}
-        scope="project"
+        scope="workspace"
         identifier="/test/path"
         isRestarting={false}
       />,
@@ -106,7 +106,7 @@ describe('PolicyUpdateDialog', () => {
     const { lastFrame } = renderWithProviders(
       <PolicyUpdateDialog
         onSelect={onSelect}
-        scope="project"
+        scope="workspace"
         identifier="/test/path"
         isRestarting={true}
       />,

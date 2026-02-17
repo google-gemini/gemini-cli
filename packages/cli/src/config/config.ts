@@ -294,7 +294,7 @@ export async function parseArguments(
         .option('accept-changed-policies', {
           type: 'boolean',
           description:
-            'Automatically accept changed project policies (use with caution).',
+            'Automatically accept changed workspace policies (use with caution).',
         }),
     )
     // Register MCP subcommands
@@ -702,52 +702,52 @@ export async function loadCliConfig(
     policyPaths: argv.policy,
   };
 
-  let projectPoliciesDir: string | undefined;
+  let workspacePoliciesDir: string | undefined;
   let policyUpdateConfirmationRequest:
     | PolicyUpdateConfirmationRequest
     | undefined;
 
   if (trustedFolder) {
-    const potentialProjectPoliciesDir = new Storage(
+    const potentialWorkspacePoliciesDir = new Storage(
       cwd,
-    ).getProjectPoliciesDir();
+    ).getWorkspacePoliciesDir();
     const integrityManager = new PolicyIntegrityManager();
     const integrityResult = await integrityManager.checkIntegrity(
-      'project',
+      'workspace',
       cwd,
-      potentialProjectPoliciesDir,
+      potentialWorkspacePoliciesDir,
     );
 
     if (integrityResult.status === IntegrityStatus.MATCH) {
-      projectPoliciesDir = potentialProjectPoliciesDir;
+      workspacePoliciesDir = potentialWorkspacePoliciesDir;
     } else if (
       integrityResult.status === IntegrityStatus.NEW &&
       integrityResult.fileCount === 0
     ) {
-      // No project policies found
-      projectPoliciesDir = undefined;
+      // No workspace policies found
+      workspacePoliciesDir = undefined;
     } else {
       // Policies changed or are new
       if (argv.acceptChangedPolicies) {
         debugLogger.warn(
-          'WARNING: Project policies changed or are new. Auto-accepting due to --accept-changed-policies flag.',
+          'WARNING: Workspace policies changed or are new. Auto-accepting due to --accept-changed-policies flag.',
         );
         await integrityManager.acceptIntegrity(
-          'project',
+          'workspace',
           cwd,
           integrityResult.hash,
         );
-        projectPoliciesDir = potentialProjectPoliciesDir;
+        workspacePoliciesDir = potentialWorkspacePoliciesDir;
       } else if (interactive) {
         policyUpdateConfirmationRequest = {
-          scope: 'project',
+          scope: 'workspace',
           identifier: cwd,
-          policyDir: potentialProjectPoliciesDir,
+          policyDir: potentialWorkspacePoliciesDir,
           newHash: integrityResult.hash,
         };
       } else {
         debugLogger.warn(
-          'WARNING: Project policies changed or are new. Loading default policies only. Use --accept-changed-policies to accept.',
+          'WARNING: Workspace policies changed or are new. Loading default policies only. Use --accept-changed-policies to accept.',
         );
       }
     }
@@ -756,7 +756,7 @@ export async function loadCliConfig(
   const policyEngineConfig = await createPolicyEngineConfig(
     effectiveSettings,
     approvalMode,
-    projectPoliciesDir,
+    workspacePoliciesDir,
   );
   policyEngineConfig.nonInteractive = !interactive;
 

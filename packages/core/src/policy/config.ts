@@ -38,7 +38,7 @@ export const DEFAULT_CORE_POLICIES_DIR = path.join(__dirname, 'policies');
 
 // Policy tier constants for priority calculation
 export const DEFAULT_POLICY_TIER = 1;
-export const PROJECT_POLICY_TIER = 2;
+export const WORKSPACE_POLICY_TIER = 2;
 export const USER_POLICY_TIER = 3;
 export const ADMIN_POLICY_TIER = 4;
 
@@ -49,12 +49,12 @@ export const ADMIN_POLICY_TIER = 4;
  * @param defaultPoliciesDir Optional path to a directory containing default policies.
  * @param policyPaths Optional user-provided policy paths (from --policy flag).
  *   When provided, these replace the default user policies directory.
- * @param projectPoliciesDir Optional path to a directory containing project policies.
+ * @param workspacePoliciesDir Optional path to a directory containing workspace policies.
  */
 export function getPolicyDirectories(
   defaultPoliciesDir?: string,
   policyPaths?: string[],
-  projectPoliciesDir?: string,
+  workspacePoliciesDir?: string,
 ): string[] {
   const dirs = [];
 
@@ -68,9 +68,9 @@ export function getPolicyDirectories(
     dirs.push(Storage.getUserPoliciesDir());
   }
 
-  // Project Tier (third highest)
-  if (projectPoliciesDir) {
-    dirs.push(projectPoliciesDir);
+  // Workspace Tier (third highest)
+  if (workspacePoliciesDir) {
+    dirs.push(workspacePoliciesDir);
   }
 
   // Default tier (lowest priority)
@@ -80,13 +80,13 @@ export function getPolicyDirectories(
 }
 
 /**
- * Determines the policy tier (1=default, 2=user, 3=project, 4=admin) for a given directory.
+ * Determines the policy tier (1=default, 2=user, 3=workspace, 4=admin) for a given directory.
  * This is used by the TOML loader to assign priority bands.
  */
 export function getPolicyTier(
   dir: string,
   defaultPoliciesDir?: string,
-  projectPoliciesDir?: string,
+  workspacePoliciesDir?: string,
 ): number {
   const USER_POLICIES_DIR = Storage.getUserPoliciesDir();
   const ADMIN_POLICIES_DIR = Storage.getSystemPoliciesDir();
@@ -108,10 +108,10 @@ export function getPolicyTier(
     return USER_POLICY_TIER;
   }
   if (
-    projectPoliciesDir &&
-    normalizedDir === path.resolve(projectPoliciesDir)
+    workspacePoliciesDir &&
+    normalizedDir === path.resolve(workspacePoliciesDir)
   ) {
-    return PROJECT_POLICY_TIER;
+    return WORKSPACE_POLICY_TIER;
   }
   if (normalizedDir === normalizedAdmin) {
     return ADMIN_POLICY_TIER;
@@ -167,12 +167,12 @@ export async function createPolicyEngineConfig(
   settings: PolicySettings,
   approvalMode: ApprovalMode,
   defaultPoliciesDir?: string,
-  projectPoliciesDir?: string,
+  workspacePoliciesDir?: string,
 ): Promise<PolicyEngineConfig> {
   const policyDirs = getPolicyDirectories(
     defaultPoliciesDir,
     settings.policyPaths,
-    projectPoliciesDir,
+    workspacePoliciesDir,
   );
   const securePolicyDirs = await filterSecurePolicyDirectories(policyDirs);
 
@@ -186,7 +186,7 @@ export async function createPolicyEngineConfig(
     checkers: tomlCheckers,
     errors,
   } = await loadPoliciesFromToml(securePolicyDirs, (p) => {
-    const tier = getPolicyTier(p, defaultPoliciesDir, projectPoliciesDir);
+    const tier = getPolicyTier(p, defaultPoliciesDir, workspacePoliciesDir);
 
     // If it's a user-provided path that isn't already categorized as ADMIN,
     // treat it as USER tier.
@@ -222,11 +222,11 @@ export async function createPolicyEngineConfig(
   //
   // Priority bands (tiers):
   // - Default policies (TOML): 1 + priority/1000 (e.g., priority 100 → 1.100)
-  // - Project policies (TOML): 2 + priority/1000 (e.g., priority 100 → 2.100)
+  // - Workspace policies (TOML): 2 + priority/1000 (e.g., priority 100 → 2.100)
   // - User policies (TOML): 3 + priority/1000 (e.g., priority 100 → 3.100)
   // - Admin policies (TOML): 4 + priority/1000 (e.g., priority 100 → 4.100)
   //
-  // This ensures Admin > User > Project > Default hierarchy is always preserved,
+  // This ensures Admin > User > Workspace > Default hierarchy is always preserved,
   // while allowing user-specified priorities to work within each tier.
   //
   // Settings-based and dynamic rules (all in user tier 3.x):

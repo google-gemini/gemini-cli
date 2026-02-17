@@ -14,7 +14,7 @@ vi.mock('../utils/security.js', () => ({
   isDirectorySecure: vi.fn().mockResolvedValue({ secure: true }),
 }));
 
-describe('Project-Level Policies', () => {
+describe('Workspace-Level Policies', () => {
   beforeEach(async () => {
     vi.resetModules();
     const { Storage } = await import('../config/storage.js');
@@ -34,8 +34,8 @@ describe('Project-Level Policies', () => {
     vi.doUnmock('node:fs/promises');
   });
 
-  it('should load project policies with correct priority (Tier 2)', async () => {
-    const projectPoliciesDir = '/mock/project/policies';
+  it('should load workspace policies with correct priority (Tier 2)', async () => {
+    const workspacePoliciesDir = '/mock/workspace/policies';
     const defaultPoliciesDir = '/mock/default/policies';
 
     // Mock FS
@@ -69,10 +69,10 @@ describe('Project-Level Policies', () => {
         return [
           { name: 'user.toml', isFile: () => true, isDirectory: () => false },
         ] as unknown as Awaited<ReturnType<typeof actualFs.readdir>>;
-      if (normalizedPath.endsWith('project/policies'))
+      if (normalizedPath.endsWith('workspace/policies'))
         return [
           {
-            name: 'project.toml',
+            name: 'workspace.toml',
             isFile: () => true,
             isDirectory: () => false,
           },
@@ -100,7 +100,7 @@ decision = "deny"
 priority = 10
 `; // Tier 3 -> 3.010
       }
-      if (path.includes('project.toml')) {
+      if (path.includes('workspace.toml')) {
         return `[[rule]]
 toolName = "test_tool"
 decision = "allow"
@@ -132,12 +132,12 @@ priority = 10
 
     const { createPolicyEngineConfig } = await import('./config.js');
 
-    // Test 1: Project vs User (User should win)
+    // Test 1: Workspace vs User (User should win)
     const config = await createPolicyEngineConfig(
       {},
       ApprovalMode.DEFAULT,
       defaultPoliciesDir,
-      projectPoliciesDir,
+      workspacePoliciesDir,
     );
 
     const rules = config.rules?.filter((r) => r.toolName === 'test_tool');
@@ -145,22 +145,22 @@ priority = 10
 
     // Check for all 4 rules
     const defaultRule = rules?.find((r) => r.priority === 1.01);
-    const projectRule = rules?.find((r) => r.priority === 2.01);
+    const workspaceRule = rules?.find((r) => r.priority === 2.01);
     const userRule = rules?.find((r) => r.priority === 3.01);
     const adminRule = rules?.find((r) => r.priority === 4.01);
 
     expect(defaultRule).toBeDefined();
     expect(userRule).toBeDefined();
-    expect(projectRule).toBeDefined();
+    expect(workspaceRule).toBeDefined();
     expect(adminRule).toBeDefined();
 
-    // Verify Hierarchy: Admin > User > Project > Default
+    // Verify Hierarchy: Admin > User > Workspace > Default
     expect(adminRule!.priority).toBeGreaterThan(userRule!.priority!);
-    expect(userRule!.priority).toBeGreaterThan(projectRule!.priority!);
-    expect(projectRule!.priority).toBeGreaterThan(defaultRule!.priority!);
+    expect(userRule!.priority).toBeGreaterThan(workspaceRule!.priority!);
+    expect(workspaceRule!.priority).toBeGreaterThan(defaultRule!.priority!);
   });
 
-  it('should ignore project policies if projectPoliciesDir is undefined', async () => {
+  it('should ignore workspace policies if workspacePoliciesDir is undefined', async () => {
     const defaultPoliciesDir = '/mock/default/policies';
 
     // Mock FS (simplified)
@@ -217,7 +217,7 @@ priority=10`,
       {},
       ApprovalMode.DEFAULT,
       defaultPoliciesDir,
-      undefined, // No project dir
+      undefined, // No workspace dir
     );
 
     // Should only have default tier rule (1.01)
@@ -226,8 +226,8 @@ priority=10`,
     expect(rules![0].priority).toBe(1.01);
   });
 
-  it('should load project policies and correctly transform to Tier 2', async () => {
-    const projectPoliciesDir = '/mock/project/policies';
+  it('should load workspace policies and correctly transform to Tier 2', async () => {
+    const workspacePoliciesDir = '/mock/workspace/policies';
 
     // Mock FS
     const actualFs =
@@ -247,10 +247,10 @@ priority=10`,
 
     const mockReaddir = vi.fn(async (path: string) => {
       const normalizedPath = nodePath.normalize(path);
-      if (normalizedPath.endsWith('project/policies'))
+      if (normalizedPath.endsWith('workspace/policies'))
         return [
           {
-            name: 'project.toml',
+            name: 'workspace.toml',
             isFile: () => true,
             isDirectory: () => false,
           },
@@ -283,12 +283,12 @@ priority=500`,
       {},
       ApprovalMode.DEFAULT,
       undefined,
-      projectPoliciesDir,
+      workspacePoliciesDir,
     );
 
     const rule = config.rules?.find((r) => r.toolName === 'p_tool');
     expect(rule).toBeDefined();
-    // Project Tier (2) + 500/1000 = 2.5
+    // Workspace Tier (2) + 500/1000 = 2.5
     expect(rule?.priority).toBe(2.5);
   });
 });

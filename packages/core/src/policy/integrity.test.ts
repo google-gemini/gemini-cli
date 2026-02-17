@@ -61,11 +61,11 @@ describe('PolicyIntegrityManager', () => {
     it('should return NEW if no stored hash', async () => {
       mockFs.readFile.mockRejectedValue({ code: 'ENOENT' }); // No stored file
       readPolicyFilesMock.mockResolvedValue([
-        { path: '/project/policies/a.toml', content: 'contentA' },
+        { path: '/workspace/policies/a.toml', content: 'contentA' },
       ]);
 
       const result = await integrityManager.checkIntegrity(
-        'project',
+        'workspace',
         'id',
         '/dir',
       );
@@ -77,13 +77,13 @@ describe('PolicyIntegrityManager', () => {
 
     it('should return MATCH if stored hash matches', async () => {
       readPolicyFilesMock.mockResolvedValue([
-        { path: '/project/policies/a.toml', content: 'contentA' },
+        { path: '/workspace/policies/a.toml', content: 'contentA' },
       ]);
       // We can't easily get the expected hash without calling private method or re-implementing logic.
       // But we can run checkIntegrity once (NEW) to get the hash, then mock FS with that hash.
       mockFs.readFile.mockRejectedValue({ code: 'ENOENT' });
       const resultNew = await integrityManager.checkIntegrity(
-        'project',
+        'workspace',
         'id',
         '/dir',
       );
@@ -91,12 +91,12 @@ describe('PolicyIntegrityManager', () => {
 
       mockFs.readFile.mockResolvedValue(
         JSON.stringify({
-          'project:id': currentHash,
+          'workspace:id': currentHash,
         }),
       );
 
       const result = await integrityManager.checkIntegrity(
-        'project',
+        'workspace',
         'id',
         '/dir',
       );
@@ -108,10 +108,10 @@ describe('PolicyIntegrityManager', () => {
     it('should return MISMATCH if stored hash differs', async () => {
       mockFs.readFile.mockRejectedValue({ code: 'ENOENT' });
       readPolicyFilesMock.mockResolvedValue([
-        { path: '/project/policies/a.toml', content: 'contentA' },
+        { path: '/workspace/policies/a.toml', content: 'contentA' },
       ]);
       const resultNew = await integrityManager.checkIntegrity(
-        'project',
+        'workspace',
         'id',
         '/dir',
       );
@@ -119,12 +119,12 @@ describe('PolicyIntegrityManager', () => {
 
       mockFs.readFile.mockResolvedValue(
         JSON.stringify({
-          'project:id': 'different_hash',
+          'workspace:id': 'different_hash',
         }),
       );
 
       const result = await integrityManager.checkIntegrity(
-        'project',
+        'workspace',
         'id',
         '/dir',
       );
@@ -137,21 +137,21 @@ describe('PolicyIntegrityManager', () => {
       mockFs.readFile.mockRejectedValue({ code: 'ENOENT' });
 
       readPolicyFilesMock.mockResolvedValue([
-        { path: '/project/policies/a.toml', content: 'contentA' },
+        { path: '/workspace/policies/a.toml', content: 'contentA' },
       ]);
       const result1 = await integrityManager.checkIntegrity(
-        'project',
+        'workspace',
         'id',
-        '/project/policies',
+        '/workspace/policies',
       );
 
       readPolicyFilesMock.mockResolvedValue([
-        { path: '/project/policies/b.toml', content: 'contentA' },
+        { path: '/workspace/policies/b.toml', content: 'contentA' },
       ]);
       const result2 = await integrityManager.checkIntegrity(
-        'project',
+        'workspace',
         'id',
-        '/project/policies',
+        '/workspace/policies',
       );
 
       expect(result1.hash).not.toBe(result2.hash);
@@ -161,21 +161,21 @@ describe('PolicyIntegrityManager', () => {
       mockFs.readFile.mockRejectedValue({ code: 'ENOENT' });
 
       readPolicyFilesMock.mockResolvedValue([
-        { path: '/project/policies/a.toml', content: 'contentA' },
+        { path: '/workspace/policies/a.toml', content: 'contentA' },
       ]);
       const result1 = await integrityManager.checkIntegrity(
-        'project',
+        'workspace',
         'id',
-        '/project/policies',
+        '/workspace/policies',
       );
 
       readPolicyFilesMock.mockResolvedValue([
-        { path: '/project/policies/a.toml', content: 'contentB' },
+        { path: '/workspace/policies/a.toml', content: 'contentB' },
       ]);
       const result2 = await integrityManager.checkIntegrity(
-        'project',
+        'workspace',
         'id',
-        '/project/policies',
+        '/workspace/policies',
       );
 
       expect(result1.hash).not.toBe(result2.hash);
@@ -185,23 +185,23 @@ describe('PolicyIntegrityManager', () => {
       mockFs.readFile.mockRejectedValue({ code: 'ENOENT' });
 
       readPolicyFilesMock.mockResolvedValue([
-        { path: '/project/policies/a.toml', content: 'contentA' },
-        { path: '/project/policies/b.toml', content: 'contentB' },
+        { path: '/workspace/policies/a.toml', content: 'contentA' },
+        { path: '/workspace/policies/b.toml', content: 'contentB' },
       ]);
       const result1 = await integrityManager.checkIntegrity(
-        'project',
+        'workspace',
         'id',
-        '/project/policies',
+        '/workspace/policies',
       );
 
       readPolicyFilesMock.mockResolvedValue([
-        { path: '/project/policies/b.toml', content: 'contentB' },
-        { path: '/project/policies/a.toml', content: 'contentA' },
+        { path: '/workspace/policies/b.toml', content: 'contentB' },
+        { path: '/workspace/policies/a.toml', content: 'contentA' },
       ]);
       const result2 = await integrityManager.checkIntegrity(
-        'project',
+        'workspace',
         'id',
-        '/project/policies',
+        '/workspace/policies',
       );
 
       expect(result1.hash).toBe(result2.hash);
@@ -215,7 +215,7 @@ describe('PolicyIntegrityManager', () => {
         { path: '/dirA/p.toml', content: 'contentA' },
       ]);
       const { hash: hashA } = await integrityManager.checkIntegrity(
-        'project',
+        'workspace',
         'idA',
         '/dirA',
       );
@@ -224,7 +224,7 @@ describe('PolicyIntegrityManager', () => {
         { path: '/dirB/p.toml', content: 'contentB' },
       ]);
       const { hash: hashB } = await integrityManager.checkIntegrity(
-        'project',
+        'workspace',
         'idB',
         '/dirB',
       );
@@ -232,8 +232,8 @@ describe('PolicyIntegrityManager', () => {
       // Now mock storage with both
       mockFs.readFile.mockResolvedValue(
         JSON.stringify({
-          'project:idA': hashA,
-          'project:idB': 'oldHashB', // Different from hashB
+          'workspace:idA': hashA,
+          'workspace:idB': 'oldHashB', // Different from hashB
         }),
       );
 
@@ -242,7 +242,7 @@ describe('PolicyIntegrityManager', () => {
         { path: '/dirA/p.toml', content: 'contentA' },
       ]);
       const resultA = await integrityManager.checkIntegrity(
-        'project',
+        'workspace',
         'idA',
         '/dirA',
       );
@@ -254,7 +254,7 @@ describe('PolicyIntegrityManager', () => {
         { path: '/dirB/p.toml', content: 'contentB' },
       ]);
       const resultB = await integrityManager.checkIntegrity(
-        'project',
+        'workspace',
         'idB',
         '/dirB',
       );
@@ -269,11 +269,11 @@ describe('PolicyIntegrityManager', () => {
       mockFs.mkdir.mockResolvedValue(undefined);
       mockFs.writeFile.mockResolvedValue(undefined);
 
-      await integrityManager.acceptIntegrity('project', 'id', 'hash123');
+      await integrityManager.acceptIntegrity('workspace', 'id', 'hash123');
 
       expect(mockFs.writeFile).toHaveBeenCalledWith(
         '/mock/storage/policy_integrity.json',
-        JSON.stringify({ 'project:id': 'hash123' }, null, 2),
+        JSON.stringify({ 'workspace:id': 'hash123' }, null, 2),
         'utf-8',
       );
     });
@@ -287,14 +287,14 @@ describe('PolicyIntegrityManager', () => {
       mockFs.mkdir.mockResolvedValue(undefined);
       mockFs.writeFile.mockResolvedValue(undefined);
 
-      await integrityManager.acceptIntegrity('project', 'id', 'hash123');
+      await integrityManager.acceptIntegrity('workspace', 'id', 'hash123');
 
       expect(mockFs.writeFile).toHaveBeenCalledWith(
         '/mock/storage/policy_integrity.json',
         JSON.stringify(
           {
             'other:id': 'otherhash',
-            'project:id': 'hash123',
+            'workspace:id': 'hash123',
           },
           null,
           2,
