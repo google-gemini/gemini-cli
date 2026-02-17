@@ -420,12 +420,12 @@ export const LS_DEFINITION: ToolDefinition = {
 // ============================================================================
 
 /**
- * Generates the platform-specific description for the shell tool.
+ * Generates the platform-specific description and instructions for the shell tool.
  */
 export function getShellToolDescription(
   enableInteractiveShell: boolean,
   enableEfficiency: boolean,
-): string {
+): { description: string; instructions: string } {
   const efficiencyGuidelines = enableEfficiency
     ? `
 
@@ -449,12 +449,18 @@ export function getShellToolDescription(
     const backgroundInstructions = enableInteractiveShell
       ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use PowerShell background constructs.'
       : 'Command can start background processes using PowerShell constructs such as `Start-Process -NoNewWindow` or `Start-Job`.';
-    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. ${backgroundInstructions}${efficiencyGuidelines}${returnedInfo}`;
+    return {
+      description: `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`.`,
+      instructions: `${backgroundInstructions}${efficiencyGuidelines}${returnedInfo}`,
+    };
   } else {
     const backgroundInstructions = enableInteractiveShell
       ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use `&` to background commands.'
       : 'Command can start background processes using `&`.';
-    return `This tool executes a given shell command as \`bash -c <command>\`. ${backgroundInstructions} Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${efficiencyGuidelines}${returnedInfo}`;
+    return {
+      description: `This tool executes a given shell command as \`bash -c <command>\`.`,
+      instructions: `${backgroundInstructions} Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${efficiencyGuidelines}${returnedInfo}`,
+    };
   }
 }
 
@@ -475,13 +481,15 @@ export function getShellDefinition(
   enableInteractiveShell: boolean,
   enableEfficiency: boolean,
 ): ToolDefinition {
+  const { description, instructions } = getShellToolDescription(
+    enableInteractiveShell,
+    enableEfficiency,
+  );
   return {
     base: {
       name: SHELL_TOOL_NAME,
-      description: getShellToolDescription(
-        enableInteractiveShell,
-        enableEfficiency,
-      ),
+      description,
+      instructions,
       parametersJsonSchema: {
         type: 'object',
         properties: {

@@ -466,19 +466,27 @@ export class ShellTool extends BaseDeclarativeTool<
     void initializeShellParsers().catch(() => {
       // Errors are surfaced when parsing commands.
     });
+    const modelId =
+      typeof config.getActiveModel === 'function'
+        ? config.getActiveModel()
+        : undefined;
     const definition = getShellDefinition(
       config.getEnableInteractiveShell(),
       config.getEnableShellOutputEfficiency(),
     );
+    const resolved = resolveToolDeclaration(definition, modelId);
     super(
       ShellTool.Name,
       'Shell',
-      definition.base.description!,
+      resolved.description!,
       Kind.Execute,
-      definition.base.parametersJsonSchema,
+      resolved.parametersJsonSchema,
       messageBus,
       false, // output is not markdown
       true, // output can be updated
+      undefined, // extensionName
+      undefined, // extensionId
+      resolved.instructions,
     );
   }
 
