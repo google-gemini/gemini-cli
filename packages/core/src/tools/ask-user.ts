@@ -13,9 +13,12 @@ import {
   type ToolConfirmationPayload,
   ToolConfirmationOutcome,
 } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { QuestionType, type Question } from '../confirmation-bus/types.js';
 import { ASK_USER_TOOL_NAME, ASK_USER_DISPLAY_NAME } from './tool-names.js';
+import { ASK_USER_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 export interface AskUserParams {
   questions: Question[];
@@ -29,74 +32,9 @@ export class AskUserTool extends BaseDeclarativeTool<
     super(
       ASK_USER_TOOL_NAME,
       ASK_USER_DISPLAY_NAME,
-      'Ask the user one or more questions to gather preferences, clarify requirements, or make decisions.',
+      ASK_USER_DEFINITION.base.description!,
       Kind.Communicate,
-      {
-        type: 'object',
-        required: ['questions'],
-        properties: {
-          questions: {
-            type: 'array',
-            minItems: 1,
-            maxItems: 4,
-            items: {
-              type: 'object',
-              required: ['question', 'header'],
-              properties: {
-                question: {
-                  type: 'string',
-                  description:
-                    'The complete question to ask the user. Should be clear, specific, and end with a question mark.',
-                },
-                header: {
-                  type: 'string',
-                  maxLength: 16,
-                  description:
-                    'MUST be 16 characters or fewer or the call will fail. Very short label displayed as a chip/tag. Use abbreviations: "Auth" not "Authentication", "Config" not "Configuration". Examples: "Auth method", "Library", "Approach", "Database".',
-                },
-                type: {
-                  type: 'string',
-                  enum: ['choice', 'text', 'yesno'],
-                  default: 'choice',
-                  description:
-                    "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation.",
-                },
-                options: {
-                  type: 'array',
-                  description:
-                    "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added. Not needed for 'text' or 'yesno' types.",
-                  items: {
-                    type: 'object',
-                    required: ['label', 'description'],
-                    properties: {
-                      label: {
-                        type: 'string',
-                        description:
-                          'The display text for this option (1-5 words). Example: "OAuth 2.0"',
-                      },
-                      description: {
-                        type: 'string',
-                        description:
-                          'Brief explanation of this option. Example: "Industry standard, supports SSO"',
-                      },
-                    },
-                  },
-                },
-                multiSelect: {
-                  type: 'boolean',
-                  description:
-                    "Only applies when type='choice'. Set to true to allow selecting multiple options.",
-                },
-                placeholder: {
-                  type: 'string',
-                  description:
-                    "Hint text shown in the input field. For type='text', shown in the main input. For type='choice', shown in the 'Other' custom input.",
-                },
-              },
-            },
-          },
-        },
-      },
+      ASK_USER_DEFINITION.base.parametersJsonSchema,
       messageBus,
     );
   }
@@ -110,7 +48,7 @@ export class AskUserTool extends BaseDeclarativeTool<
 
     for (let i = 0; i < params.questions.length; i++) {
       const q = params.questions[i];
-      const questionType = q.type ?? QuestionType.CHOICE;
+      const questionType = q.type;
 
       // Validate that 'choice' type has options
       if (questionType === QuestionType.CHOICE) {
@@ -154,6 +92,27 @@ export class AskUserTool extends BaseDeclarativeTool<
   ): AskUserInvocation {
     return new AskUserInvocation(params, messageBus, toolName, toolDisplayName);
   }
+
+  override async validateBuildAndExecute(
+    params: AskUserParams,
+    abortSignal: AbortSignal,
+  ): Promise<ToolResult> {
+    const result = await super.validateBuildAndExecute(params, abortSignal);
+    if (
+      result.error &&
+      result.error.type === ToolErrorType.INVALID_TOOL_PARAMS
+    ) {
+      return {
+        ...result,
+        returnDisplay: '',
+      };
+    }
+    return result;
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(ASK_USER_DEFINITION, modelId);
+  }
 }
 
 export class AskUserInvocation extends BaseToolInvocation<
@@ -168,7 +127,7 @@ export class AskUserInvocation extends BaseToolInvocation<
   ): Promise<ToolAskUserConfirmationDetails | false> {
     const normalizedQuestions = this.params.questions.map((q) => ({
       ...q,
-      type: q.type ?? QuestionType.CHOICE,
+      type: q.type,
     }));
 
     return {
@@ -192,9 +151,7 @@ export class AskUserInvocation extends BaseToolInvocation<
   }
 
   async execute(_signal: AbortSignal): Promise<ToolResult> {
-    const questionTypes = this.params.questions.map(
-      (q) => q.type ?? QuestionType.CHOICE,
-    );
+    const questionTypes = this.params.questions.map((q) => q.type);
 
     if (this.confirmationOutcome === ToolConfirmationOutcome.Cancel) {
       return {
@@ -241,4 +198,14 @@ export class AskUserInvocation extends BaseToolInvocation<
       data: metrics,
     };
   }
+}
+
+/**
+ * Returns true if the tool name and status correspond to a completed 'Ask User' tool call.
+ */
+export function isCompletedAskUserTool(name: string, status: string): boolean {
+  return (
+    name === ASK_USER_DISPLAY_NAME &&
+    ['Success', 'Error', 'Canceled'].includes(status)
+  );
 }

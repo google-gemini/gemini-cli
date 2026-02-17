@@ -14,7 +14,7 @@ import {
   type Mock,
   type MockedObject,
 } from 'vitest';
-import { render } from '../test-utils/render.js';
+import { render, persistentStateMock } from '../test-utils/render.js';
 import { waitFor } from '../test-utils/async.js';
 import { cleanup } from 'ink-testing-library';
 import { act, useContext, type ReactElement } from 'react';
@@ -29,6 +29,7 @@ import {
   type ResumedSessionData,
   AuthType,
   type AgentDefinition,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 
 // Mock coreEvents
@@ -87,6 +88,7 @@ import ansiEscapes from 'ansi-escapes';
 import { mergeSettings, type LoadedSettings } from '../config/settings.js';
 import type { InitializationResult } from '../core/initializer.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
+import { StreamingState } from './types.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
 import {
   UIActionsContext,
@@ -299,6 +301,7 @@ describe('AppContainer State Management', () => {
   };
 
   beforeEach(() => {
+    persistentStateMock.reset();
     vi.clearAllMocks();
 
     mockIdeClient.getInstance.mockReturnValue(new Promise(() => {}));
@@ -486,6 +489,37 @@ describe('AppContainer State Management', () => {
         unmount = result.unmount;
       });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
+      unmount!();
+    });
+
+    it('shows full UI details by default', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.cleanUiDetailsVisible).toBe(true);
+      });
+      unmount!();
+    });
+
+    it('starts in minimal UI mode when Focus UI preference is persisted', async () => {
+      persistentStateMock.get.mockReturnValueOnce(true);
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({
+          settings: mockSettings,
+        });
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.cleanUiDetailsVisible).toBe(false);
+      });
+      expect(persistentStateMock.get).toHaveBeenCalledWith('focusUiEnabled');
       unmount!();
     });
   });
@@ -1380,7 +1414,7 @@ describe('AppContainer State Management', () => {
                 name: 'run_shell_command',
                 args: { command: 'ls > out' },
               },
-              status: 'executing',
+              status: CoreToolCallStatus.Executing,
             } as unknown as TrackedToolCall,
           ],
           activePtyId: 'pty-1',
@@ -2945,5 +2979,99 @@ describe('AppContainer State Management', () => {
         await act(async () => unmount!());
       },
     );
+  });
+
+  describe('Plan Mode Availability', () => {
+    it('should allow plan mode when enabled and idle', async () => {
+      vi.spyOn(mockConfig, 'isPlanEnabled').mockReturnValue(true);
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        pendingHistoryItems: [],
+      });
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState).toBeTruthy();
+        expect(capturedUIState.allowPlanMode).toBe(true);
+      });
+      unmount!();
+    });
+
+    it('should NOT allow plan mode when disabled in config', async () => {
+      vi.spyOn(mockConfig, 'isPlanEnabled').mockReturnValue(false);
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        pendingHistoryItems: [],
+      });
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState).toBeTruthy();
+        expect(capturedUIState.allowPlanMode).toBe(false);
+      });
+      unmount!();
+    });
+
+    it('should NOT allow plan mode when streaming', async () => {
+      vi.spyOn(mockConfig, 'isPlanEnabled').mockReturnValue(true);
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: StreamingState.Responding,
+        pendingHistoryItems: [],
+      });
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState).toBeTruthy();
+        expect(capturedUIState.allowPlanMode).toBe(false);
+      });
+      unmount!();
+    });
+
+    it('should NOT allow plan mode when a tool is awaiting confirmation', async () => {
+      vi.spyOn(mockConfig, 'isPlanEnabled').mockReturnValue(true);
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: StreamingState.Idle,
+        pendingHistoryItems: [
+          {
+            type: 'tool_group',
+            tools: [
+              {
+                name: 'test_tool',
+                status: CoreToolCallStatus.AwaitingApproval,
+              },
+            ],
+          },
+        ],
+      });
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState).toBeTruthy();
+        expect(capturedUIState.allowPlanMode).toBe(false);
+      });
+      unmount!();
+    });
   });
 });

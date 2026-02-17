@@ -344,11 +344,12 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.SHOW_MORE_LINES,
-      positive: [
+      positive: [createKey('o', { ctrl: true })],
+      negative: [
         createKey('s', { ctrl: true }),
-        createKey('o', { ctrl: true }),
+        createKey('s'),
+        createKey('l', { ctrl: true }),
       ],
-      negative: [createKey('s'), createKey('l', { ctrl: true })],
     },
 
     // Shell commands
@@ -370,7 +371,7 @@ describe('keyMatchers', () => {
     {
       command: Command.FOCUS_SHELL_INPUT,
       positive: [createKey('tab')],
-      negative: [createKey('f', { ctrl: true }), createKey('f')],
+      negative: [createKey('f6'), createKey('f', { ctrl: true })],
     },
     {
       command: Command.TOGGLE_YOLO,
