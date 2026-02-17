@@ -12,6 +12,7 @@ import {
   truncateFastAckInput,
   generateSteeringAckMessage,
 } from './fastAckHelper.js';
+import { LlmRole } from 'src/telemetry/llmRole.js';
 
 describe('truncateFastAckInput', () => {
   it('returns input as-is when below limit', () => {
@@ -64,6 +65,7 @@ describe('generateFastAckText', () => {
       abortSignal,
       promptId: 'test',
       maxAttempts: 1,
+      role: LlmRole.UTILITY_FAST_ACK_HELPER,
     });
   });
 

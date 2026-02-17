@@ -4,9 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { it } from 'vitest';
 import { AppRig } from '../packages/cli/src/test-utils/AppRig.js';
-import type { EvalPolicy } from './test-helper.js';
+import {
+  type EvalPolicy,
+  runEval,
+  prepareLogDir,
+  symlinkNodeModules,
+} from './test-helper.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DEFAULT_GEMINI_MODEL } from '@google/gemini-cli-core';
@@ -34,12 +38,17 @@ export function appEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
       },
     });
 
+    const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
+    const logFile = path.join(logDir, `${sanitizedName}.log`);
+
     try {
       await rig.initialize();
 
+      const testDir = rig.getTestDir();
+      symlinkNodeModules(testDir);
+
       // Setup initial files
       if (evalCase.files) {
-        const testDir = rig.getTestDir();
         for (const [filePath, content] of Object.entries(evalCase.files)) {
           const fullPath = path.join(testDir, filePath);
           fs.mkdirSync(path.dirname(fullPath), { recursive: true });
@@ -62,15 +71,16 @@ export function appEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
       await rig.sendMessage(evalCase.prompt);
 
       // Run assertion. Interaction-heavy tests can do their own waiting/steering here.
-      await evalCase.assert(rig, rig.getStaticOutput());
+      const output = rig.getStaticOutput();
+      await evalCase.assert(rig, output);
     } finally {
+      const output = rig.getStaticOutput();
+      if (output) {
+        await fs.promises.writeFile(logFile, output);
+      }
       await rig.unmount();
     }
   };
 
-  if (policy === 'USUALLY_PASSES' && !process.env['RUN_EVALS']) {
-    it.skip(evalCase.name, fn);
-  } else {
-    it(evalCase.name, fn, (evalCase.timeout ?? 60000) + 10000);
-  }
+  runEval(policy, evalCase.name, fn, (evalCase.timeout ?? 60000) + 10000);
 }

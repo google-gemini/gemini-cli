@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { LlmRole } from '../telemetry/llmRole.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { debugLogger } from './debugLogger.js';
@@ -174,6 +175,7 @@ export async function generateFastAckText(
     const response = await llmClient.generateContent({
       modelConfigKey,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      role: LlmRole.UTILITY_FAST_ACK_HELPER,
       abortSignal,
       promptId,
       maxAttempts: 1, // Fast path, don't retry much
