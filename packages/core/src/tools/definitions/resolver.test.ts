@@ -25,7 +25,7 @@ describe('resolveToolDeclaration', () => {
 
   it('should return the base definition when no modelId is provided', () => {
     const result = resolveToolDeclaration(mockDefinition);
-    expect(result).toEqual(mockDefinition.base);
+    expect(result.declaration).toEqual(mockDefinition.base);
   });
 
   it('should return overridden description when modelId matches override criteria', () => {
@@ -43,8 +43,8 @@ describe('resolveToolDeclaration', () => {
       definitionWithOverride,
       'special-model',
     );
-    expect(result.description).toBe('Overridden description');
-    expect(result.name).toBe(mockDefinition.base.name);
+    expect(result.declaration.description).toBe('Overridden description');
+    expect(result.declaration.name).toBe(mockDefinition.base.name);
   });
 
   it('should return base definition when modelId does not match override criteria', () => {
@@ -62,11 +62,13 @@ describe('resolveToolDeclaration', () => {
       definitionWithOverride,
       'regular-model',
     );
-    expect(result.description).toBe(mockDefinition.base.description);
+    expect(result.declaration.description).toBe(
+      mockDefinition.base.description,
+    );
   });
 
   it('should return the base definition when a modelId is provided but no overrides exist', () => {
     const result = resolveToolDeclaration(mockDefinition, 'gemini-1.5-pro');
-    expect(result).toEqual(mockDefinition.base);
+    expect(result.declaration).toEqual(mockDefinition.base);
   });
 });
