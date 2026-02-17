@@ -237,9 +237,12 @@ jobs:
     steps:
       - name: 'Check E2E test results'
         run: |
-          if [[ (${{ needs.e2e_linux.result }} != 'success' && ${{ needs.e2e_linux.result }} != 'skipped') || \
-               (${{ needs.e2e_mac.result }} != 'success' && ${{ needs.e2e_mac.result }} != 'skipped') ]]; then
+          if [[ (${NEEDS_E2E_LINUX_RESULT} != 'success' && ${NEEDS_E2E_LINUX_RESULT} != 'skipped') || \
+               (${NEEDS_E2E_MAC_RESULT} != 'success' && ${NEEDS_E2E_MAC_RESULT} != 'skipped') ]]; then
             echo "One or more E2E jobs failed."
             exit 1
           fi
           echo "All required E2E jobs passed!"
+        env:
+          NEEDS_E2E_LINUX_RESULT: ${{ needs.e2e_linux.result }}
+          NEEDS_E2E_MAC_RESULT: ${{ needs.e2e_mac.result }}
