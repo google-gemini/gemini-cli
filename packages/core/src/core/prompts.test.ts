@@ -424,7 +424,6 @@ describe('Core System Prompt (prompts.ts)', () => {
   describe('ApprovalMode in System Prompt', () => {
     it('should include PLAN mode instructions', () => {
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
-
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain('# Active Approval Mode: Plan');
       expect(prompt).toMatchSnapshot();
