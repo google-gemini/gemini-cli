@@ -103,17 +103,3 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Unc
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
 ShowMoreLines"
 `;
-
-exports[`MainContent > does not render empty history items 1`] = `
-"AppHeader(full)
-▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > Hello
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-✦ Hi there
-
-  ShowMoreLines
-  Non-empty content
-
-  ShowMoreLines
-"
-`;
