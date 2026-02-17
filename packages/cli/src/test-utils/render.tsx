@@ -66,8 +66,8 @@ class XtermStdout extends EventEmitter {
   private queue: { promise: Promise<void> };
   isTTY = true;
 
-  private lastRenderOutput = '';
-  private lastRenderStaticContent = '';
+  private lastRenderOutput: string | undefined = undefined;
+  private lastRenderStaticContent: string | undefined = undefined;
 
   constructor(state: TerminalState, queue: { promise: Promise<void> }) {
     super();
@@ -99,6 +99,8 @@ class XtermStdout extends EventEmitter {
 
   clear = () => {
     this.state.terminal.reset();
+    this.lastRenderOutput = undefined;
+    this.lastRenderStaticContent = undefined;
   };
 
   dispose = () => {
@@ -136,13 +138,15 @@ class XtermStdout extends EventEmitter {
   async waitUntilReady() {
     const startRenderCount = this.renderCount;
     if (!vi.isFakeTimers()) {
+      // Give Ink a chance to start its rendering loop
       await new Promise((resolve) => setImmediate(resolve));
     }
     await act(async () => {
       if (vi.isFakeTimers()) {
         await vi.advanceTimersByTimeAsync(50);
       } else {
-        // Wait for at least one render to be called, but don't wait forever.
+        // Wait for at least one render to be called if we haven't rendered yet or since start of this call,
+        // but don't wait forever as some renders might be synchronous or skipped.
         if (this.renderCount === startRenderCount) {
           const renderPromise = new Promise((resolve) =>
             this.once('render', resolve),
@@ -155,24 +159,55 @@ class XtermStdout extends EventEmitter {
       }
     });
 
-    const isMatch = () => {
-      const currentFrame = this.lastFrame({ allowEmpty: true }).trim();
+    let attempts = 0;
+    const maxAttempts = 50;
+
+    let lastCurrent = '';
+    let lastExpected = '';
+
+    while (attempts < maxAttempts) {
+      // Ensure all pending writes to the terminal are processed.
+      await this.queue.promise;
+
+      const currentFrame = stripAnsi(
+        this.lastFrame({ allowEmpty: true }),
+      ).trim();
       const expectedFrame = stripAnsi(
-        this.lastRenderStaticContent + this.lastRenderOutput,
+        (this.lastRenderStaticContent ?? '') + (this.lastRenderOutput ?? ''),
       ).trim();
 
-      // We strip ANSI from both to compare plain text content
-      const strippedCurrent = stripAnsi(currentFrame);
-      return (
-        strippedCurrent.includes(expectedFrame) ||
-        expectedFrame === '' ||
-        // Sometimes static content might be rendered as just "..." or similar if there's a lot
-        expectedFrame === '...'
-      );
-    };
+      lastCurrent = currentFrame;
+      lastExpected = expectedFrame;
 
-    let attempts = 0;
-    while ((this.pendingWrites > 0 || !isMatch()) && attempts < 10) {
+      const isMatch = () => {
+        if (this.lastRenderOutput === undefined) {
+          return false;
+        }
+
+        if (expectedFrame === '...') {
+          return currentFrame !== '';
+        }
+
+        // If both are empty, it's a match.
+        if (expectedFrame === '' && currentFrame === '') {
+          return true;
+        }
+
+        // If Ink expects nothing but terminal has content, or vice-versa, it's NOT a match.
+        if (expectedFrame === '' || currentFrame === '') {
+          return false;
+        }
+
+        // Check if the current frame contains the expected content.
+        // We use includes because xterm might have some formatting or
+        // extra whitespace that Ink doesn't account for in its raw output metrics.
+        return currentFrame.includes(expectedFrame);
+      };
+
+      if (this.pendingWrites === 0 && isMatch()) {
+        return;
+      }
+
       attempts++;
       await act(async () => {
         if (vi.isFakeTimers()) {
@@ -182,6 +217,14 @@ class XtermStdout extends EventEmitter {
         }
       });
     }
+
+    throw new Error(
+      `waitUntilReady() timed out after ${maxAttempts} attempts.\n` +
+        `Expected content (stripped ANSI):\n"${lastExpected}"\n` +
+        `Actual content (stripped ANSI):\n"${lastCurrent}"\n` +
+        `Pending writes: ${this.pendingWrites}\n` +
+        `Render count: ${this.renderCount}`,
+    );
   }
 }
 
