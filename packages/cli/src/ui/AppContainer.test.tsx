@@ -14,13 +14,13 @@ import {
   type Mock,
   type MockedObject,
 } from 'vitest';
-import { render } from '../test-utils/render.js';
+import { render, persistentStateMock } from '../test-utils/render.js';
 import { waitFor } from '../test-utils/async.js';
 import { cleanup } from 'ink-testing-library';
 import { act, useContext, type ReactElement } from 'react';
 import { AppContainer } from './AppContainer.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
-import { type TrackedToolCall } from './hooks/useReactToolScheduler.js';
+import { type TrackedToolCall } from './hooks/useToolScheduler.js';
 import {
   type Config,
   makeFakeConfig,
@@ -29,6 +29,7 @@ import {
   type ResumedSessionData,
   AuthType,
   type AgentDefinition,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 
 // Mock coreEvents
@@ -135,6 +136,7 @@ vi.mock('./hooks/vim.js');
 vi.mock('./hooks/useFocus.js');
 vi.mock('./hooks/useBracketedPaste.js');
 vi.mock('./hooks/useLoadingIndicator.js');
+vi.mock('./hooks/useSuspend.js');
 vi.mock('./hooks/useFolderTrust.js');
 vi.mock('./hooks/useIdeTrustListener.js');
 vi.mock('./hooks/useMessageQueue.js');
@@ -197,7 +199,9 @@ import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
-import { useKeypress } from './hooks/useKeypress.js';
+import { useKeypress, type Key } from './hooks/useKeypress.js';
+import * as useKeypressModule from './hooks/useKeypress.js';
+import { useSuspend } from './hooks/useSuspend.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import {
@@ -270,6 +274,7 @@ describe('AppContainer State Management', () => {
   const mockedUseTextBuffer = useTextBuffer as Mock;
   const mockedUseLogger = useLogger as Mock;
   const mockedUseLoadingIndicator = useLoadingIndicator as Mock;
+  const mockedUseSuspend = useSuspend as Mock;
   const mockedUseInputHistoryStore = useInputHistoryStore as Mock;
   const mockedUseHookDisplayState = useHookDisplayState as Mock;
   const mockedUseTerminalTheme = useTerminalTheme as Mock;
@@ -295,6 +300,7 @@ describe('AppContainer State Management', () => {
   };
 
   beforeEach(() => {
+    persistentStateMock.reset();
     vi.clearAllMocks();
 
     mockIdeClient.getInstance.mockReturnValue(new Promise(() => {}));
@@ -401,6 +407,9 @@ describe('AppContainer State Management', () => {
       elapsedTime: '0.0s',
       currentLoadingPhrase: '',
     });
+    mockedUseSuspend.mockReturnValue({
+      handleSuspend: vi.fn(),
+    });
     mockedUseHookDisplayState.mockReturnValue([]);
     mockedUseTerminalTheme.mockReturnValue(undefined);
     mockedUseShellInactivityStatus.mockReturnValue({
@@ -440,8 +449,8 @@ describe('AppContainer State Management', () => {
           ...defaultMergedSettings.ui,
           showStatusInTitle: false,
           hideWindowTitle: false,
+          useAlternateBuffer: false,
         },
-        useAlternateBuffer: false,
       },
     } as unknown as LoadedSettings;
 
@@ -479,6 +488,37 @@ describe('AppContainer State Management', () => {
         unmount = result.unmount;
       });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
+      unmount!();
+    });
+
+    it('shows full UI details by default', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.cleanUiDetailsVisible).toBe(true);
+      });
+      unmount!();
+    });
+
+    it('starts in minimal UI mode when Focus UI preference is persisted', async () => {
+      persistentStateMock.get.mockReturnValueOnce(true);
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({
+          settings: mockSettings,
+        });
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.cleanUiDetailsVisible).toBe(false);
+      });
+      expect(persistentStateMock.get).toHaveBeenCalledWith('focusUiEnabled');
       unmount!();
     });
   });
@@ -727,10 +767,10 @@ describe('AppContainer State Management', () => {
         getChatRecordingService: vi.fn(() => mockChatRecordingService),
       };
 
-      const configWithRecording = {
-        ...mockConfig,
-        getGeminiClient: vi.fn(() => mockGeminiClient),
-      } as unknown as Config;
+      const configWithRecording = makeFakeConfig();
+      vi.spyOn(configWithRecording, 'getGeminiClient').mockReturnValue(
+        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
+      );
 
       expect(() => {
         renderAppContainer({
@@ -761,11 +801,13 @@ describe('AppContainer State Management', () => {
         setHistory: vi.fn(),
       };
 
-      const configWithRecording = {
-        ...mockConfig,
-        getGeminiClient: vi.fn(() => mockGeminiClient),
-        getSessionId: vi.fn(() => 'test-session-123'),
-      } as unknown as Config;
+      const configWithRecording = makeFakeConfig();
+      vi.spyOn(configWithRecording, 'getGeminiClient').mockReturnValue(
+        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
+      );
+      vi.spyOn(configWithRecording, 'getSessionId').mockReturnValue(
+        'test-session-123',
+      );
 
       expect(() => {
         renderAppContainer({
@@ -801,10 +843,10 @@ describe('AppContainer State Management', () => {
         getUserTier: vi.fn(),
       };
 
-      const configWithRecording = {
-        ...mockConfig,
-        getGeminiClient: vi.fn(() => mockGeminiClient),
-      } as unknown as Config;
+      const configWithRecording = makeFakeConfig();
+      vi.spyOn(configWithRecording, 'getGeminiClient').mockReturnValue(
+        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
+      );
 
       renderAppContainer({
         config: configWithRecording,
@@ -835,10 +877,10 @@ describe('AppContainer State Management', () => {
         })),
       };
 
-      const configWithClient = {
-        ...mockConfig,
-        getGeminiClient: vi.fn(() => mockGeminiClient),
-      } as unknown as Config;
+      const configWithClient = makeFakeConfig();
+      vi.spyOn(configWithClient, 'getGeminiClient').mockReturnValue(
+        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
+      );
 
       const resumedData = {
         conversation: {
@@ -891,10 +933,10 @@ describe('AppContainer State Management', () => {
         getChatRecordingService: vi.fn(),
       };
 
-      const configWithClient = {
-        ...mockConfig,
-        getGeminiClient: vi.fn(() => mockGeminiClient),
-      } as unknown as Config;
+      const configWithClient = makeFakeConfig();
+      vi.spyOn(configWithClient, 'getGeminiClient').mockReturnValue(
+        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
+      );
 
       const resumedData = {
         conversation: {
@@ -944,10 +986,10 @@ describe('AppContainer State Management', () => {
         getUserTier: vi.fn(),
       };
 
-      const configWithRecording = {
-        ...mockConfig,
-        getGeminiClient: vi.fn(() => mockGeminiClient),
-      } as unknown as Config;
+      const configWithRecording = makeFakeConfig();
+      vi.spyOn(configWithRecording, 'getGeminiClient').mockReturnValue(
+        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
+      );
 
       renderAppContainer({
         config: configWithRecording,
@@ -1371,7 +1413,7 @@ describe('AppContainer State Management', () => {
                 name: 'run_shell_command',
                 args: { command: 'ls > out' },
               },
-              status: 'executing',
+              status: CoreToolCallStatus.Executing,
             } as unknown as TrackedToolCall,
           ],
           activePtyId: 'pty-1',
@@ -1942,6 +1984,19 @@ describe('AppContainer State Management', () => {
       });
     });
 
+    describe('CTRL+Z', () => {
+      it('should call handleSuspend', async () => {
+        const handleSuspend = vi.fn();
+        mockedUseSuspend.mockReturnValue({ handleSuspend });
+        await setupKeypressTest();
+
+        pressKey('\x1A'); // Ctrl+Z
+
+        expect(handleSuspend).toHaveBeenCalledTimes(1);
+        unmount();
+      });
+    });
+
     describe('Focus Handling (Tab / Shift+Tab)', () => {
       beforeEach(() => {
         // Mock activePtyId to enable focus
@@ -2088,6 +2143,128 @@ describe('AppContainer State Management', () => {
 
         unmount();
       });
+    });
+  });
+
+  describe('Shortcuts Help Visibility', () => {
+    let handleGlobalKeypress: (key: Key) => boolean;
+    let mockedUseKeypress: Mock;
+    let rerender: () => void;
+    let unmount: () => void;
+
+    const setupShortcutsVisibilityTest = async () => {
+      const renderResult = renderAppContainer();
+      await act(async () => {
+        vi.advanceTimersByTime(0);
+      });
+      rerender = () => renderResult.rerender(getAppContainer());
+      unmount = renderResult.unmount;
+    };
+
+    const pressKey = (key: Partial<Key>) => {
+      act(() => {
+        handleGlobalKeypress({
+          name: 'r',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          insertable: false,
+          sequence: '',
+          ...key,
+        } as Key);
+      });
+      rerender();
+    };
+
+    beforeEach(() => {
+      mockedUseKeypress = vi.spyOn(useKeypressModule, 'useKeypress') as Mock;
+      mockedUseKeypress.mockImplementation(
+        (callback: (key: Key) => boolean, options: { isActive: boolean }) => {
+          // AppContainer registers multiple keypress handlers; capture only
+          // active handlers so inactive copy-mode handler doesn't override.
+          if (options?.isActive) {
+            handleGlobalKeypress = callback;
+          }
+        },
+      );
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      mockedUseKeypress.mockRestore();
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    it('dismisses shortcuts help when a registered hotkey is pressed', async () => {
+      await setupShortcutsVisibilityTest();
+
+      act(() => {
+        capturedUIActions.setShortcutsHelpVisible(true);
+      });
+      rerender();
+      expect(capturedUIState.shortcutsHelpVisible).toBe(true);
+
+      pressKey({ name: 'r', ctrl: true, sequence: '\x12' }); // Ctrl+R
+      expect(capturedUIState.shortcutsHelpVisible).toBe(false);
+
+      unmount();
+    });
+
+    it('dismisses shortcuts help when streaming starts', async () => {
+      await setupShortcutsVisibilityTest();
+
+      act(() => {
+        capturedUIActions.setShortcutsHelpVisible(true);
+      });
+      rerender();
+      expect(capturedUIState.shortcutsHelpVisible).toBe(true);
+
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: 'responding',
+      });
+
+      await act(async () => {
+        rerender();
+      });
+      await waitFor(() => {
+        expect(capturedUIState.shortcutsHelpVisible).toBe(false);
+      });
+
+      unmount();
+    });
+
+    it('dismisses shortcuts help when action-required confirmation appears', async () => {
+      await setupShortcutsVisibilityTest();
+
+      act(() => {
+        capturedUIActions.setShortcutsHelpVisible(true);
+      });
+      rerender();
+      expect(capturedUIState.shortcutsHelpVisible).toBe(true);
+
+      mockedUseSlashCommandProcessor.mockReturnValue({
+        handleSlashCommand: vi.fn(),
+        slashCommands: [],
+        pendingHistoryItems: [],
+        commandContext: {},
+        shellConfirmationRequest: null,
+        confirmationRequest: {
+          prompt: 'Confirm this action?',
+          onConfirm: vi.fn(),
+        },
+      });
+
+      await act(async () => {
+        rerender();
+      });
+      await waitFor(() => {
+        expect(capturedUIState.shortcutsHelpVisible).toBe(false);
+      });
+
+      unmount();
     });
   });
 

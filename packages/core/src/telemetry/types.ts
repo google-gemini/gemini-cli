@@ -14,6 +14,7 @@ import type { Config } from '../config/config.js';
 import type { ApprovalMode } from '../policy/types.js';
 
 import type { CompletedToolCall } from '../core/coreToolScheduler.js';
+import { CoreToolCallStatus } from '../scheduler/types.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { AuthType } from '../core/contentGenerator.js';
 import type { LogAttributes, LogRecord } from '@opentelemetry/api-logs';
@@ -271,7 +272,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       this.function_name = call.request.name;
       this.function_args = call.request.args;
       this.duration_ms = call.durationMs ?? 0;
-      this.success = call.status === 'success';
+      this.success = call.status === CoreToolCallStatus.Success;
       this.decision = call.outcome
         ? getDecisionFromOutcome(call.outcome)
         : undefined;
@@ -296,7 +297,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       );
 
       if (
-        call.status === 'success' &&
+        call.status === CoreToolCallStatus.Success &&
         typeof call.response.resultDisplay === 'object' &&
         call.response.resultDisplay !== null &&
         fileDiff
@@ -304,6 +305,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
         const diffStat = fileDiff.diffStat;
         if (diffStat) {
           this.metadata = {
+            ...this.metadata,
             model_added_lines: diffStat.model_added_lines,
             model_removed_lines: diffStat.model_removed_lines,
             model_added_chars: diffStat.model_added_chars,
@@ -314,6 +316,10 @@ export class ToolCallEvent implements BaseTelemetryEvent {
             user_removed_chars: diffStat.user_removed_chars,
           };
         }
+      }
+
+      if (call.status === CoreToolCallStatus.Success && call.response.data) {
+        this.metadata = { ...this.metadata, ...call.response.data };
       }
     } else {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -347,7 +353,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
     };
 
     if (this.error) {
-      attributes['error'] = this.error;
+      attributes[CoreToolCallStatus.Error] = this.error;
       attributes['error.message'] = this.error;
       if (this.error_type) {
         attributes['error_type'] = this.error_type;
@@ -886,8 +892,8 @@ export function makeSlashCommandEvent({
 }
 
 export enum SlashCommandStatus {
-  SUCCESS = 'success',
-  ERROR = 'error',
+  SUCCESS = CoreToolCallStatus.Success,
+  ERROR = CoreToolCallStatus.Error,
 }
 
 export const EVENT_REWIND = 'gemini_cli.rewind';
@@ -1289,7 +1295,7 @@ export class ExtensionInstallEvent implements BaseTelemetryEvent {
   extension_id: string;
   extension_version: string;
   extension_source: string;
-  status: 'success' | 'error';
+  status: CoreToolCallStatus.Success | CoreToolCallStatus.Error;
 
   constructor(
     extension_name: string,
@@ -1297,7 +1303,7 @@ export class ExtensionInstallEvent implements BaseTelemetryEvent {
     extension_id: string,
     extension_version: string,
     extension_source: string,
-    status: 'success' | 'error',
+    status: CoreToolCallStatus.Success | CoreToolCallStatus.Error,
   ) {
     this['event.name'] = 'extension_install';
     this['event.timestamp'] = new Date().toISOString();
@@ -1423,13 +1429,13 @@ export class ExtensionUninstallEvent implements BaseTelemetryEvent {
   extension_name: string;
   hashed_extension_name: string;
   extension_id: string;
-  status: 'success' | 'error';
+  status: CoreToolCallStatus.Success | CoreToolCallStatus.Error;
 
   constructor(
     extension_name: string,
     hashed_extension_name: string,
     extension_id: string,
-    status: 'success' | 'error',
+    status: CoreToolCallStatus.Success | CoreToolCallStatus.Error,
   ) {
     this['event.name'] = 'extension_uninstall';
     this['event.timestamp'] = new Date().toISOString();
@@ -1464,7 +1470,7 @@ export class ExtensionUpdateEvent implements BaseTelemetryEvent {
   extension_previous_version: string;
   extension_version: string;
   extension_source: string;
-  status: 'success' | 'error';
+  status: CoreToolCallStatus.Success | CoreToolCallStatus.Error;
 
   constructor(
     extension_name: string,
@@ -1473,7 +1479,7 @@ export class ExtensionUpdateEvent implements BaseTelemetryEvent {
     extension_version: string,
     extension_previous_version: string,
     extension_source: string,
-    status: 'success' | 'error',
+    status: CoreToolCallStatus.Success | CoreToolCallStatus.Error,
   ) {
     this['event.name'] = 'extension_update';
     this['event.timestamp'] = new Date().toISOString();
@@ -1716,9 +1722,9 @@ export const EVENT_EDIT_CORRECTION = 'gemini_cli.edit_correction';
 export class EditCorrectionEvent implements BaseTelemetryEvent {
   'event.name': 'edit_correction';
   'event.timestamp': string;
-  correction: 'success' | 'failure';
+  correction: CoreToolCallStatus.Success | 'failure';
 
-  constructor(correction: 'success' | 'failure') {
+  constructor(correction: CoreToolCallStatus.Success | 'failure') {
     this['event.name'] = 'edit_correction';
     this['event.timestamp'] = new Date().toISOString();
     this.correction = correction;
@@ -2093,7 +2099,7 @@ export class HookCallEvent implements BaseTelemetryEvent {
 
     if (this.error) {
       // Always log errors
-      attributes['error'] = this.error;
+      attributes[CoreToolCallStatus.Error] = this.error;
     }
 
     return attributes;
@@ -2103,5 +2109,62 @@ export class HookCallEvent implements BaseTelemetryEvent {
     const hookId = `${this.hook_event_name}.${this.hook_name}`;
     const status = `${this.success ? 'succeeded' : 'failed'}`;
     return `Hook call ${hookId} ${status} in ${this.duration_ms}ms`;
+  }
+}
+
+export const EVENT_KEYCHAIN_AVAILABILITY = 'gemini_cli.keychain.availability';
+export class KeychainAvailabilityEvent implements BaseTelemetryEvent {
+  'event.name': 'keychain_availability';
+  'event.timestamp': string;
+  available: boolean;
+
+  constructor(available: boolean) {
+    this['event.name'] = 'keychain_availability';
+    this['event.timestamp'] = new Date().toISOString();
+    this.available = available;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_KEYCHAIN_AVAILABILITY,
+      'event.timestamp': this['event.timestamp'],
+      available: this.available,
+    };
+    return attributes;
+  }
+
+  toLogBody(): string {
+    return `Keychain availability: ${this.available}`;
+  }
+}
+
+export const EVENT_TOKEN_STORAGE_INITIALIZATION =
+  'gemini_cli.token_storage.initialization';
+export class TokenStorageInitializationEvent implements BaseTelemetryEvent {
+  'event.name': 'token_storage_initialization';
+  'event.timestamp': string;
+  type: string;
+  forced: boolean;
+
+  constructor(type: string, forced: boolean) {
+    this['event.name'] = 'token_storage_initialization';
+    this['event.timestamp'] = new Date().toISOString();
+    this.type = type;
+    this.forced = forced;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_TOKEN_STORAGE_INITIALIZATION,
+      'event.timestamp': this['event.timestamp'],
+      type: this.type,
+      forced: this.forced,
+    };
+  }
+
+  toLogBody(): string {
+    return `Token storage initialized. Type: ${this.type}. Forced: ${this.forced}`;
   }
 }

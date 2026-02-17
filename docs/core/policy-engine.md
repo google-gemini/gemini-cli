@@ -208,9 +208,11 @@ commandPrefix = "git "
 
 # (Optional) A regex to match against the entire shell command.
 # This is also syntactic sugar for `toolName = "run_shell_command"`.
-# Note: This pattern is tested against the JSON representation of the arguments (e.g., `{"command":"<your_command>"}`), so anchors like `^` or `$` will apply to the full JSON string, not just the command text.
+# Note: This pattern is tested against the JSON representation of the arguments (e.g., `{"command":"<your_command>"}`).
+# Because it prepends `"command":"`, it effectively matches from the start of the command.
+# Anchors like `^` or `$` apply to the full JSON string, so `^` should usually be avoided here.
 # You cannot use commandPrefix and commandRegex in the same rule.
-commandRegex = "^git (commit|push)"
+commandRegex = "git (commit|push)"
 
 # The decision to take. Must be "allow", "deny", or "ask_user".
 decision = "ask_user"
