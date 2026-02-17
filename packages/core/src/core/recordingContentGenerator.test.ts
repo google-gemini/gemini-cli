@@ -18,6 +18,7 @@ import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
+import { LlmRole } from '../telemetry/types.js';
 
 vi.mock('node:fs', () => ({
   appendFileSync: vi.fn(),
@@ -51,9 +52,14 @@ describe('RecordingContentGenerator', () => {
     const response = await recorder.generateContent(
       {} as GenerateContentParameters,
       'id1',
+      LlmRole.MAIN,
     );
     expect(response).toEqual(mockResponse);
-    expect(mockRealGenerator.generateContent).toHaveBeenCalledWith({}, 'id1');
+    expect(mockRealGenerator.generateContent).toHaveBeenCalledWith(
+      {},
+      'id1',
+      LlmRole.MAIN,
+    );
 
     expect(appendFileSync).toHaveBeenCalledWith(
       filePath,
@@ -90,6 +96,7 @@ describe('RecordingContentGenerator', () => {
     const stream = await recorder.generateContentStream(
       {} as GenerateContentParameters,
       'id1',
+      LlmRole.MAIN,
     );
     const responses = [];
     for await (const response of stream) {
@@ -100,6 +107,7 @@ describe('RecordingContentGenerator', () => {
     expect(mockRealGenerator.generateContentStream).toHaveBeenCalledWith(
       {},
       'id1',
+      LlmRole.MAIN,
     );
 
     expect(appendFileSync).toHaveBeenCalledWith(

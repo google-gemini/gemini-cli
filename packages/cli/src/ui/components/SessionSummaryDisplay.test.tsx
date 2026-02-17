@@ -55,6 +55,7 @@ describe('<SessionSummaryDisplay />', () => {
             thoughts: 300,
             tool: 200,
           },
+          roles: {},
         },
       },
       tools: {

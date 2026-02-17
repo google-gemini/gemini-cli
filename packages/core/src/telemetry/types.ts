@@ -41,6 +41,8 @@ import {
 } from './semantic.js';
 import { sanitizeHookName } from './sanitize.js';
 import { getFileDiffFromResultDisplay } from '../utils/fileDiffUtils.js';
+import { LlmRole } from './llmRole.js';
+export { LlmRole };
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -375,17 +377,20 @@ export class ApiRequestEvent implements BaseTelemetryEvent {
   model: string;
   prompt: GenAIPromptDetails;
   request_text?: string;
+  role?: LlmRole;
 
   constructor(
     model: string,
     prompt_details: GenAIPromptDetails,
     request_text?: string,
+    role?: LlmRole,
   ) {
     this['event.name'] = 'api_request';
     this['event.timestamp'] = new Date().toISOString();
     this.model = model;
     this.prompt = prompt_details;
     this.request_text = request_text;
+    this.role = role;
   }
 
   toLogRecord(config: Config): LogRecord {
@@ -397,6 +402,9 @@ export class ApiRequestEvent implements BaseTelemetryEvent {
       prompt_id: this.prompt.prompt_id,
       request_text: this.request_text,
     };
+    if (this.role) {
+      attributes['role'] = this.role;
+    }
     return { body: `API request to ${this.model}.`, attributes };
   }
 
@@ -445,6 +453,7 @@ export class ApiErrorEvent implements BaseTelemetryEvent {
   status_code?: number | string;
   duration_ms: number;
   auth_type?: string;
+  role?: LlmRole;
 
   constructor(
     model: string,
@@ -454,6 +463,7 @@ export class ApiErrorEvent implements BaseTelemetryEvent {
     auth_type?: string,
     error_type?: string,
     status_code?: number | string,
+    role?: LlmRole,
   ) {
     this['event.name'] = 'api_error';
     this['event.timestamp'] = new Date().toISOString();
@@ -464,6 +474,7 @@ export class ApiErrorEvent implements BaseTelemetryEvent {
     this.duration_ms = duration_ms;
     this.prompt = prompt_details;
     this.auth_type = auth_type;
+    this.role = role;
   }
 
   toLogRecord(config: Config): LogRecord {
@@ -481,6 +492,10 @@ export class ApiErrorEvent implements BaseTelemetryEvent {
       prompt_id: this.prompt.prompt_id,
       auth_type: this.auth_type,
     };
+
+    if (this.role) {
+      attributes['role'] = this.role;
+    }
 
     if (this.error_type) {
       attributes['error.type'] = this.error_type;
@@ -590,6 +605,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
   response: GenAIResponseDetails;
   usage: GenAIUsageDetails;
   finish_reasons: OTelFinishReason[];
+  role?: LlmRole;
 
   constructor(
     model: string,
@@ -599,6 +615,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
     auth_type?: string,
     usage_data?: GenerateContentResponseUsageMetadata,
     response_text?: string,
+    role?: LlmRole,
   ) {
     this['event.name'] = 'api_response';
     this['event.timestamp'] = new Date().toISOString();
@@ -619,6 +636,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       total_token_count: usage_data?.totalTokenCount ?? 0,
     };
     this.finish_reasons = toFinishReasons(this.response.candidates);
+    this.role = role;
   }
 
   toLogRecord(config: Config): LogRecord {
@@ -639,6 +657,9 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       status_code: this.status_code,
       finish_reasons: this.finish_reasons,
     };
+    if (this.role) {
+      attributes['role'] = this.role;
+    }
     if (this.response_text) {
       attributes['response_text'] = this.response_text;
     }

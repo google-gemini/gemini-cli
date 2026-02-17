@@ -17,6 +17,7 @@ import { getResponseText } from '../utils/partUtils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { WEB_SEARCH_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { LlmRole } from '../telemetry/llmRole.js';
 
 interface GroundingChunkWeb {
   uri?: string;
@@ -86,6 +87,7 @@ class WebSearchToolInvocation extends BaseToolInvocation<
         { model: 'web-search' },
         [{ role: 'user', parts: [{ text: this.params.query }] }],
         signal,
+        LlmRole.UTILITY_TOOL,
       );
 
       const responseText = getResponseText(response);
