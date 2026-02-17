@@ -345,6 +345,7 @@ describe('Admin Controls', () => {
       // Should still start polling
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
         strictModeDisabled: true,
+        adminControlsApplicable: true,
       });
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
 
@@ -363,7 +364,10 @@ describe('Admin Controls', () => {
     });
 
     it('should fetch from server if no cachedSettings provided', async () => {
-      const serverResponse = { strictModeDisabled: false };
+      const serverResponse = {
+        strictModeDisabled: false,
+        adminControlsApplicable: true,
+      };
       (mockServer.fetchAdminControls as Mock).mockResolvedValue(serverResponse);
 
       const result = await fetchAdminControls(
@@ -402,15 +406,16 @@ describe('Admin Controls', () => {
       // Polling should have been started and should retry
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
         strictModeDisabled: false,
+        adminControlsApplicable: true,
       });
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2); // Initial + poll
     });
 
-    it('should return empty object on 403 fetch error and STOP polling', async () => {
-      const error403 = new Error('Forbidden');
-      Object.assign(error403, { status: 403 });
-      (mockServer.fetchAdminControls as Mock).mockRejectedValue(error403);
+    it('should return empty object on adminControlsApplicable false and STOP polling', async () => {
+      (mockServer.fetchAdminControls as Mock).mockResolvedValue({
+        adminControlsApplicable: false,
+      });
 
       const result = await fetchAdminControls(
         mockServer,
@@ -421,7 +426,7 @@ describe('Admin Controls', () => {
 
       expect(result).toEqual({});
 
-      // Advance time - should NOT poll because of 403
+      // Advance time - should NOT poll because of adminControlsApplicable: false
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1); // Only the initial call
     });
@@ -430,6 +435,7 @@ describe('Admin Controls', () => {
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
         strictModeDisabled: false,
         unknownField: 'bad',
+        adminControlsApplicable: true,
       });
 
       const result = await fetchAdminControls(
@@ -455,7 +461,9 @@ describe('Admin Controls', () => {
     });
 
     it('should reset polling interval if called again', async () => {
-      (mockServer.fetchAdminControls as Mock).mockResolvedValue({});
+      (mockServer.fetchAdminControls as Mock).mockResolvedValue({
+        adminControlsApplicable: true,
+      });
 
       // First call
       await fetchAdminControls(
@@ -514,6 +522,7 @@ describe('Admin Controls', () => {
       const serverResponse = {
         strictModeDisabled: true,
         unknownField: 'should be removed',
+        adminControlsApplicable: true,
       };
       (mockServer.fetchAdminControls as Mock).mockResolvedValue(serverResponse);
 
@@ -532,10 +541,10 @@ describe('Admin Controls', () => {
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
     });
 
-    it('should return empty object on 403 fetch error', async () => {
-      const error403 = new Error('Forbidden');
-      Object.assign(error403, { status: 403 });
-      (mockServer.fetchAdminControls as Mock).mockRejectedValue(error403);
+    it('should return empty object on adminControlsApplicable false', async () => {
+      (mockServer.fetchAdminControls as Mock).mockResolvedValue({
+        adminControlsApplicable: false,
+      });
 
       const result = await fetchAdminControlsOnce(mockServer, true);
       expect(result).toEqual({});
@@ -555,7 +564,9 @@ describe('Admin Controls', () => {
       const setIntervalSpy = vi.spyOn(global, 'setInterval');
       const clearIntervalSpy = vi.spyOn(global, 'clearInterval');
 
-      (mockServer.fetchAdminControls as Mock).mockResolvedValue({});
+      (mockServer.fetchAdminControls as Mock).mockResolvedValue({
+        adminControlsApplicable: true,
+      });
       await fetchAdminControlsOnce(mockServer, true);
 
       expect(setIntervalSpy).not.toHaveBeenCalled();
@@ -568,6 +579,7 @@ describe('Admin Controls', () => {
       // Initial fetch
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
         strictModeDisabled: true,
+        adminControlsApplicable: true,
       });
       await fetchAdminControls(
         mockServer,
@@ -579,6 +591,7 @@ describe('Admin Controls', () => {
       // Update for next poll
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
         strictModeDisabled: false,
+        adminControlsApplicable: true,
       });
 
       // Fast forward
@@ -598,7 +611,10 @@ describe('Admin Controls', () => {
     });
 
     it('should NOT emit if settings are deeply equal but not the same instance', async () => {
-      const settings = { strictModeDisabled: false };
+      const settings = {
+        strictModeDisabled: false,
+        adminControlsApplicable: true,
+      };
       (mockServer.fetchAdminControls as Mock).mockResolvedValue(settings);
 
       await fetchAdminControls(
@@ -613,6 +629,7 @@ describe('Admin Controls', () => {
       // Next poll returns a different object with the same values
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
         strictModeDisabled: false,
+        adminControlsApplicable: true,
       });
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
 
@@ -623,6 +640,7 @@ describe('Admin Controls', () => {
       // Initial fetch is successful
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
         strictModeDisabled: true,
+        adminControlsApplicable: true,
       });
       await fetchAdminControls(
         mockServer,
@@ -643,6 +661,7 @@ describe('Admin Controls', () => {
       // Subsequent poll succeeds with new data
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
         strictModeDisabled: false,
+        adminControlsApplicable: true,
       });
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(3);
@@ -659,10 +678,11 @@ describe('Admin Controls', () => {
       });
     });
 
-    it('should STOP polling if server returns 403', async () => {
+    it('should STOP polling if server returns adminControlsApplicable false', async () => {
       // Initial fetch is successful
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
         strictModeDisabled: true,
+        adminControlsApplicable: true,
       });
       await fetchAdminControls(
         mockServer,
@@ -672,10 +692,10 @@ describe('Admin Controls', () => {
       );
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
 
-      // Next poll returns 403
-      const error403 = new Error('Forbidden');
-      Object.assign(error403, { status: 403 });
-      (mockServer.fetchAdminControls as Mock).mockRejectedValue(error403);
+      // Next poll returns adminControlsApplicable: false
+      (mockServer.fetchAdminControls as Mock).mockResolvedValue({
+        adminControlsApplicable: false,
+      });
 
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2);
@@ -688,7 +708,9 @@ describe('Admin Controls', () => {
 
   describe('stopAdminControlsPolling', () => {
     it('should stop polling after it has started', async () => {
-      (mockServer.fetchAdminControls as Mock).mockResolvedValue({});
+      (mockServer.fetchAdminControls as Mock).mockResolvedValue({
+        adminControlsApplicable: true,
+      });
 
       // Start polling
       await fetchAdminControls(

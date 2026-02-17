@@ -80,15 +80,6 @@ export function sanitizeAdminSettings(
   };
 }
 
-function isGaxiosError(error: unknown): error is { status: number } {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'status' in error &&
-    typeof (error as { status: unknown }).status === 'number'
-  );
-}
-
 /**
  * Fetches the admin controls from the server if enabled by experiment flag.
  * Safely handles polling start/stop based on the flag and server availability.
@@ -123,17 +114,18 @@ export async function fetchAdminControls(
     const rawSettings = await server.fetchAdminControls({
       project: server.projectId,
     });
+
+    if (rawSettings.adminControlsApplicable !== true) {
+      stopAdminControlsPolling();
+      currentSettings = undefined;
+      return {};
+    }
+
     const sanitizedSettings = sanitizeAdminSettings(rawSettings);
     currentSettings = sanitizedSettings;
     startAdminControlsPolling(server, server.projectId, onSettingsChanged);
     return sanitizedSettings;
   } catch (e) {
-    // Non-enterprise users don't have access to fetch settings.
-    if (isGaxiosError(e) && e.status === 403) {
-      stopAdminControlsPolling();
-      currentSettings = undefined;
-      return {};
-    }
     debugLogger.error('Failed to fetch admin controls: ', e);
     // If initial fetch fails, start polling to retry.
     currentSettings = {};
@@ -162,12 +154,13 @@ export async function fetchAdminControlsOnce(
     const rawSettings = await server.fetchAdminControls({
       project: server.projectId,
     });
-    return sanitizeAdminSettings(rawSettings);
-  } catch (e) {
-    // Non-enterprise users don't have access to fetch settings.
-    if (isGaxiosError(e) && e.status === 403) {
+
+    if (rawSettings.adminControlsApplicable !== true) {
       return {};
     }
+
+    return sanitizeAdminSettings(rawSettings);
+  } catch (e) {
     debugLogger.error(
       'Failed to fetch admin controls: ',
       e instanceof Error ? e.message : e,
@@ -192,6 +185,13 @@ function startAdminControlsPolling(
         const rawSettings = await server.fetchAdminControls({
           project,
         });
+
+        if (rawSettings.adminControlsApplicable !== true) {
+          stopAdminControlsPolling();
+          currentSettings = undefined;
+          return;
+        }
+
         const newSettings = sanitizeAdminSettings(rawSettings);
 
         if (!isDeepStrictEqual(newSettings, currentSettings)) {
@@ -199,12 +199,6 @@ function startAdminControlsPolling(
           onSettingsChanged(newSettings);
         }
       } catch (e) {
-        // Non-enterprise users don't have access to fetch settings.
-        if (isGaxiosError(e) && e.status === 403) {
-          stopAdminControlsPolling();
-          currentSettings = undefined;
-          return;
-        }
         debugLogger.error('Failed to poll admin controls: ', e);
       }
     },
