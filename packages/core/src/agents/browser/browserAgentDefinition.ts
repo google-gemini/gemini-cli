@@ -55,7 +55,6 @@ PARALLEL TOOL CALLS - CRITICAL:
 - Do NOT make parallel calls for actions that change page state (click, fill, press_key, etc.)
 - Each action changes the DOM and invalidates UIDs from the current snapshot
 - Make state-changing actions ONE AT A TIME, then observe the results
-- For typing text, prefer type_text tool instead of multiple press_key calls
 
 OVERLAY/POPUP HANDLING:
 Before interacting with page content, scan the accessibility tree for blocking overlays:
@@ -71,6 +70,24 @@ When you need to identify elements by visual attributes not in the AX tree (e.g.
 2. It returns visual analysis with coordinates/descriptions — it does NOT perform actions
 3. Use the returned coordinates with click_at(x, y) or other tools yourself
 4. If the analysis is insufficient, call it again with a more specific instruction
+
+COMPLEX WEB APPS (spreadsheets, rich editors, canvas apps):
+Many web apps (Google Sheets/Docs, Notion, Figma, etc.) use custom rendering rather than standard HTML inputs.
+- fill does NOT work on these apps. Instead, click the target element, then use type_text to enter the value.
+- Navigate cells/fields using keyboard shortcuts (Tab, Enter, ArrowDown) — more reliable than clicking cell UIDs.
+- For spreadsheets: click a cell → type_text("value") → press_key("Enter") to confirm and move to the next cell.
+- Use the Name Box (cell reference input, usually showing "A1") to jump to specific cells.
+
+TERMINAL FAILURES — STOP IMMEDIATELY:
+Some errors are unrecoverable and retrying will never help. When you see ANY of these, call complete_task immediately with success=false and include the specific remediation steps in your summary:
+- "Could not connect to Chrome" — Include ALL of these instructions in your summary:
+  1. Open Chrome (version 144+)
+  2. Go to chrome://inspect/#remote-debugging and enable remote debugging
+  3. Or change sessionMode to "persistent" in settings.json to let the agent launch its own browser
+- "Browser closed" or "Target closed" or "Session closed" — The browser process has terminated. Tell the user to restart and try again.
+- "net::ERR_" network errors on the SAME URL after 2 retries — the site is unreachable. Report the URL and error.
+- Any error that appears IDENTICALLY 3+ times in a row — it will not resolve by retrying.
+Do NOT keep retrying terminal errors. Report them with actionable remediation steps and exit immediately.
 
 CRITICAL: When you have fully completed the user's task, you MUST call the complete_task tool with a summary of what you accomplished. Do NOT just return text - you must explicitly call complete_task to exit the loop.`;
 

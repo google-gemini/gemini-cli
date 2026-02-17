@@ -116,7 +116,120 @@ class McpToolInvocation extends BaseToolInvocation<
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
+
+      // Chrome connection errors are fatal — re-throw to terminate the agent
+      // immediately instead of returning a result the LLM would retry.
+      if (errorMsg.includes('Could not connect to Chrome')) {
+        throw error;
+      }
+
       debugLogger.error(`MCP tool ${this.toolName} failed: ${errorMsg}`);
+      return {
+        llmContent: `Error: ${errorMsg}`,
+        returnDisplay: `Error: ${errorMsg}`,
+        error: { message: errorMsg },
+      };
+    }
+  }
+}
+
+/**
+ * Composite tool invocation that types a full string by calling press_key
+ * for each character internally, avoiding N model round-trips.
+ */
+class TypeTextInvocation extends BaseToolInvocation<
+  Record<string, unknown>,
+  ToolResult
+> {
+  constructor(
+    private readonly browserManager: BrowserManager,
+    private readonly text: string,
+    messageBus: MessageBus,
+  ) {
+    super({ text }, messageBus, 'type_text', 'type_text');
+  }
+
+  getDescription(): string {
+    return `type_text: "${this.text.substring(0, 50)}${this.text.length > 50 ? '...' : ''}"`;
+  }
+
+  protected override async getConfirmationDetails(
+    _abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    if (!this.messageBus) {
+      return false;
+    }
+
+    return {
+      type: 'mcp',
+      title: `Confirm Tool: type_text`,
+      serverName: 'browser-agent',
+      toolName: 'type_text',
+      toolDisplayName: 'type_text',
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
+        await this.publishPolicyUpdate(outcome);
+      },
+    };
+  }
+
+  protected override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    return {
+      mcpName: 'browser-agent',
+    };
+  }
+
+  override async execute(): Promise<ToolResult> {
+    try {
+      const chars = [...this.text]; // Handle Unicode correctly
+      let successCount = 0;
+      let lastError: string | undefined;
+
+      for (const char of chars) {
+        // Map special characters to key names
+        const key = char === ' ' ? 'Space' : char;
+        const result: McpToolCallResult = await this.browserManager.callTool(
+          'press_key',
+          { key },
+        );
+
+        if (result.isError) {
+          const errorText = result.content
+            ?.filter(
+              (c: { type: string; text?: string }) =>
+                c.type === 'text' && c.text,
+            )
+            .map((c: { type: string; text?: string }) => c.text)
+            .join('\n');
+          lastError = errorText || 'Unknown error';
+          // Continue typing remaining characters on soft errors
+          debugLogger.warn(
+            `type_text: press_key("${key}") failed: ${lastError}`,
+          );
+        } else {
+          successCount++;
+        }
+      }
+
+      const summary =
+        successCount === chars.length
+          ? `Successfully typed ${chars.length} characters: "${this.text}"`
+          : `Typed ${successCount}/${chars.length} characters. Last error: ${lastError}`;
+
+      return {
+        llmContent: summary,
+        returnDisplay: summary,
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+
+      // Chrome connection errors are fatal
+      if (errorMsg.includes('Could not connect to Chrome')) {
+        throw error;
+      }
+
+      debugLogger.error(`type_text failed: ${errorMsg}`);
       return {
         llmContent: `Error: ${errorMsg}`,
         returnDisplay: `Error: ${errorMsg}`,
@@ -165,7 +278,56 @@ class McpDeclarativeTool extends DeclarativeTool<
 }
 
 /**
- * Creates DeclarativeTool instances from dynamically discovered MCP tools.
+ * DeclarativeTool for the custom type_text composite tool.
+ */
+class TypeTextDeclarativeTool extends DeclarativeTool<
+  Record<string, unknown>,
+  ToolResult
+> {
+  constructor(
+    private readonly browserManager: BrowserManager,
+    messageBus: MessageBus,
+  ) {
+    super(
+      'type_text',
+      'type_text',
+      'Types a full text string into the currently focused element by pressing each key in sequence. ' +
+        'Much faster than calling press_key for each character individually. ' +
+        'Use this to enter text into form fields, spreadsheet cells, or any focused input. ' +
+        'The element must already be focused (e.g., after a click). ' +
+        'Does NOT press Enter at the end — call press_key("Enter") separately if needed.',
+      Kind.Other,
+      {
+        type: 'object',
+        properties: {
+          text: {
+            type: 'string',
+            description:
+              'The text to type. Each character will be pressed in sequence.',
+          },
+        },
+        required: ['text'],
+      },
+      messageBus,
+      /* isOutputMarkdown */ true,
+      /* canUpdateOutput */ false,
+    );
+  }
+
+  build(
+    params: Record<string, unknown>,
+  ): ToolInvocation<Record<string, unknown>, ToolResult> {
+    return new TypeTextInvocation(
+      this.browserManager,
+      String(params['text'] ?? ''),
+      this.messageBus,
+    );
+  }
+}
+
+/**
+ * Creates DeclarativeTool instances from dynamically discovered MCP tools,
+ * plus custom composite tools (like type_text).
  *
  * These tools are registered in the browser agent's isolated ToolRegistry,
  * NOT in the main agent's registry.
@@ -179,7 +341,7 @@ class McpDeclarativeTool extends DeclarativeTool<
 export async function createMcpDeclarativeTools(
   browserManager: BrowserManager,
   messageBus: MessageBus,
-): Promise<McpDeclarativeTool[]> {
+): Promise<Array<McpDeclarativeTool | TypeTextDeclarativeTool>> {
   // Get dynamically discovered tools from the MCP server
   const mcpTools = await browserManager.getDiscoveredTools();
 
@@ -187,21 +349,31 @@ export async function createMcpDeclarativeTools(
     `Creating ${mcpTools.length} declarative tools for browser agent`,
   );
 
-  return mcpTools.map((mcpTool) => {
-    const schema = convertMcpToolToFunctionDeclaration(mcpTool);
-    // Augment description with uid-context hints
-    const augmentedDescription = augmentToolDescription(
-      mcpTool.name,
-      mcpTool.description ?? '',
-    );
-    return new McpDeclarativeTool(
-      browserManager,
-      mcpTool.name,
-      augmentedDescription,
-      schema.parametersJsonSchema,
-      messageBus,
-    );
-  });
+  const tools: Array<McpDeclarativeTool | TypeTextDeclarativeTool> =
+    mcpTools.map((mcpTool) => {
+      const schema = convertMcpToolToFunctionDeclaration(mcpTool);
+      // Augment description with uid-context hints
+      const augmentedDescription = augmentToolDescription(
+        mcpTool.name,
+        mcpTool.description ?? '',
+      );
+      return new McpDeclarativeTool(
+        browserManager,
+        mcpTool.name,
+        augmentedDescription,
+        schema.parametersJsonSchema,
+        messageBus,
+      );
+    });
+
+  // Add custom composite tools
+  tools.push(new TypeTextDeclarativeTool(browserManager, messageBus));
+
+  debugLogger.log(
+    `Total tools registered: ${tools.length} (${mcpTools.length} MCP + 1 custom)`,
+  );
+
+  return tools;
 }
 
 /**
@@ -223,31 +395,44 @@ function convertMcpToolToFunctionDeclaration(
 }
 
 /**
- * Augments MCP tool descriptions with uid-context hints.
- * Adds semantic guidance for tools that work with accessibility tree elements.
+ * Augments MCP tool descriptions with usage guidance.
+ * Adds semantic hints and usage rules directly in tool descriptions
+ * so the model makes correct tool choices without system prompt overhead.
+ *
+ * Actual chrome-devtools-mcp tools:
+ *   Input: click, drag, fill, fill_form, handle_dialog, hover, press_key, upload_file
+ *   Navigation: close_page, list_pages, navigate_page, new_page, select_page, wait_for
+ *   Emulation: emulate, resize_page
+ *   Performance: performance_analyze_insight, performance_start_trace, performance_stop_trace
+ *   Network: get_network_request, list_network_requests
+ *   Debugging: evaluate_script, get_console_message, list_console_messages, take_screenshot, take_snapshot
+ *   Vision (--experimental-vision): click_at, analyze_screenshot
  */
 function augmentToolDescription(toolName: string, description: string): string {
-  const uidHints: Record<string, string> = {
+  // More-specific keys MUST come before shorter keys to prevent
+  // partial matching from short-circuiting (e.g., fill_form before fill).
+  const hints: Record<string, string> = {
+    fill_form:
+      ' Fills multiple standard HTML form fields at once. Same limitations as fill — does not work on canvas/custom widgets.',
+    fill: ' Fills standard HTML form fields (<input>, <textarea>, <select>) by uid. Does NOT work on custom/canvas-based widgets (e.g., Google Sheets cells, Notion blocks). If fill times out or fails, click the element first then use press_key with individual characters instead.',
+    click_at:
+      ' Clicks at exact pixel coordinates (x, y). Use with analyze_screenshot to find coordinates of visual elements.',
     click:
-      ' Use the element uid from the accessibility tree snapshot (e.g., uid="87_4" for a button).',
-    fill: ' Use the element uid from the accessibility tree snapshot for input/select elements.',
+      ' Use the element uid from the accessibility tree snapshot (e.g., uid="87_4"). UIDs are invalidated after this action — call take_snapshot before using another uid.',
     hover:
       ' Use the element uid from the accessibility tree snapshot to hover over elements.',
-    type: ' Type text into the currently focused element.',
-    scroll:
-      ' Scroll the page in the specified direction. Use after take_snapshot to see more content.',
     take_snapshot:
-      ' Returns the accessibility tree with uid values for each element. Call this first to see available elements.',
+      ' Returns the accessibility tree with uid values for each element. Call this FIRST to see available elements, and AFTER every state-changing action (click, fill, press_key) before using any uid.',
     navigate_page:
       ' Navigate to the specified URL. Call take_snapshot after to see the new page.',
     new_page:
       ' Opens a new page/tab with the specified URL. Call take_snapshot after to see the new page.',
     press_key:
-      ' Press a keyboard key. Use for Enter, Tab, Escape, arrow keys, etc.',
+      ' Press a SINGLE keyboard key (e.g., "Enter", "Tab", "Escape", "ArrowDown", "a", "8"). ONLY accepts one key name — do NOT pass multi-character strings like "Hello" or "A1\\nEnter". To type text, call press_key once per character.',
   };
 
-  // Check for partial matches (e.g., "click" matches "click_element")
-  for (const [key, hint] of Object.entries(uidHints)) {
+  // Check for partial matches — order matters! More-specific keys first.
+  for (const [key, hint] of Object.entries(hints)) {
     if (toolName.toLowerCase().includes(key)) {
       return description + hint;
     }
