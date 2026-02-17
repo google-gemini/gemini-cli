@@ -14,9 +14,7 @@ describe('ApprovalModeIndicator', () => {
     const { lastFrame } = render(
       <ApprovalModeIndicator approvalMode={ApprovalMode.AUTO_EDIT} />,
     );
-    const output = lastFrame();
-    expect(output).toContain('auto-accept edits');
-    expect(output).toContain('shift+tab to manual');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders correctly for AUTO_EDIT mode with plan enabled', () => {
@@ -26,35 +24,28 @@ describe('ApprovalModeIndicator', () => {
         isPlanEnabled={true}
       />,
     );
-    const output = lastFrame();
-    expect(output).toContain('auto-accept edits');
-    expect(output).toContain('shift+tab to manual');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders correctly for PLAN mode', () => {
     const { lastFrame } = render(
       <ApprovalModeIndicator approvalMode={ApprovalMode.PLAN} />,
     );
-    const output = lastFrame();
-    expect(output).toContain('plan');
-    expect(output).toContain('shift+tab to accept edits');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders correctly for YOLO mode', () => {
     const { lastFrame } = render(
       <ApprovalModeIndicator approvalMode={ApprovalMode.YOLO} />,
     );
-    const output = lastFrame();
-    expect(output).toContain('YOLO');
-    expect(output).toContain('ctrl+y');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders correctly for DEFAULT mode', () => {
     const { lastFrame } = render(
       <ApprovalModeIndicator approvalMode={ApprovalMode.DEFAULT} />,
     );
-    const output = lastFrame();
-    expect(output).toContain('shift+tab to accept edits');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders correctly for DEFAULT mode with plan enabled', () => {
@@ -64,7 +55,6 @@ describe('ApprovalModeIndicator', () => {
         isPlanEnabled={true}
       />,
     );
-    const output = lastFrame();
-    expect(output).toContain('shift+tab to plan');
+    expect(lastFrame()).toMatchSnapshot();
   });
 });
