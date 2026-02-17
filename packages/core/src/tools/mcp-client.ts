@@ -1914,7 +1914,8 @@ export async function createTransport(
 
     const finalEnv: Record<string, string> = {
       [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
-          GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE };
+        GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
+    };
     for (const [key, value] of Object.entries(sanitizedEnv)) {
       if (value !== undefined) {
         finalEnv[key] = value;
