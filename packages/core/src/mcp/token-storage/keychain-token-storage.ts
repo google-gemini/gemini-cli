@@ -8,6 +8,7 @@ import * as crypto from 'node:crypto';
 import { BaseTokenStorage } from './base-token-storage.js';
 import type { OAuthCredentials, SecretStorage } from './types.js';
 import { coreEvents } from '../../utils/events.js';
+import { KeychainAvailabilityEvent } from '../../telemetry/types.js';
 
 interface Keytar {
   getPassword(service: string, account: string): Promise<string | null>;
@@ -263,9 +264,21 @@ export class KeychainTokenStorage
 
       const success = deleted && retrieved === testPassword;
       this.keychainAvailable = success;
+
+      coreEvents.emitTelemetryKeychainAvailability(
+        new KeychainAvailabilityEvent(success),
+      );
+
       return success;
     } catch (_error) {
       this.keychainAvailable = false;
+
+      // Do not log the raw error message to avoid potential PII leaks
+      // (e.g. from OS-level error messages containing file paths)
+      coreEvents.emitTelemetryKeychainAvailability(
+        new KeychainAvailabilityEvent(false),
+      );
+
       return false;
     }
   }
