@@ -157,6 +157,10 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
           .join(', ') + ` or \`${filenames[filenames.length - 1]}\``
       : `\`${filenames[0]}\``;
 
+  // ⚠️ IMPORTANT: the Context Efficiency changes strike a delicate balance that encourages
+  // the agent to minimize response sizes while also taking care to avoid extra turns. You
+  // must run the major benchmarks, such as SWEBench, prior to committing any changes to
+  // the Context Efficiency section to avoid regressing this behavior.
   return `
 # Core Mandates
 
