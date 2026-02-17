@@ -63,6 +63,16 @@ export class PromptProvider {
     const activeSnippets = isModernModel ? snippets : legacySnippets;
     const contextFilenames = getAllGeminiMdFilenames();
 
+    const registry =
+      typeof config.getToolRegistry === 'function'
+        ? config.getToolRegistry()
+        : undefined;
+    const allTools =
+      typeof registry?.getAllTools === 'function' ? registry.getAllTools() : [];
+    const toolInstructions = allTools
+      .map((t) => t.instructions)
+      .filter((i): i is string => !!i);
+
     // --- Context Gathering ---
     let planModeToolsList = PLAN_MODE_TOOLS.filter((t) =>
       enabledToolNames.has(t),
@@ -201,6 +211,8 @@ export class PromptProvider {
           : this.withSection('finalReminder', () => ({
               readFileToolName: READ_FILE_TOOL_NAME,
             })),
+        toolInstructions:
+          toolInstructions.length > 0 ? toolInstructions : undefined,
       } as snippets.SystemPromptOptions;
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

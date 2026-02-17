@@ -35,6 +35,7 @@ export interface SystemPromptOptions {
   interactiveYoloMode?: boolean;
   gitRepo?: GitRepoOptions;
   finalReminder?: FinalReminderOptions;
+  toolInstructions?: string[];
 }
 
 export interface PreambleOptions {
@@ -112,6 +113,8 @@ ${
     ? renderPlanningWorkflow(options.planningWorkflow)
     : renderPrimaryWorkflows(options.primaryWorkflows)
 }
+
+${renderToolInstructions(options.toolInstructions)}
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
 
@@ -241,6 +244,15 @@ ${workflowStepPlan(options)}
 **Goal:** Autonomously implement and deliver a visually appealing, substantially complete, and functional prototype. Utilize all tools at your disposal to implement the application. Some tools you may especially find useful are '${WRITE_FILE_TOOL_NAME}', '${EDIT_TOOL_NAME}' and '${SHELL_TOOL_NAME}'.
 
 ${newApplicationSteps(options)}
+`.trim();
+}
+
+export function renderToolInstructions(instructions?: string[]): string {
+  if (!instructions || instructions.length === 0) return '';
+  return `
+# Detailed Tool Reference
+
+${instructions.join('\n\n')}
 `.trim();
 }
 

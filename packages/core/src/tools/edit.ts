@@ -910,15 +910,23 @@ export class EditTool
     private readonly config: Config,
     messageBus: MessageBus,
   ) {
+    const modelId =
+      typeof config.getActiveModel === 'function'
+        ? config.getActiveModel()
+        : undefined;
+    const resolved = resolveToolDeclaration(EDIT_DEFINITION, modelId);
     super(
       EditTool.Name,
       EDIT_DISPLAY_NAME,
-      EDIT_DEFINITION.base.description!,
+      resolved.description!,
       Kind.Edit,
-      EDIT_DEFINITION.base.parametersJsonSchema,
+      resolved.parametersJsonSchema,
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
+      undefined, // extensionName
+      undefined, // extensionId
+      resolved.instructions,
     );
   }
 

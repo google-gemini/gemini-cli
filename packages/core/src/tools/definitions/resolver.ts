@@ -17,7 +17,7 @@ import type { ToolDefinition } from './types.js';
 export function resolveToolDeclaration(
   definition: ToolDefinition,
   modelId?: string,
-): FunctionDeclaration {
+): FunctionDeclaration & { instructions?: string } {
   if (!modelId || !definition.overrides) {
     return definition.base;
   }

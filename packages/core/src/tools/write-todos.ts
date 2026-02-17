@@ -12,6 +12,7 @@ import {
   type Todo,
   type ToolResult,
 } from './tools.js';
+import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { WRITE_TODOS_TOOL_NAME } from './tool-names.js';
 import { WRITE_TODOS_DEFINITION } from './definitions/coreTools.js';
@@ -81,16 +82,27 @@ export class WriteTodosTool extends BaseDeclarativeTool<
 > {
   static readonly Name = WRITE_TODOS_TOOL_NAME;
 
-  constructor(messageBus: MessageBus) {
+  constructor(
+    private readonly config: Config,
+    messageBus: MessageBus,
+  ) {
+    const modelId =
+      typeof config.getActiveModel === 'function'
+        ? config.getActiveModel()
+        : undefined;
+    const resolved = resolveToolDeclaration(WRITE_TODOS_DEFINITION, modelId);
     super(
       WriteTodosTool.Name,
       'WriteTodos',
-      WRITE_TODOS_DEFINITION.base.description!,
+      resolved.description!,
       Kind.Other,
-      WRITE_TODOS_DEFINITION.base.parametersJsonSchema,
+      resolved.parametersJsonSchema,
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
+      undefined, // extensionName
+      undefined, // extensionId
+      resolved.instructions,
     );
   }
 

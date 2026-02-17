@@ -269,8 +269,8 @@ export const EDIT_DEFINITION: ToolDefinition = {
     name: EDIT_TOOL_NAME,
     description: `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool to examine the file's current content before attempting a text replacement.
       
-      The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
-      
+      The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.`,
+    instructions: `
       Expectation for required parameters:
       1. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
       2. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic and that \`old_string\` and \`new_string\` are different.
@@ -646,8 +646,8 @@ NEVER save workspace-specific context, local paths, or commands (e.g. "The entry
 export const WRITE_TODOS_DEFINITION: ToolDefinition = {
   base: {
     name: WRITE_TODOS_TOOL_NAME,
-    description: `This tool can help you list out the current subtasks that are required to be completed for a given user request. The list of subtasks helps you keep track of the current task, organize complex queries and help ensure that you don't miss any steps. With this list, the user can also see the current progress you are making in executing a given task.
-
+    description: `This tool can help you list out the current subtasks that are required to be completed for a given user request. The list of subtasks helps you keep track of the current task, organize complex queries and help ensure that you don't miss any steps. With this list, the user can also see the current progress you are making in executing a given task.`,
+    instructions: `
 Depending on the task complexity, you should first divide a given task into subtasks and then use this tool to list out the subtasks that are required to be completed for a given user request.
 Each of the subtasks should be clear and distinct. 
 

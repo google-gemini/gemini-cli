@@ -361,6 +361,7 @@ export abstract class DeclarativeTool<
     readonly canUpdateOutput: boolean = false,
     readonly extensionName?: string,
     readonly extensionId?: string,
+    readonly instructions?: string,
   ) {}
 
   getSchema(_modelId?: string): FunctionDeclaration {

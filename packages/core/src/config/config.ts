@@ -2440,7 +2440,7 @@ export class Config {
     );
     if (this.getUseWriteTodos()) {
       maybeRegister(WriteTodosTool, () =>
-        registry.registerTool(new WriteTodosTool(this.messageBus)),
+        registry.registerTool(new WriteTodosTool(this, this.messageBus)),
       );
     }
     if (this.isPlanEnabled()) {

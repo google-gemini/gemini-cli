@@ -35,6 +35,7 @@ export interface SystemPromptOptions {
   sandbox?: SandboxMode;
   interactiveYoloMode?: boolean;
   gitRepo?: GitRepoOptions;
+  toolInstructions?: string[];
 }
 
 export interface PreambleOptions {
@@ -109,6 +110,8 @@ ${
     ? renderPlanningWorkflow(options.planningWorkflow)
     : renderPrimaryWorkflows(options.primaryWorkflows)
 }
+
+${renderToolInstructions(options.toolInstructions)}
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
 
@@ -265,6 +268,15 @@ ${workflowStepStrategy(options)}
 **Goal:** Autonomously implement and deliver a visually appealing, substantially complete, and functional prototype with rich aesthetics. Users judge applications by their visual impact; ensure they feel modern, "alive," and polished through consistent spacing, interactive feedback, and platform-appropriate design.
 
 ${newApplicationSteps(options)}
+`.trim();
+}
+
+export function renderToolInstructions(instructions?: string[]): string {
+  if (!instructions || instructions.length === 0) return '';
+  return `
+# Detailed Tool Reference
+
+${instructions.join('\n\n')}
 `.trim();
 }
 
