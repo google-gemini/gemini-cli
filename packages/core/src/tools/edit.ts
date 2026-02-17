@@ -1100,6 +1100,15 @@ async function calculateFuzzyReplacement(
     ?.slice(0, -1)
     .map((l) => l.trimEnd()); // Trim end of search lines to be more robust
 
+  // Limit the scope of the fuzzy match to reduce impact on responsivesness.
+  // Each comparison takes roughly O(L^2) time.
+  // We perform sourceLines.length comparisons (sliding window).
+  // Total complexity proxy: sourceLines.length * old_string.length^2
+  // Limit to 4e8 for < 1 second.
+  if (sourceLines.length * Math.pow(old_string.length, 2) > 400_000_000) {
+    return null;
+  }
+
   if (!searchLines || searchLines.length === 0) {
     return null;
   }

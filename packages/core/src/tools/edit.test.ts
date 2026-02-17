@@ -420,6 +420,38 @@ describe('EditTool', () => {
       expect(result.newContent).toBe(content);
     });
 
+    it('should NOT perform a fuzzy replacement when the complexity (length * size) is too high', async () => {
+      // 2000 chars
+      const longString = 'a'.repeat(2000);
+
+      // Create a file with enough lines to trigger the complexity limit
+      // Complexity = Lines * Length^2
+      // Threshold = 500,000,000
+      // 2000^2 = 4,000,000.
+      // Need > 125 lines. Let's use 200 lines.
+      const lines = Array(200).fill(longString);
+      const content = lines.join('\n');
+
+      // Mismatch at the end (making it a fuzzy match candidate)
+      const oldString = longString + 'c';
+      const newString = 'replacement';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          instruction: 'update',
+          old_string: oldString,
+          new_string: newString,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      // Should return 0 occurrences because fuzzy match is skipped
+      expect(result.occurrences).toBe(0);
+      expect(result.newContent).toBe(content);
+    });
+
     it('should perform multiple fuzzy replacements if multiple valid matches are found', async () => {
       const content = `
 function doIt() {
