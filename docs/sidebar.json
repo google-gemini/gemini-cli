@@ -89,7 +89,7 @@
       { "label": "Plan mode (experimental)", "slug": "docs/cli/plan-mode" },
       { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
       { "label": "Telemetry", "slug": "docs/cli/telemetry" },
-      { "label": "Token caching", "slug": "docs/cli/token-caching" },
+      { "label": "Token caching", "slug": "docs/cli/token-caching" }
     ]
   },
   {
@@ -139,7 +139,7 @@
         "label": "Developer guide: Reference",
         "slug": "docs/extensions/reference"
       }
-    ]  
+    ]
   },
   {
     "label": "Reference",
