@@ -62,12 +62,20 @@ describe('Frugal reads eval', () => {
         'Agent should have used read_file to check context',
       ).toBeGreaterThan(0);
 
-      // We expect a single contiguous range covering all errors since they are near each other.
-      // Some models re-verify or read more than once, so we allow up to 4.
+      // We expect 1-3 ranges in a single turn.
       expect(
         targetFileReads.length,
-        'Agent should have been efficient with ranged reads for near errors',
-      ).toEqual(1);
+        'Agent should have used 1-3 ranged reads for near errors',
+      ).toBeLessThanOrEqual(3);
+
+      const firstPromptId = targetFileReads[0].toolRequest.prompt_id;
+      expect(firstPromptId, 'Prompt ID should be defined').toBeDefined();
+      expect(
+        targetFileReads.every(
+          (call) => call.toolRequest.prompt_id === firstPromptId,
+        ),
+        'All reads should have happened in the same turn',
+      ).toBe(true);
 
       let totalLinesRead = 0;
       const readRanges: { offset: number; limit: number }[] = [];

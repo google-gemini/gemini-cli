@@ -9,7 +9,7 @@ import { evalTest } from './test-helper.js';
 
 /**
  * Evals to verify that the agent uses search tools efficiently (frugally)
- * by utilizing limiting parameters like `total_max_matches` and `max_matches_per_file`.
+ * by utilizing limiting parameters like `limit` and `max_matches_per_file`.
  * This ensures the agent doesn't flood the context window with unnecessary search results.
  */
 describe('Frugal Search', () => {
@@ -120,12 +120,12 @@ describe('Frugal Search', () => {
       const grepParams = grepCalls.map(getGrepParams);
 
       const hasTotalMaxLimit = grepParams.some(
-        (p) => p.total_max_matches !== undefined && p.total_max_matches <= 100,
+        (p) => p.limit !== undefined && p.limit <= 100,
       );
       expect(
         hasTotalMaxLimit,
-        `Expected agent to use a small total_max_matches (<= 100) for a sample usage request. Actual values: ${JSON.stringify(
-          grepParams.map((p) => p.total_max_matches),
+        `Expected agent to use a small limit (<= 100) for a sample usage request. Actual values: ${JSON.stringify(
+          grepParams.map((p) => p.limit),
         )}`,
       ).toBe(true);
     },
