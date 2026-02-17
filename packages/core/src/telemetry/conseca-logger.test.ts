@@ -9,7 +9,7 @@ import { logs, type Logger } from '@opentelemetry/api-logs';
 import {
   logConsecaPolicyGeneration,
   logConsecaVerdict,
-} from './conseca_logger.js';
+} from './conseca-logger.js';
 import {
   ConsecaPolicyGenerationEvent,
   ConsecaVerdictEvent,
@@ -24,7 +24,7 @@ vi.mock('@opentelemetry/api-logs');
 vi.mock('./sdk.js');
 vi.mock('./clearcut-logger/clearcut-logger.js');
 
-describe('conseca_logger', () => {
+describe('conseca-logger', () => {
   let mockConfig: Config;
   let mockLogger: { emit: ReturnType<typeof vi.fn> };
   let mockClearcutLogger: {
