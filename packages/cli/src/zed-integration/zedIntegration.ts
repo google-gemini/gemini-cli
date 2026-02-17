@@ -478,6 +478,11 @@ export class Session {
 
     let nextMessage: Content | null = { role: 'user', parts };
 
+    // Accumulate token usage across the entire prompt turn (may have multiple
+    // LLM round-trips when tool calls happen).
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+
     while (nextMessage !== null) {
       if (pendingSend.signal.aborted) {
         chat.addHistory(nextMessage);
@@ -527,6 +532,13 @@ export class Session {
             }
           }
 
+          // Capture usageMetadata from each chunk (last one has final counts)
+          if (resp.type === StreamEventType.CHUNK && resp.value.usageMetadata) {
+            const meta = resp.value.usageMetadata;
+            totalInputTokens = meta.promptTokenCount ?? totalInputTokens;
+            totalOutputTokens = meta.candidatesTokenCount ?? totalOutputTokens;
+          }
+
           if (resp.type === StreamEventType.CHUNK && resp.value.functionCalls) {
             functionCalls.push(...resp.value.functionCalls);
           }
@@ -566,6 +578,24 @@ export class Session {
 
         nextMessage = { role: 'user', parts: toolResponseParts };
       }
+    }
+
+    // Send token usage notification in the same format that Codex uses,
+    // so the frontend extNotification handler can display it without changes.
+    if (totalInputTokens > 0 || totalOutputTokens > 0) {
+      const totalTokens = totalInputTokens + totalOutputTokens;
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      this.connection.extNotification('thread/tokenUsage/updated', {
+        tokenUsage: {
+          total: {
+            inputTokens: totalInputTokens,
+            outputTokens: totalOutputTokens,
+            totalTokens,
+            cachedInputTokens: 0,
+            reasoningOutputTokens: 0,
+          },
+        },
+      });
     }
 
     return { stopReason: 'end_turn' };
