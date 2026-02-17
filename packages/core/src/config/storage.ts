@@ -140,7 +140,7 @@ export class Storage {
     return path.join(tempDir, identifier);
   }
 
-  getProjectPoliciesDir(): string {
+  getWorkspacePoliciesDir(): string {
     return path.join(this.getGeminiDir(), 'policies');
   }
 

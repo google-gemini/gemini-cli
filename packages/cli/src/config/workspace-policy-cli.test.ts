@@ -49,7 +49,7 @@ vi.mock('@google/gemini-cli-core', async () => {
   };
 });
 
-describe('Project-Level Policy CLI Integration', () => {
+describe('Workspace-Level Policy CLI Integration', () => {
   const MOCK_CWD = process.cwd();
 
   beforeEach(() => {
@@ -63,13 +63,13 @@ describe('Project-Level Policy CLI Integration', () => {
     vi.mocked(ServerConfig.isHeadlessMode).mockReturnValue(false);
   });
 
-  it('should have getProjectPoliciesDir on Storage class', () => {
+  it('should have getWorkspacePoliciesDir on Storage class', () => {
     const storage = new ServerConfig.Storage(MOCK_CWD);
-    expect(storage.getProjectPoliciesDir).toBeDefined();
-    expect(typeof storage.getProjectPoliciesDir).toBe('function');
+    expect(storage.getWorkspacePoliciesDir).toBeDefined();
+    expect(typeof storage.getWorkspacePoliciesDir).toBe('function');
   });
 
-  it('should pass projectPoliciesDir to createPolicyEngineConfig when folder is trusted', async () => {
+  it('should pass workspacePoliciesDir to createPolicyEngineConfig when folder is trusted', async () => {
     vi.mocked(isWorkspaceTrusted).mockReturnValue({
       isTrusted: true,
       source: 'file',
@@ -88,7 +88,7 @@ describe('Project-Level Policy CLI Integration', () => {
     );
   });
 
-  it('should NOT pass projectPoliciesDir to createPolicyEngineConfig when folder is NOT trusted', async () => {
+  it('should NOT pass workspacePoliciesDir to createPolicyEngineConfig when folder is NOT trusted', async () => {
     vi.mocked(isWorkspaceTrusted).mockReturnValue({
       isTrusted: false,
       source: 'file',
@@ -107,7 +107,7 @@ describe('Project-Level Policy CLI Integration', () => {
     );
   });
 
-  it('should NOT pass projectPoliciesDir if integrity is NEW but fileCount is 0', async () => {
+  it('should NOT pass workspacePoliciesDir if integrity is NEW but fileCount is 0', async () => {
     vi.mocked(isWorkspaceTrusted).mockReturnValue({
       isTrusted: true,
       source: 'file',
@@ -131,7 +131,7 @@ describe('Project-Level Policy CLI Integration', () => {
     );
   });
 
-  it('should warn and NOT pass projectPoliciesDir if integrity MISMATCH in non-interactive mode', async () => {
+  it('should warn and NOT pass workspacePoliciesDir if integrity MISMATCH in non-interactive mode', async () => {
     vi.mocked(isWorkspaceTrusted).mockReturnValue({
       isTrusted: true,
       source: 'file',
@@ -149,7 +149,7 @@ describe('Project-Level Policy CLI Integration', () => {
     await loadCliConfig(settings, 'test-session', argv, { cwd: MOCK_CWD });
 
     expect(debugLogger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('Project policies changed or are new'),
+      expect.stringContaining('Workspace policies changed or are new'),
     );
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.anything(),
@@ -176,7 +176,7 @@ describe('Project-Level Policy CLI Integration', () => {
     await loadCliConfig(settings, 'test-session', argv, { cwd: MOCK_CWD });
 
     expect(mockAcceptIntegrity).toHaveBeenCalledWith(
-      'project',
+      'workspace',
       MOCK_CWD,
       'new-hash',
     );
@@ -211,7 +211,7 @@ describe('Project-Level Policy CLI Integration', () => {
     });
 
     expect(config.getPolicyUpdateConfirmationRequest()).toEqual({
-      scope: 'project',
+      scope: 'workspace',
       identifier: MOCK_CWD,
       policyDir: expect.stringContaining(path.join('.gemini', 'policies')),
       newHash: 'new-hash',
@@ -247,7 +247,7 @@ describe('Project-Level Policy CLI Integration', () => {
     });
 
     expect(config.getPolicyUpdateConfirmationRequest()).toEqual({
-      scope: 'project',
+      scope: 'workspace',
       identifier: MOCK_CWD,
       policyDir: expect.stringContaining(path.join('.gemini', 'policies')),
       newHash: 'new-hash',

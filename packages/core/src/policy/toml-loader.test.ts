@@ -234,7 +234,7 @@ modes = ["autoEdit"]
       expect(result2.rules).toHaveLength(1);
       expect(result2.rules[0].toolName).toBe('tier2-tool');
       expect(result2.rules[0].modes).toEqual(['autoEdit']);
-      expect(result2.rules[0].source).toBe('Project: tier2.toml');
+      expect(result2.rules[0].source).toBe('Workspace: tier2.toml');
 
       const getPolicyTier3 = (_dir: string) => 3; // Tier 3
       const result3 = await loadPoliciesFromToml([tempDir], getPolicyTier3);
