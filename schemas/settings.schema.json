@@ -1052,6 +1052,13 @@
           "markdownDescription": "The format to use when importing memory.\n\n- Category: `Context`\n- Requires restart: `no`",
           "type": "string"
         },
+        "includeDirectoryTree": {
+          "title": "Include Directory Tree",
+          "description": "Whether to include the directory tree of the current working directory in the initial request to the model.",
+          "markdownDescription": "Whether to include the directory tree of the current working directory in the initial request to the model.\n\n- Category: `Context`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "discoveryMaxDirs": {
           "title": "Memory Discovery Max Dirs",
           "description": "Maximum number of directories to search for memory.",
