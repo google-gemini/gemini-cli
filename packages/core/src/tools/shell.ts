@@ -365,7 +365,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           parts.push(`<error>${finalError}</error>`);
         }
 
-        if (result.exitCode !== null && result.exitCode !== 0) {
+        if (result.exitCode !== null) {
           parts.push(`<exit_code>${result.exitCode}</exit_code>`);
         }
 

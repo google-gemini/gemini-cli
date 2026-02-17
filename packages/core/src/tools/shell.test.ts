@@ -687,13 +687,13 @@ describe('ShellTool', () => {
       expect(result.llmContent).not.toContain('Directory:');
     });
 
-    it('should not include Exit Code when command succeeds (exit code 0)', async () => {
+    it('should include Exit Code when command succeeds (exit code 0)', async () => {
       const invocation = shellTool.build({ command: 'echo hello' });
       const promise = invocation.execute(mockAbortSignal);
       resolveShellExecution({ output: 'hello', exitCode: 0 });
 
       const result = await promise;
-      expect(result.llmContent).not.toContain('<exit_code>');
+      expect(result.llmContent).toContain('<exit_code>0</exit_code>');
     });
 
     it('should include Exit Code when command fails (non-zero exit code)', async () => {
@@ -776,6 +776,7 @@ describe('ShellTool', () => {
       // Should only contain subprocess_result and output
       expect(result.llmContent).toContain('<subprocess_result>');
       expect(result.llmContent).toContain('<output>hello</output>');
+      expect(result.llmContent).toContain('<exit_code>0</exit_code>');
     });
   });
 
