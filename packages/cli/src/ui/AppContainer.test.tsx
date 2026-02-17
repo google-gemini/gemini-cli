@@ -88,6 +88,7 @@ import ansiEscapes from 'ansi-escapes';
 import { mergeSettings, type LoadedSettings } from '../config/settings.js';
 import type { InitializationResult } from '../core/initializer.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
+import { StreamingState } from './types.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
 import {
   UIActionsContext,
@@ -2978,5 +2979,99 @@ describe('AppContainer State Management', () => {
         await act(async () => unmount!());
       },
     );
+  });
+
+  describe('Plan Mode Availability', () => {
+    it('should allow plan mode when enabled and idle', async () => {
+      vi.spyOn(mockConfig, 'isPlanEnabled').mockReturnValue(true);
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        pendingHistoryItems: [],
+      });
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState).toBeTruthy();
+        expect(capturedUIState.allowPlanMode).toBe(true);
+      });
+      unmount!();
+    });
+
+    it('should NOT allow plan mode when disabled in config', async () => {
+      vi.spyOn(mockConfig, 'isPlanEnabled').mockReturnValue(false);
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        pendingHistoryItems: [],
+      });
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState).toBeTruthy();
+        expect(capturedUIState.allowPlanMode).toBe(false);
+      });
+      unmount!();
+    });
+
+    it('should NOT allow plan mode when streaming', async () => {
+      vi.spyOn(mockConfig, 'isPlanEnabled').mockReturnValue(true);
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: StreamingState.Responding,
+        pendingHistoryItems: [],
+      });
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState).toBeTruthy();
+        expect(capturedUIState.allowPlanMode).toBe(false);
+      });
+      unmount!();
+    });
+
+    it('should NOT allow plan mode when a tool is awaiting confirmation', async () => {
+      vi.spyOn(mockConfig, 'isPlanEnabled').mockReturnValue(true);
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: StreamingState.Idle,
+        pendingHistoryItems: [
+          {
+            type: 'tool_group',
+            tools: [
+              {
+                name: 'test_tool',
+                status: CoreToolCallStatus.AwaitingApproval,
+              },
+            ],
+          },
+        ],
+      });
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState).toBeTruthy();
+        expect(capturedUIState.allowPlanMode).toBe(false);
+      });
+      unmount!();
+    });
   });
 });

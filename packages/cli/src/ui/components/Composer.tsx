@@ -346,7 +346,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                   {showApprovalIndicator && (
                     <ApprovalModeIndicator
                       approvalMode={showApprovalModeIndicator}
-                      isPlanEnabled={config.isPlanEnabled()}
+                      allowPlanMode={uiState.allowPlanMode}
                     />
                   )}
                   {!showLoadingIndicator && (
