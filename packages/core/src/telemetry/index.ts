@@ -51,7 +51,7 @@ export {
 export {
   logConsecaPolicyGeneration,
   logConsecaVerdict,
-} from './conseca_logger.js';
+} from './conseca-logger.js';
 export type { SlashCommandEvent, ChatCompressionEvent } from './types.js';
 export {
   SlashCommandStatus,
