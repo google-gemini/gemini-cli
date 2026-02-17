@@ -151,6 +151,7 @@ Implement a comprehensive authentication system with multiple providers.
         ...options,
         config: {
           getTargetDir: () => mockTargetDir,
+          getPlanDirectory: () => mockPlansDir,
           getIdeMode: () => false,
           isTrustedFolder: () => true,
           storage: {
@@ -426,6 +427,7 @@ Implement a comprehensive authentication system with multiple providers.
             useAlternateBuffer,
             config: {
               getTargetDir: () => mockTargetDir,
+              getPlanDirectory: () => mockPlansDir,
               getIdeMode: () => false,
               isTrustedFolder: () => true,
               storage: {

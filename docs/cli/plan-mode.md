@@ -107,6 +107,62 @@ These are the only allowed tools:
 - **Skills:** [`activate_skill`] (allows loading specialized instructions and
   resources in a read-only manner)
 
+### Customizing the Plan Directory
+
+By default, plans are stored in a temporary directory within `~/.gemini/tmp/`.
+You can customize this location, but doing so requires **two steps**:
+configuring the setting and adding a policy rule.
+
+**Important:** If you only update `settings.json`, the agent will be blocked
+from writing to your custom directory by the default safety policies.
+
+#### 1. Configure the directory in `settings.json`
+
+Add the `plan.directory` setting to your `~/.gemini/settings.json` file. This
+path can be **absolute** or **relative** to your project root.
+
+```json
+{
+  "general": {
+    "plan": {
+      "directory": "conductor"
+    }
+  }
+}
+```
+
+#### 2. Add a policy to allow writing to that directory
+
+Create a policy file (e.g., `~/.gemini/policies/custom-plans.toml`) to
+explicitly allow the agent to write files to your custom directory while in Plan
+Mode.
+
+The `argsPattern` in your policy must match the `file_path` (or `path`) argument
+passed to the tool.
+
+```toml
+[[rule]]
+toolName = ["write_file", "replace"]
+# Allow writing to any path within the "conductor/" directory
+# This regex matches a relative path.
+argsPattern = "\"(?:file_path|path)\":\"conductor/[^\"]+\""
+decision = "allow"
+priority = 100
+modes = ["plan"]
+```
+
+**Relative vs. Absolute Paths:**
+
+- **Relative Paths:** If you use a relative path like `"conductor"` in
+  `settings.json`, the agent will typically use `conductor/plan.md`. Your
+  `argsPattern` should reflect this relative structure.
+- **Absolute Paths:** If you use an absolute path like `"/usr/local/plans"`,
+  your `argsPattern` must match that absolute path:
+  `\"(?:file_path|path)\":\"/usr/local/plans/[^\"]+\"`.
+
+> **Tip:** For Windows users, the regex pattern must match double-backslashes in
+> the JSON-stringified arguments: `conductor\\\\[^"]+`.
+
 ### Customizing Planning with Skills
 
 You can leverage [Agent Skills](./skills.md) to customize how Gemini CLI

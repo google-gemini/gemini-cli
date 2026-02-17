@@ -142,6 +142,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`general.plan`** (object):
+  - **Description:** Configuration for planning features.
+  - **Default:** `{}`
+
 - **`general.enablePromptCompletion`** (boolean):
   - **Description:** Enable AI-powered prompt completion suggestions while
     typing.

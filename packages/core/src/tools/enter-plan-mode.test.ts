@@ -23,6 +23,8 @@ describe('EnterPlanModeTool', () => {
 
     mockConfig = {
       setApprovalMode: vi.fn(),
+      getPlanDirectory: vi.fn().mockReturnValue('/mock/plans/dir'),
+      validatePathAccess: vi.fn().mockReturnValue(null),
       storage: {
         getProjectTempPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
       } as unknown as Config['storage'],
@@ -60,7 +62,7 @@ describe('EnterPlanModeTool', () => {
       expect(result.title).toBe('Enter Plan Mode');
       if (result.type === 'info') {
         expect(result.prompt).toBe(
-          'This will restrict the agent to read-only tools to allow for safe planning.',
+          'This will switch to Plan Mode. The agent will be primarily restricted to read-only tools, but will have write access to its designated plans directory: /mock/plans/dir',
         );
       }
     });
@@ -101,7 +103,7 @@ describe('EnterPlanModeTool', () => {
   });
 
   describe('execute', () => {
-    it('should set approval mode to PLAN and return message', async () => {
+    it('should set approval mode to PLAN', async () => {
       const invocation = tool.build({});
 
       const result = await invocation.execute(new AbortController().signal);
@@ -111,6 +113,21 @@ describe('EnterPlanModeTool', () => {
       );
       expect(result.llmContent).toContain('Switching to Plan mode');
       expect(result.returnDisplay).toBe('Switching to Plan mode');
+    });
+
+    it('should throw error if plan directory validation fails', async () => {
+      const invocation = tool.build({});
+      mockConfig.validatePathAccess = vi
+        .fn()
+        .mockReturnValue('Path outside workspace');
+
+      await expect(
+        invocation.execute(new AbortController().signal),
+      ).rejects.toThrow(
+        'Invalid plan directory configuration: Path outside workspace',
+      );
+
+      expect(mockConfig.setApprovalMode).not.toHaveBeenCalled();
     });
 
     it('should include optional reason in output display but not in llmContent', async () => {

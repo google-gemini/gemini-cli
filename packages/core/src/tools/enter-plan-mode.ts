@@ -97,12 +97,13 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
       );
     }
 
+    const plansDir = this.config.getPlanDirectory();
+
     // ASK_USER
     return {
       type: 'info',
       title: 'Enter Plan Mode',
-      prompt:
-        'This will restrict the agent to read-only tools to allow for safe planning.',
+      prompt: `This will switch to Plan Mode. The agent will be primarily restricted to read-only tools, but will have write access to its designated plans directory: ${plansDir}`,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         this.confirmationOutcome = outcome;
         await this.publishPolicyUpdate(outcome);
@@ -116,6 +117,13 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
         llmContent: 'User cancelled entering Plan Mode.',
         returnDisplay: 'Cancelled',
       };
+    }
+
+    const plansDir = this.config.getPlanDirectory();
+    // Validate that the plan directory is safe (within workspace)
+    const pathError = this.config.validatePathAccess(plansDir, 'write');
+    if (pathError) {
+      throw new Error(`Invalid plan directory configuration: ${pathError}`);
     }
 
     this.config.setApprovalMode(ApprovalMode.PLAN);

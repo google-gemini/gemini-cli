@@ -833,6 +833,15 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
+    planDirectory:
+      settings.general &&
+      'plan' in settings.general &&
+      typeof settings.general.plan === 'object' &&
+      settings.general.plan !== null &&
+      'directory' in settings.general.plan &&
+      typeof settings.general.plan.directory === 'string'
+        ? settings.general.plan.directory
+        : undefined,
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,

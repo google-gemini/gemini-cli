@@ -43,6 +43,10 @@ import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import { DEFAULT_GEMINI_MODEL } from './models.js';
 import { Storage } from './storage.js';
 
+vi.mock('glob', () => ({
+  glob: vi.fn().mockResolvedValue([]),
+}));
+
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
   return {
@@ -2510,6 +2514,25 @@ describe('Plans Directory Initialization', () => {
     expect(context.getDirectories()).toContain(plansDir);
   });
 
+  it('should create custom plans directory and add it to workspace context when plan.directory is provided', async () => {
+    const customDir = 'custom-plans';
+    const config = new Config({
+      ...baseParams,
+      plan: true,
+      planDirectory: customDir,
+    });
+
+    await config.initialize();
+
+    const expectedDir = path.resolve(baseParams.targetDir, customDir);
+    expect(fs.promises.mkdir).toHaveBeenCalledWith(expectedDir, {
+      recursive: true,
+    });
+
+    const context = config.getWorkspaceContext();
+    expect(context.getDirectories()).toContain(expectedDir);
+  });
+
   it('should NOT create plans directory or add it to workspace context when plan is disabled', async () => {
     const config = new Config({
       ...baseParams,
@@ -2626,5 +2649,57 @@ describe('syncPlanModeTools', () => {
     config.syncPlanModeTools();
 
     expect(setToolsSpy).toHaveBeenCalled();
+  });
+});
+
+describe('Plan Directory', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test',
+    targetDir: '/tmp/project',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '/tmp/project',
+  };
+
+  it('should return custom plan directory when provided', () => {
+    const customDir = 'custom-plans';
+    const params: ConfigParameters = {
+      ...baseParams,
+      planDirectory: customDir,
+    };
+    const config = new Config(params);
+    expect(config.getPlanDirectory()).toBe(
+      path.resolve(baseParams.targetDir, customDir),
+    );
+  });
+
+  it('should return default plans directory when no custom directory is provided', () => {
+    const config = new Config(baseParams);
+    // storage.getProjectTempPlansDir() is tested in storage.test.ts, here we just check it matches
+    expect(config.getPlanDirectory()).toBe(
+      config.storage.getProjectTempPlansDir(),
+    );
+  });
+
+  it('should support absolute paths for custom plans directory within workspace', () => {
+    const absolutePath = path.resolve(baseParams.targetDir, 'plans');
+    const params: ConfigParameters = {
+      ...baseParams,
+      planDirectory: absolutePath,
+    };
+    const config = new Config(params);
+    expect(config.getPlanDirectory()).toBe(absolutePath);
+  });
+
+  it('should fallback to default plans directory when configured path is outside workspace', () => {
+    const outsidePath = '/outside/workspace/plans';
+    const params: ConfigParameters = {
+      ...baseParams,
+      planDirectory: outsidePath,
+    };
+    const config = new Config(params);
+    expect(config.getPlanDirectory()).toBe(
+      config.storage.getProjectTempPlansDir(),
+    );
   });
 });

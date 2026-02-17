@@ -105,6 +105,13 @@
           },
           "additionalProperties": false
         },
+        "plan": {
+          "title": "Plan Configuration",
+          "description": "Configuration for planning features.",
+          "markdownDescription": "Configuration for planning features.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "$ref": "#/$defs/PlanConfig"
+        },
         "enablePromptCompletion": {
           "title": "Enable Prompt Completion",
           "description": "Enable AI-powered prompt completion suggestions while typing.",
@@ -1968,6 +1975,17 @@
         "targetServiceAccount": {
           "type": "string",
           "description": "Service account email to impersonate (name@project.iam.gserviceaccount.com)."
+        }
+      }
+    },
+    "PlanConfig": {
+      "type": "object",
+      "description": "Planning features configuration.",
+      "additionalProperties": false,
+      "properties": {
+        "directory": {
+          "type": "string",
+          "description": "Custom directory for implementation plans."
         }
       }
     },

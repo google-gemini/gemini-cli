@@ -266,6 +266,16 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      plan: {
+        type: 'object',
+        label: 'Plan Configuration',
+        category: 'General',
+        requiresRestart: false,
+        default: {},
+        description: 'Configuration for planning features.',
+        showInDialog: false,
+        ref: 'PlanConfig',
+      },
       enablePromptCompletion: {
         type: 'boolean',
         label: 'Enable Prompt Completion',
@@ -2128,6 +2138,17 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         type: 'string',
         description:
           'Service account email to impersonate (name@project.iam.gserviceaccount.com).',
+      },
+    },
+  },
+  PlanConfig: {
+    type: 'object',
+    description: 'Planning features configuration.',
+    additionalProperties: false,
+    properties: {
+      directory: {
+        type: 'string',
+        description: 'Custom directory for implementation plans.',
       },
     },
   },

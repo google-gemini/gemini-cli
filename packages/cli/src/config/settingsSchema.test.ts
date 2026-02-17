@@ -401,6 +401,18 @@ describe('SettingsSchema', () => {
       );
     });
 
+    it('should have plan config in general schema', () => {
+      const setting = getSettingsSchema().general.properties.plan;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('object');
+      expect(setting.category).toBe('General');
+      expect(setting.default).toStrictEqual({});
+      expect(setting.requiresRestart).toBe(false);
+      expect(setting.showInDialog).toBe(false);
+      expect(setting.ref).toBe('PlanConfig');
+      expect(setting.description).toBe('Configuration for planning features.');
+    });
+
     it('should have hooksConfig.notifications setting in schema', () => {
       const setting = getSettingsSchema().hooksConfig?.properties.notifications;
       expect(setting).toBeDefined();
