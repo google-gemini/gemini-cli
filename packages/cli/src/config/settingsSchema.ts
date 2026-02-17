@@ -475,6 +475,15 @@ const SETTINGS_SCHEMA = {
           'Show a warning when running Gemini CLI in the home directory.',
         showInDialog: true,
       },
+      showCompatibilityWarnings: {
+        type: 'boolean',
+        label: 'Show Compatibility Warnings',
+        category: 'UI',
+        requiresRestart: true,
+        default: true,
+        description: 'Show warnings about terminal or OS compatibility issues.',
+        showInDialog: true,
+      },
       hideTips: {
         type: 'boolean',
         label: 'Hide Tips',

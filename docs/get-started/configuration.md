@@ -228,6 +228,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`ui.showCompatibilityWarnings`** (boolean):
+  - **Description:** Show warnings about terminal or OS compatibility issues.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
 - **`ui.hideTips`** (boolean):
   - **Description:** Hide helpful tips in the UI
   - **Default:** `false`

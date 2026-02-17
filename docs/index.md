@@ -14,13 +14,16 @@ npm install -g @google/gemini-cli
 
 Jump in to Gemini CLI.
 
-- **[Quickstart](./get-started/index.md):** Your first session with Gemini CLI.
-- **[Installation](./get-started/installation.md):** How to install Gemini CLI
-  on your system.
-- **[Authentication](./get-started/authentication.md):** Setup instructions for
-  personal and enterprise accounts.
-- **[Examples](./get-started/examples.md):** Practical examples of Gemini CLI in
-  action.
+- **[Quickstart](./get-started/index.md):** A streamlined guide to get you
+  chatting in minutes.
+- **[Installation](./get-started/installation.md):** Instructions for macOS,
+  Linux, and Windows.
+- **[Compatibility](./compatibility.md):** Supported operating systems and
+  terminal environments.
+- **[Authentication](./get-started/authentication.md):** Set up access using
+  Google OAuth, API keys, or Vertex AI.
+- **[Examples](./get-started/examples.md):** View common usage scenarios to
+  inspire your own workflows.
 - **[Cheatsheet](./cli/cli-reference.md):** A quick reference for common
   commands and options.
 

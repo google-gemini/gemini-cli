@@ -255,6 +255,13 @@
           "default": true,
           "type": "boolean"
         },
+        "showCompatibilityWarnings": {
+          "title": "Show Compatibility Warnings",
+          "description": "Show warnings about terminal or OS compatibility issues.",
+          "markdownDescription": "Show warnings about terminal or OS compatibility issues.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "hideTips": {
           "title": "Hide Tips",
           "description": "Hide helpful tips in the UI",

@@ -13,6 +13,7 @@ import {
   isFolderTrustEnabled,
   isWorkspaceTrusted,
 } from '../config/trustedFolders.js';
+import { getCompatibilityWarnings } from './compatibility.js';
 
 type WarningCheck = {
   id: string;
@@ -84,5 +85,11 @@ export async function getUserStartupWarnings(
   const results = await Promise.all(
     WARNING_CHECKS.map((check) => check.check(workspaceRoot, settings)),
   );
-  return results.filter((msg) => msg !== null);
+  const warnings = results.filter((msg) => msg !== null);
+
+  if (settings.ui?.showCompatibilityWarnings !== false) {
+    warnings.push(...getCompatibilityWarnings());
+  }
+
+  return warnings;
 }
