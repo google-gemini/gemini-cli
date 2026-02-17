@@ -65,6 +65,7 @@ export {
   ToolCallDecision,
   RewindEvent,
 } from './types.js';
+export { LlmRole } from './llmRole.js';
 export { makeSlashCommandEvent, makeChatCompressionEvent } from './types.js';
 export type { TelemetryEvent } from './types.js';
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';
