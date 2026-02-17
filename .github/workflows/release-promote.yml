@@ -67,6 +67,7 @@ jobs:
         id: 'versions'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GITHUB_EVENT_INPUTS_REF: ${{ github.event.inputs.ref }}
         run: |
           set -e
           STABLE_COMMAND="node scripts/get-release-version.js --type=stable ${{ github.event.inputs.stable_version_override && format('--stable_version_override={0}', github.event.inputs.stable_version_override) || '' }}"
@@ -87,7 +88,7 @@ jobs:
           echo "PREVIOUS_STABLE_TAG=$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           echo "PREVIEW_VERSION=$(echo "${PREVIEW_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           # shellcheck disable=SC1083
-          REF="${{ github.event.inputs.ref }}"
+          REF="${GITHUB_EVENT_INPUTS_REF}"
           SHA=$(git ls-remote origin "$REF" | awk '{print $1}')
           if [ -z "$SHA" ]; then
             if [[ "$REF" =~ ^[0-9a-f]{7,40}$ ]]; then
@@ -109,17 +110,27 @@ jobs:
         run: |
           echo "Release Plan:"
           echo "-----------"
-          echo "Stable Release: ${{ steps.versions.outputs.STABLE_VERSION }}"
-          echo "  - Commit: ${{ steps.versions.outputs.STABLE_SHA }}"
-          echo "  - Previous Tag: ${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }}"
+          echo "Stable Release: ${STEPS_VERSIONS_OUTPUTS_STABLE_VERSION}"
+          echo "  - Commit: ${STEPS_VERSIONS_OUTPUTS_STABLE_SHA}"
+          echo "  - Previous Tag: ${STEPS_VERSIONS_OUTPUTS_PREVIOUS_STABLE_TAG}"
           echo ""
-          echo "Preview Release: ${{ steps.versions.outputs.PREVIEW_VERSION }}"
-          echo "  - Commit: ${{ steps.versions.outputs.PREVIEW_SHA }} (${{ github.event.inputs.ref }})"
-          echo "  - Previous Tag: ${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }}"
+          echo "Preview Release: ${STEPS_VERSIONS_OUTPUTS_PREVIEW_VERSION}"
+          echo "  - Commit: ${STEPS_VERSIONS_OUTPUTS_PREVIEW_SHA} (${GITHUB_EVENT_INPUTS_REF})"
+          echo "  - Previous Tag: ${STEPS_VERSIONS_OUTPUTS_PREVIOUS_PREVIEW_TAG}"
           echo ""
-          echo "Preparing Next Nightly Release: ${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}"
-          echo "  - Merging Version Update PR to Branch: ${{ github.event.inputs.ref }}"
-          echo "  - Previous Tag: ${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }}"
+          echo "Preparing Next Nightly Release: ${STEPS_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION}"
+          echo "  - Merging Version Update PR to Branch: ${GITHUB_EVENT_INPUTS_REF}"
+          echo "  - Previous Tag: ${STEPS_VERSIONS_OUTPUTS_PREVIOUS_NIGHTLY_TAG}"
+        env:
+          STEPS_VERSIONS_OUTPUTS_STABLE_VERSION: ${{ steps.versions.outputs.STABLE_VERSION }}
+          STEPS_VERSIONS_OUTPUTS_STABLE_SHA: ${{ steps.versions.outputs.STABLE_SHA }}
+          STEPS_VERSIONS_OUTPUTS_PREVIOUS_STABLE_TAG: ${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }}
+          STEPS_VERSIONS_OUTPUTS_PREVIEW_VERSION: ${{ steps.versions.outputs.PREVIEW_VERSION }}
+          STEPS_VERSIONS_OUTPUTS_PREVIEW_SHA: ${{ steps.versions.outputs.PREVIEW_SHA }}
+          GITHUB_EVENT_INPUTS_REF: ${{ github.event.inputs.ref }}
+          STEPS_VERSIONS_OUTPUTS_PREVIOUS_PREVIEW_TAG: ${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }}
+          STEPS_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION: ${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}
+          STEPS_VERSIONS_OUTPUTS_PREVIOUS_NIGHTLY_TAG: ${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }}
 
   test:
     name: 'Test ${{ matrix.channel }}'
@@ -312,23 +323,28 @@ jobs:
       - name: 'Create and switch to a new branch'
         id: 'release_branch'
         run: |
-          BRANCH_NAME="chore/nightly-version-bump-${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"
+          BRANCH_NAME="chore/nightly-version-bump-${NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION}"
           git switch -c "${BRANCH_NAME}"
           echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
+        env:
+          NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION: ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}
 
       - name: 'Update package versions'
-        run: 'npm run release:version "${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"'
+        run: 'npm run release:version "${NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION}"'
+        env:
+          NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION: ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}
 
       - name: 'Commit and Push package versions'
         env:
           BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
           DRY_RUN: '${{ github.event.inputs.dry_run }}'
+          NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION: ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}
         run: |-
           git add package.json packages/*/package.json
           if [ -f package-lock.json ]; then
             git add package-lock.json
           fi
-          git commit -m "chore(release): bump version to ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"
+          git commit -m "chore(release): bump version to ${NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION}"
           if [[ "${DRY_RUN}" == "false" ]]; then
             echo "Pushing release branch to remote..."
             git push --set-upstream origin "${BRANCH_NAME}"
