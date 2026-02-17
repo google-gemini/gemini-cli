@@ -117,33 +117,108 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
 }
 
+/**
+ * Adjusts the indentation of a block of text to match a target indentation level.
+ */
+function rebaseIndentation(text: string, targetIndent: string): string {
+  if (targetIndent === '') return text;
+
+  const lines = text.split('\n');
+  const firstContentIdx = lines.findIndex((l) => l.trim().length > 0);
+  if (firstContentIdx === -1) return text;
+
+  const baseIndent = lines[firstContentIdx].match(/^([ \t]*)/)?.[1] ?? '';
+
+  return lines
+    .map((line) => {
+      if (line.trim().length === 0) return line.length > 0 ? targetIndent : '';
+      return line.startsWith(baseIndent)
+        ? targetIndent + line.substring(baseIndent.length)
+        : targetIndent + line.trimStart();
+    })
+    .join('\n');
+}
+
+/**
+ * Removes redundant trailing spaces from a replacement block if they are
+ * already present in the source context.
+ */
+function handleTrailingSpaces(
+  replacement: string,
+  targetTrailingSpaces: string,
+): string {
+  if (targetTrailingSpaces.length === 0) return replacement;
+  const lines = replacement.split('\n');
+  const lastIdx = lines.length - 1;
+  if (lines[lastIdx].endsWith(targetTrailingSpaces)) {
+    lines[lastIdx] = lines[lastIdx].slice(0, -targetTrailingSpaces.length);
+  }
+  return lines.join('\n');
+}
+
 async function calculateExactReplacement(
   context: ReplacementContext,
 ): Promise<ReplacementResult | null> {
   const { currentContent, params } = context;
   const { old_string, new_string } = params;
 
-  const normalizedCode = currentContent;
   const normalizedSearch = old_string.replace(/\r\n/g, '\n');
   const normalizedReplace = new_string.replace(/\r\n/g, '\n');
 
-  const exactOccurrences = normalizedCode.split(normalizedSearch).length - 1;
-  if (exactOccurrences > 0) {
-    let modifiedCode = safeLiteralReplace(
-      normalizedCode,
-      normalizedSearch,
-      normalizedReplace,
-    );
-    modifiedCode = restoreTrailingNewline(currentContent, modifiedCode);
-    return {
-      newContent: modifiedCode,
-      occurrences: exactOccurrences,
-      finalOldString: normalizedSearch,
-      finalNewString: normalizedReplace,
-    };
+  const occurrences = currentContent.split(normalizedSearch).length - 1;
+  if (occurrences === 0) return null;
+
+  const parts: string[] = [];
+  let lastOffset = 0;
+  let matchIdx = currentContent.indexOf(normalizedSearch, lastOffset);
+
+  while (matchIdx !== -1) {
+    const beforeMatch = currentContent.substring(0, matchIdx);
+    const linePrefix = beforeMatch.substring(beforeMatch.lastIndexOf('\n') + 1);
+    let matchEndOffset = matchIdx + normalizedSearch.length;
+
+    if (
+      /^[ \t]*$/.test(linePrefix) &&
+      matchIdx - linePrefix.length >= lastOffset
+    ) {
+      const afterMatch = currentContent.substring(matchEndOffset);
+      const nextNewline = afterMatch.indexOf('\n');
+      const lineSuffix =
+        nextNewline === -1 ? afterMatch : afterMatch.substring(0, nextNewline);
+      const trailingSpaces = lineSuffix.match(/^[ \t]*/)?.[0] ?? '';
+
+      let rebased = rebaseIndentation(normalizedReplace, linePrefix);
+      rebased = handleTrailingSpaces(rebased, trailingSpaces);
+
+      if (lineSuffix.trim().length > 0) {
+        if (rebased === '' || rebased.endsWith('\n')) {
+          rebased = (rebased === '' ? '' : rebased) + linePrefix;
+          matchEndOffset += trailingSpaces.length;
+        }
+      }
+
+      parts.push(
+        currentContent.substring(lastOffset, matchIdx - linePrefix.length),
+        rebased,
+      );
+    } else {
+      parts.push(
+        currentContent.substring(lastOffset, matchIdx),
+        normalizedReplace,
+      );
+    }
+
+    lastOffset = matchEndOffset;
+    matchIdx = currentContent.indexOf(normalizedSearch, lastOffset);
   }
 
-  return null;
+  parts.push(currentContent.substring(lastOffset));
+  return {
+    newContent: restoreTrailingNewline(currentContent, parts.join('')),
+    occurrences,
+    finalOldString: normalizedSearch,
+    finalNewString: normalizedReplace,
+  };
 }
 
 async function calculateFlexibleReplacement(
@@ -160,7 +235,6 @@ async function calculateFlexibleReplacement(
   const searchLinesStripped = normalizedSearch
     .split('\n')
     .map((line: string) => line.trim());
-  const replaceLines = normalizedReplace.split('\n');
 
   let flexibleOccurrences = 0;
   let i = 0;
@@ -173,18 +247,16 @@ async function calculateFlexibleReplacement(
 
     if (isMatch) {
       flexibleOccurrences++;
-      const firstLineInMatch = window[0];
-      const indentationMatch = firstLineInMatch.match(/^([ \t]*)/);
-      const indentation = indentationMatch ? indentationMatch[1] : '';
-      const newBlockWithIndent = replaceLines.map(
-        (line: string) => `${indentation}${line}`,
-      );
-      sourceLines.splice(
-        i,
-        searchLinesStripped.length,
-        newBlockWithIndent.join('\n'),
-      );
-      i += replaceLines.length;
+
+      const targetIndent =
+        window.find((l) => l.trim().length > 0)?.match(/^([ \t]*)/)?.[1] ?? '';
+      const rebased = rebaseIndentation(normalizedReplace, targetIndent);
+      const replacement = rebased.endsWith('\n') ? rebased : rebased + '\n';
+      const replacementLines =
+        replacement.match(/.*(?:\n|$)/g)?.slice(0, -1) ?? [];
+
+      sourceLines.splice(i, searchLinesStripped.length, ...replacementLines);
+      i += replacementLines.length;
     } else {
       i++;
     }
@@ -232,7 +304,8 @@ async function calculateRegexReplacement(
 
   const escapedTokens = tokens.map(escapeRegex);
   // Join tokens with `\s*` to allow for flexible whitespace between them.
-  const pattern = escapedTokens.join('\\s*');
+  // Include trailing horizontal whitespace to ensure trailing spaces are captured in the match.
+  const pattern = escapedTokens.join('\\s*') + '[ \\t]*';
 
   // The final pattern captures leading whitespace (indentation) and then matches the token pattern.
   // 'm' flag enables multi-line mode, so '^' matches the start of any line.
@@ -245,17 +318,17 @@ async function calculateRegexReplacement(
     return null;
   }
 
-  const indentation = match[1] || '';
-  const newLines = normalizedReplace.split('\n');
-  const newBlockWithIndent = newLines
-    .map((line) => `${indentation}${line}`)
-    .join('\n');
+  const targetIndent = match[1] || '';
+  const matchedText = match[0];
+  const trailingSpaces = matchedText.match(/([ \t]*)$/)?.[1] ?? '';
 
-  // Use replace with the regex to substitute the matched content.
-  // Since the regex doesn't have the 'g' flag, it will only replace the first occurrence.
+  let rebased = rebaseIndentation(normalizedReplace, targetIndent);
+  rebased = handleTrailingSpaces(rebased, trailingSpaces);
+
+  // Replace matched content while preserving original trailing spaces.
   const modifiedCode = currentContent.replace(
     flexibleRegex,
-    newBlockWithIndent,
+    () => rebased + trailingSpaces,
   );
 
   return {

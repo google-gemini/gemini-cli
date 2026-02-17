@@ -409,6 +409,241 @@ describe('EditTool', () => {
       const expectedContent = '  // some comment\n\n  function newFunc() {}';
       expect(result.newContent).toBe(expectedContent);
     });
+
+    it('should not double indent when new_string is already indented (flexible matching)', async () => {
+      const currentContent = '  const a = 1;\n  const b = 2;\n  const c = 3;';
+      const old_string = 'const   b = 2;'; // Extra space to force flexible matching
+      const new_string = '  const b = 22;';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string,
+          new_string,
+        },
+        currentContent,
+        abortSignal,
+      });
+
+      expect(result.newContent).toContain('  const b = 22;');
+      expect(result.newContent).not.toContain('    const b = 22;');
+    });
+
+    it('should preserve trailing spaces when requested in new_string (flexible matching)', async () => {
+      const currentContent =
+        '  const a = 1;  \n  const b = 2;  \n  const c = 3;  ';
+      const old_string = 'const   b = 2;'; // Extra space to force flexible matching
+      const new_string = '  const b = 22;  ';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string,
+          new_string,
+        },
+        currentContent,
+        abortSignal,
+      });
+
+      // The flexible matcher replaces the entire line.
+      // rebaseIndentation will use the targetIndent '  ' from the match.
+      // If new_string is '  const b = 22;  ', rebaseIndentation will see baseIndent as '  '.
+      // It will return '  ' + ( '  const b = 22;  '.substring(2) ) => '  const b = 22;  '.
+      expect(result.newContent).toContain('  const b = 22;  \n');
+    });
+
+    it('should perform rebasing for multiple exact occurrences', async () => {
+      const currentContent = 'foo();\n  foo();';
+      const old_string = 'foo();';
+      const new_string = '  bar();';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string,
+          new_string,
+        },
+        currentContent,
+        abortSignal,
+      });
+
+      expect(result.newContent).toBe('  bar();\n  bar();');
+    });
+
+    it('should allow shifting code to the left during rebasing', async () => {
+      const currentContent = '  foo();';
+      const old_string = 'foo();';
+      const new_string = '    bar();'; // User provides more indentation than target
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string,
+          new_string,
+        },
+        currentContent,
+        abortSignal,
+      });
+
+      // targetIndent is '  '. rebaseIndentation('    bar();', '  ') should return '  bar();'
+      expect(result.newContent).toBe('  bar();');
+    });
+
+    it('should rebase indentation, preserve suffixes, and respect blank lines in exact matching', async () => {
+      const currentContent = '  foo(); suffix();\n\n  foo();';
+      const old_string = 'foo();';
+      // Multi-line replacement with an internal blank line and trailing newline
+      const new_string = 'bar();\n\n  baz();\n';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string,
+          new_string,
+          expected_replacements: 2,
+        },
+        currentContent,
+        abortSignal,
+      });
+
+      // Occurrence 1: Rebased +2, suffix preserved on next line with prefix
+      // Occurrence 2: Rebased +2
+      const expected =
+        '  bar();\n\n    baz();\n  suffix();\n\n  bar();\n\n    baz();';
+      expect(result.newContent).toBe(expected);
+    });
+
+    it('should handle trailing spaces and literal $ sequences in regex matching', async () => {
+      const currentContent = '  const x = 1;  ';
+      const old_string = 'const x=1;'; // Regex match
+      const new_string = 'const y = "$1";  '; // Contains $1 and trailing spaces
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string,
+          new_string,
+        },
+        currentContent,
+        abortSignal,
+      });
+
+      // Indent 2. Suffix 2 spaces. Literal "$1" should NOT be expanded by regex replace.
+      expect(result.newContent).toBe('  const y = "$1";  ');
+    });
+
+    it('should handle multi-line replacements in flexible matching', async () => {
+      const currentContent = '  line1();\n  line2();\n  line3();';
+      const old_string = 'line   2();'; // Flexible match
+      const new_string = 'newA();\nnewB();';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string,
+          new_string,
+        },
+        currentContent,
+        abortSignal,
+      });
+
+      expect(result.newContent).toBe(
+        '  line1();\n  newA();\n  newB();\n  line3();',
+      );
+    });
+
+    it('should return original text in rebaseIndentation when no content is found', async () => {
+      const currentContent = '  foo();';
+      const old_string = 'foo();';
+      const new_string = '  \n  '; // Whitespace-only
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string,
+          new_string,
+        },
+        currentContent,
+        abortSignal,
+      });
+
+      // targetIndent is '  '. rebaseIndentation('  \n  ', '  ') returns '  \n  '
+      // Final result is linePrefix ('  ') + rebased ('  \n  ') -> '    \n    '
+      // Wait, let's trace:
+      // matchIndex is 2. linePrefix is '  '.
+      // rebaseIndentation('  \n  ', '  ') returns '  \n  ' (new logic).
+      // modifiedCode = currentContent.substring(0, 0) + '  \n  ' + '';
+      // Wait, substring(0, 2 - 2) is 0.
+      // So it replaces '  foo();' with '  \n  '.
+      expect(result.newContent).toBe('  \n  ');
+    });
+
+    it('should handle complex suffixes and multi-line exact replacements', async () => {
+      const currentContent = '  if (cond) { // comment\n    foo();\n  }';
+      const old_string = 'if (cond) {';
+      const new_string = 'if (newCond) {\n  setup();';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string,
+          new_string,
+        },
+        currentContent,
+        abortSignal,
+      });
+
+      // targetIndent: '  '.
+      // rebased: '  if (newCond) {\n    setup();'
+      // suffix: ' // comment' (trim().length > 0)
+      // rebased ends with setup(); (no newline)
+      // Result: '  if (newCond) {\n    setup(); // comment\n    foo();\n  }'
+      const expected =
+        '  if (newCond) {\n    setup(); // comment\n    foo();\n  }';
+      expect(result.newContent).toBe(expected);
+    });
+
+    it('should handle non-overlapping replacements correctly (aba in ababa)', async () => {
+      const currentContent = 'ababa';
+      const old_string = 'aba';
+      const new_string = 'c';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string,
+          new_string,
+        },
+        currentContent,
+        abortSignal,
+      });
+
+      // Standard non-overlapping replaceAll("aba", "c") on "ababa" should give "cba"
+      // Match 1: 0-2 (aba). Skip to index 3. No more matches.
+      expect(result.newContent).toBe('cba');
+      expect(result.occurrences).toBe(1);
+    });
+
+    it('should handle multiple multi-line exact replacements consistently', async () => {
+      const currentContent = '  START\n  END\n  START\n  END';
+      const old_string = 'START\n  END';
+      const new_string = 'NEW_START\nNEW_END';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string,
+          new_string,
+          expected_replacements: 2,
+        },
+        currentContent,
+        abortSignal,
+      });
+
+      const expected = '  NEW_START\n  NEW_END\n  NEW_START\n  NEW_END';
+      expect(result.newContent).toBe(expected);
+      expect(result.occurrences).toBe(2);
+    });
   });
 
   describe('validateToolParams', () => {
