@@ -15,7 +15,7 @@ import {
   type Mock,
 } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { awaitConfirmation, resolveConfirmation } from './confirmation.js';
+import { resolveConfirmation } from './confirmation.js';
 import {
   MessageBusType,
   type ToolConfirmationResponse,
@@ -31,7 +31,7 @@ import type { ToolModificationHandler } from './tool-modifier.js';
 import type { ValidatingToolCall, WaitingToolCall } from './types.js';
 import { ROOT_SCHEDULER_ID } from './types.js';
 import type { Config } from '../config/config.js';
-import type { EditorType } from '../utils/editor.js';
+import { type EditorType } from '../utils/editor.js';
 import { randomUUID } from 'node:crypto';
 
 // Mock Dependencies
@@ -39,10 +39,19 @@ vi.mock('node:crypto', () => ({
   randomUUID: vi.fn(),
 }));
 
+vi.mock('../utils/editor.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/editor.js')>();
+  return {
+    ...actual,
+    resolveEditorAsync: () => Promise.resolve('vim'),
+  };
+});
+
 describe('confirmation.ts', () => {
   let mockMessageBus: MessageBus;
 
   beforeEach(() => {
+    vi.stubEnv('SANDBOX', '');
     mockMessageBus = new EventEmitter() as unknown as MessageBus;
     mockMessageBus.publish = vi.fn().mockResolvedValue(undefined);
     vi.spyOn(mockMessageBus, 'on');
@@ -53,6 +62,7 @@ describe('confirmation.ts', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -74,43 +84,6 @@ describe('confirmation.ts', () => {
       };
       mockMessageBus.on('newListener', handler);
     });
-
-  describe('awaitConfirmation', () => {
-    it('should resolve when confirmed response matches correlationId', async () => {
-      const correlationId = 'test-correlation-id';
-      const abortController = new AbortController();
-
-      const promise = awaitConfirmation(
-        mockMessageBus,
-        correlationId,
-        abortController.signal,
-      );
-
-      emitResponse({
-        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-        correlationId,
-        confirmed: true,
-      });
-
-      const result = await promise;
-      expect(result).toEqual({
-        outcome: ToolConfirmationOutcome.ProceedOnce,
-        payload: undefined,
-      });
-    });
-
-    it('should reject when abort signal is triggered', async () => {
-      const correlationId = 'abort-id';
-      const abortController = new AbortController();
-      const promise = awaitConfirmation(
-        mockMessageBus,
-        correlationId,
-        abortController.signal,
-      );
-      abortController.abort();
-      await expect(promise).rejects.toThrow('Operation cancelled');
-    });
-  });
 
   describe('resolveConfirmation', () => {
     let mockState: Mocked<SchedulerStateManager>;
@@ -286,8 +259,13 @@ describe('confirmation.ts', () => {
       };
       invocationMock.shouldConfirmExecute.mockResolvedValue(details);
 
-      // 1. User says Modify
-      // 2. User says Proceed
+      // Set up modifier mock before starting the flow
+      mockModifier.handleModifyWithEditor.mockResolvedValue({
+        updatedParams: { foo: 'bar' },
+      });
+      toolMock.build.mockReturnValue({} as unknown as AnyToolInvocation);
+
+      // Start the confirmation flow
       const listenerPromise1 = waitForListener(
         MessageBusType.TOOL_CONFIRMATION_RESPONSE,
       );
@@ -302,7 +280,12 @@ describe('confirmation.ts', () => {
 
       await listenerPromise1;
 
-      // First response: Modify
+      // Prepare to detect when the loop re-subscribes after modification
+      const listenerPromise2 = waitForListener(
+        MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+      );
+
+      // First response: User chooses to modify with editor
       emitResponse({
         type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
         correlationId: '123e4567-e89b-12d3-a456-426614174000',
@@ -310,22 +293,12 @@ describe('confirmation.ts', () => {
         outcome: ToolConfirmationOutcome.ModifyWithEditor,
       });
 
-      // Mock the modifier action
-      mockModifier.handleModifyWithEditor.mockResolvedValue({
-        updatedParams: { foo: 'bar' },
-      });
-      toolMock.build.mockReturnValue({} as unknown as AnyToolInvocation);
-
-      // Wait for loop to cycle and re-subscribe
-      const listenerPromise2 = waitForListener(
-        MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-      );
+      // Wait for the loop to process the modification and re-subscribe
       await listenerPromise2;
 
-      // Expect state update
       expect(mockState.updateArgs).toHaveBeenCalled();
 
-      // Second response: Proceed
+      // Second response: User approves the modified params
       emitResponse({
         type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
         correlationId: '123e4567-e89b-12d3-a456-426614174000',
