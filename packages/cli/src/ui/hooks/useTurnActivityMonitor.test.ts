@@ -8,8 +8,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '../../test-utils/render.js';
 import { useTurnActivityMonitor } from './useTurnActivityMonitor.js';
 import { StreamingState } from '../types.js';
-import { hasRedirection } from '@google/gemini-cli-core';
-import { type TrackedToolCall } from './useReactToolScheduler.js';
+import { hasRedirection, CoreToolCallStatus } from '@google/gemini-cli-core';
+import { type TrackedToolCall } from './useToolScheduler.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -93,7 +93,7 @@ describe('useTurnActivityMonitor', () => {
             name: 'run_shell_command',
             args: { command: 'ls -la' },
           },
-          status: 'executing',
+          status: CoreToolCallStatus.Executing,
         } as unknown as TrackedToolCall,
       ],
     });
@@ -108,7 +108,7 @@ describe('useTurnActivityMonitor', () => {
             name: 'run_shell_command',
             args: { command: 'ls > tool_out.txt' },
           },
-          status: 'executing',
+          status: CoreToolCallStatus.Executing,
         } as unknown as TrackedToolCall,
       ],
     });
