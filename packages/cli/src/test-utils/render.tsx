@@ -180,17 +180,22 @@ class XtermStdout extends EventEmitter {
       lastExpected = expectedFrame;
 
       const isMatch = () => {
-        if (this.lastRenderOutput === undefined) {
-          return false;
-        }
-
         if (expectedFrame === '...') {
           return currentFrame !== '';
         }
 
         // If both are empty, it's a match.
-        if (expectedFrame === '' && currentFrame === '') {
+        // We consider undefined lastRenderOutput as effectively empty for this check
+        // to support hook testing where Ink may skip rendering completely.
+        if (
+          (this.lastRenderOutput === undefined || expectedFrame === '') &&
+          currentFrame === ''
+        ) {
           return true;
+        }
+
+        if (this.lastRenderOutput === undefined) {
+          return false;
         }
 
         // If Ink expects nothing but terminal has content, or vice-versa, it's NOT a match.

@@ -1384,7 +1384,9 @@ describe('SettingsDialog', () => {
 
   describe('String Settings Editing', () => {
     it('should allow editing and committing a string setting', async () => {
-      let settings = createMockSettings({ 'a.string.setting': 'initial' });
+      let settings = createMockSettings({
+        'general.sessionCleanup.maxAge': 'initial',
+      });
       const onSelect = vi.fn();
 
       const { stdin, unmount, rerender, waitUntilReady } = render(
@@ -1394,11 +1396,15 @@ describe('SettingsDialog', () => {
       );
       await waitUntilReady();
 
-      // Navigate to the last setting
+      // Search for 'chat history' to filter the list
       await act(async () => {
-        for (let i = 0; i < 20; i++) {
-          stdin.write('j'); // Down
-        }
+        stdin.write('chat history');
+      });
+      await waitUntilReady();
+
+      // Press Down Arrow to focus the list
+      await act(async () => {
+        stdin.write(TerminalKeys.DOWN_ARROW);
       });
       await waitUntilReady();
 
@@ -1418,8 +1424,8 @@ describe('SettingsDialog', () => {
 
       settings = createMockSettings({
         user: {
-          settings: { 'a.string.setting': 'new value' },
-          originalSettings: { 'a.string.setting': 'new value' },
+          settings: { 'general.sessionCleanup.maxAge': 'new value' },
+          originalSettings: { 'general.sessionCleanup.maxAge': 'new value' },
           path: '',
         },
       });
