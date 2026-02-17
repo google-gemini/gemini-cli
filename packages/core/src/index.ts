@@ -158,6 +158,7 @@ export * from './tools/read-many-files.js';
 export * from './tools/mcp-client.js';
 export * from './tools/mcp-tool.js';
 export * from './tools/write-todos.js';
+export * from './tools/activate-skill.js';
 export * from './tools/ask-user.js';
 
 // MCP OAuth
@@ -192,3 +193,6 @@ export * from './agents/types.js';
 // Export stdio utils
 export * from './utils/stdio.js';
 export * from './utils/terminal.js';
+
+// Export types from @google/genai
+export type { Content, Part, FunctionCall } from '@google/genai';

@@ -1003,7 +1003,7 @@ describe('useSlashCommandProcessor', () => {
         command: '/fail',
         expectedLog: {
           command: 'fail',
-          status: 'error',
+          status: SlashCommandStatus.ERROR,
           subcommand: undefined,
         },
         desc: 'failure event for failed command',

@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Box } from 'ink';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
-import { ToolCallStatus, StreamingState } from '../types.js';
+import { StreamingState } from '../types.js';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
-import type { Config } from '@google/gemini-cli-core';
+import { type Config, CoreToolCallStatus } from '@google/gemini-cli-core';
 import type { ConfirmingToolState } from '../hooks/useConfirmingTool.js';
 import { theme } from '../semantic-colors.js';
 
@@ -63,7 +63,7 @@ describe('ToolConfirmationQueue', () => {
         callId: 'call-1',
         name: 'ls',
         description: 'list files',
-        status: ToolCallStatus.Confirming,
+        status: CoreToolCallStatus.AwaitingApproval,
         confirmationDetails: {
           type: 'exec' as const,
           title: 'Confirm execution',
@@ -105,7 +105,7 @@ describe('ToolConfirmationQueue', () => {
       tool: {
         callId: 'call-1',
         name: 'ls',
-        status: ToolCallStatus.Confirming,
+        status: CoreToolCallStatus.AwaitingApproval,
         confirmationDetails: undefined,
       },
       index: 1,
@@ -134,7 +134,7 @@ describe('ToolConfirmationQueue', () => {
         callId: 'call-1',
         name: 'replace',
         description: 'edit file',
-        status: ToolCallStatus.Confirming,
+        status: CoreToolCallStatus.AwaitingApproval,
         confirmationDetails: {
           type: 'edit' as const,
           title: 'Confirm edit',
@@ -181,7 +181,7 @@ describe('ToolConfirmationQueue', () => {
         callId: 'call-1',
         name: 'replace',
         description: 'edit file',
-        status: ToolCallStatus.Confirming,
+        status: CoreToolCallStatus.AwaitingApproval,
         confirmationDetails: {
           type: 'edit' as const,
           title: 'Confirm edit',
@@ -230,7 +230,7 @@ describe('ToolConfirmationQueue', () => {
         callId: 'call-1',
         name: 'replace',
         description: 'edit file',
-        status: ToolCallStatus.Confirming,
+        status: CoreToolCallStatus.AwaitingApproval,
         confirmationDetails: {
           type: 'edit' as const,
           title: 'Confirm edit',
@@ -271,7 +271,7 @@ describe('ToolConfirmationQueue', () => {
         callId: 'call-1',
         name: 'ask_user',
         description: 'ask user',
-        status: ToolCallStatus.Confirming,
+        status: CoreToolCallStatus.AwaitingApproval,
         confirmationDetails: {
           type: 'ask_user' as const,
           questions: [],
@@ -307,7 +307,7 @@ describe('ToolConfirmationQueue', () => {
         callId: 'call-1',
         name: 'exit_plan_mode',
         description: 'exit plan mode',
-        status: ToolCallStatus.Confirming,
+        status: CoreToolCallStatus.AwaitingApproval,
         confirmationDetails: {
           type: 'exit_plan_mode' as const,
           planPath: '/path/to/plan',

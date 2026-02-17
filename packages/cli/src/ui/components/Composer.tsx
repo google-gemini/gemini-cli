@@ -6,7 +6,11 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
-import { ApprovalMode, tokenLimit } from '@google/gemini-cli-core';
+import {
+  ApprovalMode,
+  tokenLimit,
+  CoreToolCallStatus,
+} from '@google/gemini-cli-core';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StatusDisplay } from './StatusDisplay.js';
 import { ToastDisplay, shouldShowToast } from './ToastDisplay.js';
@@ -30,11 +34,7 @@ import { useVimMode } from '../contexts/VimModeContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
-import {
-  StreamingState,
-  type HistoryItemToolGroup,
-  ToolCallStatus,
-} from '../types.js';
+import { StreamingState, type HistoryItemToolGroup } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
@@ -67,7 +67,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           (item): item is HistoryItemToolGroup => item.type === 'tool_group',
         )
         .some((item) =>
-          item.tools.some((tool) => tool.status === ToolCallStatus.Confirming),
+          item.tools.some(
+            (tool) => tool.status === CoreToolCallStatus.AwaitingApproval,
+          ),
         ),
     [uiState.pendingHistoryItems],
   );
@@ -141,8 +143,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     settings.merged.ui.showShortcutsHint &&
     !hideShortcutsHintForSuggestions &&
     !hideMinimalModeHintWhileBusy &&
-    !hasPendingActionRequired &&
-    (!showUiDetails || !showLoadingIndicator);
+    !hasPendingActionRequired;
   const showMinimalModeBleedThrough =
     !hideUiDetailsForSuggestions && Boolean(minimalModeBleedThrough);
   const showMinimalInlineLoading = !showUiDetails && showLoadingIndicator;
@@ -189,7 +190,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             marginLeft={1}
             marginRight={isNarrow ? 0 : 1}
             flexDirection="row"
-            alignItems="center"
+            alignItems={isNarrow ? 'flex-start' : 'center'}
             flexGrow={1}
           >
             {showUiDetails && showLoadingIndicator && (
@@ -326,45 +327,51 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
               {hasToast ? (
                 <ToastDisplay />
               ) : (
-                !showLoadingIndicator && (
-                  <Box
-                    flexDirection={isNarrow ? 'column' : 'row'}
-                    alignItems={isNarrow ? 'flex-start' : 'center'}
-                  >
-                    {showApprovalIndicator && (
-                      <ApprovalModeIndicator
-                        approvalMode={showApprovalModeIndicator}
-                        isPlanEnabled={config.isPlanEnabled()}
-                      />
-                    )}
-                    {uiState.shellModeActive && (
-                      <Box
-                        marginLeft={showApprovalIndicator && !isNarrow ? 1 : 0}
-                        marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
-                      >
-                        <ShellModeIndicator />
-                      </Box>
-                    )}
-                    {showRawMarkdownIndicator && (
-                      <Box
-                        marginLeft={
-                          (showApprovalIndicator || uiState.shellModeActive) &&
-                          !isNarrow
-                            ? 1
-                            : 0
-                        }
-                        marginTop={
-                          (showApprovalIndicator || uiState.shellModeActive) &&
-                          isNarrow
-                            ? 1
-                            : 0
-                        }
-                      >
-                        <RawMarkdownIndicator />
-                      </Box>
-                    )}
-                  </Box>
-                )
+                <Box
+                  flexDirection={isNarrow ? 'column' : 'row'}
+                  alignItems={isNarrow ? 'flex-start' : 'center'}
+                >
+                  {showApprovalIndicator && (
+                    <ApprovalModeIndicator
+                      approvalMode={showApprovalModeIndicator}
+                      isPlanEnabled={config.isPlanEnabled()}
+                    />
+                  )}
+                  {!showLoadingIndicator && (
+                    <>
+                      {uiState.shellModeActive && (
+                        <Box
+                          marginLeft={
+                            showApprovalIndicator && !isNarrow ? 1 : 0
+                          }
+                          marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
+                        >
+                          <ShellModeIndicator />
+                        </Box>
+                      )}
+                      {showRawMarkdownIndicator && (
+                        <Box
+                          marginLeft={
+                            (showApprovalIndicator ||
+                              uiState.shellModeActive) &&
+                            !isNarrow
+                              ? 1
+                              : 0
+                          }
+                          marginTop={
+                            (showApprovalIndicator ||
+                              uiState.shellModeActive) &&
+                            isNarrow
+                              ? 1
+                              : 0
+                          }
+                        >
+                          <RawMarkdownIndicator />
+                        </Box>
+                      )}
+                    </>
+                  )}
+                </Box>
               )}
             </Box>
 

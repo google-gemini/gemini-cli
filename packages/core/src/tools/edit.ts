@@ -27,6 +27,7 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
+import { CoreToolCallStatus } from '../scheduler/types.js';
 
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
 import {
@@ -42,7 +43,11 @@ import { EditCorrectionEvent } from '../telemetry/types.js';
 import { logEditCorrectionEvent } from '../telemetry/loggers.js';
 
 import { correctPath } from '../utils/pathCorrector.js';
-import { EDIT_TOOL_NAME, READ_FILE_TOOL_NAME } from './tool-names.js';
+import {
+  EDIT_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  EDIT_DISPLAY_NAME,
+} from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { EDIT_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
@@ -505,7 +510,7 @@ class EditToolInvocation
       };
     }
 
-    const event = new EditCorrectionEvent('success');
+    const event = new EditCorrectionEvent(CoreToolCallStatus.Success);
     logEditCorrectionEvent(this.config, event);
 
     return {
@@ -907,7 +912,7 @@ export class EditTool
   ) {
     super(
       EditTool.Name,
-      'Edit',
+      EDIT_DISPLAY_NAME,
       EDIT_DEFINITION.base.description!,
       Kind.Edit,
       EDIT_DEFINITION.base.parametersJsonSchema,

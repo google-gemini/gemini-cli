@@ -77,6 +77,27 @@ describe('setupUser for existing user', () => {
     );
   });
 
+  it('should pass httpOptions to CodeAssistServer when provided', async () => {
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'test-project');
+    mockLoad.mockResolvedValue({
+      currentTier: mockPaidTier,
+    });
+    const httpOptions = {
+      headers: {
+        'User-Agent': 'GeminiCLI/1.0.0/gemini-2.0-flash (darwin; arm64)',
+      },
+    };
+    await setupUser({} as OAuth2Client, undefined, httpOptions);
+    expect(CodeAssistServer).toHaveBeenCalledWith(
+      {},
+      'test-project',
+      httpOptions,
+      '',
+      undefined,
+      undefined,
+    );
+  });
+
   it('should ignore GOOGLE_CLOUD_PROJECT when project from server is set', async () => {
     vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'test-project');
     mockLoad.mockResolvedValue({

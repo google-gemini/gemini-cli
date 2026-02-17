@@ -43,7 +43,6 @@ export interface PreambleOptions {
 
 export interface CoreMandatesOptions {
   interactive: boolean;
-  isGemini3: boolean;
   hasSkills: boolean;
   hasHierarchicalMemory: boolean;
   contextFilenames?: string[];
@@ -61,7 +60,6 @@ export interface PrimaryWorkflowsOptions {
 
 export interface OperationalGuidelinesOptions {
   interactive: boolean;
-  isGemini3: boolean;
   interactiveShellEnabled: boolean;
 }
 
@@ -179,7 +177,7 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - ${mandateConfirm(options.interactive)}
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}
-${mandateExplainBeforeActing(options.isGemini3)}${mandateContinueWork(options.interactive)}
+- **Explain Before Acting:** Never call tools in silence. You MUST provide a concise, one-sentence explanation of your intent or strategy immediately before executing tool calls. This is essential for transparency, especially when confirming a request or answering a question. Silence is only acceptable for repetitive, low-level discovery operations (e.g., sequential file reads) where narration would be noisy.${mandateContinueWork(options.interactive)}
 `.trim();
 }
 
@@ -282,7 +280,8 @@ export function renderOperationalGuidelines(
 - **Role:** A senior software engineer and collaborative peer programmer.
 - **High-Signal Output:** Focus exclusively on **intent** and **technical rationale**. Avoid conversational filler, apologies, and mechanical tool-use narration (e.g., "I will now call...").
 - **Concise & Direct:** Adopt a professional, direct, and concise tone suitable for a CLI environment.
-- **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical.${toneAndStyleNoChitchat(options.isGemini3)}
+- **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical.
+- **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes...") unless they serve to explain intent as required by the 'Explain Before Acting' mandate.
 - **No Repetition:** Once you have provided a final synthesis of your work, do not repeat yourself or provide additional summaries. For simple or direct requests, prioritize extreme brevity.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
@@ -483,12 +482,6 @@ function mandateConflictResolution(hasHierarchicalMemory: boolean): string {
   return '\n- **Conflict Resolution:** Instructions are provided in hierarchical context tags: `<global_context>`, `<extension_context>`, and `<project_context>`. In case of contradictory instructions, follow this priority: `<project_context>` (highest) > `<extension_context>` > `<global_context>` (lowest).';
 }
 
-function mandateExplainBeforeActing(isGemini3: boolean): string {
-  if (!isGemini3) return '';
-  return `
-- **Explain Before Acting:** Never call tools in silence. You MUST provide a concise, one-sentence explanation of your intent or strategy immediately before executing tool calls. This is essential for transparency, especially when confirming a request or answering a question. Silence is only acceptable for repetitive, low-level discovery operations (e.g., sequential file reads) where narration would be noisy.`;
-}
-
 function mandateContinueWork(interactive: boolean): string {
   if (interactive) return '';
   return `
@@ -553,7 +546,7 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
   if (options.approvedPlan) {
     return `
 1. **Understand:** Read the approved plan. Treat this file as your single source of truth.
-2. **Implement:** Implement the application according to the plan. When starting, scaffold the application using ${formatToolName(SHELL_TOOL_NAME)}. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, CSS animations, icons) to ensure a complete, rich, and coherent experience. Never link to external services or assume local paths for assets that have not been created. If you discover new requirements or need to change the approach, confirm with the user and update the plan file.
+2. **Implement:** Implement the application according to the plan. When starting, scaffold the application using ${formatToolName(SHELL_TOOL_NAME)}. For interactive scaffolding tools (like create-react-app, create-vite, or npm create), you MUST use the corresponding non-interactive flag (e.g. '--yes', '-y', or specific template flags) to prevent the environment from hanging waiting for user input. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, CSS animations, icons) to ensure a complete, rich, and coherent experience. Never link to external services or assume local paths for assets that have not been created. If you discover new requirements or need to change the approach, confirm with the user and update the plan file.
 3. **Verify:** Review work against the original request and the approved plan. Fix bugs, deviations, and ensure placeholders are visually adequate. **Ensure styling and interactions produce a high-quality, polished, and beautiful prototype.** Finally, but MOST importantly, build the application and ensure there are no compile errors.
 4. **Finish:** Provide a brief summary of what was built.`.trim();
   }
@@ -588,7 +581,7 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
      - **Mobile:** Compose Multiplatform or Flutter.
      - **Games:** HTML/CSS/JS (Three.js for 3D).
      - **CLIs:** Python or Go.
-3. **Implementation:** Autonomously implement each feature per the approved plan. When starting, scaffold the application using ${formatToolName(SHELL_TOOL_NAME)} for commands like 'npm init', 'npx create-react-app'. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, icons) to ensure a complete, coherent experience. Never link to external services or assume local paths for assets that have not been created.
+3. **Implementation:** Autonomously implement each feature per the approved plan. When starting, scaffold the application using ${formatToolName(SHELL_TOOL_NAME)} for commands like 'npm init', 'npx create-react-app'. For interactive scaffolding tools (like create-react-app, create-vite, or npm create), you MUST use the corresponding non-interactive flag (e.g. '--yes', '-y', or specific template flags) to prevent the environment from hanging waiting for user input. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, icons) to ensure a complete, coherent experience. Never link to external services or assume local paths for assets that have not been created.
 4. **Verify:** Review work against the original request. Fix bugs and deviations. Ensure styling and interactions produce a high-quality, functional, and beautiful prototype. **Build the application and ensure there are no compile errors.**
 5. **Solicit Feedback:** Provide instructions on how to start the application and request user feedback on the prototype.`.trim();
   }
@@ -603,16 +596,8 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
      - **Mobile:** Compose Multiplatform or Flutter.
      - **Games:** HTML/CSS/JS (Three.js for 3D).
      - **CLIs:** Python or Go.
-3. **Implementation:** Autonomously implement each feature per the approved plan. When starting, scaffold the application using ${formatToolName(SHELL_TOOL_NAME)}. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, icons). Never link to external services or assume local paths for assets that have not been created.
+3. **Implementation:** Autonomously implement each feature per the approved plan. When starting, scaffold the application using ${formatToolName(SHELL_TOOL_NAME)}. For interactive scaffolding tools (like create-react-app, create-vite, or npm create), you MUST use the corresponding non-interactive flag (e.g. '--yes', '-y', or specific template flags) to prevent the environment from hanging waiting for user input. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, icons). Never link to external services or assume local paths for assets that have not been created.
 4. **Verify:** Review work against the original request. Fix bugs and deviations. **Build the application and ensure there are no compile errors.**`.trim();
-}
-
-function toneAndStyleNoChitchat(isGemini3: boolean): string {
-  return isGemini3
-    ? `
-- **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes...") unless they serve to explain intent as required by the 'Explain Before Acting' mandate.`
-    : `
-- **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.`;
 }
 
 function toolUsageInteractive(
