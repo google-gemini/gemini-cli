@@ -23,7 +23,7 @@ export class ModelFamilyService {
    * @param modelId The model identifier (e.g., 'gemini-2.5-pro', 'gemini-3-flash-preview')
    * @returns The resolved ToolFamily
    */
-  static getToolFamily(modelId?: string): ToolFamily {
+  export function getToolFamily(modelId?: string): ToolFamily {
     if (!modelId) {
       return 'default-legacy';
     }
