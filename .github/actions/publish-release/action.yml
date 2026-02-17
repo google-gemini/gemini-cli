@@ -90,15 +90,19 @@ runs:
       id: 'release_branch'
       shell: 'bash'
       run: |
-        BRANCH_NAME="release/${{ inputs.release-tag }}"
+        BRANCH_NAME="release/${INPUTS_RELEASE_TAG}"
         git switch -c "${BRANCH_NAME}"
         echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
+      env:
+        INPUTS_RELEASE_TAG: ${{ inputs.release-tag }}
 
     - name: '⬆️ Update package versions'
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
       run: |
-        npm run release:version "${{ inputs.release-version }}"
+        npm run release:version "${INPUTS_RELEASE_VERSION}"
+      env:
+        INPUTS_RELEASE_VERSION: ${{ inputs.release-version }}
 
     - name: '💾 Commit and Conditionally Push package versions'
       working-directory: '${{ inputs.working-directory }}'
@@ -160,23 +164,30 @@ runs:
       working-directory: '${{ inputs.working-directory }}'
       env:
         NODE_AUTH_TOKEN: '${{ steps.core-token.outputs.auth-token }}'
+        INPUTS_DRY_RUN: ${{ inputs.dry-run }}
+        INPUTS_CORE_PACKAGE_NAME: ${{ inputs.core-package-name }}
       shell: 'bash'
       run: |
         npm publish \
-          --dry-run="${{ inputs.dry-run }}" \
-          --workspace="${{ inputs.core-package-name }}" \
+          --dry-run="${INPUTS_DRY_RUN}" \
+          --workspace="${INPUTS_CORE_PACKAGE_NAME}" \
           --no-tag
-        npm dist-tag rm ${{ inputs.core-package-name }} false --silent
+        npm dist-tag rm ${INPUTS_CORE_PACKAGE_NAME} false --silent
 
     - name: '🔗 Install latest core package'
       working-directory: '${{ inputs.working-directory }}'
       if: "${{ inputs.dry-run != 'true' }}"
       shell: 'bash'
       run: |
-        npm install "${{ inputs.core-package-name }}@${{ inputs.release-version }}" \
-        --workspace="${{ inputs.cli-package-name }}" \
-        --workspace="${{ inputs.a2a-package-name }}" \
+        npm install "${INPUTS_CORE_PACKAGE_NAME}@${INPUTS_RELEASE_VERSION}" \
+        --workspace="${INPUTS_CLI_PACKAGE_NAME}" \
+        --workspace="${INPUTS_A2A_PACKAGE_NAME}" \
         --save-exact
+      env:
+        INPUTS_CORE_PACKAGE_NAME: ${{ inputs.core-package-name }}
+        INPUTS_RELEASE_VERSION: ${{ inputs.release-version }}
+        INPUTS_CLI_PACKAGE_NAME: ${{ inputs.cli-package-name }}
+        INPUTS_A2A_PACKAGE_NAME: ${{ inputs.a2a-package-name }}
 
     - name: 'Get CLI Token'
       uses: './.github/actions/npm-auth-token'
@@ -192,13 +203,15 @@ runs:
       working-directory: '${{ inputs.working-directory }}'
       env:
         NODE_AUTH_TOKEN: '${{ steps.cli-token.outputs.auth-token }}'
+        INPUTS_DRY_RUN: ${{ inputs.dry-run }}
+        INPUTS_CLI_PACKAGE_NAME: ${{ inputs.cli-package-name }}
       shell: 'bash'
       run: |
         npm publish \
-          --dry-run="${{ inputs.dry-run }}" \
-          --workspace="${{ inputs.cli-package-name }}" \
+          --dry-run="${INPUTS_DRY_RUN}" \
+          --workspace="${INPUTS_CLI_PACKAGE_NAME}" \
           --no-tag
-        npm dist-tag rm ${{ inputs.cli-package-name }} false --silent
+        npm dist-tag rm ${INPUTS_CLI_PACKAGE_NAME} false --silent
 
     - name: 'Get a2a-server Token'
       uses: './.github/actions/npm-auth-token'
@@ -214,14 +227,16 @@ runs:
       working-directory: '${{ inputs.working-directory }}'
       env:
         NODE_AUTH_TOKEN: '${{ steps.a2a-token.outputs.auth-token }}'
+        INPUTS_DRY_RUN: ${{ inputs.dry-run }}
+        INPUTS_A2A_PACKAGE_NAME: ${{ inputs.a2a-package-name }}
       shell: 'bash'
       # Tag staging for initial release
       run: |
         npm publish \
-          --dry-run="${{ inputs.dry-run }}" \
-          --workspace="${{ inputs.a2a-package-name }}" \
+          --dry-run="${INPUTS_DRY_RUN}" \
+          --workspace="${INPUTS_A2A_PACKAGE_NAME}" \
           --no-tag
-        npm dist-tag rm ${{ inputs.a2a-package-name }} false --silent
+        npm dist-tag rm ${INPUTS_A2A_PACKAGE_NAME} false --silent
 
     - name: '🔬 Verify NPM release by version'
       uses: './.github/actions/verify-release'
@@ -255,13 +270,16 @@ runs:
       if: "${{ inputs.dry-run != 'true' && inputs.skip-github-release != 'true' && inputs.npm-tag != 'dev' && inputs.npm-registry-url != 'https://npm.pkg.github.com/' }}"
       env:
         GITHUB_TOKEN: '${{ inputs.github-token }}'
+        INPUTS_RELEASE_TAG: ${{ inputs.release-tag }}
+        STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME: ${{ steps.release_branch.outputs.BRANCH_NAME }}
+        INPUTS_PREVIOUS_TAG: ${{ inputs.previous-tag }}
       shell: 'bash'
       run: |
-        gh release create "${{ inputs.release-tag }}" \
+        gh release create "${INPUTS_RELEASE_TAG}" \
           bundle/gemini.js \
-          --target "${{ steps.release_branch.outputs.BRANCH_NAME }}" \
-          --title "Release ${{ inputs.release-tag }}" \
-          --notes-start-tag "${{ inputs.previous-tag }}" \
+          --target "${STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME}" \
+          --title "Release ${INPUTS_RELEASE_TAG}" \
+          --notes-start-tag "${INPUTS_PREVIOUS_TAG}" \
           --generate-notes \
           ${{ inputs.npm-tag != 'latest' && '--prerelease' || '' }}
 
@@ -271,5 +289,8 @@ runs:
       continue-on-error: true
       shell: 'bash'
       run: |
-        echo "Cleaning up release branch ${{ steps.release_branch.outputs.BRANCH_NAME }}..."
-        git push origin --delete "${{ steps.release_branch.outputs.BRANCH_NAME }}"
+        echo "Cleaning up release branch ${STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME}..."
+        git push origin --delete "${STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME}"
+
+      env:
+        STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME: ${{ steps.release_branch.outputs.BRANCH_NAME }}
