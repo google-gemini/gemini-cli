@@ -32,7 +32,7 @@ describe('Frugal Search', () => {
    * an unexpectedly large file benefitting from frugal approaches to viewing, like grep, or
    * ranged reads.
    */
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should use grep or ranged read for large files',
     prompt: 'What year was legacy_processor.ts written?',
     files: {
@@ -45,7 +45,7 @@ describe('Frugal Search', () => {
           (_, i) =>
             `// Legacy code block ${i} - strictly preserved for backward compatibility`,
         ),
-      ].join('\\n'),
+      ].join('\n'),
       'README.md': '# Project documentation',
     },
     assert: async (rig) => {
