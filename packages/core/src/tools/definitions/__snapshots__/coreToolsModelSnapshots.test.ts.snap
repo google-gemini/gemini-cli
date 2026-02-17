@@ -485,7 +485,7 @@ Use this tool when the user's query implies needing the content of several files
       },
       "recursive": {
         "default": true,
-        "description": "Optional. Whether to search recursively (primarily controlled by ** in glob patterns). Defaults to true.",
+        "description": "Optional. Whether to search recursively (primarily controlled by \`**\` in glob patterns). Defaults to true.",
         "type": "boolean",
       },
       "useDefaultExcludes": {
@@ -1274,7 +1274,7 @@ Use this tool when the user's query implies needing the content of several files
       },
       "recursive": {
         "default": true,
-        "description": "Optional. Whether to search recursively (primarily controlled by ** in glob patterns). Defaults to true.",
+        "description": "Optional. Whether to search recursively (primarily controlled by \`**\` in glob patterns). Defaults to true.",
         "type": "boolean",
       },
       "useDefaultExcludes": {

@@ -412,7 +412,7 @@ Use this tool when the user's query implies needing the content of several files
         recursive: {
           type: 'boolean',
           description:
-            'Optional. Whether to search recursively (primarily controlled by ** in glob patterns). Defaults to true.',
+            'Optional. Whether to search recursively (primarily controlled by `**` in glob patterns). Defaults to true.',
           default: true,
         },
 
