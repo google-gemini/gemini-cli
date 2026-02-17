@@ -429,6 +429,26 @@ describe('Core System Prompt (prompts.ts)', () => {
       expect(prompt).toMatchSnapshot();
     });
 
+    it('should include modern PLAN mode instructions for preview models', () => {
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+        PREVIEW_GEMINI_MODEL,
+      );
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+      vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([
+        'glob',
+        'grep_search',
+        'ask_user',
+      ]);
+
+      const prompt = getCoreSystemPrompt(mockConfig);
+
+      expect(prompt).toContain('# Active Approval Mode: Plan');
+      expect(prompt).toContain(
+        'Use multi-select to offer flexibility and include detailed descriptions for each option',
+      );
+      expect(prompt).toMatchSnapshot();
+    });
+
     it('should NOT include approval mode instructions for DEFAULT mode', () => {
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
         ApprovalMode.DEFAULT,

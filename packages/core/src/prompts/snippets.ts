@@ -451,7 +451,7 @@ When writing the plan file, you MUST include the following structure:
 
 ## Workflow
 1. **Explore & Analyze:** Analyze requirements and use search/read tools to explore the codebase. For complex tasks, identify at least two viable implementation approaches.
-2. **Consult:** Present a concise summary of the identified approaches (including pros/cons and your recommendation) to the user via ${formatToolName(ASK_USER_TOOL_NAME)} and wait for their selection. For simple or canonical tasks, you may skip this and proceed to drafting.
+2. **Consult:** Present a concise summary of the identified approaches (including pros/cons and your recommendation) to the user via ${formatToolName(ASK_USER_TOOL_NAME)} and wait for their selection. Use multi-select to offer flexibility and include detailed descriptions for each option to help the user understand the implications of their choice. For simple or canonical tasks, you may skip this and proceed to drafting.
 3. **Draft:** Write the detailed implementation plan for the selected approach to the plans directory using ${formatToolName(WRITE_FILE_TOOL_NAME)}.
 4. **Review & Approval:** Present a brief summary of the drafted plan in your chat response and concurrently call the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to formally request approval. If rejected, iterate.
 

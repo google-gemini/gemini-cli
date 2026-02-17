@@ -61,6 +61,9 @@ describe('AskUserTool', () => {
   it('should have correct metadata', () => {
     expect(tool.name).toBe('ask_user');
     expect(tool.displayName).toBe('Ask User');
+    expect(tool.description).toContain(
+      'prefer providing multiple-choice options with detailed descriptions and enable multi-select where appropriate',
+    );
   });
 
   describe('validateToolParams', () => {

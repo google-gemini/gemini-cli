@@ -771,7 +771,7 @@ export const ASK_USER_DEFINITION: ToolDefinition = {
   base: {
     name: ASK_USER_TOOL_NAME,
     description:
-      'Ask the user one or more questions to gather preferences, clarify requirements, or make decisions.',
+      'Ask the user one or more questions to gather preferences, clarify requirements, or make decisions. When using this tool, prefer providing multiple-choice options with detailed descriptions and enable multi-select where appropriate to provide maximum flexibility.',
     parametersJsonSchema: {
       type: 'object',
       required: ['questions'],
