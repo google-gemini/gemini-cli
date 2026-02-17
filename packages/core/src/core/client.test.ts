@@ -47,6 +47,7 @@ import type {
 } from '../services/modelConfigService.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import * as policyCatalog from '../availability/policyCatalog.js';
+import { LlmRole } from '../telemetry/types.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents } from '../utils/events.js';
 
@@ -243,6 +244,7 @@ describe('Gemini Client (client.ts)', () => {
       getShowModelInfoInChat: vi.fn().mockReturnValue(false),
       getContinueOnFailedApiCall: vi.fn(),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
+      getIncludeDirectoryTree: vi.fn().mockReturnValue(true),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
       },
@@ -2913,6 +2915,7 @@ ${JSON.stringify(
         { model: 'test-model' },
         contents,
         abortSignal,
+        LlmRole.MAIN,
       );
 
       expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
@@ -2927,6 +2930,7 @@ ${JSON.stringify(
           contents,
         },
         'test-session-id',
+        LlmRole.MAIN,
       );
     });
 
@@ -2938,6 +2942,7 @@ ${JSON.stringify(
         { model: initialModel },
         contents,
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
@@ -2945,6 +2950,7 @@ ${JSON.stringify(
           model: initialModel,
         }),
         'test-session-id',
+        LlmRole.MAIN,
       );
     });
 
