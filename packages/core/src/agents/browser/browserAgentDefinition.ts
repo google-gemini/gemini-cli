@@ -74,17 +74,14 @@ When you need to identify elements by visual attributes not in the AX tree (e.g.
 COMPLEX WEB APPS (spreadsheets, rich editors, canvas apps):
 Many web apps (Google Sheets/Docs, Notion, Figma, etc.) use custom rendering rather than standard HTML inputs.
 - fill does NOT work on these apps. Instead, click the target element, then use type_text to enter the value.
-- Navigate cells/fields using keyboard shortcuts (Tab, Enter, ArrowDown) — more reliable than clicking cell UIDs.
-- For spreadsheets: click a cell → type_text("value") → press_key("Enter") to confirm and move to the next cell.
+- type_text supports a submitKey parameter to press a key after typing (e.g., submitKey="Enter" to submit, submitKey="Tab" to move to the next field). This is much faster than separate press_key calls.
+- Navigate cells/fields using keyboard shortcuts (Tab, Enter, ArrowDown) — more reliable than clicking UIDs.
 - Use the Name Box (cell reference input, usually showing "A1") to jump to specific cells.
 
 TERMINAL FAILURES — STOP IMMEDIATELY:
-Some errors are unrecoverable and retrying will never help. When you see ANY of these, call complete_task immediately with success=false and include the specific remediation steps in your summary:
-- "Could not connect to Chrome" — Include ALL of these instructions in your summary:
-  1. Open Chrome (version 144+)
-  2. Go to chrome://inspect/#remote-debugging and enable remote debugging
-  3. Or change sessionMode to "persistent" in settings.json to let the agent launch its own browser
-- "Browser closed" or "Target closed" or "Session closed" — The browser process has terminated. Tell the user to restart and try again.
+Some errors are unrecoverable and retrying will never help. When you see ANY of these, call complete_task immediately with success=false and include the EXACT error message (including any remediation steps it contains) in your summary:
+- "Could not connect to Chrome" or "Failed to connect to Chrome" or "Timed out connecting to Chrome" — Include the full error message with its remediation steps in your summary verbatim. Do NOT paraphrase or omit instructions.
+- "Browser closed" or "Target closed" or "Session closed" — The browser process has terminated. Include the error and tell the user to try again.
 - "net::ERR_" network errors on the SAME URL after 2 retries — the site is unreachable. Report the URL and error.
 - Any error that appears IDENTICALLY 3+ times in a row — it will not resolve by retrying.
 Do NOT keep retrying terminal errors. Report them with actionable remediation steps and exit immediately.

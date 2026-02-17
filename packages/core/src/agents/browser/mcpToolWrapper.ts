@@ -156,13 +156,17 @@ class TypeTextInvocation extends BaseToolInvocation<
   constructor(
     private readonly browserManager: BrowserManager,
     private readonly text: string,
+    private readonly submitKey: string | undefined,
     messageBus: MessageBus,
   ) {
-    super({ text }, messageBus, 'type_text', 'type_text');
+    super({ text, submitKey }, messageBus, 'type_text', 'type_text');
   }
 
   getDescription(): string {
-    return `type_text: "${this.text.substring(0, 50)}${this.text.length > 50 ? '...' : ''}"`;
+    const preview = `"${this.text.substring(0, 50)}${this.text.length > 50 ? '...' : ''}"`;
+    return this.submitKey
+      ? `type_text: ${preview} + ${this.submitKey}`
+      : `type_text: ${preview}`;
   }
 
   protected override async getConfirmationDetails(
@@ -194,48 +198,32 @@ class TypeTextInvocation extends BaseToolInvocation<
 
   override async execute(signal: AbortSignal): Promise<ToolResult> {
     try {
-      const chars = [...this.text]; // Handle Unicode correctly
-      let successCount = 0;
-      let lastError: string | undefined;
+      if (signal.aborted) {
+        return {
+          llmContent: 'Error: Operation cancelled before typing started.',
+          returnDisplay: 'Operation cancelled before typing started.',
+          error: { message: 'Operation cancelled' },
+        };
+      }
 
-      for (const char of chars) {
-        if (signal.aborted) {
-          return {
-            llmContent: `Error: Operation cancelled after typing ${successCount}/${chars.length} characters.`,
-            returnDisplay: `Operation cancelled after typing ${successCount}/${chars.length} characters.`,
-            error: { message: 'Operation cancelled' },
-          };
-        }
+      await this.typeCharByChar(signal);
 
-        // Map special characters to key names
-        const key = char === ' ' ? 'Space' : char;
-        const result: McpToolCallResult = await this.browserManager.callTool(
-          'press_key',
-          { key },
-        );
-
-        if (result.isError) {
-          const errorText = result.content
-            ?.filter(
-              (c: { type: string; text?: string }) =>
-                c.type === 'text' && c.text,
-            )
-            .map((c: { type: string; text?: string }) => c.text)
-            .join('\n');
-          lastError = errorText || 'Unknown error';
-          // Continue typing remaining characters on soft errors
+      // Optionally press a submit key (Enter, Tab, etc.) after typing
+      if (this.submitKey && !signal.aborted) {
+        const keyResult = await this.browserManager.callTool('press_key', {
+          key: this.submitKey,
+        });
+        if (keyResult.isError) {
+          const errText = this.extractErrorText(keyResult);
           debugLogger.warn(
-            `type_text: press_key("${key}") failed: ${lastError}`,
+            `type_text: submitKey("${this.submitKey}") failed: ${errText}`,
           );
-        } else {
-          successCount++;
         }
       }
 
-      const summary =
-        successCount === chars.length
-          ? `Successfully typed ${chars.length} characters: "${this.text}"`
-          : `Typed ${successCount}/${chars.length} characters. Last error: ${lastError}`;
+      const summary = this.submitKey
+        ? `Successfully typed "${this.text}" and pressed ${this.submitKey}`
+        : `Successfully typed "${this.text}"`;
 
       return {
         llmContent: summary,
@@ -256,6 +244,36 @@ class TypeTextInvocation extends BaseToolInvocation<
         error: { message: errorMsg },
       };
     }
+  }
+
+  /** Types each character via individual press_key MCP calls. */
+  private async typeCharByChar(signal: AbortSignal): Promise<void> {
+    const chars = [...this.text]; // Handle Unicode correctly
+    for (const char of chars) {
+      if (signal.aborted) return;
+
+      // Map special characters to key names
+      const key = char === ' ' ? 'Space' : char;
+      const result = await this.browserManager.callTool('press_key', { key });
+
+      if (result.isError) {
+        debugLogger.warn(
+          `type_text: press_key("${key}") failed: ${this.extractErrorText(result)}`,
+        );
+      }
+    }
+  }
+
+  /** Extract error text from an MCP tool result. */
+  private extractErrorText(result: McpToolCallResult): string {
+    return (
+      result.content
+        ?.filter(
+          (c: { type: string; text?: string }) => c.type === 'text' && c.text,
+        )
+        .map((c: { type: string; text?: string }) => c.text)
+        .join('\n') || 'Unknown error'
+    );
   }
 }
 
@@ -311,19 +329,24 @@ class TypeTextDeclarativeTool extends DeclarativeTool<
     super(
       'type_text',
       'type_text',
-      'Types a full text string into the currently focused element by pressing each key in sequence. ' +
+      'Types a full text string into the currently focused element. ' +
         'Much faster than calling press_key for each character individually. ' +
-        'Use this to enter text into form fields, spreadsheet cells, or any focused input. ' +
+        'Use this to enter text into form fields, search boxes, spreadsheet cells, or any focused input. ' +
         'The element must already be focused (e.g., after a click). ' +
-        'Does NOT press Enter at the end — call press_key("Enter") separately if needed.',
+        'Use submitKey to press a key after typing (e.g., submitKey="Enter" to submit a form or confirm a value, submitKey="Tab" to move to the next field).',
       Kind.Other,
       {
         type: 'object',
         properties: {
           text: {
             type: 'string',
+            description: 'The text to type into the focused element.',
+          },
+          submitKey: {
+            type: 'string',
             description:
-              'The text to type. Each character will be pressed in sequence.',
+              'Optional key to press after typing (e.g., "Enter", "Tab", "Escape"). ' +
+              'Useful for submitting form fields or moving to the next cell in a spreadsheet.',
           },
         },
         required: ['text'],
@@ -337,9 +360,14 @@ class TypeTextDeclarativeTool extends DeclarativeTool<
   build(
     params: Record<string, unknown>,
   ): ToolInvocation<Record<string, unknown>, ToolResult> {
+    const submitKey =
+      typeof params['submitKey'] === 'string' && params['submitKey']
+        ? params['submitKey']
+        : undefined;
     return new TypeTextInvocation(
       this.browserManager,
       String(params['text'] ?? ''),
+      submitKey,
       this.messageBus,
     );
   }
@@ -448,7 +476,7 @@ function augmentToolDescription(toolName: string, description: string): string {
     new_page:
       ' Opens a new page/tab with the specified URL. Call take_snapshot after to see the new page.',
     press_key:
-      ' Press a SINGLE keyboard key (e.g., "Enter", "Tab", "Escape", "ArrowDown", "a", "8"). ONLY accepts one key name — do NOT pass multi-character strings like "Hello" or "A1\\nEnter". To type text, call press_key once per character.',
+      ' Press a SINGLE keyboard key (e.g., "Enter", "Tab", "Escape", "ArrowDown", "a", "8"). ONLY accepts one key name — do NOT pass multi-character strings like "Hello" or "A1\\nEnter". To type text, use type_text instead of calling press_key for each character.',
   };
 
   // Check for partial matches — order matters! More-specific keys first.

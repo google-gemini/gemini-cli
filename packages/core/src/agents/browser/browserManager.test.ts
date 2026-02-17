@@ -287,6 +287,77 @@ describe('BrowserManager', () => {
         /chrome:\/\/inspect\/#remote-debugging/,
       );
     });
+
+    it('should throw profile-lock remediation when persistent mode hits "already running"', async () => {
+      vi.mocked(Client).mockImplementation(
+        () =>
+          ({
+            connect: vi
+              .fn()
+              .mockRejectedValue(
+                new Error(
+                  'Could not connect to Chrome. The browser is already running for the current profile.',
+                ),
+              ),
+            close: vi.fn().mockResolvedValue(undefined),
+            listTools: vi.fn(),
+            callTool: vi.fn(),
+          }) as unknown as InstanceType<typeof Client>,
+      );
+
+      // Default config = persistent mode
+      const manager = new BrowserManager(mockConfig);
+
+      await expect(manager.ensureConnection()).rejects.toThrow(
+        /Close all Chrome windows using this profile/,
+      );
+      const manager2 = new BrowserManager(mockConfig);
+      await expect(manager2.ensureConnection()).rejects.toThrow(
+        /Set sessionMode to "isolated"/,
+      );
+    });
+
+    it('should throw timeout-specific remediation for persistent mode', async () => {
+      vi.mocked(Client).mockImplementation(
+        () =>
+          ({
+            connect: vi
+              .fn()
+              .mockRejectedValue(
+                new Error('Timed out connecting to chrome-devtools-mcp'),
+              ),
+            close: vi.fn().mockResolvedValue(undefined),
+            listTools: vi.fn(),
+            callTool: vi.fn(),
+          }) as unknown as InstanceType<typeof Client>,
+      );
+
+      const manager = new BrowserManager(mockConfig);
+
+      await expect(manager.ensureConnection()).rejects.toThrow(
+        /Chrome is not installed/,
+      );
+    });
+
+    it('should include sessionMode in generic fallback error', async () => {
+      vi.mocked(Client).mockImplementation(
+        () =>
+          ({
+            connect: vi
+              .fn()
+              .mockRejectedValue(new Error('Some unexpected error')),
+            close: vi.fn().mockResolvedValue(undefined),
+            listTools: vi.fn(),
+            callTool: vi.fn(),
+          }) as unknown as InstanceType<typeof Client>,
+      );
+
+      const manager = new BrowserManager(mockConfig);
+
+      await expect(manager.ensureConnection()).rejects.toThrow(
+        /sessionMode: persistent/,
+      );
+    });
   });
 
   describe('MCP isolation', () => {

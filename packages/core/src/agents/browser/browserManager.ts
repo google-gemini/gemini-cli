@@ -315,24 +315,82 @@ export class BrowserManager {
         }),
       ]);
     } catch (error) {
-      // Provide actionable error for 'existing' mode failures
-      if (sessionMode === 'existing') {
-        const message = error instanceof Error ? error.message : String(error);
-        throw new Error(
-          `Failed to connect to existing Chrome instance: ${message}\n\n` +
-            `To use sessionMode "existing", you must:\n` +
-            `  1. Open Chrome (version 144+)\n` +
-            `  2. Navigate to chrome://inspect/#remote-debugging\n` +
-            `  3. Enable remote debugging\n\n` +
-            `Alternatively, use sessionMode "persistent" (default) to launch a dedicated browser.`,
-        );
-      }
-      throw error;
+      // Provide error-specific, session-mode-aware remediation
+      throw this.createConnectionError(
+        error instanceof Error ? error.message : String(error),
+        sessionMode,
+      );
     } finally {
       if (timeoutId !== undefined) {
         clearTimeout(timeoutId);
       }
     }
+  }
+
+  /**
+   * Creates an Error with context-specific remediation based on the actual
+   * error message and the current sessionMode.
+   */
+  private createConnectionError(message: string, sessionMode: string): Error {
+    const lowerMessage = message.toLowerCase();
+
+    // "already running for the current profile" — persistent mode profile lock
+    if (lowerMessage.includes('already running')) {
+      if (sessionMode === 'persistent' || sessionMode === 'isolated') {
+        return new Error(
+          `Could not connect to Chrome: ${message}\n\n` +
+            `The Chrome profile is locked by another running instance.\n` +
+            `To fix this:\n` +
+            `  1. Close all Chrome windows using this profile, OR\n` +
+            `  2. Set sessionMode to "isolated" in settings.json to use a temporary profile, OR\n` +
+            `  3. Set chromeProfilePath in settings.json to use a different profile directory`,
+        );
+      }
+      // existing mode — shouldn't normally hit this, but handle gracefully
+      return new Error(
+        `Could not connect to Chrome: ${message}\n\n` +
+          `The Chrome profile is locked.\n` +
+          `Close other Chrome instances and try again.`,
+      );
+    }
+
+    // Timeout errors
+    if (lowerMessage.includes('timed out')) {
+      if (sessionMode === 'existing') {
+        return new Error(
+          `Timed out connecting to Chrome: ${message}\n\n` +
+            `To use sessionMode "existing", you must:\n` +
+            `  1. Open Chrome (version 144+)\n` +
+            `  2. Navigate to chrome://inspect/#remote-debugging\n` +
+            `  3. Enable remote debugging\n\n` +
+            `Alternatively, set sessionMode to "persistent" (default) in settings.json to launch a dedicated browser.`,
+        );
+      }
+      return new Error(
+        `Timed out connecting to Chrome: ${message}\n\n` +
+          `Possible causes:\n` +
+          `  1. Chrome is not installed or not in PATH\n` +
+          `  2. npx cannot download chrome-devtools-mcp (check network/proxy)\n` +
+          `  3. Chrome failed to start (try setting headless: true in settings.json)`,
+      );
+    }
+
+    // Generic "existing" mode failures (connection refused, etc.)
+    if (sessionMode === 'existing') {
+      return new Error(
+        `Failed to connect to existing Chrome instance: ${message}\n\n` +
+          `To use sessionMode "existing", you must:\n` +
+          `  1. Open Chrome (version 144+)\n` +
+          `  2. Navigate to chrome://inspect/#remote-debugging\n` +
+          `  3. Enable remote debugging\n\n` +
+          `Alternatively, set sessionMode to "persistent" (default) in settings.json to launch a dedicated browser.`,
+      );
+    }
+
+    // Generic fallback — include sessionMode for debugging context
+    return new Error(
+      `Failed to connect to Chrome (sessionMode: ${sessionMode}): ${message}`,
+    );
   }
 
   /**
