@@ -12,23 +12,38 @@ import type { ToolDefinition } from './types.js';
  *
  * @param definition The tool definition containing the base declaration and optional overrides.
  * @param modelId Optional model identifier to apply specific overrides.
- * @returns The FunctionDeclaration to be sent to the API.
+ * @returns An object containing the FunctionDeclaration for the API and optional instructions for the system prompt.
  */
 export function resolveToolDeclaration(
   definition: ToolDefinition,
   modelId?: string,
-): FunctionDeclaration & { instructions?: string } {
+): { declaration: FunctionDeclaration; instructions?: string } {
+  const { instructions: baseInstructions, ...baseDeclaration } =
+    definition.base;
+
   if (!modelId || !definition.overrides) {
-    return definition.base;
+    return {
+      declaration: baseDeclaration,
+      instructions: baseInstructions,
+    };
   }
 
   const override = definition.overrides(modelId);
   if (!override) {
-    return definition.base;
+    return {
+      declaration: baseDeclaration,
+      instructions: baseInstructions,
+    };
   }
 
+  const { instructions: overrideInstructions, ...overrideDeclaration } =
+    override;
+
   return {
-    ...definition.base,
-    ...override,
+    declaration: {
+      ...baseDeclaration,
+      ...overrideDeclaration,
+    },
+    instructions: overrideInstructions ?? baseInstructions,
   };
 }

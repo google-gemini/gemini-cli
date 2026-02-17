@@ -493,6 +493,7 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
   }
 
   override getSchema(modelId?: string) {
-    return resolveToolDeclaration(READ_MANY_FILES_DEFINITION, modelId);
+    return resolveToolDeclaration(READ_MANY_FILES_DEFINITION, modelId)
+      .declaration;
   }
 }

@@ -474,19 +474,22 @@ export class ShellTool extends BaseDeclarativeTool<
       config.getEnableInteractiveShell(),
       config.getEnableShellOutputEfficiency(),
     );
-    const resolved = resolveToolDeclaration(definition, modelId);
+    const { declaration, instructions } = resolveToolDeclaration(
+      definition,
+      modelId,
+    );
     super(
       ShellTool.Name,
       'Shell',
-      resolved.description!,
+      declaration.description!,
       Kind.Execute,
-      resolved.parametersJsonSchema,
+      declaration.parametersJsonSchema,
       messageBus,
       false, // output is not markdown
       true, // output can be updated
       undefined, // extensionName
       undefined, // extensionId
-      resolved.instructions,
+      instructions,
     );
   }
 
@@ -527,6 +530,6 @@ export class ShellTool extends BaseDeclarativeTool<
       this.config.getEnableInteractiveShell(),
       this.config.getEnableShellOutputEfficiency(),
     );
-    return resolveToolDeclaration(definition, modelId);
+    return resolveToolDeclaration(definition, modelId).declaration;
   }
 }

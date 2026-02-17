@@ -914,19 +914,22 @@ export class EditTool
       typeof config.getActiveModel === 'function'
         ? config.getActiveModel()
         : undefined;
-    const resolved = resolveToolDeclaration(EDIT_DEFINITION, modelId);
+    const { declaration, instructions } = resolveToolDeclaration(
+      EDIT_DEFINITION,
+      modelId,
+    );
     super(
       EditTool.Name,
       EDIT_DISPLAY_NAME,
-      resolved.description!,
+      declaration.description!,
       Kind.Edit,
-      resolved.parametersJsonSchema,
+      declaration.parametersJsonSchema,
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
       undefined, // extensionName
       undefined, // extensionId
-      resolved.instructions,
+      instructions,
     );
   }
 
@@ -970,7 +973,7 @@ export class EditTool
   }
 
   override getSchema(modelId?: string) {
-    return resolveToolDeclaration(EDIT_DEFINITION, modelId);
+    return resolveToolDeclaration(EDIT_DEFINITION, modelId).declaration;
   }
 
   getModifyContext(_: AbortSignal): ModifyContext<EditToolParams> {

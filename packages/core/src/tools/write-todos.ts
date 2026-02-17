@@ -90,24 +90,33 @@ export class WriteTodosTool extends BaseDeclarativeTool<
       typeof config.getActiveModel === 'function'
         ? config.getActiveModel()
         : undefined;
-    const resolved = resolveToolDeclaration(WRITE_TODOS_DEFINITION, modelId);
+    const { declaration, instructions } = resolveToolDeclaration(
+      WRITE_TODOS_DEFINITION,
+      modelId,
+    );
     super(
       WriteTodosTool.Name,
       'WriteTodos',
-      resolved.description!,
+      declaration.description!,
       Kind.Other,
-      resolved.parametersJsonSchema,
+      declaration.parametersJsonSchema,
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
       undefined, // extensionName
       undefined, // extensionId
-      resolved.instructions,
+      instructions,
     );
   }
 
   override getSchema(modelId?: string) {
-    return resolveToolDeclaration(WRITE_TODOS_DEFINITION, modelId);
+    const activeModel =
+      modelId ??
+      (typeof this.config.getActiveModel === 'function'
+        ? this.config.getActiveModel()
+        : undefined);
+    return resolveToolDeclaration(WRITE_TODOS_DEFINITION, activeModel)
+      .declaration;
   }
 
   protected override validateToolParamValues(
