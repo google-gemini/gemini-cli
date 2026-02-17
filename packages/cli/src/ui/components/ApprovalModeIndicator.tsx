@@ -11,7 +11,7 @@ import { ApprovalMode } from '@google/gemini-cli-core';
 
 interface ApprovalModeIndicatorProps {
   approvalMode: ApprovalMode;
-  isPlanEnabled?: boolean;
+  allowPlanMode?: boolean;
 }
 
 export const APPROVAL_MODE_TEXT = {
@@ -26,7 +26,7 @@ export const APPROVAL_MODE_TEXT = {
 
 export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
   approvalMode,
-  isPlanEnabled,
+  allowPlanMode,
 }) => {
   let textColor = '';
   let textContent = '';
@@ -36,7 +36,7 @@ export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
     case ApprovalMode.AUTO_EDIT:
       textColor = theme.status.warning;
       textContent = APPROVAL_MODE_TEXT.AUTO_EDIT;
-      subText = isPlanEnabled
+      subText = allowPlanMode
         ? APPROVAL_MODE_TEXT.HINT_SWITCH_TO_PLAN_MODE
         : APPROVAL_MODE_TEXT.HINT_SWITCH_TO_MANUAL_MODE;
       break;
