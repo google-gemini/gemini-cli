@@ -29,6 +29,7 @@ import {
   type ResumedSessionData,
   AuthType,
   type AgentDefinition,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 
 // Mock coreEvents
@@ -1412,7 +1413,7 @@ describe('AppContainer State Management', () => {
                 name: 'run_shell_command',
                 args: { command: 'ls > out' },
               },
-              status: 'executing',
+              status: CoreToolCallStatus.Executing,
             } as unknown as TrackedToolCall,
           ],
           activePtyId: 'pty-1',

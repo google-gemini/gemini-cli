@@ -107,6 +107,13 @@ export class SkillManager {
     this.addSkillsWithPrecedence(builtinSkills);
   }
 
+  /**
+   * Adds skills to the manager programmatically.
+   */
+  addSkills(skills: SkillDefinition[]): void {
+    this.addSkillsWithPrecedence(skills);
+  }
+
   private addSkillsWithPrecedence(newSkills: SkillDefinition[]): void {
     const skillMap = new Map<string, SkillDefinition>(
       this.skills.map((s) => [s.name, s]),
