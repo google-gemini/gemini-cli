@@ -114,6 +114,7 @@ import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
 import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
+import { DefaultFeatureGate, type FeatureGate } from './features.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
@@ -584,6 +585,8 @@ export interface ConfigParameters {
   tracker?: boolean;
   planSettings?: PlanSettings;
   modelSteering?: boolean;
+  features?: Record<string, boolean>;
+  featureGates?: string;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
@@ -731,6 +734,7 @@ export class Config implements McpContext {
   private readonly useAlternateBuffer: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
+  private readonly enablePromptCompletion: boolean = false;
   private readonly truncateToolOutputThreshold: number;
   private compressionTruncationCounter = 0;
   private initialized = false;
@@ -791,7 +795,8 @@ export class Config implements McpContext {
   private disabledSkills: string[];
   private readonly adminSkillsEnabled: boolean;
 
-  private readonly experimentalJitContext: boolean;
+  private readonly featureGate: FeatureGate;
+
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
   private readonly trackerEnabled: boolean;
@@ -881,7 +886,6 @@ export class Config implements McpContext {
     this.model = params.model;
     this.disableLoopDetection = params.disableLoopDetection ?? false;
     this._activeModel = params.model;
-    this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
@@ -891,6 +895,41 @@ export class Config implements McpContext {
     this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
+
+    // Initialize FeatureGate with precedence:
+    // 1. CLI Flags (params.featureGates)
+    // 2. Env Var (GEMINI_FEATURE_GATES)
+    // 3. User Settings (params.features)
+    // 4. Legacy Experimental Settings
+    const gate = DefaultFeatureGate.deepCopy();
+    if (params.features) {
+      gate.setFromMap(params.features);
+    }
+
+    // Map legacy experimental flags to features if not already set
+    const legacyMap: Record<string, boolean | undefined> = {
+      toolOutputMasking: params.toolOutputMasking?.enabled,
+      enableAgents: params.enableAgents,
+      extensionManagement: params.extensionManagement,
+      plan: params.plan,
+      jitContext: params.experimentalJitContext,
+      zedIntegration: params.experimentalZedIntegration,
+    };
+    for (const [key, value] of Object.entries(legacyMap)) {
+      if (value !== undefined && params.features?.[key] === undefined) {
+        gate.setFromMap({ [key]: value });
+      }
+    }
+
+    const envGates = process.env['GEMINI_FEATURE_GATES'];
+    if (envGates) {
+      gate.set(envGates);
+    }
+    if (params.featureGates) {
+      gate.set(params.featureGates);
+    }
+    this.featureGate = gate;
+
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.modelSteering = params.modelSteering ?? false;
@@ -959,7 +998,6 @@ export class Config implements McpContext {
       params.enableShellOutputEfficiency ?? true;
     this.shellToolInactivityTimeout =
       (params.shellToolInactivityTimeout ?? 300) * 1000; // 5 minutes
-    this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir, this.sessionId);
     this.storage.setCustomPlansDir(params.planSettings?.directory);
@@ -1093,6 +1131,13 @@ export class Config implements McpContext {
   }
 
   /**
+   * Returns true if the feature is enabled.
+   */
+  isFeatureEnabled(key: string): boolean {
+    return this.featureGate.enabled(key);
+  }
+
+  /**
    * Dedups initialization requests using a shared promise that is only resolved
    * once.
    */
@@ -1163,7 +1208,7 @@ export class Config implements McpContext {
       }
     });
 
-    if (!this.interactive || this.acpMode) {
+    if (!this.interactive || this.acpMode || this.getExperimentalZedIntegration()) {
       await this.mcpInitializationPromise;
     }
 
@@ -1193,7 +1238,7 @@ export class Config implements McpContext {
       await this.hookSystem.initialize();
     }
 
-    if (this.experimentalJitContext) {
+    if (this.isFeatureEnabled('jitContext')) {
       this.contextManager = new ContextManager(this);
       await this.contextManager.refresh();
     }
@@ -1853,7 +1898,7 @@ export class Config implements McpContext {
   }
 
   getUserMemory(): string | HierarchicalMemory {
-    if (this.experimentalJitContext && this.contextManager) {
+    if (this.isFeatureEnabled('jitContext') && this.contextManager) {
       return {
         global: this.contextManager.getGlobalMemory(),
         extension: this.contextManager.getExtensionMemory(),
@@ -1867,7 +1912,7 @@ export class Config implements McpContext {
    * Refreshes the MCP context, including memory, tools, and system instructions.
    */
   async refreshMcpContext(): Promise<void> {
-    if (this.experimentalJitContext && this.contextManager) {
+    if (this.isFeatureEnabled('jitContext') && this.contextManager) {
       await this.contextManager.refresh();
     } else {
       const { refreshServerHierarchicalMemory } = await import(
@@ -1898,7 +1943,7 @@ export class Config implements McpContext {
   }
 
   isJitContextEnabled(): boolean {
-    return this.experimentalJitContext;
+    return this.isFeatureEnabled('jitContext');
   }
 
   isModelSteeringEnabled(): boolean {
@@ -1906,7 +1951,7 @@ export class Config implements McpContext {
   }
 
   getToolOutputMaskingEnabled(): boolean {
-    return this.toolOutputMasking.enabled;
+    return this.isFeatureEnabled('toolOutputMasking');
   }
 
   async getToolOutputMaskingConfig(): Promise<ToolOutputMaskingConfig> {
@@ -1930,7 +1975,7 @@ export class Config implements McpContext {
       : undefined;
 
     return {
-      enabled: this.toolOutputMasking.enabled,
+      enabled: this.getToolOutputMaskingEnabled(),
       toolProtectionThreshold:
         parsedProtection !== undefined && !isNaN(parsedProtection)
           ? parsedProtection
@@ -1945,7 +1990,7 @@ export class Config implements McpContext {
   }
 
   getGeminiMdFileCount(): number {
-    if (this.experimentalJitContext && this.contextManager) {
+    if (this.isFeatureEnabled('jitContext') && this.contextManager) {
       return this.contextManager.getLoadedPaths().size;
     }
     return this.geminiMdFileCount;
@@ -1956,7 +2001,7 @@ export class Config implements McpContext {
   }
 
   getGeminiMdFilePaths(): string[] {
-    if (this.experimentalJitContext && this.contextManager) {
+    if (this.isFeatureEnabled('jitContext') && this.contextManager) {
       return Array.from(this.contextManager.getLoadedPaths());
     }
     return this.geminiMdFilePaths;
@@ -2037,6 +2082,42 @@ export class Config implements McpContext {
         });
       }
       this.updateSystemInstructionIfInitialized();
+    }
+  }
+
+  /**
+   * Synchronizes enter/exit plan mode tools based on current mode.
+   */
+  syncPlanModeTools(): void {
+    const isPlanMode = this.getApprovalMode() === ApprovalMode.PLAN;
+    const registry = this.getToolRegistry();
+
+    if (isPlanMode) {
+      if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
+        registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
+      }
+      if (!registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
+        registry.registerTool(new ExitPlanModeTool(this, this.messageBus));
+      }
+    } else {
+      if (registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
+        registry.unregisterTool(EXIT_PLAN_MODE_TOOL_NAME);
+      }
+      if (this.isPlanEnabled()) {
+        if (!registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
+          registry.registerTool(new EnterPlanModeTool(this, this.messageBus));
+        }
+      } else {
+        if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
+          registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
+        }
+      }
+    }
+
+    if (this.geminiClient?.isInitialized()) {
+      this.geminiClient.setTools().catch((err) => {
+        debugLogger.error('Failed to update tools', err);
+      });
     }
   }
 
@@ -2246,6 +2327,10 @@ export class Config implements McpContext {
     }
   }
 
+  getExperimentalZedIntegration(): boolean {
+    return this.isFeatureEnabled('zedIntegration');
+  }
+
   getListExtensions(): boolean {
     return this.listExtensions;
   }
@@ -2259,7 +2344,7 @@ export class Config implements McpContext {
   }
 
   getExtensionManagement(): boolean {
-    return this.extensionManagement;
+    return this.isFeatureEnabled('extensionManagement');
   }
 
   getExtensions(): GeminiCLIExtension[] {
@@ -2285,7 +2370,7 @@ export class Config implements McpContext {
   }
 
   isPlanEnabled(): boolean {
-    return this.planEnabled;
+    return this.isFeatureEnabled('plan');
   }
 
   isTrackerEnabled(): boolean {
@@ -2305,7 +2390,7 @@ export class Config implements McpContext {
   }
 
   isAgentsEnabled(): boolean {
-    return this.enableAgents;
+    return this.isFeatureEnabled('enableAgents');
   }
 
   isEventDrivenSchedulerEnabled(): boolean {

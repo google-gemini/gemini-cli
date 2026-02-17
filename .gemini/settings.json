@@ -4,6 +4,9 @@
     "extensionReloading": true,
     "modelSteering": true
   },
+  "features": {
+    "allAlpha": true
+  },
   "general": {
     "devtools": true
   }

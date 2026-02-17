@@ -9,7 +9,11 @@ import * as path from 'node:path';
 import { stat } from 'node:fs/promises';
 import chalk from 'chalk';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
-import { type MergedSettings, SettingScope } from './settings.js';
+import {
+  type MergedSettings,
+  SettingScope,
+  isFeatureEnabled,
+} from './settings.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { loadInstallMetadata, type ExtensionConfig } from './extension.js';
 import {
@@ -323,7 +327,10 @@ Would you like to attempt to install via "git clone" instead?`,
         }
 
         await fs.promises.mkdir(destinationPath, { recursive: true });
-        if (this.requestSetting && this.settings.experimental.extensionConfig) {
+        if (
+          this.requestSetting &&
+          isFeatureEnabled(this.settings, 'extensionConfig')
+        ) {
           if (isUpdate) {
             await maybePromptForSettings(
               newExtensionConfig,
@@ -341,7 +348,10 @@ Would you like to attempt to install via "git clone" instead?`,
           }
         }
 
-        const missingSettings = this.settings.experimental.extensionConfig
+        const missingSettings = isFeatureEnabled(
+          this.settings,
+          'extensionConfig',
+        )
           ? await getMissingSettings(
               newExtensionConfig,
               extensionId,
@@ -677,7 +687,7 @@ Would you like to attempt to install via "git clone" instead?`,
       let userSettings: Record<string, string> = {};
       let workspaceSettings: Record<string, string> = {};
 
-      if (this.settings.experimental.extensionConfig) {
+      if (isFeatureEnabled(this.settings, 'extensionConfig')) {
         userSettings = await getScopedEnvContents(
           config,
           extensionId,
@@ -697,7 +707,10 @@ Would you like to attempt to install via "git clone" instead?`,
       config = resolveEnvVarsInObject(config, customEnv);
 
       const resolvedSettings: ResolvedExtensionSetting[] = [];
-      if (config.settings && this.settings.experimental.extensionConfig) {
+      if (
+        config.settings &&
+        isFeatureEnabled(this.settings, 'extensionConfig')
+      ) {
         for (const setting of config.settings) {
           const value = customEnv[setting.envVar];
           let scope: 'user' | 'workspace' | undefined;

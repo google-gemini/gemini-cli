@@ -44,6 +44,7 @@ import {
   type MergedSettings,
   saveModelChange,
   loadSettings,
+  isFeatureEnabled,
 } from './settings.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
@@ -78,6 +79,7 @@ export interface CliArgs {
   allowedTools: string[] | undefined;
   acp?: boolean;
   experimentalAcp?: boolean;
+  featureGates?: string | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
@@ -181,6 +183,12 @@ export async function parseArguments(
           type: 'boolean',
           description:
             'Starts the agent in ACP mode (deprecated, use --acp instead)',
+        })
+        .option('feature-gates', {
+          type: 'string',
+          nargs: 1,
+          description:
+            'Comma-separated list of feature key-value pairs (e.g. "Foo=true,Bar=false")',
         })
         .option('allowed-mcp-server-names', {
           type: 'array',
@@ -328,7 +336,7 @@ export async function parseArguments(
       return true;
     });
 
-  if (settings.experimental?.extensionManagement) {
+  if (isFeatureEnabled(settings, 'extensionManagement')) {
     yargsInstance.command(extensionsCommand);
   }
 
@@ -486,7 +494,7 @@ export async function loadCliConfig(
     .getExtensions()
     .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
 
-  const experimentalJitContext = settings.experimental?.jitContext ?? false;
+  const experimentalJitContext = isFeatureEnabled(settings, 'jitContext');
 
   let memoryContent: string | HierarchicalMemory = '';
   let fileCount = 0;
@@ -532,7 +540,7 @@ export async function loadCliConfig(
         approvalMode = ApprovalMode.AUTO_EDIT;
         break;
       case 'plan':
-        if (!(settings.experimental?.plan ?? false)) {
+        if (!isFeatureEnabled(settings, 'plan')) {
           debugLogger.warn(
             'Approval mode "plan" is only available when experimental.plan is enabled. Falling back to "default".',
           );
@@ -759,15 +767,17 @@ export async function loadCliConfig(
     bugCommand: settings.advanced?.bugCommand,
     model: resolvedModel,
     maxSessionTurns: settings.model?.maxSessionTurns,
-
+    experimentalZedIntegration: argv.experimentalAcp || false,
+    features: settings.features,
+    featureGates: argv.featureGates,
     listExtensions: argv.listExtensions || false,
     listSessions: argv.listSessions || false,
     deleteSession: argv.deleteSession,
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
-    enableExtensionReloading: settings.experimental?.extensionReloading,
-    enableAgents: settings.experimental?.enableAgents,
-    plan: settings.experimental?.plan,
+    enableExtensionReloading: isFeatureEnabled(settings, 'extensionReloading'),
+    enableAgents: isFeatureEnabled(settings, 'enableAgents'),
+    plan: isFeatureEnabled(settings, 'plan'),
     tracker: settings.experimental?.taskTracker,
     directWebFetch: settings.experimental?.directWebFetch,
     planSettings: settings.general?.plan?.directory
@@ -776,9 +786,14 @@ export async function loadCliConfig(
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
-    experimentalJitContext: settings.experimental?.jitContext,
+    experimentalJitContext: isFeatureEnabled(settings, 'jitContext'),
     modelSteering: settings.experimental?.modelSteering,
-    toolOutputMasking: settings.experimental?.toolOutputMasking,
+    toolOutputMasking:
+      (settings.features as Record<string, unknown> | undefined)?.[
+        'toolOutputMasking'
+      ] !== undefined
+        ? { enabled: isFeatureEnabled(settings, 'toolOutputMasking') }
+        : settings.experimental?.toolOutputMasking,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,

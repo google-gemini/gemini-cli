@@ -7,6 +7,7 @@
 // Export config
 export * from './config/config.js';
 export * from './config/memory.js';
+export * from './config/features.js';
 export * from './config/defaultModelConfigs.js';
 export * from './config/models.js';
 export * from './config/constants.js';
