@@ -241,7 +241,12 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
 
       // Create formatted content for LLM
       const directoryContent = entries
-        .map((entry) => `${entry.isDirectory ? '[DIR] ' : ''}${entry.name}`)
+        .map((entry) => {
+          if (entry.isDirectory) {
+            return `[DIR] ${entry.name}`;
+          }
+          return `${entry.name} (${entry.size} bytes)`;
+        })
         .join('\n');
 
       let resultMessage = `Directory listing for ${resolvedDirPath}:\n${directoryContent}`;
