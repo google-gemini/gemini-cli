@@ -43,6 +43,15 @@ import { pickDefaultThemeName } from '../ui/themes/theme.js';
 
 export const persistentStateMock = new FakePersistentState();
 
+if (process.env['NODE_ENV'] === 'test') {
+  // We mock NODE_ENV to development during tests that use render.tsx
+  // so that animations (which check process.env.NODE_ENV !== 'test')
+  // are actually tested. We mutate process.env directly here because
+  // vi.stubEnv() is cleared by vi.unstubAllEnvs() in test-setup.ts
+  // after each test.
+  process.env['NODE_ENV'] = 'development';
+}
+
 vi.mock('../utils/persistentState.js', () => ({
   persistentState: persistentStateMock,
 }));

@@ -410,6 +410,7 @@ describe('<ModelStatsDisplay />', () => {
     const output = lastFrame();
     expect(output).toContain('gemini-3-pro-');
     expect(output).toContain('gemini-3-flash-');
+    unmount();
   });
 
   it('should display role breakdown correctly', async () => {
@@ -602,6 +603,7 @@ describe('<ModelStatsDisplay />', () => {
     const output = lastFrame();
     expect(output).toContain(longRoleName);
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
   it('should filter out invalid role names', async () => {
