@@ -126,17 +126,6 @@ they appear in the UI.
 | --------------------------------- | ------------------------------ | --------------------------------------------- | ------- |
 | Auto Configure Max Old Space Size | `advanced.autoConfigureMemory` | Automatically configure Node.js memory limits | `false` |
 
-### Agents
-
-| UI Label             | Setting                                                         | Description                                                                                                       | Default        |
-| -------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------- |
-| Enable Browser Agent | `agents.overrides.browser_agent.enabled`                        | Enable the browser automation sub-agent.                                                                          | `false`        |
-| Session Mode         | `agents.overrides.browser_agent.customConfig.sessionMode`       | How Chrome is managed: `"persistent"`, `"isolated"`, or `"existing"`.                                             | `"persistent"` |
-| Headless             | `agents.overrides.browser_agent.customConfig.headless`          | Run Chrome in headless mode (no visible window).                                                                  | `false`        |
-| Chrome Profile Path  | `agents.overrides.browser_agent.customConfig.chromeProfilePath` | Custom path to a Chrome profile directory.                                                                        | `undefined`    |
-| Visual Model         | `agents.overrides.browser_agent.customConfig.visualModel`       | Model override for visual analysis (for example, `"gemini-2.5-computer-use-preview-10-2025"`).                    | `undefined`    |
-| Allowed Domains      | `agents.overrides.browser_agent.customConfig.allowedDomains`    | Restrict navigation to these domain patterns. Supports `*` wildcards. If empty, all non-blocked URLs are allowed. | `[]`           |
-
 ### Experimental
 
 | UI Label                   | Setting                                  | Description                                                                                                                                               | Default |
