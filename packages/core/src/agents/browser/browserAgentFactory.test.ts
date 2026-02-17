@@ -43,6 +43,11 @@ vi.mock('../../utils/debugLogger.js', () => ({
   },
 }));
 
+import {
+  buildBrowserSystemPrompt,
+  BROWSER_AGENT_NAME,
+} from './browserAgentDefinition.js';
+
 describe('browserAgentFactory', () => {
   let mockConfig: Config;
   let mockMessageBus: MessageBus;
@@ -100,8 +105,8 @@ describe('browserAgentFactory', () => {
         mockMessageBus,
       );
 
-      expect(definition.name).toBe('browser_agent');
-      // 5 MCP tools + 1 analyze_screenshot tool
+      expect(definition.name).toBe(BROWSER_AGENT_NAME);
+      // 5 MCP tools + 1 type_text composite tool (no analyze_screenshot without visualModel)
       expect(definition.toolConfig?.tools).toHaveLength(6);
     });
 
@@ -137,6 +142,73 @@ describe('browserAgentFactory', () => {
       expect(definition.outputConfig).toBeDefined();
       expect(definition.promptConfig).toBeDefined();
     });
+
+    it('should exclude visual prompt section when visualModel is not configured', async () => {
+      const { definition } = await createBrowserAgentDefinition(
+        mockConfig,
+        mockMessageBus,
+      );
+
+      const systemPrompt = definition.promptConfig?.systemPrompt ?? '';
+      expect(systemPrompt).not.toContain('analyze_screenshot');
+      expect(systemPrompt).not.toContain('VISUAL IDENTIFICATION');
+    });
+
+    it('should include visual prompt section when visualModel is configured', async () => {
+      const configWithVision = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+              customConfig: {
+                headless: false,
+                visualModel: 'gemini-2.5-flash-preview',
+              },
+            },
+          },
+        },
+      });
+
+      const { definition } = await createBrowserAgentDefinition(
+        configWithVision,
+        mockMessageBus,
+      );
+
+      const systemPrompt = definition.promptConfig?.systemPrompt ?? '';
+      expect(systemPrompt).toContain('analyze_screenshot');
+      expect(systemPrompt).toContain('VISUAL IDENTIFICATION');
+    });
+
+    it('should include analyze_screenshot tool when visualModel is configured', async () => {
+      const configWithVision = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+              customConfig: {
+                headless: false,
+                visualModel: 'gemini-2.5-flash-preview',
+              },
+            },
+          },
+        },
+      });
+
+      const { definition } = await createBrowserAgentDefinition(
+        configWithVision,
+        mockMessageBus,
+      );
+
+      // 5 MCP tools + 1 type_text + 1 analyze_screenshot
+      expect(definition.toolConfig?.tools).toHaveLength(7);
+      const toolNames =
+        definition.toolConfig?.tools
+          ?.filter(
+            (t): t is { name: string } => typeof t === 'object' && 'name' in t,
+          )
+          .map((t) => t.name) ?? [];
+      expect(toolNames).toContain('analyze_screenshot');
+    });
   });
 
   describe('cleanupBrowserAgent', () => {
@@ -156,5 +228,31 @@ describe('browserAgentFactory', () => {
       // Should not throw
       await expect(cleanupBrowserAgent(errorManager)).resolves.toBeUndefined();
     });
+  });
+});
+
+describe('buildBrowserSystemPrompt', () => {
+  it('should include visual section when vision is enabled', () => {
+    const prompt = buildBrowserSystemPrompt(true);
+    expect(prompt).toContain('VISUAL IDENTIFICATION');
+    expect(prompt).toContain('analyze_screenshot');
+    expect(prompt).toContain('click_at');
+  });
+
+  it('should exclude visual section when vision is disabled', () => {
+    const prompt = buildBrowserSystemPrompt(false);
+    expect(prompt).not.toContain('VISUAL IDENTIFICATION');
+    expect(prompt).not.toContain('analyze_screenshot');
+  });
+
+  it('should always include core sections regardless of vision', () => {
+    for (const visionEnabled of [true, false]) {
+      const prompt = buildBrowserSystemPrompt(visionEnabled);
+      expect(prompt).toContain('PARALLEL TOOL CALLS');
+      expect(prompt).toContain('OVERLAY/POPUP HANDLING');
+      expect(prompt).toContain('COMPLEX WEB APPS');
+      expect(prompt).toContain('TERMINAL FAILURES');
+      expect(prompt).toContain('complete_task');
+    }
   });
 });

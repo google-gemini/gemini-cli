@@ -39,11 +39,23 @@ export const BrowserTaskResultSchema = z.object({
     .describe('Optional extracted data from the task'),
 });
 
+const VISUAL_SECTION = `
+VISUAL IDENTIFICATION (analyze_screenshot):
+When you need to identify elements by visual attributes not in the AX tree (e.g., "click the yellow button", "find the red error message"), or need precise pixel coordinates:
+1. Call analyze_screenshot with a clear instruction describing what to find
+2. It returns visual analysis with coordinates/descriptions — it does NOT perform actions
+3. Use the returned coordinates with click_at(x, y) or other tools yourself
+4. If the analysis is insufficient, call it again with a more specific instruction
+`;
+
 /**
  * System prompt for the semantic browser agent.
  * Extracted from prototype (computer_use_subagent_cdt branch).
+ *
+ * @param visionEnabled Whether visual tools (analyze_screenshot, click_at) are available.
  */
-export const BROWSER_SYSTEM_PROMPT = `You are an expert browser automation agent (Orchestrator). Your goal is to completely fulfill the user's request.
+export function buildBrowserSystemPrompt(visionEnabled: boolean): string {
+  return `You are an expert browser automation agent (Orchestrator). Your goal is to completely fulfill the user's request.
 
 IMPORTANT: You will receive an accessibility tree snapshot showing elements with uid values (e.g., uid=87_4 button "Login"). 
 Use these uid values directly with your tools:
@@ -63,13 +75,7 @@ Before interacting with page content, scan the accessibility tree for blocking o
 - Common patterns: elements with role="dialog", role="tooltip", role="alertdialog", or aria-modal="true"
 - If you see such elements, DISMISS THEM FIRST by clicking close/dismiss buttons before proceeding
 - If a click seems to have no effect, check if an overlay appeared or is blocking the target
-
-VISUAL IDENTIFICATION (analyze_screenshot):
-When you need to identify elements by visual attributes not in the AX tree (e.g., "click the yellow button", "find the red error message"), or need precise pixel coordinates:
-1. Call analyze_screenshot with a clear instruction describing what to find
-2. It returns visual analysis with coordinates/descriptions — it does NOT perform actions
-3. Use the returned coordinates with click_at(x, y) or other tools yourself
-4. If the analysis is insufficient, call it again with a more specific instruction
+${visionEnabled ? VISUAL_SECTION : ''}
 
 COMPLEX WEB APPS (spreadsheets, rich editors, canvas apps):
 Many web apps (Google Sheets/Docs, Notion, Figma, etc.) use custom rendering rather than standard HTML inputs.
@@ -87,6 +93,7 @@ Some errors are unrecoverable and retrying will never help. When you see ANY of 
 Do NOT keep retrying terminal errors. Report them with actionable remediation steps and exit immediately.
 
 CRITICAL: When you have fully completed the user's task, you MUST call the complete_task tool with a summary of what you accomplished. Do NOT just return text - you must explicitly call complete_task to exit the loop.`;
+}
 
 /**
  * Browser Agent Definition Factory.
@@ -98,6 +105,7 @@ CRITICAL: When you have fully completed the user's task, you MUST call the compl
  */
 export const BrowserAgentDefinition = (
   config: Config,
+  visionEnabled = false,
 ): LocalAgentDefinition<typeof BrowserTaskResultSchema> => {
   // Use Preview Flash model if the main model is any of the preview models.
   // If the main model is not a preview model, use the default flash model.
@@ -161,7 +169,7 @@ export const BrowserAgentDefinition = (
 </task>
 
 First, use new_page to open the relevant URL. Then call take_snapshot to see the page and proceed with your task.`,
-      systemPrompt: BROWSER_SYSTEM_PROMPT,
+      systemPrompt: buildBrowserSystemPrompt(visionEnabled),
     },
   };
 };

@@ -464,7 +464,7 @@ function augmentToolDescription(toolName: string, description: string): string {
       ' Fills multiple standard HTML form fields at once. Same limitations as fill — does not work on canvas/custom widgets.',
     fill: ' Fills standard HTML form fields (<input>, <textarea>, <select>) by uid. Does NOT work on custom/canvas-based widgets (e.g., Google Sheets cells, Notion blocks). If fill times out or fails, click the element first then use press_key with individual characters instead.',
     click_at:
-      ' Clicks at exact pixel coordinates (x, y). Use with analyze_screenshot to find coordinates of visual elements.',
+      ' Clicks at exact pixel coordinates (x, y). Use when you have specific coordinates for visual elements.',
     click:
       ' Use the element uid from the accessibility tree snapshot (e.g., uid="87_4"). UIDs are invalidated after this action — call take_snapshot before using another uid.',
     hover:
