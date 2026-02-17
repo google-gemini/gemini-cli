@@ -180,6 +180,9 @@ export class ReadFileTool extends BaseDeclarativeTool<
       messageBus,
       true,
       false,
+      undefined,
+      undefined,
+      true,
     );
     this.fileDiscoveryService = new FileDiscoveryService(
       config.getTargetDir(),

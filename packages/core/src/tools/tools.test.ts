@@ -9,6 +9,8 @@ import type { ToolInvocation, ToolResult } from './tools.js';
 import { DeclarativeTool, hasCycleInSchema, Kind } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { ReadFileTool } from './read-file.js';
+import { makeFakeConfig } from '../test-utils/config.js';
 
 class TestToolInvocation implements ToolInvocation<object, ToolResult> {
   constructor(
@@ -236,5 +238,60 @@ describe('hasCycleInSchema', () => {
 
   it('should return false for an empty schema', () => {
     expect(hasCycleInSchema({})).toBe(false);
+  });
+});
+
+describe('Tools Read-Only property', () => {
+  it('should have isReadOnly true for ReadFileTool', () => {
+    const config = makeFakeConfig();
+    const bus = createMockMessageBus();
+    const tool = new ReadFileTool(config, bus);
+    expect(tool.isReadOnly).toBe(true);
+  });
+
+  it('should respect isReadOnly value for generic tools', () => {
+    class MutatorTool extends DeclarativeTool<object, ToolResult> {
+      override build(_params: object): ToolInvocation<object, ToolResult> {
+        throw new Error('Method not implemented.');
+      }
+      protected createInvocation(): unknown {
+        return null;
+      }
+    }
+    const bus = createMockMessageBus();
+    const mutator = new MutatorTool(
+      'mutator',
+      'Mutator',
+      '...',
+      Kind.Edit,
+      {},
+      bus,
+      true,
+      true,
+    );
+    expect(mutator.isReadOnly).toBe(false);
+
+    class ReadOnlyTool extends DeclarativeTool<object, ToolResult> {
+      override build(_params: object): ToolInvocation<object, ToolResult> {
+        throw new Error('Method not implemented.');
+      }
+      protected createInvocation(): unknown {
+        return null;
+      }
+    }
+    const readOnly = new ReadOnlyTool(
+      'read',
+      'Read',
+      '...',
+      Kind.Read,
+      {},
+      bus,
+      true,
+      false,
+      undefined,
+      undefined,
+      true,
+    );
+    expect(readOnly.isReadOnly).toBe(true);
   });
 });

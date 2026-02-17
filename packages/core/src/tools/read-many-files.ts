@@ -474,6 +474,9 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
+      undefined,
+      undefined,
+      true,
     );
   }
 

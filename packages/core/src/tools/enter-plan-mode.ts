@@ -38,6 +38,11 @@ export class EnterPlanModeTool extends BaseDeclarativeTool<
       Kind.Plan,
       ENTER_PLAN_MODE_DEFINITION.base.parametersJsonSchema,
       messageBus,
+      true,
+      false,
+      undefined,
+      undefined,
+      true,
     );
   }
 
