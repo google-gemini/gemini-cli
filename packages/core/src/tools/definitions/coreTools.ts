@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * Orchestrator for tool definitions.
+ * Resolves the correct toolset based on model family and provides legacy exports.
+ */
+
 import type { ToolDefinition, CoreToolSet } from './types.js';
 import { ModelFamilyService } from './modelFamilyService.js';
 import { DEFAULT_LEGACY_SET } from './model-family-sets/default-legacy.js';

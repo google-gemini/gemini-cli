@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * Full tool manifest for legacy models.
+ * Includes complete descriptions and schemas for auditing in one place.
+ */
+
 import type { CoreToolSet } from '../types.js';
 import {
   GLOB_TOOL_NAME,

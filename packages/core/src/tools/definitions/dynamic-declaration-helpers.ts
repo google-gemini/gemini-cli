@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * Reusable logic for generating tool declarations that depend on runtime state
+ * (OS, platforms, or dynamic schema values like available skills).
+ */
+
 import { type FunctionDeclaration } from '@google/genai';
 import * as os from 'node:os';
 import { z } from 'zod';

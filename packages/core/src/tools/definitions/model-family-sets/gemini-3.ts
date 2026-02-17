@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * Full tool manifest for Gemini 3 models.
+ * Allows model-specific optimizations of descriptions and schemas.
+ */
+
 import type { CoreToolSet } from '../types.js';
 import {
   GLOB_TOOL_NAME,

@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * Single source of truth for mapping model IDs to tool families.
+ */
+
 import { isGemini3Model } from '../../config/models.js';
 import { type ToolFamily } from './types.js';
 
