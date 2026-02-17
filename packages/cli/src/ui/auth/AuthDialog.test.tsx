@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
 import {
   describe,
@@ -318,9 +319,10 @@ describe('AuthDialog', () => {
       renderWithProviders(<AuthDialog {...props} />);
       const { onSelect: handleAuthSelect } =
         mockedRadioButtonSelect.mock.calls[0][0];
-      await handleAuthSelect(AuthType.LOGIN_WITH_GOOGLE);
-
-      await vi.runAllTimersAsync();
+      await act(async () => {
+        await handleAuthSelect(AuthType.LOGIN_WITH_GOOGLE);
+        await vi.runAllTimersAsync();
+      });
 
       expect(mockedRunExitCleanup).toHaveBeenCalled();
       expect(exitSpy).toHaveBeenCalledWith(RELAUNCH_EXIT_CODE);

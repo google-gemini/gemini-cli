@@ -76,6 +76,7 @@ import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { shouldDismissShortcutsHelpOnHotkey } from '../utils/shortcutsHelp.js';
+import { useRepeatedKeyPress } from '../hooks/useRepeatedKeyPress.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -227,10 +228,31 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     shortcutsHelpVisible,
   } = useUIState();
   const [suppressCompletion, setSuppressCompletion] = useState(false);
-  const escPressCount = useRef(0);
-  const lastPlainTabPressTimeRef = useRef<number | null>(null);
+  const { handlePress: registerPlainTabPress, resetCount: resetPlainTabPress } =
+    useRepeatedKeyPress({
+      windowMs: DOUBLE_TAB_CLEAN_UI_TOGGLE_WINDOW_MS,
+    });
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
-  const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const { handlePress: handleEscPress, resetCount: resetEscapeState } =
+    useRepeatedKeyPress({
+      windowMs: 500,
+      onRepeat: (count) => {
+        if (count === 1) {
+          setShowEscapePrompt(true);
+        } else if (count === 2) {
+          resetEscapeState();
+          if (buffer.text.length > 0) {
+            buffer.setText('');
+            resetCompletionState();
+          } else if (history.length > 0) {
+            onSubmit('/rewind');
+          } else {
+            coreEvents.emitFeedback('info', 'Nothing to rewind to');
+          }
+        }
+      },
+      onReset: () => setShowEscapePrompt(false),
+    });
   const [recentUnsafePasteTime, setRecentUnsafePasteTime] = useState<
     number | null
   >(null);
@@ -284,15 +306,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const showCursor = focus && isShellFocused && !isEmbeddedShellFocused;
 
-  const resetEscapeState = useCallback(() => {
-    if (escapeTimerRef.current) {
-      clearTimeout(escapeTimerRef.current);
-      escapeTimerRef.current = null;
-    }
-    escPressCount.current = 0;
-    setShowEscapePrompt(false);
-  }, []);
-
   // Notify parent component about escape prompt state changes
   useEffect(() => {
     if (onEscapePromptChange) {
@@ -300,12 +313,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     }
   }, [showEscapePrompt, onEscapePromptChange]);
 
-  // Clear escape prompt timer on unmount
+  // Clear paste timeout on unmount
   useEffect(
     () => () => {
-      if (escapeTimerRef.current) {
-        clearTimeout(escapeTimerRef.current);
-      }
       if (pasteTimeoutRef.current) {
         clearTimeout(pasteTimeoutRef.current);
       }
@@ -335,8 +345,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       resetReverseSearchCompletionState();
     },
     [
-      onSubmit,
       buffer,
+      onSubmit,
       resetCompletionState,
       shellModeActive,
       shellHistory,
@@ -639,22 +649,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         commandSearchActive;
       if (isPlainTab) {
         if (!hasTabCompletionInteraction) {
-          const now = Date.now();
-          const isDoubleTabPress =
-            lastPlainTabPressTimeRef.current !== null &&
-            now - lastPlainTabPressTimeRef.current <=
-              DOUBLE_TAB_CLEAN_UI_TOGGLE_WINDOW_MS;
-          if (isDoubleTabPress) {
-            lastPlainTabPressTimeRef.current = null;
+          if (registerPlainTabPress() === 2) {
             toggleCleanUiDetailsVisible();
+            resetPlainTabPress();
             return true;
           }
-          lastPlainTabPressTimeRef.current = now;
         } else {
-          lastPlainTabPressTimeRef.current = null;
+          resetPlainTabPress();
         }
       } else {
-        lastPlainTabPressTimeRef.current = null;
+        resetPlainTabPress();
       }
 
       if (key.name === 'paste') {
@@ -732,9 +736,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // Reset ESC count and hide prompt on any non-ESC key
       if (key.name !== 'escape') {
-        if (escPressCount.current > 0 || showEscapePrompt) {
-          resetEscapeState();
-        }
+        resetEscapeState();
       }
 
       // Ctrl+O to expand/collapse paste placeholders
@@ -798,30 +800,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return true;
         }
 
-        // Handle double ESC
-        if (escPressCount.current === 0) {
-          escPressCount.current = 1;
-          setShowEscapePrompt(true);
-          if (escapeTimerRef.current) {
-            clearTimeout(escapeTimerRef.current);
-          }
-          escapeTimerRef.current = setTimeout(() => {
-            resetEscapeState();
-          }, 500);
-          return true;
-        }
-
-        // Second ESC
-        resetEscapeState();
-        if (buffer.text.length > 0) {
-          buffer.setText('');
-          resetCompletionState();
-          return true;
-        } else if (history.length > 0) {
-          onSubmit('/rewind');
-          return true;
-        }
-        coreEvents.emitFeedback('info', 'Nothing to rewind to');
+        handleEscPress();
         return true;
       }
 
@@ -1193,7 +1172,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       reverseSearchCompletion,
       handleClipboardPaste,
       resetCompletionState,
-      showEscapePrompt,
       resetEscapeState,
       vimHandleInput,
       reverseSearchActive,
@@ -1205,16 +1183,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       kittyProtocol.enabled,
       shortcutsHelpVisible,
       setShortcutsHelpVisible,
-      toggleCleanUiDetailsVisible,
       tryLoadQueuedMessages,
       setBannerVisible,
-      onSubmit,
       activePtyId,
       setEmbeddedShellFocused,
       backgroundShells.size,
       backgroundShellHeight,
-      history,
       streamingState,
+      handleEscPress,
+      registerPlainTabPress,
+      resetPlainTabPress,
+      toggleCleanUiDetailsVisible,
     ],
   );
 

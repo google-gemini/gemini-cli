@@ -14,6 +14,10 @@ import type {
   MessageRecord,
 } from '@google/gemini-cli-core';
 
+vi.mock('./CliSpinner.js', () => ({
+  CliSpinner: () => 'MockSpinner',
+}));
+
 vi.mock('../utils/formatters.js', async (importOriginal) => {
   const original =
     await importOriginal<typeof import('../utils/formatters.js')>();
