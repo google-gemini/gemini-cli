@@ -41,6 +41,8 @@ const EVENT_HOOK_CALL_COUNT = 'gemini_cli.hook_call.count';
 const EVENT_HOOK_CALL_LATENCY = 'gemini_cli.hook_call.latency';
 const KEYCHAIN_AVAILABILITY_COUNT = 'gemini_cli.keychain.availability.count';
 const TOKEN_STORAGE_TYPE_COUNT = 'gemini_cli.token_storage.type.count';
+const EVENT_ONBOARDING_START = 'gemini_cli.onboarding.start';
+const EVENT_ONBOARDING_END = 'gemini_cli.onboarding.end';
 
 // Agent Metrics
 const AGENT_RUN_COUNT = 'gemini_cli.agent.run.count';
@@ -255,9 +257,20 @@ const COUNTER_DEFINITIONS = {
     assign: (c: Counter) => (tokenStorageTypeCounter = c),
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
-      type: string;
       forced: boolean;
     },
+  },
+  [EVENT_ONBOARDING_START]: {
+    description: 'Counts onboarding start events.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (onboardingStartCounter = c),
+    attributes: {} as Record<string, never>,
+  },
+  [EVENT_ONBOARDING_END]: {
+    description: 'Counts onboarding end events.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (onboardingEndCounter = c),
+    attributes: {} as Record<string, never>,
   },
 } as const;
 
@@ -597,6 +610,8 @@ let hookCallCounter: Counter | undefined;
 let hookCallLatencyHistogram: Histogram | undefined;
 let keychainAvailabilityCounter: Counter | undefined;
 let tokenStorageTypeCounter: Counter | undefined;
+let onboardingStartCounter: Counter | undefined;
+let onboardingEndCounter: Counter | undefined;
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 let genAiClientTokenUsageHistogram: Histogram | undefined;
@@ -768,6 +783,25 @@ export function recordLinesChanged(
 }
 
 // --- New Metric Recording Functions ---
+
+/**
+ * Records a metric for when the onboarding process starts.
+ */
+export function recordOnboardingStart(config: Config): void {
+  if (!onboardingStartCounter || !isMetricsInitialized) return;
+  onboardingStartCounter.add(
+    1,
+    baseMetricDefinition.getCommonAttributes(config),
+  );
+}
+
+/**
+ * Records a metric for when the onboarding process ends successfully.
+ */
+export function recordOnboardingEnd(config: Config): void {
+  if (!onboardingEndCounter || !isMetricsInitialized) return;
+  onboardingEndCounter.add(1, baseMetricDefinition.getCommonAttributes(config));
+}
 
 /**
  * Records a metric for when a UI frame flickers.
