@@ -9,7 +9,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { Text } from 'ink';
 import type { Key } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
-import type { LoadableSettingScope } from '../../config/settings.js';
+import type { LoadableSettingScope, Settings } from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
 import { getScopeMessageForSetting } from '../../utils/dialogScopeUtils.js';
 import {
@@ -20,8 +20,12 @@ import {
   getDialogRestartRequiredSettings,
   getEffectiveDefaultValue,
   getEffectiveValue,
+  settingExistsInScope,
 } from '../../utils/settingsUtils.js';
-import { useSettingsStore } from '../contexts/SettingsContext.js';
+import {
+  useSettingsStore,
+  type SettingsState,
+} from '../contexts/SettingsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import {
   type SettingsType,
@@ -136,18 +140,27 @@ function parseEditedValue(
   return { valid: true, value: newValue };
 }
 
-// Capture initial values of all restart-required settings for diff tracking
-function captureRestartSnapshot(
-  merged: Record<string, unknown>,
-): Map<string, string> {
-  const snapshot = new Map<string, string>();
-  // Only track dialog-visible restart settings — non-dialog keys (parent
-  // container objects like mcpServers, tools) can't be changed here.
-  // JSON.stringify for value comparison in case a future showInDialog setting
-  // has an object value (structuredClone breaks reference equality).
+function capturePerScopeRestartSnapshot(
+  settings: SettingsState,
+): Map<string, Map<string, string>> {
+  // Map<key, Map<scopeName, json>>
+  const snapshot = new Map<string, Map<string, string>>();
+  const scopes: Array<[string, Settings]> = [
+    ['User', settings.user.settings],
+    ['Workspace', settings.workspace.settings],
+    ['System', settings.system.settings],
+  ];
+
   for (const key of getDialogRestartRequiredSettings()) {
-    const value = getEffectiveValue(key, {}, merged);
-    snapshot.set(key, JSON.stringify(value));
+    const scopeMap = new Map<string, string>();
+    for (const [scopeName, scopeSettings] of scopes) {
+      // Raw per-scope value (undefined if not in file)
+      const value = settingExistsInScope(key, scopeSettings)
+        ? getEffectiveValue(key, scopeSettings, {})
+        : undefined;
+      scopeMap.set(scopeName, JSON.stringify(value));
+    }
+    snapshot.set(key, scopeMap);
   }
   return snapshot;
 }
@@ -171,20 +184,31 @@ export function SettingsDialog({
 
   // Snapshot restart-required values at mount time for diff tracking
   const [initialRestartValues] = useState(() =>
-    captureRestartSnapshot(settings.merged),
+    capturePerScopeRestartSnapshot(settings),
   );
 
-  // Derived: which restart-required keys have changed from initial values
   const restartChangedKeys = useMemo(() => {
     const changed = new Set<string>();
-    for (const [key, initialJson] of initialRestartValues) {
-      const currentValue = getEffectiveValue(key, {}, settings.merged);
-      if (JSON.stringify(currentValue) !== initialJson) {
-        changed.add(key);
+    const scopes: Array<[string, Settings]> = [
+      ['User', settings.user.settings],
+      ['Workspace', settings.workspace.settings],
+      ['System', settings.system.settings],
+    ];
+
+    for (const [key, initialScopeMap] of initialRestartValues) {
+      for (const [scopeName, scopeSettings] of scopes) {
+        const currentValue = settingExistsInScope(key, scopeSettings)
+          ? getEffectiveValue(key, scopeSettings, {})
+          : undefined;
+        const initialJson = initialScopeMap.get(scopeName);
+        if (JSON.stringify(currentValue) !== initialJson) {
+          changed.add(key);
+          break; // one scope changed is enough
+        }
       }
     }
     return changed;
-  }, [settings.merged, initialRestartValues]);
+  }, [settings, initialRestartValues]);
 
   // Derived: whether to show restart prompt
   const showRestartPrompt = restartChangedKeys.size > 0;
