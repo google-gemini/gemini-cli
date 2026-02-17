@@ -143,6 +143,10 @@
         "label": "Activate skill (tool)",
         "slug": "docs/tools/activate-skill"
       },
+      {
+        "label": "Browser agent (experimental)",
+        "slug": "docs/core/subagents#browser-agent-experimental"
+      },
       { "label": "Ask user (tool)", "slug": "docs/tools/ask-user" },
       { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
       { "label": "File system (tool)", "slug": "docs/tools/file-system" },

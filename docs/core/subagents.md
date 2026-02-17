@@ -80,6 +80,124 @@ Gemini CLI comes with the following built-in sub-agents:
   invoked by the user.
 - **Configuration:** Enabled by default. No specific configuration options.
 
+### Browser Agent (experimental)
+
+- **Name:** `browser_agent`
+- **Purpose:** Automate web browser tasks — navigating websites, filling forms,
+  clicking buttons, and extracting information from web pages — using the
+  accessibility tree.
+- **When to use:** "Go to example.com and fill out the contact form," "Extract
+  the pricing table from this page," "Click the login button and enter my
+  credentials."
+
+> **Note:** This is a preview feature currently under active development.
+
+#### Prerequisites
+
+The browser agent requires:
+
+- **Chrome** version 144 or later installed on your system.
+- **Node.js** with `npx` available (used to launch the
+  [`chrome-devtools-mcp`](https://www.npmjs.com/package/chrome-devtools-mcp)
+  server).
+
+#### Enabling the browser agent
+
+The browser agent is disabled by default. Enable it in your `settings.json`:
+
+```json
+{
+  "agents": {
+    "overrides": {
+      "browser_agent": {
+        "enabled": true
+      }
+    }
+  }
+}
+```
+
+#### Session modes
+
+The `sessionMode` setting controls how Chrome is launched and managed. Set it
+under `customConfig`:
+
+```json
+{
+  "agents": {
+    "overrides": {
+      "browser_agent": {
+        "enabled": true,
+        "customConfig": {
+          "sessionMode": "persistent"
+        }
+      }
+    }
+  }
+}
+```
+
+The available modes are:
+
+| Mode         | Description                                                                                                                                                                                 |
+| :----------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `persistent` | **(Default)** Launches Chrome with a persistent profile stored at `~/.cache/chrome-devtools-mcp/`. Cookies, history, and settings are preserved between sessions.                           |
+| `isolated`   | Launches Chrome with a temporary profile that is deleted after each session. Use this for clean-state automation.                                                                           |
+| `existing`   | Attaches to an already-running Chrome instance. You must enable remote debugging first by navigating to `chrome://inspect/#remote-debugging` in Chrome. No new browser process is launched. |
+
+#### Configuration reference
+
+All settings go under `agents.overrides.browser_agent.customConfig` in your
+`settings.json`.
+
+| Setting             | Type       | Default        | Description                                                                                                            |
+| :------------------ | :--------- | :------------- | :--------------------------------------------------------------------------------------------------------------------- |
+| `sessionMode`       | `string`   | `"persistent"` | How Chrome is managed: `"persistent"`, `"isolated"`, or `"existing"`.                                                  |
+| `headless`          | `boolean`  | `false`        | Run Chrome in headless mode (no visible window).                                                                       |
+| `chromeProfilePath` | `string`   | —              | Custom path to a Chrome profile directory.                                                                             |
+| `visualModel`       | `string`   | —              | Model override for the visual agent (for example, `"gemini-2.5-computer-use-preview-10-2025"`).                        |
+| `allowedDomains`    | `string[]` | `[]`           | Restrict navigation to these domain patterns only. If empty, all non-blocked URLs are allowed. Supports `*` wildcards. |
+
+#### Security
+
+The browser agent enforces the following security restrictions:
+
+- **Blocked URL patterns:** `file://`, `javascript:`, `data:text/html`,
+  `chrome://extensions`, and `chrome://settings/passwords` are always blocked.
+- **Domain allowlisting:** When `allowedDomains` is set, only URLs matching the
+  specified patterns (plus built-in defaults like `*.google.com` and
+  `*.github.com`) are allowed. URLs outside the allowlist are blocked.
+- **Sensitive action confirmation:** Actions like form filling, file uploads,
+  and form submissions require user confirmation through the standard policy
+  engine.
+
+#### Visual agent
+
+By default, the browser agent interacts with pages through the accessibility
+tree using element `uid` values. For tasks that require visual identification
+(for example, "click the yellow button" or "find the red error message"), you
+can enable the visual agent by setting a `visualModel`:
+
+```json
+{
+  "agents": {
+    "overrides": {
+      "browser_agent": {
+        "enabled": true,
+        "customConfig": {
+          "visualModel": "gemini-2.5-computer-use-preview-10-2025"
+        }
+      }
+    }
+  }
+}
+```
+
+When enabled, the agent gains access to the `analyze_screenshot` tool, which
+captures a screenshot and sends it to the vision model for analysis. The model
+returns coordinates and element descriptions that the browser agent uses with
+the `click_at` tool for precise, coordinate-based interactions.
+
 ## Creating custom sub-agents
 
 You can create your own sub-agents to automate specific workflows or enforce
