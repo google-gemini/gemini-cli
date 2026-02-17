@@ -15,10 +15,10 @@ import { HalfLinePaddedBox } from './shared/HalfLinePaddedBox.js';
 import {
   type TextBuffer,
   logicalPosToOffset,
-  PASTED_TEXT_PLACEHOLDER_REGEX,
   getTransformUnderCursor,
   LARGE_PASTE_LINE_THRESHOLD,
   LARGE_PASTE_CHAR_THRESHOLD,
+  expandPastedContent,
 } from './shared/text-buffer.js';
 import {
   cpSlice,
@@ -325,14 +325,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
-      let processedValue = submittedValue;
-      if (buffer.pastedContent) {
-        // Replace placeholders like [Pasted Text: 6 lines] with actual content
-        processedValue = processedValue.replace(
-          PASTED_TEXT_PLACEHOLDER_REGEX,
-          (match) => buffer.pastedContent[match] || match,
-        );
-      }
+      const processedValue = expandPastedContent(
+        submittedValue,
+        buffer.pastedContent,
+      );
 
       if (shellModeActive) {
         shellHistory.addCommandToHistory(processedValue);

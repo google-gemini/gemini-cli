@@ -41,6 +41,19 @@ export const LARGE_PASTE_CHAR_THRESHOLD = 500;
 export const PASTED_TEXT_PLACEHOLDER_REGEX =
   /\[Pasted Text: \d+ (?:lines|chars)(?: #\d+)?\]/g;
 
+export function expandPastedContent(
+  text: string,
+  pastedContent: Record<string, string> | undefined,
+): string {
+  if (!pastedContent || Object.keys(pastedContent).length === 0) {
+    return text;
+  }
+  return text.replace(
+    PASTED_TEXT_PLACEHOLDER_REGEX,
+    (match) => pastedContent[match] || match,
+  );
+}
+
 export type Direction =
   | 'left'
   | 'right'

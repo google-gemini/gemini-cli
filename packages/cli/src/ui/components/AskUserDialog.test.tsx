@@ -12,6 +12,7 @@ import { AskUserDialog } from './AskUserDialog.js';
 import { QuestionType, type Question } from '@google/gemini-cli-core';
 import chalk from 'chalk';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
+import { PASTED_TEXT_PLACEHOLDER_REGEX } from './shared/text-buffer.js';
 
 // Helper to write to stdin with proper act() wrapping
 const writeKey = (stdin: { write: (data: string) => void }, key: string) => {
@@ -1284,6 +1285,84 @@ describe('AskUserDialog', () => {
       await waitFor(() => {
         expect(lastFrame()).toMatchSnapshot();
       });
+    });
+  });
+  it('submits expanded text for large pastes in TEXT questions', async () => {
+    const textQuestion: Question[] = [
+      {
+        question: 'Paste text:',
+        header: 'Text',
+        type: QuestionType.TEXT,
+      },
+    ];
+
+    const onSubmit = vi.fn();
+    const { stdin, lastFrame } = renderWithProviders(
+      <AskUserDialog
+        questions={textQuestion}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+        width={120}
+      />,
+      { width: 120 },
+    );
+
+    const largeText = 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6';
+    const ESC = '\x1b';
+    // Simulate paste
+    writeKey(stdin, `${ESC}[200~${largeText}${ESC}[201~`);
+
+    await waitFor(() => {
+      const frame = lastFrame();
+      expect(frame).toBeDefined();
+      expect(PASTED_TEXT_PLACEHOLDER_REGEX.test(frame!)).toBe(true);
+    });
+
+    writeKey(stdin, '\r');
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ '0': largeText });
+    });
+  });
+
+  it('submits expanded text for large pastes in CHOICE question custom options', async () => {
+    const choiceQuestion: Question[] = [
+      {
+        question: 'Choose:',
+        header: 'Question',
+        type: QuestionType.CHOICE,
+        options: [{ label: 'Option 1', description: 'Option 1 description' }],
+      },
+    ];
+
+    const onSubmit = vi.fn();
+    const { stdin, lastFrame } = renderWithProviders(
+      <AskUserDialog
+        questions={choiceQuestion}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+        width={120}
+      />,
+      { width: 120 },
+    );
+
+    // Select "Other"
+    writeKey(stdin, 'j');
+
+    const largeText = 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6';
+    const ESC = '\x1b';
+    writeKey(stdin, `${ESC}[200~${largeText}${ESC}[201~`);
+
+    await waitFor(() => {
+      const frame = lastFrame();
+      expect(frame).toBeDefined();
+      expect(PASTED_TEXT_PLACEHOLDER_REGEX.test(frame!)).toBe(true);
+    });
+
+    writeKey(stdin, '\r');
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ '0': largeText });
     });
   });
 });
