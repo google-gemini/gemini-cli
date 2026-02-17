@@ -4,12 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
-
-// Import the bundled teleporter which contains the protobuf definitions and decryption logic
-// eslint-disable-next-line no-restricted-syntax
-const teleporter = require('./trajectory_teleporter.min.js');
+import * as teleporter from './trajectory_teleporter.min.js';
 
 /**
  * Decrypts and parses an Antigravity trajectory file (.pb) into JSON.
