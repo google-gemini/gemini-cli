@@ -125,6 +125,7 @@ describe('analyzeScreenshot', () => {
           ]),
         }),
         'visual-analysis',
+        'utility_tool',
       );
 
       // Verify result

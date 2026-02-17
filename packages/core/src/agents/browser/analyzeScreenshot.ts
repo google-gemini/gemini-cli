@@ -29,6 +29,7 @@ import type { BrowserManager } from './browserManager.js';
 import type { Config } from '../../config/config.js';
 import { getVisualAgentModel } from './modelAvailability.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { LlmRole } from '../../telemetry/llmRole.js';
 
 /**
  * System prompt for the visual analysis model call.
@@ -146,6 +147,7 @@ class AnalyzeScreenshotInvocation extends BaseToolInvocation<
           ],
         },
         'visual-analysis',
+        LlmRole.UTILITY_TOOL,
       );
 
       // Extract text from response
