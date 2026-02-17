@@ -236,41 +236,6 @@ describe('useApprovalModeIndicator', () => {
     expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
   });
 
-  it('should cycle through DEFAULT -> AUTO_EDIT -> PLAN -> DEFAULT when plan is enabled', () => {
-    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
-    mockConfigInstance.isPlanEnabled.mockReturnValue(true);
-    renderHook(() =>
-      useApprovalModeIndicator({
-        config: mockConfigInstance as unknown as ActualConfigType,
-        addItem: vi.fn(),
-      }),
-    );
-
-    // DEFAULT -> AUTO_EDIT
-    act(() => {
-      capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
-    });
-    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
-      ApprovalMode.AUTO_EDIT,
-    );
-
-    // AUTO_EDIT -> PLAN
-    act(() => {
-      capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
-    });
-    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
-      ApprovalMode.PLAN,
-    );
-
-    // PLAN -> DEFAULT
-    act(() => {
-      capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
-    });
-    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
-      ApprovalMode.DEFAULT,
-    );
-  });
-
   it('should not toggle if only one key or other keys combinations are pressed', () => {
     mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
     renderHook(() =>
@@ -727,6 +692,46 @@ describe('useApprovalModeIndicator', () => {
     expect(mockOnApprovalModeChange).toHaveBeenNthCalledWith(
       2,
       ApprovalMode.AUTO_EDIT,
+    );
+  });
+
+  it('should cycle to PLAN when allowPlanMode is true', () => {
+    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.AUTO_EDIT);
+
+    renderHook(() =>
+      useApprovalModeIndicator({
+        config: mockConfigInstance as unknown as ActualConfigType,
+        addItem: vi.fn(),
+        allowPlanMode: true,
+      }),
+    );
+
+    // AUTO_EDIT -> PLAN
+    act(() => {
+      capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
+    });
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.PLAN,
+    );
+  });
+
+  it('should cycle to DEFAULT when allowPlanMode is false', () => {
+    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.AUTO_EDIT);
+
+    renderHook(() =>
+      useApprovalModeIndicator({
+        config: mockConfigInstance as unknown as ActualConfigType,
+        addItem: vi.fn(),
+        allowPlanMode: false,
+      }),
+    );
+
+    // AUTO_EDIT -> DEFAULT
+    act(() => {
+      capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
+    });
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.DEFAULT,
     );
   });
 });
