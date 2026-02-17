@@ -18,7 +18,7 @@ import {
   ToolConfirmationOutcome,
   type PolicyUpdateOptions,
 } from './tools.js';
-import type { CallableTool, FunctionCall, Part } from '@google/genai';
+import type { FunctionCall, Part } from '@google/genai';
 import type { Progress } from '@modelcontextprotocol/sdk/types.js';
 import { ToolErrorType } from './tool-error.js';
 import type { Config } from '../config/config.js';
@@ -84,7 +84,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   }
 
   constructor(
-    private readonly mcpTool: CallableTool,
+    private readonly mcpTool: CallableToolWithProgress,
     readonly serverName: string,
     readonly serverToolName: string,
     readonly displayName: string,
@@ -221,10 +221,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       // Conditionally pass progressCallback to avoid passing undefined as
       // a second arg (which would change the call signature for existing tests)
       const callPromise = progressCallback
-        ? (this.mcpTool as CallableToolWithProgress).callTool(
-            functionCalls,
-            progressCallback,
-          )
+        ? this.mcpTool.callTool(functionCalls, progressCallback)
         : this.mcpTool.callTool(functionCalls);
 
       callPromise
@@ -273,7 +270,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
   ToolResult
 > {
   constructor(
-    private readonly mcpTool: CallableTool,
+    private readonly mcpTool: CallableToolWithProgress,
     readonly serverName: string,
     readonly serverToolName: string,
     description: string,

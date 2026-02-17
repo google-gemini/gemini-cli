@@ -21,6 +21,7 @@ import {
   DiscoveredMCPTool,
   MCP_QUALIFIED_NAME_SEPARATOR,
 } from '../tools/mcp-tool.js';
+import type { CallableToolWithProgress } from '../tools/mcp-client.js';
 import { LSTool } from '../tools/ls.js';
 import { LS_TOOL_NAME, READ_FILE_TOOL_NAME } from '../tools/tool-names.js';
 import {
@@ -35,7 +36,6 @@ import {
   type Content,
   type PartListUnion,
   type Tool,
-  type CallableTool,
 } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
@@ -508,7 +508,7 @@ describe('LocalAgentExecutor', () => {
       const mockMcpTool = {
         tool: vi.fn(),
         callTool: vi.fn(),
-      } as unknown as CallableTool;
+      } as unknown as CallableToolWithProgress;
 
       const mcpTool = new DiscoveredMCPTool(
         mockMcpTool,

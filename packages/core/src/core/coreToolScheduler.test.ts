@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import type { Mock } from 'vitest';
-import type { CallableTool } from '@google/genai';
+import type { CallableToolWithProgress } from '../tools/mcp-client.js';
 import { CoreToolScheduler } from './coreToolScheduler.js';
 import {
   type ToolCall,
@@ -1934,7 +1934,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
     const serverName = 'test-server';
     const toolName = 'test-tool';
     const mcpTool = new DiscoveredMCPTool(
-      mockMcpTool as unknown as CallableTool,
+      mockMcpTool as unknown as CallableToolWithProgress,
       serverName,
       toolName,
       'description',

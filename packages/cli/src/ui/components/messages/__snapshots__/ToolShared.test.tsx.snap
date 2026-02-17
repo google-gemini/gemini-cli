@@ -2,7 +2,7 @@
 
 exports[`MCPProgressIndicator > clamps progress exceeding total 1`] = `
 "
-████████████████████ 150%"
+████████████████████ 100%"
 `;
 
 exports[`MCPProgressIndicator > renders determinate progress bar at 50% 1`] = `

@@ -15,7 +15,8 @@ import {
 } from './mcp-tool.js';
 import type { ToolResult } from './tools.js';
 import { ToolConfirmationOutcome } from './tools.js'; // Added ToolConfirmationOutcome
-import type { CallableTool, FunctionCall, Part } from '@google/genai';
+import type { FunctionCall, Part } from '@google/genai';
+import type { CallableToolWithProgress } from './mcp-client.js';
 import type { Progress } from '@modelcontextprotocol/sdk/types.js';
 import { ToolErrorType } from './tool-error.js';
 import {
@@ -24,12 +25,12 @@ import {
 } from '../test-utils/mock-message-bus.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 
-// Mock @google/genai mcpToTool and CallableTool
-// We only need to mock the parts of CallableTool that DiscoveredMCPTool uses.
+// Mock CallableToolWithProgress
+// We only need to mock the parts that DiscoveredMCPTool uses.
 const mockCallTool = vi.fn();
 const mockToolMethod = vi.fn();
 
-const mockCallableToolInstance: Mocked<CallableTool> = {
+const mockCallableToolInstance: Mocked<CallableToolWithProgress> = {
   tool: mockToolMethod as any, // Not directly used by DiscoveredMCPTool instance methods
   callTool: mockCallTool as any,
   // Add other methods if DiscoveredMCPTool starts using them
@@ -952,7 +953,7 @@ describe('DiscoveredMCPTool', () => {
       const mockCallableToolInst = {
         tool: vi.fn(),
         callTool: progressMockCallTool,
-      } as unknown as Mocked<CallableTool>;
+      } as unknown as Mocked<CallableToolWithProgress>;
 
       const testTool = new DiscoveredMCPTool(
         mockCallableToolInst,

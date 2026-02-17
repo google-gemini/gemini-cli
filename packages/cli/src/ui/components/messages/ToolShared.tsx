@@ -252,7 +252,9 @@ export const MCPProgressIndicator: React.FC<MCPProgressIndicatorProps> = ({
   barWidth,
 }) => {
   const percentage =
-    total && total > 0 ? Math.round((progress / total) * 100) : null;
+    total && total > 0
+      ? Math.min(100, Math.round((progress / total) * 100))
+      : null;
 
   let rawFilled: number;
   if (total && total > 0) {

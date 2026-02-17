@@ -650,4 +650,123 @@ describe('SchedulerStateManager', () => {
       expect(snapshot[2].request.callId).toBe('3');
     });
   });
+
+  describe('updateProgress', () => {
+    function makeExecuting(id = 'call-1') {
+      const call = createValidatingCall(id);
+      stateManager.enqueue([call]);
+      stateManager.dequeue();
+      stateManager.updateStatus(id, CoreToolCallStatus.Executing);
+      vi.mocked(mockMessageBus.publish).mockClear();
+    }
+
+    it('should update mcpProgress on an executing call', () => {
+      makeExecuting();
+      stateManager.updateProgress('call-1', { progress: 50, total: 100 });
+
+      const snapshot = stateManager.getSnapshot();
+      const active = snapshot[0] as ExecutingToolCall;
+      expect(active.mcpProgress).toEqual({ progress: 50, total: 100 });
+    });
+
+    it('should ignore non-executing calls', () => {
+      const call = createValidatingCall();
+      stateManager.enqueue([call]);
+      stateManager.dequeue();
+      stateManager.updateStatus(
+        'call-1',
+        CoreToolCallStatus.Success,
+        createMockResponse('call-1'),
+      );
+      vi.mocked(mockMessageBus.publish).mockClear();
+
+      stateManager.updateProgress('call-1', { progress: 50, total: 100 });
+      expect(mockMessageBus.publish).not.toHaveBeenCalled();
+    });
+
+    it('should ignore unknown callIds', () => {
+      stateManager.updateProgress('nonexistent', { progress: 50, total: 100 });
+      expect(mockMessageBus.publish).not.toHaveBeenCalled();
+    });
+
+    it('should preserve mcpProgress across liveOutput updates', () => {
+      makeExecuting();
+      stateManager.updateProgress('call-1', { progress: 50, total: 100 });
+      stateManager.updateStatus('call-1', CoreToolCallStatus.Executing, {
+        liveOutput: 'new output',
+      });
+
+      const active = stateManager.getSnapshot()[0] as ExecutingToolCall;
+      expect(active.mcpProgress).toEqual({ progress: 50, total: 100 });
+      expect(active.liveOutput).toBe('new output');
+    });
+
+    it('should preserve liveOutput across progress updates', () => {
+      makeExecuting();
+      stateManager.updateStatus('call-1', CoreToolCallStatus.Executing, {
+        liveOutput: 'existing output',
+      });
+      stateManager.updateProgress('call-1', { progress: 75, total: 100 });
+
+      const active = stateManager.getSnapshot()[0] as ExecutingToolCall;
+      expect(active.liveOutput).toBe('existing output');
+      expect(active.mcpProgress).toEqual({ progress: 75, total: 100 });
+    });
+  });
+
+  describe('progress throttling', () => {
+    function makeExecuting(id = 'call-1') {
+      const call = createValidatingCall(id);
+      stateManager.enqueue([call]);
+      stateManager.dequeue();
+      stateManager.updateStatus(id, CoreToolCallStatus.Executing);
+      vi.mocked(mockMessageBus.publish).mockClear();
+    }
+
+    it('should emit immediately on first progress update', () => {
+      makeExecuting();
+      stateManager.updateProgress('call-1', { progress: 10, total: 100 });
+      expect(mockMessageBus.publish).toHaveBeenCalledTimes(1);
+    });
+
+    it('should batch rapid progress updates with leading+trailing', () => {
+      vi.useFakeTimers();
+      makeExecuting();
+
+      for (let i = 1; i <= 10; i++) {
+        stateManager.updateProgress('call-1', { progress: i * 10, total: 100 });
+      }
+
+      // Leading emit on first call
+      expect(mockMessageBus.publish).toHaveBeenCalledTimes(1);
+
+      // Advance past throttle window
+      vi.advanceTimersByTime(100);
+
+      // Trailing emit
+      expect(mockMessageBus.publish).toHaveBeenCalledTimes(2);
+
+      vi.useRealTimers();
+    });
+
+    it('should flush pending progress update via flushProgressThrottle', () => {
+      vi.useFakeTimers();
+      makeExecuting();
+
+      stateManager.updateProgress('call-1', { progress: 10, total: 100 });
+      stateManager.updateProgress('call-1', { progress: 20, total: 100 });
+      expect(mockMessageBus.publish).toHaveBeenCalledTimes(1);
+
+      stateManager.flushProgressThrottle();
+      expect(mockMessageBus.publish).toHaveBeenCalledTimes(2);
+
+      vi.useRealTimers();
+    });
+
+    it('should be a no-op when flushProgressThrottle has nothing pending', () => {
+      makeExecuting();
+      stateManager.flushProgressThrottle();
+      expect(mockMessageBus.publish).not.toHaveBeenCalled();
+    });
+  });
 });
