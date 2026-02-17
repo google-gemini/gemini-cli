@@ -21,7 +21,7 @@ describe('ApprovalModeIndicator', () => {
     const { lastFrame } = render(
       <ApprovalModeIndicator
         approvalMode={ApprovalMode.AUTO_EDIT}
-        isPlanEnabled={true}
+        allowPlanMode={true}
       />,
     );
     expect(lastFrame()).toMatchSnapshot();
@@ -52,7 +52,7 @@ describe('ApprovalModeIndicator', () => {
     const { lastFrame } = render(
       <ApprovalModeIndicator
         approvalMode={ApprovalMode.DEFAULT}
-        isPlanEnabled={true}
+        allowPlanMode={true}
       />,
     );
     expect(lastFrame()).toMatchSnapshot();

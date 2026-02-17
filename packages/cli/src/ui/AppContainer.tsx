@@ -1087,14 +1087,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ],
   );
 
-  // Auto-accept indicator
-  const showApprovalModeIndicator = useApprovalModeIndicator({
-    config,
-    addItem: historyManager.addItem,
-    onApprovalModeChange: handleApprovalModeChangeWithUiReveal,
-    isActive: !embeddedShellFocused,
-  });
-
   const { isMcpReady } = useMcpStatus(config);
 
   const {
@@ -1897,6 +1889,19 @@ Logging in with Google... Restarting Gemini CLI to continue.
     !!validationRequest ||
     !!customDialog;
 
+  const allowPlanMode =
+    config.isPlanEnabled() &&
+    streamingState === StreamingState.Idle &&
+    !hasPendingActionRequired;
+
+  const showApprovalModeIndicator = useApprovalModeIndicator({
+    config,
+    addItem: historyManager.addItem,
+    onApprovalModeChange: handleApprovalModeChangeWithUiReveal,
+    isActive: !embeddedShellFocused,
+    allowPlanMode,
+  });
+
   const isPassiveShortcutsHelpState =
     isInputActive &&
     streamingState === StreamingState.Idle &&
@@ -2031,6 +2036,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       messageQueue,
       queueErrorMessage,
       showApprovalModeIndicator,
+      allowPlanMode,
       currentModel,
       quota: {
         userTier,
@@ -2145,6 +2151,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       messageQueue,
       queueErrorMessage,
       showApprovalModeIndicator,
+      allowPlanMode,
       userTier,
       quotaStats,
       proQuotaRequest,
