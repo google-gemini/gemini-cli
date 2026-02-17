@@ -79,6 +79,8 @@ describe('ToolMessage Sticky Header Regression', () => {
           data={['item1']}
           renderItem={() => (
             <ToolGroupMessage
+              borderColor="grey"
+              borderDimColor={false}
               groupId={1}
               toolCalls={toolCalls}
               terminalWidth={terminalWidth - 2} // Account for ScrollableList padding
@@ -165,6 +167,8 @@ describe('ToolMessage Sticky Header Regression', () => {
           data={['item1']}
           renderItem={() => (
             <ToolGroupMessage
+              borderColor="grey"
+              borderDimColor={false}
               groupId={1}
               toolCalls={toolCalls}
               terminalWidth={terminalWidth - 2}

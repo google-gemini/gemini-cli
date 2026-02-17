@@ -42,6 +42,8 @@ describe('<ToolGroupMessage />', () => {
   const baseProps = {
     groupId: 1,
     terminalWidth: 80,
+    borderColor: 'grey',
+    borderDimColor: false,
   };
 
   const baseMockConfig = makeFakeConfig({
@@ -61,7 +63,12 @@ describe('<ToolGroupMessage />', () => {
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
@@ -119,7 +126,12 @@ describe('<ToolGroupMessage />', () => {
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
@@ -159,7 +171,12 @@ describe('<ToolGroupMessage />', () => {
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
@@ -197,7 +214,12 @@ describe('<ToolGroupMessage />', () => {
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
@@ -222,7 +244,12 @@ describe('<ToolGroupMessage />', () => {
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
@@ -236,7 +263,12 @@ describe('<ToolGroupMessage />', () => {
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: [] }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: [],
+              },
+            ],
           },
         },
       );
@@ -267,7 +299,12 @@ describe('<ToolGroupMessage />', () => {
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
@@ -290,7 +327,12 @@ describe('<ToolGroupMessage />', () => {
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
@@ -325,8 +367,14 @@ describe('<ToolGroupMessage />', () => {
           config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [
-              { type: 'tool_group', tools: toolCalls1 },
-              { type: 'tool_group', tools: toolCalls2 },
+              {
+                type: 'tool_group',
+                tools: toolCalls1,
+              },
+              {
+                type: 'tool_group',
+                tools: toolCalls2,
+              },
             ],
           },
         },
@@ -349,7 +397,12 @@ describe('<ToolGroupMessage />', () => {
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
@@ -371,7 +424,12 @@ describe('<ToolGroupMessage />', () => {
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
@@ -405,7 +463,12 @@ describe('<ToolGroupMessage />', () => {
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );

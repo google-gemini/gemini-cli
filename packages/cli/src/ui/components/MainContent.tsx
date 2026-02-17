@@ -19,9 +19,84 @@ import { useMemo, memo, useCallback, useEffect, useRef } from 'react';
 import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
+import { CoreToolCallStatus } from '@google/gemini-cli-core';
+import { isShellTool } from './messages/ToolShared.js';
+import { theme } from '../semantic-colors.js';
+import type {
+  HistoryItem,
+  HistoryItemWithoutId,
+  HistoryItemToolGroup,
+} from '../types.js';
+import type { UIState } from '../contexts/UIStateContext.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
+
+/**
+ * Calculates the border color and dimming state for a tool group message.
+ */
+export function getToolGroupBorderAppearance(
+  item: HistoryItem | HistoryItemWithoutId,
+  activeShellPtyId: number | null | undefined,
+  embeddedShellFocused: boolean | undefined,
+  allPendingItems: HistoryItemWithoutId[],
+  backgroundShells: UIState['backgroundShells'],
+): { borderColor: string; borderDimColor: boolean } {
+  if (item.type !== 'tool_group') {
+    return { borderColor: '', borderDimColor: false };
+  }
+
+  // If this item has no tools, it's a closing slice for the current batch.
+  // We need to look at the last pending item to determine the batch's appearance.
+  const toolsToInspect =
+    item.tools.length > 0
+      ? item.tools
+      : allPendingItems
+          .filter(
+            (i): i is HistoryItemToolGroup =>
+              i !== null && i !== undefined && i.type === 'tool_group',
+          )
+          .slice(-1)
+          .flatMap((i) => i.tools);
+
+  const hasPending = toolsToInspect.some(
+    (t) =>
+      t.status !== CoreToolCallStatus.Success &&
+      t.status !== CoreToolCallStatus.Error &&
+      t.status !== CoreToolCallStatus.Cancelled,
+  );
+
+  const isEmbeddedShellFocused = toolsToInspect.some(
+    (t) =>
+      isShellTool(t.name) &&
+      t.status === CoreToolCallStatus.Executing &&
+      t.ptyId === activeShellPtyId &&
+      !!embeddedShellFocused,
+  );
+
+  const isShellCommand = toolsToInspect.some((t) => isShellTool(t.name));
+
+  // If we have an active PTY that isn't a background shell, then the current
+  // pending batch is definitely a shell batch.
+  const isCurrentlyInShellTurn =
+    !!activeShellPtyId && !backgroundShells.has(activeShellPtyId);
+
+  const isShell =
+    isShellCommand || (item.tools.length === 0 && isCurrentlyInShellTurn);
+  const isPending =
+    hasPending || (item.tools.length === 0 && isCurrentlyInShellTurn);
+
+  const borderColor =
+    (isShell && isPending) || isEmbeddedShellFocused
+      ? theme.ui.symbol
+      : isPending
+        ? theme.status.warning
+        : theme.border.default;
+
+  const borderDimColor = isPending && (!isShell || !isEmbeddedShellFocused);
+
+  return { borderColor, borderDimColor };
+}
 
 // Limit Gemini messages to a very high number of lines to mitigate performance
 // issues in the worst case if we somehow get an enormous response from Gemini.
@@ -49,49 +124,77 @@ export const MainContent = () => {
     staticAreaMaxItemHeight,
     availableTerminalHeight,
     cleanUiDetailsVisible,
+    activePtyId,
+    embeddedShellFocused,
+    backgroundShells,
   } = uiState;
   const showHeaderDetails = cleanUiDetailsVisible;
 
   const historyItems = useMemo(
     () =>
-      uiState.history.map((h) => (
-        <MemoizedHistoryItemDisplay
-          terminalWidth={mainAreaWidth}
-          availableTerminalHeight={staticAreaMaxItemHeight}
-          availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
-          key={h.id}
-          item={h}
-          isPending={false}
-          commands={uiState.slashCommands}
-        />
-      )),
+      uiState.history.map((h) => {
+        const { borderColor, borderDimColor } = getToolGroupBorderAppearance(
+          h,
+          activePtyId,
+          embeddedShellFocused,
+          [],
+          backgroundShells,
+        );
+        return (
+          <MemoizedHistoryItemDisplay
+            terminalWidth={mainAreaWidth}
+            availableTerminalHeight={staticAreaMaxItemHeight}
+            availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
+            key={h.id}
+            item={h}
+            isPending={false}
+            commands={uiState.slashCommands}
+            borderColor={borderColor}
+            borderDimColor={borderDimColor}
+          />
+        );
+      }),
     [
       uiState.history,
       mainAreaWidth,
       staticAreaMaxItemHeight,
       uiState.slashCommands,
+      activePtyId,
+      embeddedShellFocused,
+      backgroundShells,
     ],
   );
 
   const pendingItems = useMemo(
     () => (
       <Box flexDirection="column">
-        {pendingHistoryItems.map((item, i) => (
-          <HistoryItemDisplay
-            key={i}
-            availableTerminalHeight={
-              (uiState.constrainHeight && !isAlternateBuffer) ||
-              isAlternateBuffer
-                ? availableTerminalHeight
-                : undefined
-            }
-            terminalWidth={mainAreaWidth}
-            item={{ ...item, id: 0 }}
-            isPending={true}
-            activeShellPtyId={uiState.activePtyId}
-            embeddedShellFocused={uiState.embeddedShellFocused}
-          />
-        ))}
+        {pendingHistoryItems.map((item, i) => {
+          const { borderColor, borderDimColor } = getToolGroupBorderAppearance(
+            item,
+            activePtyId,
+            embeddedShellFocused,
+            pendingHistoryItems,
+            backgroundShells,
+          );
+          return (
+            <HistoryItemDisplay
+              key={i}
+              availableTerminalHeight={
+                (uiState.constrainHeight && !isAlternateBuffer) ||
+                isAlternateBuffer
+                  ? availableTerminalHeight
+                  : undefined
+              }
+              terminalWidth={mainAreaWidth}
+              item={{ ...item, id: 0 }}
+              isPending={true}
+              activeShellPtyId={activePtyId}
+              embeddedShellFocused={embeddedShellFocused}
+              borderColor={borderColor}
+              borderDimColor={borderDimColor}
+            />
+          );
+        })}
         {showConfirmationQueue && confirmingTool && (
           <ToolConfirmationQueue confirmingTool={confirmingTool} />
         )}
@@ -103,8 +206,9 @@ export const MainContent = () => {
       isAlternateBuffer,
       availableTerminalHeight,
       mainAreaWidth,
-      uiState.activePtyId,
-      uiState.embeddedShellFocused,
+      activePtyId,
+      embeddedShellFocused,
+      backgroundShells,
       showConfirmationQueue,
       confirmingTool,
     ],
@@ -130,6 +234,13 @@ export const MainContent = () => {
           />
         );
       } else if (item.type === 'history') {
+        const { borderColor, borderDimColor } = getToolGroupBorderAppearance(
+          item.item,
+          activePtyId,
+          embeddedShellFocused,
+          [],
+          backgroundShells,
+        );
         return (
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
@@ -139,6 +250,8 @@ export const MainContent = () => {
             item={item.item}
             isPending={false}
             commands={uiState.slashCommands}
+            borderColor={borderColor}
+            borderDimColor={borderDimColor}
           />
         );
       } else {
@@ -151,6 +264,9 @@ export const MainContent = () => {
       mainAreaWidth,
       uiState.slashCommands,
       pendingItems,
+      activePtyId,
+      embeddedShellFocused,
+      backgroundShells,
     ],
   );
 

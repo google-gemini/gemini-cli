@@ -23,7 +23,10 @@ import {
  */
 export function mapToDisplay(
   toolOrTools: ToolCall[] | ToolCall,
-  options: { borderTop?: boolean; borderBottom?: boolean } = {},
+  options: {
+    borderTop?: boolean;
+    borderBottom?: boolean;
+  } = {},
 ): HistoryItemToolGroup {
   const toolCalls = Array.isArray(toolOrTools) ? toolOrTools : [toolOrTools];
   const { borderTop, borderBottom } = options;

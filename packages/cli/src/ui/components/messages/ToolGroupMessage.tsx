@@ -13,11 +13,8 @@ import { ToolMessage } from './ToolMessage.js';
 import { ShellToolMessage } from './ShellToolMessage.js';
 import { theme } from '../../semantic-colors.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
-import { isShellTool, isThisShellFocused } from './ToolShared.js';
-import {
-  CoreToolCallStatus,
-  shouldHideToolCall,
-} from '@google/gemini-cli-core';
+import { isShellTool } from './ToolShared.js';
+import { shouldHideToolCall } from '@google/gemini-cli-core';
 import { ShowMoreLines } from '../ShowMoreLines.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
 
@@ -31,6 +28,8 @@ interface ToolGroupMessageProps {
   onShellInputSubmit?: (input: string) => void;
   borderTop?: boolean;
   borderBottom?: boolean;
+  borderColor: string;
+  borderDimColor: boolean;
 }
 
 // Main component renders the border and maps the tools using ToolMessage
@@ -44,6 +43,8 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   embeddedShellFocused,
   borderTop: borderTopOverride,
   borderBottom: borderBottomOverride,
+  borderColor,
+  borderDimColor,
 }) => {
   // Filter out tool calls that should be hidden (e.g. in-progress Ask User, or Plan Mode operations).
   const toolCalls = useMemo(
@@ -79,31 +80,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       }),
     [toolCalls],
   );
-
-  const isEmbeddedShellFocused = visibleToolCalls.some((t) =>
-    isThisShellFocused(
-      t.name,
-      t.status,
-      t.ptyId,
-      activeShellPtyId,
-      embeddedShellFocused,
-    ),
-  );
-
-  const hasPending = !visibleToolCalls.every(
-    (t) => t.status === CoreToolCallStatus.Success,
-  );
-
-  const isShellCommand = toolCalls.some((t) => isShellTool(t.name));
-  const borderColor =
-    (isShellCommand && hasPending) || isEmbeddedShellFocused
-      ? theme.ui.symbol
-      : hasPending
-        ? theme.status.warning
-        : theme.border.default;
-
-  const borderDimColor =
-    hasPending && (!isShellCommand || !isEmbeddedShellFocused);
 
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
 

@@ -47,6 +47,8 @@ interface HistoryItemDisplayProps {
   activeShellPtyId?: number | null;
   embeddedShellFocused?: boolean;
   availableTerminalHeightGemini?: number;
+  borderColor?: string;
+  borderDimColor?: boolean;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -58,6 +60,8 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   activeShellPtyId,
   embeddedShellFocused,
   availableTerminalHeightGemini,
+  borderColor,
+  borderDimColor,
 }) => {
   const settings = useSettings();
   const inlineThinkingMode = getInlineThinkingMode(settings);
@@ -181,6 +185,8 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           embeddedShellFocused={embeddedShellFocused}
           borderTop={itemForDisplay.borderTop}
           borderBottom={itemForDisplay.borderBottom}
+          borderColor={borderColor ?? ''}
+          borderDimColor={borderDimColor ?? false}
         />
       )}
       {itemForDisplay.type === 'compression' && (
