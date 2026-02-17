@@ -5,11 +5,12 @@
  */
 
 import React, { useMemo } from 'react';
-import { Text, Box } from 'ink';
+import { styledCharsToString } from '@alcalzone/ansi-tokenize';
 import {
+  Text,
+  Box,
   type StyledChar,
   toStyledCharacters,
-  styledCharsToString,
   styledCharsWidth,
   wordBreakStyledChars,
   wrapStyledChars,
