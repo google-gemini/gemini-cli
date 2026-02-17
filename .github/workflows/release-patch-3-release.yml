@@ -70,10 +70,11 @@ jobs:
         id: 'patch_version'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GITHUB_EVENT_INPUTS_TYPE: ${{ github.event.inputs.type }}
         run: |
           # Use the existing get-release-version.js script to calculate patch version
           # Run from main checkout which has full git history and access to npm
-          PATCH_JSON=$(node scripts/get-release-version.js --type=patch --patch-from=${{ github.event.inputs.type }})
+          PATCH_JSON=$(node scripts/get-release-version.js --type=patch --patch-from=${GITHUB_EVENT_INPUTS_TYPE})
           echo "Patch version calculation result: ${PATCH_JSON}"
 
           RELEASE_VERSION=$(echo "${PATCH_JSON}" | jq -r .releaseVersion)
@@ -90,13 +91,16 @@ jobs:
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           CHANNEL: '${{ github.event.inputs.type }}'
+          STEPS_PATCH_VERSION_OUTPUTS_RELEASE_VERSION: ${{ steps.patch_version.outputs.RELEASE_VERSION }}
+          STEPS_PATCH_VERSION_OUTPUTS_RELEASE_TAG: ${{ steps.patch_version.outputs.RELEASE_TAG }}
+          STEPS_PATCH_VERSION_OUTPUTS_PREVIOUS_TAG: ${{ steps.patch_version.outputs.PREVIOUS_TAG }}
         run: |
           echo "🔍 Verifying no concurrent patch releases have occurred..."
 
           # Store original calculation for comparison
-          ORIGINAL_RELEASE_VERSION="${{ steps.patch_version.outputs.RELEASE_VERSION }}"
-          ORIGINAL_RELEASE_TAG="${{ steps.patch_version.outputs.RELEASE_TAG }}"
-          ORIGINAL_PREVIOUS_TAG="${{ steps.patch_version.outputs.PREVIOUS_TAG }}"
+          ORIGINAL_RELEASE_VERSION="${STEPS_PATCH_VERSION_OUTPUTS_RELEASE_VERSION}"
+          ORIGINAL_RELEASE_TAG="${STEPS_PATCH_VERSION_OUTPUTS_RELEASE_TAG}"
+          ORIGINAL_PREVIOUS_TAG="${STEPS_PATCH_VERSION_OUTPUTS_PREVIOUS_TAG}"
 
           echo "Original calculation:"
           echo "  Release version: ${ORIGINAL_RELEASE_VERSION}"
@@ -138,10 +142,15 @@ jobs:
       - name: 'Print Calculated Version'
         run: |-
           echo "Patch Release Summary:"
-          echo "  Release Version: ${{ steps.patch_version.outputs.RELEASE_VERSION }}"
-          echo "  Release Tag: ${{ steps.patch_version.outputs.RELEASE_TAG }}"
-          echo "  NPM Tag: ${{ steps.patch_version.outputs.NPM_TAG }}"
-          echo "  Previous Tag: ${{ steps.patch_version.outputs.PREVIOUS_TAG }}"
+          echo "  Release Version: ${STEPS_PATCH_VERSION_OUTPUTS_RELEASE_VERSION}"
+          echo "  Release Tag: ${STEPS_PATCH_VERSION_OUTPUTS_RELEASE_TAG}"
+          echo "  NPM Tag: ${STEPS_PATCH_VERSION_OUTPUTS_NPM_TAG}"
+          echo "  Previous Tag: ${STEPS_PATCH_VERSION_OUTPUTS_PREVIOUS_TAG}"
+        env:
+          STEPS_PATCH_VERSION_OUTPUTS_RELEASE_VERSION: ${{ steps.patch_version.outputs.RELEASE_VERSION }}
+          STEPS_PATCH_VERSION_OUTPUTS_RELEASE_TAG: ${{ steps.patch_version.outputs.RELEASE_TAG }}
+          STEPS_PATCH_VERSION_OUTPUTS_NPM_TAG: ${{ steps.patch_version.outputs.NPM_TAG }}
+          STEPS_PATCH_VERSION_OUTPUTS_PREVIOUS_TAG: ${{ steps.patch_version.outputs.PREVIOUS_TAG }}
 
       - name: 'Run Tests'
         if: "${{github.event.inputs.force_skip_tests != 'true'}}"
