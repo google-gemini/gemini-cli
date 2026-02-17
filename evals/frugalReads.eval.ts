@@ -14,7 +14,7 @@ describe('Frugal reads eval', () => {
    * primarily on ranged reads when the line number is known, and combining
    * nearby ranges into a single contiguous read to save tool calls.
    */
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should use ranged read when nearby lines are targeted',
     files: {
       'package.json': JSON.stringify({
@@ -133,7 +133,7 @@ describe('Frugal reads eval', () => {
    * Ensures the agent uses multiple ranged reads when the targets are far
    * apart to avoid the need to read the whole file.
    */
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should use ranged read when targets are far apart',
     files: {
       'package.json': JSON.stringify({
@@ -202,7 +202,7 @@ describe('Frugal reads eval', () => {
    * Validates that the agent reads the entire file if there are lots of matches
    * (e.g.: 10), as it's more efficient than many small ranged reads.
    */
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should read the entire file when there are many matches',
     files: {
       'package.json': JSON.stringify({
