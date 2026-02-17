@@ -17,13 +17,12 @@ import {
 import { handleInstall, installCommand } from './install.js';
 import yargs from 'yargs';
 import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
-import type {
-  ExtensionManager,
-  inferInstallMetadata,
-} from '../../config/extension-manager.js';
+import type { inferInstallMetadata } from '../../config/extension-manager.js';
+import { ExtensionManager } from '../../config/extension-manager.js';
 import type { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import type * as fs from 'node:fs/promises';
 import type { Stats } from 'node:fs';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 const mockInstallOrUpdateExtension: Mock<
   typeof ExtensionManager.prototype.installOrUpdateExtension
@@ -207,5 +206,38 @@ describe('handleInstall', () => {
 
     expect(debugErrorSpy).toHaveBeenCalledWith('Install extension failed');
     expect(processSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('should pass promptForSetting when skipSettings is not provided', async () => {
+    mockInstallOrUpdateExtension.mockResolvedValue({
+      name: 'test-extension',
+    } as unknown as GeminiCLIExtension);
+
+    await handleInstall({
+      source: 'http://google.com',
+    });
+
+    expect(vi.mocked(ExtensionManager)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestSetting: promptForSetting,
+      }),
+    );
+  });
+
+  it('should pass null for requestSetting when skipSettings is true', async () => {
+    mockInstallOrUpdateExtension.mockResolvedValue({
+      name: 'test-extension',
+    } as unknown as GeminiCLIExtension);
+
+    await handleInstall({
+      source: 'http://google.com',
+      skipSettings: true,
+    });
+
+    expect(vi.mocked(ExtensionManager)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestSetting: null,
+      }),
+    );
   });
 });
