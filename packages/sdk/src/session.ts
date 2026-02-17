@@ -99,7 +99,7 @@ export class GeminiCliSession {
 
       const loadPromises = this.skillRefs.map(async (ref) => {
         try {
-          if (ref.type === 'dir' || ref.type === 'root') {
+          if (ref.type === 'dir') {
             return await loadSkillsFromDir(ref.path);
           }
         } catch (e) {
