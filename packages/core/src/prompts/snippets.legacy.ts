@@ -250,7 +250,7 @@ ${newApplicationSteps(options)}
 export function renderToolInstructions(instructions?: string[]): string {
   if (!instructions || instructions.length === 0) return '';
   return `
-# Detailed Tool Reference
+# Detailed Tool Usage Reference
 
 ${instructions.join('\n\n')}
 `.trim();
