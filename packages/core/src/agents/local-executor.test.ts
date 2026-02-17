@@ -2037,6 +2037,132 @@ describe('LocalAgentExecutor', () => {
       expect(recoveryEvent.success).toBe(true);
       expect(recoveryEvent.reason).toBe(AgentTerminateMode.MAX_TURNS);
     });
+
+    describe('Model Steering', () => {
+      let configWithHints: Config;
+
+      beforeEach(() => {
+        configWithHints = makeFakeConfig({ modelSteering: true });
+        vi.spyOn(configWithHints, 'getAgentRegistry').mockReturnValue({
+          getAllAgentNames: () => [],
+        } as unknown as AgentRegistry);
+        vi.spyOn(configWithHints, 'getToolRegistry').mockReturnValue(
+          parentToolRegistry,
+        );
+      });
+
+      it('should inject initial user hints into the first turn', async () => {
+        const definition = createTestDefinition();
+        configWithHints.userHintService.addUserHint('Initial Hint');
+
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          configWithHints,
+        );
+
+        mockModelResponse([
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'Done' },
+            id: 'call1',
+          },
+        ]);
+
+        await executor.run({ goal: 'Hint test' }, signal);
+
+        // The first call to sendMessageStream should contain the hint
+        expect(mockSendMessageStream).toHaveBeenCalled();
+        const firstTurnMessageParts = mockSendMessageStream.mock.calls[0][1];
+        expect(firstTurnMessageParts).toContainEqual(
+          expect.objectContaining({
+            text: expect.stringContaining('Initial Hint'),
+          }),
+        );
+      });
+
+      it('should inject mid-execution hints into subsequent turns', async () => {
+        const definition = createTestDefinition();
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          configWithHints,
+        );
+
+        // Turn 1: Model calls LS
+        mockModelResponse(
+          [{ name: LS_TOOL_NAME, args: { path: '.' }, id: 'call1' }],
+          'T1: Listing',
+        );
+
+        // We use a manual promise to ensure the hint is added WHILE Turn 1 is "running"
+        let resolveToolCall: (value: unknown) => void;
+        const toolCallPromise = new Promise((resolve) => {
+          resolveToolCall = resolve;
+        });
+        mockScheduleAgentTools.mockReturnValueOnce(toolCallPromise);
+
+        // Turn 2: Model calls complete_task
+        mockModelResponse(
+          [
+            {
+              name: TASK_COMPLETE_TOOL_NAME,
+              args: { finalResult: 'Done' },
+              id: 'call2',
+            },
+          ],
+          'T2: Done',
+        );
+
+        // Start execution
+        const runPromise = executor.run({ goal: 'Mid-turn hint test' }, signal);
+
+        // Small delay to ensure the run loop has reached the await and registered listener
+        await vi.advanceTimersByTimeAsync(1);
+
+        // Add the hint while the tool call is pending
+        configWithHints.userHintService.addUserHint('Corrective Hint');
+
+        // Now resolve the tool call to complete Turn 1
+        resolveToolCall!([
+          {
+            status: 'success',
+            request: {
+              callId: 'call1',
+              name: LS_TOOL_NAME,
+              args: { path: '.' },
+              isClientInitiated: false,
+              prompt_id: 'p1',
+            },
+            tool: {} as AnyDeclarativeTool,
+            invocation: {} as AnyToolInvocation,
+            response: {
+              callId: 'call1',
+              resultDisplay: 'file1.txt',
+              responseParts: [
+                {
+                  functionResponse: {
+                    name: LS_TOOL_NAME,
+                    response: { result: 'file1.txt' },
+                    id: 'call1',
+                  },
+                },
+              ],
+            },
+          },
+        ]);
+
+        await runPromise;
+
+        expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+
+        // The second turn (turn 1) should contain the corrective hint.
+        const secondTurnMessageParts = mockSendMessageStream.mock.calls[1][1];
+        expect(secondTurnMessageParts).toContainEqual(
+          expect.objectContaining({
+            text: expect.stringContaining('Corrective Hint'),
+          }),
+        );
+      });
+    });
   });
   describe('Chat Compression', () => {
     const mockWorkResponse = (id: string) => {

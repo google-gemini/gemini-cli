@@ -1584,6 +1584,13 @@
           "markdownDescription": "Enable planning features (Plan Mode and tools).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
+        },
+        "modelSteering": {
+          "title": "Model Steering",
+          "description": "Enable model steering (user hints) to guide the model during tool execution.",
+          "markdownDescription": "Enable model steering (user hints) to guide the model during tool execution.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false

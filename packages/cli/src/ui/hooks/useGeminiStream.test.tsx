@@ -64,6 +64,11 @@ const MockedGeminiClientClass = vi.hoisted(() =>
     this.startChat = mockStartChat;
     this.sendMessageStream = mockSendMessageStream;
     this.addHistory = vi.fn();
+    this.generateContent = vi.fn().mockResolvedValue({
+      candidates: [
+        { content: { parts: [{ text: 'Got it. Focusing on tests only.' }] } },
+      ],
+    });
     this.getCurrentSequenceModel = vi.fn().mockReturnValue('test-model');
     this.getChat = vi.fn().mockReturnValue({
       recordCompletedToolCalls: vi.fn(),
@@ -263,6 +268,13 @@ describe('useGeminiStream', () => {
     getGlobalMemory: vi.fn(() => ''),
     getUserMemory: vi.fn(() => ''),
     getMessageBus: vi.fn(() => mockMessageBus),
+    getBaseLlmClient: vi.fn(() => ({
+      generateContent: vi.fn().mockResolvedValue({
+        candidates: [
+          { content: { parts: [{ text: 'Got it. Focusing on tests only.' }] } },
+        ],
+      }),
+    })),
     getIdeMode: vi.fn(() => false),
     getEnableHooks: vi.fn(() => false),
   } as unknown as Config;
@@ -672,6 +684,114 @@ describe('useGeminiStream', () => {
       false,
       expectedMergedResponse,
     );
+  });
+
+  it('should inject steering hint prompt for continuation', async () => {
+    const toolCallResponseParts: Part[] = [{ text: 'tool final response' }];
+    const completedToolCalls: TrackedToolCall[] = [
+      {
+        request: {
+          callId: 'call1',
+          name: 'tool1',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-ack',
+        },
+        status: 'success',
+        responseSubmittedToGemini: false,
+        response: {
+          callId: 'call1',
+          responseParts: toolCallResponseParts,
+          errorType: undefined,
+        },
+        tool: {
+          displayName: 'MockTool',
+        },
+        invocation: {
+          getDescription: () => `Mock description`,
+        } as unknown as AnyToolInvocation,
+      } as TrackedCompletedToolCall,
+    ];
+
+    mockSendMessageStream.mockReturnValue(
+      (async function* () {
+        yield {
+          type: ServerGeminiEventType.Content,
+          value: 'Applied the requested adjustment.',
+        };
+      })(),
+    );
+
+    let capturedOnComplete:
+      | ((completedTools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+    mockUseToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        [],
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        mockCancelAllToolCalls,
+        0,
+      ];
+    });
+
+    renderHookWithProviders(() =>
+      useGeminiStream(
+        new MockedGeminiClientClass(mockConfig),
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false,
+        () => 'vscode' as EditorType,
+        () => {},
+        () => Promise.resolve(),
+        false,
+        () => {},
+        () => {},
+        () => {},
+        80,
+        24,
+        undefined,
+        () => 'focus on tests only',
+      ),
+    );
+
+    await act(async () => {
+      if (capturedOnComplete) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        await capturedOnComplete(completedToolCalls);
+      }
+    });
+
+    await waitFor(() => {
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
+    });
+
+    const sentParts = mockSendMessageStream.mock.calls[0][0] as Part[];
+    const injectedHintPart = sentParts[0] as { text?: string };
+    expect(injectedHintPart.text).toContain('User steering update:');
+    expect(injectedHintPart.text).toContain(
+      '<user_input>\nfocus on tests only\n</user_input>',
+    );
+    expect(injectedHintPart.text).toContain(
+      'Classify it as ADD_TASK, MODIFY_TASK, CANCEL_TASK, or EXTRA_CONTEXT.',
+    );
+    expect(injectedHintPart.text).toContain(
+      'Do not cancel/skip tasks unless the user explicitly cancels them.',
+    );
+    expect(
+      mockAddItem.mock.calls.some(
+        ([item]) =>
+          item?.type === 'info' &&
+          typeof item.text === 'string' &&
+          item.text.includes('Got it. Focusing on tests only.'),
+      ),
+    ).toBe(true);
   });
 
   it('should handle all tool calls being cancelled', async () => {
