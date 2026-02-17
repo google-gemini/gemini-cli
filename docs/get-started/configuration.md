@@ -1606,6 +1606,12 @@ sandbox image:
 BUILD_SANDBOX=1 gemini -s
 ```
 
+**Note:** Building custom sandboxes from a Dockerfile is only supported when
+running Gemini CLI from source code. If you installed the CLI via npm
+(`npm install -g @google/gemini-cli`), the `BUILD_SANDBOX` feature is not
+available. To use custom sandboxes with the npm package, you need to build your
+Docker image separately and reference it via configuration.
+
 ## Usage statistics
 
 To help us improve the Gemini CLI, we collect anonymized usage statistics. This
