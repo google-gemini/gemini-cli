@@ -154,7 +154,10 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
     [orderedIds],
   );
 
-  const maxLabelWidth = useMemo(() => listItems.reduce((max, item) => Math.max(max, item.label.length), 0), [listItems]);
+  const maxLabelWidth = useMemo(
+    () => listItems.reduce((max, item) => Math.max(max, item.label.length), 0),
+    [listItems],
+  );
 
   // Save settings when orderedIds or selectedIds change
   useEffect(() => {
