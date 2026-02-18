@@ -152,7 +152,7 @@
       { "label": "Keyboard shortcuts", "slug": "docs/cli/keyboard-shortcuts" },
       { "label": "Memory import processor", "slug": "docs/core/memport" },
       { "label": "Policy engine", "slug": "docs/core/policy-engine" },
-      { "label": "Tools API", "slug": "docs/core/tools-api" }
+      { "label": "Tools reference", "slug": "docs/reference/tools" }
     ]
   },
   {
