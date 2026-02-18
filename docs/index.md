@@ -94,10 +94,12 @@ Technical reference documentation for each capability of Gemini CLI.
 - **[Model routing](./cli/model-routing.md):** Automatic fallback resilience.
 - **[Plan mode (experimental)](./cli/plan-mode.md):** Use a safe, read-only mode
   for planning complex changes.
-- **[Remote Agents](./core/remote-agents.md):** Connecting to and using remote agents.
+- **[Remote Agents](./core/remote-agents.md):** Connecting to and using remote
+  agents.
 - **[Sandboxing](./cli/sandbox.md):** Isolate tool execution.
 - **[Shell (tool)](./tools/shell.md):** Detailed system execution parameters.
-- **[Subagents](./core/subagents.md):** Using specialized agents for specific tasks.
+- **[Subagents](./core/subagents.md):** Using specialized agents for specific
+  tasks.
 - **[Telemetry](./cli/telemetry.md):** Usage and performance metric details.
 - **[Todo (tool)](./tools/todos.md):** Progress tracking specification.
 - **[Token caching](./cli/token-caching.md):** Performance optimization.
@@ -133,7 +135,8 @@ Deep technical documentation and API specifications.
 - **[Configuration reference](./get-started/configuration.md):** Settings and
   environment variables.
 - **[Keyboard shortcuts](./cli/keyboard-shortcuts.md):** Productivity tips.
-- **[Memory import processor](./core/memport.md):** How Gemini CLI processes memory from various sources.
+- **[Memory import processor](./core/memport.md):** How Gemini CLI processes
+  memory from various sources.
 - **[Policy engine](./core/policy-engine.md):** Fine-grained execution control.
 - **[Tools API](./core/tools-api.md):** The API for defining and using tools.
 
@@ -150,8 +153,10 @@ Support, release history, and legal information.
 
 - **[Contribution guide](/docs/contributing):** How to contribute to Gemini CLI.
 - **[Integration testing](./integration-tests.md):** Running integration tests.
-- **[Issue and PR automation](./issue-and-pr-automation.md):** Automation for issues and pull requests.
-- **[Local development](./local-development.md):** Setting up a local development environment.
+- **[Issue and PR automation](./issue-and-pr-automation.md):** Automation for
+  issues and pull requests.
+- **[Local development](./local-development.md):** Setting up a local
+  development environment.
 - **[NPM package structure](./npm.md):** The structure of the NPM packages.
 
 ## Releases
