@@ -88,18 +88,7 @@ export const RIP_GREP_DEFINITION: ToolDefinition = {
   get base() {
     return DEFAULT_LEGACY_SET.grep_search_ripgrep;
   },
-  overrides: (modelId: string) => {
-    if (
-      modelId.includes('gemini-3-pro-preview') ||
-      modelId.includes('gemini-3-flash-preview')
-    ) {
-      return {
-        description:
-          'Searches for a regular expression pattern within file contents. This tool is FAST and optimized, powered by ripgrep. PREFERRED over standard `run_shell_command("grep ...")` due to better performance and automatic output limiting (max 20k matches).',
-      };
-    }
-    return undefined;
-  },
+  overrides: (modelId) => getToolSet(modelId).grep_search_ripgrep,
 };
 
 export const WEB_SEARCH_DEFINITION: ToolDefinition = {
