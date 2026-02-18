@@ -1549,7 +1549,6 @@ describe('InputPrompt', () => {
       { color: 'black', name: 'black' },
       { color: '#000000', name: '#000000' },
       { color: '#000', name: '#000' },
-      { color: undefined, name: 'default (black)' },
       { color: 'white', name: 'white' },
       { color: '#ffffff', name: '#ffffff' },
       { color: '#fff', name: '#fff' },
@@ -1619,6 +1618,11 @@ describe('InputPrompt', () => {
 
       const { stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
+        {
+          uiState: {
+            terminalBackgroundColor: 'black',
+          } as Partial<UIState>,
+        },
       );
 
       await waitFor(() => {

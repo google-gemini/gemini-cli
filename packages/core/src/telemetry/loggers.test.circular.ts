@@ -17,6 +17,7 @@ import {
   type ToolCallRequestInfo,
   type ToolCallResponseInfo,
 } from '../scheduler/types.js';
+import { CoreToolCallStatus } from '../scheduler/types.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 
 describe('Circular Reference Handling', () => {
@@ -62,7 +63,7 @@ describe('Circular Reference Handling', () => {
 
     const tool = new MockTool({ name: 'mock-tool' });
     const mockCompletedToolCall: CompletedToolCall = {
-      status: 'success',
+      status: CoreToolCallStatus.Success,
       request: mockRequest,
       response: mockResponse,
       tool,
@@ -112,7 +113,7 @@ describe('Circular Reference Handling', () => {
 
     const tool = new MockTool({ name: 'mock-tool' });
     const mockCompletedToolCall: CompletedToolCall = {
-      status: 'success',
+      status: CoreToolCallStatus.Success,
       request: mockRequest,
       response: mockResponse,
       tool,
