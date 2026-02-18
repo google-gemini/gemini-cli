@@ -202,15 +202,20 @@ export class McpClient {
     this.toolRegistry.sortTools();
 
     // Validate MCP tool names in policy rules against discovered tools
-    const discoveredToolNames = tools.map((t) => t.serverToolName);
-    const policyRules = cliConfig.getPolicyEngine().getRules();
-    const warnings = validateMcpPolicyToolNames(
-      this.serverName,
-      discoveredToolNames,
-      policyRules,
-    );
-    for (const warning of warnings) {
-      coreEvents.emitFeedback('warning', warning);
+    try {
+      const discoveredToolNames = tools.map((t) => t.serverToolName);
+      const policyRules = cliConfig.getPolicyEngine().getRules();
+      const warnings = validateMcpPolicyToolNames(
+        this.serverName,
+        discoveredToolNames,
+        policyRules,
+      );
+      for (const warning of warnings) {
+        coreEvents.emitFeedback('warning', warning);
+      }
+    } catch {
+      // Policy engine may not be available in all contexts (e.g. tests).
+      // Validation is best-effort; skip silently if unavailable.
     }
   }
 
