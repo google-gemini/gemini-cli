@@ -56,16 +56,19 @@ jobs:
         id: 'origin_tag'
         shell: 'bash'
         run: |
-          TAG_VALUE="v${{ github.event.inputs.rollback_origin }}"
+          TAG_VALUE="v${GITHUB_EVENT_INPUTS_ROLLBACK_ORIGIN}"
           echo "ORIGIN_TAG=$TAG_VALUE" >> "$GITHUB_OUTPUT"
+        env:
+          GITHUB_EVENT_INPUTS_ROLLBACK_ORIGIN: ${{ github.event.inputs.rollback_origin }}
 
       - name: 'Get Origin Commit Hash'
         id: 'origin_hash'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          STEPS_ORIGIN_TAG_OUTPUTS_ORIGIN_TAG: ${{ steps.origin_tag.outputs.ORIGIN_TAG }}
         shell: 'bash'
         run: |
-          echo "ORIGIN_HASH=$(git rev-parse ${{ steps.origin_tag.outputs.ORIGIN_TAG }})" >> "$GITHUB_OUTPUT"
+          echo "ORIGIN_HASH=$(git rev-parse ${STEPS_ORIGIN_TAG_OUTPUTS_ORIGIN_TAG})" >> "$GITHUB_OUTPUT"
 
       - name: 'Change tag'
         if: "${{ github.event.inputs.rollback_destination != '' }}"
@@ -82,44 +85,49 @@ jobs:
         if: "${{ github.event.inputs.dry-run == 'false' }}"
         env:
           NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+          GITHUB_EVENT_INPUTS_ROLLBACK_ORIGIN: ${{ github.event.inputs.rollback_origin }}
         shell: 'bash'
         run: |
-          npm deprecate @google/gemini-cli@${{ github.event.inputs.rollback_origin }} "This version has been rolled back."
+          npm deprecate @google/gemini-cli@${GITHUB_EVENT_INPUTS_ROLLBACK_ORIGIN} "This version has been rolled back."
 
       - name: 'Deprecate Core Npm Package'
         if: "${{ github.event.inputs.dry-run == 'false' }}"
         env:
           NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CORE }}'
+          GITHUB_EVENT_INPUTS_ROLLBACK_ORIGIN: ${{ github.event.inputs.rollback_origin }}
         shell: 'bash'
         run: |
-          npm deprecate @google/gemini-core@${{ github.event.inputs.rollback_origin }} "This version has been rolled back."
+          npm deprecate @google/gemini-core@${GITHUB_EVENT_INPUTS_ROLLBACK_ORIGIN} "This version has been rolled back."
 
       - name: 'Deprecate A2A Server Npm Package'
         if: "${{ github.event.inputs.dry-run == 'false' }}"
         env:
           NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_A2A_SERVER }}'
+          GITHUB_EVENT_INPUTS_ROLLBACK_ORIGIN: ${{ github.event.inputs.rollback_origin }}
         shell: 'bash'
         run: |
-          npm deprecate @google/gemini-cli-a2a-server@${{ github.event.inputs.rollback_origin }} "This version has been rolled back."
+          npm deprecate @google/gemini-cli-a2a-server@${GITHUB_EVENT_INPUTS_ROLLBACK_ORIGIN} "This version has been rolled back."
 
       - name: 'Delete Github Release'
         if: "${{ github.event.inputs.dry-run == 'false' }}"
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          STEPS_ORIGIN_TAG_OUTPUTS_ORIGIN_TAG: ${{ steps.origin_tag.outputs.ORIGIN_TAG }}
         shell: 'bash'
         run: |
-          gh release delete '${{ steps.origin_tag.outputs.ORIGIN_TAG }}' --yes
+          gh release delete '${STEPS_ORIGIN_TAG_OUTPUTS_ORIGIN_TAG}' --yes
 
       - name: 'Verify Origin Release Deletion'
         if: "${{ github.event.inputs.dry-run == 'false' }}"
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          STEPS_ORIGIN_TAG_OUTPUTS_ORIGIN_TAG: ${{ steps.origin_tag.outputs.ORIGIN_TAG }}
         shell: 'bash'
         run: |
-          TARGET_TAG="${{ steps.origin_tag.outputs.ORIGIN_TAG }}"
+          TARGET_TAG="${STEPS_ORIGIN_TAG_OUTPUTS_ORIGIN_TAG}"
           RELEASE_TAG=$(gh release view "$TARGET_TAG" --json tagName --jq .tagName)
           if [ "$RELEASE_TAG" = "$TARGET_TAG" ]; then
-            echo '❌ Failed to delete release with tag ${{ steps.origin_tag.outputs.ORIGIN_TAG }}'
+            echo '❌ Failed to delete release with tag ${STEPS_ORIGIN_TAG_OUTPUTS_ORIGIN_TAG}'
             echo '❌ This means the release was not deleted, and the workflow should fail.'
             exit 1
           fi
@@ -129,21 +137,25 @@ jobs:
         if: "${{ github.event.inputs.dry-run == 'false' }}"
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          STEPS_ORIGIN_TAG_OUTPUTS_ORIGIN_TAG: ${{ steps.origin_tag.outputs.ORIGIN_TAG }}
+          STEPS_ORIGIN_HASH_OUTPUTS_ORIGIN_HASH: ${{ steps.origin_hash.outputs.ORIGIN_HASH }}
         shell: 'bash'
         run: |
-          ROLLBACK_TAG_NAME="${{ steps.origin_tag.outputs.ORIGIN_TAG }}-rollback"
+          ROLLBACK_TAG_NAME="${STEPS_ORIGIN_TAG_OUTPUTS_ORIGIN_TAG}-rollback"
           echo "ROLLBACK_TAG=$ROLLBACK_TAG_NAME" >> "$GITHUB_OUTPUT"
-          git tag "$ROLLBACK_TAG_NAME" "${{ steps.origin_hash.outputs.ORIGIN_HASH }}"
+          git tag "$ROLLBACK_TAG_NAME" "${STEPS_ORIGIN_HASH_OUTPUTS_ORIGIN_HASH}"
           git push origin --tags
 
       - name: 'Verify Rollback Tag Added'
         if: "${{ github.event.inputs.dry-run == 'false' }}"
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          STEPS_ROLLBACK_TAG_OUTPUTS_ROLLBACK_TAG: ${{ steps.rollback_tag.outputs.ROLLBACK_TAG }}
+          STEPS_ORIGIN_HASH_OUTPUTS_ORIGIN_HASH: ${{ steps.origin_hash.outputs.ORIGIN_HASH }}
         shell: 'bash'
         run: |
-          TARGET_TAG="${{ steps.rollback_tag.outputs.ROLLBACK_TAG }}"
-          TARGET_HASH="${{ steps.origin_hash.outputs.ORIGIN_HASH }}"
+          TARGET_TAG="${STEPS_ROLLBACK_TAG_OUTPUTS_ROLLBACK_TAG}"
+          TARGET_HASH="${STEPS_ORIGIN_HASH_OUTPUTS_ORIGIN_HASH}"
           ROLLBACK_COMMIT=$(git rev-parse -q --verify "$TARGET_TAG")
           if [ "$ROLLBACK_COMMIT" != "$TARGET_HASH" ]; then
             echo '❌ Failed to add tag $TARGET_TAG to commit $TARGET_HASH'
@@ -157,17 +169,32 @@ jobs:
         run: |
           echo "
           Inputs:
-          - rollback_origin: '${{ github.event.inputs.rollback_origin }}'
-          - rollback_destination: '${{ github.event.inputs.rollback_destination }}'
-          - channel: '${{ github.event.inputs.channel }}'
-          - ref: '${{ github.event.inputs.ref }}'
+          - rollback_origin: '${GITHUB_EVENT_INPUTS_ROLLBACK_ORIGIN}'
+          - rollback_destination: '${GITHUB_EVENT_INPUTS_ROLLBACK_DESTINATION}'
+          - channel: '${GITHUB_EVENT_INPUTS_CHANNEL}'
+          - ref: '${GITHUB_EVENT_INPUTS_REF}'
 
           Outputs:
-          - ORIGIN_TAG: '${{ steps.origin_tag.outputs.ORIGIN_TAG }}'
-          - ORIGIN_HASH: '${{ steps.origin_hash.outputs.ORIGIN_HASH }}'
-          - ROLLBACK_TAG: '${{ steps.rollback_tag.outputs.ROLLBACK_TAG }}'
+          - ORIGIN_TAG: '${STEPS_ORIGIN_TAG_OUTPUTS_ORIGIN_TAG}'
+          - ORIGIN_HASH: '${STEPS_ORIGIN_HASH_OUTPUTS_ORIGIN_HASH}'
+          - ROLLBACK_TAG: '${STEPS_ROLLBACK_TAG_OUTPUTS_ROLLBACK_TAG}'
 
-          Would have npm deprecate @google/gemini-cli@${{ github.event.inputs.rollback_origin }} and @google/gemini-core@${{ github.event.inputs.rollback_origin }}
-          Would have deleted the github release with tag ${{ steps.origin_tag.outputs.ORIGIN_TAG }}
-          Would have added tag ${{ steps.origin_tag.outputs.ORIGIN_TAG }}-rollback to ${{ steps.origin_hash.outputs.ORIGIN_HASH }}
+          Would have npm deprecate @google/gemini-cli@${GITHUB_EVENT_INPUTS_ROLLBACK_ORIGIN} and @google/gemini-core@${GITHUB_EVENT_INPUTS_ROLLBACK_ORIGIN}
+          Would have deleted the github release with tag ${STEPS_ORIGIN_TAG_OUTPUTS_ORIGIN_TAG}
+          Would have added tag ${STEPS_ORIGIN_TAG_OUTPUTS_ORIGIN_TAG}-rollback to ${STEPS_ORIGIN_HASH_OUTPUTS_ORIGIN_HASH}
           "
+
+        env:
+          GITHUB_EVENT_INPUTS_ROLLBACK_ORIGIN: ${{ github.event.inputs.rollback_origin }}
+
+          GITHUB_EVENT_INPUTS_ROLLBACK_DESTINATION: ${{ github.event.inputs.rollback_destination }}
+
+          GITHUB_EVENT_INPUTS_CHANNEL: ${{ github.event.inputs.channel }}
+
+          GITHUB_EVENT_INPUTS_REF: ${{ github.event.inputs.ref }}
+
+          STEPS_ORIGIN_TAG_OUTPUTS_ORIGIN_TAG: ${{ steps.origin_tag.outputs.ORIGIN_TAG }}
+
+          STEPS_ORIGIN_HASH_OUTPUTS_ORIGIN_HASH: ${{ steps.origin_hash.outputs.ORIGIN_HASH }}
+
+          STEPS_ROLLBACK_TAG_OUTPUTS_ROLLBACK_TAG: ${{ steps.rollback_tag.outputs.ROLLBACK_TAG }}

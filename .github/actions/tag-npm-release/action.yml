@@ -42,31 +42,42 @@ runs:
         ${{ inputs.dry-run != 'true' }}
       env:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-core }}'
+        INPUTS_VERSION: ${{ inputs.version }}
+        INPUTS_CHANNEL: ${{ inputs.channel }}
       shell: 'bash'
       run: |
-        npm dist-tag add @google/gemini-cli-core@${{ inputs.version }} ${{ inputs.channel }}
+        npm dist-tag add @google/gemini-cli-core@${INPUTS_VERSION} ${INPUTS_CHANNEL}
 
     - name: 'Change tag for @google/gemini-cli'
       if: |-
         ${{ inputs.dry-run != 'true' }}
       env:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-cli }}'
+        INPUTS_VERSION: ${{ inputs.version }}
+        INPUTS_CHANNEL: ${{ inputs.channel }}
       shell: 'bash'
       run: |
-        npm dist-tag add @google/gemini-cli@${{ inputs.version }} ${{ inputs.channel }}
+        npm dist-tag add @google/gemini-cli@${INPUTS_VERSION} ${INPUTS_CHANNEL}
 
     - name: 'Change tag for @google/gemini-cli-a2a-server'
       if: |-
         ${{ inputs.dry-run == 'false' }}
       env:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-a2a-server }}'
+        INPUTS_VERSION: ${{ inputs.version }}
+        INPUTS_CHANNEL: ${{ inputs.channel }}
       shell: 'bash'
       run: |
-        npm dist-tag add @google/gemini-cli-a2a-server@${{ inputs.version }} ${{ inputs.channel }}
+        npm dist-tag add @google/gemini-cli-a2a-server@${INPUTS_VERSION} ${INPUTS_CHANNEL}
 
     - name: 'Log dry run'
       if: |-
         ${{ inputs.dry-run == 'true' }}
       shell: 'bash'
       run: |
-        echo "Dry run: Would have added tag '${{ inputs.channel }}' to version '${{ inputs.version }}' for @google/gemini-cli, @google/gemini-cli-core, and @google/gemini-cli-a2a-server."
+        echo "Dry run: Would have added tag '${INPUTS_CHANNEL}' to version '${INPUTS_VERSION}' for @google/gemini-cli, @google/gemini-cli-core, and @google/gemini-cli-a2a-server."
+
+      env:
+        INPUTS_CHANNEL: ${{ inputs.channel }}
+
+        INPUTS_VERSION: ${{ inputs.version }}
