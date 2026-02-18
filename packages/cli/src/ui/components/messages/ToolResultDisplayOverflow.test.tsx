@@ -35,9 +35,7 @@ describe('ToolResultDisplay Overflow', () => {
     const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <ToolGroupMessage
-          borderColor="grey"
-          borderDimColor={false}
-          groupId={1}
+          item={{ id: 1, type: 'tool_group', tools: toolCalls }}
           toolCalls={toolCalls}
           availableTerminalHeight={15} // Small height to force overflow
           terminalWidth={80}

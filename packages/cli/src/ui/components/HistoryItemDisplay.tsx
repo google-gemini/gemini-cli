@@ -6,7 +6,6 @@
 
 import type React from 'react';
 import { useMemo } from 'react';
-import { theme } from '../semantic-colors.js';
 import { escapeAnsiCtrlCodes } from '../utils/textUtils.js';
 import type { HistoryItem } from '../types.js';
 import { UserMessage } from './messages/UserMessage.js';
@@ -45,11 +44,7 @@ interface HistoryItemDisplayProps {
   terminalWidth: number;
   isPending: boolean;
   commands?: readonly SlashCommand[];
-  activeShellPtyId?: number | null;
-  embeddedShellFocused?: boolean;
   availableTerminalHeightGemini?: number;
-  borderColor?: string;
-  borderDimColor?: boolean;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -58,11 +53,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   terminalWidth,
   isPending,
   commands,
-  activeShellPtyId,
-  embeddedShellFocused,
   availableTerminalHeightGemini,
-  borderColor,
-  borderDimColor,
 }) => {
   const settings = useSettings();
   const inlineThinkingMode = getInlineThinkingMode(settings);
@@ -178,16 +169,12 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'tool_group' && (
         <ToolGroupMessage
+          item={itemForDisplay}
           toolCalls={itemForDisplay.tools}
-          groupId={itemForDisplay.id}
           availableTerminalHeight={availableTerminalHeight}
           terminalWidth={terminalWidth}
-          activeShellPtyId={activeShellPtyId}
-          embeddedShellFocused={embeddedShellFocused}
           borderTop={itemForDisplay.borderTop}
           borderBottom={itemForDisplay.borderBottom}
-          borderColor={borderColor ?? theme.border.default}
-          borderDimColor={borderDimColor ?? false}
         />
       )}
       {itemForDisplay.type === 'compression' && (

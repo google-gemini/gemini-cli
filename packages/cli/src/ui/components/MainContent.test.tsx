@@ -277,6 +277,7 @@ describe('getToolGroupBorderAppearance', () => {
     // so it counts as pending shell.
     expect(result.borderColor).toEqual(theme.ui.symbol);
     // It shouldn't be dim because there are no tools to say it isEmbeddedShellFocused = false
+    expect(result.borderDimColor).toBe(false);
   });
 });
 

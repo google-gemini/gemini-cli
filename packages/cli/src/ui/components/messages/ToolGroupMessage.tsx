@@ -7,7 +7,11 @@
 import type React from 'react';
 import { useMemo } from 'react';
 import { Box, Text } from 'ink';
-import type { IndividualToolCallDisplay } from '../../types.js';
+import type {
+  HistoryItem,
+  HistoryItemWithoutId,
+  IndividualToolCallDisplay,
+} from '../../types.js';
 import { ToolCallStatus, mapCoreStatusToDisplayStatus } from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
 import { ShellToolMessage } from './ShellToolMessage.js';
@@ -17,34 +21,28 @@ import { isShellTool } from './ToolShared.js';
 import { shouldHideToolCall } from '@google/gemini-cli-core';
 import { ShowMoreLines } from '../ShowMoreLines.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
+import { getToolGroupBorderAppearance } from '../../utils/borderStyles.js';
 
 interface ToolGroupMessageProps {
-  groupId: number;
+  item: HistoryItem | HistoryItemWithoutId;
   toolCalls: IndividualToolCallDisplay[];
   availableTerminalHeight?: number;
   terminalWidth: number;
-  activeShellPtyId?: number | null;
-  embeddedShellFocused?: boolean;
   onShellInputSubmit?: (input: string) => void;
   borderTop?: boolean;
   borderBottom?: boolean;
-  borderColor: string;
-  borderDimColor: boolean;
 }
 
 // Main component renders the border and maps the tools using ToolMessage
 const TOOL_MESSAGE_HORIZONTAL_MARGIN = 4;
 
 export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
+  item,
   toolCalls: allToolCalls,
   availableTerminalHeight,
   terminalWidth,
-  activeShellPtyId,
-  embeddedShellFocused,
   borderTop: borderTopOverride,
   borderBottom: borderBottomOverride,
-  borderColor,
-  borderDimColor,
 }) => {
   // Filter out tool calls that should be hidden (e.g. in-progress Ask User, or Plan Mode operations).
   const toolCalls = useMemo(
@@ -62,7 +60,31 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   );
 
   const config = useConfig();
-  const { constrainHeight } = useUIState();
+  const {
+    constrainHeight,
+    activePtyId,
+    embeddedShellFocused,
+    backgroundShells,
+    pendingHistoryItems,
+  } = useUIState();
+
+  const { borderColor, borderDimColor } = useMemo(
+    () =>
+      getToolGroupBorderAppearance(
+        item,
+        activePtyId,
+        embeddedShellFocused,
+        pendingHistoryItems,
+        backgroundShells,
+      ),
+    [
+      item,
+      activePtyId,
+      embeddedShellFocused,
+      pendingHistoryItems,
+      backgroundShells,
+    ],
+  );
 
   // We HIDE tools that are still in pre-execution states (Confirming, Pending)
   // from the History log. They live in the Global Queue or wait for their turn.
@@ -151,12 +173,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             width={contentWidth}
           >
             {isShellToolCall ? (
-              <ShellToolMessage
-                {...commonProps}
-                activeShellPtyId={activeShellPtyId}
-                embeddedShellFocused={embeddedShellFocused}
-                config={config}
-              />
+              <ShellToolMessage {...commonProps} config={config} />
             ) : (
               <ToolMessage {...commonProps} />
             )}

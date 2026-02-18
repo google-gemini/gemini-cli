@@ -19,7 +19,6 @@ import { useMemo, memo, useCallback, useEffect, useRef } from 'react';
 import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
-import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
@@ -50,77 +49,47 @@ export const MainContent = () => {
     staticAreaMaxItemHeight,
     availableTerminalHeight,
     cleanUiDetailsVisible,
-    activePtyId,
-    embeddedShellFocused,
-    backgroundShells,
   } = uiState;
   const showHeaderDetails = cleanUiDetailsVisible;
 
   const historyItems = useMemo(
     () =>
-      uiState.history.map((h) => {
-        const { borderColor, borderDimColor } = getToolGroupBorderAppearance(
-          h,
-          activePtyId,
-          embeddedShellFocused,
-          [],
-          backgroundShells,
-        );
-        return (
-          <MemoizedHistoryItemDisplay
-            terminalWidth={mainAreaWidth}
-            availableTerminalHeight={staticAreaMaxItemHeight}
-            availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
-            key={h.id}
-            item={h}
-            isPending={false}
-            commands={uiState.slashCommands}
-            borderColor={borderColor}
-            borderDimColor={borderDimColor}
-          />
-        );
-      }),
+      uiState.history.map((h) => (
+        <MemoizedHistoryItemDisplay
+          terminalWidth={mainAreaWidth}
+          availableTerminalHeight={staticAreaMaxItemHeight}
+          availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
+          key={h.id}
+          item={h}
+          isPending={false}
+          commands={uiState.slashCommands}
+        />
+      )),
     [
       uiState.history,
       mainAreaWidth,
       staticAreaMaxItemHeight,
       uiState.slashCommands,
-      activePtyId,
-      embeddedShellFocused,
-      backgroundShells,
     ],
   );
 
   const pendingItems = useMemo(
     () => (
       <Box flexDirection="column">
-        {pendingHistoryItems.map((item, i) => {
-          const { borderColor, borderDimColor } = getToolGroupBorderAppearance(
-            item,
-            activePtyId,
-            embeddedShellFocused,
-            pendingHistoryItems,
-            backgroundShells,
-          );
-          return (
-            <HistoryItemDisplay
-              key={i}
-              availableTerminalHeight={
-                (uiState.constrainHeight && !isAlternateBuffer) ||
-                isAlternateBuffer
-                  ? availableTerminalHeight
-                  : undefined
-              }
-              terminalWidth={mainAreaWidth}
-              item={{ ...item, id: 0 }}
-              isPending={true}
-              activeShellPtyId={activePtyId}
-              embeddedShellFocused={embeddedShellFocused}
-              borderColor={borderColor}
-              borderDimColor={borderDimColor}
-            />
-          );
-        })}
+        {pendingHistoryItems.map((item, i) => (
+          <HistoryItemDisplay
+            key={i}
+            availableTerminalHeight={
+              (uiState.constrainHeight && !isAlternateBuffer) ||
+              isAlternateBuffer
+                ? availableTerminalHeight
+                : undefined
+            }
+            terminalWidth={mainAreaWidth}
+            item={{ ...item, id: 0 }}
+            isPending={true}
+          />
+        ))}
         {showConfirmationQueue && confirmingTool && (
           <ToolConfirmationQueue confirmingTool={confirmingTool} />
         )}
@@ -132,9 +101,6 @@ export const MainContent = () => {
       isAlternateBuffer,
       availableTerminalHeight,
       mainAreaWidth,
-      activePtyId,
-      embeddedShellFocused,
-      backgroundShells,
       showConfirmationQueue,
       confirmingTool,
     ],
@@ -160,13 +126,6 @@ export const MainContent = () => {
           />
         );
       } else if (item.type === 'history') {
-        const { borderColor, borderDimColor } = getToolGroupBorderAppearance(
-          item.item,
-          activePtyId,
-          embeddedShellFocused,
-          [],
-          backgroundShells,
-        );
         return (
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
@@ -176,8 +135,6 @@ export const MainContent = () => {
             item={item.item}
             isPending={false}
             commands={uiState.slashCommands}
-            borderColor={borderColor}
-            borderDimColor={borderDimColor}
           />
         );
       } else {
@@ -190,9 +147,6 @@ export const MainContent = () => {
       mainAreaWidth,
       uiState.slashCommands,
       pendingItems,
-      activePtyId,
-      embeddedShellFocused,
-      backgroundShells,
     ],
   );
 

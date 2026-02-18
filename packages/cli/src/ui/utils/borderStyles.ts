@@ -104,14 +104,20 @@ export function getToolGroupBorderAppearance(
   const isPending =
     hasPending || (item.tools.length === 0 && isCurrentlyInShellTurn);
 
+  const isEffectivelyFocused =
+    isEmbeddedShellFocused ||
+    (item.tools.length === 0 &&
+      isCurrentlyInShellTurn &&
+      !!embeddedShellFocused);
+
   const borderColor =
-    (isShell && isPending) || isEmbeddedShellFocused
+    (isShell && isPending) || isEffectivelyFocused
       ? theme.ui.symbol
       : isPending
         ? theme.status.warning
         : theme.border.default;
 
-  const borderDimColor = isPending && (!isShell || !isEmbeddedShellFocused);
+  const borderDimColor = isPending && (!isShell || !isEffectivelyFocused);
 
   return { borderColor, borderDimColor };
 }
