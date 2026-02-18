@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Box } from 'ink';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
-import { StreamingState } from '../types.js';
+import { StreamingState, ToolCallStatus } from '../types.js';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { type Config, CoreToolCallStatus } from '@google/gemini-cli-core';
