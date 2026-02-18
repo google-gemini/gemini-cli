@@ -46,6 +46,7 @@ packages/*/coverage/
 # Generated files
 packages/cli/src/generated/
 packages/core/src/generated/
+packages/devtools/src/_client-assets.ts
 .integration-tests/
 packages/vscode-ide-companion/*.vsix
 packages/cli/download-ripgrep*/
