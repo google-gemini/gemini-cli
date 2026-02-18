@@ -1,0 +1,32 @@
+{
+  "name": "@google/gemini-cli-devtools",
+  "version": "0.30.0-nightly.20260210.a2174751d",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "scripts": {
+    "build": "npm run build:client && tsc -p tsconfig.build.json",
+    "build:client": "node esbuild.client.js"
+  },
+  "files": [
+    "dist",
+    "client/index.html"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}

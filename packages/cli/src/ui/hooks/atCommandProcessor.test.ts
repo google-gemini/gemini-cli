@@ -17,10 +17,10 @@ import {
   COMMON_IGNORE_PATTERNS,
   GEMINI_IGNORE_FILE_NAME,
   // DEFAULT_FILE_EXCLUDES,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import * as core from '@google/gemini-cli-core';
 import * as os from 'node:os';
-import { ToolCallStatus } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
@@ -145,6 +145,7 @@ describe('handleAtCommand', () => {
   afterEach(async () => {
     abortController.abort();
     await fsPromises.rm(testRootDir, { recursive: true, force: true });
+    vi.unstubAllGlobals();
   });
 
   it('should pass through query if no @ command is present', async () => {
@@ -211,7 +212,9 @@ describe('handleAtCommand', () => {
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'tool_group',
-        tools: [expect.objectContaining({ status: ToolCallStatus.Success })],
+        tools: [
+          expect.objectContaining({ status: CoreToolCallStatus.Success }),
+        ],
       }),
       125,
     );
@@ -289,8 +292,8 @@ describe('handleAtCommand', () => {
       path.join(testRootDir, 'path', 'to', 'my file.txt'),
       fileContent,
     );
-    const escapedpath = path.join(testRootDir, 'path', 'to', 'my\\ file.txt');
-    const query = `@${escapedpath}`;
+
+    const query = `@${core.escapePath(filePath)}`;
 
     const result = await handleAtCommand({
       query,
@@ -313,11 +316,53 @@ describe('handleAtCommand', () => {
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'tool_group',
-        tools: [expect.objectContaining({ status: ToolCallStatus.Success })],
+        tools: [
+          expect.objectContaining({ status: CoreToolCallStatus.Success }),
+        ],
       }),
       125,
     );
   }, 10000);
+
+  it('should correctly handle double-quoted paths with spaces', async () => {
+    // Mock platform to win32 so unescapePath strips quotes
+    vi.stubGlobal(
+      'process',
+      Object.create(process, {
+        platform: {
+          get: () => 'win32',
+        },
+      }),
+    );
+
+    const fileContent = 'Content of file with spaces';
+    const filePath = await createTestFile(
+      path.join(testRootDir, 'my folder', 'my file.txt'),
+      fileContent,
+    );
+    // On Windows, the user might provide: @"path/to/my file.txt"
+    const query = `@"${filePath}"`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 126,
+      signal: abortController.signal,
+    });
+
+    const relativePath = getRelativePath(filePath);
+    expect(result).toEqual({
+      processedQuery: [
+        { text: `@${relativePath}` },
+        { text: '\n--- Content from referenced files ---' },
+        { text: `\nContent from @${relativePath}:\n` },
+        { text: fileContent },
+        { text: '\n--- End of content ---' },
+      ],
+    });
+  });
 
   it('should correctly handle file paths with narrow non-breaking space (NNBSP)', async () => {
     const nnbsp = '\u202F';
@@ -919,8 +964,8 @@ describe('handleAtCommand', () => {
         path.join(testRootDir, 'spaced file.txt'),
         fileContent,
       );
-      const escapedPath = path.join(testRootDir, 'spaced\\ file.txt');
-      const query = `Check @${escapedPath}, it has spaces.`;
+
+      const query = `Check @${core.escapePath(filePath)}, it has spaces.`;
 
       const result = await handleAtCommand({
         query,
@@ -1241,7 +1286,9 @@ describe('handleAtCommand', () => {
     // Assert
     // It SHOULD be called for the tool_group
     expect(mockAddItem).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'tool_group' }),
+      expect.objectContaining({
+        type: 'tool_group',
+      }),
       999,
     );
 
@@ -1298,7 +1345,9 @@ describe('handleAtCommand', () => {
       });
       expect(containsResourceText).toBe(true);
       expect(mockAddItem).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'tool_group' }),
+        expect.objectContaining({
+          type: 'tool_group',
+        }),
         expect.any(Number),
       );
     });
@@ -1390,7 +1439,7 @@ describe('handleAtCommand', () => {
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'tool_group',
-        tools: [expect.objectContaining({ status: ToolCallStatus.Error })],
+        tools: [expect.objectContaining({ status: CoreToolCallStatus.Error })],
       }),
       134,
     );

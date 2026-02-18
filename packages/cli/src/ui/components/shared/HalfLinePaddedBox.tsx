@@ -8,6 +8,7 @@ import type React from 'react';
 import { useMemo } from 'react';
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { useUIState } from '../../contexts/UIStateContext.js';
+import { theme } from '../../semantic-colors.js';
 import {
   interpolateColor,
   resolveColor,
@@ -52,8 +53,8 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
   backgroundOpacity,
   children,
 }) => {
-  const { terminalWidth, terminalBackgroundColor } = useUIState();
-  const terminalBg = terminalBackgroundColor || 'black';
+  const { terminalWidth } = useUIState();
+  const terminalBg = theme.background.primary || 'black';
 
   const isLowColor = isLowColorDepth();
 

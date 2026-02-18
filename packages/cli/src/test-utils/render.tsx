@@ -33,6 +33,10 @@ import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
 import { AppContext, type AppState } from '../ui/contexts/AppContext.js';
 import { createMockSettings } from './settings.js';
+import { SessionStatsProvider } from '../ui/contexts/SessionContext.js';
+import { themeManager, DEFAULT_THEME } from '../ui/themes/theme-manager.js';
+import { DefaultLight } from '../ui/themes/default-light.js';
+import { pickDefaultThemeName } from '../ui/themes/theme.js';
 
 export const persistentStateMock = new FakePersistentState();
 
@@ -150,7 +154,9 @@ const baseMockUiState = {
   terminalWidth: 120,
   terminalHeight: 40,
   currentModel: 'gemini-pro',
-  terminalBackgroundColor: undefined,
+  terminalBackgroundColor: 'black',
+  cleanUiDetailsVisible: false,
+  allowPlanMode: true,
   activePtyId: undefined,
   backgroundShells: new Map(),
   backgroundShellHeight: 0,
@@ -204,6 +210,10 @@ const mockUIActions: UIActions = {
   handleApiKeyCancel: vi.fn(),
   setBannerVisible: vi.fn(),
   setShortcutsHelpVisible: vi.fn(),
+  setCleanUiDetailsVisible: vi.fn(),
+  toggleCleanUiDetailsVisible: vi.fn(),
+  revealCleanUiDetailsTemporarily: vi.fn(),
+  handleWarning: vi.fn(),
   setEmbeddedShellFocused: vi.fn(),
   dismissBackgroundShell: vi.fn(),
   setActiveBackgroundShellPid: vi.fn(),
@@ -293,6 +303,15 @@ export const renderWithProviders = (
     mainAreaWidth,
   };
 
+  themeManager.setTerminalBackground(baseState.terminalBackgroundColor);
+  const themeName = pickDefaultThemeName(
+    baseState.terminalBackgroundColor,
+    themeManager.getAllThemes(),
+    DEFAULT_THEME.name,
+    DefaultLight.name,
+  );
+  themeManager.setActiveTheme(themeName);
+
   const finalUIActions = { ...mockUIActions, ...uiActions };
 
   const allToolCalls = (finalUiState.pendingHistoryItems || [])
@@ -306,39 +325,43 @@ export const renderWithProviders = (
           <UIStateContext.Provider value={finalUiState}>
             <VimModeProvider settings={finalSettings}>
               <ShellFocusContext.Provider value={shellFocus}>
-                <StreamingContext.Provider value={finalUiState.streamingState}>
-                  <UIActionsContext.Provider value={finalUIActions}>
-                    <ToolActionsProvider
-                      config={config}
-                      toolCalls={allToolCalls}
-                    >
-                      <AskUserActionsProvider
-                        request={null}
-                        onSubmit={vi.fn()}
-                        onCancel={vi.fn()}
+                <SessionStatsProvider>
+                  <StreamingContext.Provider
+                    value={finalUiState.streamingState}
+                  >
+                    <UIActionsContext.Provider value={finalUIActions}>
+                      <ToolActionsProvider
+                        config={config}
+                        toolCalls={allToolCalls}
                       >
-                        <KeypressProvider>
-                          <MouseProvider
-                            mouseEventsEnabled={mouseEventsEnabled}
-                          >
-                            <TerminalProvider>
-                              <ScrollProvider>
-                                <Box
-                                  width={terminalWidth}
-                                  flexShrink={0}
-                                  flexGrow={0}
-                                  flexDirection="column"
-                                >
-                                  {component}
-                                </Box>
-                              </ScrollProvider>
-                            </TerminalProvider>
-                          </MouseProvider>
-                        </KeypressProvider>
-                      </AskUserActionsProvider>
-                    </ToolActionsProvider>
-                  </UIActionsContext.Provider>
-                </StreamingContext.Provider>
+                        <AskUserActionsProvider
+                          request={null}
+                          onSubmit={vi.fn()}
+                          onCancel={vi.fn()}
+                        >
+                          <KeypressProvider>
+                            <MouseProvider
+                              mouseEventsEnabled={mouseEventsEnabled}
+                            >
+                              <TerminalProvider>
+                                <ScrollProvider>
+                                  <Box
+                                    width={terminalWidth}
+                                    flexShrink={0}
+                                    flexGrow={0}
+                                    flexDirection="column"
+                                  >
+                                    {component}
+                                  </Box>
+                                </ScrollProvider>
+                              </TerminalProvider>
+                            </MouseProvider>
+                          </KeypressProvider>
+                        </AskUserActionsProvider>
+                      </ToolActionsProvider>
+                    </UIActionsContext.Provider>
+                  </StreamingContext.Provider>
+                </SessionStatsProvider>
               </ShellFocusContext.Provider>
             </VimModeProvider>
           </UIStateContext.Provider>
