@@ -34,27 +34,16 @@ export function getShellToolDescription(
       - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).`
     : '';
 
-  const returnedInfo = `
-
-      The following information is returned:
-
-      Output: Combined stdout/stderr. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Exit Code: Only included if non-zero (command failed).
-      Error: Only included if a process-level error occurred (e.g., spawn failure).
-      Signal: Only included if process was terminated by a signal.
-      Background PIDs: Only included if background processes were started.
-      Process Group PGID: Only included if available.`;
-
   if (os.platform() === 'win32') {
     const backgroundInstructions = enableInteractiveShell
       ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use PowerShell background constructs.'
       : 'Command can start background processes using PowerShell constructs such as `Start-Process -NoNewWindow` or `Start-Job`.';
-    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. ${backgroundInstructions}${efficiencyGuidelines}${returnedInfo}`;
+    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. ${backgroundInstructions}${efficiencyGuidelines}`;
   } else {
     const backgroundInstructions = enableInteractiveShell
       ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use `&` to background commands.'
       : 'Command can start background processes using `&`.';
-    return `This tool executes a given shell command as \`bash -c <command>\`. ${backgroundInstructions} Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${efficiencyGuidelines}${returnedInfo}`;
+    return `This tool executes a given shell command as \`bash -c <command>\`. ${backgroundInstructions}${efficiencyGuidelines}`;
   }
 }
 
