@@ -226,6 +226,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     backgroundShells,
     backgroundShellHeight,
     shortcutsHelpVisible,
+    hintMode,
   } = useUIState();
   const [suppressCompletion, setSuppressCompletion] = useState(false);
   const { handlePress: registerPlainTabPress, resetCount: resetPlainTabPress } =
@@ -267,7 +268,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   ]);
   const [expandedSuggestionIndex, setExpandedSuggestionIndex] =
     useState<number>(-1);
-  const shellHistory = useShellHistory(config.getProjectRoot());
+  const shellHistory = useShellHistory(config.getProjectRoot(), config.storage);
   const shellHistoryData = shellHistory.history;
 
   const completion = useCommandCompletion({
@@ -1420,7 +1421,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         />
       ) : null}
       <HalfLinePaddedBox
-        backgroundBaseColor={theme.text.secondary}
+        backgroundBaseColor={
+          hintMode ? theme.text.accent : theme.text.secondary
+        }
         backgroundOpacity={
           showCursor
             ? DEFAULT_INPUT_BACKGROUND_OPACITY

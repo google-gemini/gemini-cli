@@ -45,6 +45,18 @@ describe('<HistoryItemDisplay />', () => {
     expect(lastFrame()).toContain('Hello');
   });
 
+  it('renders HintMessage for "hint" type', () => {
+    const item: HistoryItem = {
+      ...baseItem,
+      type: 'hint',
+      text: 'Try using ripgrep first',
+    };
+    const { lastFrame } = renderWithProviders(
+      <HistoryItemDisplay {...baseItem} item={item} />,
+    );
+    expect(lastFrame()).toContain('Try using ripgrep first');
+  });
+
   it('renders UserMessage for "user" type with slash command', () => {
     const item: HistoryItem = {
       ...baseItem,
