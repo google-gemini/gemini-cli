@@ -39,7 +39,7 @@ export function getShellToolDescription(
       The following information is returned:
 
       Output: Combined stdout/stderr. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Exit Code: Only included if non-zero (command failed).
+      Exit Code: The process exit code, or null if terminated by a signal.
       Error: Only included if a process-level error occurred (e.g., spawn failure).
       Signal: Only included if process was terminated by a signal.
       Background PIDs: Only included if background processes were started.
