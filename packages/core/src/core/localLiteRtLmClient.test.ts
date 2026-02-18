@@ -37,9 +37,7 @@ describe('LocalLiteRtLmClient', () => {
 
   it('should successfully call generateJson and return parsed JSON', async () => {
     mockGenerateContent.mockResolvedValue({
-      text: `\`\`\`json
-{"key": "value"}
-\`\`\``,
+      text: '{"key": "value"}',
     });
 
     const client = new LocalLiteRtLmClient(mockConfig);
@@ -68,7 +66,7 @@ describe('LocalLiteRtLmClient', () => {
     );
   });
 
-  it('should clean and repair malformed JSON', async () => {
+  it('should throw if the JSON is malformed', async () => {
     mockGenerateContent.mockResolvedValue({
       text: `{
   “key”: ‘value’,
@@ -76,9 +74,9 @@ describe('LocalLiteRtLmClient', () => {
     });
 
     const client = new LocalLiteRtLmClient(mockConfig);
-    const result = await client.generateJson([], 'test-instruction');
-
-    expect(result).toEqual({ key: 'value' });
+    await expect(client.generateJson([], 'test-instruction')).rejects.toThrow(
+      SyntaxError,
+    );
   });
 
   it('should add reminder to the last user message', async () => {

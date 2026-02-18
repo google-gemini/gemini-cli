@@ -83,6 +83,7 @@ describe('GemmaClassifierStrategy', () => {
       expect.any(Array),
       expect.any(String),
       expect.any(String),
+      expect.any(AbortSignal),
     );
   });
 
@@ -298,7 +299,7 @@ second message
 #### Current Request:
 "simple task"
 `;
-     
+
     expect(lastTurn!.parts!.at(0)!.text).toEqual(expectedLastTurn);
   });
 });
