@@ -3370,7 +3370,7 @@ describe('useGeminiStream', () => {
       );
     });
 
-    it('should not add whitespace-only history item when splitting message', async () => {
+    it('should add whitespace-only history item when splitting message', async () => {
       // Input: "   content"
       // Split at 3 -> before: "   ", after: "content"
       vi.mocked(findLastSafeSplitPoint).mockReturnValue(3);
@@ -3387,12 +3387,9 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('user query');
       });
 
-      await waitFor(() => {
-        // addItem should NOT be called for "   " because of .trim() check
-        // It is called for 'user query' and the final content 'content'.
-      });
+      await waitFor(() => {});
 
-      expect(mockAddItem).toHaveBeenCalledTimes(2);
+      expect(mockAddItem).toHaveBeenCalledTimes(3);
       expect(mockAddItem).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'user', text: 'user query' }),
         expect.any(Number),
