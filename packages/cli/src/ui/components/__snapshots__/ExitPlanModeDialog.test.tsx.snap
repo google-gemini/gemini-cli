@@ -1,0 +1,234 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ExitPlanModeDialog > useAlternateBuffer: false > bubbles up Ctrl+C when feedback is empty while editing 1`] = `
+"Overview
+
+Add user authentication to the CLI application.
+
+Implementation Steps
+
+ 1. Create src/auth/AuthService.ts with login/logout methods
+ 2. Add session storage in src/storage/SessionStore.ts
+ 3. Update src/commands/index.ts to check auth status
+ 4. Add tests in src/auth/__tests__/
+
+Files to Modify
+
+ - src/index.ts - Add auth middleware
+ - src/config.ts - Add auth configuration options
+
+  1.  Yes, automatically accept edits
+      Approves plan and allows tools to run automatically
+  2.  Yes, manually accept edits
+      Approves plan but requires confirmation for each tool
+● 3.  Type your feedback...
+
+Enter to submit · Esc to cancel"
+`;
+
+exports[`ExitPlanModeDialog > useAlternateBuffer: false > calls onFeedback when feedback is typed and submitted 1`] = `
+"Overview
+
+Add user authentication to the CLI application.
+
+Implementation Steps
+
+ 1. Create src/auth/AuthService.ts with login/logout methods
+ 2. Add session storage in src/storage/SessionStore.ts
+ 3. Update src/commands/index.ts to check auth status
+ 4. Add tests in src/auth/__tests__/
+
+Files to Modify
+
+ - src/index.ts - Add auth middleware
+ - src/config.ts - Add auth configuration options
+
+  1.  Yes, automatically accept edits
+      Approves plan and allows tools to run automatically
+  2.  Yes, manually accept edits
+      Approves plan but requires confirmation for each tool
+● 3.  Add tests
+
+Enter to submit · Esc to cancel"
+`;
+
+exports[`ExitPlanModeDialog > useAlternateBuffer: false > displays error state when file read fails 1`] = `" Error reading plan: File not found"`;
+
+exports[`ExitPlanModeDialog > useAlternateBuffer: false > handles long plan content appropriately 1`] = `
+"Overview
+
+Implement a comprehensive authentication system with multiple providers.
+
+Implementation Steps
+
+ 1. Create src/auth/AuthService.ts with login/logout methods
+ 2. Add session storage in src/storage/SessionStore.ts
+ 3. Update src/commands/index.ts to check auth status
+ 4. Add OAuth2 provider support in src/auth/providers/OAuth2Provider.ts
+ 5. Add SAML provider support in src/auth/providers/SAMLProvider.ts
+ 6. Add LDAP provider support in src/auth/providers/LDAPProvider.ts
+ 7. Create token refresh mechanism in src/auth/TokenManager.ts
+ 8. Add multi-factor authentication in src/auth/MFAService.ts
+... last 22 lines hidden ...
+
+● 1.  Yes, automatically accept edits
+      Approves plan and allows tools to run automatically
+  2.  Yes, manually accept edits
+      Approves plan but requires confirmation for each tool
+  3.  Type your feedback...
+
+Enter to select · ↑/↓ to navigate · Esc to cancel"
+`;
+
+exports[`ExitPlanModeDialog > useAlternateBuffer: false > renders correctly with plan content 1`] = `
+"Overview
+
+Add user authentication to the CLI application.
+
+Implementation Steps
+
+ 1. Create src/auth/AuthService.ts with login/logout methods
+ 2. Add session storage in src/storage/SessionStore.ts
+ 3. Update src/commands/index.ts to check auth status
+ 4. Add tests in src/auth/__tests__/
+
+Files to Modify
+
+ - src/index.ts - Add auth middleware
+ - src/config.ts - Add auth configuration options
+
+● 1.  Yes, automatically accept edits
+      Approves plan and allows tools to run automatically
+  2.  Yes, manually accept edits
+      Approves plan but requires confirmation for each tool
+  3.  Type your feedback...
+
+Enter to select · ↑/↓ to navigate · Esc to cancel"
+`;
+
+exports[`ExitPlanModeDialog > useAlternateBuffer: true > bubbles up Ctrl+C when feedback is empty while editing 1`] = `
+"Overview
+
+Add user authentication to the CLI application.
+
+Implementation Steps
+
+ 1. Create src/auth/AuthService.ts with login/logout methods
+ 2. Add session storage in src/storage/SessionStore.ts
+ 3. Update src/commands/index.ts to check auth status
+ 4. Add tests in src/auth/__tests__/
+
+Files to Modify
+
+ - src/index.ts - Add auth middleware
+ - src/config.ts - Add auth configuration options
+
+  1.  Yes, automatically accept edits
+      Approves plan and allows tools to run automatically
+  2.  Yes, manually accept edits
+      Approves plan but requires confirmation for each tool
+● 3.  Type your feedback...
+
+Enter to submit · Esc to cancel"
+`;
+
+exports[`ExitPlanModeDialog > useAlternateBuffer: true > calls onFeedback when feedback is typed and submitted 1`] = `
+"Overview
+
+Add user authentication to the CLI application.
+
+Implementation Steps
+
+ 1. Create src/auth/AuthService.ts with login/logout methods
+ 2. Add session storage in src/storage/SessionStore.ts
+ 3. Update src/commands/index.ts to check auth status
+ 4. Add tests in src/auth/__tests__/
+
+Files to Modify
+
+ - src/index.ts - Add auth middleware
+ - src/config.ts - Add auth configuration options
+
+  1.  Yes, automatically accept edits
+      Approves plan and allows tools to run automatically
+  2.  Yes, manually accept edits
+      Approves plan but requires confirmation for each tool
+● 3.  Add tests
+
+Enter to submit · Esc to cancel"
+`;
+
+exports[`ExitPlanModeDialog > useAlternateBuffer: true > displays error state when file read fails 1`] = `" Error reading plan: File not found"`;
+
+exports[`ExitPlanModeDialog > useAlternateBuffer: true > handles long plan content appropriately 1`] = `
+"Overview
+
+Implement a comprehensive authentication system with multiple providers.
+
+Implementation Steps
+
+ 1. Create src/auth/AuthService.ts with login/logout methods
+ 2. Add session storage in src/storage/SessionStore.ts
+ 3. Update src/commands/index.ts to check auth status
+ 4. Add OAuth2 provider support in src/auth/providers/OAuth2Provider.ts
+ 5. Add SAML provider support in src/auth/providers/SAMLProvider.ts
+ 6. Add LDAP provider support in src/auth/providers/LDAPProvider.ts
+ 7. Create token refresh mechanism in src/auth/TokenManager.ts
+ 8. Add multi-factor authentication in src/auth/MFAService.ts
+ 9. Implement session timeout handling in src/auth/SessionManager.ts
+ 10. Add audit logging for auth events in src/auth/AuditLogger.ts
+ 11. Create user profile management in src/auth/UserProfile.ts
+ 12. Add role-based access control in src/auth/RBACService.ts
+ 13. Implement password policy enforcement in src/auth/PasswordPolicy.ts
+ 14. Add brute force protection in src/auth/BruteForceGuard.ts
+ 15. Create secure cookie handling in src/auth/CookieManager.ts
+
+Files to Modify
+
+ - src/index.ts - Add auth middleware
+ - src/config.ts - Add auth configuration options
+ - src/routes/api.ts - Add auth endpoints
+ - src/middleware/cors.ts - Update CORS for auth headers
+ - src/utils/crypto.ts - Add encryption utilities
+
+Testing Strategy
+
+ - Unit tests for each auth provider
+ - Integration tests for full auth flows
+ - Security penetration testing
+ - Load testing for session management
+
+● 1.  Yes, automatically accept edits
+      Approves plan and allows tools to run automatically
+  2.  Yes, manually accept edits
+      Approves plan but requires confirmation for each tool
+  3.  Type your feedback...
+
+Enter to select · ↑/↓ to navigate · Esc to cancel"
+`;
+
+exports[`ExitPlanModeDialog > useAlternateBuffer: true > renders correctly with plan content 1`] = `
+"Overview
+
+Add user authentication to the CLI application.
+
+Implementation Steps
+
+ 1. Create src/auth/AuthService.ts with login/logout methods
+ 2. Add session storage in src/storage/SessionStore.ts
+ 3. Update src/commands/index.ts to check auth status
+ 4. Add tests in src/auth/__tests__/
+
+Files to Modify
+
+ - src/index.ts - Add auth middleware
+ - src/config.ts - Add auth configuration options
+
+● 1.  Yes, automatically accept edits
+      Approves plan and allows tools to run automatically
+  2.  Yes, manually accept edits
+      Approves plan but requires confirmation for each tool
+  3.  Type your feedback...
+
+Enter to select · ↑/↓ to navigate · Esc to cancel"
+`;

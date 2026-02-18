@@ -7,14 +7,18 @@
 import { act } from 'react';
 import { ToolMessage } from './ToolMessage.js';
 import { ShellToolMessage } from './ShellToolMessage.js';
-import { ToolCallStatus, StreamingState } from '../../types.js';
+import { StreamingState } from '../../types.js';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   SHELL_COMMAND_NAME,
   SHELL_FOCUS_HINT_DELAY_MS,
 } from '../../constants.js';
-import type { Config, ToolResultDisplay } from '@google/gemini-cli-core';
+import {
+  type Config,
+  type ToolResultDisplay,
+  CoreToolCallStatus,
+} from '@google/gemini-cli-core';
 
 vi.mock('../GeminiRespondingSpinner.js', () => ({
   GeminiRespondingSpinner: () => null,
@@ -34,7 +38,7 @@ describe('Focus Hint', () => {
     name: SHELL_COMMAND_NAME,
     description: 'A tool for testing',
     resultDisplay: undefined as ToolResultDisplay | undefined,
-    status: ToolCallStatus.Executing,
+    status: CoreToolCallStatus.Executing,
     terminalWidth: 80,
     confirmationDetails: undefined,
     emphasis: 'medium' as const,
@@ -77,7 +81,7 @@ describe('Focus Hint', () => {
 
       // Now it SHOULD contain the focus hint
       expect(lastFrame()).toMatchSnapshot('after-delay-no-output');
-      expect(lastFrame()).toContain('(tab to focus)');
+      expect(lastFrame()).toContain('(Tab to focus)');
     });
 
     it('shows focus hint after delay with output', async () => {
@@ -95,7 +99,7 @@ describe('Focus Hint', () => {
       });
 
       expect(lastFrame()).toMatchSnapshot('after-delay-with-output');
-      expect(lastFrame()).toContain('(tab to focus)');
+      expect(lastFrame()).toContain('(Tab to focus)');
     });
   });
 
@@ -116,7 +120,7 @@ describe('Focus Hint', () => {
 
     // The focus hint should be visible
     expect(lastFrame()).toMatchSnapshot('long-description');
-    expect(lastFrame()).toContain('(tab to focus)');
+    expect(lastFrame()).toContain('(Tab to focus)');
     // The name should still be visible
     expect(lastFrame()).toContain(SHELL_COMMAND_NAME);
   });

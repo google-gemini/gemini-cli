@@ -21,13 +21,65 @@ import type { SelectionListItem } from '../hooks/useSelectionList.js';
 import { TabHeader, type Tab } from './shared/TabHeader.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
-import { checkExhaustive } from '../../utils/checks.js';
+import { checkExhaustive } from '@google/gemini-cli-core';
 import { TextInput } from './shared/TextInput.js';
 import { useTextBuffer } from './shared/text-buffer.js';
-import { UIStateContext } from '../contexts/UIStateContext.js';
 import { getCachedStringWidth } from '../utils/textUtils.js';
 import { useTabbedNavigation } from '../hooks/useTabbedNavigation.js';
 import { DialogFooter } from './shared/DialogFooter.js';
+import { MarkdownDisplay } from '../utils/MarkdownDisplay.js';
+import { RenderInline } from '../utils/InlineMarkdownRenderer.js';
+import { MaxSizedBox } from './shared/MaxSizedBox.js';
+import { UIStateContext } from '../contexts/UIStateContext.js';
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+
+/** Padding for dialog content to prevent text from touching edges. */
+const DIALOG_PADDING = 4;
+
+/**
+ * Checks if text is a single line without markdown identifiers.
+ */
+function isPlainSingleLine(text: string): boolean {
+  // Must be a single line (no newlines)
+  if (text.includes('\n') || text.includes('\r')) {
+    return false;
+  }
+
+  // Check for common markdown identifiers
+  const markdownPatterns = [
+    /^#{1,6}\s/, // Headers
+    /^[`~]{3,}/, // Code fences
+    /^[-*+]\s/, // Unordered lists
+    /^\d+\.\s/, // Ordered lists
+    /^[-*_]{3,}$/, // Horizontal rules
+    /\|/, // Tables
+    /\*\*|__/, // Bold
+    /(?<!\*)\*(?!\*)/, // Italic (single asterisk not part of bold)
+    /(?<!_)_(?!_)/, // Italic (single underscore not part of bold)
+    /`[^`]+`/, // Inline code
+    /\[.*?\]\(.*?\)/, // Links
+    /!\[/, // Images
+  ];
+
+  for (const pattern of markdownPatterns) {
+    if (pattern.test(text)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Auto-bolds plain single-line text by wrapping in **.
+ * Returns the text unchanged if it already contains markdown.
+ */
+function autoBoldIfPlain(text: string): string {
+  if (isPlainSingleLine(text)) {
+    return `**${text}**`;
+  }
+  return text;
+}
 
 interface AskUserDialogState {
   answers: { [key: string]: string };
@@ -41,6 +93,7 @@ type AskUserDialogAction =
       payload: {
         index: number;
         answer: string;
+        submit?: boolean;
       };
     }
   | { type: 'SET_EDITING_CUSTOM'; payload: { isEditing: boolean } }
@@ -62,7 +115,7 @@ function askUserDialogReducerLogic(
 
   switch (action.type) {
     case 'SET_ANSWER': {
-      const { index, answer } = action.payload;
+      const { index, answer, submit } = action.payload;
       const hasAnswer =
         answer !== undefined && answer !== null && answer.trim() !== '';
       const newAnswers = { ...state.answers };
@@ -76,6 +129,7 @@ function askUserDialogReducerLogic(
       return {
         ...state,
         answers: newAnswers,
+        submitted: submit ? true : state.submitted,
       };
     }
     case 'SET_EDITING_CUSTOM': {
@@ -121,6 +175,14 @@ interface AskUserDialogProps {
    * Useful for managing global keypress handlers.
    */
   onActiveTextInputChange?: (active: boolean) => void;
+  /**
+   * Width of the dialog.
+   */
+  width: number;
+  /**
+   * Height constraint for scrollable content.
+   */
+  availableHeight?: number;
 }
 
 interface ReviewViewProps {
@@ -152,12 +214,7 @@ const ReviewView: React.FC<ReviewViewProps> = ({
   );
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      paddingX={1}
-      borderColor={theme.border.default}
-    >
+    <Box flexDirection="column">
       {progressHeader}
       <Box marginBottom={1}>
         <Text bold color={theme.text.primary}>
@@ -174,15 +231,19 @@ const ReviewView: React.FC<ReviewViewProps> = ({
         </Box>
       )}
 
-      {questions.map((q, i) => (
-        <Box key={i} marginBottom={0}>
-          <Text color={theme.text.secondary}>{q.header}</Text>
-          <Text color={theme.text.secondary}> → </Text>
-          <Text color={answers[i] ? theme.text.primary : theme.status.warning}>
-            {answers[i] || '(not answered)'}
-          </Text>
-        </Box>
-      ))}
+      <Box flexDirection="column">
+        {questions.map((q, i) => (
+          <Box key={i} marginBottom={0}>
+            <Text color={theme.text.secondary}>{q.header}</Text>
+            <Text color={theme.text.secondary}> → </Text>
+            <Text
+              color={answers[i] ? theme.text.primary : theme.status.warning}
+            >
+              {answers[i] || '(not answered)'}
+            </Text>
+          </Box>
+        ))}
+      </Box>
       <DialogFooter
         primaryAction="Enter to submit"
         navigationActions="Tab/Shift+Tab to edit answers"
@@ -199,6 +260,7 @@ interface TextQuestionViewProps {
   onSelectionChange?: (answer: string) => void;
   onEditingCustomOption?: (editing: boolean) => void;
   availableWidth: number;
+  availableHeight?: number;
   initialAnswer?: string;
   progressHeader?: React.ReactNode;
   keyboardHints?: React.ReactNode;
@@ -210,20 +272,21 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   onSelectionChange,
   onEditingCustomOption,
   availableWidth,
+  availableHeight,
   initialAnswer,
   progressHeader,
   keyboardHints,
 }) => {
+  const isAlternateBuffer = useAlternateBuffer();
   const prefix = '> ';
-  const horizontalPadding = 4 + 1; // Padding from Box (2) and border (2) + 1 for cursor
+  const horizontalPadding = 1; // 1 for cursor
   const bufferWidth =
     availableWidth - getCachedStringWidth(prefix) - horizontalPadding;
 
   const buffer = useTextBuffer({
     initialText: initialAnswer,
-    viewport: { width: Math.max(1, bufferWidth), height: 1 },
-    singleLine: true,
-    isValidPath: () => false,
+    viewport: { width: Math.max(1, bufferWidth), height: 3 },
+    singleLine: false,
   });
 
   const { text: textValue } = buffer;
@@ -241,21 +304,22 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   const handleExtraKeys = useCallback(
     (key: Key) => {
       if (keyMatchers[Command.QUIT](key)) {
+        if (textValue === '') {
+          return false;
+        }
         buffer.setText('');
         return true;
       }
       return false;
     },
-    [buffer],
+    [buffer, textValue],
   );
 
   useKeypress(handleExtraKeys, { isActive: true, priority: true });
 
   const handleSubmit = useCallback(
     (val: string) => {
-      if (val.trim()) {
-        onAnswer(val.trim());
-      }
+      onAnswer(val.trim());
     },
     [onAnswer],
   );
@@ -270,22 +334,34 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
 
   const placeholder = question.placeholder || 'Enter your response';
 
+  const HEADER_HEIGHT = progressHeader ? 2 : 0;
+  const INPUT_HEIGHT = 2; // TextInput + margin
+  const FOOTER_HEIGHT = 2; // DialogFooter + margin
+  const overhead = HEADER_HEIGHT + INPUT_HEIGHT + FOOTER_HEIGHT;
+  const questionHeight =
+    availableHeight && !isAlternateBuffer
+      ? Math.max(1, availableHeight - overhead)
+      : undefined;
+
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      paddingX={1}
-      borderColor={theme.border.default}
-    >
+    <Box flexDirection="column">
       {progressHeader}
       <Box marginBottom={1}>
-        <Text bold color={theme.text.primary}>
-          {question.question}
-        </Text>
+        <MaxSizedBox
+          maxHeight={questionHeight}
+          maxWidth={availableWidth}
+          overflowDirection="bottom"
+        >
+          <MarkdownDisplay
+            text={autoBoldIfPlain(question.question)}
+            terminalWidth={availableWidth - DIALOG_PADDING}
+            isPending={false}
+          />
+        </MaxSizedBox>
       </Box>
 
       <Box flexDirection="row" marginBottom={1}>
-        <Text color={theme.text.accent}>{'> '}</Text>
+        <Text color={theme.status.success}>{'> '}</Text>
         <TextInput
           buffer={buffer}
           placeholder={placeholder}
@@ -381,6 +457,7 @@ interface ChoiceQuestionViewProps {
   onSelectionChange?: (answer: string) => void;
   onEditingCustomOption?: (editing: boolean) => void;
   availableWidth: number;
+  availableHeight?: number;
   initialAnswer?: string;
   progressHeader?: React.ReactNode;
   keyboardHints?: React.ReactNode;
@@ -391,14 +468,13 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   onAnswer,
   onSelectionChange,
   onEditingCustomOption,
+  availableWidth,
+  availableHeight,
   initialAnswer,
   progressHeader,
   keyboardHints,
 }) => {
-  const uiState = useContext(UIStateContext);
-  const terminalWidth = uiState?.terminalWidth ?? 80;
-  const availableWidth = terminalWidth;
-
+  const isAlternateBuffer = useAlternateBuffer();
   const numOptions =
     (question.options?.length ?? 0) + (question.type !== 'yesno' ? 1 : 0);
   const numLen = String(numOptions).length;
@@ -407,15 +483,9 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   const checkboxWidth = question.multiSelect ? 4 : 1; // "[x] " or " "
   const checkmarkWidth = question.multiSelect ? 0 : 2; // "" or " ✓"
   const cursorPadding = 1; // Extra character for cursor at end of line
-  const outerBoxPadding = 4; // border (2) + paddingX (2)
 
   const horizontalPadding =
-    outerBoxPadding +
-    radioWidth +
-    numberWidth +
-    checkboxWidth +
-    checkmarkWidth +
-    cursorPadding;
+    radioWidth + numberWidth + checkboxWidth + checkmarkWidth + cursorPadding;
 
   const bufferWidth = availableWidth - horizontalPadding;
 
@@ -491,9 +561,8 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
   const customBuffer = useTextBuffer({
     initialText: initialCustomText,
-    viewport: { width: Math.max(1, bufferWidth), height: 1 },
-    singleLine: true,
-    isValidPath: () => false,
+    viewport: { width: Math.max(1, bufferWidth), height: 3 },
+    singleLine: false,
   });
 
   const customOptionText = customBuffer.text;
@@ -544,6 +613,9 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     (key: Key) => {
       // If focusing custom option, handle Ctrl+C
       if (isCustomOptionFocused && keyMatchers[Command.QUIT](key)) {
+        if (customOptionText === '') {
+          return false;
+        }
         customBuffer.setText('');
         return true;
       }
@@ -586,7 +658,12 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       }
       return false;
     },
-    [isCustomOptionFocused, customBuffer, onEditingCustomOption],
+    [
+      isCustomOptionFocused,
+      customBuffer,
+      onEditingCustomOption,
+      customOptionText,
+    ],
   );
 
   useKeypress(handleExtraKeys, { isActive: true, priority: true });
@@ -698,31 +775,53 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     }
   }, [customOptionText, isCustomOptionSelected, question.multiSelect]);
 
+  const HEADER_HEIGHT = progressHeader ? 2 : 0;
+  const TITLE_MARGIN = 1;
+  const FOOTER_HEIGHT = 2; // DialogFooter + margin
+  const overhead = HEADER_HEIGHT + TITLE_MARGIN + FOOTER_HEIGHT;
+  const listHeight = availableHeight
+    ? Math.max(1, availableHeight - overhead)
+    : undefined;
+  const questionHeight =
+    listHeight && !isAlternateBuffer
+      ? Math.min(15, Math.max(1, listHeight - DIALOG_PADDING))
+      : undefined;
+  const maxItemsToShow =
+    listHeight && questionHeight
+      ? Math.max(1, Math.floor((listHeight - questionHeight) / 2))
+      : selectionItems.length;
+
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      paddingX={1}
-      borderColor={theme.border.default}
-    >
+    <Box flexDirection="column">
       {progressHeader}
-      <Box marginBottom={1}>
-        <Text bold color={theme.text.primary}>
-          {question.question}
-        </Text>
+      <Box marginBottom={TITLE_MARGIN}>
+        <MaxSizedBox
+          maxHeight={questionHeight}
+          maxWidth={availableWidth}
+          overflowDirection="bottom"
+        >
+          <Box flexDirection="column">
+            <MarkdownDisplay
+              text={autoBoldIfPlain(question.question)}
+              terminalWidth={availableWidth - DIALOG_PADDING}
+              isPending={false}
+            />
+            {question.multiSelect && (
+              <Text color={theme.text.secondary} italic>
+                (Select all that apply)
+              </Text>
+            )}
+          </Box>
+        </MaxSizedBox>
       </Box>
-      {question.multiSelect && (
-        <Text color={theme.text.secondary} italic>
-          {' '}
-          (Select all that apply)
-        </Text>
-      )}
 
       <BaseSelectionList<OptionItem>
         items={selectionItems}
         onSelect={handleSelect}
         onHighlight={handleHighlight}
         focusKey={isCustomOptionFocused ? 'other' : undefined}
+        maxItemsToShow={maxItemsToShow}
+        showScrollArrows={true}
         renderItem={(item, context) => {
           const optionItem = item.value;
           const isChecked =
@@ -734,12 +833,14 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
           // Render inline text input for custom option
           if (optionItem.type === 'other') {
-            const placeholder = 'Enter a custom value';
+            const placeholder = question.placeholder || 'Enter a custom value';
             return (
               <Box flexDirection="row">
                 {showCheck && (
                   <Text
-                    color={isChecked ? theme.text.accent : theme.text.secondary}
+                    color={
+                      isChecked ? theme.status.success : theme.text.secondary
+                    }
                   >
                     [{isChecked ? 'x' : ' '}]
                   </Text>
@@ -749,9 +850,22 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
                   buffer={customBuffer}
                   placeholder={placeholder}
                   focus={context.isSelected}
-                  onSubmit={() => handleSelect(optionItem)}
+                  onSubmit={(val) => {
+                    if (question.multiSelect) {
+                      const fullAnswer = buildAnswerString(
+                        selectedIndices,
+                        true,
+                        val,
+                      );
+                      if (fullAnswer) {
+                        onAnswer(fullAnswer);
+                      }
+                    } else if (val.trim()) {
+                      onAnswer(val.trim());
+                    }
+                  }}
                 />
-                {isChecked && !question.multiSelect && (
+                {isChecked && !question.multiSelect && !context.isSelected && (
                   <Text color={theme.status.success}> ✓</Text>
                 )}
               </Box>
@@ -771,7 +885,9 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
               <Box flexDirection="row">
                 {showCheck && (
                   <Text
-                    color={isChecked ? theme.text.accent : theme.text.secondary}
+                    color={
+                      isChecked ? theme.status.success : theme.text.secondary
+                    }
                   >
                     [{isChecked ? 'x' : ' '}]
                   </Text>
@@ -787,7 +903,10 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
               {optionItem.description && (
                 <Text color={theme.text.secondary} wrap="wrap">
                   {' '}
-                  {optionItem.description}
+                  <RenderInline
+                    text={optionItem.description}
+                    defaultColor={theme.text.secondary}
+                  />
                 </Text>
               )}
             </Box>
@@ -804,13 +923,18 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   onSubmit,
   onCancel,
   onActiveTextInputChange,
+  width,
+  availableHeight: availableHeightProp,
 }) => {
+  const uiState = useContext(UIStateContext);
+  const availableHeight =
+    availableHeightProp ??
+    (uiState?.constrainHeight !== false
+      ? uiState?.availableTerminalHeight
+      : undefined);
+
   const [state, dispatch] = useReducer(askUserDialogReducerLogic, initialState);
   const { answers, isEditingCustomOption, submitted } = state;
-
-  const uiState = useContext(UIStateContext);
-  const terminalWidth = uiState?.terminalWidth ?? 80;
-  const availableWidth = terminalWidth;
 
   const reviewTabIndex = questions.length;
   const tabCount =
@@ -842,9 +966,12 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       if (keyMatchers[Command.ESCAPE](key)) {
         onCancel();
         return true;
-      } else if (keyMatchers[Command.QUIT](key) && !isEditingCustomOption) {
-        onCancel();
-        return true;
+      } else if (keyMatchers[Command.QUIT](key)) {
+        if (!isEditingCustomOption) {
+          onCancel();
+        }
+        // Return false to let ctrl-C bubble up to AppContainer for exit flow
+        return false;
       }
       return false;
     },
@@ -898,21 +1025,27 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
     (answer: string) => {
       if (submitted) return;
 
-      dispatch({
-        type: 'SET_ANSWER',
-        payload: {
-          index: currentQuestionIndex,
-          answer,
-        },
-      });
-
       if (questions.length > 1) {
+        dispatch({
+          type: 'SET_ANSWER',
+          payload: {
+            index: currentQuestionIndex,
+            answer,
+          },
+        });
         goToNextTab();
       } else {
-        dispatch({ type: 'SUBMIT' });
+        dispatch({
+          type: 'SET_ANSWER',
+          payload: {
+            index: currentQuestionIndex,
+            answer,
+            submit: true,
+          },
+        });
       }
     },
-    [currentQuestionIndex, questions.length, submitted, goToNextTab],
+    [currentQuestionIndex, questions, submitted, goToNextTab],
   );
 
   const handleReviewSubmit = useCallback(() => {
@@ -1021,7 +1154,8 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
         onAnswer={handleAnswer}
         onSelectionChange={handleSelectionChange}
         onEditingCustomOption={handleEditingCustomOption}
-        availableWidth={availableWidth}
+        availableWidth={width}
+        availableHeight={availableHeight}
         initialAnswer={answers[currentQuestionIndex]}
         progressHeader={progressHeader}
         keyboardHints={keyboardHints}
@@ -1033,7 +1167,8 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
         onAnswer={handleAnswer}
         onSelectionChange={handleSelectionChange}
         onEditingCustomOption={handleEditingCustomOption}
-        availableWidth={availableWidth}
+        availableWidth={width}
+        availableHeight={availableHeight}
         initialAnswer={answers[currentQuestionIndex]}
         progressHeader={progressHeader}
         keyboardHints={keyboardHints}
@@ -1043,7 +1178,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   return (
     <Box
       flexDirection="column"
-      width={availableWidth}
+      width={width}
       aria-label={`Question ${currentQuestionIndex + 1} of ${questions.length}: ${currentQuestion.question}`}
     >
       {questionView}

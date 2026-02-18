@@ -9,18 +9,16 @@ import {
   BaseToolInvocation,
   type ToolResult,
   Kind,
-  type ToolCallConfirmationDetails,
+  type ToolAskUserConfirmationDetails,
+  type ToolConfirmationPayload,
+  ToolConfirmationOutcome,
 } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import {
-  MessageBusType,
-  QuestionType,
-  type Question,
-  type AskUserRequest,
-  type AskUserResponse,
-} from '../confirmation-bus/types.js';
-import { randomUUID } from 'node:crypto';
+import { QuestionType, type Question } from '../confirmation-bus/types.js';
 import { ASK_USER_TOOL_NAME, ASK_USER_DISPLAY_NAME } from './tool-names.js';
+import { ASK_USER_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 export interface AskUserParams {
   questions: Question[];
@@ -34,74 +32,9 @@ export class AskUserTool extends BaseDeclarativeTool<
     super(
       ASK_USER_TOOL_NAME,
       ASK_USER_DISPLAY_NAME,
-      'Ask the user one or more questions to gather preferences, clarify requirements, or make decisions.',
+      ASK_USER_DEFINITION.base.description!,
       Kind.Communicate,
-      {
-        type: 'object',
-        required: ['questions'],
-        properties: {
-          questions: {
-            type: 'array',
-            minItems: 1,
-            maxItems: 4,
-            items: {
-              type: 'object',
-              required: ['question', 'header'],
-              properties: {
-                question: {
-                  type: 'string',
-                  description:
-                    'The complete question to ask the user. Should be clear, specific, and end with a question mark.',
-                },
-                header: {
-                  type: 'string',
-                  maxLength: 12,
-                  description:
-                    'Very short label displayed as a chip/tag (max 12 chars). Examples: "Auth method", "Library", "Approach".',
-                },
-                type: {
-                  type: 'string',
-                  enum: ['choice', 'text', 'yesno'],
-                  default: 'choice',
-                  description:
-                    "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation.",
-                },
-                options: {
-                  type: 'array',
-                  description:
-                    "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added. Not needed for 'text' or 'yesno' types.",
-                  items: {
-                    type: 'object',
-                    required: ['label', 'description'],
-                    properties: {
-                      label: {
-                        type: 'string',
-                        description:
-                          'The display text for this option (1-5 words). Example: "OAuth 2.0"',
-                      },
-                      description: {
-                        type: 'string',
-                        description:
-                          'Brief explanation of this option. Example: "Industry standard, supports SSO"',
-                      },
-                    },
-                  },
-                },
-                multiSelect: {
-                  type: 'boolean',
-                  description:
-                    "Only applies when type='choice'. Set to true to allow selecting multiple options.",
-                },
-                placeholder: {
-                  type: 'string',
-                  description:
-                    "Only applies when type='text'. Hint text shown in the input field.",
-                },
-              },
-            },
-          },
-        },
-      },
+      ASK_USER_DEFINITION.base.parametersJsonSchema,
       messageBus,
     );
   }
@@ -115,7 +48,7 @@ export class AskUserTool extends BaseDeclarativeTool<
 
     for (let i = 0; i < params.questions.length; i++) {
       const q = params.questions[i];
-      const questionType = q.type ?? QuestionType.CHOICE;
+      const questionType = q.type;
 
       // Validate that 'choice' type has options
       if (questionType === QuestionType.CHOICE) {
@@ -159,106 +92,120 @@ export class AskUserTool extends BaseDeclarativeTool<
   ): AskUserInvocation {
     return new AskUserInvocation(params, messageBus, toolName, toolDisplayName);
   }
+
+  override async validateBuildAndExecute(
+    params: AskUserParams,
+    abortSignal: AbortSignal,
+  ): Promise<ToolResult> {
+    const result = await super.validateBuildAndExecute(params, abortSignal);
+    if (
+      result.error &&
+      result.error.type === ToolErrorType.INVALID_TOOL_PARAMS
+    ) {
+      return {
+        ...result,
+        returnDisplay: '',
+      };
+    }
+    return result;
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(ASK_USER_DEFINITION, modelId);
+  }
 }
 
 export class AskUserInvocation extends BaseToolInvocation<
   AskUserParams,
   ToolResult
 > {
+  private confirmationOutcome: ToolConfirmationOutcome | null = null;
+  private userAnswers: { [questionIndex: string]: string } = {};
+
   override async shouldConfirmExecute(
     _abortSignal: AbortSignal,
-  ): Promise<ToolCallConfirmationDetails | false> {
-    return false;
+  ): Promise<ToolAskUserConfirmationDetails | false> {
+    const normalizedQuestions = this.params.questions.map((q) => ({
+      ...q,
+      type: q.type,
+    }));
+
+    return {
+      type: 'ask_user',
+      title: 'Ask User',
+      questions: normalizedQuestions,
+      onConfirm: async (
+        outcome: ToolConfirmationOutcome,
+        payload?: ToolConfirmationPayload,
+      ) => {
+        this.confirmationOutcome = outcome;
+        if (payload && 'answers' in payload) {
+          this.userAnswers = payload.answers;
+        }
+      },
+    };
   }
 
   getDescription(): string {
     return `Asking user: ${this.params.questions.map((q) => q.question).join(', ')}`;
   }
 
-  async execute(signal: AbortSignal): Promise<ToolResult> {
-    const correlationId = randomUUID();
+  async execute(_signal: AbortSignal): Promise<ToolResult> {
+    const questionTypes = this.params.questions.map((q) => q.type);
 
-    const request: AskUserRequest = {
-      type: MessageBusType.ASK_USER_REQUEST,
-      questions: this.params.questions.map((q) => ({
-        ...q,
-        type: q.type ?? QuestionType.CHOICE,
-      })),
-      correlationId,
+    if (this.confirmationOutcome === ToolConfirmationOutcome.Cancel) {
+      return {
+        llmContent: 'User dismissed ask_user dialog without answering.',
+        returnDisplay: 'User dismissed dialog',
+        data: {
+          ask_user: {
+            question_types: questionTypes,
+            dismissed: true,
+          },
+        },
+      };
+    }
+
+    const answerEntries = Object.entries(this.userAnswers);
+    const hasAnswers = answerEntries.length > 0;
+
+    const metrics: Record<string, unknown> = {
+      ask_user: {
+        question_types: questionTypes,
+        dismissed: false,
+        empty_submission: !hasAnswers,
+        answer_count: answerEntries.length,
+      },
     };
 
-    return new Promise<ToolResult>((resolve, reject) => {
-      const responseHandler = (response: AskUserResponse): void => {
-        if (response.correlationId === correlationId) {
-          cleanup();
+    const returnDisplay = hasAnswers
+      ? `**User answered:**\n${answerEntries
+          .map(([index, answer]) => {
+            const question = this.params.questions[parseInt(index, 10)];
+            const category = question?.header ?? `Q${index}`;
+            const prefix = `  ${category} → `;
+            const indent = ' '.repeat(prefix.length);
 
-          // Handle user cancellation
-          if (response.cancelled) {
-            resolve({
-              llmContent: 'User dismissed ask user dialog without answering.',
-              returnDisplay: 'User dismissed dialog',
-            });
-            return;
-          }
+            const lines = answer.split('\n');
+            return prefix + lines.join('\n' + indent);
+          })
+          .join('\n')}`
+      : 'User submitted without answering questions.';
 
-          // Build formatted key-value display
-          const answerEntries = Object.entries(response.answers);
-          const hasAnswers = answerEntries.length > 0;
-
-          const returnDisplay = hasAnswers
-            ? `**User answered:**\n${answerEntries
-                .map(([index, answer]) => {
-                  const question = this.params.questions[parseInt(index, 10)];
-                  const category = question?.header ?? `Q${index}`;
-                  return `  ${category} → ${answer}`;
-                })
-                .join('\n')}`
-            : 'User submitted without answering questions.';
-
-          resolve({
-            llmContent: JSON.stringify({ answers: response.answers }),
-            returnDisplay,
-          });
-        }
-      };
-
-      const cleanup = () => {
-        if (responseHandler) {
-          this.messageBus.unsubscribe(
-            MessageBusType.ASK_USER_RESPONSE,
-            responseHandler,
-          );
-        }
-        signal.removeEventListener('abort', abortHandler);
-      };
-
-      const abortHandler = () => {
-        cleanup();
-        resolve({
-          llmContent: 'Tool execution cancelled by user.',
-          returnDisplay: 'Cancelled',
-          error: {
-            message: 'Cancelled',
-          },
-        });
-      };
-
-      if (signal.aborted) {
-        abortHandler();
-        return;
-      }
-
-      signal.addEventListener('abort', abortHandler);
-      this.messageBus.subscribe(
-        MessageBusType.ASK_USER_RESPONSE,
-        responseHandler,
-      );
-
-      // Publish request
-      this.messageBus.publish(request).catch((err) => {
-        cleanup();
-        reject(err);
-      });
-    });
+    return {
+      llmContent: JSON.stringify({ answers: this.userAnswers }),
+      returnDisplay,
+      data: metrics,
+    };
   }
+}
+
+/**
+ * Returns true if the tool name and status correspond to a completed 'Ask User' tool call.
+ */
+export function isCompletedAskUserTool(name: string, status: string): boolean {
+  return (
+    name === ASK_USER_DISPLAY_NAME &&
+    ['Success', 'Error', 'Canceled'].includes(status)
+  );
 }

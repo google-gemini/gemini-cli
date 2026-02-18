@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 144
+  // Next ID: 159
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -542,4 +542,67 @@ export enum EventMetadataKey {
 
   // Logs the duration spent in an approval mode in milliseconds.
   GEMINI_CLI_APPROVAL_MODE_DURATION_MS = 143,
+
+  // ==========================================================================
+  // Rewind Event Keys
+  // ==========================================================================
+
+  // Logs the outcome of a rewind operation.
+  GEMINI_CLI_REWIND_OUTCOME = 144,
+
+  // Model Routing Event Keys (Cont.)
+  // ==========================================================================
+
+  // Logs the reasoning for the routing decision.
+  GEMINI_CLI_ROUTING_REASONING = 145,
+
+  // Logs whether numerical routing was enabled.
+  GEMINI_CLI_ROUTING_NUMERICAL_ENABLED = 146,
+
+  // Logs the classifier threshold used.
+  GEMINI_CLI_ROUTING_CLASSIFIER_THRESHOLD = 147,
+
+  // ==========================================================================
+  // Tool Output Masking Event Keys
+  // ==========================================================================
+
+  // Logs the total tokens in the prunable block before masking.
+  GEMINI_CLI_TOOL_OUTPUT_MASKING_TOKENS_BEFORE = 148,
+
+  // Logs the total tokens in the masked remnants after masking.
+  GEMINI_CLI_TOOL_OUTPUT_MASKING_TOKENS_AFTER = 149,
+
+  // Logs the number of tool outputs masked in this operation.
+  GEMINI_CLI_TOOL_OUTPUT_MASKING_MASKED_COUNT = 150,
+
+  // Logs the total prunable tokens identified at the trigger point.
+  GEMINI_CLI_TOOL_OUTPUT_MASKING_TOTAL_PRUNABLE_TOKENS = 151,
+
+  // Ask User Stats Event Keys
+  // ==========================================================================
+
+  // Logs the types of questions asked in the ask_user tool.
+  GEMINI_CLI_ASK_USER_QUESTION_TYPES = 152,
+
+  // Logs whether the ask_user dialog was dismissed.
+  GEMINI_CLI_ASK_USER_DISMISSED = 153,
+
+  // Logs whether the ask_user dialog was submitted empty.
+  GEMINI_CLI_ASK_USER_EMPTY_SUBMISSION = 154,
+
+  // Logs the number of questions answered in the ask_user tool.
+  GEMINI_CLI_ASK_USER_ANSWER_COUNT = 155,
+
+  // ==========================================================================
+  // Keychain & Token Storage Event Keys
+  // ==========================================================================
+
+  // Logs whether the keychain is available.
+  GEMINI_CLI_KEYCHAIN_AVAILABLE = 156,
+
+  // Logs the type of token storage initialized.
+  GEMINI_CLI_TOKEN_STORAGE_TYPE = 157,
+
+  // Logs whether the token storage type was forced by an environment variable.
+  GEMINI_CLI_TOKEN_STORAGE_FORCED = 158,
 }

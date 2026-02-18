@@ -7,9 +7,13 @@
 import { it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { execSync } from 'node:child_process';
 import { TestRig } from '@google/gemini-cli-test-utils';
-import { createUnauthorizedToolError } from '@google/gemini-cli-core';
+import {
+  createUnauthorizedToolError,
+  parseAgentMarkdown,
+} from '@google/gemini-cli-core';
 
 export * from '@google/gemini-cli-test-utils';
 
@@ -34,14 +38,67 @@ export type EvalPolicy = 'ALWAYS_PASSES' | 'USUALLY_PASSES';
 export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
   const fn = async () => {
     const rig = new TestRig();
+    const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
+    const activityLogFile = path.join(logDir, `${sanitizedName}.jsonl`);
+    const logFile = path.join(logDir, `${sanitizedName}.log`);
+    let isSuccess = false;
     try {
       rig.setup(evalCase.name, evalCase.params);
 
+      // Symlink node modules to reduce the amount of time needed to
+      // bootstrap test projects.
+      symlinkNodeModules(rig.testDir || '');
+
       if (evalCase.files) {
+        const acknowledgedAgents: Record<string, Record<string, string>> = {};
+        const projectRoot = fs.realpathSync(rig.testDir!);
+
         for (const [filePath, content] of Object.entries(evalCase.files)) {
           const fullPath = path.join(rig.testDir!, filePath);
           fs.mkdirSync(path.dirname(fullPath), { recursive: true });
           fs.writeFileSync(fullPath, content);
+
+          // If it's an agent file, calculate hash for acknowledgement
+          if (
+            filePath.startsWith('.gemini/agents/') &&
+            filePath.endsWith('.md')
+          ) {
+            const hash = crypto
+              .createHash('sha256')
+              .update(content)
+              .digest('hex');
+
+            try {
+              const agentDefs = await parseAgentMarkdown(fullPath, content);
+              if (agentDefs.length > 0) {
+                const agentName = agentDefs[0].name;
+                if (!acknowledgedAgents[projectRoot]) {
+                  acknowledgedAgents[projectRoot] = {};
+                }
+                acknowledgedAgents[projectRoot][agentName] = hash;
+              }
+            } catch (error) {
+              console.warn(
+                `Failed to parse agent for test acknowledgement: ${filePath}`,
+                error,
+              );
+            }
+          }
+        }
+
+        // Write acknowledged_agents.json to the home directory
+        if (Object.keys(acknowledgedAgents).length > 0) {
+          const ackPath = path.join(
+            rig.homeDir!,
+            '.gemini',
+            'acknowledgments',
+            'agents.json',
+          );
+          fs.mkdirSync(path.dirname(ackPath), { recursive: true });
+          fs.writeFileSync(
+            ackPath,
+            JSON.stringify(acknowledgedAgents, null, 2),
+          );
         }
 
         const execOptions = { cwd: rig.testDir!, stdio: 'inherit' as const };
@@ -62,6 +119,10 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
       const result = await rig.run({
         args: evalCase.prompt,
         approvalMode: evalCase.approvalMode ?? 'yolo',
+        timeout: evalCase.timeout,
+        env: {
+          GEMINI_CLI_ACTIVITY_LOG_TARGET: activityLogFile,
+        },
       });
 
       const unauthorizedErrorPrefix =
@@ -73,19 +134,65 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
       }
 
       await evalCase.assert(rig, result);
+      isSuccess = true;
     } finally {
-      await logToFile(
-        evalCase.name,
+      if (isSuccess) {
+        await fs.promises.unlink(activityLogFile).catch((err) => {
+          if (err.code !== 'ENOENT') throw err;
+        });
+      }
+
+      if (rig._lastRunStderr) {
+        const stderrFile = path.join(logDir, `${sanitizedName}.stderr.log`);
+        await fs.promises.writeFile(stderrFile, rig._lastRunStderr);
+      }
+
+      await fs.promises.writeFile(
+        logFile,
         JSON.stringify(rig.readToolLogs(), null, 2),
       );
       await rig.cleanup();
     }
   };
 
+  runEval(policy, evalCase.name, fn, evalCase.timeout);
+}
+
+/**
+ * Wraps a test function with the appropriate Vitest 'it' or 'it.skip' based on policy.
+ */
+export function runEval(
+  policy: EvalPolicy,
+  name: string,
+  fn: () => Promise<void>,
+  timeout?: number,
+) {
   if (policy === 'USUALLY_PASSES' && !process.env['RUN_EVALS']) {
-    it.skip(evalCase.name, fn);
+    it.skip(name, fn);
   } else {
-    it(evalCase.name, fn);
+    it(name, fn, timeout);
+  }
+}
+
+export async function prepareLogDir(name: string) {
+  const logDir = path.resolve(process.cwd(), 'evals/logs');
+  await fs.promises.mkdir(logDir, { recursive: true });
+  const sanitizedName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  return { logDir, sanitizedName };
+}
+
+/**
+ * Symlinks node_modules to the test directory to speed up tests that need to run tools.
+ */
+export function symlinkNodeModules(testDir: string) {
+  const rootNodeModules = path.join(process.cwd(), 'node_modules');
+  const testNodeModules = path.join(testDir, 'node_modules');
+  if (
+    testDir &&
+    fs.existsSync(rootNodeModules) &&
+    !fs.existsSync(testNodeModules)
+  ) {
+    fs.symlinkSync(rootNodeModules, testNodeModules, 'dir');
   }
 }
 
@@ -93,15 +200,8 @@ export interface EvalCase {
   name: string;
   params?: Record<string, any>;
   prompt: string;
+  timeout?: number;
   files?: Record<string, string>;
   approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
   assert: (rig: TestRig, result: string) => Promise<void>;
-}
-
-async function logToFile(name: string, content: string) {
-  const logDir = 'evals/logs';
-  await fs.promises.mkdir(logDir, { recursive: true });
-  const sanitizedName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-  const logFile = `${logDir}/${sanitizedName}.log`;
-  await fs.promises.writeFile(logFile, content);
 }

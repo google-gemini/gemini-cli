@@ -18,10 +18,13 @@ import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 import {
   type GeminiClient,
+  type UserFeedbackPayload,
   SlashCommandStatus,
   makeFakeConfig,
   coreEvents,
+  CoreEvent,
 } from '@google/gemini-cli-core';
+import { SlashCommandConflictHandler } from '../../services/SlashCommandConflictHandler.js';
 
 const {
   logSlashCommand,
@@ -182,6 +185,26 @@ describe('useSlashCommandProcessor', () => {
     mockFileLoadCommands.mockResolvedValue(Object.freeze(fileCommands));
     mockMcpLoadCommands.mockResolvedValue(Object.freeze(mcpCommands));
 
+    const conflictHandler = new SlashCommandConflictHandler();
+    conflictHandler.start();
+
+    const handleFeedback = (payload: UserFeedbackPayload) => {
+      let type = MessageType.INFO;
+      if (payload.severity === 'error') {
+        type = MessageType.ERROR;
+      } else if (payload.severity === 'warning') {
+        type = MessageType.WARNING;
+      }
+      mockAddItem(
+        {
+          type,
+          text: payload.message,
+        },
+        Date.now(),
+      );
+    };
+    coreEvents.on(CoreEvent.UserFeedback, handleFeedback);
+
     let result!: { current: ReturnType<typeof useSlashCommandProcessor> };
     let unmount!: () => void;
     let rerender!: (props?: unknown) => void;
@@ -213,6 +236,8 @@ describe('useSlashCommandProcessor', () => {
             toggleDebugProfiler: vi.fn(),
             dispatchExtensionStateUpdate: vi.fn(),
             addConfirmUpdateExtensionRequest: vi.fn(),
+            toggleBackgroundShell: vi.fn(),
+            toggleShortcutsHelp: vi.fn(),
             setText: vi.fn(),
           },
           new Map(), // extensionsUpdateState
@@ -226,7 +251,11 @@ describe('useSlashCommandProcessor', () => {
       rerender = hook.rerender;
     });
 
-    unmountHook = async () => unmount();
+    unmountHook = async () => {
+      conflictHandler.stop();
+      coreEvents.off(CoreEvent.UserFeedback, handleFeedback);
+      unmount();
+    };
 
     await waitFor(() => {
       expect(result.current.slashCommands).toBeDefined();
@@ -974,7 +1003,7 @@ describe('useSlashCommandProcessor', () => {
         command: '/fail',
         expectedLog: {
           command: 'fail',
-          status: 'error',
+          status: SlashCommandStatus.ERROR,
           subcommand: undefined,
         },
         desc: 'failure event for failed command',
@@ -1049,5 +1078,120 @@ describe('useSlashCommandProcessor', () => {
     await waitFor(() =>
       expect(result.current.slashCommands).toEqual([newCommand]),
     );
+  });
+
+  describe('Conflict Notifications', () => {
+    it('should display a warning when a command conflict occurs', async () => {
+      const builtinCommand = createTestCommand({ name: 'deploy' });
+      const extensionCommand = createTestCommand(
+        {
+          name: 'deploy',
+          extensionName: 'firebase',
+        },
+        CommandKind.FILE,
+      );
+
+      const result = await setupProcessorHook({
+        builtinCommands: [builtinCommand],
+        fileCommands: [extensionCommand],
+      });
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(2));
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Command conflicts detected'),
+        }),
+        expect.any(Number),
+      );
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining(
+            "- Command '/deploy' from extension 'firebase' was renamed",
+          ),
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should deduplicate conflict warnings across re-renders', async () => {
+      const builtinCommand = createTestCommand({ name: 'deploy' });
+      const extensionCommand = createTestCommand(
+        {
+          name: 'deploy',
+          extensionName: 'firebase',
+        },
+        CommandKind.FILE,
+      );
+
+      const result = await setupProcessorHook({
+        builtinCommands: [builtinCommand],
+        fileCommands: [extensionCommand],
+      });
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(2));
+
+      // First notification
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Command conflicts detected'),
+        }),
+        expect.any(Number),
+      );
+
+      mockAddItem.mockClear();
+
+      // Trigger a reload or re-render
+      await act(async () => {
+        result.current.commandContext.ui.reloadCommands();
+      });
+
+      // Wait a bit for effect to run
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Should NOT have notified again
+      expect(mockAddItem).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Command conflicts detected'),
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should correctly identify the winner extension in the message', async () => {
+      const ext1Command = createTestCommand(
+        {
+          name: 'deploy',
+          extensionName: 'firebase',
+        },
+        CommandKind.FILE,
+      );
+      const ext2Command = createTestCommand(
+        {
+          name: 'deploy',
+          extensionName: 'aws',
+        },
+        CommandKind.FILE,
+      );
+
+      const result = await setupProcessorHook({
+        fileCommands: [ext1Command, ext2Command],
+      });
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(2));
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining("conflicts with extension 'firebase'"),
+        }),
+        expect.any(Number),
+      );
+    });
   });
 });

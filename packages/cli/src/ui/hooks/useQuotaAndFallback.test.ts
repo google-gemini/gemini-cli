@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -157,7 +157,7 @@ describe('useQuotaAndFallback', () => {
         const message = request!.message;
         expect(message).toContain('Usage limit reached for gemini-pro.');
         expect(message).toContain('Access resets at'); // From getResetTimeMessage
-        expect(message).toContain('/stats for usage details');
+        expect(message).toContain('/stats model for usage details');
         expect(message).toContain('/auth to switch to API key.');
 
         expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
@@ -328,8 +328,7 @@ describe('useQuotaAndFallback', () => {
         const message = request!.message;
         expect(message).toBe(
           `It seems like you don't have access to gemini-3-pro-preview.
-Learn more at https://goo.gle/enable-preview-features
-To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
+Your admin might have disabled the access. Contact them to enable the Preview Release Channel.`,
         );
 
         // Simulate the user choosing to switch
@@ -341,6 +340,46 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
         expect(intent).toBe('retry_always');
 
         expect(result.current.proQuotaRequest).toBeNull();
+      });
+
+      it('should handle ModelNotFoundError with invalid model correctly', async () => {
+        const { result } = renderHook(() =>
+          useQuotaAndFallback({
+            config: mockConfig,
+            historyManager: mockHistoryManager,
+            userTier: UserTierId.FREE,
+            setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+            onShowAuthSelection: mockOnShowAuthSelection,
+          }),
+        );
+
+        const handler = setFallbackHandlerSpy.mock
+          .calls[0][0] as FallbackModelHandler;
+
+        let promise: Promise<FallbackIntent | null>;
+        const error = new ModelNotFoundError('model not found', 404);
+
+        act(() => {
+          promise = handler('invalid-model', 'gemini-2.5-pro', error);
+        });
+
+        const request = result.current.proQuotaRequest;
+        expect(request).not.toBeNull();
+        expect(request?.failedModel).toBe('invalid-model');
+        expect(request?.isModelNotFoundError).toBe(true);
+
+        const message = request!.message;
+        expect(message).toBe(
+          `Model "invalid-model" was not found or is invalid.
+/model to switch models.`,
+        );
+
+        act(() => {
+          result.current.handleProQuotaChoice('retry_always');
+        });
+
+        const intent = await promise!;
+        expect(intent).toBe('retry_always');
       });
     });
   });

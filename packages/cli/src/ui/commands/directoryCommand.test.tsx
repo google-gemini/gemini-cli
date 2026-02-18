@@ -67,6 +67,9 @@ describe('directoryCommand', () => {
       isRestrictiveSandbox: vi.fn().mockReturnValue(false),
       getGeminiClient: vi.fn().mockReturnValue({
         addDirectoryContext: vi.fn(),
+        getChatRecordingService: vi.fn().mockReturnValue({
+          recordDirectories: vi.fn(),
+        }),
       }),
       getWorkingDir: () => path.resolve('/test/dir'),
       shouldLoadMemoryFromIncludeDirectories: () => false,
@@ -83,6 +86,11 @@ describe('directoryCommand', () => {
         settings: {
           merged: {
             memoryDiscoveryMaxDirs: 1000,
+            security: {
+              folderTrust: {
+                enabled: false,
+              },
+            },
           },
         },
       },

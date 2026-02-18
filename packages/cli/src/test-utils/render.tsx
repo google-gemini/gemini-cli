@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,7 +10,7 @@ import type React from 'react';
 import { vi } from 'vitest';
 import { act, useState } from 'react';
 import os from 'node:os';
-import { LoadedSettings, type Settings } from '../config/settings.js';
+import { LoadedSettings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
 import { ShellFocusContext } from '../ui/contexts/ShellFocusContext.js';
@@ -27,10 +27,16 @@ import {
 import { type HistoryItemToolGroup, StreamingState } from '../ui/types.js';
 import { ToolActionsProvider } from '../ui/contexts/ToolActionsContext.js';
 import { AskUserActionsProvider } from '../ui/contexts/AskUserActionsContext.js';
+import { TerminalProvider } from '../ui/contexts/TerminalContext.js';
 
 import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
 import { AppContext, type AppState } from '../ui/contexts/AppContext.js';
+import { createMockSettings } from './settings.js';
+import { SessionStatsProvider } from '../ui/contexts/SessionContext.js';
+import { themeManager, DEFAULT_THEME } from '../ui/themes/theme-manager.js';
+import { DefaultLight } from '../ui/themes/default-light.js';
+import { pickDefaultThemeName } from '../ui/themes/theme.js';
 
 export const persistentStateMock = new FakePersistentState();
 
@@ -50,6 +56,7 @@ export const render = (
   terminalWidth?: number,
 ): ReturnType<typeof inkRender> => {
   let renderResult: ReturnType<typeof inkRender> =
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     undefined as unknown as ReturnType<typeof inkRender>;
   act(() => {
     renderResult = inkRender(tree);
@@ -111,14 +118,19 @@ const getMockConfigInternal = (): Config => {
   return mockConfigInternal;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
 const configProxy = new Proxy({} as Config, {
   get(_target, prop) {
     if (prop === 'getTargetDir') {
       return () =>
         '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long';
     }
+    if (prop === 'getUseBackgroundColor') {
+      return () => true;
+    }
     const internal = getMockConfigInternal();
     if (prop in internal) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return internal[prop as keyof typeof internal];
     }
     throw new Error(`mockConfig does not have property ${String(prop)}`);
@@ -134,20 +146,6 @@ export const mockSettings = new LoadedSettings(
   [],
 );
 
-export const createMockSettings = (
-  overrides: Partial<Settings>,
-): LoadedSettings => {
-  const settings = overrides as Settings;
-  return new LoadedSettings(
-    { path: '', settings: {}, originalSettings: {} },
-    { path: '', settings: {}, originalSettings: {} },
-    { path: '', settings, originalSettings: settings },
-    { path: '', settings: {}, originalSettings: {} },
-    true,
-    [],
-  );
-};
-
 // A minimal mock UIState to satisfy the context provider.
 // Tests that need specific UIState values should provide their own.
 const baseMockUiState = {
@@ -156,7 +154,18 @@ const baseMockUiState = {
   terminalWidth: 120,
   terminalHeight: 40,
   currentModel: 'gemini-pro',
-  terminalBackgroundColor: undefined,
+  terminalBackgroundColor: 'black',
+  cleanUiDetailsVisible: false,
+  allowPlanMode: true,
+  activePtyId: undefined,
+  backgroundShells: new Map(),
+  backgroundShellHeight: 0,
+  quota: {
+    userTier: undefined,
+    stats: undefined,
+    proQuotaRequest: null,
+    validationRequest: null,
+  },
 };
 
 export const mockAppState: AppState = {
@@ -200,7 +209,15 @@ const mockUIActions: UIActions = {
   handleApiKeySubmit: vi.fn(),
   handleApiKeyCancel: vi.fn(),
   setBannerVisible: vi.fn(),
+  setShortcutsHelpVisible: vi.fn(),
+  setCleanUiDetailsVisible: vi.fn(),
+  toggleCleanUiDetailsVisible: vi.fn(),
+  revealCleanUiDetailsTemporarily: vi.fn(),
+  handleWarning: vi.fn(),
   setEmbeddedShellFocused: vi.fn(),
+  dismissBackgroundShell: vi.fn(),
+  setActiveBackgroundShellPid: vi.fn(),
+  setIsBackgroundShellListOpen: vi.fn(),
   setAuthContext: vi.fn(),
   handleRestart: vi.fn(),
   handleNewAgentsSelect: vi.fn(),
@@ -214,6 +231,7 @@ export const renderWithProviders = (
     uiState: providedUiState,
     width,
     mouseEventsEnabled = false,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     config = configProxy as unknown as Config,
     useAlternateBuffer = true,
     uiActions,
@@ -235,17 +253,20 @@ export const renderWithProviders = (
     appState?: AppState;
   } = {},
 ): ReturnType<typeof render> & { simulateClick: typeof simulateClick } => {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const baseState: UIState = new Proxy(
     { ...baseMockUiState, ...providedUiState },
     {
       get(target, prop) {
         if (prop in target) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           return target[prop as keyof typeof target];
         }
         // For properties not in the base mock or provided state,
         // we'll check the original proxy to see if it's a defined but
         // unprovided property, and if not, throw.
         if (prop in baseMockUiState) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           return baseMockUiState[prop as keyof typeof baseMockUiState];
         }
         throw new Error(`mockUiState does not have property ${String(prop)}`);
@@ -282,6 +303,15 @@ export const renderWithProviders = (
     mainAreaWidth,
   };
 
+  themeManager.setTerminalBackground(baseState.terminalBackgroundColor);
+  const themeName = pickDefaultThemeName(
+    baseState.terminalBackgroundColor,
+    themeManager.getAllThemes(),
+    DEFAULT_THEME.name,
+    DefaultLight.name,
+  );
+  themeManager.setActiveTheme(themeName);
+
   const finalUIActions = { ...mockUIActions, ...uiActions };
 
   const allToolCalls = (finalUiState.pendingHistoryItems || [])
@@ -295,37 +325,43 @@ export const renderWithProviders = (
           <UIStateContext.Provider value={finalUiState}>
             <VimModeProvider settings={finalSettings}>
               <ShellFocusContext.Provider value={shellFocus}>
-                <StreamingContext.Provider value={finalUiState.streamingState}>
-                  <UIActionsContext.Provider value={finalUIActions}>
-                    <ToolActionsProvider
-                      config={config}
-                      toolCalls={allToolCalls}
-                    >
-                      <AskUserActionsProvider
-                        request={null}
-                        onSubmit={vi.fn()}
-                        onCancel={vi.fn()}
+                <SessionStatsProvider>
+                  <StreamingContext.Provider
+                    value={finalUiState.streamingState}
+                  >
+                    <UIActionsContext.Provider value={finalUIActions}>
+                      <ToolActionsProvider
+                        config={config}
+                        toolCalls={allToolCalls}
                       >
-                        <KeypressProvider>
-                          <MouseProvider
-                            mouseEventsEnabled={mouseEventsEnabled}
-                          >
-                            <ScrollProvider>
-                              <Box
-                                width={terminalWidth}
-                                flexShrink={0}
-                                flexGrow={0}
-                                flexDirection="column"
-                              >
-                                {component}
-                              </Box>
-                            </ScrollProvider>
-                          </MouseProvider>
-                        </KeypressProvider>
-                      </AskUserActionsProvider>
-                    </ToolActionsProvider>
-                  </UIActionsContext.Provider>
-                </StreamingContext.Provider>
+                        <AskUserActionsProvider
+                          request={null}
+                          onSubmit={vi.fn()}
+                          onCancel={vi.fn()}
+                        >
+                          <KeypressProvider>
+                            <MouseProvider
+                              mouseEventsEnabled={mouseEventsEnabled}
+                            >
+                              <TerminalProvider>
+                                <ScrollProvider>
+                                  <Box
+                                    width={terminalWidth}
+                                    flexShrink={0}
+                                    flexGrow={0}
+                                    flexDirection="column"
+                                  >
+                                    {component}
+                                  </Box>
+                                </ScrollProvider>
+                              </TerminalProvider>
+                            </MouseProvider>
+                          </KeypressProvider>
+                        </AskUserActionsProvider>
+                      </ToolActionsProvider>
+                    </UIActionsContext.Provider>
+                  </StreamingContext.Provider>
+                </SessionStatsProvider>
               </ShellFocusContext.Provider>
             </VimModeProvider>
           </UIStateContext.Provider>
@@ -349,7 +385,9 @@ export function renderHook<Result, Props>(
   rerender: (props?: Props) => void;
   unmount: () => void;
 } {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const result = { current: undefined as unknown as Result };
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   let currentProps = options?.initialProps as Props;
 
   function TestComponent({
@@ -380,6 +418,7 @@ export function renderHook<Result, Props>(
 
   function rerender(props?: Props) {
     if (arguments.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       currentProps = props as Props;
     }
     act(() => {
@@ -413,6 +452,7 @@ export function renderHookWithProviders<Result, Props>(
   rerender: (props?: Props) => void;
   unmount: () => void;
 } {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const result = { current: undefined as unknown as Result };
 
   let setPropsFn: ((props: Props) => void) | undefined;
@@ -434,6 +474,7 @@ export function renderHookWithProviders<Result, Props>(
   act(() => {
     renderResult = renderWithProviders(
       <Wrapper>
+        {/* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */}
         <TestComponent initialProps={options.initialProps as Props} />
       </Wrapper>,
       options,
@@ -443,6 +484,7 @@ export function renderHookWithProviders<Result, Props>(
   function rerender(newProps?: Props) {
     act(() => {
       if (arguments.length > 0 && setPropsFn) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         setPropsFn(newProps as Props);
       } else if (forceUpdateFn) {
         forceUpdateFn();

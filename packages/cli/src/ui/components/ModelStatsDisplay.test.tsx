@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,8 +8,10 @@ import { render } from '../../test-utils/render.js';
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { ModelStatsDisplay } from './ModelStatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
+import * as SettingsContext from '../contexts/SettingsContext.js';
+import type { LoadedSettings } from '../../config/settings.js';
 import type { SessionMetrics } from '../contexts/SessionContext.js';
-import { ToolCallDecision } from '@google/gemini-cli-core';
+import { ToolCallDecision, LlmRole } from '@google/gemini-cli-core';
 
 // Mock the context to provide controlled data for testing
 vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
@@ -20,9 +22,22 @@ vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
   };
 });
 
-const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
+vi.mock('../contexts/SettingsContext.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof SettingsContext>();
+  return {
+    ...actual,
+    useSettings: vi.fn(),
+  };
+});
 
-const renderWithMockedStats = (metrics: SessionMetrics, width?: number) => {
+const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
+const useSettingsMock = vi.mocked(SettingsContext.useSettings);
+
+const renderWithMockedStats = (
+  metrics: SessionMetrics,
+  width?: number,
+  currentModel: string = 'gemini-2.5-pro',
+) => {
   useSessionStatsMock.mockReturnValue({
     stats: {
       sessionId: 'test-session',
@@ -36,7 +51,15 @@ const renderWithMockedStats = (metrics: SessionMetrics, width?: number) => {
     startNewPrompt: vi.fn(),
   });
 
-  return render(<ModelStatsDisplay />, width);
+  useSettingsMock.mockReturnValue({
+    merged: {
+      ui: {
+        showUserIdentity: true,
+      },
+    },
+  } as unknown as LoadedSettings);
+
+  return render(<ModelStatsDisplay currentModel={currentModel} />, width);
 };
 
 describe('<ModelStatsDisplay />', () => {
@@ -95,6 +118,7 @@ describe('<ModelStatsDisplay />', () => {
             thoughts: 0,
             tool: 0,
           },
+          roles: {},
         },
       },
       tools: {
@@ -137,6 +161,7 @@ describe('<ModelStatsDisplay />', () => {
             thoughts: 2,
             tool: 0,
           },
+          roles: {},
         },
         'gemini-2.5-flash': {
           api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 50 },
@@ -149,6 +174,7 @@ describe('<ModelStatsDisplay />', () => {
             thoughts: 0,
             tool: 3,
           },
+          roles: {},
         },
       },
       tools: {
@@ -191,6 +217,7 @@ describe('<ModelStatsDisplay />', () => {
             thoughts: 10,
             tool: 5,
           },
+          roles: {},
         },
         'gemini-2.5-flash': {
           api: { totalRequests: 20, totalErrors: 2, totalLatencyMs: 500 },
@@ -203,6 +230,7 @@ describe('<ModelStatsDisplay />', () => {
             thoughts: 20,
             tool: 10,
           },
+          roles: {},
         },
       },
       tools: {
@@ -248,6 +276,7 @@ describe('<ModelStatsDisplay />', () => {
             thoughts: 111111111,
             tool: 222222222,
           },
+          roles: {},
         },
       },
       tools: {
@@ -286,6 +315,7 @@ describe('<ModelStatsDisplay />', () => {
             thoughts: 2,
             tool: 1,
           },
+          roles: {},
         },
       },
       tools: {
@@ -328,6 +358,7 @@ describe('<ModelStatsDisplay />', () => {
               thoughts: 100,
               tool: 50,
             },
+            roles: {},
           },
           'gemini-3-flash-preview': {
             api: { totalRequests: 20, totalErrors: 0, totalLatencyMs: 1000 },
@@ -340,6 +371,7 @@ describe('<ModelStatsDisplay />', () => {
               thoughts: 200,
               tool: 100,
             },
+            roles: {},
           },
         },
         tools: {
@@ -361,11 +393,258 @@ describe('<ModelStatsDisplay />', () => {
         },
       },
       80,
+      'auto-gemini-3',
     );
 
     const output = lastFrame();
     expect(output).toContain('gemini-3-pro-');
     expect(output).toContain('gemini-3-flash-');
+  });
+
+  it('should display role breakdown correctly', () => {
+    const { lastFrame } = renderWithMockedStats({
+      models: {
+        'gemini-2.5-pro': {
+          api: { totalRequests: 2, totalErrors: 0, totalLatencyMs: 200 },
+          tokens: {
+            input: 20,
+            prompt: 30,
+            candidates: 40,
+            total: 70,
+            cached: 10,
+            thoughts: 0,
+            tool: 0,
+          },
+          roles: {
+            [LlmRole.MAIN]: {
+              totalRequests: 1,
+              totalErrors: 0,
+              totalLatencyMs: 100,
+              tokens: {
+                input: 10,
+                prompt: 15,
+                candidates: 20,
+                total: 35,
+                cached: 5,
+                thoughts: 0,
+                tool: 0,
+              },
+            },
+          },
+        },
+      },
+      tools: {
+        totalCalls: 0,
+        totalSuccess: 0,
+        totalFail: 0,
+        totalDurationMs: 0,
+        totalDecisions: {
+          accept: 0,
+          reject: 0,
+          modify: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
+        },
+        byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
+      },
+    });
+
+    const output = lastFrame();
+    expect(output).toContain('main');
+    expect(output).toContain('Input');
+    expect(output).toContain('Output');
+    expect(output).toContain('Cache Reads');
+    expect(output).toMatchSnapshot();
+  });
+
+  it('should render user identity information when provided', () => {
+    useSettingsMock.mockReturnValue({
+      merged: {
+        ui: {
+          showUserIdentity: true,
+        },
+      },
+    } as unknown as LoadedSettings);
+
+    const { lastFrame } = render(
+      <ModelStatsDisplay
+        selectedAuthType="oauth"
+        userEmail="test@example.com"
+        tier="Pro"
+      />,
+    );
+
+    useSessionStatsMock.mockReturnValue({
+      stats: {
+        sessionId: 'test-session',
+        sessionStartTime: new Date(),
+        metrics: {
+          models: {
+            'gemini-2.5-pro': {
+              api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
+              tokens: {
+                input: 10,
+                prompt: 10,
+                candidates: 20,
+                total: 30,
+                cached: 0,
+                thoughts: 0,
+                tool: 0,
+              },
+              roles: {},
+            },
+          },
+          tools: {
+            totalCalls: 0,
+            totalSuccess: 0,
+            totalFail: 0,
+            totalDurationMs: 0,
+            totalDecisions: {
+              accept: 0,
+              reject: 0,
+              modify: 0,
+              [ToolCallDecision.AUTO_ACCEPT]: 0,
+            },
+            byName: {},
+          },
+          files: {
+            totalLinesAdded: 0,
+            totalLinesRemoved: 0,
+          },
+        },
+        lastPromptTokenCount: 0,
+        promptCount: 5,
+      },
+
+      getPromptCount: () => 5,
+      startNewPrompt: vi.fn(),
+    });
+
+    const output = lastFrame();
+    expect(output).toContain('Auth Method:');
+    expect(output).toContain('Logged in with Google');
+    expect(output).toContain('(test@example.com)');
+    expect(output).toContain('Tier:');
+    expect(output).toContain('Pro');
+  });
+
+  it('should handle long role name layout', () => {
+    // Use the longest valid role name to test layout
+    const longRoleName = LlmRole.UTILITY_LOOP_DETECTOR;
+
+    const { lastFrame } = renderWithMockedStats({
+      models: {
+        'gemini-2.5-pro': {
+          api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
+          tokens: {
+            input: 10,
+            prompt: 10,
+            candidates: 20,
+            total: 30,
+            cached: 0,
+            thoughts: 0,
+            tool: 0,
+          },
+          roles: {
+            [longRoleName]: {
+              totalRequests: 1,
+              totalErrors: 0,
+              totalLatencyMs: 100,
+              tokens: {
+                input: 10,
+                prompt: 10,
+                candidates: 20,
+                total: 30,
+                cached: 0,
+                thoughts: 0,
+                tool: 0,
+              },
+            },
+          },
+        },
+      },
+      tools: {
+        totalCalls: 0,
+        totalSuccess: 0,
+        totalFail: 0,
+        totalDurationMs: 0,
+        totalDecisions: {
+          accept: 0,
+          reject: 0,
+          modify: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
+        },
+        byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
+      },
+    });
+
+    const output = lastFrame();
+    expect(output).toContain(longRoleName);
+    expect(output).toMatchSnapshot();
+  });
+
+  it('should filter out invalid role names', () => {
+    const invalidRoleName =
+      'this_is_a_very_long_role_name_that_should_be_wrapped' as LlmRole;
+    const { lastFrame } = renderWithMockedStats({
+      models: {
+        'gemini-2.5-pro': {
+          api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
+          tokens: {
+            input: 10,
+            prompt: 10,
+            candidates: 20,
+            total: 30,
+            cached: 0,
+            thoughts: 0,
+            tool: 0,
+          },
+          roles: {
+            [invalidRoleName]: {
+              totalRequests: 1,
+              totalErrors: 0,
+              totalLatencyMs: 100,
+              tokens: {
+                input: 10,
+                prompt: 10,
+                candidates: 20,
+                total: 30,
+                cached: 0,
+                thoughts: 0,
+                tool: 0,
+              },
+            },
+          },
+        },
+      },
+      tools: {
+        totalCalls: 0,
+        totalSuccess: 0,
+        totalFail: 0,
+        totalDurationMs: 0,
+        totalDecisions: {
+          accept: 0,
+          reject: 0,
+          modify: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
+        },
+        byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
+      },
+    });
+
+    const output = lastFrame();
+    expect(output).not.toContain(invalidRoleName);
     expect(output).toMatchSnapshot();
   });
 });

@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
 import type { Config } from '@google/gemini-cli-core';
-import { debugLogger, spawnAsync } from '@google/gemini-cli-core';
+import { debugLogger, spawnAsync, LlmRole } from '@google/gemini-cli-core';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
 
@@ -80,7 +80,7 @@ const VISIBLE_LINES_COLLAPSED = 6;
 const VISIBLE_LINES_EXPANDED = 20;
 const VISIBLE_LINES_DETAIL = 25;
 const VISIBLE_CANDIDATES = 5;
-const MAX_CONCURRENT_ANALYSIS = 3;
+const MAX_CONCURRENT_ANALYSIS = 10;
 
 const getReactionCount = (issue: Issue | Candidate | undefined) => {
   if (!issue || !issue.reactionGroups) return 0;
@@ -157,6 +157,7 @@ export const TriageDuplicates = ({
         '--json',
         'number,title,body,state,stateReason,labels,url,comments,author,reactionGroups',
       ]);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(stdout) as Candidate;
     } catch (err) {
       debugLogger.error(
@@ -278,8 +279,10 @@ Return a JSON object with:
         },
         abortSignal: new AbortController().signal,
         promptId: 'triage-duplicates',
+        role: LlmRole.UTILITY_TOOL,
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const rec = response as unknown as GeminiRecommendation;
 
       let canonical: Candidate | undefined;
@@ -336,7 +339,7 @@ Return a JSON object with:
       const issuesToAnalyze = state.issues
         .slice(
           state.currentIndex,
-          state.currentIndex + MAX_CONCURRENT_ANALYSIS + 2,
+          state.currentIndex + MAX_CONCURRENT_ANALYSIS + 20,
         ) // Look ahead a bit
         .filter(
           (issue) =>
@@ -822,7 +825,7 @@ Return a JSON object with:
           minHeight={Math.min(candLines.length, VISIBLE_LINES_DETAIL)}
         >
           {candViewLines.map((line: string, i: number) => (
-            <Text key={i} wrap="truncate-end">
+            <Text key={i} wrap="wrap">
               {line}
             </Text>
           ))}
@@ -881,7 +884,7 @@ Return a JSON object with:
           minHeight={Math.min(targetLines.length, visibleLines)}
         >
           {targetViewLines.map((line, i) => (
-            <Text key={i} italic wrap="truncate-end">
+            <Text key={i} italic wrap="wrap">
               {line}
             </Text>
           ))}
@@ -949,7 +952,7 @@ Return a JSON object with:
                           ? 'blue'
                           : undefined
                       }
-                      wrap="truncate-end"
+                      wrap="wrap"
                     >
                       {absoluteIndex + 1}. <Text bold>#{c.number}</Text>{' '}
                       <Text color={getStateColor(c.state, c.stateReason)}>
@@ -963,7 +966,7 @@ Return a JSON object with:
                       - {c.title} (Score: {c.score}/100)
                     </Text>
                     <Box marginLeft={2}>
-                      <Text color="gray" wrap="truncate-end">
+                      <Text color="gray" wrap="wrap">
                         Reactions: {getReactionCount(c)} | {c.reason}
                       </Text>
                     </Box>
@@ -997,14 +1000,14 @@ Return a JSON object with:
           <Text bold color="blue">
             Analysis:{' '}
           </Text>
-          <Text wrap="truncate-end"> {state.message}</Text>
+          <Text wrap="wrap"> {state.message}</Text>
         </Box>
         {state.suggestedComment && (
           <Box marginTop={1} flexDirection="column">
             <Text bold color="gray">
               Suggested Comment:
             </Text>
-            <Text italic color="gray" wrap="truncate-end">
+            <Text italic color="gray" wrap="wrap">
               &quot;{state.suggestedComment}&quot;
             </Text>
           </Box>

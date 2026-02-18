@@ -458,6 +458,81 @@ describe('GrepTool', () => {
       // Clean up
       await fs.rm(secondDir, { recursive: true, force: true });
     });
+
+    it('should respect total_max_matches and truncate results', async () => {
+      // Use 'world' pattern which has 3 matches across fileA.txt and sub/fileC.txt
+      const params: GrepToolParams = {
+        pattern: 'world',
+        total_max_matches: 2,
+      };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('Found 2 matches');
+      expect(result.llmContent).toContain(
+        'results limited to 2 matches for performance',
+      );
+      // It should find matches in fileA.txt first (2 matches)
+      expect(result.llmContent).toContain('File: fileA.txt');
+      expect(result.llmContent).toContain('L1: hello world');
+      expect(result.llmContent).toContain('L2: second line with world');
+      // And sub/fileC.txt should be excluded because limit reached
+      expect(result.llmContent).not.toContain('File: sub/fileC.txt');
+      expect(result.returnDisplay).toBe('Found 2 matches (limited)');
+    });
+
+    it('should respect max_matches_per_file in JS fallback', async () => {
+      const params: GrepToolParams = {
+        pattern: 'world',
+        max_matches_per_file: 1,
+      };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      // fileA.txt has 2 worlds, but should only return 1.
+      // sub/fileC.txt has 1 world, so total matches = 2.
+      expect(result.llmContent).toContain('Found 2 matches');
+      expect(result.llmContent).toContain('File: fileA.txt');
+      expect(result.llmContent).toContain('L1: hello world');
+      expect(result.llmContent).not.toContain('L2: second line with world');
+      expect(result.llmContent).toContain('File: sub/fileC.txt');
+      expect(result.llmContent).toContain('L1: another world in sub dir');
+    });
+
+    it('should return only file paths when names_only is true', async () => {
+      const params: GrepToolParams = {
+        pattern: 'world',
+        names_only: true,
+      };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('Found 2 files with matches');
+      expect(result.llmContent).toContain('fileA.txt');
+      expect(result.llmContent).toContain('sub/fileC.txt');
+      expect(result.llmContent).not.toContain('L1:');
+      expect(result.llmContent).not.toContain('hello world');
+    });
+
+    it('should filter out matches based on exclude_pattern', async () => {
+      await fs.writeFile(
+        path.join(tempRootDir, 'copyright.txt'),
+        'Copyright 2025 Google LLC\nCopyright 2026 Google LLC',
+      );
+
+      const params: GrepToolParams = {
+        pattern: 'Copyright .* Google LLC',
+        exclude_pattern: '2026',
+        dir_path: '.',
+      };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('Found 1 match');
+      expect(result.llmContent).toContain('copyright.txt');
+      expect(result.llmContent).toContain('Copyright 2025 Google LLC');
+      expect(result.llmContent).not.toContain('Copyright 2026 Google LLC');
+    });
   });
 
   describe('getDescription', () => {

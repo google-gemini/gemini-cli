@@ -53,6 +53,7 @@ import {
   recordConversationOffered,
 } from './telemetry.js';
 import { getClientMetadata } from './experiments/client_metadata.js';
+import type { LlmRole } from '../telemetry/types.js';
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
   /** Additional HTTP headers to be sent with the request. */
@@ -75,6 +76,8 @@ export class CodeAssistServer implements ContentGenerator {
   async generateContentStream(
     req: GenerateContentParameters,
     userPromptId: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    role: LlmRole,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const responses =
       await this.requestStreamingPost<CaGenerateContentResponse>(
@@ -125,6 +128,8 @@ export class CodeAssistServer implements ContentGenerator {
   async generateContent(
     req: GenerateContentParameters,
     userPromptId: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    role: LlmRole,
   ): Promise<GenerateContentResponse> {
     const start = Date.now();
     const response = await this.requestPost<CaGenerateContentResponse>(
@@ -301,6 +306,7 @@ export class CodeAssistServer implements ContentGenerator {
       body: JSON.stringify(req),
       signal,
     });
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return res.data as T;
   }
 
@@ -318,6 +324,7 @@ export class CodeAssistServer implements ContentGenerator {
       responseType: 'json',
       signal,
     });
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return res.data as T;
   }
 
@@ -351,6 +358,7 @@ export class CodeAssistServer implements ContentGenerator {
 
     return (async function* (): AsyncGenerator<T> {
       const rl = readline.createInterface({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         input: res.data as NodeJS.ReadableStream,
         crlfDelay: Infinity, // Recognizes '\r\n' and '\n' as line breaks
       });
@@ -363,6 +371,7 @@ export class CodeAssistServer implements ContentGenerator {
           if (bufferedLines.length === 0) {
             continue; // no data to yield
           }
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           yield JSON.parse(bufferedLines.join('\n')) as T;
           bufferedLines = []; // Reset the buffer after yielding
         }
@@ -374,7 +383,9 @@ export class CodeAssistServer implements ContentGenerator {
   private getBaseUrl(): string {
     const endpoint =
       process.env['CODE_ASSIST_ENDPOINT'] ?? CODE_ASSIST_ENDPOINT;
-    return `${endpoint}/${CODE_ASSIST_API_VERSION}`;
+    const version =
+      process.env['CODE_ASSIST_API_VERSION'] || CODE_ASSIST_API_VERSION;
+    return `${endpoint}/${version}`;
   }
 
   getMethodUrl(method: string): string {
@@ -388,11 +399,13 @@ export class CodeAssistServer implements ContentGenerator {
 
 function isVpcScAffectedUser(error: unknown): boolean {
   if (error && typeof error === 'object' && 'response' in error) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const gaxiosError = error as {
       response?: {
         data?: unknown;
       };
     };
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const response = gaxiosError.response?.data as
       | GoogleRpcResponse
       | undefined;

@@ -49,6 +49,7 @@ async function finishAddingDirectories(
         text: `Successfully added GEMINI.md files from the following directories if there are:\n- ${added.join('\n- ')}`,
       });
     } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       errors.push(`Error refreshing memory: ${(error as Error).message}`);
     }
   }
@@ -57,6 +58,13 @@ async function finishAddingDirectories(
     const gemini = config.getGeminiClient();
     if (gemini) {
       await gemini.addDirectoryContext();
+
+      // Persist directories to session file for resume support
+      const chatRecordingService = gemini.getChatRecordingService();
+      const workspaceContext = config.getWorkspaceContext();
+      chatRecordingService?.recordDirectories(
+        workspaceContext.getDirectories(),
+      );
     }
     addItem({
       type: MessageType.INFO,

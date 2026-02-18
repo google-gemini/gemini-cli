@@ -7,6 +7,7 @@
 import { Box } from 'ink';
 import { Header } from './Header.js';
 import { Tips } from './Tips.js';
+import { UserIdentity } from './UserIdentity.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -16,15 +17,24 @@ import { useTips } from '../hooks/useTips.js';
 
 interface AppHeaderProps {
   version: string;
+  showDetails?: boolean;
 }
 
-export const AppHeader = ({ version }: AppHeaderProps) => {
+export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
   const settings = useSettings();
   const config = useConfig();
   const { nightly, terminalWidth, bannerData, bannerVisible } = useUIState();
 
-  const { bannerText } = useBanner(bannerData, config);
+  const { bannerText } = useBanner(bannerData);
   const { showTips } = useTips();
+
+  if (!showDetails) {
+    return (
+      <Box flexDirection="column">
+        <Header version={version} nightly={false} />
+      </Box>
+    );
+  }
 
   return (
     <Box flexDirection="column">
@@ -39,6 +49,9 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
             />
           )}
         </>
+      )}
+      {settings.merged.ui.showUserIdentity !== false && (
+        <UserIdentity config={config} />
       )}
       {!(settings.merged.ui.hideTips || config.getScreenReader()) &&
         showTips && <Tips config={config} />}

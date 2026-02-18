@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -34,6 +34,8 @@ import { WebFetchTool } from '../tools/web-fetch.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
+import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
+import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
@@ -51,10 +53,14 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  isAutoModel,
   isPreviewModel,
+  PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
+  resolveModel,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
@@ -86,20 +92,21 @@ import { ContextManager } from '../services/contextManager.js';
 import type { GenerateContentParameters } from '@google/genai';
 
 // Re-export OAuth config type
-export type { MCPOAuthConfig, AnyToolInvocation };
-import type { AnyToolInvocation } from '../tools/tools.js';
+export type { MCPOAuthConfig, AnyToolInvocation, AnyDeclarativeTool };
+import type { AnyToolInvocation, AnyDeclarativeTool } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
 import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
-import type { EventEmitter } from 'node:events';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type { UserTierId } from '../code_assist/types.js';
 import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
-import type { FetchAdminControlsResponse } from '../code_assist/types.js';
+import type { AdminControlsSettings } from '../code_assist/types.js';
+import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
@@ -147,6 +154,13 @@ export interface OutputSettings {
   format?: OutputFormat;
 }
 
+export interface ToolOutputMaskingConfig {
+  enabled: boolean;
+  toolProtectionThreshold: number;
+  minPrunableTokensThreshold: number;
+  protectLatestTurn: boolean;
+}
+
 export interface ExtensionSetting {
   name: string;
   description: string;
@@ -157,7 +171,7 @@ export interface ExtensionSetting {
 export interface ResolvedExtensionSetting {
   name: string;
   envVar: string;
-  value: string;
+  value?: string;
   sensitive: boolean;
   scope?: 'user' | 'workspace';
   source?: string;
@@ -176,6 +190,57 @@ export interface AgentOverride {
 
 export interface AgentSettings {
   overrides?: Record<string, AgentOverride>;
+}
+
+export interface CustomTheme {
+  type: 'custom';
+  name: string;
+
+  text?: {
+    primary?: string;
+    secondary?: string;
+    link?: string;
+    accent?: string;
+    response?: string;
+  };
+  background?: {
+    primary?: string;
+    diff?: {
+      added?: string;
+      removed?: string;
+    };
+  };
+  border?: {
+    default?: string;
+    focused?: string;
+  };
+  ui?: {
+    comment?: string;
+    symbol?: string;
+    gradient?: string[];
+  };
+  status?: {
+    error?: string;
+    success?: string;
+    warning?: string;
+  };
+
+  // Legacy properties (all optional)
+  Background?: string;
+  Foreground?: string;
+  LightBlue?: string;
+  AccentBlue?: string;
+  AccentPurple?: string;
+  AccentCyan?: string;
+  AccentGreen?: string;
+  AccentYellow?: string;
+  AccentRed?: string;
+  DiffAdded?: string;
+  DiffRemoved?: string;
+  Comment?: string;
+  Gray?: string;
+  DarkGray?: string;
+  GradientColors?: string[];
 }
 
 /**
@@ -199,6 +264,11 @@ export interface GeminiCLIExtension {
   resolvedSettings?: ResolvedExtensionSetting[];
   skills?: SkillDefinition[];
   agents?: AgentDefinition[];
+  /**
+   * Custom themes contributed by this extension.
+   * These themes will be registered when the extension is activated.
+   */
+  themes?: CustomTheme[];
 }
 
 export interface ExtensionInstallMetadata {
@@ -215,6 +285,11 @@ import {
   DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
 } from './constants.js';
+import {
+  DEFAULT_TOOL_PROTECTION_THRESHOLD,
+  DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD,
+  DEFAULT_PROTECT_LATEST_TURN,
+} from '../services/toolOutputMaskingService.js';
 
 import {
   type ExtensionLoader,
@@ -223,6 +298,10 @@ import {
 import { McpClientManager } from '../tools/mcp-client-manager.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 import { getErrorMessage } from '../utils/errors.js';
+import {
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+} from '../tools/tool-names.js';
 
 export type { FileFilteringOptions };
 export {
@@ -230,8 +309,7 @@ export {
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
 };
 
-export const DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 4_000_000;
-export const DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES = 1000;
+export const DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 40_000;
 
 export class MCPServerConfig {
   constructor(
@@ -305,14 +383,16 @@ export interface ConfigParameters {
   question?: string;
 
   coreTools?: string[];
+  /** @deprecated Use Policy Engine instead */
   allowedTools?: string[];
+  /** @deprecated Use Policy Engine instead */
   excludeTools?: string[];
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
   mcpEnablementCallbacks?: McpEnablementCallbacks;
-  userMemory?: string;
+  userMemory?: string | HierarchicalMemory;
   geminiMdFileCount?: number;
   geminiMdFilePaths?: string[];
   approvalMode?: ApprovalMode;
@@ -337,6 +417,7 @@ export interface ConfigParameters {
   includeDirectories?: string[];
   bugCommand?: BugCommandSettings;
   model: string;
+  disableLoopDetection?: boolean;
   maxSessionTurns?: number;
   experimentalZedIntegration?: boolean;
   listSessions?: boolean;
@@ -355,6 +436,7 @@ export interface ConfigParameters {
   folderTrust?: boolean;
   ideMode?: boolean;
   loadMemoryFromIncludeDirectories?: boolean;
+  includeDirectoryTree?: boolean;
   importFormat?: 'tree' | 'flat';
   discoveryMaxDirs?: number;
   compressionThreshold?: number;
@@ -368,8 +450,6 @@ export interface ConfigParameters {
   extensionManagement?: boolean;
   enablePromptCompletion?: boolean;
   truncateToolOutputThreshold?: number;
-  truncateToolOutputLines?: number;
-  enableToolOutputTruncation?: boolean;
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
@@ -392,13 +472,13 @@ export interface ConfigParameters {
   hooks?: { [K in HookEventName]?: HookDefinition[] };
   disabledHooks?: string[];
   projectHooks?: { [K in HookEventName]?: HookDefinition[] };
-  previewFeatures?: boolean;
   enableAgents?: boolean;
   enableEventDrivenScheduler?: boolean;
   skillsSupport?: boolean;
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
+  toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
   plan?: boolean;
   onModelChange?: (model: string) => void;
@@ -439,7 +519,9 @@ export class Config {
   private readonly question: string | undefined;
 
   private readonly coreTools: string[] | undefined;
+  /** @deprecated Use Policy Engine instead */
   private readonly allowedTools: string[] | undefined;
+  /** @deprecated Use Policy Engine instead */
   private readonly excludeTools: string[] | undefined;
   private readonly toolDiscoveryCommand: string | undefined;
   private readonly toolCallCommand: string | undefined;
@@ -448,7 +530,7 @@ export class Config {
   private readonly extensionsEnabled: boolean;
   private mcpServers: Record<string, MCPServerConfig> | undefined;
   private readonly mcpEnablementCallbacks?: McpEnablementCallbacks;
-  private userMemory: string;
+  private userMemory: string | HierarchicalMemory;
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
   private readonly showMemoryUsage: boolean;
@@ -475,7 +557,7 @@ export class Config {
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private model: string;
-  private previewFeatures: boolean | undefined;
+  private readonly disableLoopDetection: boolean;
   private hasAccessToPreviewModel: boolean = false;
   private readonly noBrowser: boolean;
   private readonly folderTrust: boolean;
@@ -492,11 +574,37 @@ export class Config {
   fallbackModelHandler?: FallbackModelHandler;
   validationHandler?: ValidationHandler;
   private quotaErrorOccurred: boolean = false;
+  private modelQuotas: Map<
+    string,
+    { remaining: number; limit: number; resetTime?: string }
+  > = new Map();
+  private lastRetrievedQuota?: RetrieveUserQuotaResponse;
+  private lastQuotaFetchTime = 0;
+  private lastEmittedQuotaRemaining: number | undefined;
+  private lastEmittedQuotaLimit: number | undefined;
+
+  private emitQuotaChangedEvent(): void {
+    const pooled = this.getPooledQuota();
+    if (
+      this.lastEmittedQuotaRemaining !== pooled.remaining ||
+      this.lastEmittedQuotaLimit !== pooled.limit
+    ) {
+      this.lastEmittedQuotaRemaining = pooled.remaining;
+      this.lastEmittedQuotaLimit = pooled.limit;
+      coreEvents.emitQuotaChanged(
+        pooled.remaining,
+        pooled.limit,
+        pooled.resetTime,
+      );
+    }
+  }
+
   private readonly summarizeToolOutput:
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
   private readonly experimentalZedIntegration: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
+  private readonly includeDirectoryTree: boolean = true;
   private readonly importFormat: 'tree' | 'flat';
   private readonly discoveryMaxDirs: number;
   private readonly compressionThreshold: number | undefined;
@@ -512,10 +620,9 @@ export class Config {
   private readonly extensionManagement: boolean = true;
   private readonly enablePromptCompletion: boolean = false;
   private readonly truncateToolOutputThreshold: number;
-  private readonly truncateToolOutputLines: number;
   private compressionTruncationCounter = 0;
-  private readonly enableToolOutputTruncation: boolean;
-  private initialized: boolean = false;
+  private initialized = false;
+  private initPromise: Promise<void> | undefined;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
@@ -535,6 +642,7 @@ export class Config {
   private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
   private readonly enableHooksUI: boolean;
+  private readonly toolOutputMasking: ToolOutputMaskingConfig;
   private hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
   private projectHooks:
     | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
@@ -564,13 +672,15 @@ export class Config {
   private readonly planEnabled: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
-  private remoteAdminSettings: FetchAdminControlsResponse | undefined;
+  private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
   private lastModeSwitchTime: number = Date.now();
+  private approvedPlanPath: string | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
     this.clientVersion = params.clientVersion ?? 'unknown';
+    this.approvedPlanPath = undefined;
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.fileSystemService = new StandardFileSystemService();
@@ -641,6 +751,7 @@ export class Config {
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
+    this.disableLoopDetection = params.disableLoopDetection ?? false;
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
@@ -651,8 +762,19 @@ export class Config {
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
     this.modelAvailabilityService = new ModelAvailabilityService();
-    this.previewFeatures = params.previewFeatures ?? undefined;
     this.experimentalJitContext = params.experimentalJitContext ?? false;
+    this.toolOutputMasking = {
+      enabled: params.toolOutputMasking?.enabled ?? true,
+      toolProtectionThreshold:
+        params.toolOutputMasking?.toolProtectionThreshold ??
+        DEFAULT_TOOL_PROTECTION_THRESHOLD,
+      minPrunableTokensThreshold:
+        params.toolOutputMasking?.minPrunableTokensThreshold ??
+        DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD,
+      protectLatestTurn:
+        params.toolOutputMasking?.protectLatestTurn ??
+        DEFAULT_PROTECT_LATEST_TURN,
+    };
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.experimentalZedIntegration =
       params.experimentalZedIntegration ?? false;
@@ -666,6 +788,7 @@ export class Config {
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.folderTrust = params.folderTrust ?? false;
     this.ideMode = params.ideMode ?? false;
+    this.includeDirectoryTree = params.includeDirectoryTree ?? true;
     this.loadMemoryFromIncludeDirectories =
       params.loadMemoryFromIncludeDirectories ?? false;
     this.importFormat = params.importFormat ?? 'tree';
@@ -688,9 +811,6 @@ export class Config {
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
-    this.truncateToolOutputLines =
-      params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
-    this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     // // TODO(joshualitt): Re-evaluate the todo tool for 3 family.
     this.useWriteTodos = isPreviewModel(this.model)
       ? false
@@ -706,7 +826,7 @@ export class Config {
       (params.shellToolInactivityTimeout ?? 300) * 1000; // 5 minutes
     this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
-    this.storage = new Storage(this.targetDir);
+    this.storage = new Storage(this.targetDir, this.sessionId);
 
     this.fakeResponses = params.fakeResponses;
     this.recordResponses = params.recordResponses;
@@ -792,14 +912,26 @@ export class Config {
     );
   }
 
+  isInitialized(): boolean {
+    return this.initialized;
+  }
+
   /**
-   * Must only be called once, throws if called again.
+   * Dedups initialization requests using a shared promise that is only resolved
+   * once.
    */
   async initialize(): Promise<void> {
-    if (this.initialized) {
-      throw Error('Config was already initialized');
+    if (this.initPromise) {
+      return this.initPromise;
     }
-    this.initialized = true;
+
+    this.initPromise = this._initialize();
+
+    return this.initPromise;
+  }
+
+  private async _initialize(): Promise<void> {
+    await this.storage.initialize();
 
     // Add pending directories to workspace context
     for (const dir of this.pendingIncludeDirectories) {
@@ -848,7 +980,7 @@ export class Config {
       }
     });
 
-    if (!this.interactive) {
+    if (!this.interactive || this.experimentalZedIntegration) {
       await mcpInitialization;
     }
 
@@ -858,6 +990,7 @@ export class Config {
         await this.getSkillManager().discoverSkills(
           this.storage,
           this.getExtensions(),
+          this.isTrustedFolder(),
         );
         this.getSkillManager().setDisabledSkills(this.disabledSkills);
 
@@ -883,6 +1016,8 @@ export class Config {
     }
 
     await this.geminiClient.initialize();
+    this.syncPlanModeTools();
+    this.initialized = true;
   }
 
   getContentGenerator(): ContentGenerator {
@@ -929,15 +1064,6 @@ export class Config {
     this.experimentsPromise = getExperiments(codeAssistServer)
       .then((experiments) => {
         this.setExperiments(experiments);
-
-        // If preview features have not been set and the user authenticated through Google, we enable preview based on remote config only if it's true
-        if (this.getPreviewFeatures() === undefined) {
-          const remotePreviewFeatures =
-            experiments.flags[ExperimentFlags.ENABLE_PREVIEW]?.boolValue;
-          if (remotePreviewFeatures === true) {
-            this.setPreviewFeatures(remotePreviewFeatures);
-          }
-        }
       })
       .catch((e) => {
         debugLogger.error('Failed to fetch experiments', e);
@@ -965,7 +1091,7 @@ export class Config {
       codeAssistServer,
       this.getRemoteAdminSettings(),
       adminControlsEnabled,
-      (newSettings: FetchAdminControlsResponse) => {
+      (newSettings: AdminControlsSettings) => {
         this.setRemoteAdminSettings(newSettings);
         coreEvents.emitAdminSettingsChanged();
       },
@@ -986,8 +1112,7 @@ export class Config {
   }
 
   getUserTierName(): string | undefined {
-    // TODO(#1275): Re-enable user tier display when ready.
-    return undefined;
+    return this.contentGenerator?.userTierName;
   }
 
   /**
@@ -1034,16 +1159,20 @@ export class Config {
     this.latestApiRequest = req;
   }
 
-  getRemoteAdminSettings(): FetchAdminControlsResponse | undefined {
+  getRemoteAdminSettings(): AdminControlsSettings | undefined {
     return this.remoteAdminSettings;
   }
 
-  setRemoteAdminSettings(settings: FetchAdminControlsResponse): void {
+  setRemoteAdminSettings(settings: AdminControlsSettings): void {
     this.remoteAdminSettings = settings;
   }
 
   shouldLoadMemoryFromIncludeDirectories(): boolean {
     return this.loadMemoryFromIncludeDirectories;
+  }
+
+  getIncludeDirectoryTree(): boolean {
+    return this.includeDirectoryTree;
   }
 
   getImportFormat(): 'tree' | 'flat' {
@@ -1060,6 +1189,10 @@ export class Config {
 
   getModel(): string {
     return this.model;
+  }
+
+  getDisableLoopDetection(): boolean {
+    return this.disableLoopDetection ?? false;
   }
 
   setModel(newModel: string, isTemporary: boolean = true): void {
@@ -1125,6 +1258,90 @@ export class Config {
     return this.quotaErrorOccurred;
   }
 
+  setQuota(
+    remaining: number | undefined,
+    limit: number | undefined,
+    modelId?: string,
+  ): void {
+    const activeModel = modelId ?? this.getActiveModel();
+    if (remaining !== undefined && limit !== undefined) {
+      const current = this.modelQuotas.get(activeModel);
+      if (
+        !current ||
+        current.remaining !== remaining ||
+        current.limit !== limit
+      ) {
+        this.modelQuotas.set(activeModel, { remaining, limit });
+        this.emitQuotaChangedEvent();
+      }
+    }
+  }
+
+  private getPooledQuota(): {
+    remaining?: number;
+    limit?: number;
+    resetTime?: string;
+  } {
+    const model = this.getModel();
+    if (!isAutoModel(model)) {
+      return {};
+    }
+
+    const isPreview =
+      model === PREVIEW_GEMINI_MODEL_AUTO ||
+      isPreviewModel(this.getActiveModel());
+    const proModel = isPreview ? PREVIEW_GEMINI_MODEL : DEFAULT_GEMINI_MODEL;
+    const flashModel = isPreview
+      ? PREVIEW_GEMINI_FLASH_MODEL
+      : DEFAULT_GEMINI_FLASH_MODEL;
+
+    const proQuota = this.modelQuotas.get(proModel);
+    const flashQuota = this.modelQuotas.get(flashModel);
+
+    if (proQuota || flashQuota) {
+      // For reset time, take the one that is furthest in the future (most conservative)
+      const resetTime = [proQuota?.resetTime, flashQuota?.resetTime]
+        .filter((t): t is string => !!t)
+        .sort()
+        .reverse()[0];
+
+      return {
+        remaining: (proQuota?.remaining ?? 0) + (flashQuota?.remaining ?? 0),
+        limit: (proQuota?.limit ?? 0) + (flashQuota?.limit ?? 0),
+        resetTime,
+      };
+    }
+
+    return {};
+  }
+
+  getQuotaRemaining(): number | undefined {
+    const pooled = this.getPooledQuota();
+    if (pooled.remaining !== undefined) {
+      return pooled.remaining;
+    }
+    const primaryModel = resolveModel(this.getModel());
+    return this.modelQuotas.get(primaryModel)?.remaining;
+  }
+
+  getQuotaLimit(): number | undefined {
+    const pooled = this.getPooledQuota();
+    if (pooled.limit !== undefined) {
+      return pooled.limit;
+    }
+    const primaryModel = resolveModel(this.getModel());
+    return this.modelQuotas.get(primaryModel)?.limit;
+  }
+
+  getQuotaResetTime(): string | undefined {
+    const pooled = this.getPooledQuota();
+    if (pooled.resetTime !== undefined) {
+      return pooled.resetTime;
+    }
+    const primaryModel = resolveModel(this.getModel());
+    return this.modelQuotas.get(primaryModel)?.resetTime;
+  }
+
   getEmbeddingModel(): string {
     return this.embeddingModel;
   }
@@ -1140,7 +1357,8 @@ export class Config {
       !!sandboxConfig &&
       sandboxConfig.command === 'sandbox-exec' &&
       !!seatbeltProfile &&
-      seatbeltProfile.startsWith('restrictive-')
+      (seatbeltProfile.startsWith('restrictive-') ||
+        seatbeltProfile.startsWith('strict-'))
     );
   }
 
@@ -1187,29 +1405,6 @@ export class Config {
     return this.question;
   }
 
-  getPreviewFeatures(): boolean | undefined {
-    return this.previewFeatures;
-  }
-
-  setPreviewFeatures(previewFeatures: boolean) {
-    // No change in state, no action needed
-    if (this.previewFeatures === previewFeatures) {
-      return;
-    }
-    this.previewFeatures = previewFeatures;
-    const currentModel = this.getModel();
-
-    // Case 1: Disabling preview features while on a preview model
-    if (!previewFeatures && isPreviewModel(currentModel)) {
-      this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
-    }
-
-    // Case 2: Enabling preview features while on the default auto model
-    else if (previewFeatures && currentModel === DEFAULT_GEMINI_MODEL_AUTO) {
-      this.setModel(PREVIEW_GEMINI_MODEL_AUTO);
-    }
-  }
-
   getHasAccessToPreviewModel(): boolean {
     return this.hasAccessToPreviewModel;
   }
@@ -1227,6 +1422,35 @@ export class Config {
       const quota = await codeAssistServer.retrieveUserQuota({
         project: codeAssistServer.projectId,
       });
+
+      if (quota.buckets) {
+        this.lastRetrievedQuota = quota;
+        this.lastQuotaFetchTime = Date.now();
+
+        for (const bucket of quota.buckets) {
+          if (
+            bucket.modelId &&
+            bucket.remainingAmount &&
+            bucket.remainingFraction != null
+          ) {
+            const remaining = parseInt(bucket.remainingAmount, 10);
+            const limit =
+              bucket.remainingFraction > 0
+                ? Math.round(remaining / bucket.remainingFraction)
+                : (this.modelQuotas.get(bucket.modelId)?.limit ?? 0);
+
+            if (!isNaN(remaining) && Number.isFinite(limit) && limit > 0) {
+              this.modelQuotas.set(bucket.modelId, {
+                remaining,
+                limit,
+                resetTime: bucket.resetTime,
+              });
+            }
+          }
+        }
+        this.emitQuotaChangedEvent();
+      }
+
       const hasAccess =
         quota.buckets?.some((b) => b.modelId === PREVIEW_GEMINI_MODEL) ?? false;
       this.setHasAccessToPreviewModel(hasAccess);
@@ -1235,6 +1459,41 @@ export class Config {
       debugLogger.debug('Failed to retrieve user quota', e);
       return undefined;
     }
+  }
+
+  async refreshUserQuotaIfStale(
+    staleMs = 30_000,
+  ): Promise<RetrieveUserQuotaResponse | undefined> {
+    const now = Date.now();
+    if (now - this.lastQuotaFetchTime > staleMs) {
+      return this.refreshUserQuota();
+    }
+    return this.lastRetrievedQuota;
+  }
+
+  getLastRetrievedQuota(): RetrieveUserQuotaResponse | undefined {
+    return this.lastRetrievedQuota;
+  }
+
+  getRemainingQuotaForModel(modelId: string):
+    | {
+        remainingAmount?: number;
+        remainingFraction?: number;
+        resetTime?: string;
+      }
+    | undefined {
+    const bucket = this.lastRetrievedQuota?.buckets?.find(
+      (b) => b.modelId === modelId,
+    );
+    if (!bucket) return undefined;
+
+    return {
+      remainingAmount: bucket.remainingAmount
+        ? parseInt(bucket.remainingAmount, 10)
+        : undefined,
+      remainingFraction: bucket.remainingFraction,
+      resetTime: bucket.resetTime,
+    };
   }
 
   getCoreTools(): string[] | undefined {
@@ -1247,11 +1506,12 @@ export class Config {
 
   /**
    * All the excluded tools from static configuration, loaded extensions, or
-   * other sources.
+   * other sources (like the Policy Engine).
    *
    * May change over time.
    */
   getExcludeTools(): Set<string> | undefined {
+    // Right now this is present for backward compatibility with settings.json exclude
     const excludeToolsSet = new Set([...(this.excludeTools ?? [])]);
     for (const extension of this.getExtensionLoader().getExtensions()) {
       if (!extension.isActive) {
@@ -1261,6 +1521,12 @@ export class Config {
         excludeToolsSet.add(tool);
       }
     }
+
+    const policyExclusions = this.policyEngine.getExcludedTools();
+    for (const tool of policyExclusions) {
+      excludeToolsSet.add(tool);
+    }
+
     return excludeToolsSet;
   }
 
@@ -1322,14 +1588,13 @@ export class Config {
     this.mcpServers = mcpServers;
   }
 
-  getUserMemory(): string {
+  getUserMemory(): string | HierarchicalMemory {
     if (this.experimentalJitContext && this.contextManager) {
-      return [
-        this.contextManager.getGlobalMemory(),
-        this.contextManager.getEnvironmentMemory(),
-      ]
-        .filter(Boolean)
-        .join('\n\n');
+      return {
+        global: this.contextManager.getGlobalMemory(),
+        extension: this.contextManager.getExtensionMemory(),
+        project: this.contextManager.getEnvironmentMemory(),
+      };
     }
     return this.userMemory;
   }
@@ -1352,7 +1617,7 @@ export class Config {
     }
   }
 
-  setUserMemory(newUserMemory: string): void {
+  setUserMemory(newUserMemory: string | HierarchicalMemory): void {
     this.userMemory = newUserMemory;
   }
 
@@ -1370,6 +1635,45 @@ export class Config {
 
   isJitContextEnabled(): boolean {
     return this.experimentalJitContext;
+  }
+
+  getToolOutputMaskingEnabled(): boolean {
+    return this.toolOutputMasking.enabled;
+  }
+
+  async getToolOutputMaskingConfig(): Promise<ToolOutputMaskingConfig> {
+    await this.ensureExperimentsLoaded();
+
+    const remoteProtection =
+      this.experiments?.flags[ExperimentFlags.MASKING_PROTECTION_THRESHOLD]
+        ?.intValue;
+    const remotePrunable =
+      this.experiments?.flags[ExperimentFlags.MASKING_PRUNABLE_THRESHOLD]
+        ?.intValue;
+    const remoteProtectLatest =
+      this.experiments?.flags[ExperimentFlags.MASKING_PROTECT_LATEST_TURN]
+        ?.boolValue;
+
+    const parsedProtection = remoteProtection
+      ? parseInt(remoteProtection, 10)
+      : undefined;
+    const parsedPrunable = remotePrunable
+      ? parseInt(remotePrunable, 10)
+      : undefined;
+
+    return {
+      enabled: this.toolOutputMasking.enabled,
+      toolProtectionThreshold:
+        parsedProtection !== undefined && !isNaN(parsedProtection)
+          ? parsedProtection
+          : this.toolOutputMasking.toolProtectionThreshold,
+      minPrunableTokensThreshold:
+        parsedPrunable !== undefined && !isNaN(parsedPrunable)
+          ? parsedPrunable
+          : this.toolOutputMasking.minPrunableTokensThreshold,
+      protectLatestTurn:
+        remoteProtectLatest ?? this.toolOutputMasking.protectLatestTurn,
+    };
   }
 
   getGeminiMdFileCount(): number {
@@ -1421,7 +1725,44 @@ export class Config {
       currentMode !== mode &&
       (currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN);
     if (isPlanModeTransition) {
+      this.syncPlanModeTools();
       this.updateSystemInstructionIfInitialized();
+    }
+  }
+
+  /**
+   * Synchronizes enter/exit plan mode tools based on current mode.
+   */
+  syncPlanModeTools(): void {
+    const isPlanMode = this.getApprovalMode() === ApprovalMode.PLAN;
+    const registry = this.getToolRegistry();
+
+    if (isPlanMode) {
+      if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
+        registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
+      }
+      if (!registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
+        registry.registerTool(new ExitPlanModeTool(this, this.messageBus));
+      }
+    } else {
+      if (registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
+        registry.unregisterTool(EXIT_PLAN_MODE_TOOL_NAME);
+      }
+      if (this.planEnabled) {
+        if (!registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
+          registry.registerTool(new EnterPlanModeTool(this, this.messageBus));
+        }
+      } else {
+        if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
+          registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
+        }
+      }
+    }
+
+    if (this.geminiClient?.isInitialized()) {
+      this.geminiClient.setTools().catch((err) => {
+        debugLogger.error('Failed to update tools', err);
+      });
     }
   }
 
@@ -1642,6 +1983,14 @@ export class Config {
     return this.planEnabled;
   }
 
+  getApprovedPlanPath(): string | undefined {
+    return this.approvedPlanPath;
+  }
+
+  setApprovedPlanPath(path: string | undefined): void {
+    this.approvedPlanPath = path;
+  }
+
   isAgentsEnabled(): boolean {
     return this.enableAgents;
   }
@@ -1712,10 +2061,6 @@ export class Config {
    * @returns true if the path is allowed, false otherwise.
    */
   isPathAllowed(absolutePath: string): boolean {
-    if (this.interactive && path.isAbsolute(absolutePath)) {
-      return true;
-    }
-
     const realpath = (p: string) => {
       let resolved: string;
       try {
@@ -1743,9 +2088,22 @@ export class Config {
    * Validates if a path is allowed and returns a detailed error message if not.
    *
    * @param absolutePath The absolute path to validate.
+   * @param checkType The type of access to check ('read' or 'write'). Defaults to 'write' for safety.
    * @returns An error message string if the path is disallowed, null otherwise.
    */
-  validatePathAccess(absolutePath: string): string | null {
+  validatePathAccess(
+    absolutePath: string,
+    checkType: 'read' | 'write' = 'write',
+  ): string | null {
+    // For read operations, check read-only paths first
+    if (checkType === 'read') {
+      if (this.getWorkspaceContext().isPathReadable(absolutePath)) {
+        return null;
+      }
+    }
+
+    // Then check standard allowed paths (Workspace + Temp)
+    // This covers 'write' checks and acts as a fallback/temp-dir check for 'read'
     if (this.isPathAllowed(absolutePath)) {
       return null;
     }
@@ -1860,6 +2218,7 @@ export class Config {
       await this.getSkillManager().discoverSkills(
         this.storage,
         this.getExtensions(),
+        this.isTrustedFolder(),
       );
       this.getSkillManager().setDisabledSkills(this.disabledSkills);
 
@@ -1954,10 +2313,6 @@ export class Config {
     return this.enablePromptCompletion;
   }
 
-  getEnableToolOutputTruncation(): boolean {
-    return this.enableToolOutputTruncation;
-  }
-
   getTruncateToolOutputThreshold(): number {
     return Math.min(
       // Estimate remaining context window in characters (1 token ~= 4 chars).
@@ -1965,10 +2320,6 @@ export class Config {
         (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
       this.truncateToolOutputThreshold,
     );
-  }
-
-  getTruncateToolOutputLines(): number {
-    return this.truncateToolOutputLines;
   }
 
   getNextCompressionTruncationId(): number {
@@ -2017,10 +2368,12 @@ export class Config {
     const registry = new ToolRegistry(this, this.messageBus);
 
     // helper to create & register core tools that are enabled
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const registerCoreTool = (ToolClass: any, ...args: unknown[]) => {
-      const className = ToolClass.name;
-      const toolName = ToolClass.Name || className;
+    const maybeRegister = (
+      toolClass: { name: string; Name?: string },
+      registerFn: () => void,
+    ) => {
+      const className = toolClass.name;
+      const toolName = toolClass.Name || className;
       const coreTools = this.getCoreTools();
       // On some platforms, the className can be minified to _ClassName.
       const normalizedClassName = className.replace(/^_+/, '');
@@ -2037,15 +2390,16 @@ export class Config {
       }
 
       if (isEnabled) {
-        // Pass message bus to tools (required for policy engine integration)
-        const toolArgs = [...args, this.getMessageBus()];
-
-        registry.registerTool(new ToolClass(...toolArgs));
+        registerFn();
       }
     };
 
-    registerCoreTool(LSTool, this);
-    registerCoreTool(ReadFileTool, this);
+    maybeRegister(LSTool, () =>
+      registry.registerTool(new LSTool(this, this.messageBus)),
+    );
+    maybeRegister(ReadFileTool, () =>
+      registry.registerTool(new ReadFileTool(this, this.messageBus)),
+    );
 
     if (this.getUseRipgrep()) {
       let useRipgrep = false;
@@ -2056,26 +2410,60 @@ export class Config {
         errorString = String(error);
       }
       if (useRipgrep) {
-        registerCoreTool(RipGrepTool, this);
+        maybeRegister(RipGrepTool, () =>
+          registry.registerTool(new RipGrepTool(this, this.messageBus)),
+        );
       } else {
         logRipgrepFallback(this, new RipgrepFallbackEvent(errorString));
-        registerCoreTool(GrepTool, this);
+        maybeRegister(GrepTool, () =>
+          registry.registerTool(new GrepTool(this, this.messageBus)),
+        );
       }
     } else {
-      registerCoreTool(GrepTool, this);
+      maybeRegister(GrepTool, () =>
+        registry.registerTool(new GrepTool(this, this.messageBus)),
+      );
     }
 
-    registerCoreTool(GlobTool, this);
-    registerCoreTool(ActivateSkillTool, this);
-    registerCoreTool(EditTool, this);
-    registerCoreTool(WriteFileTool, this);
-    registerCoreTool(WebFetchTool, this);
-    registerCoreTool(ShellTool, this);
-    registerCoreTool(MemoryTool);
-    registerCoreTool(WebSearchTool, this);
-    registerCoreTool(AskUserTool);
+    maybeRegister(GlobTool, () =>
+      registry.registerTool(new GlobTool(this, this.messageBus)),
+    );
+    maybeRegister(ActivateSkillTool, () =>
+      registry.registerTool(new ActivateSkillTool(this, this.messageBus)),
+    );
+    maybeRegister(EditTool, () =>
+      registry.registerTool(new EditTool(this, this.messageBus)),
+    );
+    maybeRegister(WriteFileTool, () =>
+      registry.registerTool(new WriteFileTool(this, this.messageBus)),
+    );
+    maybeRegister(WebFetchTool, () =>
+      registry.registerTool(new WebFetchTool(this, this.messageBus)),
+    );
+    maybeRegister(ShellTool, () =>
+      registry.registerTool(new ShellTool(this, this.messageBus)),
+    );
+    maybeRegister(MemoryTool, () =>
+      registry.registerTool(new MemoryTool(this.messageBus)),
+    );
+    maybeRegister(WebSearchTool, () =>
+      registry.registerTool(new WebSearchTool(this, this.messageBus)),
+    );
+    maybeRegister(AskUserTool, () =>
+      registry.registerTool(new AskUserTool(this.messageBus)),
+    );
     if (this.getUseWriteTodos()) {
-      registerCoreTool(WriteTodosTool);
+      maybeRegister(WriteTodosTool, () =>
+        registry.registerTool(new WriteTodosTool(this.messageBus)),
+      );
+    }
+    if (this.isPlanEnabled()) {
+      maybeRegister(ExitPlanModeTool, () =>
+        registry.registerTool(new ExitPlanModeTool(this, this.messageBus)),
+      );
+      maybeRegister(EnterPlanModeTool, () =>
+        registry.registerTool(new EnterPlanModeTool(this, this.messageBus)),
+      );
     }
 
     // Register Subagents as Tools
@@ -2096,26 +2484,16 @@ export class Config {
       agentsOverrides['codebase_investigator']?.enabled !== false ||
       agentsOverrides['cli_help']?.enabled !== false
     ) {
-      const allowedTools = this.getAllowedTools();
       const definitions = this.agentRegistry.getAllDefinitions();
 
       for (const definition of definitions) {
-        const isAllowed =
-          !allowedTools || allowedTools.includes(definition.name);
-
-        if (isAllowed) {
-          try {
-            const tool = new SubagentTool(
-              definition,
-              this,
-              this.getMessageBus(),
-            );
-            registry.registerTool(tool);
-          } catch (e: unknown) {
-            debugLogger.warn(
-              `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
-            );
-          }
+        try {
+          const tool = new SubagentTool(definition, this, this.getMessageBus());
+          registry.registerTool(tool);
+        } catch (e: unknown) {
+          debugLogger.warn(
+            `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
+          );
         }
       }
     }

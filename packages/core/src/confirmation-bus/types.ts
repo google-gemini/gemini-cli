@@ -65,7 +65,12 @@ export interface ToolConfirmationResponse {
  * Data-only versions of ToolCallConfirmationDetails for bus transmission.
  */
 export type SerializableConfirmationDetails =
-  | { type: 'info'; title: string; prompt: string; urls?: string[] }
+  | {
+      type: 'info';
+      title: string;
+      prompt: string;
+      urls?: string[];
+    }
   | {
       type: 'edit';
       title: string;
@@ -90,6 +95,16 @@ export type SerializableConfirmationDetails =
       serverName: string;
       toolName: string;
       toolDisplayName: string;
+    }
+  | {
+      type: 'ask_user';
+      title: string;
+      questions: Question[];
+    }
+  | {
+      type: 'exit_plan_mode';
+      title: string;
+      planPath: string;
     };
 
 export interface UpdatePolicy {
@@ -132,13 +147,13 @@ export enum QuestionType {
 export interface Question {
   question: string;
   header: string;
-  /** Question type: 'choice' renders selectable options, 'text' renders free-form input, 'yesno' renders a binary Yes/No choice. Defaults to 'choice'. */
-  type?: QuestionType;
-  /** Selectable choices. REQUIRED when type='choice' or omitted. IGNORED for 'text' and 'yesno'. */
+  /** Question type: 'choice' renders selectable options, 'text' renders free-form input, 'yesno' renders a binary Yes/No choice. */
+  type: QuestionType;
+  /** Selectable choices. REQUIRED when type='choice'. IGNORED for 'text' and 'yesno'. */
   options?: QuestionOption[];
   /** Allow multiple selections. Only applies when type='choice'. */
   multiSelect?: boolean;
-  /** Placeholder hint text. Only applies when type='text'. */
+  /** Placeholder hint text. For type='text', shown in the input field. For type='choice', shown in the "Other" custom input. */
   placeholder?: string;
 }
 

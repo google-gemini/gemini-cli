@@ -11,6 +11,7 @@ import {
 import { LRUCache } from 'mnemonist';
 import { cpLen, cpSlice } from './textUtils.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../constants.js';
+import { AT_COMMAND_PATH_REGEX_SOURCE } from '../hooks/atCommandProcessor.js';
 
 export type HighlightToken = {
   text: string;
@@ -19,11 +20,12 @@ export type HighlightToken = {
 
 // Matches slash commands (e.g., /help), @ references (files or MCP resource URIs),
 // and large paste placeholders (e.g., [Pasted Text: 6 lines]).
-// The @ pattern uses a negated character class to support URIs like `@file:///example.txt`
-// which contain colons. It matches any character except delimiters: comma, whitespace,
-// semicolon, common punctuation, and brackets.
+//
+// The @ pattern uses the same source as the command processor to ensure consistency.
+// It matches any character except strict delimiters (ASCII whitespace, comma, etc.).
+// This supports URIs like `@file:///example.txt` and filenames with Unicode spaces (like NNBSP).
 const HIGHLIGHT_REGEX = new RegExp(
-  `(^/[a-zA-Z0-9_-]+|@(?:\\\\ |[^,\\s;!?()\\[\\]{}])+|${PASTED_TEXT_PLACEHOLDER_REGEX.source})`,
+  `(^/[a-zA-Z0-9_-]+|@${AT_COMMAND_PATH_REGEX_SOURCE}|${PASTED_TEXT_PLACEHOLDER_REGEX.source})`,
   'g',
 );
 

@@ -54,6 +54,7 @@ import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
+import { ToolOutputMaskingService } from '../services/toolOutputMaskingService.js';
 import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
 import {
   applyModelSelection,
@@ -63,6 +64,7 @@ import { resolveModel } from '../config/models.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
+import type { LlmRole } from '../telemetry/types.js';
 
 const MAX_TURNS = 100;
 
@@ -84,6 +86,7 @@ export class GeminiClient {
 
   private readonly loopDetector: LoopDetectionService;
   private readonly compressionService: ChatCompressionService;
+  private readonly toolOutputMaskingService: ToolOutputMaskingService;
   private lastPromptId: string;
   private currentSequenceModel: string | null = null;
   private lastSentIdeContext: IdeContext | undefined;
@@ -98,6 +101,7 @@ export class GeminiClient {
   constructor(private readonly config: Config) {
     this.loopDetector = new LoopDetectionService(config);
     this.compressionService = new ChatCompressionService();
+    this.toolOutputMaskingService = new ToolOutputMaskingService();
     this.lastPromptId = this.config.getSessionId();
 
     coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
@@ -253,9 +257,20 @@ export class GeminiClient {
     this.forceFullIdeContext = true;
   }
 
-  async setTools(): Promise<void> {
+  private lastUsedModelId?: string;
+
+  async setTools(modelId?: string): Promise<void> {
+    if (!this.chat) {
+      return;
+    }
+
+    if (modelId && modelId === this.lastUsedModelId) {
+      return;
+    }
+    this.lastUsedModelId = modelId;
+
     const toolRegistry = this.config.getToolRegistry();
-    const toolDeclarations = toolRegistry.getFunctionDeclarations();
+    const toolDeclarations = toolRegistry.getFunctionDeclarations(modelId);
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
     this.getChat().setTools(tools);
   }
@@ -305,9 +320,7 @@ export class GeminiClient {
       return;
     }
 
-    const systemMemory = this.config.isJitContextEnabled()
-      ? this.config.getGlobalMemory()
-      : this.config.getUserMemory();
+    const systemMemory = this.config.getUserMemory();
     const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
     this.getChat().setSystemInstruction(systemInstruction);
   }
@@ -318,6 +331,7 @@ export class GeminiClient {
   ): Promise<GeminiChat> {
     this.forceFullIdeContext = true;
     this.hasFailedCompressionAttempt = false;
+    this.lastUsedModelId = undefined;
 
     const toolRegistry = this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
@@ -326,9 +340,7 @@ export class GeminiClient {
     const history = await getInitialChatHistory(this.config, extraHistory);
 
     try {
-      const systemMemory = this.config.isJitContextEnabled()
-        ? this.config.getGlobalMemory()
-        : this.config.getUserMemory();
+      const systemMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
       return new GeminiChat(
         this.config,
@@ -336,6 +348,13 @@ export class GeminiClient {
         tools,
         history,
         resumedSessionData,
+        async (modelId: string) => {
+          this.lastUsedModelId = modelId;
+          const toolRegistry = this.config.getToolRegistry();
+          const toolDeclarations =
+            toolRegistry.getFunctionDeclarations(modelId);
+          return [{ functionDeclarations: toolDeclarations }];
+        },
       );
     } catch (error) {
       await reportError(
@@ -532,6 +551,7 @@ export class GeminiClient {
     prompt_id: string,
     boundedTurns: number,
     isInvalidStreamRetry: boolean,
+    displayContent?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     // Re-initialize turn (it was empty before if in loop, or new instance)
     let turn = new Turn(this.getChat(), prompt_id);
@@ -560,6 +580,8 @@ export class GeminiClient {
 
     const remainingTokenCount =
       tokenLimit(modelForLimitCheck) - this.getChat().getLastPromptTokenCount();
+
+    await this.tryMaskToolOutputs(this.getHistory());
 
     // Estimate tokens. For text-only requests, we estimate based on character length.
     // For requests with non-text parts (like images, tools), we use the countTokens API.
@@ -635,7 +657,10 @@ export class GeminiClient {
     }
 
     // availability logic
-    const modelConfigKey: ModelConfigKey = { model: modelToUse };
+    const modelConfigKey: ModelConfigKey = {
+      model: modelToUse,
+      isChatModel: true,
+    };
     const { model: finalModel } = applyModelSelection(
       this.config,
       modelConfigKey,
@@ -647,7 +672,16 @@ export class GeminiClient {
       yield { type: GeminiEventType.ModelInfo, value: modelToUse };
     }
     this.currentSequenceModel = modelToUse;
-    const resultStream = turn.run(modelConfigKey, request, linkedSignal);
+
+    // Update tools with the final modelId to ensure model-dependent descriptions are used.
+    await this.setTools(modelToUse);
+
+    const resultStream = turn.run(
+      modelConfigKey,
+      request,
+      linkedSignal,
+      displayContent,
+    );
     let isError = false;
     let isInvalidStream = false;
 
@@ -708,6 +742,7 @@ export class GeminiClient {
           prompt_id,
           boundedTurns - 1,
           true,
+          displayContent,
         );
         return turn;
       }
@@ -739,7 +774,8 @@ export class GeminiClient {
             signal,
             prompt_id,
             boundedTurns - 1,
-            // isInvalidStreamRetry is false
+            false, // isInvalidStreamRetry is false
+            displayContent,
           );
           return turn;
         }
@@ -754,6 +790,7 @@ export class GeminiClient {
     prompt_id: string,
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
+    displayContent?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
@@ -809,6 +846,7 @@ export class GeminiClient {
         prompt_id,
         boundedTurns,
         isInvalidStreamRetry,
+        displayContent,
       );
 
       // Fire AfterAgent hook if we have a turn and no pending tools
@@ -860,6 +898,8 @@ export class GeminiClient {
             signal,
             prompt_id,
             boundedTurns - 1,
+            false,
+            displayContent,
           );
         }
       }
@@ -886,6 +926,7 @@ export class GeminiClient {
     modelConfigKey: ModelConfigKey,
     contents: Content[],
     abortSignal: AbortSignal,
+    role: LlmRole,
   ): Promise<GenerateContentResponse> {
     const desiredModelConfig =
       this.config.modelConfigService.getResolvedConfig(modelConfigKey);
@@ -940,6 +981,7 @@ export class GeminiClient {
             contents,
           },
           this.lastPromptId,
+          role,
         );
       };
       const onPersistent429Callback = async (
@@ -1043,5 +1085,21 @@ export class GeminiClient {
     }
 
     return info;
+  }
+
+  /**
+   * Masks bulky tool outputs to save context window space.
+   */
+  private async tryMaskToolOutputs(history: Content[]): Promise<void> {
+    if (!this.config.getToolOutputMaskingEnabled()) {
+      return;
+    }
+    const result = await this.toolOutputMaskingService.mask(
+      history,
+      this.config,
+    );
+    if (result.maskedCount > 0) {
+      this.getChat().setHistory(result.newHistory);
+    }
   }
 }
