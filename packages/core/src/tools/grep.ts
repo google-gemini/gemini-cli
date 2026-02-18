@@ -75,6 +75,7 @@ export interface GrepToolParams {
  */
 interface GrepMatch {
   filePath: string;
+  absolutePath: string;
   lineNumber: number;
   line: string;
 }
@@ -130,6 +131,7 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       return {
         filePath: relativeFilePath || path.basename(absoluteFilePath),
+        absolutePath: absoluteFilePath,
         lineNumber,
         line: lineContent,
       };
@@ -309,14 +311,61 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       llmContent += `:\n---\n`;
 
-      for (const filePath in matchesByFile) {
-        llmContent += `File: ${filePath}
+      if (matchCount <= 3 && matchCount > 0 && !this.params.names_only) {
+        for (const filePath in matchesByFile) {
+          const fileMatches = matchesByFile[filePath];
+          let fileLines: string[] | null = null;
+          try {
+            const content = await fsPromises.readFile(
+              fileMatches[0].absolutePath,
+              'utf8',
+            );
+            fileLines = content.split(/\r?\n/);
+          } catch (err) {
+            debugLogger.warn(
+              `Failed to read file for context: ${fileMatches[0].absolutePath}`,
+              err,
+            );
+          }
+
+          llmContent += `File: ${filePath}\n`;
+
+          for (const match of fileMatches) {
+            if (fileLines) {
+              const startLine = Math.max(0, match.lineNumber - 1 - 50);
+              const endLine = Math.min(
+                fileLines.length,
+                match.lineNumber - 1 + 50 + 1,
+              );
+              const contextLines = fileLines.slice(startLine, endLine);
+
+              llmContent += `Match at line ${match.lineNumber}:\n`;
+              contextLines.forEach((line, index) => {
+                const currentLineNumber = startLine + index + 1;
+                if (currentLineNumber === match.lineNumber) {
+                  llmContent += `> L${currentLineNumber}: ${line}\n`;
+                } else {
+                  llmContent += `  L${currentLineNumber}: ${line}\n`;
+                }
+              });
+              llmContent += '\n';
+            } else {
+              const trimmedLine = match.line.trim();
+              llmContent += `L${match.lineNumber}: ${trimmedLine}\n`;
+            }
+          }
+          llmContent += '---\n';
+        }
+      } else {
+        for (const filePath in matchesByFile) {
+          llmContent += `File: ${filePath}
 `;
-        matchesByFile[filePath].forEach((match) => {
-          const trimmedLine = match.line.trim();
-          llmContent += `L${match.lineNumber}: ${trimmedLine}\n`;
-        });
-        llmContent += '---\n';
+          matchesByFile[filePath].forEach((match) => {
+            const trimmedLine = match.line.trim();
+            llmContent += `L${match.lineNumber}: ${trimmedLine}\n`;
+          });
+          llmContent += '---\n';
+        }
       }
 
       return {
@@ -569,6 +618,7 @@ class GrepToolInvocation extends BaseToolInvocation<
                 filePath:
                   path.relative(absolutePath, fileAbsolutePath) ||
                   path.basename(fileAbsolutePath),
+                absolutePath: fileAbsolutePath,
                 lineNumber: index + 1,
                 line,
               });
