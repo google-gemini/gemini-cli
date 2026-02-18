@@ -84,12 +84,11 @@ describe('ToolConfirmationMessage', () => {
   });
 
   it('should display WarningMessage for deceptive URLs in info type', () => {
-    const confirmationDetails: ToolCallConfirmationDetails = {
+    const confirmationDetails: SerializableConfirmationDetails = {
       type: 'info',
       title: 'Confirm Web Fetch',
       prompt: 'https://täst.com',
       urls: ['https://täst.com'],
-      onConfirm: vi.fn(),
     };
 
     const { lastFrame } = renderWithProviders(
@@ -111,13 +110,12 @@ describe('ToolConfirmationMessage', () => {
   });
 
   it('should display WarningMessage for deceptive URLs in exec type commands', () => {
-    const confirmationDetails: ToolCallConfirmationDetails = {
+    const confirmationDetails: SerializableConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Execution',
       command: 'curl https://еxample.com',
       rootCommand: 'curl',
       rootCommands: ['curl'],
-      onConfirm: vi.fn(),
     };
 
     const { lastFrame } = renderWithProviders(
@@ -139,12 +137,11 @@ describe('ToolConfirmationMessage', () => {
   });
 
   it('should aggregate multiple deceptive URLs into a single WarningMessage', () => {
-    const confirmationDetails: ToolCallConfirmationDetails = {
+    const confirmationDetails: SerializableConfirmationDetails = {
       type: 'info',
       title: 'Confirm Web Fetch',
       prompt: 'Fetch both',
       urls: ['https://еxample.com', 'https://täst.com'],
-      onConfirm: vi.fn(),
     };
 
     const { lastFrame } = renderWithProviders(
