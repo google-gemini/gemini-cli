@@ -87,7 +87,6 @@ describe('Workspace-Level Policy CLI Integration', () => {
         ),
       }),
       expect.anything(),
-      undefined,
     );
   });
 
@@ -107,7 +106,6 @@ describe('Workspace-Level Policy CLI Integration', () => {
         workspacePoliciesDir: undefined,
       }),
       expect.anything(),
-      undefined,
     );
   });
 
@@ -132,7 +130,6 @@ describe('Workspace-Level Policy CLI Integration', () => {
         workspacePoliciesDir: undefined,
       }),
       expect.anything(),
-      undefined,
     );
   });
 
@@ -161,7 +158,6 @@ describe('Workspace-Level Policy CLI Integration', () => {
         workspacePoliciesDir: undefined,
       }),
       expect.anything(),
-      undefined, // Should NOT load policies
     );
   });
 
@@ -193,7 +189,6 @@ describe('Workspace-Level Policy CLI Integration', () => {
         ),
       }),
       expect.anything(),
-      undefined,
     );
   });
 
@@ -233,7 +228,6 @@ describe('Workspace-Level Policy CLI Integration', () => {
         workspacePoliciesDir: undefined,
       }),
       expect.anything(),
-      undefined,
     );
   });
 
@@ -268,7 +262,6 @@ describe('Workspace-Level Policy CLI Integration', () => {
         workspacePoliciesDir: undefined,
       }),
       expect.anything(),
-      undefined,
     );
   });
 });

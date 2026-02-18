@@ -40,13 +40,9 @@ import {
   Config,
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
-  Storage,
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
-  PolicyIntegrityManager,
-  IntegrityStatus,
-  type PolicyUpdateConfirmationRequest,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -60,7 +56,10 @@ import { resolvePath } from '../utils/resolvePath.js';
 import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
-import { createPolicyEngineConfig } from './policy.js';
+import {
+  createPolicyEngineConfig,
+  resolveWorkspacePolicyState,
+} from './policy.js';
 import { ExtensionManager } from './extension-manager.js';
 import { McpServerEnablementManager } from './mcp/mcpServerEnablement.js';
 import type { ExtensionEvents } from '@google/gemini-cli-core/src/utils/extensionLoader.js';
@@ -702,56 +701,13 @@ export async function loadCliConfig(
     policyPaths: argv.policy,
   };
 
-  let workspacePoliciesDir: string | undefined;
-  let policyUpdateConfirmationRequest:
-    | PolicyUpdateConfirmationRequest
-    | undefined;
-
-  if (trustedFolder) {
-    const potentialWorkspacePoliciesDir = new Storage(
+  const { workspacePoliciesDir, policyUpdateConfirmationRequest } =
+    await resolveWorkspacePolicyState({
       cwd,
-    ).getWorkspacePoliciesDir();
-    const integrityManager = new PolicyIntegrityManager();
-    const integrityResult = await integrityManager.checkIntegrity(
-      'workspace',
-      cwd,
-      potentialWorkspacePoliciesDir,
-    );
-
-    if (integrityResult.status === IntegrityStatus.MATCH) {
-      workspacePoliciesDir = potentialWorkspacePoliciesDir;
-    } else if (
-      integrityResult.status === IntegrityStatus.NEW &&
-      integrityResult.fileCount === 0
-    ) {
-      // No workspace policies found
-      workspacePoliciesDir = undefined;
-    } else {
-      // Policies changed or are new
-      if (argv.acceptChangedPolicies) {
-        debugLogger.warn(
-          'WARNING: Workspace policies changed or are new. Auto-accepting due to --accept-changed-policies flag.',
-        );
-        await integrityManager.acceptIntegrity(
-          'workspace',
-          cwd,
-          integrityResult.hash,
-        );
-        workspacePoliciesDir = potentialWorkspacePoliciesDir;
-      } else if (interactive) {
-        policyUpdateConfirmationRequest = {
-          scope: 'workspace',
-          identifier: cwd,
-          policyDir: potentialWorkspacePoliciesDir,
-          newHash: integrityResult.hash,
-        };
-      } else {
-        debugLogger.warn(
-          'WARNING: Workspace policies changed or are new. Loading default policies only. Use --accept-changed-policies to accept.',
-        );
-      }
-    }
-  }
+      trustedFolder,
+      interactive,
+      acceptChangedPolicies: argv.acceptChangedPolicies ?? false,
+    });
 
   const policyEngineConfig = await createPolicyEngineConfig(
     effectiveSettings,
