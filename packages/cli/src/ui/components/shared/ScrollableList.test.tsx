@@ -11,7 +11,7 @@ import { ScrollableList, type ScrollableListRef } from './ScrollableList.js';
 import { ScrollProvider } from '../../contexts/ScrollProvider.js';
 import { KeypressProvider } from '../../contexts/KeypressContext.js';
 import { MouseProvider } from '../../contexts/MouseContext.js';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { waitFor } from '../../../test-utils/async.js';
 
 vi.mock('../../contexts/UIStateContext.js', () => ({
@@ -133,6 +133,14 @@ const TestComponent = ({
   );
 };
 describe('ScrollableList Demo Behavior', () => {
+  beforeEach(() => {
+    vi.stubEnv('NODE_ENV', 'test');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('should scroll to bottom when new items are added and stop when scrolled up', async () => {
     let addItem: (() => void) | undefined;
     let listRef: ScrollableListRef<Item> | null = null;
