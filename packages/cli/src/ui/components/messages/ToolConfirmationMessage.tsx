@@ -452,10 +452,10 @@ export const ToolConfirmationMessage: React.FC<
       bodyContent = (
         <Box flexDirection="column">
           <Text color={theme.text.link}>
-            MCP Server: {sanitizeForDisplay(mcpProps.serverName)}
+            MCP Server: {stripUnsafeCharacters(mcpProps.serverName)}
           </Text>
           <Text color={theme.text.link}>
-            Tool: {sanitizeForDisplay(mcpProps.toolName)}
+            Tool: {stripUnsafeCharacters(mcpProps.toolName)}
           </Text>
         </Box>
       );
