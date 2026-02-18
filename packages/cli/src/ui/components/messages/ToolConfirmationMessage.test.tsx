@@ -85,6 +85,86 @@ describe('ToolConfirmationMessage', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
+  it('should display WarningMessage for deceptive URLs in info type', () => {
+    const confirmationDetails: ToolCallConfirmationDetails = {
+      type: 'info',
+      title: 'Confirm Web Fetch',
+      prompt: 'https://täst.com',
+      urls: ['https://täst.com'],
+      onConfirm: vi.fn(),
+    };
+
+    const { lastFrame } = renderWithProviders(
+      <ToolConfirmationMessage
+        callId="test-call-id"
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
+    );
+
+    const output = lastFrame();
+    expect(output).toContain('Deceptive URL(s) detected');
+    expect(output).toContain('Original: https://täst.com');
+    expect(output).toContain(
+      'Actual Host (Punycode): https://xn--tst-qla.com/',
+    );
+  });
+
+  it('should display WarningMessage for deceptive URLs in exec type commands', () => {
+    const confirmationDetails: ToolCallConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm Execution',
+      command: 'curl https://еxample.com',
+      rootCommand: 'curl',
+      rootCommands: ['curl'],
+      onConfirm: vi.fn(),
+    };
+
+    const { lastFrame } = renderWithProviders(
+      <ToolConfirmationMessage
+        callId="test-call-id"
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
+    );
+
+    const output = lastFrame();
+    expect(output).toContain('Deceptive URL(s) detected');
+    expect(output).toContain('Original: https://еxample.com/');
+    expect(output).toContain(
+      'Actual Host (Punycode): https://xn--xample-2of.com/',
+    );
+  });
+
+  it('should aggregate multiple deceptive URLs into a single WarningMessage', () => {
+    const confirmationDetails: ToolCallConfirmationDetails = {
+      type: 'info',
+      title: 'Confirm Web Fetch',
+      prompt: 'Fetch both',
+      urls: ['https://еxample.com', 'https://täst.com'],
+      onConfirm: vi.fn(),
+    };
+
+    const { lastFrame } = renderWithProviders(
+      <ToolConfirmationMessage
+        callId="test-call-id"
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
+    );
+
+    const output = lastFrame();
+    expect(output).toContain('Deceptive URL(s) detected');
+    expect(output).toContain('Original: https://еxample.com/');
+    expect(output).toContain('Original: https://täst.com/');
+  });
+
   it('should display multiple commands for exec type when provided', () => {
     const confirmationDetails: ToolCallConfirmationDetails = {
       type: 'exec',

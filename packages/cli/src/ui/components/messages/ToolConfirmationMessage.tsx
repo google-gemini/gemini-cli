@@ -35,6 +35,12 @@ import {
 } from '../../textConstants.js';
 import { AskUserDialog } from '../AskUserDialog.js';
 import { ExitPlanModeDialog } from '../ExitPlanModeDialog.js';
+import { WarningMessage } from './WarningMessage.js';
+import {
+  getDeceptiveUrlDetails,
+  toUnicodeUrl,
+  type DeceptiveUrlDetails,
+} from '../../utils/urlSecurityUtils.js';
 
 export interface ToolConfirmationMessageProps {
   callId: string;
@@ -101,6 +107,37 @@ export const ToolConfirmationMessage: React.FC<
     (item: ToolConfirmationOutcome) => handleConfirm(item),
     [handleConfirm],
   );
+
+  const deceptiveUrlWarnings = useMemo(() => {
+    const urls: string[] = [];
+    if (confirmationDetails.type === 'info' && confirmationDetails.urls) {
+      urls.push(...confirmationDetails.urls);
+    } else if (confirmationDetails.type === 'exec') {
+      const commands =
+        confirmationDetails.commands && confirmationDetails.commands.length > 0
+          ? confirmationDetails.commands
+          : [confirmationDetails.command];
+      for (const cmd of commands) {
+        const matches = cmd.match(/https?:\/\/[^\s"'`<>]+/g);
+        if (matches) urls.push(...matches);
+      }
+    }
+
+    const uniqueUrls = Array.from(new Set(urls));
+    return uniqueUrls
+      .map(getDeceptiveUrlDetails)
+      .filter((d): d is DeceptiveUrlDetails => d !== null);
+  }, [confirmationDetails]);
+
+  const deceptiveUrlWarningText = useMemo(() => {
+    if (deceptiveUrlWarnings.length === 0) return null;
+    return `**Warning:** Deceptive URL(s) detected:\n\n${deceptiveUrlWarnings
+      .map(
+        (w) =>
+          `   **Original:** ${w.originalUrl}\n   **Actual Host (Punycode):** ${w.punycodeUrl}`,
+      )
+      .join('\n\n')}`;
+  }, [deceptiveUrlWarnings]);
 
   const getOptions = useCallback(() => {
     const options: Array<RadioSelectItem<ToolConfirmationOutcome>> = [];
@@ -258,10 +295,20 @@ export const ToolConfirmationMessage: React.FC<
     return Math.max(availableTerminalHeight - surroundingElementsHeight, 1);
   }, [availableTerminalHeight, getOptions]);
 
-  const { question, bodyContent, options } = useMemo(() => {
+  const { question, bodyContent, options, securityWarnings } = useMemo<{
+    question: string;
+    bodyContent: React.ReactNode;
+    options: Array<RadioSelectItem<ToolConfirmationOutcome>>;
+    securityWarnings: React.ReactNode;
+  }>(() => {
     let bodyContent: React.ReactNode | null = null;
+    let securityWarnings: React.ReactNode | null = null;
     let question = '';
     const options = getOptions();
+
+    if (deceptiveUrlWarningText) {
+      securityWarnings = <WarningMessage text={deceptiveUrlWarningText} />;
+    }
 
     if (confirmationDetails.type === 'ask_user') {
       bodyContent = (
@@ -277,7 +324,12 @@ export const ToolConfirmationMessage: React.FC<
           availableHeight={availableBodyContentHeight()}
         />
       );
-      return { question: '', bodyContent, options: [] };
+      return {
+        question: '',
+        bodyContent,
+        options: [],
+        securityWarnings: null,
+      };
     }
 
     if (confirmationDetails.type === 'exit_plan_mode') {
@@ -303,7 +355,7 @@ export const ToolConfirmationMessage: React.FC<
           availableHeight={availableBodyContentHeight()}
         />
       );
-      return { question: '', bodyContent, options: [] };
+      return { question: '', bodyContent, options: [], securityWarnings: null };
     }
 
     if (confirmationDetails.type === 'edit') {
@@ -432,10 +484,10 @@ export const ToolConfirmationMessage: React.FC<
           {displayUrls && infoProps.urls && infoProps.urls.length > 0 && (
             <Box flexDirection="column" marginTop={1}>
               <Text color={theme.text.primary}>URLs to fetch:</Text>
-              {infoProps.urls.map((url) => (
-                <Text key={url}>
+              {infoProps.urls.map((urlString) => (
+                <Text key={urlString}>
                   {' '}
-                  - <RenderInline text={url} />
+                  - <RenderInline text={toUnicodeUrl(urlString)} />
                 </Text>
               ))}
             </Box>
@@ -454,13 +506,14 @@ export const ToolConfirmationMessage: React.FC<
       );
     }
 
-    return { question, bodyContent, options };
+    return { question, bodyContent, options, securityWarnings };
   }, [
     confirmationDetails,
     getOptions,
     availableBodyContentHeight,
     terminalWidth,
     handleConfirm,
+    deceptiveUrlWarningText,
   ]);
 
   if (confirmationDetails.type === 'edit') {
@@ -503,6 +556,12 @@ export const ToolConfirmationMessage: React.FC<
               {bodyContent}
             </MaxSizedBox>
           </Box>
+
+          {securityWarnings && (
+            <Box flexShrink={0} marginBottom={1}>
+              {securityWarnings}
+            </Box>
+          )}
 
           <Box marginBottom={1} flexShrink={0}>
             <Text color={theme.text.primary}>{question}</Text>
