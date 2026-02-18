@@ -5,7 +5,6 @@
       { "label": "Overview", "slug": "docs" },
       { "label": "Quickstart", "slug": "docs/get-started" },
       { "label": "Installation", "slug": "docs/get-started/installation" },
-      { "label": "Compatibility", "slug": "docs/compatibility" },
       { "label": "Authentication", "slug": "docs/get-started/authentication" },
       { "label": "Examples", "slug": "docs/get-started/examples" },
       { "label": "CLI cheatsheet", "slug": "docs/cli/cli-reference" },
