@@ -103,15 +103,16 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
 
     // if there is any error, non-zero exit code, signal, or stderr, return error details instead of stdout
     if (error || code !== 0 || signal || stderr) {
+      if (code !== null && code !== 0) {
+        parts.push(`<exit_code>${code}</exit_code>`);
+      }
       const parts = [
         `<output>\n    <stdout>${stdout.trim() || '(empty)'}</stdout>\n    <stderr>${stderr.trim() || '(empty)'}</stderr>\n  </output>`,
       ];
       if (error) {
         parts.push(`<error>${error}</error>`);
       }
-      if (code !== null && code !== 0) {
-        parts.push(`<exit_code>${code}</exit_code>`);
-      }
+      
       if (signal) {
         parts.push(`<signal>${signal}</signal>`);
       }
