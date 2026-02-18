@@ -949,6 +949,16 @@ const SETTINGS_SCHEMA = {
         description: 'The format to use when importing memory.',
         showInDialog: false,
       },
+      includeDirectoryTree: {
+        type: 'boolean',
+        label: 'Include Directory Tree',
+        category: 'Context',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Whether to include the directory tree of the current working directory in the initial request to the model.',
+        showInDialog: false,
+      },
       discoveryMaxDirs: {
         type: 'number',
         label: 'Memory Discovery Max Dirs',

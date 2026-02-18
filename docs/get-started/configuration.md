@@ -490,6 +490,19 @@ their corresponding top-level category object in your `settings.json` file.
           }
         }
       },
+      "fast-ack-helper": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-2.5-flash-lite",
+          "generateContentConfig": {
+            "temperature": 0.2,
+            "maxOutputTokens": 120,
+            "thinkingConfig": {
+              "thinkingBudget": 0
+            }
+          }
+        }
+      },
       "edit-corrector": {
         "extends": "base",
         "modelConfig": {
@@ -632,6 +645,11 @@ their corresponding top-level category object in your `settings.json` file.
 - **`context.importFormat`** (string):
   - **Description:** The format to use when importing memory.
   - **Default:** `undefined`
+
+- **`context.includeDirectoryTree`** (boolean):
+  - **Description:** Whether to include the directory tree of the current
+    working directory in the initial request to the model.
+  - **Default:** `true`
 
 - **`context.discoveryMaxDirs`** (number):
   - **Description:** Maximum number of directories to search for memory.

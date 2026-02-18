@@ -52,6 +52,7 @@
   {
     "label": "Features",
     "items": [
+      { "label": "Agent Skills", "slug": "docs/cli/skills" },
       {
         "label": "/about - About Gemini CLI",
         "link": "/docs/cli/commands/#about"
@@ -144,20 +145,31 @@
       { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
       { "label": "File system (tool)", "slug": "docs/tools/file-system" },
       { "label": "Headless mode", "slug": "docs/cli/headless" },
+      { "label": "Help", "link": "/docs/cli/commands/#help-or" },
+      { "label": "Hooks", "slug": "docs/hooks" },
+      { "label": "IDE integration", "slug": "docs/ide-integration" },
+      { "label": "MCP servers", "slug": "docs/tools/mcp-server" },
       {
-        "label": "Internal documentation (tool)",
-        "slug": "docs/tools/internal-docs"
+        "label": "Memory management",
+        "link": "/docs/cli/commands/#memory"
       },
-      { "label": "Memory (tool)", "slug": "docs/tools/memory" },
       { "label": "Model routing", "slug": "docs/cli/model-routing" },
+      { "label": "Model selection", "slug": "docs/cli/model" },
       { "label": "Plan mode (experimental)", "slug": "docs/cli/plan-mode" },
+      { "label": "Rewind", "slug": "docs/cli/rewind" },
       { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
-      { "label": "Shell (tool)", "slug": "docs/tools/shell" },
+      { "label": "Settings", "slug": "docs/cli/settings" },
+      {
+        "label": "Shell",
+        "link": "/docs/cli/commands/#shells-or-bashes"
+      },
+      {
+        "label": "Stats",
+        "link": "/docs/cli/commands/#stats"
+      },
       { "label": "Telemetry", "slug": "docs/cli/telemetry" },
-      { "label": "Todo (tool)", "slug": "docs/tools/todos" },
       { "label": "Token caching", "slug": "docs/cli/token-caching" },
-      { "label": "Web fetch (tool)", "slug": "docs/tools/web-fetch" },
-      { "label": "Web search (tool)", "slug": "docs/tools/web-search" }
+      { "label": "Tools", "link": "/docs/cli/commands/#tools" }
     ]
   },
   {
@@ -183,14 +195,30 @@
   {
     "label": "Extensions",
     "items": [
-      { "label": "Introduction", "slug": "docs/extensions" },
       {
-        "label": "Writing extensions",
+        "label": "Overview",
+        "slug": "docs/extensions"
+      },
+      {
+        "label": "User guide: Install and manage",
+        "link": "/docs/extensions/#manage-extensions"
+      },
+      {
+        "label": "Developer guide: Build extensions",
         "slug": "docs/extensions/writing-extensions"
       },
-      { "label": "Reference", "slug": "docs/extensions/reference" },
-      { "label": "Best practices", "slug": "docs/extensions/best-practices" },
-      { "label": "Releasing", "slug": "docs/extensions/releasing" }
+      {
+        "label": "Developer guide: Best practices",
+        "slug": "docs/extensions/best-practices"
+      },
+      {
+        "label": "Developer guide: Releasing",
+        "slug": "docs/extensions/releasing"
+      },
+      {
+        "label": "Developer guide: Reference",
+        "slug": "docs/extensions/reference"
+      }
     ]
   },
   {
