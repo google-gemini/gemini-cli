@@ -133,6 +133,7 @@ they appear in the UI.
 | Enable Tool Output Masking | `experimental.toolOutputMasking.enabled` | Enables tool output masking to save tokens.                                         | `true`  |
 | Use OSC 52 Paste           | `experimental.useOSC52Paste`             | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false` |
 | Plan                       | `experimental.plan`                      | Enable planning features (Plan Mode and tools).                                     | `false` |
+| Model Steering             | `experimental.modelSteering`             | Enable model steering (user hints) to guide the model during tool execution.        | `false` |
 
 ### Skills
 

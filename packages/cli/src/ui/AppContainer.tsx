@@ -79,6 +79,8 @@ import {
   type AgentsDiscoveredPayload,
   ChangeAuthRequestedError,
   CoreToolCallStatus,
+  generateSteeringAckMessage,
+  buildUserSteeringHintPrompt,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -697,6 +699,7 @@ export const AppContainer = (props: AppContainerProps) => {
         settings.setValue(scope, 'security.auth.selectedType', authType);
 
         try {
+          config.setRemoteAdminSettings(undefined);
           await config.refreshAuth(authType);
           setAuthState(AuthState.Authenticated);
         } catch (e) {
@@ -996,6 +999,30 @@ Logging in with Google... Restarting Gemini CLI to continue.
     }
   }, [pendingRestorePrompt, inputHistory, historyManager.history]);
 
+  const pendingHintsRef = useRef<string[]>([]);
+  const [pendingHintCount, setPendingHintCount] = useState(0);
+
+  const consumePendingHints = useCallback(() => {
+    if (pendingHintsRef.current.length === 0) {
+      return null;
+    }
+    const hint = pendingHintsRef.current.join('\n');
+    pendingHintsRef.current = [];
+    setPendingHintCount(0);
+    return hint;
+  }, []);
+
+  useEffect(() => {
+    const hintListener = (hint: string) => {
+      pendingHintsRef.current.push(hint);
+      setPendingHintCount((prev) => prev + 1);
+    };
+    config.userHintService.onUserHint(hintListener);
+    return () => {
+      config.userHintService.offUserHint(hintListener);
+    };
+  }, [config]);
+
   const {
     streamingState,
     submitQuery,
@@ -1034,6 +1061,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     terminalWidth,
     terminalHeight,
     embeddedShellFocused,
+    consumePendingHints,
   );
 
   toggleBackgroundShellRef.current = toggleBackgroundShell;
@@ -1142,10 +1170,38 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ],
   );
 
+  const handleHintSubmit = useCallback(
+    (hint: string) => {
+      const trimmed = hint.trim();
+      if (!trimmed) {
+        return;
+      }
+      config.userHintService.addUserHint(trimmed);
+      // Render hints with a distinct style.
+      historyManager.addItem({
+        type: 'hint',
+        text: trimmed,
+      });
+    },
+    [config, historyManager],
+  );
+
   const handleFinalSubmit = useCallback(
     async (submittedValue: string) => {
       const isSlash = isSlashCommand(submittedValue.trim());
       const isIdle = streamingState === StreamingState.Idle;
+      const isAgentRunning =
+        streamingState === StreamingState.Responding ||
+        isToolExecuting([
+          ...pendingSlashCommandHistoryItems,
+          ...pendingGeminiHistoryItems,
+        ]);
+
+      if (config.isModelSteeringEnabled() && isAgentRunning && !isSlash) {
+        handleHintSubmit(submittedValue);
+        addInput(submittedValue);
+        return;
+      }
 
       if (isSlash || (isIdle && isMcpReady)) {
         if (!isSlash) {
@@ -1187,7 +1243,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isMcpReady,
       streamingState,
       messageQueue.length,
+      pendingSlashCommandHistoryItems,
+      pendingGeminiHistoryItems,
       config,
+      handleHintSubmit,
     ],
   );
 
@@ -1939,6 +1998,44 @@ Logging in with Google... Restarting Gemini CLI to continue.
     setShortcutsHelpVisible,
   ]);
 
+  useEffect(() => {
+    if (
+      !isConfigInitialized ||
+      !config.isModelSteeringEnabled() ||
+      streamingState !== StreamingState.Idle ||
+      !isMcpReady ||
+      isToolAwaitingConfirmation(pendingHistoryItems)
+    ) {
+      return;
+    }
+
+    const pendingHint = consumePendingHints();
+    if (!pendingHint) {
+      return;
+    }
+
+    void generateSteeringAckMessage(
+      config.getBaseLlmClient(),
+      pendingHint,
+    ).then((ackText) => {
+      historyManager.addItem({
+        type: 'info',
+        text: ackText,
+      });
+    });
+    void submitQuery([{ text: buildUserSteeringHintPrompt(pendingHint) }]);
+  }, [
+    config,
+    historyManager,
+    isConfigInitialized,
+    isMcpReady,
+    streamingState,
+    submitQuery,
+    consumePendingHints,
+    pendingHistoryItems,
+    pendingHintCount,
+  ]);
+
   const allToolCalls = useMemo(
     () =>
       pendingHistoryItems
@@ -2105,6 +2202,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isBackgroundShellListOpen,
       adminSettingsChanged,
       newAgents,
+      hintMode:
+        config.isModelSteeringEnabled() &&
+        isToolExecuting([
+          ...pendingSlashCommandHistoryItems,
+          ...pendingGeminiHistoryItems,
+        ]),
+      hintBuffer: '',
     }),
     [
       isThemeDialogOpen,
@@ -2276,6 +2380,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setActiveBackgroundShellPid,
       setIsBackgroundShellListOpen,
       setAuthContext,
+      onHintInput: () => {},
+      onHintBackspace: () => {},
+      onHintClear: () => {},
+      onHintSubmit: () => {},
       handleRestart: async () => {
         if (process.send) {
           const remoteSettings = config.getRemoteAdminSettings();
