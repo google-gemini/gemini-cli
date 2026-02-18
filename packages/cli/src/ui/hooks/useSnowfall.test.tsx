@@ -23,7 +23,7 @@ vi.mock('../themes/theme-manager.js', () => ({
   DEFAULT_THEME: { name: 'Default' },
 }));
 
-vi.mock('../themes/holiday.js', () => ({
+vi.mock('../themes/builtin/dark/holiday.js', () => ({
   Holiday: { name: 'Holiday' },
 }));
 

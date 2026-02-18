@@ -30,9 +30,9 @@ import {
   resolveColor,
 } from './color-utils.js';
 import { DEFAULT_BORDER_OPACITY } from '../constants.js';
-import { ANSI } from './ansi.js';
-import { ANSILight } from './ansi-light.js';
-import { NoColorTheme } from './no-color.js';
+import { ANSI } from './builtin/dark/ansi.js';
+import { ANSILight } from './builtin/light/ansi-light.js';
+import { NoColorTheme } from './builtin/dark/no-color.js';
 import process from 'node:process';
 import { debugLogger, homedir } from '@google/gemini-cli-core';
 
