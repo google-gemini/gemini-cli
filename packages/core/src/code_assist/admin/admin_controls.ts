@@ -104,7 +104,7 @@ export async function fetchAdminControls(
 
   // If we already have settings (e.g. from IPC during relaunch), use them
   // to avoid blocking startup with another fetch. We'll still start polling.
-  if (cachedSettings) {
+  if (cachedSettings && Object.keys(cachedSettings).length !== 0) {
     currentSettings = cachedSettings;
     startAdminControlsPolling(server, server.projectId, onSettingsChanged);
     return cachedSettings;
