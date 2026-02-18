@@ -54,87 +54,87 @@
     "items": [
       {
         "label": "/about - About Gemini CLI",
-        "slug": "docs/cli/commands#about"
+        "link": "/docs/cli/commands/#about"
       },
       {
         "label": "/auth - Authentication",
         "slug": "docs/get-started/authentication"
       },
-      { "label": "/bug - Report a bug", "slug": "docs/cli/commands#bug" },
-      { "label": "/chat - Chat history", "slug": "docs/cli/commands#chat" },
-      { "label": "/clear - Clear screen", "slug": "docs/cli/commands#clear" },
+      { "label": "/bug - Report a bug", "link": "/docs/cli/commands/#bug" },
+      { "label": "/chat - Chat history", "link": "/docs/cli/commands/#chat" },
+      { "label": "/clear - Clear screen", "link": "/docs/cli/commands/#clear" },
       {
         "label": "/compress - Compress context",
-        "slug": "docs/cli/commands#compress"
+        "link": "/docs/cli/commands/#compress"
       },
-      { "label": "/copy - Copy output", "slug": "docs/cli/commands#copy" },
+      { "label": "/copy - Copy output", "link": "/docs/cli/commands/#copy" },
       {
         "label": "/directory - Manage workspace",
-        "slug": "docs/cli/commands#directory-or-dir"
+        "link": "/docs/cli/commands/#directory-or-dir"
       },
       {
         "label": "/docs - Open documentation",
-        "slug": "docs/cli/commands#docs"
+        "link": "/docs/cli/commands/#docs"
       },
       {
         "label": "/editor - Select editor",
-        "slug": "docs/cli/commands#editor"
+        "link": "/docs/cli/commands/#editor"
       },
       {
         "label": "/extensions - Manage extensions",
-        "slug": "docs/extensions/index"
+        "slug": "docs/extensions"
       },
-      { "label": "/help - Show help", "slug": "docs/cli/commands#help-or" },
+      { "label": "/help - Show help", "link": "/docs/cli/commands/#help-or" },
       { "label": "/hooks - Hooks", "slug": "docs/hooks" },
       { "label": "/ide - IDE integration", "slug": "docs/ide-integration" },
       {
         "label": "/init - Initialize context",
-        "slug": "docs/cli/commands#init"
+        "link": "/docs/cli/commands/#init"
       },
       { "label": "/mcp - MCP servers", "slug": "docs/tools/mcp-server" },
 
       {
         "label": "/memory - Manage memory",
-        "slug": "docs/cli/commands#memory"
+        "link": "/docs/cli/commands/#memory"
       },
       { "label": "/model - Model selection", "slug": "docs/cli/model" },
       {
         "label": "/policies - Manage policies",
-        "slug": "docs/cli/commands#policies"
+        "link": "/docs/cli/commands/#policies"
       },
       {
         "label": "/privacy - Privacy notice",
-        "slug": "docs/cli/commands#privacy"
+        "link": "/docs/cli/commands/#privacy"
       },
-      { "label": "/quit - Exit CLI", "slug": "docs/cli/commands#quit-or-exit" },
+      { "label": "/quit - Exit CLI", "link": "/docs/cli/commands/#quit-or-exit" },
       { "label": "/restore - Restore files", "slug": "docs/cli/checkpointing" },
       {
         "label": "/resume - Resume session",
 
-        "slug": "docs/cli/commands#resume"
+        "link": "/docs/cli/commands/#resume"
       },
       { "label": "/rewind - Rewind", "slug": "docs/cli/rewind" },
       { "label": "/settings - Settings", "slug": "docs/cli/settings" },
       {
         "label": "/setup-github - GitHub setup",
-        "slug": "docs/cli/commands#setup-github"
+        "link": "/docs/cli/commands/#setup-github"
       },
       {
         "label": "/shells - Manage processes",
-        "slug": "docs/cli/commands#shells-or-bashes"
+        "link": "/docs/cli/commands/#shells-or-bashes"
       },
       { "label": "/skills - Agent skills", "slug": "docs/cli/skills" },
       {
         "label": "/stats - Session statistics",
-        "slug": "docs/cli/commands#stats"
+        "link": "/docs/cli/commands/#stats"
       },
       {
         "label": "/terminal-setup - Terminal keybindings",
-        "slug": "docs/cli/commands#terminal-setup"
+        "link": "/docs/cli/commands/#terminal-setup"
       },
       { "label": "/theme - Themes", "slug": "docs/cli/themes" },
-      { "label": "/tools - List tools", "slug": "docs/cli/commands#tools" },
-      { "label": "/vim - Vim mode", "slug": "docs/cli/commands#vim" },
+      { "label": "/tools - List tools", "link": "/docs/cli/commands/#tools" },
+      { "label": "/vim - Vim mode", "link": "/docs/cli/commands/#vim" },
 
       {
         "label": "Activate skill (tool)",
@@ -235,7 +235,7 @@
   {
     "label": "Releases",
     "items": [
-      { "label": "Release notes", "slug": "docs/changelogs/" },
+      { "label": "Release notes", "slug": "docs/changelogs" },
       { "label": "Stable release", "slug": "docs/changelogs/latest" },
       { "label": "Preview release", "slug": "docs/changelogs/preview" }
     ]
