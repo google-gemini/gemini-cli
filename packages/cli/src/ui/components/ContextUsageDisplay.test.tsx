@@ -36,7 +36,7 @@ describe('ContextUsageDisplay', () => {
       />,
     );
     const output = lastFrame();
-    expect(output).toContain('50% context left');
+    expect(output).toContain('50% left');
   });
 
   it('renders short label when terminal width is small', () => {
@@ -61,6 +61,6 @@ describe('ContextUsageDisplay', () => {
       />,
     );
     const output = lastFrame();
-    expect(output).toContain('0% context left');
+    expect(output).toContain('0% left');
   });
 });
