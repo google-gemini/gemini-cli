@@ -130,11 +130,21 @@ export const FeaturesList: React.FC<FeaturesListProps> = ({ features }) => {
               </Box>
             </Box>
             {feature.description && (
-              <Box marginLeft={2} marginBottom={1}>
+              <Box marginLeft={2}>
                 <Text dimColor color={theme.text.primary}>
                   {feature.description}
                 </Text>
               </Box>
+            )}
+            {feature.issueUrl && (
+              <Box marginLeft={2} marginBottom={1}>
+                <Text color={theme.text.accent}>
+                  Tracker: <Text dimColor>{feature.issueUrl}</Text>
+                </Text>
+              </Box>
+            )}
+            {!feature.issueUrl && feature.description && (
+              <Box marginBottom={1} />
             )}
           </Box>
         ))}

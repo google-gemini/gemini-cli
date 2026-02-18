@@ -49,7 +49,23 @@ The stability of each feature is visually indicated in the
 [`/settings` UI](/docs/cli/settings.md) with colored badges. **GA** features are
 considerd stable and look identical to standard settings.
 
-### Precedence and Reconciliation
+## Lifecycle tracking issues
+
+Every feature managed under this system must have a corresponding **Lifecycle
+Tracking Issue** on GitHub. These issues act as a living roadmap and a public
+feedback loop for the feature's progression through Alpha, Beta, and GA stages.
+
+You can find the link to a feature's tracking issue in the following ways:
+
+1.  **`/features` Command:** The tracker URL is displayed alongside the metadata
+    for each feature.
+2.  **`FeatureDefinitions`:** The `issueUrl` is defined in
+    `packages/core/src/config/features.ts`.
+
+Maintainers use these issues to document promotion criteria, link related bug
+reports, and collect user feedback before moving a feature to the next stage.
+
+### Precedence and reconciliation
 
 When determining if a feature is enabled, the system follows this order of
 precedence (highest priority first):
@@ -92,11 +108,14 @@ For more details on persistent configuration, see the [Configuration guide].
 Maintaining a feature involves promoting it through stages or eventually
 deprecating and removing it.
 
-### Adding a Feature
+### Adding a feature
 
 To add a new feature under lifecycle management:
 
-1.  **Define the Feature**: Add a new entry to [`FeatureDefinitions`] in
+1.  **Create a Tracker Issue:** Use the **Feature Lifecycle Tracker** template
+    on GitHub to create a new issue. This issue will track the feature from
+    Alpha through GA.
+2.  **Define the Feature:** Add a new entry to [`FeatureDefinitions`] in
     [`features.ts`].
 
     ```typescript
@@ -108,6 +127,7 @@ To add a new feature under lifecycle management:
           preRelease: FeatureStage.Alpha,
           since: '0.31.0',
           description: 'Description of my new feature.',
+          issueUrl: 'https://github.com/google-gemini/gemini-cli/issues/123',
         },
       ],
     };
@@ -116,7 +136,7 @@ To add a new feature under lifecycle management:
     _Note: The `default` field is optional. If omitted, it defaults to `false`
     for Alpha/Deprecated and `true` for Beta/GA._
 
-2.  **Expose in Settings**: Add the feature to the `features` object in
+3.  **Expose in Settings**: Add the feature to the `features` object in
     [`settingsSchema.ts`]. This ensures it appears in the `/settings` UI and is
     validated.
     ```typescript
@@ -135,7 +155,7 @@ To add a new feature under lifecycle management:
       },
     },
     ```
-3.  **Use the Feature**: In your code, check if the feature is enabled using the
+4.  **Use the Feature**: In your code, check if the feature is enabled using the
     `Config` object.
     ```typescript
     if (this.config.isFeatureEnabled('myNewFeature')) {
@@ -143,18 +163,21 @@ To add a new feature under lifecycle management:
     }
     ```
 
-### Promoting a Feature
+### Promoting a feature
 
 When a feature is ready for the next stage:
 
-1.  **Update [`features.ts`]**: Add a new `FeatureSpec` to the feature's array.
+1.  **Update the Tracker:** Review the requirements in the lifecycle tracker
+    issue. Once met, update the roadmap table in the issue description and post
+    a comment announcing the promotion.
+2.  **Update [`features.ts`]**: Add a new `FeatureSpec` to the feature's array.
     - **To BETA**: Set `preRelease: FeatureStage.Beta` (Defaults to `true`).
     - **To GA**: Set `preRelease: FeatureStage.GA` (Defaults to `true` and
       locked).
     - Update the `since` version.
-2.  **Update [`settingsSchema.ts`]**: Update the `label` and `description` if
+3.  **Update [`settingsSchema.ts`]**: Update the `label` and `description` if
     necessary.
-3.  **GA Cleanup**: Once a feature is GA and no longer optional, remove the
+4.  **GA Cleanup**: Once a feature is GA and no longer optional, remove the
     feature gate check from the code and make it a core part of the logic.
 
 ### Deprecating a Feature

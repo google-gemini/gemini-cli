@@ -131,6 +131,7 @@ describe('FeatureGate', () => {
       since: '0.1.0',
       until: undefined,
       description: 'Feature 1',
+      issueUrl: undefined,
     });
     expect(feat2).toEqual({
       key: 'feat2',
@@ -139,6 +140,27 @@ describe('FeatureGate', () => {
       since: '0.2.0',
       until: '0.3.0',
       description: 'Feature 2',
+      issueUrl: undefined,
+    });
+  });
+
+  it('should include issueUrl in feature info', () => {
+    const gate = DefaultFeatureGate.deepCopy();
+    gate.add({
+      featWithUrl: [
+        {
+          preRelease: FeatureStage.Alpha,
+          issueUrl: 'https://github.com/google/gemini-cli/issues/1',
+        },
+      ],
+    });
+
+    const info = gate.getFeatureInfo();
+    const feat = info.find((f) => f.key === 'featWithUrl');
+
+    expect(feat).toMatchObject({
+      key: 'featWithUrl',
+      issueUrl: 'https://github.com/google/gemini-cli/issues/1',
     });
   });
 
