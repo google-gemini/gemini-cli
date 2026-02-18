@@ -555,11 +555,13 @@ export async function loadCliConfig(
         break;
       case 'plan':
         if (!(settings.experimental?.plan ?? false)) {
-          throw new Error(
-            'Approval mode "plan" is only available when experimental.plan is enabled.',
+          debugLogger.warn(
+            'Approval mode "plan" is only available when experimental.plan is enabled. Falling back to "default".',
           );
+          approvalMode = ApprovalMode.DEFAULT;
+        } else {
+          approvalMode = ApprovalMode.PLAN;
         }
-        approvalMode = ApprovalMode.PLAN;
         break;
       case 'default':
         approvalMode = ApprovalMode.DEFAULT;
