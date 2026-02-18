@@ -6,6 +6,7 @@
 
 import {
   type CompressionStatus,
+  type ChatCompressionInfo,
   type GeminiCLIExtension,
   type MCPServerConfig,
   type ThoughtSummary,
@@ -248,6 +249,11 @@ export type HistoryItemThinking = HistoryItemBase & {
   thought: ThoughtSummary;
 };
 
+export type HistoryItemAutoCompression = HistoryItemBase & {
+  type: 'auto_compression';
+  compression: ChatCompressionInfo;
+};
+
 export type HistoryItemChatList = HistoryItemBase & {
   type: 'chat_list';
   chats: ChatDetail[];
@@ -372,6 +378,7 @@ export type HistoryItemWithoutId =
   | HistoryItemMcpStatus
   | HistoryItemChatList
   | HistoryItemThinking
+  | HistoryItemAutoCompression
   | HistoryItemHooksList;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };

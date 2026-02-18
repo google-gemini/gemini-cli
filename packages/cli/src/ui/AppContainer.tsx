@@ -1061,6 +1061,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     backgroundShells,
     dismissBackgroundShell,
     retryStatus,
+    isCompressing,
   } = useGeminiStream(
     config.getGeminiClient(),
     historyManager.history,
@@ -1613,6 +1614,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     streamingState,
     shouldShowFocusHint,
     retryStatus,
+    customWittyPhrases: isCompressing ? ['Optimizing context...'] : undefined,
   });
 
   const handleGlobalKeypress = useCallback(

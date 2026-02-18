@@ -68,6 +68,7 @@ export enum GeminiEventType {
   ModelInfo = 'model_info',
   AgentExecutionStopped = 'agent_execution_stopped',
   AgentExecutionBlocked = 'agent_execution_blocked',
+  ChatCompressing = 'chat_compressing',
 }
 
 export type ServerGeminiRetryEvent = {
@@ -192,6 +193,10 @@ export type ServerGeminiChatCompressedEvent = {
   value: ChatCompressionInfo | null;
 };
 
+export type ServerGeminiChatCompressingEvent = {
+  type: GeminiEventType.ChatCompressing;
+};
+
 export type ServerGeminiMaxSessionTurnsEvent = {
   type: GeminiEventType.MaxSessionTurns;
 };
@@ -213,6 +218,7 @@ export type ServerGeminiCitationEvent = {
 // The original union type, now composed of the individual types
 export type ServerGeminiStreamEvent =
   | ServerGeminiChatCompressedEvent
+  | ServerGeminiChatCompressingEvent
   | ServerGeminiCitationEvent
   | ServerGeminiContentEvent
   | ServerGeminiErrorEvent

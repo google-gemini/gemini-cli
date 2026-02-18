@@ -17,7 +17,7 @@ import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 import { GeminiMessageContent } from './messages/GeminiMessageContent.js';
 import { CompressionMessage } from './messages/CompressionMessage.js';
 import { WarningMessage } from './messages/WarningMessage.js';
-import { Box } from 'ink';
+import { Box, Text } from 'ink';
 import { AboutBox } from './AboutBox.js';
 import { StatsDisplay } from './StatsDisplay.js';
 import { ModelStatsDisplay } from './ModelStatsDisplay.js';
@@ -74,6 +74,14 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'user_shell' && (
         <UserShellMessage text={itemForDisplay.text} width={terminalWidth} />
+      )}
+      {itemForDisplay.type === 'auto_compression' && (
+        <Box paddingLeft={2} marginTop={0}>
+          <Text dimColor>
+            (Context optimized: {itemForDisplay.compression.originalTokenCount}{' '}
+            → {itemForDisplay.compression.newTokenCount} tokens)
+          </Text>
+        </Box>
       )}
       {itemForDisplay.type === 'gemini' && (
         <GeminiMessage

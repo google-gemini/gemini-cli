@@ -1077,6 +1077,7 @@ ${JSON.stringify(
         new AbortController().signal,
         'test-prompt-id',
       );
+      await stream.next(); // Trigger ChatCompressing
       await stream.next(); // Trigger the generator
 
       expect(countTokensSpy).toHaveBeenCalledWith(
@@ -1924,8 +1925,10 @@ ${JSON.stringify(
 
       // Assert
       expect(events).toEqual([
+        { type: GeminiEventType.ChatCompressing },
         { type: GeminiEventType.ModelInfo, value: 'default-routed-model' },
         { type: GeminiEventType.InvalidStream },
+        { type: GeminiEventType.ChatCompressing },
         { type: GeminiEventType.Content, value: 'Continued content' },
       ]);
 
@@ -1980,6 +1983,7 @@ ${JSON.stringify(
 
       // Assert
       expect(events).toEqual([
+        { type: GeminiEventType.ChatCompressing },
         { type: GeminiEventType.ModelInfo, value: 'default-routed-model' },
         { type: GeminiEventType.InvalidStream },
       ]);
@@ -2017,8 +2021,8 @@ ${JSON.stringify(
       const events = await fromAsync(stream);
 
       // Assert
-      // We expect 3 events (model_info + original + 1 retry)
-      expect(events.length).toBe(3);
+      // We expect 5 events (chat_compressing + model_info + original + 1 retry chat_compressing + 1 retry model_info)
+      expect(events.length).toBe(5);
       expect(
         events
           .filter((e) => e.type === GeminiEventType.ModelInfo)
