@@ -9,6 +9,7 @@ import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { debugLogger } from './debugLogger.js';
 import { getResponseText } from './partUtils.js';
+import { getErrorMessage } from './errors.js';
 
 export const DEFAULT_FAST_ACK_MODEL_CONFIG_KEY: ModelConfigKey = {
   model: 'fast-ack-helper',
@@ -192,7 +193,7 @@ export async function generateFastAckText(
     return responseText;
   } catch (error) {
     debugLogger.debug(
-      `[FastAckHelper] Generation failed: ${error instanceof Error ? error.message : String(error)}`,
+      `[FastAckHelper] Generation failed: ${getErrorMessage(error)}`,
     );
     return fallbackText;
   }
