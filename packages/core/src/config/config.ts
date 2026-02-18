@@ -1171,7 +1171,7 @@ export class Config {
     return this.remoteAdminSettings;
   }
 
-  setRemoteAdminSettings(settings: AdminControlsSettings): void {
+  setRemoteAdminSettings(settings: AdminControlsSettings | undefined): void {
     this.remoteAdminSettings = settings;
   }
 
