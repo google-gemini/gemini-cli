@@ -158,28 +158,6 @@ exports[`<ModelStatsDisplay /> > should handle long role name layout 1`] = `
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`<ModelStatsDisplay /> > should handle models with long names (gemini-3-*-preview) without layout breaking 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│                                                                              │
-│  Auto (Gemini 3) Stats For Nerds                                             │
-│                                                                              │
-│                                                                              │
-│  Metric                      gemini-3-pro-preview   gemini-3-flash-preview   │
-│  ──────────────────────────────────────────────────────────────────────────  │
-│  API                                                                         │
-│  Requests                    10                     20                       │
-│  Errors                      0 (0.0%)               0 (0.0%)                 │
-│  Avg Latency                 200ms                  50ms                     │
-│  Tokens                                                                      │
-│  Total                       6,000                  12,000                   │
-│    ↳ Input                   1,000                  2,000                    │
-│    ↳ Cache Reads             500 (25.0%)            1,000 (25.0%)            │
-│    ↳ Thoughts                100                    200                      │
-│    ↳ Tool                    50                     100                      │
-│    ↳ Output                  4,000                  8,000                    │
-╰──────────────────────────────────────────────────────────────────────────────╯"
-`;
-
 exports[`<ModelStatsDisplay /> > should not display conditional rows if no model has data for them 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
