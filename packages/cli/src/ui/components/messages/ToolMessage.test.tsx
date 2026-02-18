@@ -13,6 +13,10 @@ import { type AnsiOutput, CoreToolCallStatus } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { tryParseJSON } from '../../../utils/jsonoutput.js';
 
+vi.mock('../GeminiRespondingSpinner.js', () => ({
+  GeminiRespondingSpinner: () => <Text>MockRespondingSpinner</Text>,
+}));
+
 vi.mock('../TerminalOutput.js', () => ({
   TerminalOutput: function MockTerminalOutput({
     cursor,
