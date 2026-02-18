@@ -167,12 +167,11 @@ export async function createPolicyEngineConfig(
   settings: PolicySettings,
   approvalMode: ApprovalMode,
   defaultPoliciesDir?: string,
-  workspacePoliciesDir?: string,
 ): Promise<PolicyEngineConfig> {
   const policyDirs = getPolicyDirectories(
     defaultPoliciesDir,
     settings.policyPaths,
-    workspacePoliciesDir,
+    settings.workspacePoliciesDir,
   );
   const securePolicyDirs = await filterSecurePolicyDirectories(policyDirs);
 
@@ -186,7 +185,11 @@ export async function createPolicyEngineConfig(
     checkers: tomlCheckers,
     errors,
   } = await loadPoliciesFromToml(securePolicyDirs, (p) => {
-    const tier = getPolicyTier(p, defaultPoliciesDir, workspacePoliciesDir);
+    const tier = getPolicyTier(
+      p,
+      defaultPoliciesDir,
+      settings.workspacePoliciesDir,
+    );
 
     // If it's a user-provided path that isn't already categorized as ADMIN,
     // treat it as USER tier.

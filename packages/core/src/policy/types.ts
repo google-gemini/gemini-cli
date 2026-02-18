@@ -272,7 +272,9 @@ export interface PolicySettings {
     allowed?: string[];
   };
   mcpServers?: Record<string, { trust?: boolean }>;
+  // User provided policies that will replace the USER level policies in ~/.gemini/policies
   policyPaths?: string[];
+  workspacePoliciesDir?: string;
 }
 
 export interface CheckResult {
