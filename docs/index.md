@@ -115,8 +115,8 @@ npm install -g @google/gemini-cli
 
 ## Development
 
-- **[Contribution guide](./contributing.md):** Learn how to contribute to Gemini
-  CLI.
+- **[Contribution guide](/docs/contributing):** Learn how to contribute to
+  Gemini CLI.
 - **[Integration testing](./integration-tests.md):** Learn how to run the
   integration tests.
 - **[Issue and PR automation](./issue-and-pr-automation.md):** Learn about the
