@@ -107,7 +107,10 @@
         "label": "/privacy - Privacy notice",
         "link": "/docs/cli/commands/#privacy"
       },
-      { "label": "/quit - Exit CLI", "link": "/docs/cli/commands/#quit-or-exit" },
+      {
+        "label": "/quit - Exit CLI",
+        "link": "/docs/cli/commands/#quit-or-exit"
+      },
       { "label": "/restore - Restore files", "slug": "docs/cli/checkpointing" },
       {
         "label": "/resume - Resume session",
