@@ -30,14 +30,19 @@ Features progress through the following stages:
 
 The feature lifecycle can be configured in several ways:
 
-1.  **`settings.json`**: Use the `features` object to toggle specific features
+1.  **`/features` Command**: Use the `/features` (or `/feature`) command
+    directly in the CLI to list all Alpha, Beta, and Deprecated features. This
+    view shows the maturity stage, enablement status, and metadata like the
+    version it was introduced (`since`) and when it is scheduled for removal
+    (`until`).
+2.  **`settings.json`**: Use the `features` object to toggle specific features
     or entire stages.
     - `features.allAlpha`: Enable/disable all Alpha features.
     - `features.allBeta`: Enable/disable all Beta features.
     - `features.<featureName>`: Toggle an individual feature.
-2.  **CLI Flag**: Use `--feature-gates="feat1=true,feat2=false"` for runtime
+3.  **CLI Flag**: Use `--feature-gates="feat1=true,feat2=false"` for runtime
     overrides.
-3.  **Environment Variable**: Set
+4.  **Environment Variable**: Set
     `GEMINI_FEATURE_GATES="feat1=true,feat2=false"`.
 
 The stability of each feature is visually indicated in the
