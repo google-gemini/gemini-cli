@@ -5,7 +5,6 @@
  */
 
 import { GoogleGenAI } from '@google/genai';
-import { jsonrepair } from 'jsonrepair';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { Content } from '@google/genai';
@@ -25,6 +24,7 @@ export class LocalLiteRtLmClient {
     this.model = gemmaModelRouterSettings.classifier!.model!;
 
     this.client = new GoogleGenAI({
+      // The LiteRT-LM server does not require an API key, but the SDK requires one to be set even for local endpoints. This is a dummy value and is not used for authentication.
       apiKey: 'no-api-key-needed',
       httpOptions: {
         baseUrl: this.host,
@@ -83,9 +83,7 @@ export class LocalLiteRtLmClient {
         );
       }
 
-      const cleanedText = jsonrepair(text);
-
-      return JSON.parse(cleanedText);
+      return JSON.parse(result.text);
     } catch (error) {
       debugLogger.error(
         `[LocalLiteRtLmClient] Failed to generate content:`,
