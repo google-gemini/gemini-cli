@@ -96,6 +96,12 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         model: 'gemini-2.5-flash',
       },
     },
+    'gemini-3-flash-base': {
+      extends: 'base',
+      modelConfig: {
+        model: 'gemini-3-flash-preview',
+      },
+    },
     classifier: {
       extends: 'base',
       modelConfig: {
@@ -115,6 +121,19 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         generateContentConfig: {
           temperature: 0.3,
           maxOutputTokens: 16000,
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
+        },
+      },
+    },
+    'fast-ack-helper': {
+      extends: 'base',
+      modelConfig: {
+        model: 'gemini-2.5-flash-lite',
+        generateContentConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 120,
           thinkingConfig: {
             thinkingBudget: 0,
           },
@@ -151,7 +170,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
     },
     'web-search': {
-      extends: 'gemini-2.5-flash-base',
+      extends: 'gemini-3-flash-base',
       modelConfig: {
         generateContentConfig: {
           tools: [{ googleSearch: {} }],
@@ -159,7 +178,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
     },
     'web-fetch': {
-      extends: 'gemini-2.5-flash-base',
+      extends: 'gemini-3-flash-base',
       modelConfig: {
         generateContentConfig: {
           tools: [{ urlContext: {} }],
@@ -168,25 +187,25 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
     // TODO(joshualitt): During cleanup, make modelConfig optional.
     'web-fetch-fallback': {
-      extends: 'gemini-2.5-flash-base',
+      extends: 'gemini-3-flash-base',
       modelConfig: {},
     },
     'loop-detection': {
-      extends: 'gemini-2.5-flash-base',
+      extends: 'gemini-3-flash-base',
       modelConfig: {},
     },
     'loop-detection-double-check': {
       extends: 'base',
       modelConfig: {
-        model: 'gemini-2.5-pro',
+        model: 'gemini-3-pro-preview',
       },
     },
     'llm-edit-fixer': {
-      extends: 'gemini-2.5-flash-base',
+      extends: 'gemini-3-flash-base',
       modelConfig: {},
     },
     'next-speaker-checker': {
-      extends: 'gemini-2.5-flash-base',
+      extends: 'gemini-3-flash-base',
       modelConfig: {},
     },
     'chat-compression-3-pro': {
@@ -216,7 +235,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
     'chat-compression-default': {
       modelConfig: {
-        model: 'gemini-2.5-pro',
+        model: 'gemini-3-pro-preview',
       },
     },
   },

@@ -7,7 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 import type {
-  ToolCallConfirmationDetails,
+  SerializableConfirmationDetails,
   Config,
 } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
@@ -39,12 +39,11 @@ describe('ToolConfirmationMessage', () => {
   } as unknown as Config;
 
   it('should not display urls if prompt and url are the same', () => {
-    const confirmationDetails: ToolCallConfirmationDetails = {
+    const confirmationDetails: SerializableConfirmationDetails = {
       type: 'info',
       title: 'Confirm Web Fetch',
       prompt: 'https://example.com',
       urls: ['https://example.com'],
-      onConfirm: vi.fn(),
     };
 
     const { lastFrame } = renderWithProviders(
@@ -61,7 +60,7 @@ describe('ToolConfirmationMessage', () => {
   });
 
   it('should display urls if prompt and url are different', () => {
-    const confirmationDetails: ToolCallConfirmationDetails = {
+    const confirmationDetails: SerializableConfirmationDetails = {
       type: 'info',
       title: 'Confirm Web Fetch',
       prompt:
@@ -69,7 +68,6 @@ describe('ToolConfirmationMessage', () => {
       urls: [
         'https://raw.githubusercontent.com/google/gemini-react/main/README.md',
       ],
-      onConfirm: vi.fn(),
     };
 
     const { lastFrame } = renderWithProviders(
@@ -166,14 +164,13 @@ describe('ToolConfirmationMessage', () => {
   });
 
   it('should display multiple commands for exec type when provided', () => {
-    const confirmationDetails: ToolCallConfirmationDetails = {
+    const confirmationDetails: SerializableConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Multiple Commands',
       command: 'echo "hello"', // Primary command
       rootCommand: 'echo',
       rootCommands: ['echo'],
       commands: ['echo "hello"', 'ls -la', 'whoami'], // Multi-command list
-      onConfirm: vi.fn(),
     };
 
     const { lastFrame } = renderWithProviders(
@@ -194,7 +191,7 @@ describe('ToolConfirmationMessage', () => {
   });
 
   describe('with folder trust', () => {
-    const editConfirmationDetails: ToolCallConfirmationDetails = {
+    const editConfirmationDetails: SerializableConfirmationDetails = {
       type: 'edit',
       title: 'Confirm Edit',
       fileName: 'test.txt',
@@ -202,33 +199,29 @@ describe('ToolConfirmationMessage', () => {
       fileDiff: '...diff...',
       originalContent: 'a',
       newContent: 'b',
-      onConfirm: vi.fn(),
     };
 
-    const execConfirmationDetails: ToolCallConfirmationDetails = {
+    const execConfirmationDetails: SerializableConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Execution',
       command: 'echo "hello"',
       rootCommand: 'echo',
       rootCommands: ['echo'],
-      onConfirm: vi.fn(),
     };
 
-    const infoConfirmationDetails: ToolCallConfirmationDetails = {
+    const infoConfirmationDetails: SerializableConfirmationDetails = {
       type: 'info',
       title: 'Confirm Web Fetch',
       prompt: 'https://example.com',
       urls: ['https://example.com'],
-      onConfirm: vi.fn(),
     };
 
-    const mcpConfirmationDetails: ToolCallConfirmationDetails = {
+    const mcpConfirmationDetails: SerializableConfirmationDetails = {
       type: 'mcp',
       title: 'Confirm MCP Tool',
       serverName: 'test-server',
       toolName: 'test-tool',
       toolDisplayName: 'Test Tool',
-      onConfirm: vi.fn(),
     };
 
     describe.each([
@@ -294,7 +287,7 @@ describe('ToolConfirmationMessage', () => {
   });
 
   describe('enablePermanentToolApproval setting', () => {
-    const editConfirmationDetails: ToolCallConfirmationDetails = {
+    const editConfirmationDetails: SerializableConfirmationDetails = {
       type: 'edit',
       title: 'Confirm Edit',
       fileName: 'test.txt',
@@ -302,7 +295,6 @@ describe('ToolConfirmationMessage', () => {
       fileDiff: '...diff...',
       originalContent: 'a',
       newContent: 'b',
-      onConfirm: vi.fn(),
     };
 
     it('should NOT show "Allow for all future sessions" when setting is false (default)', () => {
@@ -355,7 +347,7 @@ describe('ToolConfirmationMessage', () => {
   });
 
   describe('Modify with external editor option', () => {
-    const editConfirmationDetails: ToolCallConfirmationDetails = {
+    const editConfirmationDetails: SerializableConfirmationDetails = {
       type: 'edit',
       title: 'Confirm Edit',
       fileName: 'test.txt',
@@ -363,7 +355,6 @@ describe('ToolConfirmationMessage', () => {
       fileDiff: '...diff...',
       originalContent: 'a',
       newContent: 'b',
-      onConfirm: vi.fn(),
     };
 
     it('should show "Modify with external editor" when NOT in IDE mode', () => {

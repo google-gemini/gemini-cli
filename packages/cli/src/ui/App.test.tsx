@@ -10,8 +10,8 @@ import { renderWithProviders } from '../test-utils/render.js';
 import { Text, useIsScreenReaderEnabled, type DOMElement } from 'ink';
 import { App } from './App.js';
 import { type UIState } from './contexts/UIStateContext.js';
-import { StreamingState, ToolCallStatus } from './types.js';
-import { makeFakeConfig } from '@google/gemini-cli-core';
+import { StreamingState } from './types.js';
+import { makeFakeConfig, CoreToolCallStatus } from '@google/gemini-cli-core';
 
 vi.mock('ink', async (importOriginal) => {
   const original = await importOriginal<typeof import('ink')>();
@@ -66,6 +66,7 @@ describe('App', () => {
 
   const mockUIState: Partial<UIState> = {
     streamingState: StreamingState.Idle,
+    cleanUiDetailsVisible: true,
     quittingMessages: null,
     dialogsVisible: false,
     mainControlsRef: {
@@ -201,7 +202,7 @@ describe('App', () => {
         callId: 'call-1',
         name: 'ls',
         description: 'list directory',
-        status: ToolCallStatus.Confirming,
+        status: CoreToolCallStatus.AwaitingApproval,
         resultDisplay: '',
         confirmationDetails: {
           type: 'exec' as const,
@@ -215,15 +216,21 @@ describe('App', () => {
 
     const stateWithConfirmingTool = {
       ...mockUIState,
-      pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
-      pendingGeminiHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+      pendingHistoryItems: [
+        {
+          type: 'tool_group',
+          tools: toolCalls,
+        },
+      ],
+      pendingGeminiHistoryItems: [
+        {
+          type: 'tool_group',
+          tools: toolCalls,
+        },
+      ],
     } as UIState;
 
     const configWithExperiment = makeFakeConfig();
-    vi.spyOn(
-      configWithExperiment,
-      'isEventDrivenSchedulerEnabled',
-    ).mockReturnValue(true);
     vi.spyOn(configWithExperiment, 'isTrustedFolder').mockReturnValue(true);
     vi.spyOn(configWithExperiment, 'getIdeMode').mockReturnValue(false);
 
