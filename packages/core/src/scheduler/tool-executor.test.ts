@@ -238,6 +238,146 @@ describe('ToolExecutor', () => {
     }
   });
 
+  it('should truncate large MCP tool output', async () => {
+    // 1. Setup MCP Tool Call
+    const threshold = 10;
+    vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(
+      threshold,
+    );
+
+    const longOutput =
+      'This is a very long MCP tool output that exceeds threshold';
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+      llmContent: longOutput,
+      returnDisplay: 'truncated mcp',
+    });
+
+    vi.mocked(fileUtils.saveTruncatedToolOutput).mockResolvedValue({
+      outputFile: '/tmp/mcp_truncated.txt',
+    });
+
+    vi.mocked(fileUtils.formatTruncatedToolOutput).mockReturnValue(
+      'TruncatedMcpContent...',
+    );
+
+    const mcpToolName = 'server__tool';
+    const mockTool = new MockTool({ name: mcpToolName });
+    const invocation = {
+      execute: vi.fn(),
+      getDescription: vi.fn().mockReturnValue('mcp tool'),
+    };
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-mcp',
+        name: mcpToolName,
+        args: { foo: 'bar' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-mcp',
+      },
+      tool: mockTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    // 2. Execute
+    const result = await executor.execute({
+      call: scheduledCall,
+      signal: new AbortController().signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    // 3. Verify Truncation Logic
+    expect(fileUtils.saveTruncatedToolOutput).toHaveBeenCalledWith(
+      longOutput,
+      mcpToolName,
+      'call-mcp',
+      expect.any(String),
+      'test-session-id',
+    );
+
+    expect(fileUtils.formatTruncatedToolOutput).toHaveBeenCalledWith(
+      longOutput,
+      '/tmp/mcp_truncated.txt',
+      threshold,
+    );
+
+    expect(result.status).toBe(CoreToolCallStatus.Success);
+    if (result.status === CoreToolCallStatus.Success) {
+      const response = result.response.responseParts[0]?.functionResponse
+        ?.response as Record<string, unknown>;
+      expect(response).toEqual({ output: 'TruncatedMcpContent...' });
+    }
+  });
+
+  it('should truncate large MCP tool output when returned as Part[] with 1 element', async () => {
+    // 1. Setup MCP Tool Call with Part[] output
+    const threshold = 10;
+    vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(
+      threshold,
+    );
+
+    const longOutput =
+      'This is a very long MCP tool output in a Part that exceeds threshold';
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+      llmContent: [{ text: longOutput }],
+      returnDisplay: 'truncated mcp part',
+    });
+
+    vi.mocked(fileUtils.saveTruncatedToolOutput).mockResolvedValue({
+      outputFile: '/tmp/mcp_part_truncated.txt',
+    });
+
+    vi.mocked(fileUtils.formatTruncatedToolOutput).mockReturnValue(
+      'TruncatedMcpPartContent...',
+    );
+
+    const mcpToolName = 'server__tool';
+    const mockTool = new MockTool({ name: mcpToolName });
+    const invocation = {
+      execute: vi.fn(),
+      getDescription: vi.fn().mockReturnValue('mcp tool'),
+    };
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-mcp-part',
+        name: mcpToolName,
+        args: { foo: 'bar' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-mcp-part',
+      },
+      tool: mockTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    // 2. Execute
+    const result = await executor.execute({
+      call: scheduledCall,
+      signal: new AbortController().signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    // 3. Verify Truncation Logic
+    expect(fileUtils.saveTruncatedToolOutput).toHaveBeenCalledWith(
+      longOutput,
+      mcpToolName,
+      'call-mcp-part',
+      expect.any(String),
+      'test-session-id',
+    );
+
+    expect(result.status).toBe(CoreToolCallStatus.Success);
+    if (result.status === CoreToolCallStatus.Success) {
+      const response = result.response.responseParts[0]?.functionResponse
+        ?.response as Record<string, unknown>;
+      expect(response).toEqual({ output: 'TruncatedMcpPartContent...' });
+    }
+  });
+
   it('should report PID updates for shell tools', async () => {
     // 1. Setup ShellToolInvocation
     const messageBus = createMockMessageBus();
