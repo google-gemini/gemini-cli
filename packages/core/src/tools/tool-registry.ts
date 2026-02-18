@@ -18,6 +18,7 @@ import { DiscoveredMCPTool } from './mcp-tool.js';
 import { parse } from 'shell-quote';
 import { ToolErrorType } from './tool-error.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import { escapeXml } from '../utils/xml.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
@@ -103,16 +104,17 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
 
     // if there is any error, non-zero exit code, signal, or stderr, return error details instead of stdout
     if (error || code !== 0 || signal || stderr) {
+      const parts: string[] = [];
       if (code !== null && code !== 0) {
         parts.push(`<exit_code>${code}</exit_code>`);
       }
-      const parts = [
-        `<output>\n    <stdout>${stdout.trim() || '(empty)'}</stdout>\n    <stderr>${stderr.trim() || '(empty)'}</stderr>\n  </output>`,
-      ];
+      parts.push(
+        `<output>\n    <stdout>${escapeXml(stdout.trim() || '(empty)')}</stdout>\n    <stderr>${escapeXml(stderr.trim() || '(empty)')}</stderr>\n  </output>`,
+      );
       if (error) {
-        parts.push(`<error>${error}</error>`);
+        parts.push(`<error>${escapeXml(String(error))}</error>`);
       }
-      
+
       if (signal) {
         parts.push(`<signal>${signal}</signal>`);
       }

@@ -33,6 +33,7 @@ import type {
 } from '../services/shellExecutionService.js';
 import { ShellExecutionService } from '../services/shellExecutionService.js';
 import { formatBytes } from '../utils/formatters.js';
+import { wrapCData } from '../utils/xml.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
@@ -355,18 +356,19 @@ export class ShellToolInvocation extends BaseToolInvocation<
         // Create a formatted error string for display, replacing the wrapper command
         // with the user-facing command.
 
+        const parts: string[] = [];
         if (result.exitCode !== null) {
           parts.push(`<exit_code>${result.exitCode}</exit_code>`);
         }
 
         const output = result.output || '(empty)';
-        const parts = [`<output><![CDATA[${output}]]></output>`];
+        parts.push(`<output>${wrapCData(output)}</output>`);
         if (result.error) {
           const finalError = result.error.message.replaceAll(
             commandToExecute,
             this.params.command,
           );
-          parts.push(`<error><![CDATA[${finalError}]]></error>`);
+          parts.push(`<error>${wrapCData(finalError)}</error>`);
         }
 
         if (result.signal) {

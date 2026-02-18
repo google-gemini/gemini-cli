@@ -393,7 +393,7 @@ describe('ShellTool', () => {
 
       const result = await promise;
       expect(result.llmContent).toContain(
-        '<error>wrapped command failed</error>',
+        '<error><![CDATA[wrapped command failed]]></error>',
       );
       expect(result.llmContent).not.toContain('pgrep');
     });
@@ -724,7 +724,9 @@ describe('ShellTool', () => {
       });
 
       const result = await promise;
-      expect(result.llmContent).toContain('<error>spawn ENOENT</error>');
+      expect(result.llmContent).toContain(
+        '<error><![CDATA[spawn ENOENT]]></error>',
+      );
     });
 
     it('should not include Signal when there is no signal', async () => {
@@ -775,7 +777,7 @@ describe('ShellTool', () => {
       const result = await promise;
       // Should only contain subprocess_result and output
       expect(result.llmContent).toContain('<subprocess_result>');
-      expect(result.llmContent).toContain('<output>hello</output>');
+      expect(result.llmContent).toContain('<output><![CDATA[hello]]></output>');
       expect(result.llmContent).toContain('<exit_code>0</exit_code>');
     });
   });
