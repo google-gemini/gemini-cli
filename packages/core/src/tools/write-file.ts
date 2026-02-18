@@ -147,6 +147,93 @@ export async function getCorrectedFileContent(
   return { originalContent, correctedContent, fileExists };
 }
 
+function getDiffContextSnippet(
+  originalContent: string,
+  newContent: string,
+  contextLines = 5,
+): string {
+  // If no original content, return the whole new content
+  if (!originalContent) {
+    return newContent;
+  }
+
+  const changes = Diff.diffLines(originalContent, newContent);
+  const newLines = newContent.split(/\r?\n/);
+  const ranges: Array<{ start: number; end: number }> = [];
+  let newLineIdx = 0;
+
+  for (const change of changes) {
+    if (change.added) {
+      // For added lines, the range covers the new lines
+      ranges.push({
+        start: newLineIdx,
+        end: newLineIdx + change.count,
+      });
+      newLineIdx += change.count;
+    } else if (change.removed) {
+      // For removed lines, we mark the point in the new file where they were removed
+      ranges.push({
+        start: newLineIdx,
+        end: newLineIdx,
+      });
+      // Removed lines don't advance the new file index
+    } else {
+      // Unchanged lines advance the index
+      newLineIdx += change.count;
+    }
+  }
+
+  // If no changes were detected (e.g. only whitespace if diffLines is loose, or identical),
+  // but we are here, we might just return the whole thing or say "no changes".
+  // However, write_file implies we wrote something. If identical, ranges is empty.
+  if (ranges.length === 0) {
+    return newContent;
+  }
+
+  // Expand ranges and clamp
+  const expandedRanges = ranges.map((r) => ({
+    start: Math.max(0, r.start - contextLines),
+    end: Math.min(newLines.length, r.end + contextLines),
+  }));
+
+  // Merge overlapping ranges
+  expandedRanges.sort((a, b) => a.start - b.start);
+  const mergedRanges: Array<{ start: number; end: number }> = [];
+  if (expandedRanges.length > 0) {
+    let current = expandedRanges[0];
+    for (let i = 1; i < expandedRanges.length; i++) {
+      const next = expandedRanges[i];
+      if (next.start <= current.end) {
+        current.end = Math.max(current.end, next.end);
+      } else {
+        mergedRanges.push(current);
+        current = next;
+      }
+    }
+    mergedRanges.push(current);
+  }
+
+  // Build output
+  const outputParts: string[] = [];
+  let lastEnd = 0;
+
+  for (const range of mergedRanges) {
+    if (range.start > lastEnd) {
+      outputParts.push('...');
+    }
+    // Slice is exclusive on end, but our 'end' is usually "line index + count", which works for slice.
+    // However, for single lines or correct inclusivity, let's verify.
+    // change.count is number of lines. index 0 + 1 line -> index 1. slice(0, 1) returns line 0. Correct.
+    outputParts.push(newLines.slice(range.start, range.end).join('\n'));
+    lastEnd = range.end;
+  }
+  if (lastEnd < newLines.length) {
+    outputParts.push('...');
+  }
+
+  return outputParts.join('\n');
+}
+
 class WriteFileToolInvocation extends BaseToolInvocation<
   WriteFileToolParams,
   ToolResult
@@ -356,7 +443,12 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         );
       }
 
-      llmSuccessMessageParts.push(`Here is the updated code:\n${finalContent}`);
+      const snippet = getDiffContextSnippet(
+        isNewFile ? '' : originalContent,
+        finalContent,
+        5,
+      );
+      llmSuccessMessageParts.push(`Here is the updated code:\n${snippet}`);
 
       // Log file operation for telemetry (without diff_stat to avoid double-counting)
       const mimetype = getSpecificMimeType(this.resolvedPath);
