@@ -1,0 +1,147 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { TrackerService } from './trackerService.js';
+import type { TrackerTask } from './trackerTypes.js';
+
+describe('TrackerService', () => {
+  let testRootDir: string;
+  let service: TrackerService;
+
+  beforeEach(async () => {
+    testRootDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'tracker-service-test-'),
+    );
+    service = new TrackerService(testRootDir);
+  });
+
+  afterEach(async () => {
+    await fs.rm(testRootDir, { recursive: true, force: true });
+  });
+
+  it('should initialize the tracker directory', async () => {
+    await service.ensureInitialized();
+    const tasksDir = path.join(testRootDir, '.tracker', 'tasks');
+    const stats = await fs.stat(tasksDir);
+    expect(stats.isDirectory()).toBe(true);
+  });
+
+  it('should create a task with a generated 6-char hex ID', async () => {
+    const taskData: Omit<TrackerTask, 'id'> = {
+      title: 'Test Task',
+      description: 'Test Description',
+      type: 'task',
+      status: 'open',
+      dependencies: [],
+    };
+
+    const task = await service.createTask(taskData);
+    expect(task.id).toMatch(/^[0-9a-f]{6}$/);
+    expect(task.title).toBe(taskData.title);
+
+    const savedTask = await service.getTask(task.id);
+    expect(savedTask).toEqual(task);
+  });
+
+  it('should list all tasks', async () => {
+    await service.createTask({
+      title: 'Task 1',
+      description: 'Desc 1',
+      type: 'task',
+      status: 'open',
+      dependencies: [],
+    });
+    await service.createTask({
+      title: 'Task 2',
+      description: 'Desc 2',
+      type: 'task',
+      status: 'open',
+      dependencies: [],
+    });
+
+    const tasks = await service.listTasks();
+    expect(tasks.length).toBe(2);
+    expect(tasks.map((t) => t.title)).toContain('Task 1');
+    expect(tasks.map((t) => t.title)).toContain('Task 2');
+  });
+
+  it('should update a task', async () => {
+    const task = await service.createTask({
+      title: 'Original Title',
+      description: 'Original Desc',
+      type: 'task',
+      status: 'open',
+      dependencies: [],
+    });
+
+    const updated = await service.updateTask(task.id, {
+      title: 'New Title',
+      status: 'in_progress',
+    });
+    expect(updated.title).toBe('New Title');
+    expect(updated.status).toBe('in_progress');
+    expect(updated.description).toBe('Original Desc');
+
+    const retrieved = await service.getTask(task.id);
+    expect(retrieved).toEqual(updated);
+  });
+
+  it('should prevent closing a task if dependencies are not closed', async () => {
+    const dep = await service.createTask({
+      title: 'Dependency',
+      description: 'Must be closed first',
+      type: 'task',
+      status: 'open',
+      dependencies: [],
+    });
+
+    const task = await service.createTask({
+      title: 'Main Task',
+      description: 'Depends on dep',
+      type: 'task',
+      status: 'open',
+      dependencies: [dep.id],
+    });
+
+    await expect(
+      service.updateTask(task.id, { status: 'closed' }),
+    ).rejects.toThrow(/Cannot close task/);
+
+    // Close dependency
+    await service.updateTask(dep.id, { status: 'closed' });
+
+    // Now it should work
+    const updated = await service.updateTask(task.id, { status: 'closed' });
+    expect(updated.status).toBe('closed');
+  });
+
+  it('should detect circular dependencies', async () => {
+    const taskA = await service.createTask({
+      title: 'Task A',
+      description: 'A',
+      type: 'task',
+      status: 'open',
+      dependencies: [],
+    });
+
+    const taskB = await service.createTask({
+      title: 'Task B',
+      description: 'B',
+      type: 'task',
+      status: 'open',
+      dependencies: [taskA.id],
+    });
+
+    // Try to make A depend on B
+    await expect(
+      service.updateTask(taskA.id, { dependencies: [taskB.id] }),
+    ).rejects.toThrow(/Circular dependency detected/);
+  });
+});
