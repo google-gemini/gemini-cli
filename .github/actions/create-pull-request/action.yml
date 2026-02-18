@@ -34,18 +34,22 @@ runs:
       if: "inputs.dry-run == 'false'"
       env:
         GH_TOKEN: '${{ inputs.github-token }}'
+        INPUTS_BRANCH_NAME: ${{ inputs.branch-name }}
+        INPUTS_PR_TITLE: ${{ inputs.pr-title }}
+        INPUTS_PR_BODY: ${{ inputs.pr-body }}
+        INPUTS_BASE_BRANCH: ${{ inputs.base-branch }}
       shell: 'bash'
       working-directory: '${{ inputs.working-directory }}'
       run: |
         set -e
-        if ! git ls-remote --exit-code --heads origin "${{ inputs.branch-name }}"; then
-          echo "::error::Branch '${{ inputs.branch-name }}' does not exist on the remote repository."
+        if ! git ls-remote --exit-code --heads origin "${INPUTS_BRANCH_NAME}"; then
+          echo "::error::Branch '${INPUTS_BRANCH_NAME}' does not exist on the remote repository."
           exit 1
         fi
         PR_URL=$(gh pr create \
-          --title "${{ inputs.pr-title }}" \
-          --body "${{ inputs.pr-body }}" \
-          --base "${{ inputs.base-branch }}" \
-          --head "${{ inputs.branch-name }}" \
+          --title "${INPUTS_PR_TITLE}" \
+          --body "${INPUTS_PR_BODY}" \
+          --base "${INPUTS_BASE_BRANCH}" \
+          --head "${INPUTS_BRANCH_NAME}" \
           --fill)
         gh pr merge "$PR_URL" --auto --squash

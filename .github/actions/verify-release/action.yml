@@ -51,7 +51,14 @@ runs:
       shell: 'bash'
       working-directory: './verify'
       run: |-
-        echo '❌ Got ${{ steps.gemini_cli.outputs.gemini_version }} from ${{ inputs.npm-package }}'
-        echo '❌ Expected Version ${{ inputs.expected-version }}'
+        echo '❌ Got ${STEPS_GEMINI_CLI_OUTPUTS_GEMINI_VERSION} from ${INPUTS_NPM_PACKAGE}'
+        echo '❌ Expected Version ${INPUTS_EXPECTED_VERSION}'
 
         exit 1
+
+      env:
+        STEPS_GEMINI_CLI_OUTPUTS_GEMINI_VERSION: ${{ steps.gemini_cli.outputs.gemini_version }}
+
+        INPUTS_NPM_PACKAGE: ${{ inputs.npm-package }}
+
+        INPUTS_EXPECTED_VERSION: ${{ inputs.expected-version }}
