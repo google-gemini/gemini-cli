@@ -6,8 +6,8 @@
 
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import { render } from '../../test-utils/render.js';
+import { act, useEffect } from 'react';
 import { Box, Text } from 'ink';
-import { useEffect } from 'react';
 import { Composer } from './Composer.js';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
 import {
@@ -34,6 +34,7 @@ import { StreamingState } from '../types.js';
 import { TransientMessageType } from '../../utils/events.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { SessionMetrics } from '../contexts/SessionContext.js';
+import type { TextBuffer } from './shared/text-buffer.js';
 
 const composerTestControls = vi.hoisted(() => ({
   suggestionsVisible: false,
@@ -809,6 +810,47 @@ describe('Composer', () => {
   });
 
   describe('Shortcuts Hint', () => {
+    it('restores shortcuts hint after 200ms debounce when text is cleared', async () => {
+      vi.useFakeTimers();
+
+      const { lastFrame, rerender } = await renderComposer(
+        createMockUIState({
+          buffer: { text: 'hello' } as unknown as TextBuffer,
+        }),
+      );
+
+      expect(lastFrame()).not.toContain('ShortcutsHint');
+
+      rerender(
+        <ConfigContext.Provider value={createMockConfig() as unknown as Config}>
+          <SettingsContext.Provider
+            value={createMockSettings() as unknown as LoadedSettings}
+          >
+            <UIStateContext.Provider
+              value={createMockUIState({
+                buffer: { text: '' } as unknown as TextBuffer,
+              })}
+            >
+              <UIActionsContext.Provider value={createMockUIActions()}>
+                <Composer />
+              </UIActionsContext.Provider>
+            </UIStateContext.Provider>
+          </SettingsContext.Provider>
+        </ConfigContext.Provider>,
+      );
+
+      // Still hidden immediately after clearing text due to debounce
+      expect(lastFrame()).not.toContain('ShortcutsHint');
+
+      // Fast forward past the 200ms debounce
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      expect(lastFrame()).toContain('ShortcutsHint');
+      vi.useRealTimers();
+    });
+
     it('hides shortcuts hint when showShortcutsHint setting is false', async () => {
       const uiState = createMockUIState();
       const settings = createMockSettings({
@@ -870,8 +912,7 @@ describe('Composer', () => {
 
     it('hides shortcuts hint when text is typed in buffer', async () => {
       const uiState = createMockUIState({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        buffer: { text: 'hello' } as any,
+        buffer: { text: 'hello' } as unknown as TextBuffer,
       });
 
       const { lastFrame } = await renderComposer(uiState);
