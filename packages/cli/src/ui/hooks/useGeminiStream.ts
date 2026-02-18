@@ -57,6 +57,7 @@ import type {
   HistoryItemThinking,
   HistoryItemWithoutId,
   HistoryItemToolGroup,
+  HistoryItemInfo,
   IndividualToolCallDisplay,
   SlashCommandProcessorResult,
   HistoryItemModel,
@@ -1623,7 +1624,7 @@ export const useGeminiStream = (
               color: theme.text.secondary,
               marginBottom: 1,
               text: ackText,
-            } as Omit<HistoryItem, 'id'>);
+            } as HistoryItemInfo);
           });
         }
       }

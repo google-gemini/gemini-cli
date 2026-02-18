@@ -2051,9 +2051,91 @@ describe('LocalAgentExecutor', () => {
         );
       });
 
-      it('should inject initial user hints into the first turn', async () => {
+      it('should inject user hints into the next turn after they are added', async () => {
         const definition = createTestDefinition();
+
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          configWithHints,
+        );
+
+        // Turn 1: Model calls LS
+        mockModelResponse(
+          [{ name: LS_TOOL_NAME, args: { path: '.' }, id: 'call1' }],
+          'T1: Listing',
+        );
+
+        // We use a manual promise to ensure the hint is added WHILE Turn 1 is "running"
+        let resolveToolCall: (value: unknown) => void;
+        const toolCallPromise = new Promise((resolve) => {
+          resolveToolCall = resolve;
+        });
+        mockScheduleAgentTools.mockReturnValueOnce(toolCallPromise);
+
+        // Turn 2: Model calls complete_task
+        mockModelResponse(
+          [
+            {
+              name: TASK_COMPLETE_TOOL_NAME,
+              args: { finalResult: 'Done' },
+              id: 'call2',
+            },
+          ],
+          'T2: Done',
+        );
+
+        const runPromise = executor.run({ goal: 'Hint test' }, signal);
+
+        // Give the loop a chance to start and register the listener
+        await vi.advanceTimersByTimeAsync(1);
+
         configWithHints.userHintService.addUserHint('Initial Hint');
+
+        // Resolve the tool call to complete Turn 1
+        resolveToolCall!([
+          {
+            status: 'success',
+            request: {
+              callId: 'call1',
+              name: LS_TOOL_NAME,
+              args: { path: '.' },
+              isClientInitiated: false,
+              prompt_id: 'p1',
+            },
+            tool: {} as AnyDeclarativeTool,
+            invocation: {} as AnyToolInvocation,
+            response: {
+              callId: 'call1',
+              resultDisplay: 'file1.txt',
+              responseParts: [
+                {
+                  functionResponse: {
+                    name: LS_TOOL_NAME,
+                    response: { result: 'file1.txt' },
+                    id: 'call1',
+                  },
+                },
+              ],
+            },
+          },
+        ]);
+
+        await runPromise;
+
+        // The first call to sendMessageStream should NOT contain the hint (it was added after start)
+        // The SECOND call to sendMessageStream SHOULD contain the hint
+        expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+        const secondTurnMessageParts = mockSendMessageStream.mock.calls[1][1];
+        expect(secondTurnMessageParts).toContainEqual(
+          expect.objectContaining({
+            text: expect.stringContaining('Initial Hint'),
+          }),
+        );
+      });
+
+      it('should NOT inject legacy hints added before executor was created', async () => {
+        const definition = createTestDefinition();
+        configWithHints.userHintService.addUserHint('Legacy Hint');
 
         const executor = await LocalAgentExecutor.create(
           definition,
@@ -2068,16 +2150,17 @@ describe('LocalAgentExecutor', () => {
           },
         ]);
 
-        await executor.run({ goal: 'Hint test' }, signal);
+        await executor.run({ goal: 'Isolation test' }, signal);
 
-        // The first call to sendMessageStream should contain the hint
+        // The first call to sendMessageStream should NOT contain the legacy hint
         expect(mockSendMessageStream).toHaveBeenCalled();
         const firstTurnMessageParts = mockSendMessageStream.mock.calls[0][1];
-        expect(firstTurnMessageParts).toContainEqual(
-          expect.objectContaining({
-            text: expect.stringContaining('Initial Hint'),
-          }),
-        );
+        // We expect only the goal, no hints injected at turn start
+        for (const part of firstTurnMessageParts) {
+          if (part.text) {
+            expect(part.text).not.toContain('Legacy Hint');
+          }
+        }
       });
 
       it('should inject mid-execution hints into subsequent turns', async () => {

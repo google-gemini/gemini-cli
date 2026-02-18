@@ -8,8 +8,8 @@
  * Service for managing user steering hints during a session.
  */
 export class UserHintService {
-  private userHints: Array<{ text: string; timestamp: number }> = [];
-  private userHintListeners: Set<(hint: string) => void> = new Set();
+  private readonly userHints: Array<{ text: string; timestamp: number }> = [];
+  private readonly userHintListeners: Set<(hint: string) => void> = new Set();
 
   constructor(private readonly isEnabled: () => boolean) {}
 
@@ -76,5 +76,12 @@ export class UserHintService {
       return null;
     }
     return this.userHints[this.userHints.length - 1].timestamp;
+  }
+
+  /**
+   * Clears all collected hints.
+   */
+  clear(): void {
+    this.userHints.length = 0;
   }
 }

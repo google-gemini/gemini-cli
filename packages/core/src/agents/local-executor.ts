@@ -469,10 +469,16 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       const hintListener = (hint: string) => {
         pendingHintsQueue.push(hint);
       };
+      // Capture the index of the last hint before starting to avoid re-injecting old hints.
+      // NOTE: Hints added AFTER this point will be broadcast to all currently running
+      // local agents via the listener below.
+      const startIndex =
+        this.runtimeContext.userHintService.getLatestHintIndex();
       this.runtimeContext.userHintService.onUserHint(hintListener);
 
       try {
-        const initialHints = this.runtimeContext.userHintService.getUserHints();
+        const initialHints =
+          this.runtimeContext.userHintService.getUserHintsAfter(startIndex);
         const formattedInitialHints = formatUserHintsForModel(initialHints);
 
         let currentMessage: Content = formattedInitialHints

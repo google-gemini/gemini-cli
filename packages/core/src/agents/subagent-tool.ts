@@ -66,6 +66,8 @@ export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
 }
 
 class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
+  private readonly startIndex: number;
+
   constructor(
     params: AgentInputs,
     private readonly definition: AgentDefinition,
@@ -80,6 +82,7 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
       _toolName ?? definition.name,
       _toolDisplayName ?? definition.displayName ?? definition.name,
     );
+    this.startIndex = config.userHintService.getLatestHintIndex();
   }
 
   getDescription(): string {
@@ -124,7 +127,9 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
       return agentArgs;
     }
 
-    const userHints = this.config.userHintService.getUserHints();
+    const userHints = this.config.userHintService.getUserHintsAfter(
+      this.startIndex,
+    );
     const formattedHints = formatUserHintsForModel(userHints);
     if (!formattedHints) {
       return agentArgs;

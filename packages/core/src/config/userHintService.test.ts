@@ -63,4 +63,15 @@ describe('UserHintService', () => {
 
     expect(listener).not.toHaveBeenCalled();
   });
+
+  it('should clear all hints', () => {
+    const service = new UserHintService(() => true);
+    service.addUserHint('hint 1');
+    service.addUserHint('hint 2');
+    expect(service.getUserHints()).toHaveLength(2);
+
+    service.clear();
+    expect(service.getUserHints()).toHaveLength(0);
+    expect(service.getLatestHintIndex()).toBe(-1);
+  });
 });
