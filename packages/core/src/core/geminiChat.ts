@@ -156,7 +156,43 @@ function validateHistory(history: Content[]) {
  * filters or recitation). Extracting valid turns from the history
  * ensures that subsequent requests could be accepted by the model.
  */
-function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
+
+/**
+ * Prunes the history to remove large tool outputs (like Greedy Grep context)
+ * after they have been seen by the model for one turn.
+ */
+function pruneHistory(history: Content[]): Content[] {
+  if (!history || history.length < 3) return history;
+
+  return history.map((content, index) => {
+    // Only prune user messages (which contain tool responses) that are older than the most recent one.
+    // Index < length - 2 ensures we keep the very latest tool response and the latest model thought.
+    if (content.role === 'user' && index < history.length - 2 && content.parts) {
+      const newParts = content.parts.map(part => {
+        if (part.functionResponse && part.functionResponse.name === 'grep_search') {
+          const output = (part.functionResponse.response as any)?.output || '';
+          if (output.includes('Match at line') && (output.includes('L') && output.includes('-'))) {
+             // This is a Greedy Grep output. Prune it.
+             const lines = output.split('\n');
+             const preservedLines = lines.filter(l => l.startsWith('Found') || l.startsWith('File:') || l.includes('> L'));
+             const prunedOutput = preservedLines.join('\n') + '\n[... context pruned for token efficiency ...]';
+             return {
+               ...part,
+               functionResponse: {
+                 ...part.functionResponse,
+                 response: { output: prunedOutput }
+               }
+             };
+          }
+        }
+        return part;
+      });
+      return { ...content, parts: newParts };
+    }
+    return content;
+  });
+}
+\nfunction extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
   if (comprehensiveHistory === undefined || comprehensiveHistory.length === 0) {
     return [];
   }
@@ -684,9 +720,13 @@ export class GeminiChat {
    * chat session.
    */
   getHistory(curated: boolean = false): Content[] {
-    const history = curated
+    let history = curated
       ? extractCuratedHistory(this.history)
       : this.history;
+    
+    // Prune history to remove large tool outputs after 1 turn
+    history = pruneHistory(history);
+
     // Deep copy the history to avoid mutating the history outside of the
     // chat session.
     return structuredClone(history);
