@@ -483,7 +483,10 @@ export class Session {
       const functionCalls: FunctionCall[] = [];
 
       try {
-        const model = resolveModel(this.config.getModel());
+        const model = resolveModel(
+          this.config.getModel(),
+          (await this.config.getGemini31Launched?.()) ?? false,
+        );
         const responseStream = await chat.sendMessageStream(
           { model },
           nextMessage?.parts ?? [],

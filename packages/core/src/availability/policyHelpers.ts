@@ -43,7 +43,10 @@ export function resolvePolicyChain(
   const configuredModel = config.getModel();
 
   let chain;
-  const resolvedModel = resolveModel(modelFromConfig);
+  const resolvedModel = resolveModel(
+    modelFromConfig,
+    config.getGemini31LaunchedSync?.() ?? false,
+  );
   const isAutoPreferred = preferredModel ? isAutoModel(preferredModel) : false;
   const isAutoConfigured = isAutoModel(configuredModel);
 

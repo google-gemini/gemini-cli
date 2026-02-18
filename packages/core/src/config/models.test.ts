@@ -23,6 +23,7 @@ import {
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL_AUTO,
+  isActiveModel,
 } from './models.js';
 
 describe('isGemini3Model', () => {
@@ -192,5 +193,26 @@ describe('resolveClassifierModel', () => {
     expect(
       resolveClassifierModel(PREVIEW_GEMINI_MODEL_AUTO, GEMINI_MODEL_ALIAS_PRO),
     ).toBe(PREVIEW_GEMINI_MODEL);
+  });
+});
+
+describe('isActiveModel', () => {
+  it('should return true for valid models when useGemini3_1 is false', () => {
+    expect(isActiveModel(DEFAULT_GEMINI_MODEL)).toBe(true);
+    expect(isActiveModel(PREVIEW_GEMINI_MODEL)).toBe(true);
+    expect(isActiveModel(DEFAULT_GEMINI_FLASH_MODEL)).toBe(true);
+  });
+
+  it('should return false for invalid models', () => {
+    expect(isActiveModel('invalid-model')).toBe(false);
+    expect(isActiveModel(GEMINI_MODEL_ALIAS_AUTO)).toBe(false);
+  });
+
+  it('should return false for PREVIEW_GEMINI_MODEL when useGemini3_1 is true', () => {
+    expect(isActiveModel(PREVIEW_GEMINI_MODEL, true)).toBe(false);
+  });
+
+  it('should return true for other valid models when useGemini3_1 is true', () => {
+    expect(isActiveModel(DEFAULT_GEMINI_MODEL, true)).toBe(true);
   });
 });
