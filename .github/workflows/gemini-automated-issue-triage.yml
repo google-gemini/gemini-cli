@@ -71,8 +71,10 @@ jobs:
         if: |-
           github.event_name == 'workflow_dispatch' && !contains(steps.get_issue_data.outputs.labels, 'status/need-triage')
         run: |
-          echo "Issue #${{ github.event.inputs.issue_number }} does not have the 'status/need-triage' label. Stopping workflow."
+          echo "Issue #${GITHUB_EVENT_INPUTS_ISSUE_NUMBER} does not have the 'status/need-triage' label. Stopping workflow."
           exit 1
+        env:
+          GITHUB_EVENT_INPUTS_ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
 
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
