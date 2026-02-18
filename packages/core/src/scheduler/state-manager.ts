@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Progress } from '@modelcontextprotocol/sdk/types.js';
 import type {
   ToolCall,
   Status,
@@ -45,12 +46,46 @@ export class SchedulerStateManager {
   private readonly activeCalls = new Map<string, ToolCall>();
   private readonly queue: ToolCall[] = [];
   private _completedBatch: CompletedToolCall[] = [];
+  private progressThrottleTimer: ReturnType<typeof setTimeout> | null = null;
+  private hasPendingProgressUpdate = false;
 
   constructor(
     private readonly messageBus: MessageBus,
     private readonly schedulerId: string = ROOT_SCHEDULER_ID,
     private readonly onTerminalCall?: TerminalCallHandler,
   ) {}
+
+  updateProgress(callId: string, progress: Progress): void {
+    const call = this.activeCalls.get(callId);
+    if (!call || call.status !== CoreToolCallStatus.Executing) return;
+
+    const updated = this.toExecuting(call, { mcpProgress: progress });
+    this.activeCalls.set(callId, updated);
+
+    if (!this.progressThrottleTimer) {
+      this.emitUpdate();
+      this.progressThrottleTimer = setTimeout(() => {
+        this.progressThrottleTimer = null;
+        if (this.hasPendingProgressUpdate) {
+          this.hasPendingProgressUpdate = false;
+          this.emitUpdate();
+        }
+      }, 100);
+    } else {
+      this.hasPendingProgressUpdate = true;
+    }
+  }
+
+  flushProgressThrottle(): void {
+    if (this.progressThrottleTimer) {
+      clearTimeout(this.progressThrottleTimer);
+      this.progressThrottleTimer = null;
+      if (this.hasPendingProgressUpdate) {
+        this.hasPendingProgressUpdate = false;
+        this.emitUpdate();
+      }
+    }
+  }
 
   addToolCalls(calls: ToolCall[]): void {
     this.enqueue(calls);
@@ -517,6 +552,9 @@ export class SchedulerStateManager {
       execData?.liveOutput ??
       ('liveOutput' in call ? call.liveOutput : undefined);
     const pid = execData?.pid ?? ('pid' in call ? call.pid : undefined);
+    const mcpProgress =
+      execData?.mcpProgress ??
+      ('mcpProgress' in call ? call.mcpProgress : undefined);
 
     return {
       request: call.request,
@@ -527,6 +565,7 @@ export class SchedulerStateManager {
       invocation: call.invocation,
       liveOutput,
       pid,
+      mcpProgress,
       schedulerId: call.schedulerId,
       approvalMode: call.approvalMode,
     };

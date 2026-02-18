@@ -25,7 +25,7 @@ import {
 } from '../config/models.js';
 import { ApprovalMode } from '../policy/types.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import type { CallableTool } from '@google/genai';
+import type { CallableToolWithProgress } from '../tools/mcp-client.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 // Mock tool names if they are dynamically generated or complex
@@ -442,7 +442,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
 
       const readOnlyMcpTool = new DiscoveredMCPTool(
-        {} as CallableTool,
+        {} as CallableToolWithProgress,
         'readonly-server',
         'read_static_value',
         'A read-only tool',
@@ -453,7 +453,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       );
 
       const nonReadOnlyMcpTool = new DiscoveredMCPTool(
-        {} as CallableTool,
+        {} as CallableToolWithProgress,
         'nonreadonly-server',
         'non_read_static_value',
         'A non-read-only tool',

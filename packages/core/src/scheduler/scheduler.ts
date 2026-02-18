@@ -39,6 +39,11 @@ import {
   type ToolConfirmationRequest,
 } from '../confirmation-bus/types.js';
 import { runWithToolCallContext } from '../utils/toolCallContext.js';
+import {
+  coreEvents,
+  CoreEvent,
+  type MCPToolProgressPayload,
+} from '../utils/events.js';
 
 interface SchedulerQueueItem {
   requests: ToolCallRequestInfo[];
@@ -504,51 +509,69 @@ export class Scheduler {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const activeCall = this.state.firstActiveCall as ExecutingToolCall;
 
-    const result = await runWithToolCallContext(
-      {
-        callId: activeCall.request.callId,
-        schedulerId: this.schedulerId,
-        parentCallId: this.parentCallId,
-      },
-      () =>
-        this.executor.execute({
-          call: activeCall,
-          signal,
-          outputUpdateHandler: (id, out) =>
-            this.state.updateStatus(id, CoreToolCallStatus.Executing, {
-              liveOutput: out,
-            }),
-          onUpdateToolCall: (updated) => {
-            if (
-              updated.status === CoreToolCallStatus.Executing &&
-              updated.pid
-            ) {
-              this.state.updateStatus(callId, CoreToolCallStatus.Executing, {
-                pid: updated.pid,
-              });
-            }
-          },
-        }),
-    );
+    const progressHandler = (payload: MCPToolProgressPayload) => {
+      if (payload.callId !== callId) return;
+      this.state.updateProgress(callId, {
+        progress: payload.progress,
+        total: payload.total,
+        message: payload.message,
+      });
+    };
+    coreEvents.on(CoreEvent.MCPToolProgress, progressHandler);
 
-    if (result.status === CoreToolCallStatus.Success) {
-      this.state.updateStatus(
-        callId,
-        CoreToolCallStatus.Success,
-        result.response,
+    try {
+      const result = await runWithToolCallContext(
+        {
+          callId: activeCall.request.callId,
+          schedulerId: this.schedulerId,
+          parentCallId: this.parentCallId,
+        },
+        () =>
+          this.executor.execute({
+            call: activeCall,
+            signal,
+            outputUpdateHandler: (id, out) =>
+              this.state.updateStatus(id, CoreToolCallStatus.Executing, {
+                liveOutput: out,
+              }),
+            onUpdateToolCall: (updated) => {
+              if (
+                updated.status === CoreToolCallStatus.Executing &&
+                updated.pid
+              ) {
+                this.state.updateStatus(callId, CoreToolCallStatus.Executing, {
+                  pid: updated.pid,
+                });
+              }
+            },
+          }),
       );
-    } else if (result.status === CoreToolCallStatus.Cancelled) {
-      this.state.updateStatus(
-        callId,
-        CoreToolCallStatus.Cancelled,
-        'Operation cancelled',
-      );
-    } else {
-      this.state.updateStatus(
-        callId,
-        CoreToolCallStatus.Error,
-        result.response,
-      );
+
+      coreEvents.off(CoreEvent.MCPToolProgress, progressHandler);
+      this.state.flushProgressThrottle();
+
+      if (result.status === CoreToolCallStatus.Success) {
+        this.state.updateStatus(
+          callId,
+          CoreToolCallStatus.Success,
+          result.response,
+        );
+      } else if (result.status === CoreToolCallStatus.Cancelled) {
+        this.state.updateStatus(
+          callId,
+          CoreToolCallStatus.Cancelled,
+          'Operation cancelled',
+        );
+      } else {
+        this.state.updateStatus(
+          callId,
+          CoreToolCallStatus.Error,
+          result.response,
+        );
+      }
+    } finally {
+      this.state.flushProgressThrottle();
+      coreEvents.off(CoreEvent.MCPToolProgress, progressHandler);
     }
   }
 

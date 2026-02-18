@@ -14,9 +14,8 @@ import {
   getMCPDiscoveryState,
   DiscoveredMCPTool,
   type MessageBus,
+  type CallableToolWithProgress,
 } from '@google/gemini-cli-core';
-
-import type { CallableTool } from '@google/genai';
 import { MessageType } from '../types.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -53,7 +52,7 @@ const createMockMCPTool = (
     {
       callTool: vi.fn(),
       tool: vi.fn(),
-    } as unknown as CallableTool,
+    } as unknown as CallableToolWithProgress,
     serverName,
     name,
     description || 'Mock tool description',

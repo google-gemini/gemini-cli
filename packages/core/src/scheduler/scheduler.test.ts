@@ -39,6 +39,7 @@ import {
   SchedulerStateManager,
   type TerminalCallHandler,
 } from './state-manager.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
 import { resolveConfirmation } from './confirmation.js';
 import { checkPolicy, updatePolicy } from './policy.js';
 import { ToolExecutor } from './tool-executor.js';
@@ -177,6 +178,8 @@ describe('Scheduler (Orchestrator)', () => {
       setOutcome: vi.fn(),
       cancelAllQueued: vi.fn(),
       clearBatch: vi.fn(),
+      updateProgress: vi.fn(),
+      flushProgressThrottle: vi.fn(),
     } as unknown as Mocked<SchedulerStateManager>;
 
     // Define getters for accessors idiomatically
@@ -1240,6 +1243,129 @@ describe('Scheduler (Orchestrator)', () => {
       expect(capturedContext!.callId).toBe(req1.callId);
       expect(capturedContext!.schedulerId).toBe(schedulerId);
       expect(capturedContext!.parentCallId).toBe(parentCallId);
+    });
+  });
+
+  describe('MCPToolProgress integration', () => {
+    const setupExecution = () => {
+      const validatingCall: ValidatingToolCall = {
+        status: CoreToolCallStatus.Validating,
+        request: req1,
+        tool: mockTool,
+        invocation: mockInvocation as unknown as AnyToolInvocation,
+      };
+
+      Object.defineProperty(mockStateManager, 'queueLength', {
+        get: vi.fn().mockReturnValueOnce(1).mockReturnValue(0),
+        configurable: true,
+      });
+      Object.defineProperty(mockStateManager, 'isActive', {
+        get: vi.fn().mockReturnValue(false),
+        configurable: true,
+      });
+      vi.mocked(mockStateManager.dequeue).mockReturnValueOnce(validatingCall);
+      Object.defineProperty(mockStateManager, 'firstActiveCall', {
+        get: vi.fn().mockReturnValue(validatingCall),
+        configurable: true,
+      });
+    };
+
+    it('should call state.updateProgress when MCPToolProgress fires for matching callId', async () => {
+      setupExecution();
+      mockExecutor.execute.mockImplementation(async () => {
+        coreEvents.emit(CoreEvent.MCPToolProgress, {
+          callId: req1.callId,
+          serverName: 'test-server',
+          toolName: 'test-tool',
+          progress: 50,
+          total: 100,
+          message: 'halfway',
+        });
+        return {
+          status: CoreToolCallStatus.Success,
+        } as unknown as SuccessfulToolCall;
+      });
+
+      await scheduler.schedule(req1, signal);
+
+      expect(mockStateManager.updateProgress).toHaveBeenCalledWith('call-1', {
+        progress: 50,
+        total: 100,
+        message: 'halfway',
+      });
+    });
+
+    it('should ignore MCPToolProgress events for other callIds', async () => {
+      setupExecution();
+      mockExecutor.execute.mockImplementation(async () => {
+        coreEvents.emit(CoreEvent.MCPToolProgress, {
+          callId: 'other-call-id',
+          serverName: 'test-server',
+          toolName: 'test-tool',
+          progress: 50,
+          total: 100,
+        });
+        return {
+          status: CoreToolCallStatus.Success,
+        } as unknown as SuccessfulToolCall;
+      });
+
+      await scheduler.schedule(req1, signal);
+
+      expect(mockStateManager.updateProgress).not.toHaveBeenCalled();
+    });
+
+    it('should clean up progress listener after execution', async () => {
+      setupExecution();
+      mockExecutor.execute.mockResolvedValue({
+        status: CoreToolCallStatus.Success,
+      } as unknown as SuccessfulToolCall);
+
+      await scheduler.schedule(req1, signal);
+
+      // Emit after execution - should NOT trigger updateProgress
+      mockStateManager.updateProgress.mockClear();
+      coreEvents.emit(CoreEvent.MCPToolProgress, {
+        callId: req1.callId,
+        serverName: 'test-server',
+        toolName: 'test-tool',
+        progress: 99,
+        total: 100,
+      });
+
+      expect(mockStateManager.updateProgress).not.toHaveBeenCalled();
+    });
+
+    it('should call flushProgressThrottle before terminal transition', async () => {
+      setupExecution();
+      mockExecutor.execute.mockResolvedValue({
+        status: CoreToolCallStatus.Success,
+      } as unknown as SuccessfulToolCall);
+
+      await scheduler.schedule(req1, signal);
+
+      expect(mockStateManager.flushProgressThrottle).toHaveBeenCalled();
+    });
+
+    it('should call flushProgressThrottle and clean up listener on throw path', async () => {
+      setupExecution();
+      mockExecutor.execute.mockRejectedValue(new Error('execution failed'));
+
+      await scheduler.schedule(req1, signal);
+
+      expect(mockStateManager.flushProgressThrottle).toHaveBeenCalled();
+
+      // Emit after failure - should NOT trigger updateProgress
+      mockStateManager.updateProgress.mockClear();
+      coreEvents.emit(CoreEvent.MCPToolProgress, {
+        callId: req1.callId,
+        serverName: 'test-server',
+        toolName: 'test-tool',
+        progress: 99,
+        total: 100,
+      });
+
+      expect(mockStateManager.updateProgress).not.toHaveBeenCalled();
     });
   });
 });

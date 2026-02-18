@@ -25,11 +25,15 @@ import { WorkspaceContext } from '../utils/workspaceContext.js';
 import {
   connectToMcpServer,
   createTransport,
+  discoverTools,
   hasNetworkTransport,
   isEnabled,
   McpClient,
   populateMcpServerCommand,
 } from './mcp-client.js';
+import type { DiscoveredMCPToolInvocation } from './mcp-tool.js';
+import { MCPServerConfig } from '../config/config.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { ResourceRegistry } from '../resources/resource-registry.js';
 import * as fs from 'node:fs';
@@ -57,6 +61,7 @@ vi.mock('../utils/events.js', () => ({
   coreEvents: {
     emitFeedback: vi.fn(),
     emitConsoleLog: vi.fn(),
+    emitMCPToolProgress: vi.fn(),
   },
 }));
 
@@ -2263,5 +2268,79 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
     expect(client).toBe(mockedClient);
     expect(mockedClient.connect).toHaveBeenCalledTimes(3);
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
+  });
+});
+
+describe('McpCallableTool SDK options forwarding (integration)', () => {
+  let mockSdkCallTool: ReturnType<typeof vi.fn>;
+  let tools: Awaited<ReturnType<typeof discoverTools>>;
+
+  beforeEach(async () => {
+    mockSdkCallTool = vi.fn().mockResolvedValue({
+      content: [{ type: 'text', text: 'done' }],
+    });
+
+    const mockedSdkClient = {
+      getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
+      listTools: vi.fn().mockResolvedValue({
+        tools: [
+          {
+            name: 'test-tool',
+            description: 'A test tool',
+            inputSchema: { type: 'object', properties: {} },
+          },
+        ],
+      }),
+      callTool: mockSdkCallTool,
+    };
+
+    const mockConfig = {
+      getPolicyEngine: vi.fn().mockReturnValue({ addRule: vi.fn() }),
+      sanitizationConfig: EMPTY_CONFIG,
+    } as unknown as Config;
+
+    const mockMessageBus = {
+      publish: vi.fn(),
+      on: vi.fn(),
+      off: vi.fn(),
+      emit: vi.fn(),
+    } as unknown as MessageBus;
+
+    tools = await discoverTools(
+      'test-server',
+      new MCPServerConfig('test-cmd'),
+      mockedSdkClient as unknown as ClientLib.Client,
+      mockConfig,
+      mockMessageBus,
+    );
+
+    expect(tools).toHaveLength(1);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should forward onprogress to SDK client.callTool when invocation has callId', async () => {
+    const invocation = tools[0].build({}) as DiscoveredMCPToolInvocation;
+    invocation.setCallId('call-123');
+    await invocation.execute(new AbortController().signal);
+
+    expect(mockSdkCallTool).toHaveBeenCalledWith(
+      { name: 'test-tool', arguments: {} },
+      undefined,
+      expect.objectContaining({
+        onprogress: expect.any(Function),
+        resetTimeoutOnProgress: true,
+      }),
+    );
+  });
+
+  it('should not pass onprogress when callId is not set', async () => {
+    const invocation = tools[0].build({});
+    await invocation.execute(new AbortController().signal);
+
+    const callOptions = mockSdkCallTool.mock.calls[0][2];
+    expect(callOptions.onprogress).toBeUndefined();
   });
 });

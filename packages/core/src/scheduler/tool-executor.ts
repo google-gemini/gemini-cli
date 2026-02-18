@@ -58,6 +58,8 @@ export class ToolExecutor {
     }
     const { tool, invocation } = call;
 
+    invocation?.setCallId?.(callId);
+
     // Setup live output handling
     const liveOutputCallback =
       tool.canUpdateOutput && outputUpdateHandler

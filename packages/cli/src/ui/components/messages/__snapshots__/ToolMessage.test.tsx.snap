@@ -81,6 +81,16 @@ exports[`<ToolMessage /> > renders DiffRenderer for diff results 1`] = `
 │ 1 + new                                                                      │"
 `;
 
+exports[`<ToolMessage /> > renders MCPProgressIndicator when executing with progress 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ MockRespondingSpinnertest-tool A tool for testing                            │
+│                                                                              │
+│                                                                              │
+│ ████████████████░░░░░░░░░░░░░░░░ 50%                                         │
+│ Processing...                                                                │
+│ Test result                                                                  │"
+`;
+
 exports[`<ToolMessage /> > renders basic tool information 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool A tool for testing                                              │

@@ -1,0 +1,32 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MCPProgressIndicator > clamps progress exceeding total 1`] = `
+"
+████████████████████ 100%"
+`;
+
+exports[`MCPProgressIndicator > renders determinate progress bar at 50% 1`] = `
+"
+██████████░░░░░░░░░░ 50%"
+`;
+
+exports[`MCPProgressIndicator > renders fully complete progress bar 1`] = `
+"
+████████████████████ 100%"
+`;
+
+exports[`MCPProgressIndicator > renders indeterminate progress without total 1`] = `
+"
+█████░░░░░░░░░░░░░░░ 5"
+`;
+
+exports[`MCPProgressIndicator > renders progress message when provided 1`] = `
+"
+██████████░░░░░░░░░░ 50%
+Downloading..."
+`;
+
+exports[`MCPProgressIndicator > scales bar width correctly 1`] = `
+"
+████████████████████░░░░░░░░░░░░░░░░░░░░ 50%"
+`;

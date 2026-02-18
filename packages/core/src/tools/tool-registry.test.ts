@@ -14,7 +14,8 @@ import { ApprovalMode } from '../policy/types.js';
 import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
 import { DISCOVERED_TOOL_PREFIX } from './tool-names.js';
 import { DiscoveredMCPTool, MCP_QUALIFIED_NAME_SEPARATOR } from './mcp-tool.js';
-import type { FunctionDeclaration, CallableTool } from '@google/genai';
+import type { FunctionDeclaration } from '@google/genai';
+import type { CallableToolWithProgress } from './mcp-client.js';
 import { mcpToTool } from '@google/genai';
 import { spawn } from 'node:child_process';
 
@@ -106,10 +107,9 @@ vi.mock('./tool-names.js', async (importOriginal) => {
   };
 });
 
-// Helper to create a mock CallableTool for specific test needs
 const createMockCallableTool = (
   toolDeclarations: FunctionDeclaration[],
-): Mocked<CallableTool> => ({
+): Mocked<CallableToolWithProgress> => ({
   tool: vi.fn().mockResolvedValue({ functionDeclarations: toolDeclarations }),
   callTool: vi.fn(),
 });
@@ -125,7 +125,7 @@ const createMCPTool = (
   serverName: string,
   toolName: string,
   description: string,
-  mockCallable: CallableTool = {} as CallableTool,
+  mockCallable: CallableToolWithProgress = {} as CallableToolWithProgress,
 ) =>
   new DiscoveredMCPTool(
     mockCallable,
