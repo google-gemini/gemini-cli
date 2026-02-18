@@ -313,7 +313,7 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       // Greedy Grep: If match count is low and no context was requested, automatically return context.
       if (
-        matchCount <= 3 &&
+        matchCount === 1 &&
         matchCount > 0 &&
         !this.params.names_only &&
         !this.params.context &&
@@ -340,10 +340,10 @@ class GrepToolInvocation extends BaseToolInvocation<
             const newFileMatches: GrepMatch[] = [];
             const seenLines = new Set<number>();
             for (const match of fileMatches) {
-              const startLine = Math.max(0, match.lineNumber - 1 - 15);
+              const startLine = Math.max(0, match.lineNumber - 1 - 50);
               const endLine = Math.min(
                 fileLines.length,
-                match.lineNumber - 1 + 15 + 1,
+                match.lineNumber - 1 + 50 + 1,
               );
               for (let i = startLine; i < endLine; i++) {
                 if (!seenLines.has(i + 1)) {

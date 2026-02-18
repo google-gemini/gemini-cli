@@ -311,7 +311,7 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       llmContent += `:\n---\n`;
 
-      if (matchCount <= 3 && matchCount > 0 && !this.params.names_only) {
+      if (matchCount === 1 && matchCount > 0 && !this.params.names_only) {
         for (const filePath in matchesByFile) {
           const fileMatches = matchesByFile[filePath];
           let fileLines: string[] | null = null;
@@ -332,10 +332,10 @@ class GrepToolInvocation extends BaseToolInvocation<
 
           for (const match of fileMatches) {
             if (fileLines) {
-              const startLine = Math.max(0, match.lineNumber - 1 - 15);
+              const startLine = Math.max(0, match.lineNumber - 1 - 50);
               const endLine = Math.min(
                 fileLines.length,
-                match.lineNumber - 1 + 15 + 1,
+                match.lineNumber - 1 + 50 + 1,
               );
               const contextLines = fileLines.slice(startLine, endLine);
 
