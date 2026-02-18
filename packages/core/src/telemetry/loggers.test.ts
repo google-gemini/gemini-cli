@@ -93,6 +93,7 @@ import {
   EVENT_EXTENSION_UPDATE,
   HookCallEvent,
   EVENT_HOOK_CALL,
+  LlmRole,
 } from './types.js';
 import * as metrics from './metrics.js';
 import { FileOperation } from './metrics.js';
@@ -520,6 +521,30 @@ describe('loggers', () => {
         'event.timestamp': '2025-01-01T00:00:00.000Z',
       });
     });
+
+    it('should log an API response with a role', () => {
+      const event = new ApiResponseEvent(
+        'test-model',
+        100,
+        { prompt_id: 'prompt-id-role', contents: [] },
+        { candidates: [] },
+        AuthType.LOGIN_WITH_GOOGLE,
+        {},
+        'test-response',
+        LlmRole.SUBAGENT,
+      );
+
+      logApiResponse(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'API response from test-model. Status: 200. Duration: 100ms.',
+        attributes: expect.objectContaining({
+          'event.name': EVENT_API_RESPONSE,
+          prompt_id: 'prompt-id-role',
+          role: 'subagent',
+        }),
+      });
+    });
   });
 
   describe('logApiError', () => {
@@ -652,6 +677,30 @@ describe('loggers', () => {
         ...event,
         'event.name': EVENT_API_ERROR,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
+      });
+    });
+
+    it('should log an API error with a role', () => {
+      const event = new ApiErrorEvent(
+        'test-model',
+        'error',
+        100,
+        { prompt_id: 'prompt-id-role', contents: [] },
+        AuthType.LOGIN_WITH_GOOGLE,
+        'ApiError',
+        503,
+        LlmRole.SUBAGENT,
+      );
+
+      logApiError(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'API error for test-model. Error: error. Duration: 100ms.',
+        attributes: expect.objectContaining({
+          'event.name': EVENT_API_ERROR,
+          prompt_id: 'prompt-id-role',
+          role: 'subagent',
+        }),
       });
     });
   });
@@ -914,6 +963,26 @@ describe('loggers', () => {
         attributes: expect.objectContaining({
           'event.name': 'gen_ai.client.inference.operation.details',
           'gen_ai.request.model': 'my-custom-model',
+        }),
+      });
+    });
+
+    it('should log an API request with a role', () => {
+      const event = new ApiRequestEvent(
+        'test-model',
+        { prompt_id: 'prompt-id-role', contents: [] },
+        'request text',
+        LlmRole.SUBAGENT,
+      );
+
+      logApiRequest(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'API request to test-model.',
+        attributes: expect.objectContaining({
+          'event.name': EVENT_API_REQUEST,
+          prompt_id: 'prompt-id-role',
+          role: 'subagent',
         }),
       });
     });

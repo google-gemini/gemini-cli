@@ -43,7 +43,8 @@ import {
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import type { SlashCommandProcessorResult } from '../types.js';
-import { MessageType, StreamingState, ToolCallStatus } from '../types.js';
+import { MessageType, StreamingState } from '../types.js';
+
 import type { LoadedSettings } from '../../config/settings.js';
 
 // --- MOCKS ---
@@ -159,13 +160,17 @@ vi.mock('./useLogger.js', () => ({
 
 const mockStartNewPrompt = vi.fn();
 const mockAddUsage = vi.fn();
-vi.mock('../contexts/SessionContext.js', () => ({
-  useSessionStats: vi.fn(() => ({
-    startNewPrompt: mockStartNewPrompt,
-    addUsage: mockAddUsage,
-    getPromptCount: vi.fn(() => 5),
-  })),
-}));
+vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    useSessionStats: vi.fn(() => ({
+      startNewPrompt: mockStartNewPrompt,
+      addUsage: mockAddUsage,
+      getPromptCount: vi.fn(() => 5),
+    })),
+  };
+});
 
 vi.mock('./slashCommandProcessor.js', () => ({
   handleSlashCommand: vi.fn().mockReturnValue(false),
@@ -2380,7 +2385,7 @@ describe('useGeminiStream', () => {
                 callId: 'client-read-123',
                 name: 'read_file',
                 description: toolExecutionMessage,
-                status: ToolCallStatus.Success,
+                status: CoreToolCallStatus.Success,
                 resultDisplay: toolExecutionMessage,
                 confirmationDetails: undefined,
               },
@@ -2434,7 +2439,7 @@ describe('useGeminiStream', () => {
           tools: expect.arrayContaining([
             expect.objectContaining({
               name: 'read_file',
-              status: ToolCallStatus.Success,
+              status: CoreToolCallStatus.Success,
             }),
           ]),
         }),

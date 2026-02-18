@@ -29,7 +29,7 @@ or if we have to deviate from it. Our weekly releases will be minor version
 increments and any bug or hotfixes between releases will go out as patch
 versions on the most recent release.
 
-Each Tuesday ~2000 UTC new Stable and Preview releases will be cut. The
+Each Tuesday ~20:00 UTC new Stable and Preview releases will be cut. The
 promotion flow is:
 
 - Code is committed to main and pushed each night to nightly
@@ -58,7 +58,7 @@ npm install -g @google/gemini-cli@latest
 
 ### Nightly
 
-- New releases will be published each day at UTC 0000. This will be all changes
+- New releases will be published each day at UTC 00:00. This will be all changes
   from the main branch as represented at time of release. It should be assumed
   there are pending validations and issues. Use `nightly` tag.
 

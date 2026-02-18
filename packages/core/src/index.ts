@@ -28,6 +28,7 @@ export * from './commands/memory.js';
 export * from './commands/types.js';
 
 // Export Core Logic
+export * from './core/baseLlmClient.js';
 export * from './core/client.js';
 export * from './core/contentGenerator.js';
 export * from './core/loggingContentGenerator.js';
@@ -88,6 +89,7 @@ export * from './utils/formatters.js';
 export * from './utils/generateContentResponseUtilities.js';
 export * from './utils/filesearch/fileSearch.js';
 export * from './utils/errorParsing.js';
+export * from './utils/fastAckHelper.js';
 export * from './utils/workspaceContext.js';
 export * from './utils/environmentContext.js';
 export * from './utils/ignorePatterns.js';
@@ -158,6 +160,7 @@ export * from './tools/read-many-files.js';
 export * from './tools/mcp-client.js';
 export * from './tools/mcp-tool.js';
 export * from './tools/write-todos.js';
+export * from './tools/activate-skill.js';
 export * from './tools/ask-user.js';
 
 // MCP OAuth
