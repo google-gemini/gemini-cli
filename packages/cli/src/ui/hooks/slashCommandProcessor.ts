@@ -13,6 +13,7 @@ import {
 } from 'react';
 import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
+import path from 'node:path';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import type {
   Config,
@@ -543,6 +544,23 @@ export const useSlashCommandProcessor = (
                   return { type: 'handled' };
                 }
                 case 'quit':
+                  if (result.deleteSession) {
+                    try {
+                      const chatRecordingService = config
+                        ?.getGeminiClient()
+                        ?.getChatRecordingService();
+                      if (chatRecordingService) {
+                        const filePath =
+                          chatRecordingService.getConversationFilePath();
+                        if (filePath) {
+                          const fileBaseName = path.basename(filePath, '.json');
+                          chatRecordingService.deleteSession(fileBaseName);
+                        }
+                      }
+                    } catch {
+                      // Don't let deletion errors prevent exit.
+                    }
+                  }
                   actions.quit(result.messages);
                   return { type: 'handled' };
 

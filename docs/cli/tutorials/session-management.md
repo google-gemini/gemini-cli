@@ -61,6 +61,19 @@ gemini --list-sessions
 gemini --delete-session 1
 ```
 
+### Scenario: Exiting without leaving traces
+
+If you're doing a one-off task and don't want to leave any session history
+behind, use the `--delete` flag when exiting:
+
+```
+/exit --delete
+```
+
+This removes the current session's conversation history and tool output files
+before exiting. It's useful for privacy-sensitive tasks or quick one-off
+interactions.
+
 ## How to rewind time (Undo mistakes)
 
 Gemini CLI's **Rewind** feature is like `Ctrl+Z` for your workflow.

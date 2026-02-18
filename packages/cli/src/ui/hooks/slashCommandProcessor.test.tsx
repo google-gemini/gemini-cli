@@ -721,6 +721,116 @@ describe('useSlashCommandProcessor', () => {
 
       expect(mockSetQuittingMessages).toHaveBeenCalledWith(['bye']);
     });
+
+    it('should delete the current session when quit action has deleteSession flag', async () => {
+      const mockDeleteSession = vi.fn();
+      const mockGetConversationFilePath = vi
+        .fn()
+        .mockReturnValue('/tmp/chats/session-2025-01-01T10-00-abcd1234.json');
+
+      const mockClient = {
+        getChatRecordingService: vi.fn().mockReturnValue({
+          deleteSession: mockDeleteSession,
+          getConversationFilePath: mockGetConversationFilePath,
+        }),
+      } as unknown as GeminiClient;
+      vi.spyOn(mockConfig, 'getGeminiClient').mockReturnValue(mockClient);
+
+      const quitAction = vi.fn().mockResolvedValue({
+        type: 'quit',
+        deleteSession: true,
+        messages: ['bye'],
+      });
+      const command = createTestCommand({
+        name: 'exit',
+        action: quitAction,
+      });
+      const result = await setupProcessorHook({
+        builtinCommands: [command],
+      });
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/exit --delete');
+      });
+
+      expect(mockDeleteSession).toHaveBeenCalledWith(
+        'session-2025-01-01T10-00-abcd1234',
+      );
+      expect(mockSetQuittingMessages).toHaveBeenCalledWith(['bye']);
+    });
+
+    it('should not delete session when quit action does not have deleteSession flag', async () => {
+      const mockDeleteSession = vi.fn();
+      const mockClient = {
+        getChatRecordingService: vi.fn().mockReturnValue({
+          deleteSession: mockDeleteSession,
+          getConversationFilePath: vi
+            .fn()
+            .mockReturnValue('/tmp/chats/session.json'),
+        }),
+      } as unknown as GeminiClient;
+      vi.spyOn(mockConfig, 'getGeminiClient').mockReturnValue(mockClient);
+
+      const quitAction = vi.fn().mockResolvedValue({
+        type: 'quit',
+        messages: ['bye'],
+      });
+      const command = createTestCommand({
+        name: 'exit',
+        action: quitAction,
+      });
+      const result = await setupProcessorHook({
+        builtinCommands: [command],
+      });
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/exit');
+      });
+
+      expect(mockDeleteSession).not.toHaveBeenCalled();
+      expect(mockSetQuittingMessages).toHaveBeenCalledWith(['bye']);
+    });
+
+    it('should still quit even if session deletion fails', async () => {
+      const mockClient = {
+        getChatRecordingService: vi.fn().mockReturnValue({
+          deleteSession: vi.fn().mockImplementation(() => {
+            throw new Error('Deletion failed');
+          }),
+          getConversationFilePath: vi
+            .fn()
+            .mockReturnValue('/tmp/chats/session.json'),
+        }),
+      } as unknown as GeminiClient;
+      vi.spyOn(mockConfig, 'getGeminiClient').mockReturnValue(mockClient);
+
+      const quitAction = vi.fn().mockResolvedValue({
+        type: 'quit',
+        deleteSession: true,
+        messages: ['bye'],
+      });
+      const command = createTestCommand({
+        name: 'exit',
+        action: quitAction,
+      });
+      const result = await setupProcessorHook({
+        builtinCommands: [command],
+      });
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/exit --delete');
+      });
+
+      // Should still quit even though deletion threw
+      expect(mockSetQuittingMessages).toHaveBeenCalledWith(['bye']);
+    });
+
     it('should handle "submit_prompt" action returned from a file-based command', async () => {
       const fileCommand = createTestCommand(
         {

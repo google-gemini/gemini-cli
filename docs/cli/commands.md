@@ -245,6 +245,11 @@ Slash commands provide meta-level control over the CLI itself.
 ### `/quit` (or `/exit`)
 
 - **Description:** Exit Gemini CLI.
+- **Flags:**
+  - **`--delete`**: Exit and permanently delete the current session's history
+    and temporary files (chat recording, tool outputs). Useful for privacy or
+    one-off tasks where you don't want to leave any traces.
+  - **Usage:** `/quit --delete` or `/exit --delete`
 
 ### `/restore`
 
