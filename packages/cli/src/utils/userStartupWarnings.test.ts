@@ -13,7 +13,7 @@ import {
   isFolderTrustEnabled,
   isWorkspaceTrusted,
 } from '../config/trustedFolders.js';
-import { getCompatibilityWarnings } from './compatibility.js';
+import { getCompatibilityWarnings } from '@google/gemini-cli-core';
 
 // Mock os.homedir to control the home directory in tests
 vi.mock('os', async (importOriginal) => {
@@ -24,16 +24,13 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
-vi.mock('./compatibility.js', () => ({
-  getCompatibilityWarnings: vi.fn().mockReturnValue([]),
-}));
-
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
     homedir: () => os.homedir(),
+    getCompatibilityWarnings: vi.fn().mockReturnValue([]),
   };
 });
 
@@ -56,11 +53,12 @@ describe('getUserStartupWarnings', () => {
       isTrusted: false,
       source: undefined,
     });
+    vi.mocked(getCompatibilityWarnings).mockReturnValue([]);
   });
 
   afterEach(async () => {
     await fs.rm(testRootDir, { recursive: true, force: true });
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe('home directory check', () => {

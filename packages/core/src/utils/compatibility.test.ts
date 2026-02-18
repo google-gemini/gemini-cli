@@ -25,6 +25,7 @@ describe('compatibility', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
   });
 

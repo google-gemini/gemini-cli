@@ -7,13 +7,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
-import { homedir } from '@google/gemini-cli-core';
+import { homedir, getCompatibilityWarnings } from '@google/gemini-cli-core';
 import type { Settings } from '../config/settingsSchema.js';
 import {
   isFolderTrustEnabled,
   isWorkspaceTrusted,
 } from '../config/trustedFolders.js';
-import { getCompatibilityWarnings } from './compatibility.js';
 
 type WarningCheck = {
   id: string;
