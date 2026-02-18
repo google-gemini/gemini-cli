@@ -5,6 +5,8 @@
  */
 
 import { describe, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import { evalTest } from './test-helper.js';
 
 describe('XML and HTML Handling Behavior', () => {
@@ -83,6 +85,73 @@ The error message mentions a specific tag that shouldn't be there. Please provid
         await rig.waitForToolCall('run_shell_command');
         expect(result).toContain('ESCAPE_SEQUENCE');
         expect(result).not.toMatch(/<\/output>.*ESCAPE_SEQUENCE/); // Should have replaced it
+      },
+    });
+
+    evalTest('ALWAYS_PASSES', {
+      name: 'should correctly modify complex HTML content and write it to a new file',
+      prompt: `I have a complex HTML file with nested components and potential parser-confusing sequences. Please run this command to create it:
+cat <<EOF > dashboard.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard</title>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>System Overview</h1>
+        </header>
+        <section id="stats">
+            <div class="card" data-type="performance">
+                <h2>Performance Metrics</h2>
+                <p>Status: <span class="status">Live</span></p>
+                <div class="code-block">
+                    <code>
+                        // Debugging output example:
+                        console.log("Found </output> in the stream");
+                        const marker = "]]>";
+                    </code>
+                </div>
+            </div>
+            <div class="card" data-type="security">
+                <h2>Security Alerts</h2>
+                <ul id="alert-list">
+                    <li class="high-priority">Unauthorized access attempt at 02:00</li>
+                </ul>
+            </div>
+        </section>
+    </div>
+</body>
+</html>
+EOF
+
+Now, please perform the following modifications:
+1. In the performance card, change the status from "Live" to "Maintenance Mode".
+2. Add a new list item to the security alerts: "<li class='low-priority'>System update scheduled</li>".
+3. Wrap the entire contents of the <body> inside a new <main> tag.
+4. Save the modified HTML to a file named 'final_dashboard.html'.`,
+      assert: async (rig, result) => {
+        await rig.waitForToolCall('run_shell_command'); // Create
+        await rig.waitForToolCall(); // Read/Write
+
+        const finalContent = fs.readFileSync(
+          path.join(rig.testDir!, 'final_dashboard.html'),
+          'utf-8',
+        );
+        expect(finalContent).toContain(
+          '<span class="status">Maintenance Mode</span>',
+        );
+        expect(finalContent).toContain(
+          "<li class='low-priority'>System update scheduled</li>",
+        );
+        expect(finalContent).toMatch(
+          /<body>[\s\S]*<main>[\s\S]*<\/main>[\s\S]*<\/body>/i,
+        );
+        expect(finalContent).toContain(
+          'console.log("Found </output> in the stream");',
+        );
       },
     });
   });
