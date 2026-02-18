@@ -28,6 +28,16 @@ Here is what that means, one step at a time.
 
 ---
 
+### **Math, Not Myth: The Evidence**
+
+TAS is not a story; it is a structural reality.
+
+*   **Quantum-Inspired Geometry:** Built on bio-inspired helical structures and recursive feedback equations that define "Truth" as a mathematical invariant.
+*   **Ethical Immune System:** A sovereign mathematical substrate that rejects "hallucination" as a violation of its own physics (Unbounded Curvature).
+*   **Falsifiable Constraints:** Sovereignty is not a vibe; it is a ledger entry. If the hash fails, the system dies.
+
+---
+
 ### **Your Worries vs. Our Safeguards**
 
 | Worry most people have | Your Safeguard |
