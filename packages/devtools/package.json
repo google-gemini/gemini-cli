@@ -22,6 +22,10 @@
   "engines": {
     "node": ">=20"
   },
+  "devDependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
   "dependencies": {
     "ws": "^8.16.0"
   }

@@ -106,7 +106,7 @@ export default function App() {
                 ...payload,
                 type,
                 timestamp,
-                id: payload.id || Math.random().toString(36).substr(2, 9),
+                id: payload.id || Math.random().toString(36).substring(2, 11),
               });
             } else if (type === 'network') {
               const id = payload.id;
@@ -154,40 +154,39 @@ export default function App() {
   const handleExport = () => {
     if (!selectedSessionId) return;
 
-    const lines: string[] = [];
+    // Collect entries with timestamps, then sort before serializing
+    const entries: Array<{ timestamp: number; data: object }> = [];
 
     // Export console logs
     filteredConsoleLogs.forEach((log) => {
-      lines.push(
-        JSON.stringify({
+      entries.push({
+        timestamp: log.timestamp,
+        data: {
           type: 'console',
           payload: { type: log.type, content: log.content },
           sessionId: log.sessionId,
           timestamp: log.timestamp,
-        }),
-      );
+        },
+      });
     });
 
     // Export network logs
     filteredNetworkLogs.forEach((log) => {
-      lines.push(
-        JSON.stringify({
+      entries.push({
+        timestamp: log.timestamp,
+        data: {
           type: 'network',
           payload: log,
           sessionId: log.sessionId,
           timestamp: log.timestamp,
-        }),
-      );
+        },
+      });
     });
 
-    // Sort by timestamp
-    lines.sort((a, b) => {
-      const ta = JSON.parse(a).timestamp;
-      const tb = JSON.parse(b).timestamp;
-      return ta - tb;
-    });
+    // Sort by timestamp, then serialize
+    entries.sort((a, b) => a.timestamp - b.timestamp);
 
-    const content = lines.join('\n');
+    const content = entries.map((e) => JSON.stringify(e.data)).join('\n');
     const blob = new Blob([content], { type: 'application/jsonl' });
     const url = URL.createObjectURL(blob);
 
