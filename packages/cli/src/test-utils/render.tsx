@@ -146,9 +146,8 @@ class XtermStdout extends EventEmitter {
     }
 
     // Normalize for cross-platform snapshot stability:
-    // 1. Convert backslashes to forward slashes (common for paths)
-    // 2. Normalize any \r\n to \n
-    const normalized = result.replace(/\\/g, '/').replace(/\r\n/g, '\n');
+    // Normalize any \r\n to \n
+    const normalized = result.replace(/\r\n/g, '\n');
 
     if (normalized === '' && !options.allowEmpty) {
       throw new Error(
@@ -200,7 +199,6 @@ class XtermStdout extends EventEmitter {
         (this.lastRenderStaticContent ?? '') + (this.lastRenderOutput ?? ''),
       )
         .trim()
-        .replace(/\\/g, '/')
         .replace(/\r\n/g, '\n');
 
       lastCurrent = currentFrame;

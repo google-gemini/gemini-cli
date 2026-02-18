@@ -58,7 +58,8 @@ exports[`ToolConfirmationQueue > provides more height for ask_user by subtractin
 │   2.  Enter a custom value                                                   │
 │                                                                              │
 │ Enter to select · ↑/↓ to navigate · Esc to cancel                            │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`ToolConfirmationQueue > renders AskUser tool confirmation with Success color 1`] = `

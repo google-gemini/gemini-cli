@@ -375,8 +375,8 @@ describe('<ToolMessage />', () => {
     unmount();
   });
 
-  it('renders progress information appended to description for executing tools', () => {
-    const { lastFrame } = renderWithContext(
+  it('renders progress information appended to description for executing tools', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithContext(
       <ToolMessage
         {...baseProps}
         status={CoreToolCallStatus.Executing}
@@ -385,13 +385,15 @@ describe('<ToolMessage />', () => {
       />,
       StreamingState.Responding,
     );
+    await waitUntilReady();
     expect(lastFrame()).toContain(
       'A tool for testing (Working on it... - 42%)',
     );
+    unmount();
   });
 
-  it('renders only percentage when progressMessage is missing', () => {
-    const { lastFrame } = renderWithContext(
+  it('renders only percentage when progressMessage is missing', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithContext(
       <ToolMessage
         {...baseProps}
         status={CoreToolCallStatus.Executing}
@@ -399,6 +401,8 @@ describe('<ToolMessage />', () => {
       />,
       StreamingState.Responding,
     );
+    await waitUntilReady();
     expect(lastFrame()).toContain('A tool for testing (75%)');
+    unmount();
   });
 });
