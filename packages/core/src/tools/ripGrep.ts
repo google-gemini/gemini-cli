@@ -387,10 +387,9 @@ class GrepToolInvocation extends BaseToolInvocation<
 
     if (fixed_strings) {
       rgArgs.push('--fixed-strings');
-      rgArgs.push(pattern);
-    } else {
-      rgArgs.push('--regexp', pattern);
     }
+
+    rgArgs.push('--regexp', pattern);
 
     if (context) {
       rgArgs.push('--context', context.toString());
