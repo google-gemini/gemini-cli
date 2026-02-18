@@ -36,8 +36,7 @@ command.
   the Gemini model.
 
 This command is useful for verifying which tools are active, especially when
-using custom tools via [MCP servers](../tools/mcp-server.md) or
-[extensions](../extensions/index.md).
+using custom tools.
 
 ## Environment tools
 
