@@ -11,6 +11,7 @@ import { isNodeError } from '../utils/errors.js';
 import { exec } from 'node:child_process';
 import { simpleGit, SimpleGit, CheckRepoActions } from 'simple-git';
 import { getProjectHash, GEMINI_DIR } from '../utils/paths.js';
+import { validateTransition, Proof } from '../governance/physics.js';
 
 export class GitService {
   private projectRoot: string;
@@ -106,6 +107,22 @@ export class GitService {
 
   async createFileSnapshot(message: string): Promise<string> {
     const repo = this.shadowGitRepository;
+
+    // --- The Phoenix Protocol: Code Injection ---
+    // Enforce the Iff Operator before crystallization (commit).
+    const currentDrift = 0.01; // Placeholder: In a real system, this measures entropy.
+    const proof: Proof = {
+      lineageId: await this.getCurrentCommitHash(),
+      kappa: 1.0, // Standard structural integrity
+      timestamp: Date.now(),
+      witnesses: ['TAS_ENFORCER']
+    };
+
+    if (!validateTransition(proof, currentDrift)) {
+      throw new Error('MAGNETIC QUENCH: Hamiltonian Drift Check Failed. Transition Denied.');
+    }
+    // -------------------------------------------
+
     await repo.add('.');
     const commitResult = await repo.commit(message);
     return commitResult.commit;
