@@ -63,8 +63,9 @@ jobs:
         id: 'version'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GITHUB_EVENT_INPUTS_TYPE: ${{ github.event.inputs.type }}
         run: |-
-          VERSION_JSON="$(node scripts/get-release-version.js --type=patch --patch-from=${{ github.event.inputs.type }})"
+          VERSION_JSON="$(node scripts/get-release-version.js --type=patch --patch-from=${GITHUB_EVENT_INPUTS_TYPE})"
           echo "${VERSION_JSON}"
           echo "RELEASE_TAG=$(echo "${VERSION_JSON}" | jq -r .releaseTag)" >> "${GITHUB_OUTPUT}"
           echo "RELEASE_VERSION=$(echo "${VERSION_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
@@ -73,7 +74,9 @@ jobs:
 
       - name: 'Print Calculated Version'
         run: |-
-          echo "Calculated version: ${{ steps.version.outputs.RELEASE_VERSION }}"
+          echo "Calculated version: ${STEPS_VERSION_OUTPUTS_RELEASE_VERSION}"
+        env:
+          STEPS_VERSION_OUTPUTS_RELEASE_VERSION: ${{ steps.version.outputs.RELEASE_VERSION }}
 
       - name: 'Run Tests'
         uses: './.github/actions/run-tests'
