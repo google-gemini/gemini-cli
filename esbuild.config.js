@@ -23,6 +23,19 @@ const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 const pkg = require(path.resolve(__dirname, 'package.json'));
 
+const punycodePath = path.resolve(
+  __dirname,
+  'node_modules/punycode/punycode.js',
+);
+const punycodePlugin = {
+  name: 'punycode-userland',
+  setup(build) {
+    build.onResolve({ filter: /^punycode$/ }, () => ({
+      path: punycodePath,
+    }));
+  },
+};
+
 function createWasmPlugins() {
   const wasmBinaryPlugin = {
     name: 'wasm-binary',
@@ -85,7 +98,7 @@ const cliConfig = {
   define: {
     'process.env.CLI_VERSION': JSON.stringify(pkg.version),
   },
-  plugins: createWasmPlugins(),
+  plugins: [punycodePlugin, ...createWasmPlugins()],
   alias: {
     'is-in-ci': path.resolve(__dirname, 'packages/cli/src/patches/is-in-ci.ts'),
   },
@@ -102,7 +115,7 @@ const a2aServerConfig = {
   define: {
     'process.env.CLI_VERSION': JSON.stringify(pkg.version),
   },
-  plugins: createWasmPlugins(),
+  plugins: [punycodePlugin, ...createWasmPlugins()],
 };
 
 Promise.allSettled([
