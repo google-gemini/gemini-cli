@@ -23,6 +23,8 @@ To standardize the process of updating changelog files (`latest.md`,
 ## Guidelines for `latest.md` and `preview.md` Highlights
 
 - Aim for **3-5 key highlight points**.
+- Each highlight point must start with a bold-typed title that summarizes the
+  change (e.g., `**New Feature:** A brief description...`).
 - **Prioritize** summarizing new features over other changes like bug fixes or
   chores.
 - **Avoid** mentioning features that are "experimental" or "in preview" in
@@ -65,6 +67,8 @@ detailed **highlights** section for the release-specific page.
 
 1.  **Create the Announcement for `index.md`**:
     -   Generate a concise announcement summarizing the most important changes.
+        Each announcement entry must start with a bold-typed title that
+        summarizes the change.
     -   **Important**: The format for this announcement is unique. You **must**
         use the existing announcements in `docs/changelogs/index.md` and the
         example within
