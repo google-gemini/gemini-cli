@@ -53,6 +53,7 @@ jobs:
         id: 'versions'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GITHUB_EVENT_INPUTS_REF: ${{ github.event.inputs.ref }}
         run: |
           set -e
           STABLE_JSON=$(node scripts/get-release-version.js --type=stable)
@@ -64,7 +65,7 @@ jobs:
           echo "PREVIOUS_STABLE_TAG=$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           echo "PREVIEW_VERSION=$(echo "${PREVIEW_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           # shellcheck disable=SC1083
-          echo "PREVIEW_SHA=$(git rev-parse '${{ github.event.inputs.ref }}'^{commit})" >> "${GITHUB_OUTPUT}"
+          echo "PREVIEW_SHA=$(git rev-parse '${GITHUB_EVENT_INPUTS_REF}'^{commit})" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_PREVIEW_TAG=$(echo "${PREVIEW_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           echo "NEXT_NIGHTLY_VERSION=$(echo "${NIGHTLY_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_NIGHTLY_TAG=$(echo "${NIGHTLY_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
@@ -75,14 +76,24 @@ jobs:
       - name: 'Display Pending Updates'
         run: |
           echo "Pending Changes:"
-          echo "  Nightly: ${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }} -> ${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}"
-          echo "  Preview: ${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }} -> ${{ steps.versions.outputs.PREVIEW_VERSION }}"
-          echo "  Stable:  ${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }} -> ${{ steps.versions.outputs.STABLE_VERSION }}"
+          echo "  Nightly: ${STEPS_VERSIONS_OUTPUTS_PREVIOUS_NIGHTLY_TAG} -> ${STEPS_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION}"
+          echo "  Preview: ${STEPS_VERSIONS_OUTPUTS_PREVIOUS_PREVIEW_TAG} -> ${STEPS_VERSIONS_OUTPUTS_PREVIEW_VERSION}"
+          echo "  Stable:  ${STEPS_VERSIONS_OUTPUTS_PREVIOUS_STABLE_TAG} -> ${STEPS_VERSIONS_OUTPUTS_STABLE_VERSION}"
           echo ""
           echo "Relevant SHAs:"
-          echo "  Current (Stable):  ${{ steps.versions.outputs.STABLE_SHA }}"
-          echo "  Current (Preview): ${{ steps.versions.outputs.PREVIEW_SHA }}"
-          echo "  Next (to be promoted): ${{ steps.versions.outputs.NEXT_SHA }}"
+          echo "  Current (Stable):  ${STEPS_VERSIONS_OUTPUTS_STABLE_SHA}"
+          echo "  Current (Preview): ${STEPS_VERSIONS_OUTPUTS_PREVIEW_SHA}"
+          echo "  Next (to be promoted): ${STEPS_VERSIONS_OUTPUTS_NEXT_SHA}"
+        env:
+          STEPS_VERSIONS_OUTPUTS_PREVIOUS_NIGHTLY_TAG: ${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }}
+          STEPS_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION: ${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}
+          STEPS_VERSIONS_OUTPUTS_PREVIOUS_PREVIEW_TAG: ${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }}
+          STEPS_VERSIONS_OUTPUTS_PREVIEW_VERSION: ${{ steps.versions.outputs.PREVIEW_VERSION }}
+          STEPS_VERSIONS_OUTPUTS_PREVIOUS_STABLE_TAG: ${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }}
+          STEPS_VERSIONS_OUTPUTS_STABLE_VERSION: ${{ steps.versions.outputs.STABLE_VERSION }}
+          STEPS_VERSIONS_OUTPUTS_STABLE_SHA: ${{ steps.versions.outputs.STABLE_SHA }}
+          STEPS_VERSIONS_OUTPUTS_PREVIEW_SHA: ${{ steps.versions.outputs.PREVIEW_SHA }}
+          STEPS_VERSIONS_OUTPUTS_NEXT_SHA: ${{ steps.versions.outputs.NEXT_SHA }}
 
   test:
     name: 'Test ${{ matrix.channel }}'
@@ -214,17 +225,22 @@ jobs:
       - name: 'Create and switch to a new branch'
         id: 'release_branch'
         run: |
-          BRANCH_NAME="chore/nightly-version-bump-${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"
+          BRANCH_NAME="chore/nightly-version-bump-${NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION}"
           git switch -c "${BRANCH_NAME}"
           echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
+        env:
+          NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION: ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}
 
       - name: 'Update package versions'
-        run: 'npm run release:version "${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"'
+        run: 'npm run release:version "${NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION}"'
+        env:
+          NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION: ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}
 
       - name: 'Commit and Push package versions'
         env:
           BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
           DRY_RUN: '${{ github.event.inputs.dry_run }}'
+          NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION: ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}
         run: |-
           git add package.json packages/*/package.json
           if [ -f npm-shrinkwrap.json ]; then
@@ -233,7 +249,7 @@ jobs:
           if [ -f package-lock.json ]; then
             git add package-lock.json
           fi
-          git commit -m "chore(release): bump version to ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"
+          git commit -m "chore(release): bump version to ${NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION}"
           if [[ "${DRY_RUN}" == "false" ]]; then
             echo "Pushing release branch to remote..."
             git push --set-upstream origin "${BRANCH_NAME}"
@@ -247,9 +263,10 @@ jobs:
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+          NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION: ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}
         run: |
           gh pr create \
-            --title "chore(release): bump version to ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}" \
+            --title "chore(release): bump version to ${NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION}" \
             --body "Automated version bump to prepare for the next nightly release." \
             --base "main" \
             --head "${BRANCH_NAME}" \

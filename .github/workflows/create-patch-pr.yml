@@ -50,9 +50,14 @@ jobs:
         if: "github.event.inputs.channel == 'stable'"
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-        run: 'node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=stable --dry-run=${{ github.event.inputs.dry_run }}'
+          GITHUB_EVENT_INPUTS_COMMIT: ${{ github.event.inputs.commit }}
+          GITHUB_EVENT_INPUTS_DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: 'node scripts/create-patch-pr.js --commit=${GITHUB_EVENT_INPUTS_COMMIT} --channel=stable --dry-run=${GITHUB_EVENT_INPUTS_DRY_RUN}'
 
       - name: 'Create Patch for Preview'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-        run: 'node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }}'
+          GITHUB_EVENT_INPUTS_COMMIT: ${{ github.event.inputs.commit }}
+          GITHUB_EVENT_INPUTS_CHANNEL: ${{ github.event.inputs.channel }}
+          GITHUB_EVENT_INPUTS_DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: 'node scripts/create-patch-pr.js --commit=${GITHUB_EVENT_INPUTS_COMMIT} --channel=${GITHUB_EVENT_INPUTS_CHANNEL} --dry-run=${GITHUB_EVENT_INPUTS_DRY_RUN}'
