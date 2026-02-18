@@ -115,7 +115,6 @@ export interface UIState {
   isFolderTrustDialogOpen: boolean;
   isPolicyUpdateDialogOpen: boolean;
   policyUpdateConfirmationRequest: PolicyUpdateConfirmationRequest | undefined;
-  isRestartingPolicyUpdate: boolean;
   isTrustedFolder: boolean | undefined;
   constrainHeight: boolean;
   showErrorDetails: boolean;

@@ -167,16 +167,12 @@ export const DialogManager = ({
       />
     );
   }
-  if (
-    uiState.isPolicyUpdateDialogOpen &&
-    uiState.policyUpdateConfirmationRequest
-  ) {
+  if (uiState.isPolicyUpdateDialogOpen) {
     return (
       <PolicyUpdateDialog
-        onSelect={uiActions.handlePolicyUpdateSelect}
-        scope={uiState.policyUpdateConfirmationRequest.scope}
-        identifier={uiState.policyUpdateConfirmationRequest.policyDir}
-        isRestarting={uiState.isRestartingPolicyUpdate}
+        config={config}
+        request={uiState.policyUpdateConfirmationRequest!}
+        onClose={() => uiActions.setIsPolicyUpdateDialogOpen(false)}
       />
     );
   }
