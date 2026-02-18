@@ -64,9 +64,29 @@ export class PromptProvider {
     const contextFilenames = getAllGeminiMdFilenames();
 
     // --- Context Gathering ---
-    let planModeToolsList = PLAN_MODE_TOOLS.filter((t) =>
-      enabledToolNames.has(t),
-    )
+    const allowedTools = new Set<string>(PLAN_MODE_TOOLS);
+
+    // Dynamically include tools allowed by policy in Plan Mode
+    // The default Plan Mode restriction is priority 60 in Tier 1 (approx 1.06).
+    // Any rule with priority > 1.1 (e.g. Tier 2/User rules) that allows a tool in Plan Mode should make that tool visible.
+    const policyEngine = config.getPolicyEngine();
+    const rules = policyEngine.getRules();
+    for (const rule of rules) {
+      const appliesToPlan =
+        !rule.modes || rule.modes.includes(ApprovalMode.PLAN);
+      // Priority is transformed: Tier 1 (1.xxx), Tier 2 (2.xxx).
+      // We want to respect any user policy (Tier 2+) or high-priority default policy.
+      const isHighPriority = (rule.priority ?? 0) > 1.1;
+      const isAllowOrAsk =
+        rule.decision === 'allow' || rule.decision === 'ask_user';
+
+      if (appliesToPlan && isHighPriority && isAllowOrAsk && rule.toolName) {
+        allowedTools.add(rule.toolName);
+      }
+    }
+
+    let planModeToolsList = Array.from(allowedTools)
+      .filter((t) => enabledToolNames.has(t))
       .map((t) => `  <tool>\`${t}\`</tool>`)
       .join('\n');
 
@@ -172,7 +192,7 @@ export class PromptProvider {
           'planningWorkflow',
           () => ({
             planModeToolsList,
-            plansDir: config.storage.getProjectTempPlansDir(),
+            plansDir: config.getPlanDirectory(),
             approvedPlanPath: config.getApprovedPlanPath(),
           }),
           isPlanMode,

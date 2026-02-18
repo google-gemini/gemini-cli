@@ -24,6 +24,7 @@ export async function createPolicyEngineConfig(
   settings: Settings,
   approvalMode: ApprovalMode,
   workspacePoliciesDir?: string,
+  workspaceDir?: string,
 ): Promise<PolicyEngineConfig> {
   // Explicitly construct PolicySettings from Settings to ensure type safety
   // and avoid accidental leakage of other settings properties.
@@ -35,7 +36,12 @@ export async function createPolicyEngineConfig(
     workspacePoliciesDir,
   };
 
-  return createCorePolicyEngineConfig(policySettings, approvalMode);
+  return createCorePolicyEngineConfig(
+    policySettings,
+    approvalMode,
+    undefined,
+    workspaceDir,
+  );
 }
 
 export function createPolicyUpdater(

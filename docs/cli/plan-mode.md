@@ -119,7 +119,8 @@ from writing to your custom directory by the default safety policies.
 #### 1. Configure the directory in `settings.json`
 
 Add the `plan.directory` setting to your `~/.gemini/settings.json` file. This
-path can be **absolute** or **relative** to your project root.
+path can be **absolute** or **relative** to your project root, and **can be
+located outside your project directory**.
 
 ```json
 {
@@ -144,8 +145,8 @@ passed to the tool.
 [[rule]]
 toolName = ["write_file", "replace"]
 # Allow writing to any path within the "conductor/" directory
-# This regex matches a relative path.
-argsPattern = "\"(?:file_path|path)\":\"conductor/[^\"]+\""
+# This regex matches both relative ("conductor/file") and absolute ("/path/to/conductor/file") paths.
+argsPattern = "\"(?:file_path|path)\":\"(?:.*\/)?conductor/[^\"]+\""
 decision = "allow"
 priority = 100
 modes = ["plan"]
@@ -153,15 +154,20 @@ modes = ["plan"]
 
 **Relative vs. Absolute Paths:**
 
-- **Relative Paths:** If you use a relative path like `"conductor"` in
-  `settings.json`, the agent will typically use `conductor/plan.md`. Your
-  `argsPattern` should reflect this relative structure.
-- **Absolute Paths:** If you use an absolute path like `"/usr/local/plans"`,
-  your `argsPattern` must match that absolute path:
-  `\"(?:file_path|path)\":\"/usr/local/plans/[^\"]+\"`.
+- **Best Practice:** Use a regex that handles both relative and absolute paths
+  by making the prefix optional:
+  `\"(?:file_path|path)\":\"(?:.*\/)?conductor/[^\"]+\"`.
+- **Relative Paths:** If the agent uses a relative path (e.g.,
+  `conductor/plan.md`), the regex `conductor/` matches.
+- **Absolute Paths:** If the agent uses an absolute path (e.g.,
+  `/abs/path/to/conductor/plan.md`), the regex `.*/conductor/` matches.
 
-> **Tip:** For Windows users, the regex pattern must match double-backslashes in
-> the JSON-stringified arguments: `conductor\\\\[^"]+`.
+> **Tip:** If you choose a directory inside your project, you should add it to
+> your `.gitignore` file to avoid accidentally committing temporary plans to
+> version control.
+
+> **Tip:** For Windows users, you may need to adjust the regex to match
+> backslashes.
 
 ### Customizing Planning with Skills
 

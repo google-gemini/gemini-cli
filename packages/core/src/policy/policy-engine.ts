@@ -319,6 +319,16 @@ export class PolicyEngine {
       `[PolicyEngine.check] toolCall.name: ${toolCall.name}, stringifiedArgs: ${stringifiedArgs}`,
     );
 
+    if (toolCall.name === 'write_file') {
+      for (const rule of this.rules) {
+        if (!rule.toolName || rule.toolName === 'write_file') {
+          debugLogger.debug(
+            `  - [Rule Dump] Tool=${rule.toolName}, P=${rule.priority}, Decision=${rule.decision}, Source=${rule.source}, Pattern=${rule.argsPattern}`,
+          );
+        }
+      }
+    }
+
     // Check for shell commands upfront to handle splitting
     let isShellCommand = false;
     let command: string | undefined;

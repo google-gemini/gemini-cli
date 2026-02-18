@@ -31,6 +31,7 @@ import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 
 import { isDirectorySecure } from '../utils/security.js';
+import { GEMINI_DIR } from '../utils/paths.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -72,6 +73,9 @@ export function getPolicyDirectories(
   if (workspacePoliciesDir) {
     dirs.push(workspacePoliciesDir);
   }
+
+  // Admin tier (highest priority)
+  dirs.push(Storage.getSystemPoliciesDir());
 
   // Default tier (lowest priority)
   dirs.push(defaultPoliciesDir ?? DEFAULT_CORE_POLICIES_DIR);
@@ -167,11 +171,20 @@ export async function createPolicyEngineConfig(
   settings: PolicySettings,
   approvalMode: ApprovalMode,
   defaultPoliciesDir?: string,
+  workspaceDir?: string,
 ): Promise<PolicyEngineConfig> {
+  const workspacePoliciesDir = workspaceDir
+    ? path.join(workspaceDir, GEMINI_DIR, 'policies')
+    : undefined;
+
   const policyDirs = getPolicyDirectories(
     defaultPoliciesDir,
     settings.policyPaths,
+<<<<<<< HEAD
     settings.workspacePoliciesDir,
+=======
+    workspacePoliciesDir,
+>>>>>>> 45fcd9869 (Fix: Enable write_file in Plan Mode via workspace policy)
   );
   const securePolicyDirs = await filterSecurePolicyDirectories(policyDirs);
 

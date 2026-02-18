@@ -114,6 +114,10 @@ describe('Core System Prompt (prompts.ts)', () => {
       }),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
+      getPlanDirectory: vi.fn().mockReturnValue('/tmp/project-temp/plans'),
+      getPolicyEngine: vi.fn().mockReturnValue({
+        getRules: vi.fn().mockReturnValue([]),
+      }),
     } as unknown as Config;
   });
 
@@ -401,6 +405,10 @@ describe('Core System Prompt (prompts.ts)', () => {
           getSkills: vi.fn().mockReturnValue([]),
         }),
         getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
+        getPlanDirectory: vi.fn().mockReturnValue('/tmp/project-temp/plans'),
+        getPolicyEngine: vi.fn().mockReturnValue({
+          getRules: vi.fn().mockReturnValue([]),
+        }),
       } as unknown as Config;
 
       const prompt = getCoreSystemPrompt(testConfig);
@@ -512,6 +520,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         vi.mocked(mockConfig.storage.getProjectTempPlansDir).mockReturnValue(
           '/tmp/plans',
         );
+        vi.mocked(mockConfig.getPlanDirectory).mockReturnValue('/tmp/plans');
       });
 
       it('should include approved plan path when set in config', () => {
@@ -551,6 +560,96 @@ describe('Core System Prompt (prompts.ts)', () => {
       );
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).not.toContain('# Autonomous Mode (YOLO)');
+    });
+  });
+
+  describe('Dynamic Plan Mode Tools', () => {
+    beforeEach(() => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+      // Default: no extra rules
+      mockConfig.getPolicyEngine = vi.fn().mockReturnValue({
+        getRules: vi.fn().mockReturnValue([]),
+      });
+      // Ensure write_file is "enabled" in registry but not in PLAN_MODE_TOOLS by default
+      vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([
+        'write_file',
+        'glob',
+        'replace',
+      ]);
+    });
+
+    it('should NOT include write_file by default in Plan Mode', () => {
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain('<tool>`glob`</tool>');
+      expect(prompt).not.toContain('<tool>`write_file`</tool>');
+    });
+
+    it('should include write_file if allowed by a high-priority user policy', () => {
+      vi.mocked(mockConfig.getPolicyEngine().getRules).mockReturnValue([
+        {
+          toolName: 'write_file',
+          decision: 'allow',
+          priority: 2.1, // Tier 2 (User)
+          modes: [ApprovalMode.PLAN],
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ] as any);
+
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain('<tool>`write_file`</tool>');
+    });
+
+    it('should include write_file if allowed by a high-priority policy with global mode', () => {
+      vi.mocked(mockConfig.getPolicyEngine().getRules).mockReturnValue([
+        {
+          toolName: 'write_file',
+          decision: 'allow',
+          priority: 2.1,
+          modes: undefined, // Applies to all modes
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ] as any);
+
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain('<tool>`write_file`</tool>');
+    });
+
+    it('should NOT include write_file if allowed by a low-priority policy (below Plan Mode restriction)', () => {
+      vi.mocked(mockConfig.getPolicyEngine().getRules).mockReturnValue([
+        {
+          toolName: 'write_file',
+          decision: 'allow',
+          priority: 1.05, // Lower than 1.06 (Default Plan Mode Restriction)
+          modes: [ApprovalMode.PLAN],
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ] as any);
+
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain('<tool>`write_file`</tool>');
+    });
+
+    it('should include multiple tools if allowed by policy', () => {
+      // This simulates toml-loader flattening ["write_file", "replace"] into two rules
+      vi.mocked(mockConfig.getPolicyEngine().getRules).mockReturnValue([
+        {
+          toolName: 'write_file',
+          decision: 'allow',
+          priority: 2.1,
+          modes: [ApprovalMode.PLAN],
+        },
+        {
+          toolName: 'replace',
+          decision: 'allow',
+          priority: 2.1,
+          modes: [ApprovalMode.PLAN],
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ] as any);
+
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain('<tool>`write_file`</tool>');
+      expect(prompt).toContain('<tool>`replace`</tool>');
     });
   });
 

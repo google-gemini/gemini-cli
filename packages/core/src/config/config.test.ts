@@ -2691,15 +2691,13 @@ describe('Plan Directory', () => {
     expect(config.getPlanDirectory()).toBe(absolutePath);
   });
 
-  it('should fallback to default plans directory when configured path is outside workspace', () => {
+  it('should return the configured path even when it is outside the workspace', () => {
     const outsidePath = '/outside/workspace/plans';
     const params: ConfigParameters = {
       ...baseParams,
       planDirectory: outsidePath,
     };
     const config = new Config(params);
-    expect(config.getPlanDirectory()).toBe(
-      config.storage.getProjectTempPlansDir(),
-    );
+    expect(config.getPlanDirectory()).toBe(outsidePath);
   });
 });
