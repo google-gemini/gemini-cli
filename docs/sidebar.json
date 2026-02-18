@@ -19,6 +19,10 @@
         "slug": "docs/cli/tutorials/file-management"
       },
       {
+        "label": "Get started with Agent skills",
+        "slug": "docs/cli/tutorials/skills-getting-started"
+      },
+      {
         "label": "Manage context and memory",
         "slug": "docs/cli/tutorials/memory-management"
       },
@@ -37,10 +41,6 @@
       {
         "label": "Web search and fetch",
         "slug": "docs/cli/tutorials/web-tools"
-      },
-      {
-        "label": "Get started with Agent skills",
-        "slug": "docs/cli/tutorials/skills-getting-started"
       },
       {
         "label": "Set up an MCP server",
@@ -74,6 +74,7 @@
       { "label": "Model routing", "slug": "docs/cli/model-routing" },
       { "label": "Model selection", "slug": "docs/cli/model" },
       { "label": "Plan mode", "badge": "🧪", "slug": "docs/cli/plan-mode" },
+      { "label": "Subagents", "badge": "🧪", "slug": "docs/core/subagents" },
       {
         "label": "Remote subagents",
         "badge": "🧪",
@@ -90,7 +91,6 @@
         "label": "Stats",
         "link": "/docs/cli/commands/#stats"
       },
-      { "label": "Subagents", "slug": "docs/core/subagents" },
       { "label": "Telemetry", "slug": "docs/cli/telemetry" },
       { "label": "Token caching", "slug": "docs/cli/token-caching" },
       { "label": "Tools", "link": "/docs/cli/commands/#tools" }
