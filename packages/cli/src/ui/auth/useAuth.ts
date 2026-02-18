@@ -34,12 +34,16 @@ export function validateAuthMethodWithSettings(
   return validateAuthMethod(authType);
 }
 
-export const useAuthCommand = (settings: LoadedSettings, config: Config) => {
+export const useAuthCommand = (
+  settings: LoadedSettings,
+  config: Config,
+  initialAuthError: string | null = null,
+) => {
   const [authState, setAuthState] = useState<AuthState>(
-    AuthState.Unauthenticated,
+    initialAuthError ? AuthState.Updating : AuthState.Unauthenticated,
   );
 
-  const [authError, setAuthError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(initialAuthError);
   const [apiKeyDefaultValue, setApiKeyDefaultValue] = useState<
     string | undefined
   >(undefined);
@@ -109,6 +113,7 @@ export const useAuthCommand = (settings: LoadedSettings, config: Config) => {
       const defaultAuthType = process.env['GEMINI_DEFAULT_AUTH_TYPE'];
       if (
         defaultAuthType &&
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         !Object.values(AuthType).includes(defaultAuthType as AuthType)
       ) {
         onAuthError(

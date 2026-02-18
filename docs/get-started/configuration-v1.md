@@ -166,19 +166,21 @@ a few things you can try in order of recommendation:
   - **Default:** All tools available for use by the Gemini model.
   - **Example:** `"coreTools": ["ReadFileTool", "GlobTool", "ShellTool(ls)"]`.
 
-- **`allowedTools`** (array of strings):
+- **`allowedTools`** (array of strings) [DEPRECATED]:
   - **Default:** `undefined`
   - **Description:** A list of tool names that will bypass the confirmation
     dialog. This is useful for tools that you trust and use frequently. The
-    match semantics are the same as `coreTools`.
+    match semantics are the same as `coreTools`. **Deprecated**: Use the
+    [Policy Engine](../core/policy-engine.md) instead.
   - **Example:** `"allowedTools": ["ShellTool(git status)"]`.
 
-- **`excludeTools`** (array of strings):
+- **`excludeTools`** (array of strings) [DEPRECATED]:
   - **Description:** Allows you to specify a list of core tool names that should
     be excluded from the model. A tool listed in both `excludeTools` and
     `coreTools` is excluded. You can also specify command-specific restrictions
     for tools that support it, like the `ShellTool`. For example,
     `"excludeTools": ["ShellTool(rm -rf)"]` will block the `rm -rf` command.
+    **Deprecated**: Use the [Policy Engine](../core/policy-engine.md) instead.
   - **Default**: No tools excluded.
   - **Example:** `"excludeTools": ["run_shell_command", "findFiles"]`.
   - **Security Note:** Command-specific restrictions in `excludeTools` for
@@ -214,14 +216,6 @@ a few things you can try in order of recommendation:
     system settings level such that the user will not be able to configure any
     MCP servers of their own. This should not be used as an airtight security
     mechanism.
-
-- **`autoAccept`** (boolean):
-  - **Description:** Controls whether the CLI automatically accepts and executes
-    tool calls that are considered safe (e.g., read-only operations) without
-    explicit user confirmation. If set to `true`, the CLI will bypass the
-    confirmation prompt for tools deemed safe.
-  - **Default:** `false`
-  - **Example:** `"autoAccept": true`
 
 - **`theme`** (string):
   - **Description:** Sets the visual [theme](../cli/themes.md) for Gemini CLI.

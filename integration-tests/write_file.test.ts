@@ -9,7 +9,8 @@ import {
   TestRig,
   createToolCallErrorMessage,
   printDebugInfo,
-  validateModelOutput,
+  assertModelHasOutput,
+  checkModelOutputContent,
 } from './test-helper.js';
 
 describe('write_file', () => {
@@ -46,8 +47,11 @@ describe('write_file', () => {
       ),
     ).toBeTruthy();
 
-    // Validate model output - will throw if no output, warn if missing expected content
-    validateModelOutput(result, 'dad.txt', 'Write file test');
+    assertModelHasOutput(result);
+    checkModelOutputContent(result, {
+      expectedContent: 'dad.txt',
+      testName: 'Write file test',
+    });
 
     const newFilePath = 'dad.txt';
 

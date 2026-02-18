@@ -35,7 +35,6 @@ const DEFAULT_HOOK_TIMEOUT = 60000;
  * Exit code constants for hook execution
  */
 const EXIT_CODE_SUCCESS = 0;
-const EXIT_CODE_BLOCKING_ERROR = 2;
 const EXIT_CODE_NON_BLOCKING_ERROR = 1;
 
 /**
@@ -174,6 +173,7 @@ export class HookRunner {
               typeof additionalContext === 'string' &&
               'prompt' in modifiedInput
             ) {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               (modifiedInput as BeforeAgentInput).prompt +=
                 '\n\n' + additionalContext;
             }
@@ -183,16 +183,19 @@ export class HookRunner {
         case HookEventName.BeforeModel:
           if ('llm_request' in hookOutput.hookSpecificOutput) {
             // For BeforeModel, we update the LLM request
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             const hookBeforeModelOutput = hookOutput as BeforeModelOutput;
             if (
               hookBeforeModelOutput.hookSpecificOutput?.llm_request &&
               'llm_request' in modifiedInput
             ) {
               // Merge the partial request with the existing request
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               const currentRequest = (modifiedInput as BeforeModelInput)
                 .llm_request;
               const partialRequest =
                 hookBeforeModelOutput.hookSpecificOutput.llm_request;
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               (modifiedInput as BeforeModelInput).llm_request = {
                 ...currentRequest,
                 ...partialRequest,
@@ -203,11 +206,14 @@ export class HookRunner {
 
         case HookEventName.BeforeTool:
           if ('tool_input' in hookOutput.hookSpecificOutput) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             const newToolInput = hookOutput.hookSpecificOutput[
               'tool_input'
             ] as Record<string, unknown>;
             if (newToolInput && 'tool_input' in modifiedInput) {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               (modifiedInput as BeforeToolInput).tool_input = {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                 ...(modifiedInput as BeforeToolInput).tool_input,
                 ...newToolInput,
               };
@@ -267,6 +273,7 @@ export class HookRunner {
         ...sanitizeEnvironment(process.env, this.config.sanitizationConfig),
         GEMINI_PROJECT_DIR: input.cwd,
         CLAUDE_PROJECT_DIR: input.cwd, // For compatibility
+        ...hookConfig.env,
       };
 
       const child = spawn(
@@ -345,27 +352,25 @@ export class HookRunner {
 
         // Parse output
         let output: HookOutput | undefined;
-        if (exitCode === EXIT_CODE_SUCCESS && stdout.trim()) {
+
+        const textToParse = stdout.trim() || stderr.trim();
+        if (textToParse) {
           try {
-            let parsed = JSON.parse(stdout.trim());
+            let parsed = JSON.parse(textToParse);
             if (typeof parsed === 'string') {
-              // If the output is a string, parse it in case
-              // it's double-encoded JSON string.
               parsed = JSON.parse(parsed);
             }
-            if (parsed) {
+            if (parsed && typeof parsed === 'object') {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               output = parsed as HookOutput;
             }
           } catch {
             // Not JSON, convert plain text to structured output
-            output = this.convertPlainTextToHookOutput(stdout.trim(), exitCode);
+            output = this.convertPlainTextToHookOutput(
+              textToParse,
+              exitCode || EXIT_CODE_SUCCESS,
+            );
           }
-        } else if (exitCode !== EXIT_CODE_SUCCESS && stderr.trim()) {
-          // Convert error output to structured format
-          output = this.convertPlainTextToHookOutput(
-            stderr.trim(),
-            exitCode || EXIT_CODE_NON_BLOCKING_ERROR,
-          );
         }
 
         resolve({
@@ -426,17 +431,17 @@ export class HookRunner {
         decision: 'allow',
         systemMessage: text,
       };
-    } else if (exitCode === EXIT_CODE_BLOCKING_ERROR) {
-      // Blocking error
-      return {
-        decision: 'deny',
-        reason: text,
-      };
-    } else {
-      // Non-blocking error (EXIT_CODE_NON_BLOCKING_ERROR or any other code)
+    } else if (exitCode === EXIT_CODE_NON_BLOCKING_ERROR) {
+      // Non-blocking error (EXIT_CODE_NON_BLOCKING_ERROR = 1)
       return {
         decision: 'allow',
         systemMessage: `Warning: ${text}`,
+      };
+    } else {
+      // All other non-zero exit codes (including 2) are blocking
+      return {
+        decision: 'deny',
+        reason: text,
       };
     }
   }

@@ -12,10 +12,11 @@ import type {
   RoutingDecision,
   RoutingStrategy,
 } from '../routingStrategy.js';
-import { resolveClassifierModel } from '../../config/models.js';
+import { resolveClassifierModel, isGemini3Model } from '../../config/models.js';
 import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { LlmRole } from '../../telemetry/types.js';
 
 // The number of recent history turns to provide to the router for context.
 const HISTORY_TURNS_FOR_CONTEXT = 8;
@@ -134,7 +135,12 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
     try {
+      const model = context.requestedModel ?? config.getModel();
       if (!(await config.getNumericalRoutingEnabled())) {
+        return null;
+      }
+
+      if (!isGemini3Model(model)) {
         return null;
       }
 
@@ -164,6 +170,7 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
         systemInstruction: CLASSIFIER_SYSTEM_PROMPT,
         abortSignal: context.signal,
         promptId,
+        role: LlmRole.UTILITY_ROUTER,
       });
 
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
@@ -176,18 +183,14 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
           config.getSessionId() || 'unknown-session',
         );
 
-      const selectedModel = resolveClassifierModel(
-        config.getModel(),
-        modelAlias,
-        config.getPreviewFeatures(),
-      );
+      const selectedModel = resolveClassifierModel(model, modelAlias);
 
       const latencyMs = Date.now() - startTime;
 
       return {
         model: selectedModel,
         metadata: {
-          source: `Classifier (${groupLabel})`,
+          source: `NumericalClassifier (${groupLabel})`,
           latencyMs,
           reasoning: `[Score: ${score} / Threshold: ${threshold}] ${routerResponse.complexity_reasoning}`,
         },

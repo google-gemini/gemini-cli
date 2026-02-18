@@ -26,6 +26,7 @@ import { waitFor } from '../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SettingsDialog } from './SettingsDialog.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import { VimModeProvider } from '../contexts/VimModeContext.js';
 import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { act } from 'react';
@@ -43,7 +44,7 @@ const mockSetVimMode = vi.fn();
 
 vi.mock('../contexts/UIStateContext.js', () => ({
   useUIState: () => ({
-    mainAreaWidth: 100, // Fixed width for consistent snapshots
+    terminalWidth: 100, // Fixed width for consistent snapshots
   }),
 }));
 
@@ -57,56 +58,6 @@ enum TerminalKeys {
   ESCAPE = '\u001B',
   BACKSPACE = '\u0008',
 }
-
-const createMockSettings = (
-  userSettings = {},
-  systemSettings = {},
-  workspaceSettings = {},
-) =>
-  new LoadedSettings(
-    {
-      settings: { ui: { customThemes: {} }, mcpServers: {}, ...systemSettings },
-      originalSettings: {
-        ui: { customThemes: {} },
-        mcpServers: {},
-        ...systemSettings,
-      },
-      path: '/system/settings.json',
-    },
-    {
-      settings: {},
-      originalSettings: {},
-      path: '/system/system-defaults.json',
-    },
-    {
-      settings: {
-        ui: { customThemes: {} },
-        mcpServers: {},
-        ...userSettings,
-      },
-      originalSettings: {
-        ui: { customThemes: {} },
-        mcpServers: {},
-        ...userSettings,
-      },
-      path: '/user/settings.json',
-    },
-    {
-      settings: {
-        ui: { customThemes: {} },
-        mcpServers: {},
-        ...workspaceSettings,
-      },
-      originalSettings: {
-        ui: { customThemes: {} },
-        mcpServers: {},
-        ...workspaceSettings,
-      },
-      path: '/workspace/settings.json',
-    },
-    true,
-    [],
-  );
 
 vi.mock('../../config/settingsSchema.js', async (importOriginal) => {
   const original =
@@ -307,6 +258,26 @@ describe('SettingsDialog', () => {
       // Use snapshot to capture visual layout including indicators
       expect(output).toMatchSnapshot();
     });
+
+    it('should use almost full height of the window but no more when the window height is 25 rows', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      // Render with a fixed height of 25 rows
+      const { lastFrame } = renderDialog(settings, onSelect, {
+        availableTerminalHeight: 25,
+      });
+
+      // Wait for the dialog to render
+      await waitFor(() => {
+        const output = lastFrame();
+        expect(output).toBeDefined();
+        const lines = output!.split('\n');
+
+        expect(lines.length).toBeGreaterThanOrEqual(24);
+        expect(lines.length).toBeLessThanOrEqual(25);
+      });
+    });
   });
 
   describe('Setting Descriptions', () => {
@@ -397,20 +368,12 @@ describe('SettingsDialog', () => {
 
       const { stdin, unmount, lastFrame } = renderDialog(settings, onSelect);
 
-      // Wait for initial render and verify we're on Preview Features (first setting)
-      await waitFor(() => {
-        expect(lastFrame()).toContain('Preview Features (e.g., models)');
-      });
-
-      // Navigate to Vim Mode setting and verify we're there
-      act(() => {
-        stdin.write(TerminalKeys.DOWN_ARROW as string);
-      });
+      // Wait for initial render and verify we're on Vim Mode (first setting)
       await waitFor(() => {
         expect(lastFrame()).toContain('Vim Mode');
       });
 
-      // Toggle the setting
+      // Toggle the setting (Vim Mode is the first setting now)
       act(() => {
         stdin.write(TerminalKeys.ENTER as string);
       });
@@ -619,11 +582,23 @@ describe('SettingsDialog', () => {
     });
 
     it('should show different values for different scopes', () => {
-      const settings = createMockSettings(
-        { vimMode: true }, // User settings
-        { vimMode: false }, // System settings
-        { autoUpdate: false }, // Workspace settings
-      );
+      const settings = createMockSettings({
+        user: {
+          settings: { vimMode: true },
+          originalSettings: { vimMode: true },
+          path: '',
+        },
+        system: {
+          settings: { vimMode: false },
+          originalSettings: { vimMode: false },
+          path: '',
+        },
+        workspace: {
+          settings: { autoUpdate: false },
+          originalSettings: { autoUpdate: false },
+          path: '',
+        },
+      });
       const onSelect = vi.fn();
 
       const { lastFrame } = renderDialog(settings, onSelect);
@@ -713,11 +688,23 @@ describe('SettingsDialog', () => {
 
   describe('Specific Settings Behavior', () => {
     it('should show correct display values for settings with different states', () => {
-      const settings = createMockSettings(
-        { vimMode: true, hideTips: false }, // User settings
-        { hideWindowTitle: true }, // System settings
-        { ideMode: false }, // Workspace settings
-      );
+      const settings = createMockSettings({
+        user: {
+          settings: { vimMode: true, hideTips: false },
+          originalSettings: { vimMode: true, hideTips: false },
+          path: '',
+        },
+        system: {
+          settings: { hideWindowTitle: true },
+          originalSettings: { hideWindowTitle: true },
+          path: '',
+        },
+        workspace: {
+          settings: { ideMode: false },
+          originalSettings: { ideMode: false },
+          path: '',
+        },
+      });
       const onSelect = vi.fn();
 
       const { lastFrame } = renderDialog(settings, onSelect);
@@ -774,11 +761,13 @@ describe('SettingsDialog', () => {
 
   describe('Settings Display Values', () => {
     it('should show correct values for inherited settings', () => {
-      const settings = createMockSettings(
-        {},
-        { vimMode: true, hideWindowTitle: false }, // System settings
-        {},
-      );
+      const settings = createMockSettings({
+        system: {
+          settings: { vimMode: true, hideWindowTitle: false },
+          originalSettings: { vimMode: true, hideWindowTitle: false },
+          path: '',
+        },
+      });
       const onSelect = vi.fn();
 
       const { lastFrame } = renderDialog(settings, onSelect);
@@ -789,11 +778,18 @@ describe('SettingsDialog', () => {
     });
 
     it('should show override indicator for overridden settings', () => {
-      const settings = createMockSettings(
-        { vimMode: false }, // User overrides
-        { vimMode: true }, // System default
-        {},
-      );
+      const settings = createMockSettings({
+        user: {
+          settings: { vimMode: false },
+          originalSettings: { vimMode: false },
+          path: '',
+        },
+        system: {
+          settings: { vimMode: true },
+          originalSettings: { vimMode: true },
+          path: '',
+        },
+      });
       const onSelect = vi.fn();
 
       const { lastFrame } = renderDialog(settings, onSelect);
@@ -963,11 +959,13 @@ describe('SettingsDialog', () => {
   describe('Error Recovery', () => {
     it('should handle malformed settings gracefully', () => {
       // Create settings with potentially problematic values
-      const settings = createMockSettings(
-        { vimMode: null as unknown as boolean }, // Invalid value
-        {},
-        {},
-      );
+      const settings = createMockSettings({
+        user: {
+          settings: { vimMode: null as unknown as boolean },
+          originalSettings: { vimMode: null as unknown as boolean },
+          path: '',
+        },
+      });
       const onSelect = vi.fn();
 
       const { lastFrame } = renderDialog(settings, onSelect);
@@ -1072,6 +1070,87 @@ describe('SettingsDialog', () => {
     });
   });
 
+  describe('Restart and Search Conflict Regression', () => {
+    it('should prioritize restart request over search text box when showRestartPrompt is true', async () => {
+      vi.mocked(getSettingsSchema).mockReturnValue(TOOLS_SHELL_FAKE_SCHEMA);
+      const settings = createMockSettings();
+      const onRestartRequest = vi.fn();
+
+      const { stdin, lastFrame, unmount } = renderDialog(settings, vi.fn(), {
+        onRestartRequest,
+      });
+
+      // Wait for initial render
+      await waitFor(() => expect(lastFrame()).toContain('Show Color'));
+
+      // Navigate to "Enable Interactive Shell" (second item in TOOLS_SHELL_FAKE_SCHEMA)
+      act(() => {
+        stdin.write(TerminalKeys.DOWN_ARROW);
+      });
+
+      // Wait for navigation to complete
+      await waitFor(() =>
+        expect(lastFrame()).toContain('● Enable Interactive Shell'),
+      );
+
+      // Toggle it to trigger restart required
+      act(() => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain(
+          'To see changes, Gemini CLI must be restarted',
+        );
+      });
+
+      // Press 'r' - it should call onRestartRequest, NOT be handled by search
+      act(() => {
+        stdin.write('r');
+      });
+
+      await waitFor(() => {
+        expect(onRestartRequest).toHaveBeenCalled();
+      });
+
+      unmount();
+    });
+
+    it('should hide search box when showRestartPrompt is true', async () => {
+      vi.mocked(getSettingsSchema).mockReturnValue(TOOLS_SHELL_FAKE_SCHEMA);
+      const settings = createMockSettings();
+
+      const { stdin, lastFrame, unmount } = renderDialog(settings, vi.fn());
+
+      // Search box should be visible initially (searchPlaceholder)
+      expect(lastFrame()).toContain('Search to filter');
+
+      // Navigate to "Enable Interactive Shell" and toggle it
+      act(() => {
+        stdin.write(TerminalKeys.DOWN_ARROW);
+      });
+
+      await waitFor(() =>
+        expect(lastFrame()).toContain('● Enable Interactive Shell'),
+      );
+
+      act(() => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain(
+          'To see changes, Gemini CLI must be restarted',
+        );
+      });
+
+      // Search box should now be hidden
+      expect(lastFrame()).not.toContain('Search to filter');
+
+      unmount();
+    });
+  });
+
   describe('String Settings Editing', () => {
     it('should allow editing and committing a string setting', async () => {
       let settings = createMockSettings({ 'a.string.setting': 'initial' });
@@ -1097,11 +1176,13 @@ describe('SettingsDialog', () => {
         stdin.write('\r'); // Commit
       });
 
-      settings = createMockSettings(
-        { 'a.string.setting': 'new value' },
-        {},
-        {},
-      );
+      settings = createMockSettings({
+        user: {
+          settings: { 'a.string.setting': 'new value' },
+          originalSettings: { 'a.string.setting': 'new value' },
+          path: '',
+        },
+      });
       rerender(
         <KeypressProvider>
           <SettingsDialog settings={settings} onSelect={onSelect} />
@@ -1290,7 +1371,6 @@ describe('SettingsDialog', () => {
           },
           tools: {
             enableInteractiveShell: true,
-            autoAccept: true,
             useRipgrep: true,
           },
           security: {
@@ -1316,7 +1396,6 @@ describe('SettingsDialog', () => {
           },
           tools: {
             truncateToolOutputThreshold: 50000,
-            truncateToolOutputLines: 1000,
           },
           context: {
             discoveryMaxDirs: 500,
@@ -1383,10 +1462,8 @@ describe('SettingsDialog', () => {
         userSettings: {
           tools: {
             enableInteractiveShell: true,
-            autoAccept: false,
             useRipgrep: true,
             truncateToolOutputThreshold: 25000,
-            truncateToolOutputLines: 500,
           },
           security: {
             folderTrust: {
@@ -1436,7 +1513,6 @@ describe('SettingsDialog', () => {
           },
           tools: {
             enableInteractiveShell: false,
-            autoAccept: false,
             useRipgrep: false,
           },
           security: {
@@ -1452,11 +1528,23 @@ describe('SettingsDialog', () => {
     ])(
       'should render $name correctly',
       ({ userSettings, systemSettings, workspaceSettings, stdinActions }) => {
-        const settings = createMockSettings(
-          userSettings,
-          systemSettings,
-          workspaceSettings,
-        );
+        const settings = createMockSettings({
+          user: {
+            settings: userSettings,
+            originalSettings: userSettings,
+            path: '',
+          },
+          system: {
+            settings: systemSettings,
+            originalSettings: systemSettings,
+            path: '',
+          },
+          workspace: {
+            settings: workspaceSettings,
+            originalSettings: workspaceSettings,
+            path: '',
+          },
+        });
         const onSelect = vi.fn();
 
         const { lastFrame, stdin } = renderDialog(settings, onSelect);

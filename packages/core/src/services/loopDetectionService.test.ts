@@ -38,6 +38,7 @@ describe('LoopDetectionService', () => {
     mockConfig = {
       getTelemetryEnabled: () => true,
       isInteractive: () => false,
+      getDisableLoopDetection: () => false,
       getModelAvailabilityService: vi
         .fn()
         .mockReturnValue(createAvailabilityServiceMock()),
@@ -162,6 +163,15 @@ describe('LoopDetectionService', () => {
       // Should now return false even though a loop was previously detected
       expect(service.addAndCheck(event)).toBe(false);
     });
+
+    it('should skip loop detection if disabled in config', () => {
+      vi.spyOn(mockConfig, 'getDisableLoopDetection').mockReturnValue(true);
+      const event = createToolCallRequestEvent('testTool', { param: 'value' });
+      for (let i = 0; i < TOOL_CALL_LOOP_THRESHOLD + 2; i++) {
+        expect(service.addAndCheck(event)).toBe(false);
+      }
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
   });
 
   describe('Content Loop Detection', () => {
@@ -198,6 +208,25 @@ describe('LoopDetectionService', () => {
       }
       expect(isLoop).toBe(true);
       expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not detect a loop for a list with a long shared prefix', () => {
+      service.reset('');
+      let isLoop = false;
+      const longPrefix =
+        'projects/my-google-cloud-project-12345/locations/us-central1/services/';
+
+      let listContent = '';
+      for (let i = 0; i < 15; i++) {
+        listContent += `- ${longPrefix}${i}\n`;
+      }
+
+      // Simulate receiving the list in a single large chunk or a few chunks
+      // This is the specific case where the issue occurs, as list boundaries might not reset tracking properly
+      isLoop = service.addAndCheck(createContentEvent(listContent));
+
+      expect(isLoop).toBe(false);
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
 
     it('should not detect a loop if repetitions are very far apart', () => {
@@ -742,6 +771,7 @@ describe('LoopDetectionService LLM Checks', () => {
     mockConfig = {
       getGeminiClient: () => mockGeminiClient,
       getBaseLlmClient: () => mockBaseLlmClient,
+      getDisableLoopDetection: () => false,
       getDebugMode: () => false,
       getTelemetryEnabled: () => true,
       getModel: vi.fn().mockReturnValue('cognitive-loop-v1'),

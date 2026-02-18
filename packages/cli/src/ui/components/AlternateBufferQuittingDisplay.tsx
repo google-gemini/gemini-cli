@@ -4,17 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box } from 'ink';
+import { Box, Text } from 'ink';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { AppHeader } from './AppHeader.js';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { QuittingDisplay } from './QuittingDisplay.js';
 import { useAppContext } from '../contexts/AppContext.js';
 import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
+import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
+import { ToolStatusIndicator, ToolInfo } from './messages/ToolShared.js';
+import { theme } from '../semantic-colors.js';
 
 export const AlternateBufferQuittingDisplay = () => {
   const { version } = useAppContext();
   const uiState = useUIState();
+
+  const confirmingTool = useConfirmingTool();
+  const showPromptedTool = confirmingTool !== null;
 
   // We render the entire chat history and header here to ensure that the
   // conversation history is visible to the user after the app quits and the
@@ -47,11 +53,27 @@ export const AlternateBufferQuittingDisplay = () => {
           terminalWidth={uiState.mainAreaWidth}
           item={{ ...item, id: 0 }}
           isPending={true}
-          isFocused={false}
-          activeShellPtyId={uiState.activePtyId}
-          embeddedShellFocused={uiState.embeddedShellFocused}
         />
       ))}
+      {showPromptedTool && (
+        <Box flexDirection="column" marginTop={1} marginBottom={1}>
+          <Text color={theme.status.warning} bold>
+            Action Required (was prompted):
+          </Text>
+          <Box marginTop={1}>
+            <ToolStatusIndicator
+              status={confirmingTool.tool.status}
+              name={confirmingTool.tool.name}
+            />
+            <ToolInfo
+              name={confirmingTool.tool.name}
+              status={confirmingTool.tool.status}
+              description={confirmingTool.tool.description}
+              emphasis="high"
+            />
+          </Box>
+        </Box>
+      )}
       <QuittingDisplay />
     </Box>
   );

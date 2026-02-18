@@ -23,6 +23,7 @@ import * as fs from 'node:fs';
 import { promptIdContext } from './promptIdContext.js';
 import { debugLogger } from './debugLogger.js';
 import { LRUCache } from 'mnemonist';
+import { LlmRole } from '../telemetry/types.js';
 
 const CODE_CORRECTION_SYSTEM_PROMPT = `
 You are an expert code-editing assistant. Your task is to analyze a failed edit attempt and provide a corrected version of the text snippets.
@@ -439,6 +440,7 @@ Return ONLY the corrected target snippet in the specified JSON format with the k
       abortSignal,
       systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
       promptId: getPromptId(),
+      role: LlmRole.UTILITY_EDIT_CORRECTOR,
     });
 
     if (
@@ -528,6 +530,7 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
       abortSignal,
       systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
       promptId: getPromptId(),
+      role: LlmRole.UTILITY_EDIT_CORRECTOR,
     });
 
     if (
@@ -598,6 +601,7 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
       abortSignal,
       systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
       promptId: getPromptId(),
+      role: LlmRole.UTILITY_EDIT_CORRECTOR,
     });
 
     if (
@@ -665,6 +669,7 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
       abortSignal,
       systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
       promptId: getPromptId(),
+      role: LlmRole.UTILITY_EDIT_CORRECTOR,
     });
 
     if (
@@ -689,13 +694,20 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
   }
 }
 
+function trimPreservingTrailingNewline(str: string): string {
+  const trimmedEnd = str.trimEnd();
+  const trailingWhitespace = str.slice(trimmedEnd.length);
+  const trailingNewlines = trailingWhitespace.replace(/[^\r\n]/g, '');
+  return str.trim() + trailingNewlines;
+}
+
 function trimPairIfPossible(
   target: string,
   trimIfTargetTrims: string,
   currentContent: string,
   expectedReplacements: number,
 ) {
-  const trimmedTargetString = target.trim();
+  const trimmedTargetString = trimPreservingTrailingNewline(target);
   if (target.length !== trimmedTargetString.length) {
     const trimmedTargetOccurrences = countOccurrences(
       currentContent,
@@ -703,7 +715,8 @@ function trimPairIfPossible(
     );
 
     if (trimmedTargetOccurrences === expectedReplacements) {
-      const trimmedReactiveString = trimIfTargetTrims.trim();
+      const trimmedReactiveString =
+        trimPreservingTrailingNewline(trimIfTargetTrims);
       return {
         targetString: trimmedTargetString,
         pair: trimmedReactiveString,

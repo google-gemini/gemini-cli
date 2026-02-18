@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import * as path from 'node:path';
 import { getFolderStructure } from '../utils/getFolderStructure.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -19,6 +17,8 @@ import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import type { Config } from '../config/config.js';
 import { ACTIVATE_SKILL_TOOL_NAME } from './tool-names.js';
 import { ToolErrorType } from './tool-error.js';
+import { getActivateSkillDefinition } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 /**
  * Parameters for the ActivateSkill tool
@@ -166,31 +166,14 @@ export class ActivateSkillTool extends BaseDeclarativeTool<
   ) {
     const skills = config.getSkillManager().getSkills();
     const skillNames = skills.map((s) => s.name);
-
-    let schema: z.ZodTypeAny;
-    if (skillNames.length === 0) {
-      schema = z.object({
-        name: z.string().describe('No skills are currently available.'),
-      });
-    } else {
-      schema = z.object({
-        name: z
-          .enum(skillNames as [string, ...string[]])
-          .describe('The name of the skill to activate.'),
-      });
-    }
-
-    const availableSkillsHint =
-      skillNames.length > 0
-        ? ` (Available: ${skillNames.map((n) => `'${n}'`).join(', ')})`
-        : '';
+    const definition = getActivateSkillDefinition(skillNames);
 
     super(
       ActivateSkillTool.Name,
       'Activate Skill',
-      `Activates a specialized agent skill by name${availableSkillsHint}. Returns the skill's instructions wrapped in \`<activated_skill>\` tags. These provide specialized guidance for the current task. Use this when you identify a task that matches a skill's description. ONLY use names exactly as they appear in the \`<available_skills>\` section.`,
+      definition.base.description!,
       Kind.Other,
-      zodToJsonSchema(schema),
+      definition.base.parametersJsonSchema,
       messageBus,
       true,
       false,
@@ -209,6 +192,15 @@ export class ActivateSkillTool extends BaseDeclarativeTool<
       messageBus,
       _toolName,
       _toolDisplayName ?? 'Activate Skill',
+    );
+  }
+
+  override getSchema(modelId?: string) {
+    const skills = this.config.getSkillManager().getSkills();
+    const skillNames = skills.map((s) => s.name);
+    return resolveToolDeclaration(
+      getActivateSkillDefinition(skillNames),
+      modelId,
     );
   }
 }

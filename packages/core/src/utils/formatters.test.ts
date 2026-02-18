@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { bytesToMB, formatMemoryUsage } from './formatters.js';
+import { bytesToMB, formatBytes } from './formatters.js';
 
 describe('bytesToMB', () => {
   it('converts bytes to megabytes', () => {
@@ -16,16 +16,16 @@ describe('bytesToMB', () => {
   });
 });
 
-describe('formatMemoryUsage', () => {
+describe('formatBytes', () => {
   it('formats values below one megabyte in KB', () => {
-    expect(formatMemoryUsage(512 * 1024)).toBe('512.0 KB');
+    expect(formatBytes(512 * 1024)).toBe('512.0 KB');
   });
 
   it('formats values below one gigabyte in MB', () => {
-    expect(formatMemoryUsage(5 * 1024 * 1024)).toBe('5.0 MB');
+    expect(formatBytes(5 * 1024 * 1024)).toBe('5.0 MB');
   });
 
   it('formats values of one gigabyte or larger in GB', () => {
-    expect(formatMemoryUsage(2 * 1024 * 1024 * 1024)).toBe('2.00 GB');
+    expect(formatBytes(2 * 1024 * 1024 * 1024)).toBe('2.00 GB');
   });
 });

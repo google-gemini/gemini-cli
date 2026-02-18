@@ -119,9 +119,17 @@ For example:
 
 Approval modes allow the policy engine to apply different sets of rules based on
 the CLI's operational mode. A rule can be associated with one or more modes
-(e.g., `yolo`, `autoEdit`). The rule will only be active if the CLI is running
-in one of its specified modes. If a rule has no modes specified, it is always
-active.
+(e.g., `yolo`, `autoEdit`, `plan`). The rule will only be active if the CLI is
+running in one of its specified modes. If a rule has no modes specified, it is
+always active.
+
+- `default`: The standard interactive mode where most write tools require
+  confirmation.
+- `autoEdit`: Optimized for automated code editing; some write tools may be
+  auto-approved.
+- `plan`: A strict, read-only mode for research and design. See [Customizing
+  Plan Mode Policies].
+- `yolo`: A mode where all tools are auto-approved (use with extreme caution).
 
 ## Rule matching
 
@@ -146,6 +154,38 @@ A rule matches a tool call if all of its conditions are met:
 Policies are defined in `.toml` files. The CLI loads these files from Default,
 User, and (if configured) Admin directories.
 
+### Policy locations
+
+| Tier      | Type   | Location                    |
+| :-------- | :----- | :-------------------------- |
+| **User**  | Custom | `~/.gemini/policies/*.toml` |
+| **Admin** | System | _See below (OS specific)_   |
+
+#### System-wide policies (Admin)
+
+Administrators can enforce system-wide policies (Tier 3) that override all user
+and default settings. These policies must be placed in specific, secure
+directories:
+
+| OS          | Policy Directory Path                             |
+| :---------- | :------------------------------------------------ |
+| **Linux**   | `/etc/gemini-cli/policies`                        |
+| **macOS**   | `/Library/Application Support/GeminiCli/policies` |
+| **Windows** | `C:\ProgramData\gemini-cli\policies`              |
+
+**Security Requirements:**
+
+To prevent privilege escalation, the CLI enforces strict security checks on
+admin directories. If checks fail, system policies are **ignored**.
+
+- **Linux / macOS:** Must be owned by `root` (UID 0) and NOT writable by group
+  or others (e.g., `chmod 755`).
+- **Windows:** Must be in `C:\ProgramData`. Standard users (`Users`, `Everyone`)
+  must NOT have `Write`, `Modify`, or `Full Control` permissions. _Tip: If you
+  see a security warning, use the folder properties to remove write permissions
+  for non-admin groups. You may need to "Disable inheritance" in Advanced
+  Security Settings._
+
 ### TOML rule schema
 
 Here is a breakdown of the fields available in a TOML policy rule:
@@ -168,15 +208,21 @@ commandPrefix = "git "
 
 # (Optional) A regex to match against the entire shell command.
 # This is also syntactic sugar for `toolName = "run_shell_command"`.
-# Note: This pattern is tested against the JSON representation of the arguments (e.g., `{"command":"<your_command>"}`), so anchors like `^` or `$` will apply to the full JSON string, not just the command text.
+# Note: This pattern is tested against the JSON representation of the arguments (e.g., `{"command":"<your_command>"}`).
+# Because it prepends `"command":"`, it effectively matches from the start of the command.
+# Anchors like `^` or `$` apply to the full JSON string, so `^` should usually be avoided here.
 # You cannot use commandPrefix and commandRegex in the same rule.
-commandRegex = "^git (commit|push)"
+commandRegex = "git (commit|push)"
 
 # The decision to take. Must be "allow", "deny", or "ask_user".
 decision = "ask_user"
 
 # The priority of the rule, from 0 to 999.
 priority = 10
+
+# (Optional) A custom message to display when a tool call is denied by this rule.
+# This message is returned to the model and user, useful for explaining *why* it was denied.
+deny_message = "Deletion is permanent"
 
 # (Optional) An array of approval modes where this rule is active.
 modes = ["autoEdit"]
@@ -250,6 +296,7 @@ only the `mcpName`.
 mcpName = "untrusted-server"
 decision = "deny"
 priority = 500
+deny_message = "This server is not trusted by the admin."
 ```
 
 ## Default policies
@@ -258,11 +305,13 @@ The Gemini CLI ships with a set of default policies to provide a safe
 out-of-the-box experience.
 
 - **Read-only tools** (like `read_file`, `glob`) are generally **allowed**.
-- **Agent delegation** (like `delegate_to_agent`) defaults to **`ask_user`** to
-  ensure remote agents can prompt for confirmation, but local sub-agent actions
-  are executed silently and checked individually.
+- **Agent delegation** defaults to **`ask_user`** to ensure remote agents can
+  prompt for confirmation, but local sub-agent actions are executed silently and
+  checked individually.
 - **Write tools** (like `write_file`, `run_shell_command`) default to
   **`ask_user`**.
 - In **`yolo`** mode, a high-priority rule allows all tools.
 - In **`autoEdit`** mode, rules allow certain write operations to happen without
   prompting.
+
+[Customizing Plan Mode Policies]: /docs/cli/plan-mode.md#customizing-policies

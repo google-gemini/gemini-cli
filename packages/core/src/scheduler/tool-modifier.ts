@@ -48,6 +48,7 @@ export class ToolModificationHandler {
       typeof toolCall.request.args
     >(
       toolCall.request.args,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       modifyContext as ModifyContext<typeof toolCall.request.args>,
       editorType,
       signal,
@@ -70,12 +71,13 @@ export class ToolModificationHandler {
   ): Promise<ModificationResult | undefined> {
     if (
       toolCall.confirmationDetails.type !== 'edit' ||
-      !payload.newContent ||
+      !('newContent' in payload) ||
       !isModifiableDeclarativeTool(toolCall.tool)
     ) {
       return undefined;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const modifyContext = toolCall.tool.getModifyContext(
       signal,
     ) as ModifyContext<typeof toolCall.request.args>;

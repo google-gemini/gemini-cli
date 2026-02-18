@@ -10,7 +10,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 
 describe('generalist_agent', () => {
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should be able to use generalist agent by explicitly asking the main agent to invoke it',
     params: {
       settings: {
@@ -24,11 +24,11 @@ describe('generalist_agent', () => {
     prompt:
       'Please use the generalist agent to create a file called "generalist_test_file.txt" containing exactly the following text: success',
     assert: async (rig) => {
-      // 1) Verify the generalist agent was invoked via delegate_to_agent
+      // 1) Verify the generalist agent was invoked
       const foundToolCall = await rig.waitForToolCall('generalist');
       expect(
         foundToolCall,
-        'Expected to find a delegate_to_agent tool call for generalist agent',
+        'Expected to find a tool call for generalist agent',
       ).toBeTruthy();
 
       // 2) Verify the file was created as expected

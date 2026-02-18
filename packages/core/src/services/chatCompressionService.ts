@@ -31,6 +31,7 @@ import {
   PREVIEW_GEMINI_FLASH_MODEL,
 } from '../config/models.js';
 import { PreCompressTrigger } from '../hooks/types.js';
+import { LlmRole } from '../telemetry/types.js';
 
 /**
  * Default threshold for compression token count as a fraction of the model's
@@ -48,11 +49,6 @@ export const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
  * The budget for function response tokens in the preserved history.
  */
 export const COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET = 50_000;
-
-/**
- * The number of lines to keep when truncating a function response during compression.
- */
-export const COMPRESSION_TRUNCATE_LINES = 30;
 
 /**
  * Returns the index of the oldest item to keep when compressing. May return
@@ -189,11 +185,10 @@ async function truncateHistoryToBudget(
                 config.storage.getProjectTempDir(),
               );
 
-              // Prepare a honest, readable snippet of the tail.
               const truncatedMessage = formatTruncatedToolOutput(
                 contentStr,
                 outputFile,
-                COMPRESSION_TRUNCATE_LINES,
+                config.getTruncateToolOutputThreshold(),
               );
 
               newParts.unshift({
@@ -341,10 +336,11 @@ export class ChatCompressionService {
           ],
         },
       ],
-      systemInstruction: { text: getCompressionPrompt() },
+      systemInstruction: { text: getCompressionPrompt(config) },
       promptId,
       // TODO(joshualitt): wire up a sensible abort signal,
       abortSignal: abortSignal ?? new AbortController().signal,
+      role: LlmRole.UTILITY_COMPRESSOR,
     });
     const summary = getResponseText(summaryResponse) ?? '';
 
@@ -369,8 +365,9 @@ export class ChatCompressionService {
             ],
           },
         ],
-        systemInstruction: { text: getCompressionPrompt() },
+        systemInstruction: { text: getCompressionPrompt(config) },
         promptId: `${promptId}-verify`,
+        role: LlmRole.UTILITY_COMPRESSOR,
         abortSignal: abortSignal ?? new AbortController().signal,
       });
 

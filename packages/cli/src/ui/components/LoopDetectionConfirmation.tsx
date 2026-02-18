@@ -27,7 +27,9 @@ export function LoopDetectionConfirmation({
         onComplete({
           userSelection: 'keep',
         });
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );

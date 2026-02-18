@@ -5,6 +5,7 @@
  */
 
 import { render, persistentStateMock } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { Notifications } from './Notifications.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useAppContext, type AppState } from '../contexts/AppContext.js';
@@ -33,11 +34,17 @@ vi.mock('node:fs/promises', async () => {
     unlink: vi.fn().mockResolvedValue(undefined),
   };
 });
-vi.mock('node:os', () => ({
-  default: {
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return {
+    ...actual,
+    default: {
+      ...actual,
+      homedir: () => '/mock/home',
+    },
     homedir: () => '/mock/home',
-  },
-}));
+  };
+});
 
 vi.mock('node:path', async () => {
   const actual = await vi.importActual<typeof import('node:path')>('node:path');
@@ -47,13 +54,19 @@ vi.mock('node:path', async () => {
   };
 });
 
-vi.mock('@google/gemini-cli-core', () => ({
-  GEMINI_DIR: '.gemini',
-  homedir: () => '/mock/home',
-  Storage: {
-    getGlobalTempDir: () => '/mock/temp',
-  },
-}));
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    GEMINI_DIR: '.gemini',
+    homedir: () => '/mock/home',
+    Storage: {
+      ...actual.Storage,
+      getGlobalTempDir: () => '/mock/temp',
+    },
+  };
+});
 
 vi.mock('../../config/settings.js', () => ({
   DEFAULT_MODEL_CONFIGS: {},
@@ -160,7 +173,7 @@ describe('Notifications', () => {
     render(<Notifications />);
 
     await act(async () => {
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(persistentStateMock.set).toHaveBeenCalledWith(
           'hasSeenScreenReaderNudge',
           true,

@@ -8,14 +8,14 @@ import * as http from 'node:http';
 import * as crypto from 'node:crypto';
 import type * as net from 'node:net';
 import { URL } from 'node:url';
-import type { EventEmitter } from 'node:events';
 import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import type { OAuthToken } from './token-storage/types.js';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage, FatalCancellationError } from '../utils/errors.js';
 import { OAuthUtils, ResourceMismatchError } from './oauth-utils.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { getConsentForOauth } from '../utils/authConsent.js';
 
 export const OAUTH_DISPLAY_MESSAGE_EVENT = 'oauth-display-message' as const;
 
@@ -143,6 +143,7 @@ export class MCPOAuthProvider {
       );
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return (await response.json()) as OAuthClientRegistrationResponse;
   }
 
@@ -377,6 +378,7 @@ export class MCPOAuthProvider {
         }
 
         server.listen(listenPort, () => {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const address = server.address() as net.AddressInfo;
           serverPort = address.port;
           debugLogger.log(
@@ -580,6 +582,7 @@ export class MCPOAuthProvider {
 
     // Try to parse as JSON first, fall back to form-urlencoded
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(responseText) as OAuthTokenResponse;
     } catch {
       // Parse form-urlencoded response
@@ -702,6 +705,7 @@ export class MCPOAuthProvider {
 
     // Try to parse as JSON first, fall back to form-urlencoded
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(responseText) as OAuthTokenResponse;
     } catch {
       // Parse form-urlencoded response
@@ -744,15 +748,10 @@ export class MCPOAuthProvider {
     serverName: string,
     config: MCPOAuthConfig,
     mcpServerUrl?: string,
-    events?: EventEmitter,
   ): Promise<OAuthToken> {
     // Helper function to display messages through handler or fallback to console.log
     const displayMessage = (message: string) => {
-      if (events) {
-        events.emit(OAUTH_DISPLAY_MESSAGE_EVENT, message);
-      } else {
-        debugLogger.log(message);
-      }
+      coreEvents.emitFeedback('info', message);
     };
 
     // If no authorization URL is provided, try to discover OAuth configuration
@@ -904,8 +903,14 @@ export class MCPOAuthProvider {
       mcpServerUrl,
     );
 
-    displayMessage(`Authentication required for MCP Server: '${serverName}'
-→ Opening your browser for OAuth sign-in...
+    const userConsent = await getConsentForOauth(
+      `Authentication required for MCP Server: '${serverName}.'`,
+    );
+    if (!userConsent) {
+      throw new FatalCancellationError('Authentication cancelled by user.');
+    }
+
+    displayMessage(`→ Opening your browser for OAuth sign-in...
 
 If the browser does not open, copy and paste this URL into your browser:
 ${authUrl}
