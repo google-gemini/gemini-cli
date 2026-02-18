@@ -889,6 +889,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // We prioritize execution unless the user is explicitly selecting a different suggestion.
       if (
         completion.isPerfectMatch &&
+        recentUnsafePasteTime === null &&
         keyMatchers[Command.RETURN](key) &&
         (!completion.showSuggestions || completion.activeSuggestionIndex <= 0)
       ) {
@@ -911,6 +912,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
 
         if (keyMatchers[Command.ACCEPT_SUGGESTION](key)) {
+          if (recentUnsafePasteTime !== null) {
+            buffer.newline();
+            return true;
+          }
           if (completion.suggestions.length > 0) {
             const targetIndex =
               completion.activeSuggestionIndex === -1

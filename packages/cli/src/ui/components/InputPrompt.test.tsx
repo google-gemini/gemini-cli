@@ -2388,6 +2388,45 @@ describe('InputPrompt', () => {
 
       unmount();
     });
+
+    it('should NOT submit on Enter when an @-path is a perfect match but occurs after unsafe paste', async () => {
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: true,
+        suggestions: [{ label: 'file.txt', value: 'file.txt' }],
+        activeSuggestionIndex: 0,
+        isPerfectMatch: true,
+        completionMode: CompletionMode.AT,
+      });
+      props.buffer.text = '@file.txt';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      // Simulate an unsafe paste
+      await act(async () => {
+        stdin.write(`\x1b[200~pasted content\x1b[201~`);
+      });
+
+      // Try to submit with Enter
+      await act(async () => {
+        stdin.write('\r');
+      });
+
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+
+      // Verify that onSubmit was NOT called due to recent paste protection
+      expect(props.onSubmit).not.toHaveBeenCalled();
+      // It should call newline() instead
+      expect(props.buffer.newline).toHaveBeenCalled();
+      unmount();
+    });
   });
 
   describe('enhanced input UX - keyboard shortcuts', () => {
