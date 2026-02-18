@@ -178,7 +178,7 @@ const ModelUsageTable: React.FC<{
     : `Model Usage`;
 
   return (
-    <Box flexDirection="column" marginTop={1}>
+    <Box flexDirection="column" marginBottom={1}>
       {/* Header */}
       <Box alignItems="flex-end">
         <Box width={nameWidth}>
