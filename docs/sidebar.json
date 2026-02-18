@@ -1,246 +1,315 @@
 [
   {
-    "label": "Get started",
-    "items": [
-      { "label": "Overview", "slug": "docs" },
-      { "label": "Quickstart", "slug": "docs/get-started" },
-      { "label": "Installation", "slug": "docs/get-started/installation" },
-      { "label": "Authentication", "slug": "docs/get-started/authentication" },
-      { "label": "Examples", "slug": "docs/get-started/examples" },
-      { "label": "CLI cheatsheet", "slug": "docs/cli/cli-reference" },
-      { "label": "Gemini 3 on Gemini CLI", "slug": "docs/get-started/gemini-3" }
-    ]
-  },
-  {
-    "label": "Use Gemini CLI",
+    "label": "docs_tab",
     "items": [
       {
-        "label": "File management",
-        "slug": "docs/cli/tutorials/file-management"
+        "label": "Get started",
+        "items": [
+          { "label": "Overview", "slug": "docs" },
+          { "label": "Quickstart", "slug": "docs/get-started" },
+          { "label": "Installation", "slug": "docs/get-started/installation" },
+          {
+            "label": "Authentication",
+            "slug": "docs/get-started/authentication"
+          },
+          { "label": "Examples", "slug": "docs/get-started/examples" },
+          { "label": "CLI cheatsheet", "slug": "docs/cli/cli-reference" },
+          {
+            "label": "Gemini 3 on Gemini CLI",
+            "slug": "docs/get-started/gemini-3"
+          }
+        ]
       },
       {
-        "label": "Manage context and memory",
-        "slug": "docs/cli/tutorials/memory-management"
+        "label": "Use Gemini CLI",
+        "items": [
+          {
+            "label": "File management",
+            "slug": "docs/cli/tutorials/file-management"
+          },
+          {
+            "label": "Manage context and memory",
+            "slug": "docs/cli/tutorials/memory-management"
+          },
+          {
+            "label": "Execute shell commands",
+            "slug": "docs/cli/tutorials/shell-commands"
+          },
+          {
+            "label": "Manage sessions and history",
+            "slug": "docs/cli/tutorials/session-management"
+          },
+          {
+            "label": "Plan tasks with todos",
+            "slug": "docs/cli/tutorials/task-planning"
+          },
+          {
+            "label": "Web search and fetch",
+            "slug": "docs/cli/tutorials/web-tools"
+          },
+          {
+            "label": "Get started with skills",
+            "slug": "docs/cli/tutorials/skills-getting-started"
+          },
+          {
+            "label": "Set up an MCP server",
+            "slug": "docs/cli/tutorials/mcp-setup"
+          },
+          { "label": "Automate tasks", "slug": "docs/cli/tutorials/automation" }
+        ]
       },
       {
-        "label": "Execute shell commands",
-        "slug": "docs/cli/tutorials/shell-commands"
-      },
-      {
-        "label": "Manage sessions and history",
-        "slug": "docs/cli/tutorials/session-management"
-      },
-      {
-        "label": "Plan tasks with todos",
-        "slug": "docs/cli/tutorials/task-planning"
-      },
-      {
-        "label": "Web search and fetch",
-        "slug": "docs/cli/tutorials/web-tools"
-      },
-      {
-        "label": "Get started with skills",
-        "slug": "docs/cli/tutorials/skills-getting-started"
-      },
-      {
-        "label": "Set up an MCP server",
-        "slug": "docs/cli/tutorials/mcp-setup"
-      },
-      { "label": "Automate tasks", "slug": "docs/cli/tutorials/automation" }
-    ]
-  },
-  {
-    "label": "Features",
-    "items": [
-      {
-        "label": "/about - About Gemini CLI",
-        "link": "/docs/cli/commands/#about"
-      },
-      {
-        "label": "/auth - Authentication",
-        "slug": "docs/get-started/authentication"
-      },
-      { "label": "/bug - Report a bug", "link": "/docs/cli/commands/#bug" },
-      { "label": "/chat - Chat history", "link": "/docs/cli/commands/#chat" },
-      { "label": "/clear - Clear screen", "link": "/docs/cli/commands/#clear" },
-      {
-        "label": "/compress - Compress context",
-        "link": "/docs/cli/commands/#compress"
-      },
-      { "label": "/copy - Copy output", "link": "/docs/cli/commands/#copy" },
-      {
-        "label": "/directory - Manage workspace",
-        "link": "/docs/cli/commands/#directory-or-dir"
-      },
-      {
-        "label": "/docs - Open documentation",
-        "link": "/docs/cli/commands/#docs"
-      },
-      {
-        "label": "/editor - Select editor",
-        "link": "/docs/cli/commands/#editor"
-      },
-      {
-        "label": "/extensions - Manage extensions",
-        "slug": "docs/extensions/index"
-      },
-      { "label": "/help - Show help", "link": "/docs/cli/commands/#help-or" },
-      { "label": "/hooks - Hooks", "slug": "docs/hooks" },
-      { "label": "/ide - IDE integration", "slug": "docs/ide-integration" },
-      {
-        "label": "/init - Initialize context",
-        "link": "/docs/cli/commands/#init"
-      },
-      { "label": "/mcp - MCP servers", "slug": "docs/tools/mcp-server" },
+        "label": "Features",
+        "items": [
+          {
+            "label": "/about - About Gemini CLI",
+            "link": "/docs/cli/commands/#about"
+          },
+          {
+            "label": "/auth - Authentication",
+            "slug": "docs/get-started/authentication"
+          },
+          { "label": "/bug - Report a bug", "link": "/docs/cli/commands/#bug" },
+          {
+            "label": "/chat - Chat history",
+            "link": "/docs/cli/commands/#chat"
+          },
+          {
+            "label": "/clear - Clear screen",
+            "link": "/docs/cli/commands/#clear"
+          },
+          {
+            "label": "/compress - Compress context",
+            "link": "/docs/cli/commands/#compress"
+          },
+          {
+            "label": "/copy - Copy output",
+            "link": "/docs/cli/commands/#copy"
+          },
+          {
+            "label": "/directory - Manage workspace",
+            "link": "/docs/cli/commands/#directory-or-dir"
+          },
+          {
+            "label": "/docs - Open documentation",
+            "link": "/docs/cli/commands/#docs"
+          },
+          {
+            "label": "/editor - Select editor",
+            "link": "/docs/cli/commands/#editor"
+          },
+          {
+            "label": "/extensions - Manage extensions",
+            "slug": "docs/extensions/index"
+          },
+          {
+            "label": "/help - Show help",
+            "link": "/docs/cli/commands/#help-or"
+          },
+          { "label": "/hooks - Hooks", "slug": "docs/hooks" },
+          { "label": "/ide - IDE integration", "slug": "docs/ide-integration" },
+          {
+            "label": "/init - Initialize context",
+            "link": "/docs/cli/commands/#init"
+          },
+          { "label": "/mcp - MCP servers", "slug": "docs/tools/mcp-server" },
 
-      {
-        "label": "/memory - Manage memory",
-        "link": "/docs/cli/commands/#memory"
-      },
-      { "label": "/model - Model selection", "slug": "docs/cli/model" },
-      {
-        "label": "/policies - Manage policies",
-        "link": "/docs/cli/commands/#policies"
-      },
-      {
-        "label": "/privacy - Privacy notice",
-        "link": "/docs/cli/commands/#privacy"
-      },
-      {
-        "label": "/quit - Exit CLI",
-        "link": "/docs/cli/commands/#quit-or-exit"
-      },
-      { "label": "/restore - Restore files", "slug": "docs/cli/checkpointing" },
-      {
-        "label": "/resume - Resume session",
+          {
+            "label": "/memory - Manage memory",
+            "link": "/docs/cli/commands/#memory"
+          },
+          { "label": "/model - Model selection", "slug": "docs/cli/model" },
+          {
+            "label": "/policies - Manage policies",
+            "link": "/docs/cli/commands/#policies"
+          },
+          {
+            "label": "/privacy - Privacy notice",
+            "link": "/docs/cli/commands/#privacy"
+          },
+          {
+            "label": "/quit - Exit CLI",
+            "link": "/docs/cli/commands/#quit-or-exit"
+          },
+          {
+            "label": "/restore - Restore files",
+            "slug": "docs/cli/checkpointing"
+          },
+          {
+            "label": "/resume - Resume session",
 
-        "link": "/docs/cli/commands/#resume"
-      },
-      { "label": "/rewind - Rewind", "slug": "docs/cli/rewind" },
-      { "label": "/settings - Settings", "slug": "docs/cli/settings" },
-      {
-        "label": "/setup-github - GitHub setup",
-        "link": "/docs/cli/commands/#setup-github"
-      },
-      {
-        "label": "/shells - Manage processes",
-        "link": "/docs/cli/commands/#shells-or-bashes"
-      },
-      { "label": "/skills - Agent skills", "slug": "docs/cli/skills" },
-      {
-        "label": "/stats - Session statistics",
-        "link": "/docs/cli/commands/#stats"
-      },
-      {
-        "label": "/terminal-setup - Terminal keybindings",
-        "link": "/docs/cli/commands/#terminal-setup"
-      },
-      { "label": "/theme - Themes", "slug": "docs/cli/themes" },
-      { "label": "/tools - List tools", "link": "/docs/cli/commands/#tools" },
-      { "label": "/vim - Vim mode", "link": "/docs/cli/commands/#vim" },
+            "link": "/docs/cli/commands/#resume"
+          },
+          { "label": "/rewind - Rewind", "slug": "docs/cli/rewind" },
+          { "label": "/settings - Settings", "slug": "docs/cli/settings" },
+          {
+            "label": "/setup-github - GitHub setup",
+            "link": "/docs/cli/commands/#setup-github"
+          },
+          {
+            "label": "/shells - Manage processes",
+            "link": "/docs/cli/commands/#shells-or-bashes"
+          },
+          { "label": "/skills - Agent skills", "slug": "docs/cli/skills" },
+          {
+            "label": "/stats - Session statistics",
+            "link": "/docs/cli/commands/#stats"
+          },
+          {
+            "label": "/terminal-setup - Terminal keybindings",
+            "link": "/docs/cli/commands/#terminal-setup"
+          },
+          { "label": "/theme - Themes", "slug": "docs/cli/themes" },
+          {
+            "label": "/tools - List tools",
+            "link": "/docs/cli/commands/#tools"
+          },
+          { "label": "/vim - Vim mode", "link": "/docs/cli/commands/#vim" },
 
-      {
-        "label": "Activate skill (tool)",
-        "slug": "docs/tools/activate-skill"
+          {
+            "label": "Activate skill (tool)",
+            "slug": "docs/tools/activate-skill"
+          },
+          { "label": "Ask user (tool)", "slug": "docs/tools/ask-user" },
+          { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
+          { "label": "File system (tool)", "slug": "docs/tools/file-system" },
+          { "label": "Headless mode", "slug": "docs/cli/headless" },
+          {
+            "label": "Internal documentation (tool)",
+            "slug": "docs/tools/internal-docs"
+          },
+          { "label": "Memory (tool)", "slug": "docs/tools/memory" },
+          { "label": "Model routing", "slug": "docs/cli/model-routing" },
+          { "label": "Plan mode (experimental)", "slug": "docs/cli/plan-mode" },
+          { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
+          { "label": "Shell (tool)", "slug": "docs/tools/shell" },
+          { "label": "Telemetry", "slug": "docs/cli/telemetry" },
+          { "label": "Todo (tool)", "slug": "docs/tools/todos" },
+          { "label": "Token caching", "slug": "docs/cli/token-caching" },
+          { "label": "Web fetch (tool)", "slug": "docs/tools/web-fetch" },
+          { "label": "Web search (tool)", "slug": "docs/tools/web-search" }
+        ]
       },
-      { "label": "Ask user (tool)", "slug": "docs/tools/ask-user" },
-      { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
-      { "label": "File system (tool)", "slug": "docs/tools/file-system" },
-      { "label": "Headless mode", "slug": "docs/cli/headless" },
       {
-        "label": "Internal documentation (tool)",
-        "slug": "docs/tools/internal-docs"
+        "label": "Configuration",
+        "items": [
+          { "label": "Custom commands", "slug": "docs/cli/custom-commands" },
+          {
+            "label": "Enterprise configuration",
+            "slug": "docs/cli/enterprise"
+          },
+          {
+            "label": "Ignore files (.geminiignore)",
+            "slug": "docs/cli/gemini-ignore"
+          },
+          {
+            "label": "Model configuration",
+            "slug": "docs/cli/generation-settings"
+          },
+          {
+            "label": "Project context (GEMINI.md)",
+            "slug": "docs/cli/gemini-md"
+          },
+          { "label": "Settings", "slug": "docs/cli/settings" },
+          {
+            "label": "System prompt override",
+            "slug": "docs/cli/system-prompt"
+          },
+          { "label": "Themes", "slug": "docs/cli/themes" },
+          { "label": "Trusted folders", "slug": "docs/cli/trusted-folders" }
+        ]
       },
-      { "label": "Memory (tool)", "slug": "docs/tools/memory" },
-      { "label": "Model routing", "slug": "docs/cli/model-routing" },
-      { "label": "Plan mode (experimental)", "slug": "docs/cli/plan-mode" },
-      { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
-      { "label": "Shell (tool)", "slug": "docs/tools/shell" },
-      { "label": "Telemetry", "slug": "docs/cli/telemetry" },
-      { "label": "Todo (tool)", "slug": "docs/tools/todos" },
-      { "label": "Token caching", "slug": "docs/cli/token-caching" },
-      { "label": "Web fetch (tool)", "slug": "docs/tools/web-fetch" },
-      { "label": "Web search (tool)", "slug": "docs/tools/web-search" }
+      {
+        "label": "Extensions",
+        "items": [
+          { "label": "Introduction", "slug": "docs/extensions" },
+          {
+            "label": "Writing extensions",
+            "slug": "docs/extensions/writing-extensions"
+          },
+          { "label": "Reference", "slug": "docs/extensions/reference" },
+          {
+            "label": "Best practices",
+            "slug": "docs/extensions/best-practices"
+          },
+          { "label": "Releasing", "slug": "docs/extensions/releasing" }
+        ]
+      },
+      {
+        "label": "Development",
+        "items": [
+          { "label": "Contribution guide", "slug": "docs/contributing" },
+          { "label": "Integration testing", "slug": "docs/integration-tests" },
+          {
+            "label": "Issue and PR automation",
+            "slug": "docs/issue-and-pr-automation"
+          },
+          { "label": "Local development", "slug": "docs/local-development" },
+          { "label": "NPM package structure", "slug": "docs/npm" }
+        ]
+      }
     ]
   },
   {
-    "label": "Configuration",
+    "label": "reference_tab",
     "items": [
-      { "label": "Custom commands", "slug": "docs/cli/custom-commands" },
-      { "label": "Enterprise configuration", "slug": "docs/cli/enterprise" },
       {
-        "label": "Ignore files (.geminiignore)",
-        "slug": "docs/cli/gemini-ignore"
-      },
-      {
-        "label": "Model configuration",
-        "slug": "docs/cli/generation-settings"
-      },
-      { "label": "Project context (GEMINI.md)", "slug": "docs/cli/gemini-md" },
-      { "label": "Settings", "slug": "docs/cli/settings" },
-      { "label": "System prompt override", "slug": "docs/cli/system-prompt" },
-      { "label": "Themes", "slug": "docs/cli/themes" },
-      { "label": "Trusted folders", "slug": "docs/cli/trusted-folders" }
+        "label": "Reference",
+        "items": [
+          { "label": "Command reference", "slug": "docs/reference/commands" },
+          {
+            "label": "Configuration reference",
+            "slug": "docs/reference/configuration"
+          },
+          {
+            "label": "Keyboard shortcuts",
+            "slug": "docs/reference/keyboard-shortcuts"
+          },
+          {
+            "label": "Memory import processor",
+            "slug": "docs/reference/memport"
+          },
+          { "label": "Policy engine", "slug": "docs/reference/policy-engine" },
+          { "label": "Tools API", "slug": "docs/reference/tools-api" }
+        ]
+      }
     ]
   },
   {
-    "label": "Extensions",
+    "label": "resources_tab",
     "items": [
-      { "label": "Introduction", "slug": "docs/extensions" },
       {
-        "label": "Writing extensions",
-        "slug": "docs/extensions/writing-extensions"
-      },
-      { "label": "Reference", "slug": "docs/extensions/reference" },
-      { "label": "Best practices", "slug": "docs/extensions/best-practices" },
-      { "label": "Releasing", "slug": "docs/extensions/releasing" }
+        "label": "Resources",
+        "items": [
+          {
+            "label": "Quota and pricing",
+            "slug": "docs/resources/quota-and-pricing"
+          },
+          {
+            "label": "Terms and privacy",
+            "slug": "docs/resources/tos-privacy"
+          },
+          { "label": "FAQ", "slug": "docs/resources/faq" },
+          {
+            "label": "Troubleshooting",
+            "slug": "docs/resources/troubleshooting"
+          },
+          { "label": "Uninstall", "slug": "docs/resources/uninstall" }
+        ]
+      }
     ]
   },
   {
-    "label": "Reference",
+    "label": "changelog_tab",
     "items": [
-      { "label": "Architecture", "slug": "docs/architecture" },
-      { "label": "Command reference", "slug": "docs/cli/commands" },
       {
-        "label": "Configuration reference",
-        "slug": "docs/get-started/configuration"
-      },
-      { "label": "Core concepts", "slug": "docs/core/concepts" },
-      { "label": "Keyboard shortcuts", "slug": "docs/cli/keyboard-shortcuts" },
-      { "label": "Memory import processor", "slug": "docs/core/memport" },
-      { "label": "Policy engine", "slug": "docs/core/policy-engine" },
-      { "label": "Tools API", "slug": "docs/core/tools-api" }
-    ]
-  },
-  {
-    "label": "Resources",
-    "items": [
-      { "label": "FAQ", "slug": "docs/faq" },
-      { "label": "Quota and pricing", "slug": "docs/quota-and-pricing" },
-      { "label": "Terms and privacy", "slug": "docs/tos-privacy" },
-      { "label": "Troubleshooting", "slug": "docs/troubleshooting" },
-      { "label": "Uninstall", "slug": "docs/cli/uninstall" }
-    ]
-  },
-  {
-    "label": "Development",
-    "items": [
-      { "label": "Contribution guide", "slug": "docs/contributing" },
-      { "label": "Integration testing", "slug": "docs/integration-tests" },
-      {
-        "label": "Issue and PR automation",
-        "slug": "docs/issue-and-pr-automation"
-      },
-      { "label": "Local development", "slug": "docs/local-development" },
-      { "label": "NPM package structure", "slug": "docs/npm" }
-    ]
-  },
-  {
-    "label": "Releases",
-    "items": [
-      { "label": "Release notes", "slug": "docs/changelogs/" },
-      { "label": "Stable release", "slug": "docs/changelogs/latest" },
-      { "label": "Preview release", "slug": "docs/changelogs/preview" }
+        "label": "Changelog",
+        "items": [
+          { "label": "Release notes", "slug": "docs/changelogs/" },
+          { "label": "Stable release", "slug": "docs/changelogs/latest" },
+          { "label": "Preview release", "slug": "docs/changelogs/preview" }
+        ]
+      }
     ]
   }
 ]
