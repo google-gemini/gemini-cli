@@ -192,7 +192,7 @@ function pruneHistory(history: Content[]): Content[] {
     return content;
   });
 }
-\nfunction extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
+function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
   if (comprehensiveHistory === undefined || comprehensiveHistory.length === 0) {
     return [];
   }
