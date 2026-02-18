@@ -148,7 +148,7 @@ Support, release history, and legal information.
 
 ## Development
 
-- **[Contribution guide](./contributing.md):** How to contribute to Gemini CLI.
+- **[Contribution guide](/docs/contributing):** How to contribute to Gemini CLI.
 - **[Integration testing](./integration-tests.md):** Running integration tests.
 - **[Issue and PR automation](./issue-and-pr-automation.md):** Automation for issues and pull requests.
 - **[Local development](./local-development.md):** Setting up a local development environment.
