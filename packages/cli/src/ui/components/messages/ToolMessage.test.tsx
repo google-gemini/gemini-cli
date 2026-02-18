@@ -321,7 +321,7 @@ describe('<ToolMessage />', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders progress information for executing tools', () => {
+  it('renders progress information appended to description for executing tools', () => {
     const { lastFrame } = renderWithContext(
       <ToolMessage
         {...baseProps}
@@ -331,6 +331,20 @@ describe('<ToolMessage />', () => {
       />,
       StreamingState.Responding,
     );
-    expect(lastFrame()).toContain('Working on it... (42%)');
+    expect(lastFrame()).toContain(
+      'A tool for testing (Working on it... - 42%)',
+    );
+  });
+
+  it('renders only percentage when progressMessage is missing', () => {
+    const { lastFrame } = renderWithContext(
+      <ToolMessage
+        {...baseProps}
+        status={CoreToolCallStatus.Executing}
+        progressPercent={75}
+      />,
+      StreamingState.Responding,
+    );
+    expect(lastFrame()).toContain('A tool for testing (75%)');
   });
 });

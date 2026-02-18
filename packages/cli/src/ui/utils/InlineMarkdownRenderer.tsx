@@ -35,7 +35,7 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
   const inlineRegex =
-    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+)/g;
+    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[[^\]]*?\]\([^)]*?\)|`+[^`]+?`+|<u>.*?<\/u>|https?:\/\/\S+)/g;
   let match;
 
   while ((match = inlineRegex.exec(text)) !== null) {
@@ -98,7 +98,7 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
         fullMatch.endsWith('`') &&
         fullMatch.length > INLINE_CODE_MARKER_LENGTH
       ) {
-        const codeMatch = fullMatch.match(/^(`+)(.+?)\1$/s);
+        const codeMatch = fullMatch.match(/^(`+)([^`]+?)\1$/s);
         if (codeMatch && codeMatch[2]) {
           renderedNode = (
             <Text key={key} color={theme.text.accent}>
@@ -111,7 +111,7 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
         fullMatch.includes('](') &&
         fullMatch.endsWith(')')
       ) {
-        const linkMatch = fullMatch.match(/\[(.*?)\]\((.*?)\)/);
+        const linkMatch = fullMatch.match(/\[([^\]]*?)\]\(([^)]*?)\)/);
         if (linkMatch) {
           const linkText = linkMatch[1];
           const url = linkMatch[2];

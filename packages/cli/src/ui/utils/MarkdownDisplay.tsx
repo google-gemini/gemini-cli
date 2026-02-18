@@ -64,9 +64,11 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
   const codeFenceRegex = /^ *(`{3,}|~{3,}) *(\w*?) *$/;
   const ulItemRegex = /^([ \t]*)([-*+]) +(.*)/;
   const olItemRegex = /^([ \t]*)(\d+)\. +(.*)/;
-  const hrRegex = /^ *([-*_] *){3,} *$/;
+  const hrRegex =
+    /^ {0,3}(?:(?:\*[\t ]*){3,}|(?:-[\t ]*){3,}|(?:_[\t ]*){3,})[\t ]*$/;
   const tableRowRegex = /^\s*\|(.+)\|\s*$/;
-  const tableSeparatorRegex = /^\s*\|?\s*(:?-+:?)\s*(\|\s*(:?-+:?)\s*)+\|?\s*$/;
+  const tableSeparatorRegex =
+    /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)+\|?[ \t]*$/;
 
   const contentBlocks: React.ReactNode[] = [];
   let inCodeBlock = false;

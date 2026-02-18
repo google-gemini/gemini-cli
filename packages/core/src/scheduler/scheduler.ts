@@ -124,6 +124,10 @@ export class Scheduler {
     coreEvents.on(CoreEvent.McpProgress, this.handleMcpProgress);
   }
 
+  dispose(): void {
+    coreEvents.off(CoreEvent.McpProgress, this.handleMcpProgress);
+  }
+
   private readonly handleMcpProgress = (payload: McpProgressPayload) => {
     const callId = payload.callId;
     this.state.updateStatus(callId, CoreToolCallStatus.Executing, {

@@ -214,13 +214,23 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
   // Hide description for completed Ask User tools (the result display speaks for itself)
   const isCompletedAskUser = isCompletedAskUserTool(name, status);
 
-  const displayDescription =
-    status === ToolCallStatus.Executing && progressMessage
-      ? progressMessage +
-        (progressPercent !== undefined
-          ? ` (${Math.round(progressPercent)}%)`
-          : '')
-      : description;
+  let displayDescription = description;
+  if (status === ToolCallStatus.Executing) {
+    const parts: string[] = [];
+    if (progressMessage) {
+      parts.push(progressMessage);
+    }
+    if (progressPercent !== undefined) {
+      parts.push(`${Math.round(progressPercent)}%`);
+    }
+
+    if (parts.length > 0) {
+      const progressInfo = parts.join(' - ');
+      displayDescription = description
+        ? `${description} (${progressInfo})`
+        : progressInfo;
+    }
+  }
 
   return (
     <Box overflow="hidden" height={1} flexGrow={1} flexShrink={1}>
