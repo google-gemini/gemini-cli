@@ -91,7 +91,7 @@ describe('ShellTool XML Safety', () => {
     expect(result.llmContent).toContain('</output>');
     expect(result.llmContent).toContain('<exit_code>0</exit_code>');
 
-    const matches = result.llmContent.match(/]]>/g);
+    const matches = (result.llmContent as string).match(/]]>/g);
     // Should have at least two ]]>: one from the sanitization and one from the wrapCData end.
     expect(matches?.length).toBeGreaterThanOrEqual(2);
   });
