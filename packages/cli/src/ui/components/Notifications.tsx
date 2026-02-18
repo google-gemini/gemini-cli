@@ -94,7 +94,9 @@ export const Notifications = () => {
               <Box width={3}>
                 <Text color={theme.status.warning}>⚠ </Text>
               </Box>
-              <Text color={theme.status.warning}>{warning}</Text>
+              <Box flexGrow={1}>
+                <Text color={theme.status.warning}>{warning}</Text>
+              </Box>
             </Box>
           ))}
         </Box>
