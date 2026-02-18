@@ -9,6 +9,10 @@ import type { AgentDefinition } from '../agents/types.js';
 import type { McpClient } from '../tools/mcp-client.js';
 import type { ExtensionEvents } from './extensionLoader.js';
 import type { EditorType } from './editor.js';
+import type {
+  TokenStorageInitializationEvent,
+  KeychainAvailabilityEvent,
+} from '../telemetry/types.js';
 
 /**
  * Defines the severity level for user-facing feedback.
@@ -127,6 +131,17 @@ export interface AgentsDiscoveredPayload {
   agents: AgentDefinition[];
 }
 
+export interface SlashCommandConflict {
+  name: string;
+  renamedTo: string;
+  loserExtensionName?: string;
+  winnerExtensionName?: string;
+}
+
+export interface SlashCommandConflictsPayload {
+  conflicts: SlashCommandConflict[];
+}
+
 /**
  * Payload for the 'quota-changed' event.
  */
@@ -155,7 +170,10 @@ export enum CoreEvent {
   AgentsDiscovered = 'agents-discovered',
   RequestEditorSelection = 'request-editor-selection',
   EditorSelected = 'editor-selected',
+  SlashCommandConflicts = 'slash-command-conflicts',
   QuotaChanged = 'quota-changed',
+  TelemetryKeychainAvailability = 'telemetry-keychain-availability',
+  TelemetryTokenStorageType = 'telemetry-token-storage-type',
 }
 
 /**
@@ -185,6 +203,9 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.AgentsDiscovered]: [AgentsDiscoveredPayload];
   [CoreEvent.RequestEditorSelection]: never[];
   [CoreEvent.EditorSelected]: [EditorSelectedPayload];
+  [CoreEvent.SlashCommandConflicts]: [SlashCommandConflictsPayload];
+  [CoreEvent.TelemetryKeychainAvailability]: [KeychainAvailabilityEvent];
+  [CoreEvent.TelemetryTokenStorageType]: [TokenStorageInitializationEvent];
 }
 
 type EventBacklogItem = {
@@ -322,6 +343,11 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
     this._emitOrQueue(CoreEvent.AgentsDiscovered, payload);
   }
 
+  emitSlashCommandConflicts(conflicts: SlashCommandConflict[]): void {
+    const payload: SlashCommandConflictsPayload = { conflicts };
+    this._emitOrQueue(CoreEvent.SlashCommandConflicts, payload);
+  }
+
   /**
    * Notifies subscribers that the quota has changed.
    */
@@ -348,6 +374,14 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
         ...item.args,
       );
     }
+  }
+
+  emitTelemetryKeychainAvailability(event: KeychainAvailabilityEvent): void {
+    this._emitOrQueue(CoreEvent.TelemetryKeychainAvailability, event);
+  }
+
+  emitTelemetryTokenStorageType(event: TokenStorageInitializationEvent): void {
+    this._emitOrQueue(CoreEvent.TelemetryTokenStorageType, event);
   }
 }
 

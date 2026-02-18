@@ -7,7 +7,6 @@
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
-import { ToolCallStatus } from '../../types.js';
 import {
   ScrollableList,
   type ScrollableListRef,
@@ -16,6 +15,7 @@ import { Box, Text } from 'ink';
 import { act, useRef, useEffect } from 'react';
 import { waitFor } from '../../../test-utils/async.js';
 import { SHELL_COMMAND_NAME } from '../../constants.js';
+import { CoreToolCallStatus } from '@google/gemini-cli-core';
 
 // Mock child components that might be complex
 vi.mock('../TerminalOutput.js', () => ({
@@ -51,7 +51,7 @@ describe('ToolMessage Sticky Header Regression', () => {
       { length: 10 },
       (_, i) => `${resultPrefix}-${String(i + 1).padStart(2, '0')}`,
     ).join('\n'),
-    status: ToolCallStatus.Success,
+    status: CoreToolCallStatus.Success,
     confirmationDetails: undefined,
     renderOutputAsMarkdown: false,
   });
@@ -79,7 +79,7 @@ describe('ToolMessage Sticky Header Regression', () => {
           data={['item1']}
           renderItem={() => (
             <ToolGroupMessage
-              groupId={1}
+              item={{ id: 1, type: 'tool_group', tools: toolCalls }}
               toolCalls={toolCalls}
               terminalWidth={terminalWidth - 2} // Account for ScrollableList padding
             />
@@ -144,7 +144,7 @@ describe('ToolMessage Sticky Header Regression', () => {
     const toolCalls = [
       {
         ...createToolCall('1', SHELL_COMMAND_NAME, 'shell'),
-        status: ToolCallStatus.Success,
+        status: CoreToolCallStatus.Success,
       },
     ];
 
@@ -165,7 +165,7 @@ describe('ToolMessage Sticky Header Regression', () => {
           data={['item1']}
           renderItem={() => (
             <ToolGroupMessage
-              groupId={1}
+              item={{ id: 1, type: 'tool_group', tools: toolCalls }}
               toolCalls={toolCalls}
               terminalWidth={terminalWidth - 2}
             />

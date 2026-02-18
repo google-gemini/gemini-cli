@@ -61,7 +61,11 @@ Other ways to start in Plan Mode:
 You can enter Plan Mode in three ways:
 
 1.  **Keyboard Shortcut:** Press `Shift+Tab` to cycle through approval modes
-    (`Default` -> `Plan` -> `Auto-Edit`).
+    (`Default` -> `Auto-Edit` -> `Plan`).
+
+    > **Note:** Plan Mode is automatically removed from the rotation when the
+    > agent is actively processing or showing confirmation dialogs.
+
 2.  **Command:** Type `/plan` in the input box.
 3.  **Natural Language:** Ask the agent to "start a plan for...". The agent will
     then call the [`enter_plan_mode`] tool to switch modes.
@@ -99,7 +103,7 @@ These are the only allowed tools:
 - **MCP Tools (Read):** Read-only [MCP tools] (e.g., `github_read_issue`,
   `postgres_read_schema`) are allowed.
 - **Planning (Write):** [`write_file`] and [`replace`] ONLY allowed for `.md`
-  files in the `~/.gemini/tmp/<project>/plans/` directory.
+  files in the `~/.gemini/tmp/<project>/<session-id>/plans/` directory.
 - **Skills:** [`activate_skill`] (allows loading specialized instructions and
   resources in a read-only manner)
 
