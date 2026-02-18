@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
 import { AboutBox } from './AboutBox.js';
 import { describe, it, expect, vi } from 'vitest';
 
@@ -25,7 +25,7 @@ describe('AboutBox', () => {
   };
 
   it('renders with required props', () => {
-    const { lastFrame } = render(<AboutBox {...defaultProps} />);
+    const { lastFrame } = renderWithProviders(<AboutBox {...defaultProps} />);
     const output = lastFrame();
     expect(output).toContain('About Gemini CLI');
     expect(output).toContain('1.0.0');
@@ -33,24 +33,31 @@ describe('AboutBox', () => {
     expect(output).toContain('gemini-pro');
     expect(output).toContain('default');
     expect(output).toContain('macOS');
-    expect(output).toContain('OAuth');
+    expect(output).toContain('Logged in with Google');
   });
 
   it.each([
-    ['userEmail', 'test@example.com', 'User Email'],
     ['gcpProject', 'my-project', 'GCP Project'],
     ['ideClient', 'vscode', 'IDE Client'],
+    ['tier', 'Enterprise', 'Tier'],
   ])('renders optional prop %s', (prop, value, label) => {
     const props = { ...defaultProps, [prop]: value };
-    const { lastFrame } = render(<AboutBox {...props} />);
+    const { lastFrame } = renderWithProviders(<AboutBox {...props} />);
     const output = lastFrame();
     expect(output).toContain(label);
     expect(output).toContain(value);
   });
 
+  it('renders Auth Method with email when userEmail is provided', () => {
+    const props = { ...defaultProps, userEmail: 'test@example.com' };
+    const { lastFrame } = renderWithProviders(<AboutBox {...props} />);
+    const output = lastFrame();
+    expect(output).toContain('Logged in with Google (test@example.com)');
+  });
+
   it('renders Auth Method correctly when not oauth', () => {
     const props = { ...defaultProps, selectedAuthType: 'api-key' };
-    const { lastFrame } = render(<AboutBox {...props} />);
+    const { lastFrame } = renderWithProviders(<AboutBox {...props} />);
     const output = lastFrame();
     expect(output).toContain('api-key');
   });

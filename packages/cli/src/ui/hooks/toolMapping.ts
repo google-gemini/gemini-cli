@@ -6,41 +6,15 @@
 
 import {
   type ToolCall,
-  type Status as CoreStatus,
-  type ToolCallConfirmationDetails,
   type SerializableConfirmationDetails,
   type ToolResultDisplay,
   debugLogger,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import {
-  ToolCallStatus,
   type HistoryItemToolGroup,
   type IndividualToolCallDisplay,
 } from '../types.js';
-
-export function mapCoreStatusToDisplayStatus(
-  coreStatus: CoreStatus,
-): ToolCallStatus {
-  switch (coreStatus) {
-    case 'validating':
-      return ToolCallStatus.Executing;
-    case 'awaiting_approval':
-      return ToolCallStatus.Confirming;
-    case 'executing':
-      return ToolCallStatus.Executing;
-    case 'success':
-      return ToolCallStatus.Success;
-    case 'cancelled':
-      return ToolCallStatus.Canceled;
-    case 'error':
-      return ToolCallStatus.Error;
-    case 'scheduled':
-      return ToolCallStatus.Pending;
-    default:
-      debugLogger.warn(`Unknown core status encountered: ${coreStatus}`);
-      return ToolCallStatus.Error;
-  }
-}
 
 /**
  * Transforms `ToolCall` objects into `HistoryItemToolGroup` objects for UI
@@ -49,8 +23,15 @@ export function mapCoreStatusToDisplayStatus(
  */
 export function mapToDisplay(
   toolOrTools: ToolCall[] | ToolCall,
+  options: {
+    borderTop?: boolean;
+    borderBottom?: boolean;
+    borderColor?: string;
+    borderDimColor?: boolean;
+  } = {},
 ): HistoryItemToolGroup {
   const toolCalls = Array.isArray(toolOrTools) ? toolOrTools : [toolOrTools];
+  const { borderTop, borderBottom, borderColor, borderDimColor } = options;
 
   const toolDisplays = toolCalls.map((call): IndividualToolCallDisplay => {
     let description: string;
@@ -58,7 +39,7 @@ export function mapToDisplay(
 
     const displayName = call.tool?.displayName ?? call.request.name;
 
-    if (call.status === 'error') {
+    if (call.status === CoreToolCallStatus.Error) {
       description = JSON.stringify(call.request.args);
     } else {
       description = call.invocation.getDescription();
@@ -73,34 +54,36 @@ export function mapToDisplay(
     };
 
     let resultDisplay: ToolResultDisplay | undefined = undefined;
-    let confirmationDetails:
-      | ToolCallConfirmationDetails
-      | SerializableConfirmationDetails
-      | undefined = undefined;
+    let confirmationDetails: SerializableConfirmationDetails | undefined =
+      undefined;
     let outputFile: string | undefined = undefined;
     let ptyId: number | undefined = undefined;
     let correlationId: string | undefined = undefined;
+    let progressMessage: string | undefined = undefined;
+    let progressPercent: number | undefined = undefined;
 
     switch (call.status) {
-      case 'success':
+      case CoreToolCallStatus.Success:
         resultDisplay = call.response.resultDisplay;
         outputFile = call.response.outputFile;
         break;
-      case 'error':
-      case 'cancelled':
+      case CoreToolCallStatus.Error:
+      case CoreToolCallStatus.Cancelled:
         resultDisplay = call.response.resultDisplay;
         break;
-      case 'awaiting_approval':
+      case CoreToolCallStatus.AwaitingApproval:
         correlationId = call.correlationId;
         // Pass through details. Context handles dispatch (callback vs bus).
         confirmationDetails = call.confirmationDetails;
         break;
-      case 'executing':
+      case CoreToolCallStatus.Executing:
         resultDisplay = call.liveOutput;
         ptyId = call.pid;
+        progressMessage = call.progressMessage;
+        progressPercent = call.progressPercent;
         break;
-      case 'scheduled':
-      case 'validating':
+      case CoreToolCallStatus.Scheduled:
+      case CoreToolCallStatus.Validating:
         break;
       default: {
         const exhaustiveCheck: never = call;
@@ -115,17 +98,24 @@ export function mapToDisplay(
 
     return {
       ...baseDisplayProperties,
-      status: mapCoreStatusToDisplayStatus(call.status),
+      status: call.status,
       resultDisplay,
       confirmationDetails,
       outputFile,
       ptyId,
       correlationId,
+      progressMessage,
+      progressPercent,
+      approvalMode: call.approvalMode,
     };
   });
 
   return {
     type: 'tool_group',
     tools: toolDisplays,
+    borderTop,
+    borderBottom,
+    borderColor,
+    borderDimColor,
   };
 }

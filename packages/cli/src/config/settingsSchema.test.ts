@@ -107,6 +107,14 @@ describe('SettingsSchema', () => {
         getSettingsSchema().context.properties.fileFiltering.properties
           ?.enableRecursiveFileSearch,
       ).toBeDefined();
+      expect(
+        getSettingsSchema().context.properties.fileFiltering.properties
+          ?.customIgnoreFilePaths,
+      ).toBeDefined();
+      expect(
+        getSettingsSchema().context.properties.fileFiltering.properties
+          ?.customIgnoreFilePaths.type,
+      ).toBe('array');
     });
 
     it('should have unique categories', () => {
@@ -178,6 +186,9 @@ describe('SettingsSchema', () => {
       expect(getSettingsSchema().ui.properties.hideTips.showInDialog).toBe(
         true,
       );
+      expect(
+        getSettingsSchema().ui.properties.showShortcutsHint.showInDialog,
+      ).toBe(true);
       expect(getSettingsSchema().ui.properties.hideBanner.showInDialog).toBe(
         true,
       );
@@ -216,7 +227,7 @@ describe('SettingsSchema', () => {
       expect(
         getSettingsSchema().advanced.properties.autoConfigureMemory
           .showInDialog,
-      ).toBe(false);
+      ).toBe(true);
     });
 
     it('should infer Settings type correctly', () => {
@@ -286,7 +297,7 @@ describe('SettingsSchema', () => {
       expect(
         getSettingsSchema().security.properties.folderTrust.properties.enabled
           .default,
-      ).toBe(false);
+      ).toBe(true);
       expect(
         getSettingsSchema().security.properties.folderTrust.properties.enabled
           .showInDialog,
@@ -320,28 +331,37 @@ describe('SettingsSchema', () => {
       ).toBe('Enable debug logging of keystrokes to the console.');
     });
 
-    it('should have previewFeatures setting in schema', () => {
-      expect(
-        getSettingsSchema().general.properties.previewFeatures,
-      ).toBeDefined();
-      expect(getSettingsSchema().general.properties.previewFeatures.type).toBe(
+    it('should have showShortcutsHint setting in schema', () => {
+      expect(getSettingsSchema().ui.properties.showShortcutsHint).toBeDefined();
+      expect(getSettingsSchema().ui.properties.showShortcutsHint.type).toBe(
         'boolean',
       );
+      expect(getSettingsSchema().ui.properties.showShortcutsHint.category).toBe(
+        'UI',
+      );
+      expect(getSettingsSchema().ui.properties.showShortcutsHint.default).toBe(
+        true,
+      );
       expect(
-        getSettingsSchema().general.properties.previewFeatures.category,
-      ).toBe('General');
-      expect(
-        getSettingsSchema().general.properties.previewFeatures.default,
+        getSettingsSchema().ui.properties.showShortcutsHint.requiresRestart,
       ).toBe(false);
       expect(
-        getSettingsSchema().general.properties.previewFeatures.requiresRestart,
-      ).toBe(false);
-      expect(
-        getSettingsSchema().general.properties.previewFeatures.showInDialog,
+        getSettingsSchema().ui.properties.showShortcutsHint.showInDialog,
       ).toBe(true);
       expect(
-        getSettingsSchema().general.properties.previewFeatures.description,
-      ).toBe('Enable preview features (e.g., preview models).');
+        getSettingsSchema().ui.properties.showShortcutsHint.description,
+      ).toBe('Show the "? for shortcuts" hint above the input.');
+    });
+
+    it('should have enableNotifications setting in schema', () => {
+      const setting =
+        getSettingsSchema().general.properties.enableNotifications;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('General');
+      expect(setting.default).toBe(false);
+      expect(setting.requiresRestart).toBe(false);
+      expect(setting.showInDialog).toBe(true);
     });
 
     it('should have enableAgents setting in schema', () => {
@@ -378,20 +398,6 @@ describe('SettingsSchema', () => {
       expect(setting.showInDialog).toBe(true);
       expect(setting.description).toBe(
         'Enable planning features (Plan Mode and tools).',
-      );
-    });
-
-    it('should have enableEventDrivenScheduler setting in schema', () => {
-      const setting =
-        getSettingsSchema().experimental.properties.enableEventDrivenScheduler;
-      expect(setting).toBeDefined();
-      expect(setting.type).toBe('boolean');
-      expect(setting.category).toBe('Experimental');
-      expect(setting.default).toBe(true);
-      expect(setting.requiresRestart).toBe(true);
-      expect(setting.showInDialog).toBe(false);
-      expect(setting.description).toBe(
-        'Enables event-driven scheduler within the CLI session.',
       );
     });
 

@@ -28,8 +28,8 @@ export function ApiAuthDialog({
   error,
   defaultValue = '',
 }: ApiAuthDialogProps): React.JSX.Element {
-  const { mainAreaWidth } = useUIState();
-  const viewportWidth = mainAreaWidth - 8;
+  const { terminalWidth } = useUIState();
+  const viewportWidth = terminalWidth - 8;
 
   const pendingPromise = useRef<{ cancel: () => void } | null>(null);
 
@@ -49,7 +49,6 @@ export function ApiAuthDialog({
       width: viewportWidth,
       height: 4,
     },
-    isValidPath: () => false, // No path validation needed for API key
     inputFilter: (text) =>
       text.replace(/[^a-zA-Z0-9_-]/g, '').replace(/[\r\n]/g, ''),
     singleLine: true,
@@ -86,10 +85,12 @@ export function ApiAuthDialog({
   };
 
   useKeypress(
-    async (key) => {
+    (key) => {
       if (keyMatchers[Command.CLEAR_INPUT](key)) {
-        await handleClear();
+        void handleClear();
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );

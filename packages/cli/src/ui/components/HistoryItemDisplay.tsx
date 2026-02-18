@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -34,16 +34,16 @@ import { McpStatus } from './views/McpStatus.js';
 import { ChatList } from './views/ChatList.js';
 import { HooksList } from './views/HooksList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
+import { ThinkingMessage } from './messages/ThinkingMessage.js';
+import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;
   availableTerminalHeight?: number;
   terminalWidth: number;
   isPending: boolean;
-  isFocused?: boolean;
   commands?: readonly SlashCommand[];
-  activeShellPtyId?: number | null;
-  embeddedShellFocused?: boolean;
   availableTerminalHeightGemini?: number;
 }
 
@@ -53,21 +53,23 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   terminalWidth,
   isPending,
   commands,
-  isFocused = true,
-  activeShellPtyId,
-  embeddedShellFocused,
   availableTerminalHeightGemini,
 }) => {
+  const settings = useSettings();
+  const inlineThinkingMode = getInlineThinkingMode(settings);
   const itemForDisplay = useMemo(() => escapeAnsiCtrlCodes(item), [item]);
 
   return (
     <Box flexDirection="column" key={itemForDisplay.id} width={terminalWidth}>
       {/* Render standard message types */}
+      {itemForDisplay.type === 'thinking' && inlineThinkingMode !== 'off' && (
+        <ThinkingMessage thought={itemForDisplay.thought} />
+      )}
       {itemForDisplay.type === 'user' && (
         <UserMessage text={itemForDisplay.text} width={terminalWidth} />
       )}
       {itemForDisplay.type === 'user_shell' && (
-        <UserShellMessage text={itemForDisplay.text} />
+        <UserShellMessage text={itemForDisplay.text} width={terminalWidth} />
       )}
       {itemForDisplay.type === 'gemini' && (
         <GeminiMessage
@@ -112,6 +114,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           gcpProject={itemForDisplay.gcpProject}
           ideClient={itemForDisplay.ideClient}
           userEmail={itemForDisplay.userEmail}
+          tier={itemForDisplay.tier}
         />
       )}
       {itemForDisplay.type === 'help' && commands && (
@@ -121,9 +124,42 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         <StatsDisplay
           duration={itemForDisplay.duration}
           quotas={itemForDisplay.quotas}
+          selectedAuthType={itemForDisplay.selectedAuthType}
+          userEmail={itemForDisplay.userEmail}
+          tier={itemForDisplay.tier}
+          currentModel={itemForDisplay.currentModel}
+          quotaStats={
+            itemForDisplay.pooledRemaining !== undefined ||
+            itemForDisplay.pooledLimit !== undefined ||
+            itemForDisplay.pooledResetTime !== undefined
+              ? {
+                  remaining: itemForDisplay.pooledRemaining,
+                  limit: itemForDisplay.pooledLimit,
+                  resetTime: itemForDisplay.pooledResetTime,
+                }
+              : undefined
+          }
         />
       )}
-      {itemForDisplay.type === 'model_stats' && <ModelStatsDisplay />}
+      {itemForDisplay.type === 'model_stats' && (
+        <ModelStatsDisplay
+          selectedAuthType={itemForDisplay.selectedAuthType}
+          userEmail={itemForDisplay.userEmail}
+          tier={itemForDisplay.tier}
+          currentModel={itemForDisplay.currentModel}
+          quotaStats={
+            itemForDisplay.pooledRemaining !== undefined ||
+            itemForDisplay.pooledLimit !== undefined ||
+            itemForDisplay.pooledResetTime !== undefined
+              ? {
+                  remaining: itemForDisplay.pooledRemaining,
+                  limit: itemForDisplay.pooledLimit,
+                  resetTime: itemForDisplay.pooledResetTime,
+                }
+              : undefined
+          }
+        />
+      )}
       {itemForDisplay.type === 'tool_stats' && <ToolStatsDisplay />}
       {itemForDisplay.type === 'model' && (
         <ModelMessage model={itemForDisplay.model} />
@@ -133,13 +169,12 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'tool_group' && (
         <ToolGroupMessage
+          item={itemForDisplay}
           toolCalls={itemForDisplay.tools}
-          groupId={itemForDisplay.id}
           availableTerminalHeight={availableTerminalHeight}
           terminalWidth={terminalWidth}
-          isFocused={isFocused}
-          activeShellPtyId={activeShellPtyId}
-          embeddedShellFocused={embeddedShellFocused}
+          borderTop={itemForDisplay.borderTop}
+          borderBottom={itemForDisplay.borderBottom}
         />
       )}
       {itemForDisplay.type === 'compression' && (

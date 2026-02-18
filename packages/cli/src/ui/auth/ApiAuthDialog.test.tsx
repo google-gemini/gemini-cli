@@ -5,6 +5,7 @@
  */
 
 import { render } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { ApiAuthDialog } from './ApiAuthDialog.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -34,7 +35,7 @@ vi.mock('../components/shared/text-buffer.js', () => ({
 
 vi.mock('../contexts/UIStateContext.js', () => ({
   useUIState: vi.fn(() => ({
-    mainAreaWidth: 80,
+    terminalWidth: 80,
   })),
 }));
 
@@ -109,6 +110,7 @@ describe('ApiAuthDialog', () => {
       keypressHandler({
         name: keyName,
         shift: false,
+        alt: false,
         ctrl: false,
         cmd: false,
         sequence,
@@ -132,17 +134,20 @@ describe('ApiAuthDialog', () => {
 
   it('calls clearApiKey and clears buffer when Ctrl+C is pressed', async () => {
     render(<ApiAuthDialog onSubmit={onSubmit} onCancel={onCancel} />);
-    // calls[0] is the ApiAuthDialog's useKeypress (Ctrl+C handler)
+    // Call 0 is ApiAuthDialog (isActive: true)
+    // Call 1 is TextInput (isActive: true, priority: true)
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
-    await keypressHandler({
+    keypressHandler({
       name: 'c',
       shift: false,
       ctrl: true,
       cmd: false,
     });
 
-    expect(clearApiKey).toHaveBeenCalled();
-    expect(mockBuffer.setText).toHaveBeenCalledWith('');
+    await waitFor(() => {
+      expect(clearApiKey).toHaveBeenCalled();
+      expect(mockBuffer.setText).toHaveBeenCalledWith('');
+    });
   });
 });

@@ -4,25 +4,34 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ExtensionEvents, McpClient } from '@google/gemini-cli-core';
 import { EventEmitter } from 'node:events';
+
+export enum TransientMessageType {
+  Warning = 'warning',
+  Hint = 'hint',
+}
+
+export interface TransientMessagePayload {
+  message: string;
+  type: TransientMessageType;
+}
 
 export enum AppEvent {
   OpenDebugConsole = 'open-debug-console',
-  OauthDisplayMessage = 'oauth-display-message',
   Flicker = 'flicker',
-  McpClientUpdate = 'mcp-client-update',
   SelectionWarning = 'selection-warning',
   PasteTimeout = 'paste-timeout',
+  TerminalBackground = 'terminal-background',
+  TransientMessage = 'transient-message',
 }
 
-export interface AppEvents extends ExtensionEvents {
+export interface AppEvents {
   [AppEvent.OpenDebugConsole]: never[];
-  [AppEvent.OauthDisplayMessage]: string[];
   [AppEvent.Flicker]: never[];
-  [AppEvent.McpClientUpdate]: Array<Map<string, McpClient> | never>;
   [AppEvent.SelectionWarning]: never[];
   [AppEvent.PasteTimeout]: never[];
+  [AppEvent.TerminalBackground]: [string];
+  [AppEvent.TransientMessage]: [TransientMessagePayload];
 }
 
 export const appEvents = new EventEmitter<AppEvents>();

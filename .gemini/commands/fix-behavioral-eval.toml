@@ -1,0 +1,60 @@
+description = "Check status of nightly evals, fix failures for key models, and re-run."
+prompt = """
+You are an expert at fixing behavioral evaluations.
+
+1. **Investigate**:
+   - Use 'gh' cli to fetch the results from the latest run from the main branch: https://github.com/google-gemini/gemini-cli/actions/workflows/evals-nightly.yml.
+   - DO NOT push any changes or start any runs. The rest of your evaluation will be local.
+   - Evals are in evals/ directory and are documented by evals/README.md.
+   - The test case trajectory logs will be logged to evals/logs.
+   - You should also enable and review the verbose agent logs by setting the GEMINI_DEBUG_LOG_FILE environment variable.
+   - Identify the relevant test. Confine your investigation and validation to just this test.
+   - Proactively add logging that will aid in gathering information or validating your hypotheses.
+
+2. **Fix**:
+   - If a relevant test is failing, locate the test file and the corresponding prompt/code.
+   - It's often helpful to make an extreme, brute force change to see if you are changing the right place to make an improvement and then scope it back iteratively.
+   - Your **final** change should be **minimal and targeted**.
+   - Keep in mind the following:
+     - The prompt has multiple configurations and pieces. Take care that your changes
+       end up in the final prompt for the selected model and configuration.
+     - The prompt chosen for the eval is intentional. It's often vague or indirect
+       to see how the agent performs with ambiguous instructions. Changing it should
+       be a last resort.
+     - When changing the test prompt, carefully consider whether the prompt still tests
+       the same scenario. We don't want to lose test fidelity by making the prompts too
+       direct (i.e.: easy).
+     - Your primary mechanism for improving the agent's behavior is to make changes to
+       tool instructions, system prompt (snippets.ts), and/or modules that contribute to the prompt.
+     - If prompt and description changes are unsuccessful, use logs and debugging to
+       confirm that everything is working as expected.
+    - If unable to fix the test, you can make recommendations for architecture changes
+      that might help stablize the test. Be sure to THINK DEEPLY if offering architecture guidance.
+      Some facts that might help with this are:
+      - Agents may be composed of one or more agent loops.
+      - AgentLoop == 'context + toolset + prompt'. Subagents are one type of agent loop.
+      - Agent loops perform better when:
+        - They have direct, unambiguous, and non-contradictory prompts.
+        - They have fewer irrelevant tools.
+        - They have fewer goals or steps to perform.
+        - They have less low value or irrelevant context.
+      - You may suggest compositions of existing primitives, like subagents, or
+        propose a new one.
+      - These recommendations should be high confidence and should be grounded
+        in observed deficient behaviors rather than just parroting the facts above.
+        Investigate as needed to ground your recommendations.
+
+3. **Verify**:
+   - Run just that one test if needed to validate that it is fixed. Be sure to run vitest in non-interactive mode.
+   - Running the tests can take a long time, so consider whether you can diagnose via other means or log diagnostics before committing the time. You must minimize the number of test runs needed to diagnose the failure.
+   - After the test completes, check whether it seems to have improved.
+   - You will need to run the test 3 times for Gemini 3.0, Gemini 3 flash, and Gemini 2.5 pro to ensure that it is truly stable. Run these runs in parallel, using scripts if needed.
+   - Some flakiness is expected; if it looks like a transient issue or the test is inherently unstable but passes 2/3 times, you might decide it cannot be improved.
+
+4. **Report**:
+   - Provide a summary of the test success rate for each of the tested models.
+   - Success rate is calculated based on 3 runs per model (e.g., 3/3 = 100%).
+   - If you couldn't fix it due to persistent flakiness, explain why.
+
+{{args}}
+"""

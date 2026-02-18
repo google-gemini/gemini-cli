@@ -5,10 +5,10 @@ exports[`RewindViewer > Content Filtering > 'removes reference markers' 1`] = `
 │                                                                                                                      │
 │ > Rewind                                                                                                             │
 │                                                                                                                      │
-│ ● some command @file                                                                                                 │
+│   some command @file                                                                                                 │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│   Stay at current position                                                                                           │
+│ ● Stay at current position                                                                                           │
 │   Cancel rewind and stay here                                                                                        │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -22,10 +22,27 @@ exports[`RewindViewer > Content Filtering > 'strips expanded MCP resource conten
 │                                                                                                                      │
 │ > Rewind                                                                                                             │
 │                                                                                                                      │
-│ ● read @server3:mcp://demo-resource hello                                                                            │
+│   read @server3:mcp://demo-resource hello                                                                            │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│   Stay at current position                                                                                           │
+│ ● Stay at current position                                                                                           │
+│   Cancel rewind and stay here                                                                                        │
+│                                                                                                                      │
+│                                                                                                                      │
+│ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                                         │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`RewindViewer > Content Filtering > 'uses displayContent if present and do…' 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                      │
+│ > Rewind                                                                                                             │
+│                                                                                                                      │
+│   clean display content                                                                                              │
+│   No files have been changed                                                                                         │
+│                                                                                                                      │
+│ ● Stay at current position                                                                                           │
 │   Cancel rewind and stay here                                                                                        │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -72,13 +89,13 @@ exports[`RewindViewer > Navigation > handles 'down' navigation > after-down 1`] 
 │   Q1                                                                                                                 │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│ ● Q2                                                                                                                 │
+│   Q2                                                                                                                 │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │   Q3                                                                                                                 │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│   Stay at current position                                                                                           │
+│ ● Stay at current position                                                                                           │
 │   Cancel rewind and stay here                                                                                        │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -98,30 +115,7 @@ exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 1`] = `
 │   Q2                                                                                                                 │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│   Q3                                                                                                                 │
-│   No files have been changed                                                                                         │
-│                                                                                                                      │
-│ ● Stay at current position                                                                                           │
-│   Cancel rewind and stay here                                                                                        │
-│                                                                                                                      │
-│                                                                                                                      │
-│ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                                         │
-│                                                                                                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
-`;
-
-exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-down 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                                      │
-│ > Rewind                                                                                                             │
-│                                                                                                                      │
-│ ● Q1                                                                                                                 │
-│   No files have been changed                                                                                         │
-│                                                                                                                      │
-│   Q2                                                                                                                 │
-│   No files have been changed                                                                                         │
-│                                                                                                                      │
-│   Q3                                                                                                                 │
+│ ● Q3                                                                                                                 │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │   Stay at current position                                                                                           │
@@ -133,7 +127,7 @@ exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-down 1`]
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-up 1`] = `
+exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-down 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                                      │
 │ > Rewind                                                                                                             │
@@ -156,15 +150,38 @@ exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-up 1`] =
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
+exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-up 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                      │
+│ > Rewind                                                                                                             │
+│                                                                                                                      │
+│   Q1                                                                                                                 │
+│   No files have been changed                                                                                         │
+│                                                                                                                      │
+│   Q2                                                                                                                 │
+│   No files have been changed                                                                                         │
+│                                                                                                                      │
+│ ● Q3                                                                                                                 │
+│   No files have been changed                                                                                         │
+│                                                                                                                      │
+│   Stay at current position                                                                                           │
+│   Cancel rewind and stay here                                                                                        │
+│                                                                                                                      │
+│                                                                                                                      │
+│ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                                         │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
 exports[`RewindViewer > Rendering > renders 'a single interaction' 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                                      │
 │ > Rewind                                                                                                             │
 │                                                                                                                      │
-│ ● Hello                                                                                                              │
+│   Hello                                                                                                              │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│   Stay at current position                                                                                           │
+│ ● Stay at current position                                                                                           │
 │   Cancel rewind and stay here                                                                                        │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -178,11 +195,11 @@ exports[`RewindViewer > Rendering > renders 'full text for selected item' 1`] = 
 │                                                                                                                      │
 │ > Rewind                                                                                                             │
 │                                                                                                                      │
-│ ● 1                                                                                                                  │
+│   1                                                                                                                  │
 │   2...                                                                                                               │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│   Stay at current position                                                                                           │
+│ ● Stay at current position                                                                                           │
 │   Cancel rewind and stay here                                                                                        │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -210,13 +227,13 @@ exports[`RewindViewer > updates content when conversation changes (background up
 │                                                                                                                      │
 │ > Rewind                                                                                                             │
 │                                                                                                                      │
-│ ● Message 1                                                                                                          │
+│   Message 1                                                                                                          │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │   Message 2                                                                                                          │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│   Stay at current position                                                                                           │
+│ ● Stay at current position                                                                                           │
 │   Cancel rewind and stay here                                                                                        │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -230,10 +247,10 @@ exports[`RewindViewer > updates content when conversation changes (background up
 │                                                                                                                      │
 │ > Rewind                                                                                                             │
 │                                                                                                                      │
-│ ● Message 1                                                                                                          │
+│   Message 1                                                                                                          │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│   Stay at current position                                                                                           │
+│ ● Stay at current position                                                                                           │
 │   Cancel rewind and stay here                                                                                        │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -251,11 +268,11 @@ exports[`RewindViewer > updates selection and expansion on navigation > after-do
 │   Line B...                                                                                                          │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│ ● Line 1                                                                                                             │
+│   Line 1                                                                                                             │
 │   Line 2...                                                                                                          │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│   Stay at current position                                                                                           │
+│ ● Stay at current position                                                                                           │
 │   Cancel rewind and stay here                                                                                        │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -269,7 +286,7 @@ exports[`RewindViewer > updates selection and expansion on navigation > initial-
 │                                                                                                                      │
 │ > Rewind                                                                                                             │
 │                                                                                                                      │
-│ ● Line A                                                                                                             │
+│   Line A                                                                                                             │
 │   Line B...                                                                                                          │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
@@ -277,7 +294,7 @@ exports[`RewindViewer > updates selection and expansion on navigation > initial-
 │   Line 2...                                                                                                          │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│   Stay at current position                                                                                           │
+│ ● Stay at current position                                                                                           │
 │   Cancel rewind and stay here                                                                                        │
 │                                                                                                                      │
 │                                                                                                                      │

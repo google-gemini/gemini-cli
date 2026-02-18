@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Logger } from '@opentelemetry/api-logs';
 import type { Config } from '../config/config.js';
 import type { HookPlanner, HookEventContext } from './hookPlanner.js';
 import type { HookRunner } from './hookRunner.js';
@@ -38,264 +37,8 @@ import type {
 } from '@google/genai';
 import { logHookCall } from '../telemetry/loggers.js';
 import { HookCallEvent } from '../telemetry/types.js';
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import {
-  MessageBusType,
-  type HookExecutionRequest,
-} from '../confirmation-bus/types.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
-
-/**
- * Validates that a value is a non-null object
- */
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-/**
- * Validates BeforeTool input fields
- */
-function validateBeforeToolInput(input: Record<string, unknown>): {
-  toolName: string;
-  toolInput: Record<string, unknown>;
-  mcpContext?: McpToolContext;
-} {
-  const toolName = input['tool_name'];
-  const toolInput = input['tool_input'];
-  const mcpContext = input['mcp_context'];
-  if (typeof toolName !== 'string') {
-    throw new Error(
-      'Invalid input for BeforeTool hook event: tool_name must be a string',
-    );
-  }
-  if (!isObject(toolInput)) {
-    throw new Error(
-      'Invalid input for BeforeTool hook event: tool_input must be an object',
-    );
-  }
-  if (mcpContext !== undefined && !isObject(mcpContext)) {
-    throw new Error(
-      'Invalid input for BeforeTool hook event: mcp_context must be an object',
-    );
-  }
-  return {
-    toolName,
-    toolInput,
-    mcpContext: mcpContext as McpToolContext | undefined,
-  };
-}
-
-/**
- * Validates AfterTool input fields
- */
-function validateAfterToolInput(input: Record<string, unknown>): {
-  toolName: string;
-  toolInput: Record<string, unknown>;
-  toolResponse: Record<string, unknown>;
-  mcpContext?: McpToolContext;
-} {
-  const toolName = input['tool_name'];
-  const toolInput = input['tool_input'];
-  const toolResponse = input['tool_response'];
-  const mcpContext = input['mcp_context'];
-  if (typeof toolName !== 'string') {
-    throw new Error(
-      'Invalid input for AfterTool hook event: tool_name must be a string',
-    );
-  }
-  if (!isObject(toolInput)) {
-    throw new Error(
-      'Invalid input for AfterTool hook event: tool_input must be an object',
-    );
-  }
-  if (!isObject(toolResponse)) {
-    throw new Error(
-      'Invalid input for AfterTool hook event: tool_response must be an object',
-    );
-  }
-  if (mcpContext !== undefined && !isObject(mcpContext)) {
-    throw new Error(
-      'Invalid input for AfterTool hook event: mcp_context must be an object',
-    );
-  }
-  return {
-    toolName,
-    toolInput,
-    toolResponse,
-    mcpContext: mcpContext as McpToolContext | undefined,
-  };
-}
-
-/**
- * Validates BeforeAgent input fields
- */
-function validateBeforeAgentInput(input: Record<string, unknown>): {
-  prompt: string;
-} {
-  const prompt = input['prompt'];
-  if (typeof prompt !== 'string') {
-    throw new Error(
-      'Invalid input for BeforeAgent hook event: prompt must be a string',
-    );
-  }
-  return { prompt };
-}
-
-/**
- * Validates AfterAgent input fields
- */
-function validateAfterAgentInput(input: Record<string, unknown>): {
-  prompt: string;
-  promptResponse: string;
-  stopHookActive: boolean;
-} {
-  const prompt = input['prompt'];
-  const promptResponse = input['prompt_response'];
-  const stopHookActive = input['stop_hook_active'];
-  if (typeof prompt !== 'string') {
-    throw new Error(
-      'Invalid input for AfterAgent hook event: prompt must be a string',
-    );
-  }
-  if (typeof promptResponse !== 'string') {
-    throw new Error(
-      'Invalid input for AfterAgent hook event: prompt_response must be a string',
-    );
-  }
-  // stopHookActive defaults to false if not a boolean
-  return {
-    prompt,
-    promptResponse,
-    stopHookActive:
-      typeof stopHookActive === 'boolean' ? stopHookActive : false,
-  };
-}
-
-/**
- * Validates model-related input fields (llm_request)
- */
-function validateModelInput(
-  input: Record<string, unknown>,
-  eventName: string,
-): { llmRequest: GenerateContentParameters } {
-  const llmRequest = input['llm_request'];
-  if (!isObject(llmRequest)) {
-    throw new Error(
-      `Invalid input for ${eventName} hook event: llm_request must be an object`,
-    );
-  }
-  return { llmRequest: llmRequest as unknown as GenerateContentParameters };
-}
-
-/**
- * Validates AfterModel input fields
- */
-function validateAfterModelInput(input: Record<string, unknown>): {
-  llmRequest: GenerateContentParameters;
-  llmResponse: GenerateContentResponse;
-} {
-  const llmRequest = input['llm_request'];
-  const llmResponse = input['llm_response'];
-  if (!isObject(llmRequest)) {
-    throw new Error(
-      'Invalid input for AfterModel hook event: llm_request must be an object',
-    );
-  }
-  if (!isObject(llmResponse)) {
-    throw new Error(
-      'Invalid input for AfterModel hook event: llm_response must be an object',
-    );
-  }
-  return {
-    llmRequest: llmRequest as unknown as GenerateContentParameters,
-    llmResponse: llmResponse as unknown as GenerateContentResponse,
-  };
-}
-
-/**
- * Validates Notification input fields
- */
-function validateNotificationInput(input: Record<string, unknown>): {
-  notificationType: NotificationType;
-  message: string;
-  details: Record<string, unknown>;
-} {
-  const notificationType = input['notification_type'];
-  const message = input['message'];
-  const details = input['details'];
-  if (typeof notificationType !== 'string') {
-    throw new Error(
-      'Invalid input for Notification hook event: notification_type must be a string',
-    );
-  }
-  if (typeof message !== 'string') {
-    throw new Error(
-      'Invalid input for Notification hook event: message must be a string',
-    );
-  }
-  if (!isObject(details)) {
-    throw new Error(
-      'Invalid input for Notification hook event: details must be an object',
-    );
-  }
-  return {
-    notificationType: notificationType as NotificationType,
-    message,
-    details,
-  };
-}
-
-/**
- * Validates SessionStart input fields
- */
-function validateSessionStartInput(input: Record<string, unknown>): {
-  source: SessionStartSource;
-} {
-  const source = input['source'];
-  if (typeof source !== 'string') {
-    throw new Error(
-      'Invalid input for SessionStart hook event: source must be a string',
-    );
-  }
-  return {
-    source: source as SessionStartSource,
-  };
-}
-
-/**
- * Validates SessionEnd input fields
- */
-function validateSessionEndInput(input: Record<string, unknown>): {
-  reason: SessionEndReason;
-} {
-  const reason = input['reason'];
-  if (typeof reason !== 'string') {
-    throw new Error(
-      'Invalid input for SessionEnd hook event: reason must be a string',
-    );
-  }
-  return {
-    reason: reason as SessionEndReason,
-  };
-}
-
-/**
- * Validates PreCompress input fields
- */
-function validatePreCompressInput(input: Record<string, unknown>): {
-  trigger: PreCompressTrigger;
-} {
-  const trigger = input['trigger'];
-  if (typeof trigger !== 'string') {
-    throw new Error(
-      'Invalid input for PreCompress hook event: trigger must be a string',
-    );
-  }
-  return {
-    trigger: trigger as PreCompressTrigger,
-  };
-}
 
 /**
  * Hook event bus that coordinates hook execution across the system
@@ -305,29 +48,24 @@ export class HookEventHandler {
   private readonly hookPlanner: HookPlanner;
   private readonly hookRunner: HookRunner;
   private readonly hookAggregator: HookAggregator;
-  private readonly messageBus: MessageBus;
+
+  /**
+   * Track reported failures to suppress duplicate warnings during streaming.
+   * Uses a WeakMap with the original request object as a key to ensure
+   * failures are only reported once per logical model interaction.
+   */
+  private readonly reportedFailures = new WeakMap<object, Set<string>>();
 
   constructor(
     config: Config,
-    logger: Logger,
     hookPlanner: HookPlanner,
     hookRunner: HookRunner,
     hookAggregator: HookAggregator,
-    messageBus: MessageBus,
   ) {
     this.config = config;
     this.hookPlanner = hookPlanner;
     this.hookRunner = hookRunner;
     this.hookAggregator = hookAggregator;
-    this.messageBus = messageBus;
-
-    // Subscribe to hook execution requests from MessageBus
-    if (this.messageBus) {
-      this.messageBus.subscribe<HookExecutionRequest>(
-        MessageBusType.HOOK_EXECUTION_REQUEST,
-        (request) => this.handleHookExecutionRequest(request),
-      );
-    }
   }
 
   /**
@@ -479,7 +217,12 @@ export class HookEventHandler {
       llm_request: defaultHookTranslator.toHookLLMRequest(llmRequest),
     };
 
-    return this.executeHooks(HookEventName.BeforeModel, input);
+    return this.executeHooks(
+      HookEventName.BeforeModel,
+      input,
+      undefined,
+      llmRequest,
+    );
   }
 
   /**
@@ -496,7 +239,12 @@ export class HookEventHandler {
       llm_response: defaultHookTranslator.toHookLLMResponse(llmResponse),
     };
 
-    return this.executeHooks(HookEventName.AfterModel, input);
+    return this.executeHooks(
+      HookEventName.AfterModel,
+      input,
+      undefined,
+      llmRequest,
+    );
   }
 
   /**
@@ -511,7 +259,12 @@ export class HookEventHandler {
       llm_request: defaultHookTranslator.toHookLLMRequest(llmRequest),
     };
 
-    return this.executeHooks(HookEventName.BeforeToolSelection, input);
+    return this.executeHooks(
+      HookEventName.BeforeToolSelection,
+      input,
+      undefined,
+      llmRequest,
+    );
   }
 
   /**
@@ -522,6 +275,7 @@ export class HookEventHandler {
     eventName: HookEventName,
     input: HookInput,
     context?: HookEventContext,
+    requestContext?: object,
   ): Promise<AggregatedHookResult> {
     try {
       // Create execution plan
@@ -580,7 +334,13 @@ export class HookEventHandler {
       this.processCommonHookOutputFields(aggregated);
 
       // Log hook execution
-      this.logHookExecution(eventName, input, results, aggregated);
+      this.logHookExecution(
+        eventName,
+        input,
+        results,
+        aggregated,
+        requestContext,
+      );
 
       return aggregated;
     } catch (error) {
@@ -623,6 +383,7 @@ export class HookEventHandler {
     input: HookInput,
     results: HookExecutionResult[],
     aggregated: AggregatedHookResult,
+    requestContext?: object,
   ): void {
     const failedHooks = results.filter((r) => !r.success);
     const successCount = results.length - failedHooks.length;
@@ -633,15 +394,33 @@ export class HookEventHandler {
         .map((r) => this.getHookNameFromResult(r))
         .join(', ');
 
+      let shouldEmit = true;
+      if (requestContext) {
+        let reportedSet = this.reportedFailures.get(requestContext);
+        if (!reportedSet) {
+          reportedSet = new Set<string>();
+          this.reportedFailures.set(requestContext, reportedSet);
+        }
+
+        const failureKey = `${eventName}:${failedNames}`;
+        if (reportedSet.has(failureKey)) {
+          shouldEmit = false;
+        } else {
+          reportedSet.add(failureKey);
+        }
+      }
+
       debugLogger.warn(
         `Hook execution for ${eventName}: ${successCount} succeeded, ${errorCount} failed (${failedNames}), ` +
           `total duration: ${aggregated.totalDuration}ms`,
       );
 
-      coreEvents.emitFeedback(
-        'warning',
-        `Hook(s) [${failedNames}] failed for event ${eventName}. Press F12 to see the debug drawer for more details.\n`,
-      );
+      if (shouldEmit) {
+        coreEvents.emitFeedback(
+          'warning',
+          `Hook(s) [${failedNames}] failed for event ${eventName}. Press F12 to see the debug drawer for more details.\n`,
+        );
+      }
     } else {
       debugLogger.debug(
         `Hook execution for ${eventName}: ${successCount} hooks executed successfully, ` +
@@ -728,153 +507,5 @@ export class HookEventHandler {
    */
   private getHookTypeFromResult(result: HookExecutionResult): 'command' {
     return result.hookConfig.type;
-  }
-
-  /**
-   * Handle hook execution requests from MessageBus
-   * This method routes the request to the appropriate fire*Event method
-   * and publishes the response back through MessageBus
-   *
-   * The request input only contains event-specific fields. This method adds
-   * the common base fields (session_id, cwd, etc.) before routing.
-   */
-  private async handleHookExecutionRequest(
-    request: HookExecutionRequest,
-  ): Promise<void> {
-    try {
-      // Add base fields to the input
-      const enrichedInput = {
-        ...this.createBaseInput(request.eventName as HookEventName),
-        ...request.input,
-      } as Record<string, unknown>;
-
-      let result: AggregatedHookResult;
-
-      // Route to appropriate event handler based on eventName
-      switch (request.eventName) {
-        case HookEventName.BeforeTool: {
-          const { toolName, toolInput, mcpContext } =
-            validateBeforeToolInput(enrichedInput);
-          result = await this.fireBeforeToolEvent(
-            toolName,
-            toolInput,
-            mcpContext,
-          );
-          break;
-        }
-        case HookEventName.AfterTool: {
-          const { toolName, toolInput, toolResponse, mcpContext } =
-            validateAfterToolInput(enrichedInput);
-          result = await this.fireAfterToolEvent(
-            toolName,
-            toolInput,
-            toolResponse,
-            mcpContext,
-          );
-          break;
-        }
-        case HookEventName.BeforeAgent: {
-          const { prompt } = validateBeforeAgentInput(enrichedInput);
-          result = await this.fireBeforeAgentEvent(prompt);
-          break;
-        }
-        case HookEventName.AfterAgent: {
-          const { prompt, promptResponse, stopHookActive } =
-            validateAfterAgentInput(enrichedInput);
-          result = await this.fireAfterAgentEvent(
-            prompt,
-            promptResponse,
-            stopHookActive,
-          );
-          break;
-        }
-        case HookEventName.BeforeModel: {
-          const { llmRequest } = validateModelInput(
-            enrichedInput,
-            'BeforeModel',
-          );
-          const translatedRequest =
-            defaultHookTranslator.toHookLLMRequest(llmRequest);
-          // Update the enrichedInput with translated request
-          enrichedInput['llm_request'] = translatedRequest;
-          result = await this.fireBeforeModelEvent(llmRequest);
-          break;
-        }
-        case HookEventName.AfterModel: {
-          const { llmRequest, llmResponse } =
-            validateAfterModelInput(enrichedInput);
-          const translatedRequest =
-            defaultHookTranslator.toHookLLMRequest(llmRequest);
-          const translatedResponse =
-            defaultHookTranslator.toHookLLMResponse(llmResponse);
-          // Update the enrichedInput with translated versions
-          enrichedInput['llm_request'] = translatedRequest;
-          enrichedInput['llm_response'] = translatedResponse;
-          result = await this.fireAfterModelEvent(llmRequest, llmResponse);
-          break;
-        }
-        case HookEventName.BeforeToolSelection: {
-          const { llmRequest } = validateModelInput(
-            enrichedInput,
-            'BeforeToolSelection',
-          );
-          const translatedRequest =
-            defaultHookTranslator.toHookLLMRequest(llmRequest);
-          // Update the enrichedInput with translated request
-          enrichedInput['llm_request'] = translatedRequest;
-          result = await this.fireBeforeToolSelectionEvent(llmRequest);
-          break;
-        }
-        case HookEventName.Notification: {
-          const { notificationType, message, details } =
-            validateNotificationInput(enrichedInput);
-          result = await this.fireNotificationEvent(
-            notificationType,
-            message,
-            details,
-          );
-          break;
-        }
-        case HookEventName.SessionStart: {
-          const { source } = validateSessionStartInput(enrichedInput);
-          result = await this.fireSessionStartEvent(source);
-          break;
-        }
-        case HookEventName.SessionEnd: {
-          const { reason } = validateSessionEndInput(enrichedInput);
-          result = await this.fireSessionEndEvent(reason);
-          break;
-        }
-        case HookEventName.PreCompress: {
-          const { trigger } = validatePreCompressInput(enrichedInput);
-          result = await this.firePreCompressEvent(trigger);
-          break;
-        }
-        default:
-          throw new Error(`Unsupported hook event: ${request.eventName}`);
-      }
-
-      // Publish response through MessageBus
-      if (this.messageBus) {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this.messageBus.publish({
-          type: MessageBusType.HOOK_EXECUTION_RESPONSE,
-          correlationId: request.correlationId,
-          success: result.success,
-          output: result.finalOutput as unknown as Record<string, unknown>,
-        });
-      }
-    } catch (error) {
-      // Publish error response
-      if (this.messageBus) {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this.messageBus.publish({
-          type: MessageBusType.HOOK_EXECUTION_RESPONSE,
-          correlationId: request.correlationId,
-          success: false,
-          error: error instanceof Error ? error : new Error(String(error)),
-        });
-      }
-    }
   }
 }

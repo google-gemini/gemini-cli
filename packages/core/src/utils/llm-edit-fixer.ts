@@ -8,8 +8,9 @@ import { createHash } from 'node:crypto';
 import { type Content, Type } from '@google/genai';
 import { type BaseLlmClient } from '../core/baseLlmClient.js';
 import { LRUCache } from 'mnemonist';
-import { promptIdContext } from './promptIdContext.js';
+import { getPromptIdWithFallback } from './promptIdContext.js';
 import { debugLogger } from './debugLogger.js';
+import { LlmRole } from '../telemetry/types.js';
 
 const MAX_CACHE_SIZE = 50;
 const GENERATE_JSON_TIMEOUT_MS = 40000; // 40 seconds
@@ -107,8 +108,13 @@ async function generateJsonWithTimeout<T>(
         timeoutSignal,
       ]),
     });
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return result as T;
-  } catch (_err) {
+  } catch (err) {
+    debugLogger.debug(
+      '[LLM Edit Fixer] Timeout or error during generateJson',
+      err,
+    );
     // An AbortError will be thrown on timeout.
     // We catch it and return null to signal that the operation timed out.
     return null;
@@ -136,13 +142,7 @@ export async function FixLLMEditWithInstruction(
   baseLlmClient: BaseLlmClient,
   abortSignal: AbortSignal,
 ): Promise<SearchReplaceEdit | null> {
-  let promptId = promptIdContext.getStore();
-  if (!promptId) {
-    promptId = `llm-fixer-fallback-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    debugLogger.warn(
-      `Could not find promptId in context. This is unexpected. Using a fallback ID: ${promptId}`,
-    );
-  }
+  const promptId = getPromptIdWithFallback('llm-fixer');
 
   const cacheKey = createHash('sha256')
     .update(
@@ -182,6 +182,7 @@ export async function FixLLMEditWithInstruction(
       systemInstruction: EDIT_SYS_PROMPT,
       promptId,
       maxAttempts: 1,
+      role: LlmRole.UTILITY_EDIT_CORRECTOR,
     },
     GENERATE_JSON_TIMEOUT_MS,
   );

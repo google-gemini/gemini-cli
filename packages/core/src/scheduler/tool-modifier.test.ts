@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ToolModificationHandler } from './tool-modifier.js';
 import type { WaitingToolCall, ToolCallRequestInfo } from './types.js';
+import { CoreToolCallStatus } from './types.js';
 import * as modifiableToolModule from '../tools/modifiable-tool.js';
 import * as Diff from 'diff';
 import { MockModifiableTool, MockTool } from '../test-utils/mock-tool.js';
@@ -37,7 +38,7 @@ function createMockWaitingToolCall(
   overrides: Partial<WaitingToolCall> = {},
 ): WaitingToolCall {
   return {
-    status: 'awaiting_approval',
+    status: CoreToolCallStatus.AwaitingApproval,
     request: {
       callId: 'test-call-id',
       name: 'test-tool',
@@ -193,11 +194,44 @@ describe('ToolModificationHandler', () => {
 
       const result = await handler.applyInlineModify(
         mockWaitingToolCall,
-        { newContent: undefined } as unknown as ToolConfirmationPayload,
+        {} as ToolConfirmationPayload, // no newContent property
         new AbortController().signal,
       );
 
       expect(result).toBeUndefined();
+    });
+
+    it('should process empty string as valid new content', async () => {
+      vi.mocked(
+        modifiableToolModule.isModifiableDeclarativeTool,
+      ).mockReturnValue(true);
+      (Diff.createPatch as unknown as Mock).mockReturnValue('mock-diff-empty');
+
+      mockModifyContext.getCurrentContent.mockResolvedValue('old content');
+      mockModifyContext.getFilePath.mockReturnValue('test.txt');
+      mockModifyContext.createUpdatedParams.mockReturnValue({
+        content: '',
+      });
+
+      const mockWaitingToolCall = createMockWaitingToolCall({
+        tool: mockModifiableTool,
+      });
+
+      const result = await handler.applyInlineModify(
+        mockWaitingToolCall,
+        { newContent: '' },
+        new AbortController().signal,
+      );
+
+      expect(mockModifyContext.createUpdatedParams).toHaveBeenCalledWith(
+        expect.any(String),
+        '',
+        expect.any(Object),
+      );
+      expect(result).toEqual({
+        updatedParams: { content: '' },
+        updatedDiff: 'mock-diff-empty',
+      });
     });
 
     it('should calculate diff and return updated params', async () => {

@@ -58,11 +58,12 @@ vi.mock('./terminalCapabilityManager.js', () => ({
 }));
 
 describe('terminalSetup', () => {
-  const originalEnv = process.env;
-
   beforeEach(() => {
     vi.resetAllMocks();
-    process.env = { ...originalEnv };
+    vi.stubEnv('TERM_PROGRAM', '');
+    vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('VSCODE_GIT_ASKPASS_MAIN', '');
+    vi.stubEnv('VSCODE_GIT_IPC_HANDLE', '');
 
     // Default mocks
     mocks.homedir.mockReturnValue('/home/user');
@@ -73,7 +74,7 @@ describe('terminalSetup', () => {
   });
 
   afterEach(() => {
-    process.env = originalEnv;
+    vi.unstubAllEnvs();
   });
 
   describe('detectTerminal', () => {
@@ -128,7 +129,7 @@ describe('terminalSetup', () => {
 
       expect(result.success).toBe(true);
       const writtenContent = JSON.parse(mocks.writeFile.mock.calls[0][1]);
-      expect(writtenContent).toHaveLength(2); // Shift+Enter and Ctrl+Enter
+      expect(writtenContent).toHaveLength(6); // Shift+Enter, Ctrl+Enter, Cmd+Z, Alt+Z, Shift+Cmd+Z, Shift+Alt+Z
     });
 
     it('should not modify if bindings already exist', async () => {
@@ -143,6 +144,26 @@ describe('terminalSetup', () => {
           key: 'ctrl+enter',
           command: 'workbench.action.terminal.sendSequence',
           args: { text: VSCODE_SHIFT_ENTER_SEQUENCE },
+        },
+        {
+          key: 'cmd+z',
+          command: 'workbench.action.terminal.sendSequence',
+          args: { text: '\u001b[122;9u' },
+        },
+        {
+          key: 'alt+z',
+          command: 'workbench.action.terminal.sendSequence',
+          args: { text: '\u001b[122;3u' },
+        },
+        {
+          key: 'shift+cmd+z',
+          command: 'workbench.action.terminal.sendSequence',
+          args: { text: '\u001b[122;10u' },
+        },
+        {
+          key: 'shift+alt+z',
+          command: 'workbench.action.terminal.sendSequence',
+          args: { text: '\u001b[122;4u' },
         },
       ];
       mocks.readFile.mockResolvedValue(JSON.stringify(existingBindings));

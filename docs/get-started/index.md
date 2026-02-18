@@ -64,8 +64,10 @@ and more.
 
 To explore the power of Gemini CLI, see [Gemini CLI examples](./examples.md).
 
-## What's next?
+## Next steps
 
-- Find out more about [Gemini CLI's tools](../tools/index.md).
-- Review [Gemini CLI's commands](../cli/commands.md).
-- Learn how to [get started with Gemini 3](./gemini-3.md).
+- Follow the [File management](../cli/tutorials/file-management.md) guide to
+  start working with your codebase.
+- See [Shell commands](../cli/tutorials/shell-commands.md) to learn about
+  terminal integration.
+- Explore the full range of [User guides](../cli/index.md#user-guides).

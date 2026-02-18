@@ -18,10 +18,27 @@ import {
   MessageBusType,
   type Config,
   type ToolConfirmationPayload,
-  type ToolCallConfirmationDetails,
+  type SerializableConfirmationDetails,
   debugLogger,
 } from '@google/gemini-cli-core';
 import type { IndividualToolCallDisplay } from '../types.js';
+
+type LegacyConfirmationDetails = SerializableConfirmationDetails & {
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => Promise<void>;
+};
+
+function hasLegacyCallback(
+  details: SerializableConfirmationDetails | undefined,
+): details is LegacyConfirmationDetails {
+  return (
+    !!details &&
+    'onConfirm' in details &&
+    typeof details.onConfirm === 'function'
+  );
+}
 
 interface ToolActionsContextValue {
   confirm: (
@@ -30,6 +47,7 @@ interface ToolActionsContextValue {
     payload?: ToolConfirmationPayload,
   ) => Promise<void>;
   cancel: (callId: string) => Promise<void>;
+  isDiffingEnabled: boolean;
 }
 
 const ToolActionsContext = createContext<ToolActionsContextValue | null>(null);
@@ -52,14 +70,31 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
   props: ToolActionsProviderProps,
 ) => {
   const { children, config, toolCalls } = props;
+
   // Hoist IdeClient logic here to keep UI pure
   const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
+  const [isDiffingEnabled, setIsDiffingEnabled] = useState(false);
+
   useEffect(() => {
     let isMounted = true;
     if (config.getIdeMode()) {
       IdeClient.getInstance()
         .then((client) => {
-          if (isMounted) setIdeClient(client);
+          if (!isMounted) return;
+          setIdeClient(client);
+          setIsDiffingEnabled(client.isDiffingEnabled());
+
+          const handleStatusChange = () => {
+            if (isMounted) {
+              setIsDiffingEnabled(client.isDiffingEnabled());
+            }
+          };
+
+          client.addStatusChangeListener(handleStatusChange);
+          // Return a cleanup function for the listener
+          return () => {
+            client.removeStatusChangeListener(handleStatusChange);
+          };
         })
         .catch((error) => {
           debugLogger.error('Failed to get IdeClient instance:', error);
@@ -87,16 +122,15 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
       // 1. Handle Side Effects (IDE Diff)
       if (
         details?.type === 'edit' &&
-        ideClient?.isDiffingEnabled() &&
+        isDiffingEnabled &&
         'filePath' in details // Check for safety
       ) {
         const cliOutcome =
           outcome === ToolConfirmationOutcome.Cancel ? 'rejected' : 'accepted';
-        await ideClient.resolveDiffFromCli(details.filePath, cliOutcome);
+        await ideClient?.resolveDiffFromCli(details.filePath, cliOutcome);
       }
 
-      // 2. Dispatch
-      // PATH A: Event Bus (Modern)
+      // 2. Dispatch via Event Bus
       if (tool.correlationId) {
         await config.getMessageBus().publish({
           type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
@@ -109,22 +143,17 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
         return;
       }
 
-      // PATH B: Legacy Callback (Adapter or Old Scheduler)
-      if (
-        details &&
-        'onConfirm' in details &&
-        typeof details.onConfirm === 'function'
-      ) {
-        await (details as ToolCallConfirmationDetails).onConfirm(
-          outcome,
-          payload,
-        );
+      // 3. Fallback: Legacy Callback
+      if (hasLegacyCallback(details)) {
+        await details.onConfirm(outcome, payload);
         return;
       }
 
-      debugLogger.warn(`ToolActions: No confirmation mechanism for ${callId}`);
+      debugLogger.warn(
+        `ToolActions: No correlationId or callback for ${callId}`,
+      );
     },
-    [config, toolCalls, ideClient],
+    [config, ideClient, toolCalls, isDiffingEnabled],
   );
 
   const cancel = useCallback(
@@ -135,7 +164,7 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
   );
 
   return (
-    <ToolActionsContext.Provider value={{ confirm, cancel }}>
+    <ToolActionsContext.Provider value={{ confirm, cancel, isDiffingEnabled }}>
       {children}
     </ToolActionsContext.Provider>
   );

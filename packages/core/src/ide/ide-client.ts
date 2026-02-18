@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'node:fs';
-import { isSubpath } from '../utils/paths.js';
 import { detectIde, type IdeInfo } from '../ide/detect-ide.js';
 import { ideContextStore } from './ideContext.js';
 import {
@@ -19,12 +17,18 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
-import * as os from 'node:os';
-import * as path from 'node:path';
-import { EnvHttpProxyAgent } from 'undici';
 import { ListToolsResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { IDE_REQUEST_TIMEOUT_MS } from './constants.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import {
+  getConnectionConfigFromFile,
+  getIdeServerHost,
+  getPortFromEnv,
+  getStdioConfigFromEnv,
+  validateWorkspacePath,
+  createProxyAwareFetch,
+  type StdioConfig,
+} from './ide-connection-utils.js';
 
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -54,27 +58,6 @@ export enum IDEConnectionStatus {
   Connecting = 'connecting',
 }
 
-type StdioConfig = {
-  command: string;
-  args: string[];
-};
-
-type ConnectionConfig = {
-  port?: string;
-  authToken?: string;
-  stdio?: StdioConfig;
-};
-
-function getRealPath(path: string): string {
-  try {
-    return fs.realpathSync(path);
-  } catch (_e) {
-    // If realpathSync fails, it might be because the path doesn't exist.
-    // In that case, we can fall back to the original path.
-    return path;
-  }
-}
-
 /**
  * Manages the connection to and interaction with the IDE server.
  */
@@ -88,10 +71,7 @@ export class IdeClient {
   };
   private currentIde: IdeInfo | undefined;
   private ideProcessInfo: { pid: number; command: string } | undefined;
-  private connectionConfig:
-    | (ConnectionConfig & { workspacePath?: string; ideInfo?: IdeInfo })
-    | undefined;
-  private authToken: string | undefined;
+
   private diffResponses = new Map<string, (result: DiffUpdateResult) => void>();
   private statusListeners = new Set<(state: IDEConnectionState) => void>();
   private trustChangeListeners = new Set<(isTrusted: boolean) => void>();
@@ -110,10 +90,12 @@ export class IdeClient {
       IdeClient.instancePromise = (async () => {
         const client = new IdeClient();
         client.ideProcessInfo = await getIdeProcessInfo();
-        client.connectionConfig = await client.getConnectionConfigFromFile();
+        const connectionConfig = client.ideProcessInfo
+          ? await getConnectionConfigFromFile(client.ideProcessInfo.pid)
+          : undefined;
         client.currentIde = detectIde(
           client.ideProcessInfo,
-          client.connectionConfig?.ideInfo,
+          connectionConfig?.ideInfo,
         );
         return client;
       })();
@@ -150,16 +132,17 @@ export class IdeClient {
 
     this.setState(IDEConnectionStatus.Connecting);
 
-    this.connectionConfig = await this.getConnectionConfigFromFile();
-    this.authToken =
-      this.connectionConfig?.authToken ??
-      process.env['GEMINI_CLI_IDE_AUTH_TOKEN'];
+    const connectionConfig = this.ideProcessInfo
+      ? await getConnectionConfigFromFile(this.ideProcessInfo.pid)
+      : undefined;
+    const authToken =
+      connectionConfig?.authToken ?? process.env['GEMINI_CLI_IDE_AUTH_TOKEN'];
 
     const workspacePath =
-      this.connectionConfig?.workspacePath ??
+      connectionConfig?.workspacePath ??
       process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
 
-    const { isValid, error } = IdeClient.validateWorkspacePath(
+    const { isValid, error } = validateWorkspacePath(
       workspacePath,
       process.cwd(),
     );
@@ -169,18 +152,19 @@ export class IdeClient {
       return;
     }
 
-    if (this.connectionConfig) {
-      if (this.connectionConfig.port) {
+    if (connectionConfig) {
+      if (connectionConfig.port) {
         const connected = await this.establishHttpConnection(
-          this.connectionConfig.port,
+          connectionConfig.port,
+          authToken,
         );
         if (connected) {
           return;
         }
       }
-      if (this.connectionConfig.stdio) {
+      if (connectionConfig.stdio) {
         const connected = await this.establishStdioConnection(
-          this.connectionConfig.stdio,
+          connectionConfig.stdio,
         );
         if (connected) {
           return;
@@ -188,15 +172,18 @@ export class IdeClient {
       }
     }
 
-    const portFromEnv = this.getPortFromEnv();
+    const portFromEnv = getPortFromEnv();
     if (portFromEnv) {
-      const connected = await this.establishHttpConnection(portFromEnv);
+      const connected = await this.establishHttpConnection(
+        portFromEnv,
+        authToken,
+      );
       if (connected) {
         return;
       }
     }
 
-    const stdioConfigFromEnv = this.getStdioConfigFromEnv();
+    const stdioConfigFromEnv = getStdioConfigFromEnv();
     if (stdioConfigFromEnv) {
       const connected = await this.establishStdioConnection(stdioConfigFromEnv);
       if (connected) {
@@ -503,200 +490,6 @@ export class IdeClient {
     }
   }
 
-  static validateWorkspacePath(
-    ideWorkspacePath: string | undefined,
-    cwd: string,
-  ): { isValid: boolean; error?: string } {
-    if (ideWorkspacePath === undefined) {
-      return {
-        isValid: false,
-        error: `Failed to connect to IDE companion extension. Please ensure the extension is running. To install the extension, run /ide install.`,
-      };
-    }
-
-    if (ideWorkspacePath === '') {
-      return {
-        isValid: false,
-        error: `To use this feature, please open a workspace folder in your IDE and try again.`,
-      };
-    }
-
-    const ideWorkspacePaths = ideWorkspacePath.split(path.delimiter);
-    const realCwd = getRealPath(cwd);
-    const isWithinWorkspace = ideWorkspacePaths.some((workspacePath) => {
-      const idePath = getRealPath(workspacePath);
-      return isSubpath(idePath, realCwd);
-    });
-
-    if (!isWithinWorkspace) {
-      return {
-        isValid: false,
-        error: `Directory mismatch. Gemini CLI is running in a different location than the open workspace in the IDE. Please run the CLI from one of the following directories: ${ideWorkspacePaths.join(
-          ', ',
-        )}`,
-      };
-    }
-    return { isValid: true };
-  }
-
-  private getPortFromEnv(): string | undefined {
-    const port = process.env['GEMINI_CLI_IDE_SERVER_PORT'];
-    if (!port) {
-      return undefined;
-    }
-    return port;
-  }
-
-  private getStdioConfigFromEnv(): StdioConfig | undefined {
-    const command = process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'];
-    if (!command) {
-      return undefined;
-    }
-
-    const argsStr = process.env['GEMINI_CLI_IDE_SERVER_STDIO_ARGS'];
-    let args: string[] = [];
-    if (argsStr) {
-      try {
-        const parsedArgs = JSON.parse(argsStr);
-        if (Array.isArray(parsedArgs)) {
-          args = parsedArgs;
-        } else {
-          logger.error(
-            'GEMINI_CLI_IDE_SERVER_STDIO_ARGS must be a JSON array string.',
-          );
-        }
-      } catch (e) {
-        logger.error('Failed to parse GEMINI_CLI_IDE_SERVER_STDIO_ARGS:', e);
-      }
-    }
-
-    return { command, args };
-  }
-
-  private async getConnectionConfigFromFile(): Promise<
-    | (ConnectionConfig & { workspacePath?: string; ideInfo?: IdeInfo })
-    | undefined
-  > {
-    if (!this.ideProcessInfo) {
-      return undefined;
-    }
-
-    // For backwards compatibility
-    try {
-      const portFile = path.join(
-        os.tmpdir(),
-        `gemini-ide-server-${this.ideProcessInfo.pid}.json`,
-      );
-      const portFileContents = await fs.promises.readFile(portFile, 'utf8');
-      return JSON.parse(portFileContents);
-    } catch (_) {
-      // For newer extension versions, the file name matches the pattern
-      // /^gemini-ide-server-${pid}-\d+\.json$/. If multiple IDE
-      // windows are open, multiple files matching the pattern are expected to
-      // exist.
-    }
-
-    const portFileDir = path.join(os.tmpdir(), 'gemini', 'ide');
-    let portFiles;
-    try {
-      portFiles = await fs.promises.readdir(portFileDir);
-    } catch (e) {
-      logger.debug('Failed to read IDE connection directory:', e);
-      return undefined;
-    }
-
-    if (!portFiles) {
-      return undefined;
-    }
-
-    const fileRegex = new RegExp(
-      `^gemini-ide-server-${this.ideProcessInfo.pid}-\\d+\\.json$`,
-    );
-    const matchingFiles = portFiles
-      .filter((file) => fileRegex.test(file))
-      .sort();
-    if (matchingFiles.length === 0) {
-      return undefined;
-    }
-
-    let fileContents: string[];
-    try {
-      fileContents = await Promise.all(
-        matchingFiles.map((file) =>
-          fs.promises.readFile(path.join(portFileDir, file), 'utf8'),
-        ),
-      );
-    } catch (e) {
-      logger.debug('Failed to read IDE connection config file(s):', e);
-      return undefined;
-    }
-    const parsedContents = fileContents.map((content) => {
-      try {
-        return JSON.parse(content);
-      } catch (e) {
-        logger.debug('Failed to parse JSON from config file: ', e);
-        return undefined;
-      }
-    });
-
-    const validWorkspaces = parsedContents.filter((content) => {
-      if (!content) {
-        return false;
-      }
-      const { isValid } = IdeClient.validateWorkspacePath(
-        content.workspacePath,
-        process.cwd(),
-      );
-      return isValid;
-    });
-
-    if (validWorkspaces.length === 0) {
-      return undefined;
-    }
-
-    if (validWorkspaces.length === 1) {
-      return validWorkspaces[0];
-    }
-
-    const portFromEnv = this.getPortFromEnv();
-    if (portFromEnv) {
-      const matchingPort = validWorkspaces.find(
-        (content) => String(content.port) === portFromEnv,
-      );
-      if (matchingPort) {
-        return matchingPort;
-      }
-    }
-
-    return validWorkspaces[0];
-  }
-
-  private createProxyAwareFetch() {
-    // ignore proxy for '127.0.0.1' by default to allow connecting to the ide mcp server
-    const existingNoProxy = process.env['NO_PROXY'] || '';
-    const agent = new EnvHttpProxyAgent({
-      noProxy: [existingNoProxy, '127.0.0.1'].filter(Boolean).join(','),
-    });
-    const undiciPromise = import('undici');
-    // Suppress unhandled rejection if the promise is not awaited immediately.
-    // If the import fails, the error will be thrown when awaiting undiciPromise below.
-    undiciPromise.catch(() => {});
-    return async (url: string | URL, init?: RequestInit): Promise<Response> => {
-      const { fetch: fetchFn } = await undiciPromise;
-      const fetchOptions: RequestInit & { dispatcher?: unknown } = {
-        ...init,
-        dispatcher: agent,
-      };
-      const options = fetchOptions as unknown as import('undici').RequestInit;
-      const response = await fetchFn(url, options);
-      return new Response(response.body as ReadableStream<unknown> | null, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: [...response.headers.entries()],
-      });
-    };
-  }
-
   private registerClientHandlers() {
     if (!this.client) {
       return;
@@ -774,26 +567,32 @@ export class IdeClient {
     );
   }
 
-  private async establishHttpConnection(port: string): Promise<boolean> {
+  private async establishHttpConnection(
+    port: string,
+    authToken: string | undefined,
+  ): Promise<boolean> {
     let transport: StreamableHTTPClientTransport | undefined;
     try {
+      const ideServerHost = getIdeServerHost();
+      const portNumber = parseInt(port, 10);
+      // validate port to prevent Server-Side Request Forgery (SSRF) vulnerability
+      if (isNaN(portNumber) || portNumber <= 0 || portNumber > 65535) {
+        return false;
+      }
+      const serverUrl = `http://${ideServerHost}:${portNumber}/mcp`;
       logger.debug('Attempting to connect to IDE via HTTP SSE');
+      logger.debug(`Server URL: ${serverUrl}`);
       this.client = new Client({
         name: 'streamable-http-client',
         // TODO(#3487): use the CLI version here.
         version: '1.0.0',
       });
-      transport = new StreamableHTTPClientTransport(
-        new URL(`http://${getIdeServerHost()}:${port}/mcp`),
-        {
-          fetch: this.createProxyAwareFetch(),
-          requestInit: {
-            headers: this.authToken
-              ? { Authorization: `Bearer ${this.authToken}` }
-              : {},
-          },
+      transport = new StreamableHTTPClientTransport(new URL(serverUrl), {
+        fetch: await createProxyAwareFetch(ideServerHost),
+        requestInit: {
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
         },
-      );
+      });
       await this.client.connect(transport);
       this.registerClientHandlers();
       await this.discoverTools();
@@ -844,10 +643,4 @@ export class IdeClient {
       return false;
     }
   }
-}
-
-function getIdeServerHost() {
-  const isInContainer =
-    fs.existsSync('/.dockerenv') || fs.existsSync('/run/.containerenv');
-  return isInContainer ? 'host.docker.internal' : '127.0.0.1';
 }

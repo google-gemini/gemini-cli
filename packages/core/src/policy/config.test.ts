@@ -10,6 +10,13 @@ import nodePath from 'node:path';
 
 import type { PolicySettings } from './types.js';
 import { ApprovalMode, PolicyDecision, InProcessCheckerType } from './types.js';
+import { isDirectorySecure } from '../utils/security.js';
+
+vi.unmock('../config/storage.js');
+
+vi.mock('../utils/security.js', () => ({
+  isDirectorySecure: vi.fn().mockResolvedValue({ secure: true }),
+}));
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -28,7 +35,53 @@ describe('createPolicyEngineConfig', () => {
     vi.spyOn(Storage, 'getSystemPoliciesDir').mockReturnValue(
       '/non/existent/system/policies',
     );
+    // Reset security check to default secure
+    vi.mocked(isDirectorySecure).mockResolvedValue({ secure: true });
   });
+
+  it('should filter out insecure system policy directories', async () => {
+    const { Storage } = await import('../config/storage.js');
+    const systemPolicyDir = '/insecure/system/policies';
+    vi.spyOn(Storage, 'getSystemPoliciesDir').mockReturnValue(systemPolicyDir);
+
+    vi.mocked(isDirectorySecure).mockImplementation(async (path: string) => {
+      if (nodePath.resolve(path) === nodePath.resolve(systemPolicyDir)) {
+        return { secure: false, reason: 'Insecure directory' };
+      }
+      return { secure: true };
+    });
+
+    // We need to spy on loadPoliciesFromToml to verify which directories were passed
+    // But it is not exported from config.js, it is imported.
+    // We can spy on the module it comes from.
+    const tomlLoader = await import('./toml-loader.js');
+    const loadPoliciesSpy = vi.spyOn(tomlLoader, 'loadPoliciesFromToml');
+    loadPoliciesSpy.mockResolvedValue({
+      rules: [],
+      checkers: [],
+      errors: [],
+    });
+
+    const { createPolicyEngineConfig } = await import('./config.js');
+    const settings: PolicySettings = {};
+
+    await createPolicyEngineConfig(
+      settings,
+      ApprovalMode.DEFAULT,
+      '/tmp/mock/default/policies',
+    );
+
+    // Verify loadPoliciesFromToml was called
+    expect(loadPoliciesSpy).toHaveBeenCalled();
+    const calledDirs = loadPoliciesSpy.mock.calls[0][0];
+
+    // The system directory should NOT be in the list
+    expect(calledDirs).not.toContain(systemPolicyDir);
+    // But other directories (user, default) should be there
+    expect(calledDirs).toContain('/non/existent/user/policies');
+    expect(calledDirs).toContain('/tmp/mock/default/policies');
+  });
+
   it('should return ASK_USER for write tools and ALLOW for read-only tools by default', async () => {
     const actualFs =
       await vi.importActual<typeof import('node:fs/promises')>(
@@ -264,8 +317,8 @@ describe('createPolicyEngineConfig', () => {
       (r) => r.decision === PolicyDecision.ALLOW && !r.toolName,
     );
     expect(rule).toBeDefined();
-    // Priority 999 in default tier → 1.999
-    expect(rule?.priority).toBeCloseTo(1.999, 5);
+    // Priority 998 in default tier → 1.998 (999 reserved for ask_user exception)
+    expect(rule?.priority).toBeCloseTo(1.998, 5);
   });
 
   it('should allow edit tool in AUTO_EDIT mode', async () => {
@@ -276,7 +329,10 @@ describe('createPolicyEngineConfig', () => {
       ApprovalMode.AUTO_EDIT,
     );
     const rule = config.rules?.find(
-      (r) => r.toolName === 'replace' && r.decision === PolicyDecision.ALLOW,
+      (r) =>
+        r.toolName === 'replace' &&
+        r.decision === PolicyDecision.ALLOW &&
+        r.modes?.includes(ApprovalMode.AUTO_EDIT),
     );
     expect(rule).toBeDefined();
     // Priority 15 in default tier → 1.015
@@ -407,6 +463,21 @@ describe('createPolicyEngineConfig', () => {
       }
       return [];
     });
+    const mockStat = vi.fn(async (p) => {
+      if (typeof p === 'string' && p.includes('/tmp/mock/default/policies')) {
+        return {
+          isDirectory: () => true,
+          isFile: () => false,
+        } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+      }
+      if (typeof p === 'string' && p.includes('default.toml')) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+        } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+      }
+      return actualFs.stat(p);
+    });
     const mockReadFile = vi.fn(async (p, _o) => {
       if (typeof p === 'string' && p.includes('default.toml')) {
         return '[[rule]]\ntoolName = "glob"\ndecision = "allow"\npriority = 50\n';
@@ -415,9 +486,15 @@ describe('createPolicyEngineConfig', () => {
     });
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readdir: mockReaddir, readFile: mockReadFile },
+      default: {
+        ...actualFs,
+        readdir: mockReaddir,
+        readFile: mockReadFile,
+        stat: mockStat,
+      },
       readdir: mockReaddir,
       readFile: mockReadFile,
+      stat: mockStat,
     }));
     vi.resetModules();
     const { createPolicyEngineConfig: createConfig } = await import(
@@ -526,8 +603,8 @@ describe('createPolicyEngineConfig', () => {
       (r) => !r.toolName && r.decision === PolicyDecision.ALLOW,
     );
     expect(wildcardRule).toBeDefined();
-    // Priority 999 in default tier → 1.999
-    expect(wildcardRule?.priority).toBeCloseTo(1.999, 5);
+    // Priority 998 in default tier → 1.998 (999 reserved for ask_user exception)
+    expect(wildcardRule?.priority).toBeCloseTo(1.998, 5);
 
     // Write tool ASK_USER rules are present (from write.toml)
     const writeToolRules = config.rules?.filter(
@@ -607,11 +684,37 @@ priority = 150
       },
     );
 
+    const mockStat = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.stat>[0],
+        options?: Parameters<typeof actualFs.stat>[1],
+      ) => {
+        if (
+          typeof path === 'string' &&
+          nodePath
+            .normalize(path)
+            .includes(nodePath.normalize('.gemini/policies'))
+        ) {
+          return {
+            isDirectory: () => true,
+            isFile: () => false,
+          } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+        }
+        return actualFs.stat(path, options);
+      },
+    );
+
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+      default: {
+        ...actualFs,
+        readFile: mockReadFile,
+        readdir: mockReaddir,
+        stat: mockStat,
+      },
       readFile: mockReadFile,
       readdir: mockReaddir,
+      stat: mockStat,
     }));
 
     vi.resetModules();
@@ -710,11 +813,37 @@ required_context = ["environment"]
       },
     );
 
+    const mockStat = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.stat>[0],
+        options?: Parameters<typeof actualFs.stat>[1],
+      ) => {
+        if (
+          typeof path === 'string' &&
+          nodePath
+            .normalize(path)
+            .includes(nodePath.normalize('.gemini/policies'))
+        ) {
+          return {
+            isDirectory: () => true,
+            isFile: () => false,
+          } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+        }
+        return actualFs.stat(path, options);
+      },
+    );
+
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+      default: {
+        ...actualFs,
+        readFile: mockReadFile,
+        readdir: mockReaddir,
+        stat: mockStat,
+      },
       readFile: mockReadFile,
       readdir: mockReaddir,
+      stat: mockStat,
     }));
 
     vi.resetModules();
@@ -806,11 +935,37 @@ name = "invalid-name"
       },
     );
 
+    const mockStat = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.stat>[0],
+        options?: Parameters<typeof actualFs.stat>[1],
+      ) => {
+        if (
+          typeof path === 'string' &&
+          nodePath
+            .normalize(path)
+            .includes(nodePath.normalize('.gemini/policies'))
+        ) {
+          return {
+            isDirectory: () => true,
+            isFile: () => false,
+          } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+        }
+        return actualFs.stat(path, options);
+      },
+    );
+
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+      default: {
+        ...actualFs,
+        readFile: mockReadFile,
+        readdir: mockReaddir,
+        stat: mockStat,
+      },
       readFile: mockReadFile,
       readdir: mockReaddir,
+      stat: mockStat,
     }));
 
     vi.resetModules();
@@ -892,6 +1047,148 @@ name = "invalid-name"
     );
     expect(rule).toBeDefined();
     expect(rule?.priority).toBeCloseTo(2.3, 5); // Command line allow
+
+    vi.doUnmock('node:fs/promises');
+  });
+
+  it('should allow overriding Plan Mode deny with user policy', async () => {
+    const actualFs =
+      await vi.importActual<typeof import('node:fs/promises')>(
+        'node:fs/promises',
+      );
+
+    const mockReaddir = vi.fn(
+      async (
+        path: string | Buffer | URL,
+        options?: Parameters<typeof actualFs.readdir>[1],
+      ) => {
+        const normalizedPath = nodePath.normalize(path.toString());
+        if (normalizedPath.includes('gemini-cli-test/user/policies')) {
+          return [
+            {
+              name: 'user-plan.toml',
+              isFile: () => true,
+              isDirectory: () => false,
+            },
+          ] as unknown as Awaited<ReturnType<typeof actualFs.readdir>>;
+        }
+        return actualFs.readdir(
+          path,
+          options as Parameters<typeof actualFs.readdir>[1],
+        );
+      },
+    );
+
+    const mockStat = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.stat>[0],
+        options?: Parameters<typeof actualFs.stat>[1],
+      ) => {
+        const normalizedPath = nodePath.normalize(path.toString());
+        if (normalizedPath.includes('gemini-cli-test/user/policies')) {
+          return {
+            isDirectory: () => true,
+            isFile: () => false,
+          } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+        }
+        return actualFs.stat(path, options);
+      },
+    );
+
+    const mockReadFile = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.readFile>[0],
+        options: Parameters<typeof actualFs.readFile>[1],
+      ) => {
+        const normalizedPath = nodePath.normalize(path.toString());
+        if (normalizedPath.includes('user-plan.toml')) {
+          return `
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = ["git status", "git diff"]
+decision = "allow"
+priority = 100
+modes = ["plan"]
+
+[[rule]]
+toolName = "codebase_investigator"
+decision = "allow"
+priority = 100
+modes = ["plan"]
+`;
+        }
+        return actualFs.readFile(path, options);
+      },
+    );
+
+    vi.doMock('node:fs/promises', () => ({
+      ...actualFs,
+      default: {
+        ...actualFs,
+        readFile: mockReadFile,
+        readdir: mockReaddir,
+        stat: mockStat,
+      },
+      readFile: mockReadFile,
+      readdir: mockReaddir,
+      stat: mockStat,
+    }));
+
+    vi.resetModules();
+
+    // Robustly mock Storage using doMock to ensure it persists through imports in config.js
+    vi.doMock('../config/storage.js', async () => {
+      const actual = await vi.importActual<
+        typeof import('../config/storage.js')
+      >('../config/storage.js');
+      class MockStorage extends actual.Storage {
+        static override getUserPoliciesDir() {
+          return '/tmp/gemini-cli-test/user/policies';
+        }
+        static override getSystemPoliciesDir() {
+          return '/tmp/gemini-cli-test/system/policies';
+        }
+      }
+      return { ...actual, Storage: MockStorage };
+    });
+
+    const { createPolicyEngineConfig } = await import('./config.js');
+
+    const settings: PolicySettings = {};
+    const config = await createPolicyEngineConfig(
+      settings,
+      ApprovalMode.PLAN,
+      nodePath.join(__dirname, 'policies'),
+    );
+
+    const shellRules = config.rules?.filter(
+      (r) =>
+        r.toolName === 'run_shell_command' &&
+        r.decision === PolicyDecision.ALLOW &&
+        r.modes?.includes(ApprovalMode.PLAN) &&
+        r.argsPattern,
+    );
+    expect(shellRules).toHaveLength(2);
+    expect(
+      shellRules?.some((r) => r.argsPattern?.test('{"command":"git status"}')),
+    ).toBe(true);
+    expect(
+      shellRules?.some((r) => r.argsPattern?.test('{"command":"git diff"}')),
+    ).toBe(true);
+    expect(
+      shellRules?.every(
+        (r) => !r.argsPattern?.test('{"command":"git commit"}'),
+      ),
+    ).toBe(true);
+
+    const subagentRule = config.rules?.find(
+      (r) =>
+        r.toolName === 'codebase_investigator' &&
+        r.decision === PolicyDecision.ALLOW &&
+        r.modes?.includes(ApprovalMode.PLAN),
+    );
+    expect(subagentRule).toBeDefined();
+    expect(subagentRule?.priority).toBeCloseTo(2.1, 5);
 
     vi.doUnmock('node:fs/promises');
   });

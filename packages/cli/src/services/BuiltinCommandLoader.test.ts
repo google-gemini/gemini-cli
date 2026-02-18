@@ -85,6 +85,9 @@ vi.mock('../ui/commands/extensionsCommand.js', () => ({
   extensionsCommand: () => ({}),
 }));
 vi.mock('../ui/commands/helpCommand.js', () => ({ helpCommand: {} }));
+vi.mock('../ui/commands/shortcutsCommand.js', () => ({
+  shortcutsCommand: {},
+}));
 vi.mock('../ui/commands/memoryCommand.js', () => ({ memoryCommand: {} }));
 vi.mock('../ui/commands/modelCommand.js', () => ({
   modelCommand: { name: 'model' },
@@ -98,6 +101,17 @@ vi.mock('../ui/commands/toolsCommand.js', () => ({ toolsCommand: {} }));
 vi.mock('../ui/commands/skillsCommand.js', () => ({
   skillsCommand: { name: 'skills' },
 }));
+vi.mock('../ui/commands/planCommand.js', async () => {
+  const { CommandKind } = await import('../ui/commands/types.js');
+  return {
+    planCommand: {
+      name: 'plan',
+      description: 'Plan command',
+      kind: CommandKind.BUILT_IN,
+    },
+  };
+});
+
 vi.mock('../ui/commands/mcpCommand.js', () => ({
   mcpCommand: {
     name: 'mcp',
@@ -115,15 +129,17 @@ describe('BuiltinCommandLoader', () => {
     vi.clearAllMocks();
     mockConfig = {
       getFolderTrust: vi.fn().mockReturnValue(true),
+      isPlanEnabled: vi.fn().mockReturnValue(false),
       getEnableExtensionReloading: () => false,
       getEnableHooks: () => false,
       getEnableHooksUI: () => false,
       getExtensionsEnabled: vi.fn().mockReturnValue(true),
-      isSkillsSupportEnabled: vi.fn().mockReturnValue(false),
+      isSkillsSupportEnabled: vi.fn().mockReturnValue(true),
       isAgentsEnabled: vi.fn().mockReturnValue(false),
       getMcpEnabled: vi.fn().mockReturnValue(true),
       getSkillManager: vi.fn().mockReturnValue({
         getAllSkills: vi.fn().mockReturnValue([]),
+        isAdminEnabled: vi.fn().mockReturnValue(true),
       }),
     } as unknown as Config;
 
@@ -215,6 +231,22 @@ describe('BuiltinCommandLoader', () => {
     expect(agentsCmd).toBeDefined();
   });
 
+  it('should include plan command when plan mode is enabled', async () => {
+    (mockConfig.isPlanEnabled as Mock).mockReturnValue(true);
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const planCmd = commands.find((c) => c.name === 'plan');
+    expect(planCmd).toBeDefined();
+  });
+
+  it('should exclude plan command when plan mode is disabled', async () => {
+    (mockConfig.isPlanEnabled as Mock).mockReturnValue(false);
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const planCmd = commands.find((c) => c.name === 'plan');
+    expect(planCmd).toBeUndefined();
+  });
+
   it('should exclude agents command when agents are disabled', async () => {
     mockConfig.isAgentsEnabled = vi.fn().mockReturnValue(false);
     const loader = new BuiltinCommandLoader(mockConfig);
@@ -255,16 +287,18 @@ describe('BuiltinCommandLoader profile', () => {
     vi.resetModules();
     mockConfig = {
       getFolderTrust: vi.fn().mockReturnValue(false),
+      isPlanEnabled: vi.fn().mockReturnValue(false),
       getCheckpointingEnabled: () => false,
       getEnableExtensionReloading: () => false,
       getEnableHooks: () => false,
       getEnableHooksUI: () => false,
       getExtensionsEnabled: vi.fn().mockReturnValue(true),
-      isSkillsSupportEnabled: vi.fn().mockReturnValue(false),
+      isSkillsSupportEnabled: vi.fn().mockReturnValue(true),
       isAgentsEnabled: vi.fn().mockReturnValue(false),
       getMcpEnabled: vi.fn().mockReturnValue(true),
       getSkillManager: vi.fn().mockReturnValue({
         getAllSkills: vi.fn().mockReturnValue([]),
+        isAdminEnabled: vi.fn().mockReturnValue(true),
       }),
     } as unknown as Config;
   });

@@ -18,6 +18,31 @@ including JSON schemas and API details.
 
 ---
 
+## Configuration schema
+
+Hooks are defined in `settings.json` within the `hooks` object. Each event
+(e.g., `BeforeTool`) contains an array of **hook definitions**.
+
+### Hook definition
+
+| Field        | Type      | Required | Description                                                                             |
+| :----------- | :-------- | :------- | :-------------------------------------------------------------------------------------- |
+| `matcher`    | `string`  | No       | A regex (for tools) or exact string (for lifecycle) to filter when the hook runs.       |
+| `sequential` | `boolean` | No       | If `true`, hooks in this group run one after another. If `false`, they run in parallel. |
+| `hooks`      | `array`   | **Yes**  | An array of **hook configurations**.                                                    |
+
+### Hook configuration
+
+| Field         | Type     | Required  | Description                                                          |
+| :------------ | :------- | :-------- | :------------------------------------------------------------------- |
+| `type`        | `string` | **Yes**   | The execution engine. Currently only `"command"` is supported.       |
+| `command`     | `string` | **Yes\*** | The shell command to execute. (Required when `type` is `"command"`). |
+| `name`        | `string` | No        | A friendly name for identifying the hook in logs and CLI commands.   |
+| `timeout`     | `number` | No        | Execution timeout in milliseconds (default: 60000).                  |
+| `description` | `string` | No        | A brief explanation of the hook's purpose.                           |
+
+---
+
 ## Base input schema
 
 All hooks receive these common fields via `stdin`:
@@ -142,6 +167,8 @@ case is response validation and automatic retries.
   - `reason`: Required if denied. This text is sent **to the agent as a new
     prompt** to request a correction.
   - `continue`: Set to `false` to **stop the session** without retrying.
+  - `hookSpecificOutput.clearContext`: If `true`, clears conversation history
+    (LLM memory) while preserving UI display.
 - **Exit Code 2 (Retry)**: Rejects the response and triggers an automatic retry
   turn using `stderr` as the feedback prompt.
 

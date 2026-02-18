@@ -19,6 +19,7 @@ import type {
   ExtensionsStartingEvent,
   ExtensionsStoppingEvent,
   ToolCallConfirmationDetails,
+  AgentDefinition,
 } from '@google/gemini-cli-core';
 import {
   GitService,
@@ -29,9 +30,11 @@ import {
   ToolConfirmationOutcome,
   Storage,
   IdeClient,
+  coreEvents,
   addMCPStatusChangeListener,
   removeMCPStatusChangeListener,
   MCPDiscoveryState,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type {
@@ -42,7 +45,7 @@ import type {
   ConfirmationRequest,
   IndividualToolCallDisplay,
 } from '../types.js';
-import { MessageType, ToolCallStatus } from '../types.js';
+import { MessageType } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { type CommandContext, type SlashCommand } from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
@@ -54,7 +57,6 @@ import {
   type ExtensionUpdateAction,
   type ExtensionUpdateStatus,
 } from '../state/extensions.js';
-import { appEvents } from '../../utils/events.js';
 import {
   LogoutConfirmationDialog,
   LogoutChoice,
@@ -69,6 +71,11 @@ interface SlashCommandProcessorActions {
   openSettingsDialog: () => void;
   openSessionBrowser: () => void;
   openModelDialog: () => void;
+  openAgentConfigDialog: (
+    name: string,
+    displayName: string,
+    definition: AgentDefinition,
+  ) => void;
   openPermissionsDialog: (props?: { targetDirectory?: string }) => void;
   quit: (messages: HistoryItem[]) => void;
   setDebugMessage: (message: string) => void;
@@ -76,6 +83,8 @@ interface SlashCommandProcessorActions {
   toggleDebugProfiler: () => void;
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
+  toggleBackgroundShell: () => void;
+  toggleShortcutsHelp: () => void;
   setText: (text: string) => void;
 }
 
@@ -213,6 +222,7 @@ export const useSlashCommandProcessor = (
         },
         loadHistory: (history, postLoadInput) => {
           loadHistory(history);
+          refreshStatic();
           if (postLoadInput !== undefined) {
             actions.setText(postLoadInput);
           }
@@ -224,11 +234,15 @@ export const useSlashCommandProcessor = (
         toggleDebugProfiler: actions.toggleDebugProfiler,
         toggleVimEnabled,
         reloadCommands,
+        openAgentConfigDialog: actions.openAgentConfigDialog,
         extensionsUpdateState,
         dispatchExtensionStateUpdate: actions.dispatchExtensionStateUpdate,
         addConfirmUpdateExtensionRequest:
           actions.addConfirmUpdateExtensionRequest,
+        setConfirmationRequest,
         removeComponent: () => setCustomDialog(null),
+        toggleBackgroundShell: actions.toggleBackgroundShell,
+        toggleShortcutsHelp: actions.toggleShortcutsHelp,
       },
       session: {
         stats: session.stats,
@@ -248,6 +262,7 @@ export const useSlashCommandProcessor = (
       actions,
       pendingItem,
       setPendingItem,
+      setConfirmationRequest,
       toggleVimEnabled,
       sessionShellAllowlist,
       reloadCommands,
@@ -287,8 +302,8 @@ export const useSlashCommandProcessor = (
       // starting/stopping
       reloadCommands();
     };
-    appEvents.on('extensionsStarting', extensionEventListener);
-    appEvents.on('extensionsStopping', extensionEventListener);
+    coreEvents.on('extensionsStarting', extensionEventListener);
+    coreEvents.on('extensionsStopping', extensionEventListener);
 
     return () => {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -297,8 +312,8 @@ export const useSlashCommandProcessor = (
         ideClient.removeStatusChangeListener(listener);
       })();
       removeMCPStatusChangeListener(listener);
-      appEvents.off('extensionsStarting', extensionEventListener);
-      appEvents.off('extensionsStopping', extensionEventListener);
+      coreEvents.off('extensionsStarting', extensionEventListener);
+      coreEvents.off('extensionsStopping', extensionEventListener);
     };
   }, [config, reloadCommands]);
 
@@ -315,6 +330,11 @@ export const useSlashCommandProcessor = (
         ],
         controller.signal,
       );
+
+      if (controller.signal.aborted) {
+        return;
+      }
+
       setCommands(commandService.getCommands());
     })();
 
@@ -452,8 +472,31 @@ export const useSlashCommandProcessor = (
                     case 'model':
                       actions.openModelDialog();
                       return { type: 'handled' };
+                    case 'agentConfig': {
+                      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+                      const props = result.props as Record<string, unknown>;
+                      if (
+                        !props ||
+                        typeof props['name'] !== 'string' ||
+                        typeof props['displayName'] !== 'string' ||
+                        !props['definition']
+                      ) {
+                        throw new Error(
+                          'Received invalid properties for agentConfig dialog action.',
+                        );
+                      }
+
+                      actions.openAgentConfigDialog(
+                        props['name'],
+                        props['displayName'],
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+                        props['definition'] as AgentDefinition,
+                      );
+                      return { type: 'handled' };
+                    }
                     case 'permissions':
                       actions.openPermissionsDialog(
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                         result.props as { targetDirectory?: string },
                       );
                       return { type: 'handled' };
@@ -512,7 +555,7 @@ export const useSlashCommandProcessor = (
                       callId,
                       name: 'Expansion',
                       description: 'Command expansion needs shell access',
-                      status: ToolCallStatus.Confirming,
+                      status: CoreToolCallStatus.AwaitingApproval,
                       resultDisplay: undefined,
                       confirmationDetails,
                     };

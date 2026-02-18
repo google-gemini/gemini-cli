@@ -6,12 +6,12 @@
 
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
 import type { ToolInvocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
-import { SchemaValidator } from '../utils/schemaValidator.js';
+import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
@@ -23,9 +23,14 @@ import {
   FileExclusions,
   COMMON_DIRECTORY_EXCLUDES,
 } from '../utils/ignorePatterns.js';
-import { GeminiIgnoreParser } from '../utils/geminiIgnoreParser.js';
-
-const DEFAULT_TOTAL_MAX_MATCHES = 20000;
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import { execStreaming } from '../utils/shell-utils.js';
+import {
+  DEFAULT_TOTAL_MAX_MATCHES,
+  DEFAULT_SEARCH_TIMEOUT_MS,
+} from './constants.js';
+import { RIP_GREP_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 function getRgCandidateFilenames(): readonly string[] {
   return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
@@ -81,51 +86,6 @@ export async function ensureRgPath(): Promise<string> {
 }
 
 /**
- * Checks if a path is within the root directory and resolves it.
- * @param config The configuration object.
- * @param relativePath Path relative to the root directory (or undefined for root).
- * @returns The absolute path if valid and exists, or null if no path specified.
- * @throws {Error} If path is outside root, doesn't exist, or isn't a directory/file.
- */
-function resolveAndValidatePath(
-  config: Config,
-  relativePath?: string,
-): string | null {
-  if (!relativePath) {
-    return null;
-  }
-
-  const targetDir = config.getTargetDir();
-  const targetPath = path.resolve(targetDir, relativePath);
-
-  // Ensure the resolved path is within workspace boundaries
-  const workspaceContext = config.getWorkspaceContext();
-  if (!workspaceContext.isPathWithinWorkspace(targetPath)) {
-    const directories = workspaceContext.getDirectories();
-    throw new Error(
-      `Path validation failed: Attempted path "${relativePath}" resolves outside the allowed workspace directories: ${directories.join(', ')}`,
-    );
-  }
-
-  // Check existence and type after resolving
-  try {
-    const stats = fs.statSync(targetPath);
-    if (!stats.isDirectory() && !stats.isFile()) {
-      throw new Error(
-        `Path is not a valid directory or file: ${targetPath} (CWD: ${targetDir})`,
-      );
-    }
-  } catch (error: unknown) {
-    if (isNodeError(error) && error.code === 'ENOENT') {
-      throw new Error(`Path does not exist: ${targetPath} (CWD: ${targetDir})`);
-    }
-    throw new Error(`Failed to access path stats for ${targetPath}: ${error}`);
-  }
-
-  return targetPath;
-}
-
-/**
  * Parameters for the GrepTool
  */
 export interface RipGrepToolParams {
@@ -143,6 +103,16 @@ export interface RipGrepToolParams {
    * File pattern to include in the search (e.g. "*.js", "*.{ts,tsx}")
    */
   include?: string;
+
+  /**
+   * Optional: A regular expression pattern to exclude from the search results.
+   */
+  exclude_pattern?: string;
+
+  /**
+   * Optional: If true, only the file paths of the matches will be returned.
+   */
+  names_only?: boolean;
 
   /**
    * If true, searches case-sensitively. Defaults to false.
@@ -173,6 +143,16 @@ export interface RipGrepToolParams {
    * If true, does not respect .gitignore or default ignores (like build/dist).
    */
   no_ignore?: boolean;
+
+  /**
+   * Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.
+   */
+  max_matches_per_file?: number;
+
+  /**
+   * Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.
+   */
+  total_max_matches?: number;
 }
 
 /**
@@ -182,6 +162,7 @@ interface GrepMatch {
   filePath: string;
   lineNumber: number;
   line: string;
+  isContext?: boolean;
 }
 
 class GrepToolInvocation extends BaseToolInvocation<
@@ -190,7 +171,7 @@ class GrepToolInvocation extends BaseToolInvocation<
 > {
   constructor(
     private readonly config: Config,
-    private readonly geminiIgnoreParser: GeminiIgnoreParser,
+    private readonly fileDiscoveryService: FileDiscoveryService,
     params: RipGrepToolParams,
     messageBus: MessageBus,
     _toolName?: string,
@@ -205,29 +186,105 @@ class GrepToolInvocation extends BaseToolInvocation<
       // This forces CWD search instead of 'all workspaces' search by default.
       const pathParam = this.params.dir_path || '.';
 
-      const searchDirAbs = resolveAndValidatePath(this.config, pathParam);
+      const searchDirAbs = path.resolve(this.config.getTargetDir(), pathParam);
+      const validationError = this.config.validatePathAccess(
+        searchDirAbs,
+        'read',
+      );
+      if (validationError) {
+        return {
+          llmContent: validationError,
+          returnDisplay: 'Error: Path not in workspace.',
+          error: {
+            message: validationError,
+            type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+          },
+        };
+      }
+
+      // Check existence and type asynchronously
+      try {
+        const stats = await fsPromises.stat(searchDirAbs);
+        if (!stats.isDirectory() && !stats.isFile()) {
+          return {
+            llmContent: `Path is not a valid directory or file: ${searchDirAbs}`,
+            returnDisplay: 'Error: Path is not a valid directory or file.',
+          };
+        }
+      } catch (error: unknown) {
+        if (isNodeError(error) && error.code === 'ENOENT') {
+          return {
+            llmContent: `Path does not exist: ${searchDirAbs}`,
+            returnDisplay: 'Error: Path does not exist.',
+            error: {
+              message: `Path does not exist: ${searchDirAbs}`,
+              type: ToolErrorType.FILE_NOT_FOUND,
+            },
+          };
+        }
+        return {
+          llmContent: `Failed to access path stats for ${searchDirAbs}: ${getErrorMessage(error)}`,
+          returnDisplay: 'Error: Failed to access path.',
+        };
+      }
+
       const searchDirDisplay = pathParam;
 
-      const totalMaxMatches = DEFAULT_TOTAL_MAX_MATCHES;
+      const totalMaxMatches =
+        this.params.total_max_matches ?? DEFAULT_TOTAL_MAX_MATCHES;
       if (this.config.getDebugMode()) {
         debugLogger.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
       }
 
-      let allMatches = await this.performRipgrepSearch({
-        pattern: this.params.pattern,
-        path: searchDirAbs!,
-        include: this.params.include,
-        case_sensitive: this.params.case_sensitive,
-        fixed_strings: this.params.fixed_strings,
-        context: this.params.context,
-        after: this.params.after,
-        before: this.params.before,
-        no_ignore: this.params.no_ignore,
-        signal,
-      });
+      // Create a timeout controller to prevent indefinitely hanging searches
+      const timeoutController = new AbortController();
+      const timeoutId = setTimeout(() => {
+        timeoutController.abort();
+      }, DEFAULT_SEARCH_TIMEOUT_MS);
 
-      if (allMatches.length >= totalMaxMatches) {
-        allMatches = allMatches.slice(0, totalMaxMatches);
+      // Link the passed signal to our timeout controller
+      const onAbort = () => timeoutController.abort();
+      if (signal.aborted) {
+        onAbort();
+      } else {
+        signal.addEventListener('abort', onAbort, { once: true });
+      }
+
+      let allMatches: GrepMatch[];
+      try {
+        allMatches = await this.performRipgrepSearch({
+          pattern: this.params.pattern,
+          path: searchDirAbs,
+          include: this.params.include,
+          exclude_pattern: this.params.exclude_pattern,
+          case_sensitive: this.params.case_sensitive,
+          fixed_strings: this.params.fixed_strings,
+          context: this.params.context,
+          after: this.params.after,
+          before: this.params.before,
+          no_ignore: this.params.no_ignore,
+          maxMatches: totalMaxMatches,
+          max_matches_per_file: this.params.max_matches_per_file,
+          signal: timeoutController.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+        signal.removeEventListener('abort', onAbort);
+      }
+
+      if (!this.params.no_ignore) {
+        const uniqueFiles = Array.from(
+          new Set(allMatches.map((m) => m.filePath)),
+        );
+        const absoluteFilePaths = uniqueFiles.map((f) =>
+          path.resolve(searchDirAbs, f),
+        );
+        const allowedFiles =
+          this.fileDiscoveryService.filterFiles(absoluteFilePaths);
+        const allowedSet = new Set(allowedFiles);
+        allMatches = allMatches.filter((m) =>
+          allowedSet.has(path.resolve(searchDirAbs, m.filePath)),
+        );
       }
 
       const searchLocationDescription = `in path "${searchDirDisplay}"`;
@@ -235,8 +292,6 @@ class GrepToolInvocation extends BaseToolInvocation<
         const noMatchMsg = `No matches found for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}.`;
         return { llmContent: noMatchMsg, returnDisplay: `No matches found` };
       }
-
-      const wasTruncated = allMatches.length >= totalMaxMatches;
 
       const matchesByFile = allMatches.reduce(
         (acc, match) => {
@@ -251,34 +306,38 @@ class GrepToolInvocation extends BaseToolInvocation<
         {} as Record<string, GrepMatch[]>,
       );
 
-      const matchCount = allMatches.length;
+      const matchesOnly = allMatches.filter((m) => !m.isContext);
+      const matchCount = matchesOnly.length;
       const matchTerm = matchCount === 1 ? 'match' : 'matches';
 
-      let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}`;
+      const wasTruncated = matchCount >= totalMaxMatches;
 
-      if (wasTruncated) {
-        llmContent += ` (results limited to ${totalMaxMatches} matches for performance)`;
+      if (this.params.names_only) {
+        const filePaths = Object.keys(matchesByFile).sort();
+        let llmContent = `Found ${filePaths.length} files with matches for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}${wasTruncated ? ` (results limited to ${totalMaxMatches} matches for performance)` : ''}:\n`;
+        llmContent += filePaths.join('\n');
+        return {
+          llmContent: llmContent.trim(),
+          returnDisplay: `Found ${filePaths.length} files${wasTruncated ? ' (limited)' : ''}`,
+        };
       }
 
-      llmContent += `:\n---\n`;
+      let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}${wasTruncated ? ` (results limited to ${totalMaxMatches} matches for performance)` : ''}:\n---\n`;
 
       for (const filePath in matchesByFile) {
         llmContent += `File: ${filePath}\n`;
         matchesByFile[filePath].forEach((match) => {
-          const trimmedLine = match.line.trim();
-          llmContent += `L${match.lineNumber}: ${trimmedLine}\n`;
+          const separator = match.isContext ? '-' : ':';
+          llmContent += `L${match.lineNumber}${separator} ${match.line}\n`;
         });
         llmContent += '---\n';
       }
 
-      let displayMessage = `Found ${matchCount} ${matchTerm}`;
-      if (wasTruncated) {
-        displayMessage += ` (limited)`;
-      }
-
       return {
         llmContent: llmContent.trim(),
-        returnDisplay: displayMessage,
+        returnDisplay: `Found ${matchCount} ${matchTerm}${
+          wasTruncated ? ' (limited)' : ''
+        }`,
       };
     } catch (error) {
       debugLogger.warn(`Error during GrepLogic execution: ${error}`);
@@ -290,63 +349,34 @@ class GrepToolInvocation extends BaseToolInvocation<
     }
   }
 
-  private parseRipgrepJsonOutput(
-    output: string,
-    basePath: string,
-  ): GrepMatch[] {
-    const results: GrepMatch[] = [];
-    if (!output) return results;
-
-    const lines = output.trim().split('\n');
-
-    for (const line of lines) {
-      if (!line.trim()) continue;
-
-      try {
-        const json = JSON.parse(line);
-        if (json.type === 'match') {
-          const match = json.data;
-          // Defensive check: ensure text properties exist (skips binary/invalid encoding)
-          if (match.path?.text && match.lines?.text) {
-            const absoluteFilePath = path.resolve(basePath, match.path.text);
-            const relativeFilePath = path.relative(basePath, absoluteFilePath);
-
-            results.push({
-              filePath: relativeFilePath || path.basename(absoluteFilePath),
-              lineNumber: match.line_number,
-              line: match.lines.text.trimEnd(),
-            });
-          }
-        }
-      } catch (error) {
-        debugLogger.warn(`Failed to parse ripgrep JSON line: ${line}`, error);
-      }
-    }
-    return results;
-  }
-
   private async performRipgrepSearch(options: {
     pattern: string;
     path: string;
     include?: string;
+    exclude_pattern?: string;
     case_sensitive?: boolean;
     fixed_strings?: boolean;
     context?: number;
     after?: number;
     before?: number;
     no_ignore?: boolean;
+    maxMatches: number;
+    max_matches_per_file?: number;
     signal: AbortSignal;
   }): Promise<GrepMatch[]> {
     const {
       pattern,
       path: absolutePath,
       include,
+      exclude_pattern,
       case_sensitive,
       fixed_strings,
       context,
       after,
       before,
       no_ignore,
+      maxMatches,
+      max_matches_per_file,
     } = options;
 
     const rgArgs = ['--json'];
@@ -375,11 +405,19 @@ class GrepToolInvocation extends BaseToolInvocation<
       rgArgs.push('--no-ignore');
     }
 
+    if (max_matches_per_file) {
+      rgArgs.push('--max-count', max_matches_per_file.toString());
+    }
+
     if (include) {
       rgArgs.push('--glob', include);
     }
 
     if (!no_ignore) {
+      if (!this.config.getFileFilteringRespectGitIgnore()) {
+        rgArgs.push('--no-ignore-vcs', '--no-ignore-exclude');
+      }
+
       const fileExclusions = new FileExclusions(this.config);
       const excludes = fileExclusions.getGlobExcludes([
         ...COMMON_DIRECTORY_EXCLUDES,
@@ -390,70 +428,95 @@ class GrepToolInvocation extends BaseToolInvocation<
         rgArgs.push('--glob', `!${exclude}`);
       });
 
-      if (this.config.getFileFilteringRespectGeminiIgnore()) {
-        // Add .geminiignore support (ripgrep natively handles .gitignore)
-        const geminiIgnorePath = this.geminiIgnoreParser.getIgnoreFilePath();
-        if (geminiIgnorePath) {
-          rgArgs.push('--ignore-file', geminiIgnorePath);
-        }
+      // Add .geminiignore and custom ignore files support (if provided/mandated)
+      // (ripgrep natively handles .gitignore)
+      const geminiIgnorePaths = this.fileDiscoveryService.getIgnoreFilePaths();
+      for (const ignorePath of geminiIgnorePaths) {
+        rgArgs.push('--ignore-file', ignorePath);
       }
     }
 
     rgArgs.push('--threads', '4');
     rgArgs.push(absolutePath);
 
+    const results: GrepMatch[] = [];
     try {
       const rgPath = await ensureRgPath();
-      const output = await new Promise<string>((resolve, reject) => {
-        const child = spawn(rgPath, rgArgs, {
-          windowsHide: true,
-        });
-
-        const stdoutChunks: Buffer[] = [];
-        const stderrChunks: Buffer[] = [];
-
-        const cleanup = () => {
-          if (options.signal.aborted) {
-            child.kill();
-          }
-        };
-
-        options.signal.addEventListener('abort', cleanup, { once: true });
-
-        child.stdout.on('data', (chunk) => stdoutChunks.push(chunk));
-        child.stderr.on('data', (chunk) => stderrChunks.push(chunk));
-
-        child.on('error', (err) => {
-          options.signal.removeEventListener('abort', cleanup);
-          reject(
-            new Error(
-              `Failed to start ripgrep: ${err.message}. Please ensure @lvce-editor/ripgrep is properly installed.`,
-            ),
-          );
-        });
-
-        child.on('close', (code) => {
-          options.signal.removeEventListener('abort', cleanup);
-          const stdoutData = Buffer.concat(stdoutChunks).toString('utf8');
-          const stderrData = Buffer.concat(stderrChunks).toString('utf8');
-
-          if (code === 0) {
-            resolve(stdoutData);
-          } else if (code === 1) {
-            resolve(''); // No matches found
-          } else {
-            reject(
-              new Error(`ripgrep exited with code ${code}: ${stderrData}`),
-            );
-          }
-        });
+      const generator = execStreaming(rgPath, rgArgs, {
+        signal: options.signal,
+        allowedExitCodes: [0, 1],
       });
 
-      return this.parseRipgrepJsonOutput(output, absolutePath);
+      let matchesFound = 0;
+      let excludeRegex: RegExp | null = null;
+      if (exclude_pattern) {
+        excludeRegex = new RegExp(exclude_pattern, case_sensitive ? '' : 'i');
+      }
+
+      for await (const line of generator) {
+        const match = this.parseRipgrepJsonLine(line, absolutePath);
+        if (match) {
+          if (excludeRegex && excludeRegex.test(match.line)) {
+            continue;
+          }
+
+          results.push(match);
+          if (!match.isContext) {
+            matchesFound++;
+          }
+          if (matchesFound >= maxMatches) {
+            break;
+          }
+        }
+      }
+
+      return results;
     } catch (error: unknown) {
       debugLogger.debug(`GrepLogic: ripgrep failed: ${getErrorMessage(error)}`);
       throw error;
     }
+  }
+
+  private parseRipgrepJsonLine(
+    line: string,
+    basePath: string,
+  ): GrepMatch | null {
+    try {
+      const json = JSON.parse(line);
+      if (json.type === 'match' || json.type === 'context') {
+        const data = json.data;
+        // Defensive check: ensure text properties exist (skips binary/invalid encoding)
+        if (data.path?.text && data.lines?.text) {
+          const absoluteFilePath = path.resolve(basePath, data.path.text);
+          const relativeCheck = path.relative(basePath, absoluteFilePath);
+          if (
+            relativeCheck === '..' ||
+            relativeCheck.startsWith(`..${path.sep}`) ||
+            path.isAbsolute(relativeCheck)
+          ) {
+            return null;
+          }
+
+          const relativeFilePath = path.relative(basePath, absoluteFilePath);
+
+          return {
+            filePath: relativeFilePath || path.basename(absoluteFilePath),
+            lineNumber: data.line_number,
+            line: data.lines.text.trimEnd(),
+            isContext: json.type === 'context',
+          };
+        }
+      }
+    } catch (error) {
+      // Only log if it's not a simple empty line or widely invalid
+      if (line.trim().length > 0) {
+        debugLogger.warn(
+          `Failed to parse ripgrep JSON line: ${line.substring(0, 100)}...`,
+          error,
+        );
+      }
+    }
+    return null;
   }
 
   /**
@@ -489,7 +552,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = GREP_TOOL_NAME;
-  private readonly geminiIgnoreParser: GeminiIgnoreParser;
+  private readonly fileDiscoveryService: FileDiscoveryService;
 
   constructor(
     private readonly config: Config,
@@ -498,64 +561,17 @@ export class RipGrepTool extends BaseDeclarativeTool<
     super(
       RipGrepTool.Name,
       'SearchText',
-      'FAST, optimized search powered by `ripgrep`. PREFERRED over standard `run_shell_command("grep ...")` due to better performance and automatic output limiting (max 20k matches).',
+      RIP_GREP_DEFINITION.base.description!,
       Kind.Search,
-      {
-        properties: {
-          pattern: {
-            description:
-              "The pattern to search for. By default, treated as a Rust-flavored regular expression. Use '\\b' for precise symbol matching (e.g., '\\bMatchMe\\b').",
-            type: 'string',
-          },
-          dir_path: {
-            description:
-              "Directory or file to search. Directories are searched recursively. Relative paths are resolved against current working directory. Defaults to current working directory ('.') if omitted.",
-            type: 'string',
-          },
-          include: {
-            description:
-              "Glob pattern to filter files (e.g., '*.ts', 'src/**'). Recommended for large repositories to reduce noise. Defaults to all files if omitted.",
-            type: 'string',
-          },
-          case_sensitive: {
-            description:
-              'If true, search is case-sensitive. Defaults to false (ignore case) if omitted.',
-            type: 'boolean',
-          },
-          fixed_strings: {
-            description:
-              'If true, treats the `pattern` as a literal string instead of a regular expression. Defaults to false (basic regex) if omitted.',
-            type: 'boolean',
-          },
-          context: {
-            description:
-              'Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.',
-            type: 'integer',
-          },
-          after: {
-            description:
-              'Show this many lines after each match (equivalent to grep -A). Defaults to 0 if omitted.',
-            type: 'integer',
-          },
-          before: {
-            description:
-              'Show this many lines before each match (equivalent to grep -B). Defaults to 0 if omitted.',
-            type: 'integer',
-          },
-          no_ignore: {
-            description:
-              'If true, searches all files including those usually ignored (like in .gitignore, build/, dist/, etc). Defaults to false if omitted.',
-            type: 'boolean',
-          },
-        },
-        required: ['pattern'],
-        type: 'object',
-      },
+      RIP_GREP_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
     );
-    this.geminiIgnoreParser = new GeminiIgnoreParser(config.getTargetDir());
+    this.fileDiscoveryService = new FileDiscoveryService(
+      config.getTargetDir(),
+      config.getFileFilteringOptions(),
+    );
   }
 
   /**
@@ -563,21 +579,64 @@ export class RipGrepTool extends BaseDeclarativeTool<
    * @param params Parameters to validate
    * @returns An error message string if invalid, null otherwise
    */
-  override validateToolParams(params: RipGrepToolParams): string | null {
-    const errors = SchemaValidator.validate(
-      this.schema.parametersJsonSchema,
-      params,
-    );
-    if (errors) {
-      return errors;
+  protected override validateToolParamValues(
+    params: RipGrepToolParams,
+  ): string | null {
+    if (!params.fixed_strings) {
+      try {
+        new RegExp(params.pattern);
+      } catch (error) {
+        return `Invalid regular expression pattern provided: ${params.pattern}. Error: ${getErrorMessage(error)}`;
+      }
+    }
+
+    if (params.exclude_pattern) {
+      try {
+        new RegExp(params.exclude_pattern);
+      } catch (error) {
+        return `Invalid exclude regular expression pattern provided: ${params.exclude_pattern}. Error: ${getErrorMessage(error)}`;
+      }
+    }
+
+    if (
+      params.max_matches_per_file !== undefined &&
+      params.max_matches_per_file < 1
+    ) {
+      return 'max_matches_per_file must be at least 1.';
+    }
+
+    if (
+      params.total_max_matches !== undefined &&
+      params.total_max_matches < 1
+    ) {
+      return 'total_max_matches must be at least 1.';
     }
 
     // Only validate path if one is provided
     if (params.dir_path) {
+      const resolvedPath = path.resolve(
+        this.config.getTargetDir(),
+        params.dir_path,
+      );
+      const validationError = this.config.validatePathAccess(
+        resolvedPath,
+        'read',
+      );
+      if (validationError) {
+        return validationError;
+      }
+
+      // Check existence and type
       try {
-        resolveAndValidatePath(this.config, params.dir_path);
-      } catch (error) {
-        return getErrorMessage(error);
+        const stats = fs.statSync(resolvedPath);
+        if (!stats.isDirectory() && !stats.isFile()) {
+          return `Path is not a valid directory or file: ${resolvedPath}`;
+        }
+      } catch (error: unknown) {
+        if (isNodeError(error) && error.code === 'ENOENT') {
+          return `Path does not exist: ${resolvedPath}`;
+        }
+        return `Failed to access path stats for ${resolvedPath}: ${getErrorMessage(error)}`;
       }
     }
 
@@ -592,11 +651,15 @@ export class RipGrepTool extends BaseDeclarativeTool<
   ): ToolInvocation<RipGrepToolParams, ToolResult> {
     return new GrepToolInvocation(
       this.config,
-      this.geminiIgnoreParser,
+      this.fileDiscoveryService,
       params,
       messageBus ?? this.messageBus,
       _toolName,
       _toolDisplayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(RIP_GREP_DEFINITION, modelId);
   }
 }

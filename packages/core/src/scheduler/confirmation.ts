@@ -17,14 +17,22 @@ import {
   type ToolConfirmationPayload,
   type ToolCallConfirmationDetails,
 } from '../tools/tools.js';
-import type { ValidatingToolCall, WaitingToolCall } from './types.js';
+import {
+  type ValidatingToolCall,
+  type WaitingToolCall,
+  CoreToolCallStatus,
+} from './types.js';
 import type { Config } from '../config/config.js';
 import type { SchedulerStateManager } from './state-manager.js';
 import type { ToolModificationHandler } from './tool-modifier.js';
-import type { EditorType } from '../utils/editor.js';
+import {
+  resolveEditorAsync,
+  type EditorType,
+  NO_EDITOR_AVAILABLE_ERROR,
+} from '../utils/editor.js';
 import type { DiffUpdateResult } from '../ide/ide-client.js';
-import { fireToolNotificationHook } from '../core/coreToolHookTriggers.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents } from '../utils/events.js';
 
 export interface ConfirmationResult {
   outcome: ToolConfirmationOutcome;
@@ -66,6 +74,7 @@ export async function awaitConfirmation(
       MessageBusType.TOOL_CONFIRMATION_RESPONSE,
       { signal },
     )) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const response = msg as ToolConfirmationResponse;
       if (response.correlationId === correlationId) {
         return {
@@ -80,6 +89,7 @@ export async function awaitConfirmation(
       }
     }
   } catch (error) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     if (signal.aborted || (error as Error).name === 'AbortError') {
       throw new Error('Operation cancelled');
     }
@@ -104,9 +114,11 @@ export async function resolveConfirmation(
     state: SchedulerStateManager;
     modifier: ToolModificationHandler;
     getPreferredEditor: () => EditorType | undefined;
+    schedulerId: string;
+    onWaitingForConfirmation?: (waiting: boolean) => void;
   },
 ): Promise<ResolutionResult> {
-  const { state } = deps;
+  const { state, onWaitingForConfirmation } = deps;
   const callId = toolCall.request.callId;
   let outcome = ToolConfirmationOutcome.ModifyWithEditor;
   let lastDetails: SerializableConfirmationDetails | undefined;
@@ -137,22 +149,37 @@ export async function resolveConfirmation(
     const ideConfirmation =
       'ideConfirmation' in details ? details.ideConfirmation : undefined;
 
-    state.updateStatus(callId, 'awaiting_approval', {
+    state.updateStatus(callId, CoreToolCallStatus.AwaitingApproval, {
       confirmationDetails: serializableDetails,
       correlationId,
     });
 
+    onWaitingForConfirmation?.(true);
     const response = await waitForConfirmation(
       deps.messageBus,
       correlationId,
       signal,
       ideConfirmation,
     );
+    onWaitingForConfirmation?.(false);
     outcome = response.outcome;
 
+    if ('onConfirm' in details && typeof details.onConfirm === 'function') {
+      await details.onConfirm(outcome, response.payload);
+    }
+
     if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
-      await handleExternalModification(deps, toolCall, signal);
-    } else if (response.payload?.newContent) {
+      const modResult = await handleExternalModification(
+        deps,
+        toolCall,
+        signal,
+      );
+      // Editor is not available - emit error feedback and stay in the loop
+      // to return to previous confirmation screen.
+      if (modResult.error) {
+        coreEvents.emitFeedback('error', modResult.error);
+      }
+    } else if (response.payload && 'newContent' in response.payload) {
       await handleInlineModification(deps, toolCall, response.payload, signal);
       outcome = ToolConfirmationOutcome.ProceedOnce;
     }
@@ -168,8 +195,8 @@ async function notifyHooks(
   deps: { config: Config; messageBus: MessageBus },
   details: ToolCallConfirmationDetails,
 ): Promise<void> {
-  if (deps.config.getEnableHooks()) {
-    await fireToolNotificationHook(deps.messageBus, {
+  if (deps.config.getHookSystem()) {
+    await deps.config.getHookSystem()?.fireToolNotificationEvent({
       ...details,
       // Pass no-op onConfirm to satisfy type definition; side-effects via
       // callbacks are disallowed.
@@ -179,7 +206,17 @@ async function notifyHooks(
 }
 
 /**
+ * Result of attempting external modification.
+ * If error is defined, the modification failed.
+ */
+interface ExternalModificationResult {
+  /** Error message if the modification failed */
+  error?: string;
+}
+
+/**
  * Handles modification via an external editor (e.g. Vim).
+ * Returns a result indicating success or failure with an error message.
  */
 async function handleExternalModification(
   deps: {
@@ -189,12 +226,19 @@ async function handleExternalModification(
   },
   toolCall: ValidatingToolCall,
   signal: AbortSignal,
-): Promise<void> {
+): Promise<ExternalModificationResult> {
   const { state, modifier, getPreferredEditor } = deps;
-  const editor = getPreferredEditor();
-  if (!editor) return;
+
+  const preferredEditor = getPreferredEditor();
+  const editor = await resolveEditorAsync(preferredEditor, signal);
+
+  if (!editor) {
+    // No editor available - return failure with error message
+    return { error: NO_EDITOR_AVAILABLE_ERROR };
+  }
 
   const result = await modifier.handleModifyWithEditor(
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     state.firstActiveCall as WaitingToolCall,
     editor,
     signal,
@@ -207,6 +251,7 @@ async function handleExternalModification(
       newInvocation,
     );
   }
+  return {};
 }
 
 /**
@@ -220,6 +265,7 @@ async function handleInlineModification(
 ): Promise<void> {
   const { state, modifier } = deps;
   const result = await modifier.applyInlineModify(
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     state.firstActiveCall as WaitingToolCall,
     payload,
     signal,
