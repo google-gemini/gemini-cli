@@ -390,26 +390,18 @@ describe('Admin Controls', () => {
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
     });
 
-    it('should return empty object on fetch error and still start polling', async () => {
-      (mockServer.fetchAdminControls as Mock).mockRejectedValue(
-        new Error('Network error'),
-      );
-      const result = await fetchAdminControls(
-        mockServer,
-        undefined,
-        true,
-        mockOnSettingsChanged,
-      );
+    it('should throw error on fetch error and NOT start polling', async () => {
+      const error = new Error('Network error');
+      (mockServer.fetchAdminControls as Mock).mockRejectedValue(error);
 
-      expect(result).toEqual({});
+      await expect(
+        fetchAdminControls(mockServer, undefined, true, mockOnSettingsChanged),
+      ).rejects.toThrow(error);
 
-      // Polling should have been started and should retry
-      (mockServer.fetchAdminControls as Mock).mockResolvedValue({
-        strictModeDisabled: false,
-        adminControlsApplicable: true,
-      });
+      // Polling should NOT have been started
+      // Advance timers just to be absolutely sure
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
-      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2); // Initial + poll
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1); // Only initial fetch
     });
 
     it('should return empty object on adminControlsApplicable false and STOP polling', async () => {
@@ -551,12 +543,12 @@ describe('Admin Controls', () => {
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
     });
 
-    it('should return empty object on any other fetch error', async () => {
-      (mockServer.fetchAdminControls as Mock).mockRejectedValue(
-        new Error('Network error'),
+    it('should throw error on any other fetch error', async () => {
+      const error = new Error('Network error');
+      (mockServer.fetchAdminControls as Mock).mockRejectedValue(error);
+      await expect(fetchAdminControlsOnce(mockServer, true)).rejects.toThrow(
+        error,
       );
-      const result = await fetchAdminControlsOnce(mockServer, true);
-      expect(result).toEqual({});
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
     });
 

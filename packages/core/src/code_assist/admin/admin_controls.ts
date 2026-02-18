@@ -127,10 +127,7 @@ export async function fetchAdminControls(
     return sanitizedSettings;
   } catch (e) {
     debugLogger.error('Failed to fetch admin controls: ', e);
-    // If initial fetch fails, start polling to retry.
-    currentSettings = {};
-    startAdminControlsPolling(server, server.projectId, onSettingsChanged);
-    return {};
+    throw e;
   }
 }
 
@@ -165,7 +162,7 @@ export async function fetchAdminControlsOnce(
       'Failed to fetch admin controls: ',
       e instanceof Error ? e.message : e,
     );
-    return {};
+    throw e;
   }
 }
 
