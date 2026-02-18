@@ -23,11 +23,6 @@ vi.mock('node:os', () => ({
 describe('compatibility', () => {
   const originalGetColorDepth = process.stdout.getColorDepth;
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    process.stdout.getColorDepth = vi.fn().mockReturnValue(24);
-  });
-
   afterEach(() => {
     process.stdout.getColorDepth = originalGetColorDepth;
     vi.restoreAllMocks();
@@ -84,13 +79,13 @@ describe('compatibility', () => {
 
     it('should return true when getColorDepth returns >= 24', () => {
       vi.stubEnv('COLORTERM', '');
-      vi.mocked(process.stdout.getColorDepth).mockReturnValue(24);
+      process.stdout.getColorDepth = vi.fn().mockReturnValue(24);
       expect(supportsTrueColor()).toBe(true);
     });
 
     it('should return false when true color is not supported', () => {
       vi.stubEnv('COLORTERM', '');
-      vi.mocked(process.stdout.getColorDepth).mockReturnValue(8);
+      process.stdout.getColorDepth = vi.fn().mockReturnValue(8);
       expect(supportsTrueColor()).toBe(false);
     });
   });
@@ -99,6 +94,7 @@ describe('compatibility', () => {
     beforeEach(() => {
       // Default to supporting true color to keep existing tests simple
       vi.stubEnv('COLORTERM', 'truecolor');
+      process.stdout.getColorDepth = vi.fn().mockReturnValue(24);
     });
 
     it('should return Windows 10 warning when detected', () => {
@@ -126,7 +122,7 @@ describe('compatibility', () => {
       vi.mocked(os.platform).mockReturnValue('darwin');
       vi.stubEnv('TERMINAL_EMULATOR', '');
       vi.stubEnv('COLORTERM', '');
-      vi.mocked(process.stdout.getColorDepth).mockReturnValue(8);
+      process.stdout.getColorDepth = vi.fn().mockReturnValue(8);
 
       const warnings = getCompatibilityWarnings();
       expect(warnings).toContain(
@@ -139,7 +135,7 @@ describe('compatibility', () => {
       vi.mocked(os.release).mockReturnValue('10.0.19041');
       vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
       vi.stubEnv('COLORTERM', '');
-      vi.mocked(process.stdout.getColorDepth).mockReturnValue(8);
+      process.stdout.getColorDepth = vi.fn().mockReturnValue(8);
 
       const warnings = getCompatibilityWarnings();
       expect(warnings).toHaveLength(3);
