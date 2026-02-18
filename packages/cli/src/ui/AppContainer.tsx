@@ -1268,8 +1268,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
 
-  const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
-    useFolderTrust(settings, setIsTrustedFolder, historyManager.addItem);
+  const {
+    isFolderTrustDialogOpen,
+    discoveryResults: folderDiscoveryResults,
+    handleFolderTrustSelect,
+    isRestarting,
+  } = useFolderTrust(settings, setIsTrustedFolder, historyManager.addItem);
   const {
     needsRestart: ideNeedsRestart,
     restartReason: ideTrustRestartReason,
@@ -1847,6 +1851,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isResuming,
       shouldShowIdePrompt,
       isFolderTrustDialogOpen: isFolderTrustDialogOpen ?? false,
+      folderDiscoveryResults,
       isTrustedFolder,
       constrainHeight,
       showErrorDetails,
@@ -1952,6 +1957,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isResuming,
       shouldShowIdePrompt,
       isFolderTrustDialogOpen,
+      folderDiscoveryResults,
       isTrustedFolder,
       constrainHeight,
       showErrorDetails,

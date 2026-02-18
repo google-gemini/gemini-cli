@@ -25,6 +25,12 @@ import { TrustLevel } from '../../config/trustedFolders.js';
 import * as trustedFolders from '../../config/trustedFolders.js';
 import { coreEvents, ExitCodes } from '@google/gemini-cli-core';
 
+vi.mock('../../services/FolderTrustDiscoveryService.js', () => ({
+  FolderTrustDiscoveryService: {
+    discover: vi.fn(() => new Promise(() => {})),
+  },
+}));
+
 const mockedCwd = vi.hoisted(() => vi.fn());
 const mockedExit = vi.hoisted(() => vi.fn());
 

@@ -16,6 +16,10 @@ import * as process from 'node:process';
 import { type HistoryItemWithoutId, MessageType } from '../types.js';
 import { coreEvents, ExitCodes } from '@google/gemini-cli-core';
 import { runExitCleanup } from '../../utils/cleanup.js';
+import {
+  FolderTrustDiscoveryService,
+  type FolderDiscoveryResults,
+} from '../../services/FolderTrustDiscoveryService.js';
 
 export const useFolderTrust = (
   settings: LoadedSettings,
@@ -24,6 +28,8 @@ export const useFolderTrust = (
 ) => {
   const [isTrusted, setIsTrusted] = useState<boolean | undefined>(undefined);
   const [isFolderTrustDialogOpen, setIsFolderTrustDialogOpen] = useState(false);
+  const [discoveryResults, setDiscoveryResults] =
+    useState<FolderDiscoveryResults | null>(null);
   const [isRestarting, setIsRestarting] = useState(false);
   const startupMessageSent = useRef(false);
 
@@ -35,6 +41,17 @@ export const useFolderTrust = (
     setIsFolderTrustDialogOpen(trusted === undefined);
     onTrustChange(trusted);
 
+    let isMounted = true;
+    if (trusted === undefined || trusted === false) {
+      void FolderTrustDiscoveryService.discover(process.cwd()).then(
+        (results) => {
+          if (isMounted) {
+            setDiscoveryResults(results);
+          }
+        },
+      );
+    }
+
     if (trusted === false && !startupMessageSent.current) {
       addItem(
         {
@@ -45,6 +62,10 @@ export const useFolderTrust = (
       );
       startupMessageSent.current = true;
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [folderTrust, onTrustChange, settings.merged, addItem]);
 
   const handleFolderTrustSelect = useCallback(
@@ -99,6 +120,7 @@ export const useFolderTrust = (
   return {
     isTrusted,
     isFolderTrustDialogOpen,
+    discoveryResults,
     handleFolderTrustSelect,
     isRestarting,
   };

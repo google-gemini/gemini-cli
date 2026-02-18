@@ -51,6 +51,7 @@ import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { type RestartReason } from '../hooks/useIdeTrustListener.js';
 import type { TerminalBackgroundColor } from '../utils/terminalCapabilityManager.js';
 import type { BackgroundShell } from '../hooks/shellCommandProcessor.js';
+import type { FolderDiscoveryResults } from '../../services/FolderTrustDiscoveryService.js';
 
 export interface UIState {
   history: HistoryItem[];
@@ -99,6 +100,7 @@ export interface UIState {
   isResuming: boolean;
   shouldShowIdePrompt: boolean;
   isFolderTrustDialogOpen: boolean;
+  folderDiscoveryResults: FolderDiscoveryResults | null;
   isTrustedFolder: boolean | undefined;
   constrainHeight: boolean;
   showErrorDetails: boolean;
