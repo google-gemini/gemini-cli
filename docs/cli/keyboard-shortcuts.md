@@ -142,6 +142,89 @@ available combinations.
   auto-edit, and plan (skipped when agent is busy).
 - `\` (at end of a line) + `Enter`: Insert a newline without leaving single-line
   mode.
+## Vi Mode Shortcuts
+
+When vim mode is enabled (`/vim` command or `general.vimMode: true` in settings),
+the CLI supports modal editing with NORMAL and INSERT modes.
+
+### Mode Switching
+
+| Action                                      | Keys                              |
+| ------------------------------------------- | --------------------------------- |
+| Enter NORMAL mode (from INSERT)             | `Esc`                             |
+| Enter INSERT mode at cursor (from NORMAL)   | `i`                               |
+| Enter INSERT mode after cursor              | `a`                               |
+| Enter INSERT mode at start of line          | `I`                               |
+| Enter INSERT mode at end of line            | `A`                               |
+| Insert new line below and enter INSERT mode | `o`                               |
+| Insert new line above and enter INSERT mode | `O`                               |
+| Clear input (double Escape in NORMAL mode)  | `Esc` `Esc`                       |
+
+### Navigation (NORMAL mode)
+
+| Action                              | Keys                    |
+| ----------------------------------- | ----------------------- |
+| Move left                           | `h` or `←`              |
+| Move down                           | `j` or `↓`              |
+| Move up                             | `k` or `↑`              |
+| Move right                          | `l` or `→`              |
+| Move to start of line               | `0`                     |
+| Move to first non-whitespace char   | `^`                     |
+| Move to end of line                 | `$`                     |
+| Move forward by word                | `w`                     |
+| Move backward by word               | `b`                     |
+| Move to end of word                 | `e`                     |
+| Move forward by WORD (non-space)    | `W`                     |
+| Move backward by WORD               | `B`                     |
+| Move to end of WORD                 | `E`                     |
+| Go to first line                    | `gg`                    |
+| Go to last line                     | `G`                     |
+| Go to line N                        | `N` `G` or `N` `gg`     |
+
+**Note:** All navigation commands support numeric prefixes (e.g., `5j` moves down 5 lines, `3w` moves forward 3 words).
+
+### Editing (NORMAL mode)
+
+| Action                                     | Keys         |
+| ------------------------------------------ | ------------ |
+| Delete character under cursor              | `x`          |
+| Delete from cursor to end of line          | `D`          |
+| Delete entire line(s)                      | `dd`         |
+| Change from cursor to end of line          | `C`          |
+| Change entire line(s)                      | `cc`         |
+| Delete forward word                        | `dw`         |
+| Delete backward word                       | `db`         |
+| Delete to end of word                      | `de`         |
+| Delete forward WORD                        | `dW`         |
+| Delete backward WORD                       | `dB`         |
+| Delete to end of WORD                      | `dE`         |
+| Change forward word (delete + insert)      | `cw`         |
+| Change backward word                       | `cb`         |
+| Change to end of word                      | `ce`         |
+| Change forward WORD                        | `cW`         |
+| Change backward WORD                       | `cB`         |
+| Change to end of WORD                      | `cE`         |
+| Change left (delete char + insert)         | `ch`         |
+| Change down                                | `cj`         |
+| Change up                                  | `ck`         |
+| Change right                               | `cl`         |
+| Delete left                                | `dh`         |
+| Delete down                                | `dj`         |
+| Delete up                                  | `dk`         |
+| Delete right                               | `dl`         |
+| Delete to start of line                    | `d0`         |
+| Delete to first non-whitespace             | `d^`         |
+| Change to start of line                    | `c0`         |
+| Change to first non-whitespace             | `c^`         |
+| Delete from first line to current          | `dgg`        |
+| Delete from current to last line           | `dG`         |
+| Change from first line to current          | `cgg`        |
+| Change from current to last line           | `cG`         |
+| Undo last change                           | `u`          |
+| Repeat last command                        | `.`          |
+
+**Note:** Editing commands support numeric prefixes (e.g., `3dd` deletes 3 lines, `2cw` changes 2 words).
+
 - `Esc` pressed twice quickly: Clear the input prompt if it is not empty,
   otherwise browse and rewind previous interactions.
 - `Up Arrow` / `Down Arrow`: When the cursor is at the top or bottom of a

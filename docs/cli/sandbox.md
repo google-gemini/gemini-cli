@@ -130,7 +130,7 @@ export SANDBOX_SET_UID_GID=false  # Disable UID/GID mapping
 
 **Missing commands**
 
-- Add to custom Dockerfile.
+- Add to custom Dockerfile (requires running from source code; not available when installed via npm).
 - Install via `sandbox.bashrc`.
 
 **Network issues**
