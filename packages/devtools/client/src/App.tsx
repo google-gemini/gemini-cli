@@ -261,6 +261,8 @@ export default function App() {
         ::-webkit-scrollbar-thumb { background: ${t.border}; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: ${t.textSecondary}; }
         [data-gutter]::selection, [data-gutter] *::selection { background: transparent; }
+        [data-gutter] .fold-icon { opacity: 0; transition: opacity 0.15s; }
+        [data-code-view]:has([data-gutter]:hover) .fold-icon { opacity: 1; }
       `}</style>
 
       {/* Toolbar */}
@@ -1822,6 +1824,7 @@ function CodeView({ data, t }: { data: unknown; t: ThemeColors }) {
       tabIndex={0}
       onKeyDown={handleKeyDown}
       ref={contentRef}
+      data-code-view
       style={{
         display: 'grid',
         gridTemplateColumns: '20px 1fr',
@@ -1849,7 +1852,11 @@ function CodeView({ data, t }: { data: unknown; t: ThemeColors }) {
             }}
             onClick={vl.foldable ? () => toggleFold(vl.index) : undefined}
           >
-            {vl.foldable ? (vl.isCollapsed ? '▶' : '▼') : ''}
+            {vl.foldable ? (
+              <span className="fold-icon">{vl.isCollapsed ? '▶' : '▼'}</span>
+            ) : (
+              ''
+            )}
           </div>
           {/* Content cell */}
           <div
