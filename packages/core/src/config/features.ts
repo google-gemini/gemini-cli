@@ -65,6 +65,10 @@ export interface FeatureSpec {
    * Description of the feature.
    */
   description?: string;
+  /**
+   * Link to the Lifecycle Tracking Issue on GitHub.
+   */
+  issueUrl?: string;
 }
 
 /**
@@ -77,6 +81,7 @@ export interface FeatureInfo {
   since?: string;
   until?: string;
   description?: string;
+  issueUrl?: string;
 }
 
 /**
@@ -216,6 +221,7 @@ class FeatureGateImpl implements MutableFeatureGate {
           since: latestSpec.since,
           until: latestSpec.until,
           description: latestSpec.description,
+          issueUrl: latestSpec.issueUrl,
         };
       })
       .sort((a, b) => a.key.localeCompare(b.key));

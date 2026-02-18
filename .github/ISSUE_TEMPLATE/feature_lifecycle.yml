@@ -1,0 +1,67 @@
+name: 'Feature Lifecycle Tracker'
+description: 'Track a feature through Alpha, Beta, and GA stages'
+labels:
+  - 'lifecycle/alpha'
+  - 'status/need-triage'
+body:
+  - type: 'markdown'
+    attributes:
+      value: |-
+        ## 🚀 Feature Overview
+        Provide a concise description of what this feature does and why it is being introduced.
+
+  - type: 'textarea'
+    id: 'spec'
+    attributes:
+      label: 'Feature Specification'
+      description: 'Link to design docs, RFCs, or PRs.'
+    validations:
+      required: true
+
+  - type: 'markdown'
+    attributes:
+      value: |-
+        ## 🗺️ Progression Roadmap
+        *Maintainers: Update this table and the checkboxes below as the feature matures.*
+
+        | Stage | Targeted Version | Actual Version | Date |
+        | :--- | :--- | :--- | :--- |
+        | **Alpha** | 0.x.x | | |
+        | **Beta** | 0.x.x | | |
+        | **GA** | 0.x.x | | |
+
+  - type: 'checkboxes'
+    id: 'alpha-checklist'
+    attributes:
+      label: 'Alpha Requirements (Disabled by Default)'
+      options:
+        - label: 'Feature gated by Alpha flag in `packages/core/src/config/features.ts`'
+        - label: 'Initial implementation merged'
+        - label: 'Basic unit and integration tests'
+
+  - type: 'checkboxes'
+    id: 'beta-checklist'
+    attributes:
+      label: 'Beta Requirements (Enabled by Default)'
+      options:
+        - label: 'Feature stable (no major architectural changes) for >= 2 minor versions'
+        - label: 'Comprehensive documentation in `docs/`'
+        - label: 'Telemetry/metrics implemented and verified'
+        - label: 'Promotion PR merged (stage moved to Beta)'
+
+  - type: 'checkboxes'
+    id: 'ga-checklist'
+    attributes:
+      label: 'GA Requirements (Locked to Enabled)'
+      options:
+        - label: 'Stable for >= 4 minor versions since Beta'
+        - label: 'No high-priority regressions reported'
+        - label: 'Performance audit complete'
+        - label: 'Migration plan (if applicable) documented'
+        - label: 'PR merged (feature gate removed, code integrated into core)'
+
+  - type: 'textarea'
+    id: 'feedback'
+    attributes:
+      label: 'Key Feedback & Bug Links'
+      description: 'List major bug reports or user feedback threads here.'
