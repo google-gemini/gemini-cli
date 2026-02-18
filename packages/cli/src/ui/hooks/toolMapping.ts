@@ -89,12 +89,12 @@ export function mapToDisplay(
 
     switch (call.status) {
       case 'success':
-        resultDisplay = call.response.resultDisplay;
-        outputFile = call.response.outputFile;
+        resultDisplay = call.response?.resultDisplay;
+        outputFile = call.response?.outputFile;
         break;
       case 'error':
       case 'cancelled':
-        resultDisplay = call.response.resultDisplay;
+        resultDisplay = call.response?.resultDisplay;
         break;
       case 'awaiting_approval':
         correlationId = call.correlationId;

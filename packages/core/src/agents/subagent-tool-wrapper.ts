@@ -13,6 +13,7 @@ import {
 import type { Config } from '../config/config.js';
 import type { AgentDefinition, AgentInputs } from './types.js';
 import { LocalSubagentInvocation } from './local-invocation.js';
+import { HarnessSubagentInvocation } from './harness-invocation.js';
 import { RemoteAgentInvocation } from './remote-invocation.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
@@ -72,6 +73,17 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
     if (definition.kind === 'remote') {
       return new RemoteAgentInvocation(
         definition,
+        params,
+        effectiveMessageBus,
+        _toolName,
+        _toolDisplayName,
+      );
+    }
+
+    if (this.config.isAgentHarnessEnabled()) {
+      return new HarnessSubagentInvocation(
+        definition,
+        this.config,
         params,
         effectiveMessageBus,
         _toolName,

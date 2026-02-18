@@ -7,10 +7,7 @@
 import type { Config } from '../config/config.js';
 import { LocalAgentExecutor } from './local-executor.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
-import {
-  BaseToolInvocation,
-  type ToolResult,
-} from '../tools/tools.js';
+import { BaseToolInvocation, type ToolResult } from '../tools/tools.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import type {
   LocalAgentDefinition,
@@ -18,9 +15,6 @@ import type {
   SubagentActivityEvent,
 } from './types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { AgentFactory } from './agent-factory.js';
-import type { Turn } from '../core/turn.js';
-import { promptIdContext } from '../utils/promptIdContext.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -89,10 +83,6 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
     signal: AbortSignal,
     updateOutput?: (output: string | AnsiOutput) => void,
   ): Promise<ToolResult> {
-    if (this.config.isAgentHarnessEnabled()) {
-      return this.executeWithHarness(signal, updateOutput);
-    }
-
     try {
       if (updateOutput) {
         updateOutput('Subagent starting...\n');
@@ -136,6 +126,10 @@ ${output.result}
       return {
         llmContent: [{ text: resultContent }],
         returnDisplay: displayContent,
+        data: {
+          result: output.result,
+          terminate_reason: output.terminate_reason,
+        },
       };
     } catch (error) {
       const errorMessage =
@@ -143,66 +137,6 @@ ${output.result}
 
       return {
         llmContent: `Subagent '${this.definition.name}' failed. Error: ${errorMessage}`,
-        returnDisplay: `Subagent Failed: ${this.definition.name}\nError: ${errorMessage}`,
-        error: {
-          message: errorMessage,
-          type: ToolErrorType.EXECUTION_FAILED,
-        },
-      };
-    }
-  }
-
-  private async executeWithHarness(
-    signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
-  ): Promise<ToolResult> {
-    try {
-      if (updateOutput) {
-        updateOutput('Subagent starting (Harness Mode)...\n');
-      }
-
-      const harness = AgentFactory.createHarness(this.config, this.definition, {
-        inputs: this.params,
-        parentPromptId: promptIdContext.getStore(),
-      });
-
-      const initialRequest = [{ text: 'Start' }];
-      const stream = harness.run(initialRequest, signal);
-
-      let turn: Turn | undefined;
-
-      while (true) {
-        const { value, done } = await stream.next();
-        if (done) {
-          turn = value;
-          break;
-        }
-        // For the subagent box, we don't want to stream internal thoughts or tool calls
-        // to the persistent history. We just wait for the final result.
-      }
-
-      if (!turn) {
-        throw new Error('Agent failed to return a valid turn.');
-      }
-      const output = turn.getResponseText();
-
-      const displayContent = `
-Subagent ${this.definition.name} Finished (Harness Mode)
-
-Result:
-${output}
-`;
-
-      return {
-        llmContent: [{ text: output }],
-        returnDisplay: displayContent,
-      };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-
-      return {
-        llmContent: `Subagent '${this.definition.name}' failed (Harness Mode). Error: ${errorMessage}`,
         returnDisplay: `Subagent Failed: ${this.definition.name}\nError: ${errorMessage}`,
         error: {
           message: errorMessage,

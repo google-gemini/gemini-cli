@@ -36,6 +36,7 @@ export interface UseAgentHarnessReturn {
   streamingContent: string;
   toolCalls: TrackedToolCall[];
   submitQuery: (query: PartListUnion) => Promise<void>;
+  processEvent: (event: GeminiEvent) => void;
   cancelOngoingRequest: () => void;
   reset: () => void;
   // Legacy compatibility properties
@@ -72,10 +73,6 @@ export const useAgentHarness = (
   const [thought, thoughtRef, setThought] =
     useStateAndRef<ThoughtSummary | null>(null);
 
-  // Track subagent status and output
-  const [subagentStatus, setSubagentStatus] = useState<string | null>(null);
-  const [subagentOutput, setSubagentOutput] = useState<string | null>(null);
-
   // Tools for the CURRENT turn of the main agent
   const [toolCalls, setToolCalls] = useState<TrackedToolCall[]>([]);
   const toolCallsRef = useRef<TrackedToolCall[]>([]);
@@ -87,9 +84,39 @@ export const useAgentHarness = (
 
   const pushedToolCallIdsRef = useRef<Set<string>>(new Set());
 
+  // Listen to the MessageBus for live tool updates (e.g. from subagents or long-running tools)
+  useEffect(() => {
+    const bus = config.getMessageBus();
+    const handler = (event: any) => {
+      setToolCalls((prev) => {
+        const next = [...prev];
+        for (const coreCall of event.toolCalls) {
+          const index = next.findIndex(
+            (tc) => tc.request.callId === coreCall.request.callId,
+          );
+          if (index !== -1) {
+            next[index] = {
+              ...next[index],
+              ...coreCall,
+            } as TrackedToolCall;
+          }
+        }
+        toolCallsRef.current = next;
+        return next;
+      });
+    };
+    bus.subscribe('tool-calls-update' as any, handler);
+    return () => {
+      bus.unsubscribe('tool-calls-update' as any, handler);
+    };
+  }, [config]);
+
   const pendingHistoryItems = useMemo(() => {
     const items: HistoryItemWithoutId[] = [];
-    if (thought) {
+
+    // Only show the top-level thought if we aren't currently executing tools (delegations)
+    // Subagent internal thoughts are merged into the tool box via SubagentActivity handler.
+    if (thought && toolCalls.length === 0) {
       items.push({
         type: MessageType.THINKING,
         thought,
@@ -101,34 +128,18 @@ export const useAgentHarness = (
       );
       if (unpushed.length > 0) {
         items.push(
-          mapTrackedToolCallsToDisplay(unpushed as TrackedToolCall[], {
+          mapToDisplayInternal(unpushed as TrackedToolCall[], {
             borderBottom: true,
           }),
         );
       }
     }
-            if (streamingContent) {
-              items.push({ type: MessageType.GEMINI, text: streamingContent });
-            }
-        
-            if (subagentStatus) {
-              items.push({
-                type: 'tool_group',
-                tools: [
-                  {
-                    displayName: subagentStatus.split(' is ')[0] || 'Subagent',
-                    status: 'validating',
-                    description: subagentStatus,
-                    resultDisplay: subagentOutput || undefined,
-                  },
-                ],
-                borderBottom: true,
-              } as any as HistoryItemWithoutId);
-            }
-        
-            return items;
-          }, [thought, toolCalls, streamingContent, subagentStatus, subagentOutput]);
-        
+    if (streamingContent) {
+      items.push({ type: MessageType.GEMINI, text: streamingContent });
+    }
+    return items;
+  }, [thought, toolCalls, streamingContent]);
+
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const reset = useCallback(() => {
@@ -139,7 +150,6 @@ export const useAgentHarness = (
     setToolCalls([]);
     toolCallsRef.current = [];
     pushedToolCallIdsRef.current.clear();
-    setSubagentStatus(null);
   }, [setThought]);
 
   const cancelOngoingRequest = useCallback(() => {
@@ -155,11 +165,12 @@ export const useAgentHarness = (
       switch (event.type) {
         case ServerGeminiEventType.Content:
           setStreamingState(StreamingState.Responding);
-          setStreamingContent((prev) => {
-            const next = prev + (event.value || '');
-            streamingContentRef.current = next;
-            return next;
-          });
+          {
+            const nextContent =
+              streamingContentRef.current + (event.value || '');
+            streamingContentRef.current = nextContent;
+            setStreamingContent(nextContent);
+          }
           break;
 
         case ServerGeminiEventType.Thought:
@@ -168,6 +179,7 @@ export const useAgentHarness = (
 
         case ServerGeminiEventType.ToolCallRequest:
           {
+            setThought(null);
             const tool = config.getToolRegistry().getTool(event.value.name);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const invocation = (tool as any)?.createInvocation?.(
@@ -175,44 +187,44 @@ export const useAgentHarness = (
               config.getMessageBus(),
             );
 
+            // In Harness mode, top-level calls might not have schedulerId set yet.
+            // We default to ROOT_SCHEDULER_ID to ensure they are visible.
             const newCall = {
-              request: event.value,
+              request: {
+                ...event.value,
+                schedulerId: event.value.schedulerId || ROOT_SCHEDULER_ID,
+              },
               status: 'validating',
               schedulerId: event.value.schedulerId || ROOT_SCHEDULER_ID,
               tool,
               invocation,
             } as TrackedToolCall;
 
-            setToolCalls((prev) => {
-              const next = [...prev, newCall];
-              toolCallsRef.current = next;
-              return next;
-            });
+            const nextCalls = [...toolCallsRef.current, newCall];
+            toolCallsRef.current = nextCalls;
+            setToolCalls(nextCalls);
           }
           break;
 
         case ServerGeminiEventType.ToolCallResponse:
           {
             const response = event.value;
-            setToolCalls((prev) => {
-              const next = prev.map((tc) =>
-                tc.request.callId === response.callId
-                  ? ({
-                      ...tc,
-                      status: 'success',
-                      result: response,
-                    } as unknown as TrackedToolCall)
-                  : tc,
-              );
-              toolCallsRef.current = next;
-              return next;
-            });
+            const nextCalls = toolCallsRef.current.map((tc) =>
+              tc.request.callId === response.callId
+                ? ({
+                    ...tc,
+                    status: 'success',
+                    response: response,
+                  } as unknown as TrackedToolCall)
+                : tc,
+            );
+            toolCallsRef.current = nextCalls;
+            setToolCalls(nextCalls);
           }
           break;
 
         case ServerGeminiEventType.TurnFinished:
           // MAIN AGENT turn finished. Flush current state to history.
-          setSubagentStatus(null);
           if (thoughtRef.current) {
             addItem({
               type: MessageType.THINKING,
@@ -227,7 +239,7 @@ export const useAgentHarness = (
             );
             if (unpushed.length > 0) {
               addItem(
-                mapTrackedToolCallsToDisplay(unpushed as TrackedToolCall[], {
+                mapToDisplayInternal(unpushed as TrackedToolCall[], {
                   borderBottom: true,
                 }),
               );
@@ -238,29 +250,67 @@ export const useAgentHarness = (
           }
 
           if (streamingContentRef.current) {
-            addItem({ type: MessageType.GEMINI, text: streamingContentRef.current });
+            addItem({
+              type: MessageType.GEMINI,
+              text: streamingContentRef.current,
+            });
             setStreamingContent('');
             streamingContentRef.current = '';
           }
 
-          setToolCalls([]);
           toolCallsRef.current = [];
+          setToolCalls([]);
           break;
 
         case ServerGeminiEventType.SubagentActivity:
           {
             const activity = event.value;
-            const name =
-              activity.agentName.charAt(0).toUpperCase() +
-              activity.agentName.slice(1);
+            let matched = false;
 
-            if (activity.type === 'TOOL_CALL_START') {
-              setSubagentStatus(`${name} is calling ${activity.data['name']}...`);
-              setSubagentOutput((prev) => (prev || '') + `🛠️ Calling ${activity.data['name']}...\n`);
-            } else if (activity.type === 'THOUGHT') {
-              setSubagentStatus(`${name} is thinking...`);
-            } else if (activity.type === 'TOOL_CALL_END') {
-              // Just a status update, the tool result will come via TOOL_CALL_RESPONSE eventually
+            const nextCalls = toolCallsRef.current.map((tc) => {
+              // Try to find the tool box that belongs to this agent.
+              // Note: We search ALL tool calls, not just 'executing', in case of race conditions.
+              if (
+                tc.request.name === activity.agentName ||
+                (tc.tool?.displayName || tc.request.name) === activity.agentName
+              ) {
+                matched = true;
+                const currentCall = tc as any;
+                let output = currentCall.response?.resultDisplay || '';
+                if (typeof output !== 'string') output = '';
+
+                if (activity.type === 'TOOL_CALL_START') {
+                  const rawName = String(activity.data['name'] || 'a tool');
+                  const tool = config.getToolRegistry().getTool(rawName);
+                  const displayName = tool?.displayName || rawName;
+                  output += `🛠️ Calling ${displayName}...\n`;
+                } else if (activity.type === 'THOUGHT') {
+                  const subject = String(activity.data['subject'] || 'Thinking');
+                  output += `🤖💭 ${subject}\n`;
+                }
+
+                return {
+                  ...tc,
+                  response: {
+                    ...(currentCall.response || {}),
+                    resultDisplay: output,
+                  },
+                } as unknown as TrackedToolCall;
+              }
+              return tc;
+            });
+
+            if (matched) {
+              toolCallsRef.current = nextCalls;
+              setToolCalls(nextCalls);
+            } else {
+              // Fallback: If no tool box matches, show it as a standalone item
+              if (activity.type === 'THOUGHT') {
+                addItem({
+                  type: MessageType.GEMINI,
+                  text: `🤖💭 [${activity.agentName}] ${activity.data['subject']}`,
+                });
+              }
             }
           }
           break;
@@ -275,6 +325,21 @@ export const useAgentHarness = (
     },
     [addItem, config, setThought, thoughtRef],
   );
+
+  // Listen for nested subagent activity on the MessageBus
+  useEffect(() => {
+    const bus = config.getMessageBus();
+    const handler = (event: any) => {
+      processEvent({
+        type: ServerGeminiEventType.SubagentActivity,
+        value: event.activity,
+      });
+    };
+    bus.subscribe('subagent-activity' as any, handler);
+    return () => {
+      bus.unsubscribe('subagent-activity' as any, handler);
+    };
+  }, [config, processEvent]);
 
   const submitQuery = useCallback(
     async (parts: PartListUnion) => {
@@ -316,6 +381,7 @@ export const useAgentHarness = (
     streamingContent,
     toolCalls,
     submitQuery,
+    processEvent,
     cancelOngoingRequest,
     reset,
     initError: null,
@@ -333,3 +399,22 @@ export const useAgentHarness = (
     retryStatus: null,
   };
 };
+
+/**
+ * Internal mapper to ensure we don't accidentally leak subagent-internal tools
+ * into the main UI boxes while in Harness Mode.
+ */
+function mapToDisplayInternal(
+  calls: TrackedToolCall[],
+  options: any,
+): HistoryItemWithoutId {
+  // We filter out any tool calls that are NOT part of the root harness level.
+  // This prevents internal subagent work (like list_directory) from appearing
+  // as loose tool boxes in the main chat.
+  const filtered = calls.filter((c) => {
+    // Only show tools belonging to the main top-level session.
+    return c.schedulerId === ROOT_SCHEDULER_ID;
+  });
+
+  return mapTrackedToolCallsToDisplay(filtered as any, options);
+}

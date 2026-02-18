@@ -89,6 +89,10 @@
         "slug": "docs/core/subagents"
       },
       {
+        "label": "Agent harness architecture (experimental)",
+        "slug": "docs/core/agent-harness-architecture"
+      },
+      {
         "label": "Remote subagents (experimental)",
         "slug": "docs/core/remote-agents"
       },

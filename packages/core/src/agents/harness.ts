@@ -23,6 +23,7 @@ import {
   DEFAULT_MAX_TURNS,
   DEFAULT_MAX_TIME_MINUTES,
 } from './types.js';
+import { SubagentBehavior } from './behavior.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { ToolOutputMaskingService } from '../services/toolOutputMaskingService.js';
@@ -34,6 +35,7 @@ import { scheduleAgentTools } from './agent-scheduler.js';
 import {
   type ToolCallRequestInfo,
   type ToolCallResponseInfo,
+  ROOT_SCHEDULER_ID,
 } from '../scheduler/types.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
 import { logAgentStart, logAgentFinish } from '../telemetry/loggers.js';
@@ -128,12 +130,12 @@ export class AgentHarness {
     maxTurns?: number,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     const startTime = Date.now();
-    debugLogger.debug(
-      `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Starting unified ReAct loop`,
-    );
-
     const maxTurnsLimit = maxTurns ?? DEFAULT_MAX_TURNS;
     const maxTimeMinutes = DEFAULT_MAX_TIME_MINUTES;
+
+    debugLogger.debug(
+      `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Starting unified ReAct loop. maxTurns: ${maxTurnsLimit}, maxTime: ${maxTimeMinutes}m`,
+    );
 
     const deadlineTimer = new DeadlineTimer(
       maxTimeMinutes * 60 * 1000,
@@ -163,7 +165,7 @@ export class AgentHarness {
     let turn = new Turn(this.chat!, this.behavior.agentId);
     let currentRequest = await this.behavior.transformRequest(request);
 
-    let terminateReason = AgentTerminateMode.GOAL;
+    let terminateReason = AgentTerminateMode.ABORTED;
 
     try {
       while (this.turnCounter < maxTurnsLimit) {
@@ -261,13 +263,28 @@ export class AgentHarness {
             cumulativeResponse += event.value;
           }
 
-          if (event.type === GeminiEventType.ToolCallRequest) {
-            const tool = this.toolRegistry.getTool(event.value.name);
-            if (tool instanceof SubagentTool) {
+          // Subagent activity reporting
+          if (this.behavior.name !== 'main') {
+            const displayName =
+              (this.behavior as any).definition?.displayName ||
+              this.behavior.name;
+
+            if (event.type === GeminiEventType.Thought) {
               yield {
                 type: GeminiEventType.SubagentActivity,
                 value: {
-                  agentName: this.behavior.name,
+                  agentName: displayName,
+                  type: 'THOUGHT',
+                  data: { subject: event.value.subject },
+                },
+              };
+            }
+
+            if (event.type === GeminiEventType.ToolCallRequest) {
+              yield {
+                type: GeminiEventType.SubagentActivity,
+                value: {
+                  agentName: displayName,
                   type: 'TOOL_CALL_START',
                   data: { name: event.value.name, args: event.value.args },
                 },
@@ -297,9 +314,7 @@ export class AgentHarness {
         if (afterResult.shouldContinue) {
           currentRequest = [{ text: afterResult.reason || 'Continue' }];
           this.turnCounter++;
-          if (this.behavior.name === 'main') {
-            yield { type: GeminiEventType.TurnFinished };
-          }
+          turn = new Turn(this.chat!, this.behavior.agentId);
           continue;
         }
 
@@ -310,58 +325,156 @@ export class AgentHarness {
           break;
         }
 
-        // 9. Handle tool calls or termination
-        if (turn.pendingToolCalls.length > 0) {
-          const toolResults = await this.executeTools(
-            turn.pendingToolCalls,
-            combinedSignal,
-            onWaitingForConfirmation,
-          );
+                        // 9. Handle tool calls or termination
+                        if (turn.pendingToolCalls.length > 0) {
+                          const toolResults = await this.executeTools(
+                            turn.pendingToolCalls,
+                            combinedSignal,
+                            onWaitingForConfirmation,
+                          );
+                
+                          debugLogger.debug(
+                            `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Received ${toolResults.length} tool results. Names: ${toolResults.map((tr) => tr.name).join(', ')}`,
+                          );
+                
+                                    // Yield responses so UI knows they are done
+                                    for (const result of toolResults) {
+                                      debugLogger.debug(
+                                        `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Tool ${result.name} finished. Display length: ${String(result.result?.resultDisplay).length}`,
+                                      );
+                          
+                                      if (result.result) {
+                          
+                              yield {
+                                type: GeminiEventType.ToolCallResponse,
+                                value: result.result,
+                              };
+                
+                              // Subagent activity reporting
+                              if (this.behavior.name !== 'main') {
+                                yield {
+                                  type: GeminiEventType.SubagentActivity,
+                                  value: {
+                                    agentName: this.behavior.name,
+                                    type: 'TOOL_CALL_END',
+                                    data: {
+                                      name: result.name,
+                                      output: result.result.resultDisplay,
+                                    },
+                                  },
+                                };
+                              }
+                
+                              const tool = this.toolRegistry.getTool(result.name);
+                              if (tool instanceof SubagentTool) {
+                                yield {
+                                  type: GeminiEventType.SubagentActivity,
+                                  value: {
+                                    agentName: this.behavior.name,
+                                    type: 'TOOL_CALL_END',
+                                    data: {
+                                      name: result.name,
+                                      output: result.result.resultDisplay,
+                                    },
+                                  },
+                                };
+                              }
+                            }
+                          }
+                
+                                    const goalReached = this.behavior.isGoalReached(toolResults);
+                                    debugLogger.debug(
+                                      `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] isGoalReached check: ${goalReached}`,
+                                    );
+                          
+                                    if (goalReached) {
+                                      terminateReason = AgentTerminateMode.GOAL;
+                                      debugLogger.debug(
+                                        `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Goal reached. Processing findings for ${toolResults.length} tool results.`,
+                                      );
+                          
+                                      // Extract results from the 'complete_task' tool call arguments
+                                      for (const r of toolResults) {
+                                        const completeCall = turn.pendingToolCalls.find(
+                                          (c) => c.name === TASK_COMPLETE_TOOL_NAME,
+                                        );
+                          
+                                        let findingsText: string | undefined;
+                          
+                                                      if (r.name === TASK_COMPLETE_TOOL_NAME && completeCall) {
+                                                        const outputName =
+                                                          (this.behavior as SubagentBehavior).definition?.outputConfig
+                                                            ?.outputName || 'result';
+                                                        const rawFindings =
+                                                          completeCall.args[outputName] || completeCall.args['result'];
+                                        
+                                                        debugLogger.debug(
+                                                          `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Extracting from complete_task args (${outputName}). Found: ${!!rawFindings}`,
+                                                        );
+                                        
+                                                        if (rawFindings !== undefined) {
+                                                          // CAPTURE RAW DATA: Don't stringify if it's an object/array,
+                                                          // we need to preserve structure for the parent model.
+                                                          turn.submittedOutput = rawFindings as any;
+                                                          
+                                                          findingsText =
+                                                            typeof rawFindings === 'object'
+                                                              ? JSON.stringify(rawFindings, null, 2)
+                                                              : String(rawFindings);
+                                                        }
+                                                      } else {
+                                                        const findings =
+                                                          (r.result?.data as any)?.result || r.result?.resultDisplay;
+                                                        if (findings !== undefined) {
+                                                          findingsText = String(findings);
+                                                          // Also capture as raw if not already set
+                                                          if (turn.submittedOutput === undefined) {
+                                                              turn.submittedOutput = findings;
+                                                          }
+                                                        }
+                                                      }
+                                        
+                                                      if (findingsText) {
+                                                        debugLogger.debug(
+                                                          `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Captured findings text. Length: ${findingsText.length}`,
+                                                        );
+                                                                                  if (this.chat) {
+                                            // Ensure the chat session records the final text result so future turns or getResponseText() can see it
+                                            this.chat.addHistory({
+                                              role: 'model',
+                                              parts: [{ text: findingsText }],
+                                            });
+                                          }
+                                        }
+                                      }
+                          
+                                      return turn;
+                                    }
+                                              
+          currentRequest = toolResults.map((r) => {
+            // For subagents, we want to return the raw result to the LLM, not the human-friendly display.
+            const tool = this.toolRegistry.getTool(r.name);
+            if (tool instanceof SubagentTool) {
+              const outputName =
+                (tool as any).definition?.outputConfig?.outputName || 'result';
+              const findings = (r.result?.data as any)?.[outputName] || (r.result?.data as any)?.['result'];
 
-          // Yield responses so UI knows they are done
-          for (const result of toolResults) {
-            if (result.result) {
-              yield {
-                type: GeminiEventType.ToolCallResponse,
-                value: result.result,
-              };
+              debugLogger.debug(`[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Subagent tool ${r.name} findings type: ${typeof findings}. Using outputName: ${outputName}`);
 
-              const tool = this.toolRegistry.getTool(result.name);
-              if (tool instanceof SubagentTool) {
-                yield {
-                  type: GeminiEventType.SubagentActivity,
-                  value: {
-                    agentName: this.behavior.name,
-                    type: 'TOOL_CALL_END',
-                    data: {
-                      name: result.name,
-                      output: result.result.resultDisplay,
-                    },
+              if (findings !== undefined && 'functionResponse' in r.part && r.part.functionResponse) {
+                const responsePayload = { [outputName]: findings };
+                debugLogger.debug(`[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Sending tool response keys: ${Object.keys(responsePayload).join(', ')}`);
+                
+                return {
+                  functionResponse: {
+                    ...r.part.functionResponse,
+                    response: responsePayload,
                   },
                 };
               }
             }
-          }
 
-          if (this.behavior.isGoalReached(toolResults)) {
-            terminateReason = AgentTerminateMode.GOAL;
-
-            // If it's a subagent, find the complete_task call and extract the result string
-            const goalCall = toolResults.find((r) => r.name === 'complete_task');
-            if (goalCall?.result?.resultDisplay && this.chat) {
-              // Ensure the chat session records the final text result so future turns or getResponseText() can see it
-              this.chat.addHistory({
-                role: 'model',
-                parts: [{ text: String(goalCall.result.resultDisplay) }],
-              });
-            }
-
-            return turn;
-          }
-
-          currentRequest = toolResults.map((r) => {
-            // Ensure the LLM "sees" the rich result display if it's available.
-            // We use the resultDisplay text as the definitive function response.
+            // Fallback for other tools: Ensure the LLM "sees" the rich result display if it's available.
             if (
               r.result?.resultDisplay &&
               'functionResponse' in r.part &&
@@ -377,6 +490,14 @@ export class AgentHarness {
             return r.part;
           });
           this.turnCounter++;
+          if (this.turnCounter >= maxTurnsLimit) {
+            terminateReason = AgentTerminateMode.MAX_TURNS;
+            debugLogger.debug(
+              `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Reached turn limit (${maxTurnsLimit}).`,
+            );
+            break;
+          }
+          turn = new Turn(this.chat!, this.behavior.agentId);
 
           // Only yield TurnFinished if we are the main agent.
           // Nested subagent turns should be internal and not trigger UI flushes in the parent.
@@ -392,6 +513,14 @@ export class AgentHarness {
           if (nextParts) {
             currentRequest = nextParts;
             this.turnCounter++;
+            if (this.turnCounter >= maxTurnsLimit) {
+              terminateReason = AgentTerminateMode.MAX_TURNS;
+              debugLogger.debug(
+                `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Reached turn limit (${maxTurnsLimit}) during continuation.`,
+              );
+              break;
+            }
+            turn = new Turn(this.chat!, this.behavior.agentId);
             if (this.behavior.name === 'main') {
               yield { type: GeminiEventType.TurnFinished };
             }
@@ -496,7 +625,9 @@ export class AgentHarness {
     calls: ToolCallRequestInfo[],
     signal: AbortSignal,
     onWaitingForConfirmation?: (waiting: boolean) => void,
-  ): Promise<Array<{ name: string; part: Part; result: ToolCallResponseInfo }>> {
+  ): Promise<
+    Array<{ name: string; part: Part; result: ToolCallResponseInfo }>
+  > {
     const taskCompleteCalls = calls.filter(
       (c) => c.name === TASK_COMPLETE_TOOL_NAME,
     );
@@ -512,13 +643,16 @@ export class AgentHarness {
     }> = [];
 
     if (otherCalls.length > 0) {
+      const schedulerId =
+        this.behavior.name === 'main'
+          ? ROOT_SCHEDULER_ID
+          : this.behavior.agentId;
+
       completedCalls = await scheduleAgentTools(this.config, otherCalls, {
-        schedulerId: this.behavior.agentId,
+        schedulerId,
         toolRegistry: this.toolRegistry,
         signal,
         onWaitingForConfirmation,
-        // Only broadcast to global UI if we are the main top-level agent
-        messageBus: this.behavior.name === 'main' ? undefined : null,
       });
     }
 

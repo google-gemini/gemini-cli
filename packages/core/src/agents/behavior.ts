@@ -168,7 +168,7 @@ export class MainAgentBehavior implements AgentBehavior {
 
   async initialize(_toolRegistry: ToolRegistry) {
     debugLogger.debug(
-      `[MainAgentBehavior] [${this.name}:${this.agentId}] Initialized`,
+      `[AgentHarness] [${this.name}:${this.agentId}] Initialized`,
     );
   }
 
@@ -341,7 +341,7 @@ export class SubagentBehavior implements AgentBehavior {
 
   constructor(
     private readonly config: Config,
-    private readonly definition: LocalAgentDefinition,
+    public readonly definition: LocalAgentDefinition,
     private readonly inputs?: AgentInputs,
     parentPromptId?: string,
   ) {
@@ -353,7 +353,7 @@ export class SubagentBehavior implements AgentBehavior {
 
   async initialize(toolRegistry: ToolRegistry) {
     debugLogger.debug(
-      `[SubagentBehavior] [${this.name}:${this.agentId}] Initializing tool registry`,
+      `[AgentHarness] [${this.name}:${this.agentId}] Initializing tool registry`,
     );
     const parentToolRegistry = this.config.getToolRegistry();
     if (this.definition.toolConfig) {
@@ -501,7 +501,7 @@ export class SubagentBehavior implements AgentBehavior {
     signal: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent, boolean> {
     debugLogger.debug(
-      `[SubagentBehavior] [${this.name}:${this.agentId}] Entering recovery mode. Reason: ${reason}`,
+      `[AgentHarness] [${this.name}:${this.agentId}] Entering recovery mode. Reason: ${reason}`,
     );
     const recoveryStartTime = Date.now();
     let success = false;
@@ -532,11 +532,26 @@ export class SubagentBehavior implements AgentBehavior {
       }
 
       // Check if they called complete_task in the recovery turn
-      if (turn.pendingToolCalls.length > 0) {
-        if (
-          turn.pendingToolCalls.some((c) => c.name === TASK_COMPLETE_TOOL_NAME)
-        ) {
-          success = true;
+      const completeCall = turn.pendingToolCalls.find(
+        (c) => c.name === TASK_COMPLETE_TOOL_NAME,
+      );
+      if (completeCall) {
+        success = true;
+
+        // Capture the result in the turn object explicitly
+        const outputName = this.definition.outputConfig?.outputName || 'result';
+        const rawFindings =
+          completeCall.args[outputName] || completeCall.args['result'];
+
+        if (rawFindings) {
+          turn.submittedOutput =
+            typeof rawFindings === 'object'
+              ? JSON.stringify(rawFindings, null, 2)
+              : String(rawFindings);
+
+          debugLogger.debug(
+            `[AgentHarness] [${this.name}:${this.agentId}] Captured findings from recovery complete_task. Length: ${turn.submittedOutput.length}`,
+          );
         }
       }
     } finally {
@@ -571,7 +586,7 @@ export class SubagentBehavior implements AgentBehavior {
       default:
         explanation = 'Execution was interrupted.';
     }
-    return `${explanation} You have one final chance to complete the task with a short grace period. You MUST call \`${TASK_COMPLETE_TOOL_NAME}\` immediately with your best answer and explain that your investigation was interrupted. Do not call any other tools.`;
+    return `${explanation} You have one final chance to provide your findings. You MUST call \`${TASK_COMPLETE_TOOL_NAME}\` immediately with your best synthesis and conclusion for the main agent. Do not call any other tools.`;
   }
 
   getFinalFailureMessage(

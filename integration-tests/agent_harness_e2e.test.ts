@@ -6,6 +6,8 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 describe('Agent Harness E2E', () => {
   let rig: TestRig;
@@ -41,4 +43,44 @@ describe('Agent Harness E2E', () => {
 
     expect(result2).toContain('GeminiUser');
   }, 30000);
+
+  it('should delegate to codebase_investigator and synthesize results', async () => {
+    await rig.setup('agent-harness-delegation');
+
+    // Create a dummy file for CBI to find
+    const historyDir = path.join(rig.testDir!, 'packages/core/src');
+    fs.mkdirSync(historyDir, { recursive: true });
+    fs.writeFileSync(path.join(historyDir, 'history.ts'), `
+      /** ChatHistory maintains the message history for the session. */
+      export class ChatHistory {
+        private messages: any[] = [];
+        addMessage(msg: any) { this.messages.push(msg); }
+      }
+    `);
+    const result = await rig.run({
+      args: ['chat', 'use @codebase_investigator to tell me about how chat history is maintained'],
+      env: {
+        ...process.env,
+        GEMINI_ENABLE_AGENT_HARNESS: 'true',
+      },
+    });
+
+    // Verify synthesis: CBI should have found ChatHistory or history.ts
+    const output = result.toLowerCase();
+    expect(output).toMatch(/history|chat/);
+    
+    // Verify single delegation: CBI should only be called once.
+    // We check the tool logs for 'codebase_investigator'
+    const toolLogs = rig.readToolLogs();
+    const cbiCalls = toolLogs.filter(log => log.toolRequest?.name === 'codebase_investigator');
+    
+    if (cbiCalls.length !== 1) {
+        console.log('DEBUG: Full tool logs:', JSON.stringify(toolLogs, null, 2));
+        if (rig._lastRunStdout) {
+            console.log('DEBUG: Full stdout length:', rig._lastRunStdout.length);
+        }
+    }
+    
+    expect(cbiCalls.length).toBe(1);
+  }, 120000);
 });

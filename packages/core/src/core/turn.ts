@@ -256,6 +256,7 @@ export class Turn {
   private debugResponses: GenerateContentResponse[] = [];
   private pendingCitations = new Set<string>();
   finishReason: FinishReason | undefined = undefined;
+  submittedOutput: string | undefined;
 
   constructor(
     readonly chat: GeminiChat,
