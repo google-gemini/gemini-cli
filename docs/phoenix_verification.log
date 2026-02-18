@@ -1,0 +1,8 @@
+RUN  v3.2.4 /app
+
+ ✓ packages/core/src/governance/physics.test.ts (3 tests) 4ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  01:07:05
+   Duration  769ms (transform 178ms, setup 0ms, collect 156ms, tests 4ms, environment 0ms, prepare 161ms)
