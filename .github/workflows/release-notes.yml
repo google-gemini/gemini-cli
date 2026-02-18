@@ -32,7 +32,7 @@ jobs:
         with:
           # The user-level skills need to be available to the workflow
           fetch-depth: 0
-          ref: main
+          ref: 'main'
 
       - name: 'Set up Node.js'
         uses: 'actions/setup-node@v4'
