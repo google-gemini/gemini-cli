@@ -135,13 +135,19 @@ class XtermStdout extends EventEmitter {
       trimmed.pop();
     }
     const result = trimmed.join('\n');
-    if (result === '' && !options.allowEmpty) {
+
+    // Normalize for cross-platform snapshot stability:
+    // 1. Convert backslashes to forward slashes (common for paths)
+    // 2. Normalize any \r\n to \n
+    const normalized = result.replace(/\\/g, '/').replace(/\r\n/g, '\n');
+
+    if (normalized === '' && !options.allowEmpty) {
       throw new Error(
         'lastFrame() returned an empty string. If this is intentional, use lastFrame({ allowEmpty: true }). ' +
           'Otherwise, ensure you are calling await waitUntilReady() and that the component is rendering correctly.',
       );
     }
-    return result === '' ? result : result + '\n';
+    return normalized === '' ? normalized : normalized + '\n';
   };
 
   async waitUntilReady() {
