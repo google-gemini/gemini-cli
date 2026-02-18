@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as os from 'node:os';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import toml from '@iarna/toml';
@@ -35,6 +34,7 @@ import {
 } from './prompt-processors/shellProcessor.js';
 import { AtFileProcessor } from './prompt-processors/atFileProcessor.js';
 import { sanitizeForDisplay } from '../ui/utils/textUtils.js';
+import { getUsername } from '../utils/osUtils.js';
 
 interface CommandDirectory {
   path: string;
@@ -75,15 +75,7 @@ export class FileCommandLoader implements ICommandLoader {
     this.folderTrustEnabled = !!config?.getFolderTrust();
     this.isTrustedFolder = !!config?.isTrustedFolder();
     this.projectRoot = config?.getProjectRoot() || process.cwd();
-    this.username = this.getUsername();
-  }
-
-  private getUsername(): string {
-    try {
-      return os.userInfo().username;
-    } catch {
-      return process.env['USER'] || process.env['USERNAME'] || 'User';
-    }
+    this.username = getUsername();
   }
 
   /**

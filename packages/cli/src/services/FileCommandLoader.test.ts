@@ -6,7 +6,6 @@
 
 import * as glob from 'glob';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import type { Config } from '@google/gemini-cli-core';
 import { GEMINI_DIR, Storage } from '@google/gemini-cli-core';
 import mock from 'mock-fs';
@@ -32,6 +31,9 @@ vi.mock('./prompt-processors/atFileProcessor.js', () => ({
   AtFileProcessor: vi.fn().mockImplementation(() => ({
     process: mockAtFileProcess,
   })),
+}));
+vi.mock('../utils/osUtils.js', () => ({
+  getUsername: vi.fn().mockReturnValue('mock-user'),
 }));
 vi.mock('./prompt-processors/shellProcessor.js', () => ({
   ShellProcessor: vi.fn().mockImplementation(() => ({
@@ -75,14 +77,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 vi.mock('glob', () => ({
   glob: vi.fn(),
 }));
-
-vi.mock('node:os', async (importOriginal) => {
-  const original = await importOriginal<typeof import('node:os')>();
-  return {
-    ...original,
-    userInfo: vi.fn().mockReturnValue({ username: 'mock-user' }),
-  };
-});
 
 describe('FileCommandLoader', () => {
   const signal: AbortSignal = new AbortController().signal;
@@ -1419,7 +1413,7 @@ describe('FileCommandLoader', () => {
   });
 
   describe('sourceLabel Assignment', () => {
-    it('uses the OS username for user commands', async () => {
+    it('uses the username for user commands', async () => {
       const userCommandsDir = Storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
@@ -1435,113 +1429,48 @@ describe('FileCommandLoader', () => {
       );
     });
 
-    it('falls back to environment variables or "User" if os.userInfo() fails', async () => {
-      const userInfoSpy = vi.spyOn(os, 'userInfo').mockImplementation(() => {
-        throw new Error('userInfo failed');
-      });
+    it.each([
+      {
+        name: 'standard path',
+        projectRoot: '/path/to/my-awesome-project',
+      },
+      {
+        name: 'Windows-style path',
+        projectRoot: 'C:\\Users\\test\\projects\\win-project',
+      },
+    ])(
+      'uses the project root basename for project commands ($name)',
+      async ({ projectRoot }) => {
+        const expectedLabel = path.basename(projectRoot);
+        const projectCommandsDir = path.join(
+          projectRoot,
+          GEMINI_DIR,
+          'commands',
+        );
 
-      const userCommandsDir = Storage.getUserCommandsDir();
-      mock({
-        [userCommandsDir]: {
-          'test.toml': 'prompt = "Fallback prompt"',
-        },
-      });
+        mock({
+          [projectCommandsDir]: {
+            'project.toml': 'prompt = "Project prompt"',
+          },
+        });
 
-      // Falls back to 'USER' environment variable
-      vi.stubEnv('USER', 'env-user');
-      const loader = new FileCommandLoader(null);
-      const commands = await loader.loadCommands(signal);
-      expect(commands[0].description).toBe(
-        '[env-user] Custom command from test.toml',
-      );
+        const mockConfig = {
+          getProjectRoot: vi.fn(() => projectRoot),
+          getExtensions: vi.fn(() => []),
+          getFolderTrust: vi.fn(() => false),
+          isTrustedFolder: vi.fn(() => false),
+          storage: new Storage(projectRoot),
+        } as unknown as Config;
 
-      // Falls back to 'USERNAME' environment variable
-      vi.stubEnv('USER', '');
-      vi.stubEnv('USERNAME', 'win-user');
-      const loader2 = new FileCommandLoader(null);
-      const commands2 = await loader2.loadCommands(signal);
-      expect(commands2[0].description).toBe(
-        '[win-user] Custom command from test.toml',
-      );
+        const loader = new FileCommandLoader(mockConfig);
+        const commands = await loader.loadCommands(signal);
 
-      // Falls back to 'User' string
-      vi.stubEnv('USERNAME', '');
-      const loader3 = new FileCommandLoader(null);
-      const commands3 = await loader3.loadCommands(signal);
-      expect(commands3[0].description).toBe(
-        '[User] Custom command from test.toml',
-      );
-
-      userInfoSpy.mockRestore();
-      vi.unstubAllEnvs();
-    });
-
-    it('uses the project root basename for project commands', async () => {
-      const projectRoot = '/path/to/my-awesome-project';
-      const projectCommandsDir = path.join(projectRoot, GEMINI_DIR, 'commands');
-
-      mock({
-        [projectCommandsDir]: {
-          'project.toml': 'prompt = "Project prompt"',
-        },
-      });
-
-      const mockConfig = {
-        getProjectRoot: vi.fn(() => projectRoot),
-        getExtensions: vi.fn(() => []),
-        getFolderTrust: vi.fn(() => false),
-        isTrustedFolder: vi.fn(() => false),
-        storage: new Storage(projectRoot),
-      } as unknown as Config;
-
-      const loader = new FileCommandLoader(mockConfig);
-      const commands = await loader.loadCommands(signal);
-
-      const projectCmd = commands.find((c) => c.name === 'project');
-      expect(projectCmd?.description).toBe(
-        '[my-awesome-project] Custom command from project.toml',
-      );
-    });
-
-    it('correctly handles Windows-style project root paths', async () => {
-      // Simulate a Windows path regardless of the current OS
-      const windowsProjectRoot = 'C:\\Users\\test\\projects\\win-project';
-      // We use path.win32 to explicitly test Windows behavior
-      const expectedLabel = path.win32.basename(windowsProjectRoot);
-      expect(expectedLabel).toBe('win-project');
-
-      const projectCommandsDir = path.join(
-        windowsProjectRoot,
-        GEMINI_DIR,
-        'commands',
-      );
-
-      mock({
-        [projectCommandsDir]: {
-          'win-cmd.toml': 'prompt = "Win prompt"',
-        },
-      });
-
-      const mockConfig = {
-        getProjectRoot: vi.fn(() => windowsProjectRoot),
-        getExtensions: vi.fn(() => []),
-        getFolderTrust: vi.fn(() => false),
-        isTrustedFolder: vi.fn(() => false),
-        storage: new Storage(windowsProjectRoot),
-      } as unknown as Config;
-
-      const loader = new FileCommandLoader(mockConfig);
-      const commands = await loader.loadCommands(signal);
-
-      const winCmd = commands.find((c) => c.name === 'win-cmd');
-      // On non-Windows systems, path.basename might not handle \ correctly
-      // but FileCommandLoader uses the platform-native 'path' module.
-      // In the test we just want to ensure it uses WHATEVER path.basename returns.
-      const actualLabel = path.basename(windowsProjectRoot);
-      expect(winCmd?.description).toBe(
-        `[${actualLabel}] Custom command from win-cmd.toml`,
-      );
-    });
+        const projectCmd = commands.find((c) => c.name === 'project');
+        expect(projectCmd?.description).toBe(
+          `[${expectedLabel}] Custom command from project.toml`,
+        );
+      },
+    );
 
     it('uses the extension name for extension commands', async () => {
       const extensionDir = path.join(
