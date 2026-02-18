@@ -153,6 +153,7 @@ export const INFORMATIVE_TIPS = [
   'Exit the CLI with /quit or /exit…',
   'Check model-specific usage stats with /stats model…',
   'Check tool-specific usage stats with /stats tools…',
+  'Switch to Plan Mode and view current plan with /plan…',
   "Change the CLI's color theme with /theme…",
   'List all available tools with /tools…',
   'View and edit settings with the /settings editor…',
