@@ -115,6 +115,7 @@ jobs:
           ORIGINAL_RELEASE_VERSION: '${{ steps.patch_version.outputs.RELEASE_VERSION }}'
           ORIGINAL_RELEASE_TAG: '${{ steps.patch_version.outputs.RELEASE_TAG }}'
           ORIGINAL_PREVIOUS_TAG: '${{ steps.patch_version.outputs.PREVIOUS_TAG }}'
+          VARS_CLI_PACKAGE_NAME: ${{vars.CLI_PACKAGE_NAME}}
         run: |
           echo "🔍 Verifying no concurrent patch releases have occurred..."
 
@@ -126,7 +127,7 @@ jobs:
 
           # Re-run the same version calculation script
           echo "Re-calculating version to check for changes..."
-          CURRENT_PATCH_JSON=$(node scripts/get-release-version.js --cli-package-name="${{vars.CLI_PACKAGE_NAME}}" --type=patch --patch-from="${CHANNEL}")
+          CURRENT_PATCH_JSON=$(node scripts/get-release-version.js --cli-package-name="${VARS_CLI_PACKAGE_NAME}" --type=patch --patch-from="${CHANNEL}")
           CURRENT_RELEASE_VERSION=$(echo "${CURRENT_PATCH_JSON}" | jq -r .releaseVersion)
           CURRENT_RELEASE_TAG=$(echo "${CURRENT_PATCH_JSON}" | jq -r .releaseTag)
           CURRENT_PREVIOUS_TAG=$(echo "${CURRENT_PATCH_JSON}" | jq -r .previousReleaseTag)
@@ -159,10 +160,15 @@ jobs:
       - name: 'Print Calculated Version'
         run: |-
           echo "Patch Release Summary:"
-          echo "  Release Version: ${{ steps.patch_version.outputs.RELEASE_VERSION }}"
-          echo "  Release Tag: ${{ steps.patch_version.outputs.RELEASE_TAG }}"
-          echo "  NPM Tag: ${{ steps.patch_version.outputs.NPM_TAG }}"
-          echo "  Previous Tag: ${{ steps.patch_version.outputs.PREVIOUS_TAG }}"
+          echo "  Release Version: ${STEPS_PATCH_VERSION_OUTPUTS_RELEASE_VERSION}"
+          echo "  Release Tag: ${STEPS_PATCH_VERSION_OUTPUTS_RELEASE_TAG}"
+          echo "  NPM Tag: ${STEPS_PATCH_VERSION_OUTPUTS_NPM_TAG}"
+          echo "  Previous Tag: ${STEPS_PATCH_VERSION_OUTPUTS_PREVIOUS_TAG}"
+        env:
+          STEPS_PATCH_VERSION_OUTPUTS_RELEASE_VERSION: ${{ steps.patch_version.outputs.RELEASE_VERSION }}
+          STEPS_PATCH_VERSION_OUTPUTS_RELEASE_TAG: ${{ steps.patch_version.outputs.RELEASE_TAG }}
+          STEPS_PATCH_VERSION_OUTPUTS_NPM_TAG: ${{ steps.patch_version.outputs.NPM_TAG }}
+          STEPS_PATCH_VERSION_OUTPUTS_PREVIOUS_TAG: ${{ steps.patch_version.outputs.PREVIOUS_TAG }}
 
       - name: 'Run Tests'
         if: "${{github.event.inputs.force_skip_tests != 'true'}}"
