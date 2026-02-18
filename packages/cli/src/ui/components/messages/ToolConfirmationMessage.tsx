@@ -334,7 +334,7 @@ export const ToolConfirmationMessage: React.FC<
         bodyContent = (
           <DiffRenderer
             diffContent={stripUnsafeCharacters(confirmationDetails.fileDiff)}
-            filename={sanitizeForDisplay(confirmationDetails.fileName)}
+            filename={stripUnsafeCharacters(confirmationDetails.fileName)}
             availableTerminalHeight={availableBodyContentHeight()}
             terminalWidth={terminalWidth}
           />
