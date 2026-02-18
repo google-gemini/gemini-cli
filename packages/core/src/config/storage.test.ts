@@ -12,6 +12,7 @@ vi.unmock('./storageMigration.js');
 
 import * as os from 'node:os';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -171,6 +172,82 @@ describe('Storage – additional helpers', () => {
     const tempDir = storageWithSession.getProjectTempDir();
     const expected = path.join(tempDir, sessionId, 'plans');
     expect(storageWithSession.getProjectTempPlansDir()).toBe(expected);
+  });
+
+  describe('Session and JSON Loading', () => {
+    beforeEach(async () => {
+      await storage.initialize();
+    });
+
+    it('listProjectChatFiles returns sorted sessions from chats directory', async () => {
+      const readdirSpy = vi
+        .spyOn(fs.promises, 'readdir')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .mockResolvedValue([
+          'session-1.json',
+          'session-2.json',
+          'not-a-session.txt',
+        ] as any);
+
+      const statSpy = vi
+        .spyOn(fs.promises, 'stat')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .mockImplementation(async (p: any) => {
+          if (p.endsWith('session-1.json')) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            return { mtime: new Date('2026-02-01'), mtimeMs: 1000 } as any;
+          }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          return { mtime: new Date('2026-02-02'), mtimeMs: 2000 } as any;
+        });
+
+      const sessions = await storage.listProjectChatFiles();
+
+      expect(readdirSpy).toHaveBeenCalledWith(expect.stringContaining('chats'));
+      expect(sessions).toHaveLength(2);
+      // Sorted by mtime desc
+      expect(sessions[0].filePath).toBe(path.join('chats', 'session-2.json'));
+      expect(sessions[1].filePath).toBe(path.join('chats', 'session-1.json'));
+      expect(sessions[0].lastUpdated).toBe(
+        new Date('2026-02-02').toISOString(),
+      );
+
+      readdirSpy.mockRestore();
+      statSpy.mockRestore();
+    });
+
+    it('loadProjectTempFile loads and parses JSON from relative path', async () => {
+      const readFileSpy = vi
+        .spyOn(fs.promises, 'readFile')
+        .mockResolvedValue(JSON.stringify({ hello: 'world' }));
+
+      const result = await storage.loadProjectTempFile<{ hello: string }>(
+        'some/file.json',
+      );
+
+      expect(readFileSpy).toHaveBeenCalledWith(
+        expect.stringContaining(path.join(PROJECT_SLUG, 'some/file.json')),
+        'utf8',
+      );
+      expect(result).toEqual({ hello: 'world' });
+
+      readFileSpy.mockRestore();
+    });
+
+    it('loadProjectTempFile returns null if file does not exist', async () => {
+      const error = new Error('File not found');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (error as any).code = 'ENOENT';
+      const readFileSpy = vi
+        .spyOn(fs.promises, 'readFile')
+        .mockRejectedValue(error);
+
+      const result = await storage.loadProjectTempFile('missing.json');
+
+      expect(result).toBeNull();
+
+      readFileSpy.mockRestore();
+    });
   });
 });
 

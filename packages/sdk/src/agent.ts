@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   Storage,
@@ -33,72 +32,66 @@ export class GeminiCliAgent {
     const storage = new Storage(cwd);
     await storage.initialize();
 
-    const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
+    let conversation: ConversationRecord | undefined;
+    let filePath: string | undefined;
 
-    if (!fs.existsSync(chatsDir)) {
-      throw new Error(`No sessions found in ${chatsDir}`);
+    const sessions = await storage.listProjectChatFiles();
+
+    if (sessions.length === 0) {
+      throw new Error(
+        `No sessions found in ${path.join(storage.getProjectTempDir(), 'chats')}`,
+      );
     }
-
-    const files = await fs.promises.readdir(chatsDir);
-    const jsonFiles = files.filter((f) => f.endsWith('.json'));
-
-    if (jsonFiles.length === 0) {
-      throw new Error(`No sessions found in ${chatsDir}`);
-    }
-
-    // Get stats for sorting
-    const fileStats = await Promise.all(
-      jsonFiles.map(async (file) => {
-        const filePath = path.join(chatsDir, file);
-        const stats = await fs.promises.stat(filePath);
-        return { file, filePath, mtime: stats.mtimeMs };
-      }),
-    );
-
-    // Sort by mtime desc
-    fileStats.sort((a, b) => b.mtime - a.mtime);
-
-    let targetFile: { filePath: string } | undefined;
 
     if (sessionId) {
-      // Find specific session
-      // Optimization: filenames in ChatRecordingService include first 8 chars of sessionId.
-      // We prioritize files that match this pattern.
       const truncatedId = sessionId.slice(0, 8);
-      const sortedFiles = [
-        ...fileStats.filter((f) => f.file.includes(truncatedId)),
-        ...fileStats.filter((f) => !f.file.includes(truncatedId)),
-      ];
+      // Optimization: filenames include first 8 chars of sessionId.
+      // Filter sessions that might match.
+      const candidates = sessions.filter((s) =>
+        s.filePath.includes(truncatedId),
+      );
 
-      for (const f of sortedFiles) {
-        try {
-          const content = await fs.promises.readFile(f.filePath, 'utf8');
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const data = JSON.parse(content) as ConversationRecord;
-          if (data.sessionId === sessionId) {
-            targetFile = f;
-            break;
-          }
-        } catch (_e) {
-          // Ignore parse errors
+      // If optimization fails (e.g. old files), check all?
+      // Assuming filenames always follow convention if created by this tool.
+      // But we can fallback to checking all if needed, but let's stick to candidates first.
+      // If candidates is empty, maybe fallback to all.
+      const filesToCheck = candidates.length > 0 ? candidates : sessions;
+
+      for (const sessionFile of filesToCheck) {
+        const loaded = await storage.loadProjectTempFile<ConversationRecord>(
+          sessionFile.filePath,
+        );
+        if (loaded && loaded.sessionId === sessionId) {
+          conversation = loaded;
+          filePath = path.join(
+            storage.getProjectTempDir(),
+            sessionFile.filePath,
+          );
+          break;
         }
       }
 
-      if (!targetFile) {
+      if (!conversation || !filePath) {
         throw new Error(`Session with ID ${sessionId} not found`);
       }
     } else {
-      // Most recent
-      targetFile = fileStats[0];
+      // Most recent session (listSessions returns sorted)
+      const sessionFile = sessions[0];
+      const loaded = await storage.loadProjectTempFile<ConversationRecord>(
+        sessionFile.filePath,
+      );
+      if (!loaded) {
+        throw new Error(
+          `Failed to load most recent session from ${sessionFile.filePath}`,
+        );
+      }
+      conversation = loaded;
+      filePath = path.join(storage.getProjectTempDir(), sessionFile.filePath);
     }
-
-    const content = await fs.promises.readFile(targetFile.filePath, 'utf8');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const conversation = JSON.parse(content) as ConversationRecord;
 
     const resumedData: ResumedSessionData = {
       conversation,
-      filePath: targetFile.filePath,
+      filePath,
     };
 
     return new GeminiCliSession(
