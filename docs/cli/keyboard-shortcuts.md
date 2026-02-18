@@ -36,7 +36,7 @@ available combinations.
 | Delete from the cursor to the start of the line. | `Ctrl + U`                                                       |
 | Clear all text in the input field.               | `Ctrl + C`                                                       |
 | Delete the previous word.                        | `Ctrl + Backspace`<br />`Alt + Backspace`<br />`Ctrl + W`        |
-| Delete the next word.                            | `Ctrl + Delete`<br />`Alt + Delete`                              |
+| Delete the next word.                            | `Ctrl + Delete`<br />`Alt + Delete`<br />`Alt + D`               |
 | Delete the character to the left.                | `Backspace`<br />`Ctrl + H`                                      |
 | Delete the character to the right.               | `Delete`<br />`Ctrl + D`                                         |
 | Undo the most recent text edit.                  | `Cmd + Z (no Shift)`<br />`Alt + Z (no Shift)`                   |
