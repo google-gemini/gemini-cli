@@ -814,6 +814,33 @@ describe('SettingsUtils', () => {
         });
       });
 
+      it('should show value with * when setting exists in scope', () => {
+        const settings = makeMockSettings({ ui: { requiresRestart: true } }); // true is different from default (false)
+        const mergedSettings = makeMockSettings({
+          ui: { requiresRestart: true },
+        });
+
+        const result = getDisplayValue(
+          'ui.requiresRestart',
+          settings,
+          mergedSettings,
+        );
+        expect(result).toBe('true*');
+      });
+      it('should not show * when key is not in scope', () => {
+        const settings = makeMockSettings({}); // no setting in scope
+        const mergedSettings = makeMockSettings({
+          ui: { requiresRestart: false },
+        });
+
+        const result = getDisplayValue(
+          'ui.requiresRestart',
+          settings,
+          mergedSettings,
+        );
+        expect(result).toBe('false'); // shows default value
+      });
+
       it('should show value with * when setting exists in scope, even when it matches default', () => {
         const settings = makeMockSettings({
           ui: { requiresRestart: false },
@@ -830,20 +857,6 @@ describe('SettingsUtils', () => {
         expect(result).toBe('false*');
       });
 
-      it('should not show * when key is not in scope and not in restartChangedKeys', () => {
-        const settings = makeMockSettings({}); // no setting in scope
-        const mergedSettings = makeMockSettings({
-          ui: { requiresRestart: false },
-        });
-
-        const result = getDisplayValue(
-          'ui.requiresRestart',
-          settings,
-          mergedSettings,
-        );
-        expect(result).toBe('false'); // shows default value
-      });
-
       it('should show schema default (not inherited merged value) when key is not in scope', () => {
         const settings = makeMockSettings({}); // no setting in current scope
         const mergedSettings = makeMockSettings({
@@ -856,20 +869,6 @@ describe('SettingsUtils', () => {
           mergedSettings,
         );
         expect(result).toBe('false');
-      });
-
-      it('should show value with * when setting exists in scope and differs from default', () => {
-        const settings = makeMockSettings({ ui: { requiresRestart: true } }); // true is different from default (false)
-        const mergedSettings = makeMockSettings({
-          ui: { requiresRestart: true },
-        });
-
-        const result = getDisplayValue(
-          'ui.requiresRestart',
-          settings,
-          mergedSettings,
-        );
-        expect(result).toBe('true*');
       });
     });
 
