@@ -183,6 +183,8 @@ type ToolInfoProps = {
   description: string;
   status: CoreToolCallStatus;
   emphasis: TextEmphasis;
+  progressMessage?: string;
+  progressPercent?: number;
 };
 
 export const ToolInfo: React.FC<ToolInfoProps> = ({
@@ -190,6 +192,8 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
   description,
   status: coreStatus,
   emphasis,
+  progressMessage,
+  progressPercent,
 }) => {
   const status = mapCoreStatusToDisplayStatus(coreStatus);
   const nameColor = React.useMemo<string>(() => {
@@ -210,6 +214,24 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
   // Hide description for completed Ask User tools (the result display speaks for itself)
   const isCompletedAskUser = isCompletedAskUserTool(name, status);
 
+  let displayDescription = description;
+  if (status === ToolCallStatus.Executing) {
+    const parts: string[] = [];
+    if (progressMessage) {
+      parts.push(progressMessage);
+    }
+    if (progressPercent !== undefined) {
+      parts.push(`${Math.round(progressPercent)}%`);
+    }
+
+    if (parts.length > 0) {
+      const progressInfo = parts.join(' - ');
+      displayDescription = description
+        ? `${description} (${progressInfo})`
+        : progressInfo;
+    }
+  }
+
   return (
     <Box overflow="hidden" height={1} flexGrow={1} flexShrink={1}>
       <Text strikethrough={status === ToolCallStatus.Canceled} wrap="truncate">
@@ -219,7 +241,7 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
         {!isCompletedAskUser && (
           <>
             {' '}
-            <Text color={theme.text.secondary}>{description}</Text>
+            <Text color={theme.text.secondary}>{displayDescription}</Text>
           </>
         )}
       </Text>

@@ -18,9 +18,27 @@ import {
   MessageBusType,
   type Config,
   type ToolConfirmationPayload,
+  type SerializableConfirmationDetails,
   debugLogger,
 } from '@google/gemini-cli-core';
 import type { IndividualToolCallDisplay } from '../types.js';
+
+type LegacyConfirmationDetails = SerializableConfirmationDetails & {
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => Promise<void>;
+};
+
+function hasLegacyCallback(
+  details: SerializableConfirmationDetails | undefined,
+): details is LegacyConfirmationDetails {
+  return (
+    !!details &&
+    'onConfirm' in details &&
+    typeof details.onConfirm === 'function'
+  );
+}
 
 interface ToolActionsContextValue {
   confirm: (
@@ -125,7 +143,15 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
         return;
       }
 
-      debugLogger.warn(`ToolActions: No correlationId for ${callId}`);
+      // 3. Fallback: Legacy Callback
+      if (hasLegacyCallback(details)) {
+        await details.onConfirm(outcome, payload);
+        return;
+      }
+
+      debugLogger.warn(
+        `ToolActions: No correlationId or callback for ${callId}`,
+      );
     },
     [config, ideClient, toolCalls, isDiffingEnabled],
   );

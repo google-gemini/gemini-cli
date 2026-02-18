@@ -366,6 +366,17 @@ describe('SettingsSchema', () => {
       ).toBe('Show the "? for shortcuts" hint above the input.');
     });
 
+    it('should have enableNotifications setting in schema', () => {
+      const setting =
+        getSettingsSchema().general.properties.enableNotifications;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('General');
+      expect(setting.default).toBe(false);
+      expect(setting.requiresRestart).toBe(false);
+      expect(setting.showInDialog).toBe(true);
+    });
+
     it('should have enableAgents setting in schema', () => {
       const setting = getSettingsSchema().experimental.properties.enableAgents;
       expect(setting).toBeDefined();
