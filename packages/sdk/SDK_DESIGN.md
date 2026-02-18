@@ -24,8 +24,8 @@ const simpleAgent = new GeminiCliAgent({
 // Create a new empty session
 const session = simpleAgent.session();
 
-// Resume most recent session (optional: pass a specific session ID)
-// const session = await simpleAgent.resumeSession();
+// Resume a specific session by ID
+// const session = await simpleAgent.resumeSession('some-session-id');
 
 for await (const chunk of session.sendStream('what does this project do?')) {
   console.log(chunk); // equivalent to JSON streaming chunks
