@@ -108,6 +108,8 @@ export interface IndividualToolCallDisplay {
   outputFile?: string;
   correlationId?: string;
   approvalMode?: ApprovalMode;
+  progressMessage?: string;
+  progressPercent?: number;
 }
 
 export interface CompressionProps {
@@ -221,6 +223,8 @@ export type HistoryItemToolGroup = HistoryItemBase & {
   tools: IndividualToolCallDisplay[];
   borderTop?: boolean;
   borderBottom?: boolean;
+  borderColor?: string;
+  borderDimColor?: boolean;
 };
 
 export type HistoryItemUserShell = HistoryItemBase & {

@@ -47,7 +47,13 @@ powerful tool for developers.
     be relative to the workspace root, e.g.,
     `-w @google/gemini-cli-core -- src/routing/modelRouterService.test.ts`)
 - **Full Validation:** `npm run preflight` (Heaviest check; runs clean, install,
-  build, lint, type check, and tests. Recommended before submitting PRs.)
+  build, lint, type check, and tests. Recommended before submitting PRs. Due to
+  its long runtime, only run this at the very end of a code implementation task.
+  If it fails, use faster, targeted commands (e.g., `npm run test`,
+  `npm run lint`, or workspace-specific tests) to iterate on fixes before
+  re-running `preflight`. For simple, non-code changes like documentation or
+  prompting updates, skip `preflight` at the end of the task and wait for PR
+  validation.)
 - **Individual Checks:** `npm run lint` / `npm run format` / `npm run typecheck`
 
 ## Development Conventions
