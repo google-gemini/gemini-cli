@@ -2373,4 +2373,90 @@ describe('PolicyEngine', () => {
       );
     });
   });
+
+  describe('Relative vs Absolute Path Regex (Plan Mode Trap)', () => {
+    const relativePath = 'conductor/product.md';
+    const absolutePath = '/usr/local/home/user/conductor/product.md';
+
+    it('should FAIL with the brittle regex on relative paths', async () => {
+      // The brittle regex used by the user: .*/conductor/
+      // This requires a preceding slash or characters before 'conductor'
+      const brittleRegex = /"(?:file_path|path)":".*\/conductor\/[^"]+"/;
+
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'write_file',
+          argsPattern: brittleRegex,
+          decision: PolicyDecision.ALLOW,
+          priority: 100,
+        },
+      ];
+
+      // Default behavior (simulating Plan Mode Deny fallback)
+      const engine = new PolicyEngine({
+        rules,
+        defaultDecision: PolicyDecision.DENY,
+      });
+
+      // Relative path fails matching because it starts with 'c', not '/'
+      expect(
+        (
+          await engine.check(
+            { name: 'write_file', args: { file_path: relativePath } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.DENY);
+
+      // Absolute path matches
+      expect(
+        (
+          await engine.check(
+            { name: 'write_file', args: { file_path: absolutePath } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should PASS with the robust regex on relative paths', async () => {
+      // The robust regex: (?:.*/)?conductor/
+      // Makes the prefix optional
+      const robustRegex = /"(?:file_path|path)":"(?:.*\/)?conductor\/[^"]+"/;
+
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'write_file',
+          argsPattern: robustRegex,
+          decision: PolicyDecision.ALLOW,
+          priority: 100,
+        },
+      ];
+
+      const engine = new PolicyEngine({
+        rules,
+        defaultDecision: PolicyDecision.DENY,
+      });
+
+      // Relative path matches
+      expect(
+        (
+          await engine.check(
+            { name: 'write_file', args: { file_path: relativePath } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // Absolute path matches
+      expect(
+        (
+          await engine.check(
+            { name: 'write_file', args: { file_path: absolutePath } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+    });
+  });
 });

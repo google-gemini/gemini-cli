@@ -693,8 +693,46 @@ export async function loadCliConfig(
   const policyEngineConfig = await createPolicyEngineConfig(
     effectiveSettings,
     approvalMode,
+    undefined,
+    cwd,
   );
   policyEngineConfig.nonInteractive = !interactive;
+
+  // FIX: Ensure tools allowed by high-priority policy are NOT excluded from the registry.
+  // This allows users to re-enable tools like write_file in Plan Mode via policy.
+  // We ALSO need to remove the conflicting 'Settings (Tools Excluded)' rule from policyEngineConfig,
+  // otherwise PolicyEngine will still consider it excluded.
+  const policyAllowedTools = new Set<string>();
+  if (policyEngineConfig.rules) {
+    for (const rule of policyEngineConfig.rules) {
+      // Logic mirrors promptProvider.ts: Priority > 1.1 means user/admin tier (or high priority default)
+      if (
+        (rule.priority ?? 0) > 1.1 &&
+        (rule.decision === 'allow' || rule.decision === 'ask_user') &&
+        rule.toolName
+      ) {
+        policyAllowedTools.add(rule.toolName);
+      }
+    }
+
+    // Filter out conflicting Settings Exclude rules
+    policyEngineConfig.rules = policyEngineConfig.rules.filter((rule) => {
+      if (
+        rule.source === 'Settings (Tools Excluded)' &&
+        rule.toolName &&
+        policyAllowedTools.has(rule.toolName)
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }
+
+  // If a tool is explicitly allowed by a high-priority policy, remove it from the exclusion list
+  // so it gets registered in ToolRegistry.
+  const finalExcludeTools = excludeTools.filter(
+    (t) => !policyAllowedTools.has(t),
+  );
 
   const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
   const specifiedModel =
@@ -756,7 +794,7 @@ export async function loadCliConfig(
     coreTools: settings.tools?.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
     policyEngineConfig,
-    excludeTools,
+    excludeTools: finalExcludeTools,
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
     mcpServerCommand,
@@ -812,6 +850,15 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
+    planDirectory:
+      settings.general &&
+      'plan' in settings.general &&
+      typeof settings.general.plan === 'object' &&
+      settings.general.plan !== null &&
+      'directory' in settings.general.plan &&
+      typeof settings.general.plan.directory === 'string'
+        ? settings.general.plan.directory
+        : undefined,
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,

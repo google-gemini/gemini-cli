@@ -45,6 +45,7 @@ describe('ToolConfirmationQueue', () => {
     getModel: () => 'gemini-pro',
     getDebugMode: () => false,
     getTargetDir: () => '/mock/target/dir',
+    getPlanDirectory: () => '/mock/temp/plans',
     getFileSystemService: () => ({
       readFile: vi.fn().mockResolvedValue('Plan content'),
     }),

@@ -31,6 +31,7 @@ import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 
 import { isDirectorySecure } from '../utils/security.js';
+import { GEMINI_DIR } from '../utils/paths.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,6 +53,7 @@ export const ADMIN_POLICY_TIER = 3;
 export function getPolicyDirectories(
   defaultPoliciesDir?: string,
   policyPaths?: string[],
+  workspacePoliciesDir?: string,
 ): string[] {
   const dirs: string[] = [];
 
@@ -63,6 +65,11 @@ export function getPolicyDirectories(
     dirs.push(...policyPaths);
   } else {
     dirs.push(Storage.getUserPoliciesDir());
+  }
+
+  // Workspace tier (same as User tier but potentially more specific)
+  if (workspacePoliciesDir) {
+    dirs.push(workspacePoliciesDir);
   }
 
   // Admin tier (highest priority)
@@ -97,6 +104,10 @@ export function getPolicyTier(
     return DEFAULT_POLICY_TIER;
   }
   if (normalizedDir === normalizedUser) {
+    return USER_POLICY_TIER;
+  }
+  // Workspace-local policies also fall into USER_POLICY_TIER
+  if (path.basename(path.dirname(normalizedDir)) === GEMINI_DIR) {
     return USER_POLICY_TIER;
   }
   if (normalizedDir === normalizedAdmin) {
@@ -153,10 +164,16 @@ export async function createPolicyEngineConfig(
   settings: PolicySettings,
   approvalMode: ApprovalMode,
   defaultPoliciesDir?: string,
+  workspaceDir?: string,
 ): Promise<PolicyEngineConfig> {
+  const workspacePoliciesDir = workspaceDir
+    ? path.join(workspaceDir, GEMINI_DIR, 'policies')
+    : undefined;
+
   const policyDirs = getPolicyDirectories(
     defaultPoliciesDir,
     settings.policyPaths,
+    workspacePoliciesDir,
   );
 
   const securePolicyDirs = await filterSecurePolicyDirectories(policyDirs);

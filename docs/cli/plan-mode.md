@@ -107,6 +107,68 @@ These are the only allowed tools:
 - **Skills:** [`activate_skill`] (allows loading specialized instructions and
   resources in a read-only manner)
 
+### Customizing the Plan Directory
+
+By default, plans are stored in a temporary directory within `~/.gemini/tmp/`.
+You can customize this location, but doing so requires **two steps**:
+configuring the setting and adding a policy rule.
+
+**Important:** If you only update `settings.json`, the agent will be blocked
+from writing to your custom directory by the default safety policies.
+
+#### 1. Configure the directory in `settings.json`
+
+Add the `plan.directory` setting to your `~/.gemini/settings.json` file. This
+path can be **absolute** or **relative** to your project root, and **can be
+located outside your project directory**.
+
+```json
+{
+  "general": {
+    "plan": {
+      "directory": "conductor"
+    }
+  }
+}
+```
+
+#### 2. Add a policy to allow writing to that directory
+
+Create a policy file (e.g., `~/.gemini/policies/custom-plans.toml`) to
+explicitly allow the agent to write files to your custom directory while in Plan
+Mode.
+
+The `argsPattern` in your policy must match the `file_path` (or `path`) argument
+passed to the tool.
+
+```toml
+[[rule]]
+toolName = ["write_file", "replace"]
+# Allow writing to any path within the "conductor/" directory
+# This regex matches both relative ("conductor/file") and absolute ("/path/to/conductor/file") paths.
+argsPattern = "\"(?:file_path|path)\":\"(?:.*\/)?conductor/[^\"]+\""
+decision = "allow"
+priority = 100
+modes = ["plan"]
+```
+
+**Relative vs. Absolute Paths:**
+
+- **Best Practice:** Use a regex that handles both relative and absolute paths
+  by making the prefix optional:
+  `\"(?:file_path|path)\":\"(?:.*\/)?conductor/[^\"]+\"`.
+- **Relative Paths:** If the agent uses a relative path (e.g.,
+  `conductor/plan.md`), the regex `conductor/` matches.
+- **Absolute Paths:** If the agent uses an absolute path (e.g.,
+  `/abs/path/to/conductor/plan.md`), the regex `.*/conductor/` matches.
+
+> **Tip:** If you choose a directory inside your project, you should add it to
+> your `.gitignore` file to avoid accidentally committing temporary plans to
+> version control.
+
+> **Tip:** For Windows users, you may need to adjust the regex to match
+> backslashes.
+
 ### Customizing Planning with Skills
 
 You can leverage [Agent Skills](./skills.md) to customize how Gemini CLI
