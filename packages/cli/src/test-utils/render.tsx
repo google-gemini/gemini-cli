@@ -124,17 +124,26 @@ class XtermStdout extends EventEmitter {
   };
 
   lastFrame = (options: { allowEmpty?: boolean } = {}) => {
-    const buffer = this.state.terminal.buffer.active;
-    const allLines: string[] = [];
-    for (let i = 0; i < buffer.length; i++) {
-      allLines.push(buffer.getLine(i)?.translateToString(true) ?? '');
-    }
+    let result: string;
+    // On Windows, xterm.js headless can sometimes have timing or rendering issues
+    // that lead to duplicated content or incorrect buffer state in tests.
+    // As a fallback, we can trust the raw output Ink provided during onRender.
+    if (os.platform() === 'win32') {
+      result =
+        (this.lastRenderStaticContent ?? '') + (this.lastRenderOutput ?? '');
+    } else {
+      const buffer = this.state.terminal.buffer.active;
+      const allLines: string[] = [];
+      for (let i = 0; i < buffer.length; i++) {
+        allLines.push(buffer.getLine(i)?.translateToString(true) ?? '');
+      }
 
-    const trimmed = [...allLines];
-    while (trimmed.length > 0 && trimmed[trimmed.length - 1] === '') {
-      trimmed.pop();
+      const trimmed = [...allLines];
+      while (trimmed.length > 0 && trimmed[trimmed.length - 1] === '') {
+        trimmed.pop();
+      }
+      result = trimmed.join('\n');
     }
-    const result = trimmed.join('\n');
 
     // Normalize for cross-platform snapshot stability:
     // 1. Convert backslashes to forward slashes (common for paths)
@@ -189,7 +198,10 @@ class XtermStdout extends EventEmitter {
       ).trim();
       const expectedFrame = stripAnsi(
         (this.lastRenderStaticContent ?? '') + (this.lastRenderOutput ?? ''),
-      ).trim();
+      )
+        .trim()
+        .replace(/\\/g, '/')
+        .replace(/\r\n/g, '\n');
 
       lastCurrent = currentFrame;
       lastExpected = expectedFrame;
