@@ -12,6 +12,8 @@ import { DEFAULT_GEMINI_FLASH_MODEL } from '../../config/models.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { SafetyCheckDecision } from '../protocol.js';
 
+import { LlmRole } from '../../telemetry/index.js';
+
 const CONSECA_POLICY_GENERATION_PROMPT = `
 You are a security expert responsible for generating fine-grained security policies for a large language model integrated into a command-line tool. Your role is to act as a "policy generator" that creates temporary, context-specific rules based on a user's prompt and the tools available to the main LLM.
 
@@ -132,6 +134,7 @@ export async function generatePolicy(
         ],
       },
       'conseca-policy-generation',
+      LlmRole.SUBAGENT,
     );
 
     const responseText = getResponseText(result);
