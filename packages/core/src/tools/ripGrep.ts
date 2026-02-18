@@ -340,10 +340,10 @@ class GrepToolInvocation extends BaseToolInvocation<
             const newFileMatches: GrepMatch[] = [];
             const seenLines = new Set<number>();
             for (const match of fileMatches) {
-              const startLine = Math.max(0, match.lineNumber - 1 - 50);
+              const startLine = Math.max(0, match.lineNumber - 1 - 15);
               const endLine = Math.min(
                 fileLines.length,
-                match.lineNumber - 1 + 50 + 1,
+                match.lineNumber - 1 + 15 + 1,
               );
               for (let i = startLine; i < endLine; i++) {
                 if (!seenLines.has(i + 1)) {

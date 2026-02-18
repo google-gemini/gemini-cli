@@ -332,10 +332,10 @@ class GrepToolInvocation extends BaseToolInvocation<
 
           for (const match of fileMatches) {
             if (fileLines) {
-              const startLine = Math.max(0, match.lineNumber - 1 - 50);
+              const startLine = Math.max(0, match.lineNumber - 1 - 15);
               const endLine = Math.min(
                 fileLines.length,
-                match.lineNumber - 1 + 50 + 1,
+                match.lineNumber - 1 + 15 + 1,
               );
               const contextLines = fileLines.slice(startLine, endLine);
 
