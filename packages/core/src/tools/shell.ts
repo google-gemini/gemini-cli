@@ -354,16 +354,15 @@ export class ShellToolInvocation extends BaseToolInvocation<
       } else {
         // Create a formatted error string for display, replacing the wrapper command
         // with the user-facing command.
-        const output = result.output || '(empty)';
-        const parts = [`<output>${output}</output>`];
 
+        const output = result.output || '(empty)';
+        const parts = [`<output><![CDATA[${output}]]></output>`];
         if (result.error) {
           const finalError = result.error.message.replaceAll(
             commandToExecute,
             this.params.command,
           );
-          parts.push(`<error>${finalError}</error>`);
-        }
+          parts.push(`<error><![CDATA[${finalError}]]></error>`);
 
         if (result.exitCode !== null) {
           parts.push(`<exit_code>${result.exitCode}</exit_code>`);
