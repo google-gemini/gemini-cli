@@ -5,11 +5,18 @@
  */
 
 import { Box, Text } from 'ink';
+import { useCallback } from 'react';
 import type React from 'react';
+import {
+  type Config,
+  type PolicyUpdateConfirmationRequest,
+  PolicyIntegrityManager,
+} from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
 import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { keyMatchers, Command } from '../keyMatchers.js';
 
 export enum PolicyUpdateChoice {
   ACCEPT = 'accept',
@@ -17,32 +24,46 @@ export enum PolicyUpdateChoice {
 }
 
 interface PolicyUpdateDialogProps {
-  onSelect: (choice: PolicyUpdateChoice) => void;
-  scope: string;
-  identifier: string;
-  isRestarting?: boolean;
+  config: Config;
+  request: PolicyUpdateConfirmationRequest;
+  onClose: () => void;
 }
 
 export const PolicyUpdateDialog: React.FC<PolicyUpdateDialogProps> = ({
-  onSelect,
-  scope,
-  identifier,
-  isRestarting,
+  config,
+  request,
+  onClose,
 }) => {
+  const handleSelect = useCallback(
+    async (choice: PolicyUpdateChoice) => {
+      if (choice === PolicyUpdateChoice.ACCEPT) {
+        const integrityManager = new PolicyIntegrityManager();
+        await integrityManager.acceptIntegrity(
+          request.scope,
+          request.identifier,
+          request.newHash,
+        );
+        await config.loadWorkspacePolicies(request.policyDir);
+      }
+      onClose();
+    },
+    [config, request, onClose],
+  );
+
   useKeypress(
     (key) => {
-      if (key.name === 'escape') {
-        onSelect(PolicyUpdateChoice.IGNORE);
+      if (keyMatchers[Command.ESCAPE](key)) {
+        onClose();
         return true;
       }
       return false;
     },
-    { isActive: !isRestarting },
+    { isActive: true },
   );
 
   const options: Array<RadioSelectItem<PolicyUpdateChoice>> = [
     {
-      label: 'Accept and Load (Requires Restart)',
+      label: 'Accept and Load',
       value: PolicyUpdateChoice.ACCEPT,
       key: 'accept',
     },
@@ -65,9 +86,9 @@ export const PolicyUpdateDialog: React.FC<PolicyUpdateDialogProps> = ({
       >
         <Box flexDirection="column" marginBottom={1}>
           <Text bold color={theme.text.primary}>
-            New or changed {scope} policies detected
+            New or changed {request.scope} policies detected
           </Text>
-          <Text color={theme.text.primary}>Location: {identifier}</Text>
+          <Text color={theme.text.primary}>Location: {request.identifier}</Text>
           <Text color={theme.text.primary}>
             Do you want to accept and load these policies?
           </Text>
@@ -75,17 +96,10 @@ export const PolicyUpdateDialog: React.FC<PolicyUpdateDialogProps> = ({
 
         <RadioButtonSelect
           items={options}
-          onSelect={onSelect}
-          isFocused={!isRestarting}
+          onSelect={handleSelect}
+          isFocused={true}
         />
       </Box>
-      {isRestarting && (
-        <Box marginLeft={1} marginTop={1}>
-          <Text color={theme.status.warning}>
-            Gemini CLI is restarting to apply the policy changes...
-          </Text>
-        </Box>
-      )}
     </Box>
   );
 };

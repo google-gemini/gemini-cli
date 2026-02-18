@@ -4,46 +4,76 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
+import { PolicyUpdateDialog } from './PolicyUpdateDialog.js';
 import {
-  PolicyUpdateDialog,
-  PolicyUpdateChoice,
-} from './PolicyUpdateDialog.js';
+  type Config,
+  type PolicyUpdateConfirmationRequest,
+  PolicyIntegrityManager,
+} from '@google/gemini-cli-core';
+
+// Mock PolicyIntegrityManager
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const original = (await importOriginal()) as any;
+  return {
+    ...original,
+    PolicyIntegrityManager: vi.fn().mockImplementation(() => ({
+      acceptIntegrity: vi.fn().mockResolvedValue(undefined),
+    })),
+  };
+});
 
 describe('PolicyUpdateDialog', () => {
+  let mockConfig: Config;
+  let mockRequest: PolicyUpdateConfirmationRequest;
+  let onClose: () => void;
+
+  beforeEach(() => {
+    mockConfig = {
+      loadWorkspacePolicies: vi.fn().mockResolvedValue(undefined),
+    } as unknown as Config;
+
+    mockRequest = {
+      scope: 'workspace',
+      identifier: '/test/workspace/.gemini/policies',
+      policyDir: '/test/workspace/.gemini/policies',
+      newHash: 'test-hash',
+    } as PolicyUpdateConfirmationRequest;
+
+    onClose = vi.fn();
+  });
+
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  it('renders correctly with default props', () => {
-    const onSelect = vi.fn();
+  it('renders correctly and matches snapshot', () => {
     const { lastFrame } = renderWithProviders(
       <PolicyUpdateDialog
-        onSelect={onSelect}
-        scope="workspace"
-        identifier="/test/path"
-        isRestarting={false}
+        config={mockConfig}
+        request={mockRequest}
+        onClose={onClose}
       />,
     );
 
     const output = lastFrame();
+    expect(output).toMatchSnapshot();
     expect(output).toContain('New or changed workspace policies detected');
-    expect(output).toContain('Location: /test/path');
+    expect(output).toContain('Location: /test/workspace/.gemini/policies');
     expect(output).toContain('Accept and Load');
     expect(output).toContain('Ignore');
   });
 
-  it('calls onSelect with ACCEPT when accept option is chosen', async () => {
-    const onSelect = vi.fn();
+  it('handles ACCEPT correctly', async () => {
     const { stdin } = renderWithProviders(
       <PolicyUpdateDialog
-        onSelect={onSelect}
-        scope="workspace"
-        identifier="/test/path"
-        isRestarting={false}
+        config={mockConfig}
+        request={mockRequest}
+        onClose={onClose}
       />,
     );
 
@@ -53,18 +83,20 @@ describe('PolicyUpdateDialog', () => {
     });
 
     await waitFor(() => {
-      expect(onSelect).toHaveBeenCalledWith(PolicyUpdateChoice.ACCEPT);
+      expect(PolicyIntegrityManager).toHaveBeenCalled();
+      expect(mockConfig.loadWorkspacePolicies).toHaveBeenCalledWith(
+        mockRequest.policyDir,
+      );
+      expect(onClose).toHaveBeenCalled();
     });
   });
 
-  it('calls onSelect with IGNORE when ignore option is chosen', async () => {
-    const onSelect = vi.fn();
+  it('handles IGNORE correctly', async () => {
     const { stdin } = renderWithProviders(
       <PolicyUpdateDialog
-        onSelect={onSelect}
-        scope="workspace"
-        identifier="/test/path"
-        isRestarting={false}
+        config={mockConfig}
+        request={mockRequest}
+        onClose={onClose}
       />,
     );
 
@@ -77,44 +109,27 @@ describe('PolicyUpdateDialog', () => {
     });
 
     await waitFor(() => {
-      expect(onSelect).toHaveBeenCalledWith(PolicyUpdateChoice.IGNORE);
+      expect(PolicyIntegrityManager).not.toHaveBeenCalled();
+      expect(mockConfig.loadWorkspacePolicies).not.toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
     });
   });
 
-  it('calls onSelect with IGNORE when Escape is pressed', async () => {
-    const onSelect = vi.fn();
+  it('calls onClose when Escape key is pressed', async () => {
     const { stdin } = renderWithProviders(
       <PolicyUpdateDialog
-        onSelect={onSelect}
-        scope="workspace"
-        identifier="/test/path"
-        isRestarting={false}
+        config={mockConfig}
+        request={mockRequest}
+        onClose={onClose}
       />,
     );
 
     await act(async () => {
-      stdin.write('\x1B'); // Escape key
+      stdin.write('\x1B'); // Escape key (matches Command.ESCAPE default)
     });
 
     await waitFor(() => {
-      expect(onSelect).toHaveBeenCalledWith(PolicyUpdateChoice.IGNORE);
+      expect(onClose).toHaveBeenCalled();
     });
-  });
-
-  it('displays restarting message when isRestarting is true', () => {
-    const onSelect = vi.fn();
-    const { lastFrame } = renderWithProviders(
-      <PolicyUpdateDialog
-        onSelect={onSelect}
-        scope="workspace"
-        identifier="/test/path"
-        isRestarting={true}
-      />,
-    );
-
-    const output = lastFrame();
-    expect(output).toContain(
-      'Gemini CLI is restarting to apply the policy changes...',
-    );
   });
 });

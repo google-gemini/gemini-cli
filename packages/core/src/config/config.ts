@@ -126,6 +126,8 @@ import {
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath } from '../utils/paths.js';
 import { UserHintService } from './userHintService.js';
+import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
+import { loadPoliciesFromToml } from '../policy/toml-loader.js';
 
 export interface AccessibilitySettings {
   enableLoadingPhrases?: boolean;
@@ -1731,6 +1733,32 @@ export class Config {
     | PolicyUpdateConfirmationRequest
     | undefined {
     return this.policyUpdateConfirmationRequest;
+  }
+
+  /**
+   * Hot-loads workspace policies from the specified directory into the active policy engine.
+   * This allows applying newly accepted policies without requiring an application restart.
+   *
+   * @param policyDir The directory containing the workspace policy TOML files.
+   */
+  async loadWorkspacePolicies(policyDir: string): Promise<void> {
+    const { rules, checkers } = await loadPoliciesFromToml(
+      [policyDir],
+      () => WORKSPACE_POLICY_TIER,
+    );
+
+    for (const rule of rules) {
+      this.policyEngine.addRule(rule);
+    }
+
+    for (const checker of checkers) {
+      this.policyEngine.addChecker(checker);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
+    (this as any).policyUpdateConfirmationRequest = undefined;
+
+    debugLogger.debug(`Workspace policies loaded from: ${policyDir}`);
   }
 
   setApprovalMode(mode: ApprovalMode): void {

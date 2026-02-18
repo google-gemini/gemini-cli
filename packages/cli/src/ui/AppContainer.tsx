@@ -122,7 +122,7 @@ import { appEvents, AppEvent, TransientMessageType } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
-import { RELAUNCH_EXIT_CODE, relaunchApp } from '../utils/processUtils.js';
+import { RELAUNCH_EXIT_CODE } from '../utils/processUtils.js';
 import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useMcpStatus } from './hooks/useMcpStatus.js';
@@ -154,7 +154,6 @@ import {
 } from './constants.js';
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
 import { NewAgentsChoice } from './components/NewAgentsNotification.js';
-import { PolicyUpdateChoice } from './components/PolicyUpdateDialog.js';
 import { isSlashCommand } from './utils/commandUtils.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useTimedMessage } from './hooks/useTimedMessage.js';
@@ -1446,32 +1445,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const [isPolicyUpdateDialogOpen, setIsPolicyUpdateDialogOpen] = useState(
     !!policyUpdateConfirmationRequest,
   );
-  const [isRestartingPolicyUpdate, setIsRestartingPolicyUpdate] =
-    useState(false);
-
-  const handlePolicyUpdateSelect = useCallback(
-    async (choice: PolicyUpdateChoice) => {
-      if (
-        choice === PolicyUpdateChoice.ACCEPT &&
-        policyUpdateConfirmationRequest
-      ) {
-        const integrityManager = new PolicyIntegrityManager();
-        await integrityManager.acceptIntegrity(
-          policyUpdateConfirmationRequest.scope,
-          policyUpdateConfirmationRequest.identifier,
-          policyUpdateConfirmationRequest.newHash,
-        );
-        setIsRestartingPolicyUpdate(true);
-        // Give time for the UI to render the restarting message
-        setTimeout(async () => {
-          await relaunchApp();
-        }, 250);
-      } else {
-        setIsPolicyUpdateDialogOpen(false);
-      }
-    },
-    [policyUpdateConfirmationRequest],
-  );
 
   const {
     needsRestart: ideNeedsRestart,
@@ -2173,7 +2146,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isFolderTrustDialogOpen: isFolderTrustDialogOpen ?? false,
       isPolicyUpdateDialogOpen,
       policyUpdateConfirmationRequest,
-      isRestartingPolicyUpdate,
       isTrustedFolder,
       constrainHeight,
       showErrorDetails,
@@ -2298,7 +2270,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isFolderTrustDialogOpen,
       isPolicyUpdateDialogOpen,
       policyUpdateConfirmationRequest,
-      isRestartingPolicyUpdate,
       isTrustedFolder,
       constrainHeight,
       showErrorDetails,
@@ -2396,7 +2367,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       vimHandleInput,
       handleIdePromptComplete,
       handleFolderTrustSelect,
-      handlePolicyUpdateSelect,
+      setIsPolicyUpdateDialogOpen,
       setConstrainHeight,
       onEscapePromptChange: handleEscapePromptChange,
       refreshStatic,
@@ -2481,7 +2452,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       vimHandleInput,
       handleIdePromptComplete,
       handleFolderTrustSelect,
-      handlePolicyUpdateSelect,
+      setIsPolicyUpdateDialogOpen,
       setConstrainHeight,
       handleEscapePromptChange,
       refreshStatic,
