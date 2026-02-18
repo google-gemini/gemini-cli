@@ -225,7 +225,7 @@ gemini
 You can significantly enhance security by controlling which tools the Gemini
 model can use. This is achieved through the `tools.core` setting and the
 [Policy Engine](../core/policy-engine.md). For a list of available tools, see
-the [Tools documentation](../tools/index.md).
+the [Tools reference](../reference/tools.md).
 
 ### Allowlisting with `coreTools`
 
