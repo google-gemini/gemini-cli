@@ -46,7 +46,6 @@ export function useRunEventNotifications({
   permissionConfirmationRequest,
   hasConfirmUpdateExtensionRequests,
   hasLoopDetectionConfirmationRequest,
-  terminalName,
 }: RunEventNotificationParams): void {
   const pendingAttentionNotification = useMemo(
     () =>
@@ -125,14 +124,12 @@ export function useRunEventNotifications({
     void notifyViaTerminal(
       notificationsEnabled,
       buildRunEventNotificationContent(pendingAttentionNotification.event),
-      terminalName,
     );
   }, [
     isFocused,
     hasReceivedFocusEvent,
     notificationsEnabled,
     pendingAttentionNotification,
-    terminalName,
   ]);
 
   useEffect(() => {
@@ -162,7 +159,6 @@ export function useRunEventNotifications({
         type: 'session_complete',
         detail: 'Gemini CLI finished responding.',
       }),
-      terminalName,
     );
   }, [
     streamingState,
@@ -170,6 +166,5 @@ export function useRunEventNotifications({
     hasReceivedFocusEvent,
     notificationsEnabled,
     hasPendingActionRequired,
-    terminalName,
   ]);
 }

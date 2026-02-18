@@ -11,8 +11,6 @@ import {
   MAX_NOTIFICATION_SUBTITLE_CHARS,
   MAX_NOTIFICATION_TITLE_CHARS,
   notifyViaTerminal,
-  supportsOsc9Notifications,
-  truncateForNotification,
 } from './terminalNotifications.js';
 
 const writeToStdout = vi.hoisted(() => vi.fn());
@@ -86,23 +84,6 @@ describe('terminal notifications', () => {
     expect(emitted.endsWith('\x07')).toBe(true);
   });
 
-  it('uses terminal capability-query terminalName when available', async () => {
-    vi.stubEnv('TERM_PROGRAM', 'vscode');
-
-    const shown = await notifyViaTerminal(
-      true,
-      {
-        title: 'Title',
-        body: 'Body',
-      },
-      'WezTerm 20240203',
-    );
-
-    expect(shown).toBe(true);
-    const emitted = String(writeToStdout.mock.calls[0][0]);
-    expect(emitted.startsWith('\x1b]9;')).toBe(true);
-  });
-
   it('emits BEL fallback when OSC 9 is not supported', async () => {
     vi.stubEnv('TERM_PROGRAM', '');
     vi.stubEnv('TERM', '');
@@ -144,19 +125,6 @@ describe('terminal notifications', () => {
     expect(debugLogger.debug).toHaveBeenCalledTimes(1);
   });
 
-  it('detects OSC 9 support using terminal signatures', () => {
-    expect(supportsOsc9Notifications({ TERM_PROGRAM: 'WezTerm' })).toBe(true);
-    expect(supportsOsc9Notifications({ TERM_PROGRAM: 'ghostty' })).toBe(true);
-    expect(supportsOsc9Notifications({ TERM_PROGRAM: 'iTerm.app' })).toBe(true);
-    expect(supportsOsc9Notifications({ TERM: 'xterm-kitty' })).toBe(true);
-    expect(supportsOsc9Notifications({ TERM: 'wezterm' })).toBe(true);
-    expect(supportsOsc9Notifications({}, 'WezTerm 20240203')).toBe(true);
-    expect(
-      supportsOsc9Notifications({ TERM_PROGRAM: 'WezTerm', WT_SESSION: '1' }),
-    ).toBe(false);
-    expect(supportsOsc9Notifications({})).toBe(false);
-  });
-
   it('strips terminal control sequences and newlines from payload text', async () => {
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
 
@@ -173,19 +141,6 @@ describe('terminal notifications', () => {
     expect(payload).not.toContain('[32m');
     expect(payload).not.toContain('\n');
     expect(payload).not.toContain('\r');
-  });
-
-  it('truncates notification text with ellipsis', () => {
-    const input = 'x'.repeat(300);
-    const truncated = truncateForNotification(input, 12);
-    expect(truncated).toHaveLength(12);
-    expect(truncated.endsWith('...')).toBe(true);
-  });
-
-  it('handles unicode truncation via shared code-point helpers', () => {
-    const input = 'a🙂b🙂c🙂d🙂e';
-    const truncated = truncateForNotification(input, 8);
-    expect(truncated.endsWith('...')).toBe(true);
   });
 
   it('builds bounded attention notification content', () => {

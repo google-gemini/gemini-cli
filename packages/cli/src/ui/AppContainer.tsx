@@ -1922,7 +1922,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     permissionConfirmationRequest,
     hasConfirmUpdateExtensionRequests,
     hasLoopDetectionConfirmationRequest,
-    terminalName: terminalCapabilityManager.getTerminalName(),
   });
 
   const isPassiveShortcutsHelpState =
