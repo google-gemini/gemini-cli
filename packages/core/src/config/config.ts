@@ -1126,6 +1126,13 @@ export class Config implements McpContext {
     );
   }
 
+  /**
+   * Returns the feature gate for querying feature status.
+   */
+  getFeatureGate(): FeatureGate {
+    return this.featureGate;
+  }
+
   isInitialized(): boolean {
     return this.initialized;
   }
