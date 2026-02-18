@@ -51,19 +51,26 @@ jobs:
           ${{ github.event.inputs.dry-run == 'false' }}
         env:
           NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CORE }}'
+          GITHUB_EVENT_INPUTS_VERSION: ${{ github.event.inputs.version }}
+          GITHUB_EVENT_INPUTS_CHANNEL: ${{ github.event.inputs.channel }}
         run: |
-          npm dist-tag add @google/gemini-cli-core@${{ github.event.inputs.version }} ${{ github.event.inputs.channel }}
+          npm dist-tag add @google/gemini-cli-core@${GITHUB_EVENT_INPUTS_VERSION} ${GITHUB_EVENT_INPUTS_CHANNEL}
 
       - name: 'Change tag for @google/gemini-cli'
         if: |-
           ${{ github.event.inputs.dry-run == 'false' }}
         env:
           NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+          GITHUB_EVENT_INPUTS_VERSION: ${{ github.event.inputs.version }}
+          GITHUB_EVENT_INPUTS_CHANNEL: ${{ github.event.inputs.channel }}
         run: |
-          npm dist-tag add @google/gemini-cli@${{ github.event.inputs.version }} ${{ github.event.inputs.channel }}
+          npm dist-tag add @google/gemini-cli@${GITHUB_EVENT_INPUTS_VERSION} ${GITHUB_EVENT_INPUTS_CHANNEL}
 
       - name: 'Log dry run'
         if: |-
           ${{ github.event.inputs.dry-run == 'true' }}
         run: |
-          echo "Dry run: Would have added tag '${{ github.event.inputs.channel }}' to version '${{ github.event.inputs.version }}' for @google/gemini-cli and @google/gemini-cli-core."
+          echo "Dry run: Would have added tag '${GITHUB_EVENT_INPUTS_CHANNEL}' to version '${GITHUB_EVENT_INPUTS_VERSION}' for @google/gemini-cli and @google/gemini-cli-core."
+        env:
+          GITHUB_EVENT_INPUTS_CHANNEL: ${{ github.event.inputs.channel }}
+          GITHUB_EVENT_INPUTS_VERSION: ${{ github.event.inputs.version }}
