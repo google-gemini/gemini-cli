@@ -235,8 +235,8 @@ describe('LSTool', () => {
 
       expect(entries[0]).toBe('[DIR] x-dir');
       expect(entries[1]).toBe('[DIR] y-dir');
-      expect(entries[2]).toBe('a-file.txt');
-      expect(entries[3]).toBe('b-file.txt');
+      expect(entries[2]).toBe('a-file.txt (8 bytes)');
+      expect(entries[3]).toBe('b-file.txt (8 bytes)');
     });
 
     it('should handle permission errors gracefully', async () => {
