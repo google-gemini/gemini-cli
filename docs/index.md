@@ -30,6 +30,8 @@ User-focused guides and tutorials for daily development workflows.
 
 - **[File management](./cli/tutorials/file-management.md):** How to work with
   local files and directories.
+- **[Get started with Agent skills](./cli/tutorials/skills-getting-started.md):**
+  Getting started with specialized expertise.
 - **[Manage context and memory](./cli/tutorials/memory-management.md):**
   Managing persistent instructions and facts.
 - **[Execute shell commands](./cli/tutorials/shell-commands.md):** Executing
@@ -40,8 +42,9 @@ User-focused guides and tutorials for daily development workflows.
   complex workflows.
 - **[Web search and fetch](./cli/tutorials/web-tools.md):** Searching and
   fetching content from the web.
-- **[Get started with skills](./cli/tutorials/skills-getting-started.md):**
-  Getting started with specialized expertise.
+- **[Set up an MCP server](./cli/tutorials/mcp-setup.md):** Set up an MCP
+  server.
+- **[Automate tasks](./cli/tutorials/automation.md):** Automate tasks.
 
 ## Features
 
@@ -92,13 +95,13 @@ Technical reference documentation for each capability of Gemini CLI.
   lookup for CLI features.
 - **[Memory (tool)](./tools/memory.md):** Storage details for persistent facts.
 - **[Model routing](./cli/model-routing.md):** Automatic fallback resilience.
-- **[Plan mode (experimental)](./cli/plan-mode.md):** Use a safe, read-only mode
-  for planning complex changes.
-- **[Remote Agents](./core/remote-agents.md):** Connecting to and using remote
-  agents.
+- **[Plan mode 🧪](./cli/plan-mode.md):** Use a safe, read-only mode for
+  planning complex changes.
+- **[Remote subagents 🧪](./core/remote-agents.md):** Connecting to and using
+  remote agents.
 - **[Sandboxing](./cli/sandbox.md):** Isolate tool execution.
 - **[Shell (tool)](./tools/shell.md):** Detailed system execution parameters.
-- **[Subagents](./core/subagents.md):** Using specialized agents for specific
+- **[Subagents 🧪](./core/subagents.md):** Using specialized agents for specific
   tasks.
 - **[Telemetry](./cli/telemetry.md):** Usage and performance metric details.
 - **[Todo (tool)](./tools/todos.md):** Progress tracking specification.
