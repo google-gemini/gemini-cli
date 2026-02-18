@@ -160,6 +160,8 @@ ${result.llmContent}`;
 /**
  * Implementation of the ReadFile tool logic
  */
+const readCache = new Map<string, ToolResult>();
+
 export class ReadFileTool extends BaseDeclarativeTool<
   ReadFileToolParams,
   ToolResult
@@ -185,6 +187,12 @@ export class ReadFileTool extends BaseDeclarativeTool<
       config.getTargetDir(),
       config.getFileFilteringOptions(),
     );
+    // Clear cache on any potential file modification
+    messageBus.on('tool_call_confirm', (details) => {
+      if (details.type === 'edit' || details.title.toLowerCase().includes('write')) {
+        readCache.clear();
+      }
+    });
   }
 
   protected override validateToolParamValues(
@@ -233,13 +241,34 @@ export class ReadFileTool extends BaseDeclarativeTool<
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<ReadFileToolParams, ToolResult> {
-    return new ReadFileToolInvocation(
-      this.config,
+    const key = JSON.stringify({
+      path: path.resolve(this.config.getTargetDir(), params.file_path),
+      offset: params.offset,
+      limit: params.limit,
+    });
+
+    return {
+      toolLocations: () => [{ path: path.resolve(this.config.getTargetDir(), params.file_path), line: params.offset }],
+      getDescription: () => shortenPath(makeRelative(path.resolve(this.config.getTargetDir(), params.file_path), this.config.getTargetDir())),
       params,
-      messageBus,
-      _toolName,
-      _toolDisplayName,
-    );
+      execute: async () => {
+        if (readCache.has(key)) {
+          return readCache.get(key)!;
+        }
+        const invocation = new ReadFileToolInvocation(
+          this.config,
+          params,
+          messageBus,
+          _toolName,
+          _toolDisplayName,
+        );
+        const result = await invocation.execute();
+        if (!result.error) {
+          readCache.set(key, result);
+        }
+        return result;
+      },
+    } as unknown as ToolInvocation<ReadFileToolParams, ToolResult>;
   }
 
   override getSchema(modelId?: string) {
