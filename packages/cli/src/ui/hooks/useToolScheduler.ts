@@ -104,9 +104,7 @@ export function useToolScheduler(
     [config, messageBus],
   );
 
-  useEffect(() => () => {
-      scheduler.dispose();
-    }, [scheduler]);
+  useEffect(() => () => scheduler.dispose(), [scheduler]);
 
   const internalAdaptToolCalls = useCallback(
     (coreCalls: ToolCall[], prevTracked: TrackedToolCall[]) =>
