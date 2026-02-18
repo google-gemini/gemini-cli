@@ -81,10 +81,13 @@ describe('Workspace-Level Policy CLI Integration', () => {
     await loadCliConfig(settings, 'test-session', argv, { cwd: MOCK_CWD });
 
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
-      expect.anything(),
+      expect.objectContaining({
+        workspacePoliciesDir: expect.stringContaining(
+          path.join('.gemini', 'policies'),
+        ),
+      }),
       expect.anything(),
       undefined,
-      expect.stringContaining(path.join('.gemini', 'policies')),
     );
   });
 
@@ -100,9 +103,10 @@ describe('Workspace-Level Policy CLI Integration', () => {
     await loadCliConfig(settings, 'test-session', argv, { cwd: MOCK_CWD });
 
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspacePoliciesDir: undefined,
+      }),
       expect.anything(),
-      expect.anything(),
-      undefined,
       undefined,
     );
   });
@@ -124,9 +128,10 @@ describe('Workspace-Level Policy CLI Integration', () => {
     await loadCliConfig(settings, 'test-session', argv, { cwd: MOCK_CWD });
 
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspacePoliciesDir: undefined,
+      }),
       expect.anything(),
-      expect.anything(),
-      undefined,
       undefined,
     );
   });
@@ -152,9 +157,10 @@ describe('Workspace-Level Policy CLI Integration', () => {
       expect.stringContaining('Workspace policies changed or are new'),
     );
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspacePoliciesDir: undefined,
+      }),
       expect.anything(),
-      expect.anything(),
-      undefined,
       undefined, // Should NOT load policies
     );
   });
@@ -181,10 +187,13 @@ describe('Workspace-Level Policy CLI Integration', () => {
       'new-hash',
     );
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
-      expect.anything(),
+      expect.objectContaining({
+        workspacePoliciesDir: expect.stringContaining(
+          path.join('.gemini', 'policies'),
+        ),
+      }),
       expect.anything(),
       undefined,
-      expect.stringContaining(path.join('.gemini', 'policies')),
     );
   });
 
@@ -220,9 +229,10 @@ describe('Workspace-Level Policy CLI Integration', () => {
     // so it currently DOES NOT pass the directory to createPolicyEngineConfig yet.
     // The UI will handle the confirmation and reload/update.
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspacePoliciesDir: undefined,
+      }),
       expect.anything(),
-      expect.anything(),
-      undefined,
       undefined,
     );
   });
@@ -254,9 +264,10 @@ describe('Workspace-Level Policy CLI Integration', () => {
     });
 
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspacePoliciesDir: undefined,
+      }),
       expect.anything(),
-      expect.anything(),
-      undefined,
       undefined,
     );
   });

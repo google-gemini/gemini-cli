@@ -134,10 +134,9 @@ priority = 10
 
     // Test 1: Workspace vs User (User should win)
     const config = await createPolicyEngineConfig(
-      {},
+      { workspacePoliciesDir },
       ApprovalMode.DEFAULT,
       defaultPoliciesDir,
-      workspacePoliciesDir,
     );
 
     const rules = config.rules?.filter((r) => r.toolName === 'test_tool');
@@ -214,10 +213,9 @@ priority=10`,
     const { createPolicyEngineConfig } = await import('./config.js');
 
     const config = await createPolicyEngineConfig(
-      {},
+      { workspacePoliciesDir: undefined },
       ApprovalMode.DEFAULT,
       defaultPoliciesDir,
-      undefined, // No workspace dir
     );
 
     // Should only have default tier rule (1.01)
@@ -280,10 +278,8 @@ priority=500`,
     const { createPolicyEngineConfig } = await import('./config.js');
 
     const config = await createPolicyEngineConfig(
-      {},
+      { workspacePoliciesDir },
       ApprovalMode.DEFAULT,
-      undefined,
-      workspacePoliciesDir,
     );
 
     const rule = config.rules?.find((r) => r.toolName === 'p_tool');

@@ -27,14 +27,10 @@ export async function createPolicyEngineConfig(
     tools: settings.tools,
     mcpServers: settings.mcpServers,
     policyPaths: settings.policyPaths,
+    workspacePoliciesDir,
   };
 
-  return createCorePolicyEngineConfig(
-    policySettings,
-    approvalMode,
-    undefined,
-    workspacePoliciesDir,
-  );
+  return createCorePolicyEngineConfig(policySettings, approvalMode);
 }
 
 export function createPolicyUpdater(
