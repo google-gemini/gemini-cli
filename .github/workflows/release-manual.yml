@@ -86,9 +86,11 @@ jobs:
         id: 'release_info'
         working-directory: './release'
         run: |
-          RELEASE_VERSION="${{ github.event.inputs.version }}"
+          RELEASE_VERSION="${GITHUB_EVENT_INPUTS_VERSION}"
           echo "RELEASE_VERSION=${RELEASE_VERSION#v}" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_TAG=$(git describe --tags --abbrev=0)" >> "${GITHUB_OUTPUT}"
+        env:
+          GITHUB_EVENT_INPUTS_VERSION: ${{ github.event.inputs.version }}
 
       - name: 'Run Tests'
         if: "${{github.event.inputs.force_skip_tests != 'true'}}"
