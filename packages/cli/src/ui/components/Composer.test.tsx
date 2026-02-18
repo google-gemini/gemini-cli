@@ -857,6 +857,28 @@ describe('Composer', () => {
       expect(lastFrame()).toContain('ShortcutsHint');
     });
 
+    it('hides shortcuts hint while loading when full UI details are visible', async () => {
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: true,
+        streamingState: StreamingState.Responding,
+      });
+
+      const { lastFrame } = await renderComposer(uiState);
+
+      expect(lastFrame()).not.toContain('ShortcutsHint');
+    });
+
+    it('hides shortcuts hint when text is typed in buffer', async () => {
+      const uiState = createMockUIState({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        buffer: { text: 'hello' } as any,
+      });
+
+      const { lastFrame } = await renderComposer(uiState);
+
+      expect(lastFrame()).not.toContain('ShortcutsHint');
+    });
+
     it('hides shortcuts hint while loading in minimal mode', async () => {
       const uiState = createMockUIState({
         cleanUiDetailsVisible: false,
