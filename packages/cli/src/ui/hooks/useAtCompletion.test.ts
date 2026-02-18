@@ -6,6 +6,7 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { act, useState } from 'react';
+import * as path from 'node:path';
 import { renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useAtCompletion } from './useAtCompletion.js';
@@ -587,6 +588,122 @@ describe('useAtCompletion', () => {
         'src/',
         'file.txt',
       ]);
+    });
+  });
+
+  describe('Multi-directory workspace support', () => {
+    const multiDirTmpDirs: string[] = [];
+
+    afterEach(async () => {
+      await Promise.all(multiDirTmpDirs.map((dir) => cleanupTmpDir(dir)));
+      multiDirTmpDirs.length = 0;
+    });
+
+    it('should include files from workspace directories beyond cwd', async () => {
+      const cwdStructure: FileSystemStructure = { 'main.txt': '' };
+      const addedDirStructure: FileSystemStructure = { 'added-file.txt': '' };
+      const cwdDir = await createTmpDir(cwdStructure);
+      multiDirTmpDirs.push(cwdDir);
+      const addedDir = await createTmpDir(addedDirStructure);
+      multiDirTmpDirs.push(addedDir);
+
+      const multiDirConfig = {
+        ...mockConfig,
+        getWorkspaceContext: vi.fn().mockReturnValue({
+          getDirectories: () => [cwdDir, addedDir],
+          onDirectoriesChanged: vi.fn(() => () => {}),
+        }),
+      } as unknown as Config;
+
+      const { result } = renderHook(() =>
+        useTestHarnessForAtCompletion(true, '', multiDirConfig, cwdDir),
+      );
+
+      await waitFor(() => {
+        const values = result.current.suggestions.map((s) => s.value);
+        expect(values).toContain('main.txt');
+        expect(values).toContain(
+          escapePath(path.join(addedDir, 'added-file.txt')),
+        );
+      });
+    });
+
+    it('should pick up newly added directories via onDirectoriesChanged', async () => {
+      const cwdStructure: FileSystemStructure = { 'original.txt': '' };
+      const addedStructure: FileSystemStructure = { 'new-file.txt': '' };
+      const cwdDir = await createTmpDir(cwdStructure);
+      multiDirTmpDirs.push(cwdDir);
+      const addedDir = await createTmpDir(addedStructure);
+      multiDirTmpDirs.push(addedDir);
+
+      let dirChangeListener: (() => void) | null = null;
+      const directories = [cwdDir];
+
+      const dynamicConfig = {
+        ...mockConfig,
+        getWorkspaceContext: vi.fn().mockReturnValue({
+          getDirectories: () => [...directories],
+          onDirectoriesChanged: vi.fn((listener: () => void) => {
+            dirChangeListener = listener;
+            return () => {
+              dirChangeListener = null;
+            };
+          }),
+        }),
+      } as unknown as Config;
+
+      const { result } = renderHook(() =>
+        useTestHarnessForAtCompletion(true, '', dynamicConfig, cwdDir),
+      );
+
+      await waitFor(() => {
+        const values = result.current.suggestions.map((s) => s.value);
+        expect(values).toContain('original.txt');
+        expect(values.every((v) => !v.includes('new-file.txt'))).toBe(true);
+      });
+
+      directories.push(addedDir);
+      act(() => {
+        dirChangeListener?.();
+      });
+
+      await waitFor(() => {
+        const values = result.current.suggestions.map((s) => s.value);
+        expect(values).toContain(
+          escapePath(path.join(addedDir, 'new-file.txt')),
+        );
+      });
+    });
+
+    it('should show same-named files from different directories without false deduplication', async () => {
+      const dir1Structure: FileSystemStructure = { 'readme.md': '' };
+      const dir2Structure: FileSystemStructure = { 'readme.md': '' };
+      const dir1 = await createTmpDir(dir1Structure);
+      multiDirTmpDirs.push(dir1);
+      const dir2 = await createTmpDir(dir2Structure);
+      multiDirTmpDirs.push(dir2);
+
+      const multiDirConfig = {
+        ...mockConfig,
+        getWorkspaceContext: vi.fn().mockReturnValue({
+          getDirectories: () => [dir1, dir2],
+          onDirectoriesChanged: vi.fn(() => () => {}),
+        }),
+      } as unknown as Config;
+
+      const { result } = renderHook(() =>
+        useTestHarnessForAtCompletion(true, 'readme', multiDirConfig, dir1),
+      );
+
+      await waitFor(() => {
+        const values = result.current.suggestions.map((s) => s.value);
+        const readmeEntries = values.filter((v) => v.includes('readme.md'));
+        expect(readmeEntries.length).toBe(2);
+        expect(readmeEntries).toContain('readme.md');
+        expect(readmeEntries).toContain(
+          escapePath(path.join(dir2, 'readme.md')),
+        );
+      });
     });
   });
 });
