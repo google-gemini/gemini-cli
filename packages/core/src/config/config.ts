@@ -68,6 +68,15 @@ import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
+import {
+  TrackerInitTool,
+  TrackerCreateTaskTool,
+  TrackerUpdateTaskTool,
+  TrackerGetTaskTool,
+  TrackerListTasksTool,
+  TrackerAddDependencyTool,
+  TrackerVisualizeTool,
+} from '../tools/trackerTools.js';
 import { logRipgrepFallback, logFlashFallback } from '../telemetry/loggers.js';
 import {
   RipgrepFallbackEvent,
@@ -89,6 +98,7 @@ import type {
 import { ModelConfigService } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import { ContextManager } from '../services/contextManager.js';
+import { TrackerService } from '../services/trackerService.js';
 import type { GenerateContentParameters } from '@google/genai';
 
 // Re-export OAuth config type
@@ -478,6 +488,7 @@ export interface ConfigParameters {
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
   plan?: boolean;
+  tracker?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
@@ -505,6 +516,7 @@ export class Config {
   private sessionId: string;
   private clientVersion: string;
   private fileSystemService: FileSystemService;
+  private trackerService?: TrackerService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
   readonly modelConfigService: ModelConfigService;
@@ -663,6 +675,7 @@ export class Config {
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
+  private readonly trackerEnabled: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
@@ -751,6 +764,7 @@ export class Config {
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
+    this.trackerEnabled = params.tracker ?? false;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];
@@ -1896,6 +1910,13 @@ export class Config {
     return this.bugCommand;
   }
 
+  getTrackerService(): TrackerService {
+    if (!this.trackerService) {
+      this.trackerService = new TrackerService(this.targetDir);
+    }
+    return this.trackerService;
+  }
+
   getFileService(): FileDiscoveryService {
     if (!this.fileDiscoveryService) {
       this.fileDiscoveryService = new FileDiscoveryService(this.targetDir, {
@@ -1955,6 +1976,10 @@ export class Config {
 
   isPlanEnabled(): boolean {
     return this.planEnabled;
+  }
+
+  isTrackerEnabled(): boolean {
+    return this.trackerEnabled;
   }
 
   getApprovedPlanPath(): string | undefined {
@@ -2437,6 +2462,32 @@ export class Config {
       );
       maybeRegister(EnterPlanModeTool, () =>
         registry.registerTool(new EnterPlanModeTool(this, this.messageBus)),
+      );
+    }
+
+    if (this.isTrackerEnabled()) {
+      maybeRegister(TrackerInitTool, () =>
+        registry.registerTool(new TrackerInitTool(this, this.messageBus)),
+      );
+      maybeRegister(TrackerCreateTaskTool, () =>
+        registry.registerTool(new TrackerCreateTaskTool(this, this.messageBus)),
+      );
+      maybeRegister(TrackerUpdateTaskTool, () =>
+        registry.registerTool(new TrackerUpdateTaskTool(this, this.messageBus)),
+      );
+      maybeRegister(TrackerGetTaskTool, () =>
+        registry.registerTool(new TrackerGetTaskTool(this, this.messageBus)),
+      );
+      maybeRegister(TrackerListTasksTool, () =>
+        registry.registerTool(new TrackerListTasksTool(this, this.messageBus)),
+      );
+      maybeRegister(TrackerAddDependencyTool, () =>
+        registry.registerTool(
+          new TrackerAddDependencyTool(this, this.messageBus),
+        ),
+      );
+      maybeRegister(TrackerVisualizeTool, () =>
+        registry.registerTool(new TrackerVisualizeTool(this, this.messageBus)),
       );
     }
 

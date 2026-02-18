@@ -41,6 +41,13 @@ export const ASK_USER_TOOL_NAME = 'ask_user';
 export const ASK_USER_DISPLAY_NAME = 'Ask User';
 export const EXIT_PLAN_MODE_TOOL_NAME = 'exit_plan_mode';
 export const ENTER_PLAN_MODE_TOOL_NAME = 'enter_plan_mode';
+export const TRACKER_INIT_TOOL_NAME = 'tracker_init';
+export const TRACKER_CREATE_TASK_TOOL_NAME = 'tracker_create_task';
+export const TRACKER_UPDATE_TASK_TOOL_NAME = 'tracker_update_task';
+export const TRACKER_GET_TASK_TOOL_NAME = 'tracker_get_task';
+export const TRACKER_LIST_TASKS_TOOL_NAME = 'tracker_list_tasks';
+export const TRACKER_ADD_DEPENDENCY_TOOL_NAME = 'tracker_add_dependency';
+export const TRACKER_VISUALIZE_TOOL_NAME = 'tracker_visualize';
 
 /**
  * Mapping of legacy tool names to their current names.
@@ -94,6 +101,13 @@ export const ALL_BUILTIN_TOOL_NAMES = [
   MEMORY_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
+  TRACKER_INIT_TOOL_NAME,
+  TRACKER_CREATE_TASK_TOOL_NAME,
+  TRACKER_UPDATE_TASK_TOOL_NAME,
+  TRACKER_GET_TASK_TOOL_NAME,
+  TRACKER_LIST_TASKS_TOOL_NAME,
+  TRACKER_ADD_DEPENDENCY_TOOL_NAME,
+  TRACKER_VISUALIZE_TOOL_NAME,
 ] as const;
 
 /**
