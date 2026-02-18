@@ -138,8 +138,10 @@ describe('ScrollableList Demo Behavior', () => {
     let listRef: ScrollableListRef<Item> | null = null;
     let lastFrame: () => string | undefined;
 
+    let result: ReturnType<typeof render>;
+
     await act(async () => {
-      const result = render(
+      result = render(
         <TestComponent
           onAddItem={(add) => {
             addItem = add;
@@ -192,6 +194,10 @@ describe('ScrollableList Demo Behavior', () => {
       expect(lastFrame!()).toContain('Count: 1003');
     });
     expect(lastFrame!()).not.toContain('Item 1003');
+
+    await act(async () => {
+      result.unmount();
+    });
   });
 
   it('should display sticky header when scrolled past the item', async () => {
@@ -243,8 +249,9 @@ describe('ScrollableList Demo Behavior', () => {
     };
 
     let lastFrame: () => string | undefined;
+    let result: ReturnType<typeof render>;
     await act(async () => {
-      const result = render(<StickyTestComponent />);
+      result = render(<StickyTestComponent />);
       lastFrame = result.lastFrame;
     });
 
@@ -286,6 +293,10 @@ describe('ScrollableList Demo Behavior', () => {
       expect(lastFrame!()).toContain('[Normal] Item 1');
     });
     expect(lastFrame!()).not.toContain('[STICKY] Item 1');
+
+    await act(async () => {
+      result.unmount();
+    });
   });
 
   describe('Keyboard Navigation', () => {
@@ -299,8 +310,9 @@ describe('ScrollableList Demo Behavior', () => {
         title: `Item ${i}`,
       }));
 
+      let result: ReturnType<typeof render>;
       await act(async () => {
-        const result = render(
+        result = render(
           <MouseProvider mouseEventsEnabled={false}>
             <KeypressProvider>
               <ScrollProvider>
@@ -378,6 +390,10 @@ describe('ScrollableList Demo Behavior', () => {
       await waitFor(() => {
         expect(listRef?.getScrollState()?.scrollTop).toBe(0);
       });
+
+      await act(async () => {
+        result.unmount();
+      });
     });
   });
 
@@ -386,8 +402,9 @@ describe('ScrollableList Demo Behavior', () => {
       const items = [{ id: '1', title: 'Item 1' }];
       let lastFrame: () => string | undefined;
 
+      let result: ReturnType<typeof render>;
       await act(async () => {
-        const result = render(
+        result = render(
           <MouseProvider mouseEventsEnabled={false}>
             <KeypressProvider>
               <ScrollProvider>
@@ -410,6 +427,10 @@ describe('ScrollableList Demo Behavior', () => {
 
       await waitFor(() => {
         expect(lastFrame()).toContain('Item 1');
+      });
+
+      await act(async () => {
+        result.unmount();
       });
     });
   });

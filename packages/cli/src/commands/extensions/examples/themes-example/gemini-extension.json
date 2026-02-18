@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "themes": [
     {
-      "name": "shades-of-green-theme",
+      "name": "shades-of-green",
       "type": "custom",
       "background": {
         "primary": "#1a362a"
