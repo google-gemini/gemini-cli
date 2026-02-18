@@ -20,6 +20,7 @@ import {
   type GeminiClient,
   type UserFeedbackPayload,
   SlashCommandStatus,
+  MCPDiscoveryState,
   makeFakeConfig,
   coreEvents,
   CoreEvent,
@@ -389,21 +390,49 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('Command Execution Logic', () => {
-    it('should display an error for an unknown command', async () => {
+    it('should treat unknown commands as regular input', async () => {
       const result = await setupProcessorHook();
       await waitFor(() => expect(result.current.slashCommands).toBeDefined());
 
+      let handled: Awaited<
+        ReturnType<typeof result.current.handleSlashCommand>
+      >;
       await act(async () => {
-        await result.current.handleSlashCommand('/nonexistent');
+        handled = await result.current.handleSlashCommand('/nonexistent');
       });
 
-      // Expect 2 calls: one for the user's input, one for the error message.
-      expect(mockAddItem).toHaveBeenCalledTimes(2);
-      expect(mockAddItem).toHaveBeenLastCalledWith(
-        {
+      // Unknown commands should return false so the input is sent to the model
+      expect(handled!).toBe(false);
+      // Should not add anything to history (the regular flow will handle it)
+      expect(mockAddItem).not.toHaveBeenCalled();
+    });
+
+    it('should show MCP loading warning for unknown commands when MCP is loading', async () => {
+      vi.spyOn(mockConfig, 'getMcpClientManager').mockReturnValue({
+        getDiscoveryState: () => MCPDiscoveryState.IN_PROGRESS,
+      } as ReturnType<typeof mockConfig.getMcpClientManager>);
+
+      const result = await setupProcessorHook();
+      await waitFor(() => expect(result.current.slashCommands).toBeDefined());
+
+      let handled: Awaited<
+        ReturnType<typeof result.current.handleSlashCommand>
+      >;
+      await act(async () => {
+        handled = await result.current.handleSlashCommand('/mcp-command');
+      });
+
+      // When MCP is loading, should handle the command (show warning)
+      expect(handled!).not.toBe(false);
+      // Should add user input and error message to history
+      expect(mockAddItem).toHaveBeenCalledWith(
+        { type: MessageType.USER, text: '/mcp-command' },
+        expect.any(Number),
+      );
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
           type: MessageType.ERROR,
-          text: 'Unknown command: /nonexistent',
-        },
+        }),
         expect.any(Number),
       );
     });
@@ -769,19 +798,17 @@ describe('useSlashCommandProcessor', () => {
       });
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
+      let handled: Awaited<
+        ReturnType<typeof result.current.handleSlashCommand>
+      >;
       await act(async () => {
         // Use uppercase when command is lowercase
-        await result.current.handleSlashCommand('/Test');
+        handled = await result.current.handleSlashCommand('/Test');
       });
 
-      // It should fail and call addItem with an error
-      expect(mockAddItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.ERROR,
-          text: 'Unknown command: /Test',
-        },
-        expect.any(Number),
-      );
+      // Case mismatch means it's not a known command, so treat as regular input
+      expect(handled!).toBe(false);
+      expect(mockAddItem).not.toHaveBeenCalled();
     });
 
     it('should correctly match an altName', async () => {
