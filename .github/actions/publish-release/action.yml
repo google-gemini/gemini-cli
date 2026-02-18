@@ -68,15 +68,19 @@ runs:
       id: 'release_branch'
       shell: 'bash'
       run: |
-        BRANCH_NAME="release/${{ inputs.release-tag }}"
+        BRANCH_NAME="release/${INPUTS_RELEASE_TAG}"
         git switch -c "${BRANCH_NAME}"
         echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
+      env:
+        INPUTS_RELEASE_TAG: ${{ inputs.release-tag }}
 
     - name: '⬆️ Update package versions'
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
       run: |
-        npm run release:version "${{ inputs.release-version }}"
+        npm run release:version "${INPUTS_RELEASE_VERSION}"
+      env:
+        INPUTS_RELEASE_VERSION: ${{ inputs.release-version }}
 
     - name: '💾 Commit and Conditionally Push package versions'
       working-directory: '${{ inputs.working-directory }}'
@@ -114,9 +118,10 @@ runs:
       working-directory: '${{ inputs.working-directory }}'
       env:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-core }}'
+        INPUTS_DRY_RUN: ${{ inputs.dry-run }}
       shell: 'bash'
       run: |
-        if [ "${{ inputs.dry-run }}" == "true" ]; then
+        if [ "${INPUTS_DRY_RUN}" == "true" ]; then
           npm publish --dry-run --workspace="@google/gemini-cli-core" --no-tag
         else
           npm publish --workspace="@google/gemini-cli-core" --no-tag
@@ -127,17 +132,20 @@ runs:
       if: "${{ inputs.dry-run != 'true' }}"
       shell: 'bash'
       run: |
-        npm install "@google/gemini-cli-core@${{ inputs.release-version }}" \
+        npm install "@google/gemini-cli-core@${INPUTS_RELEASE_VERSION}" \
         --workspace="@google/gemini-cli" \
         --save-exact
+      env:
+        INPUTS_RELEASE_VERSION: ${{ inputs.release-version }}
 
     - name: '📦 Publish @google/gemini-cli'
       working-directory: '${{ inputs.working-directory }}'
       env:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-cli }}'
+        INPUTS_DRY_RUN: ${{ inputs.dry-run }}
       shell: 'bash'
       run: |
-        if [ "${{ inputs.dry-run }}" == "true" ]; then
+        if [ "${INPUTS_DRY_RUN}" == "true" ]; then
           npm publish --dry-run --workspace="@google/gemini-cli" --no-tag
         else
           npm publish --workspace="@google/gemini-cli" --no-tag
@@ -173,13 +181,16 @@ runs:
       if: "${{ inputs.dry-run != 'true' && inputs.skip-github-release != 'true' && inputs.npm-tag != 'dev' }}"
       env:
         GITHUB_TOKEN: '${{ inputs.github-token }}'
+        INPUTS_RELEASE_TAG: ${{ inputs.release-tag }}
+        STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME: ${{ steps.release_branch.outputs.BRANCH_NAME }}
+        INPUTS_PREVIOUS_TAG: ${{ inputs.previous-tag }}
       shell: 'bash'
       run: |
-        gh release create "${{ inputs.release-tag }}" \
+        gh release create "${INPUTS_RELEASE_TAG}" \
           bundle/gemini.js \
-          --target "${{ steps.release_branch.outputs.BRANCH_NAME }}" \
-          --title "Release ${{ inputs.release-tag }}" \
-          --notes-start-tag "${{ inputs.previous-tag }}" \
+          --target "${STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME}" \
+          --title "Release ${INPUTS_RELEASE_TAG}" \
+          --notes-start-tag "${INPUTS_PREVIOUS_TAG}" \
           --generate-notes
 
     - name: '🧹 Clean up release branch'
@@ -188,5 +199,8 @@ runs:
       continue-on-error: true
       shell: 'bash'
       run: |
-        echo "Cleaning up release branch ${{ steps.release_branch.outputs.BRANCH_NAME }}..."
-        git push origin --delete "${{ steps.release_branch.outputs.BRANCH_NAME }}"
+        echo "Cleaning up release branch ${STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME}..."
+        git push origin --delete "${STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME}"
+
+      env:
+        STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME: ${{ steps.release_branch.outputs.BRANCH_NAME }}
