@@ -19,84 +19,10 @@ import { useMemo, memo, useCallback, useEffect, useRef } from 'react';
 import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
-import { CoreToolCallStatus } from '@google/gemini-cli-core';
-import { isShellTool } from './messages/ToolShared.js';
-import { theme } from '../semantic-colors.js';
-import type {
-  HistoryItem,
-  HistoryItemWithoutId,
-  HistoryItemToolGroup,
-} from '../types.js';
-import type { UIState } from '../contexts/UIStateContext.js';
+import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
-
-/**
- * Calculates the border color and dimming state for a tool group message.
- */
-export function getToolGroupBorderAppearance(
-  item: HistoryItem | HistoryItemWithoutId,
-  activeShellPtyId: number | null | undefined,
-  embeddedShellFocused: boolean | undefined,
-  allPendingItems: HistoryItemWithoutId[],
-  backgroundShells: UIState['backgroundShells'],
-): { borderColor: string; borderDimColor: boolean } {
-  if (item.type !== 'tool_group') {
-    return { borderColor: '', borderDimColor: false };
-  }
-
-  // If this item has no tools, it's a closing slice for the current batch.
-  // We need to look at the last pending item to determine the batch's appearance.
-  const toolsToInspect =
-    item.tools.length > 0
-      ? item.tools
-      : allPendingItems
-          .filter(
-            (i): i is HistoryItemToolGroup =>
-              i !== null && i !== undefined && i.type === 'tool_group',
-          )
-          .slice(-1)
-          .flatMap((i) => i.tools);
-
-  const hasPending = toolsToInspect.some(
-    (t) =>
-      t.status !== CoreToolCallStatus.Success &&
-      t.status !== CoreToolCallStatus.Error &&
-      t.status !== CoreToolCallStatus.Cancelled,
-  );
-
-  const isEmbeddedShellFocused = toolsToInspect.some(
-    (t) =>
-      isShellTool(t.name) &&
-      t.status === CoreToolCallStatus.Executing &&
-      t.ptyId === activeShellPtyId &&
-      !!embeddedShellFocused,
-  );
-
-  const isShellCommand = toolsToInspect.some((t) => isShellTool(t.name));
-
-  // If we have an active PTY that isn't a background shell, then the current
-  // pending batch is definitely a shell batch.
-  const isCurrentlyInShellTurn =
-    !!activeShellPtyId && !backgroundShells.has(activeShellPtyId);
-
-  const isShell =
-    isShellCommand || (item.tools.length === 0 && isCurrentlyInShellTurn);
-  const isPending =
-    hasPending || (item.tools.length === 0 && isCurrentlyInShellTurn);
-
-  const borderColor =
-    (isShell && isPending) || isEmbeddedShellFocused
-      ? theme.ui.symbol
-      : isPending
-        ? theme.status.warning
-        : theme.border.default;
-
-  const borderDimColor = isPending && (!isShell || !isEmbeddedShellFocused);
-
-  return { borderColor, borderDimColor };
-}
 
 // Limit Gemini messages to a very high number of lines to mitigate performance
 // issues in the worst case if we somehow get an enormous response from Gemini.

@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import { useMemo } from 'react';
+import { theme } from '../semantic-colors.js';
 import { escapeAnsiCtrlCodes } from '../utils/textUtils.js';
 import type { HistoryItem } from '../types.js';
 import { UserMessage } from './messages/UserMessage.js';
@@ -185,7 +186,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           embeddedShellFocused={embeddedShellFocused}
           borderTop={itemForDisplay.borderTop}
           borderBottom={itemForDisplay.borderBottom}
-          borderColor={borderColor ?? ''}
+          borderColor={borderColor ?? theme.border.default}
           borderDimColor={borderDimColor ?? false}
         />
       )}

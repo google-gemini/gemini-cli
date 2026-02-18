@@ -6,7 +6,8 @@
 
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
-import { MainContent, getToolGroupBorderAppearance } from './MainContent.js';
+import { MainContent } from './MainContent.js';
+import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Box, Text } from 'ink';
 import { act, useState, type JSX } from 'react';

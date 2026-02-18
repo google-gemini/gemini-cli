@@ -79,10 +79,7 @@ import {
   type TrackedExecutingToolCall,
 } from './useToolScheduler.js';
 import { theme } from '../semantic-colors.js';
-import {
-  isShellTool,
-  isThisShellFocused,
-} from '../components/messages/ToolShared.js';
+import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
@@ -123,42 +120,6 @@ function showCitations(settings: LoadedSettings): boolean {
     return enabled;
   }
   return true;
-}
-
-export function getToolGroupBorderAppearance(
-  toolCalls: TrackedToolCall[],
-  activeShellPtyId: number | null,
-  embeddedShellFocused: boolean,
-): { borderColor: string; borderDimColor: boolean } {
-  const hasPending = toolCalls.some(
-    (t) =>
-      t.status !== 'success' &&
-      t.status !== 'error' &&
-      t.status !== 'cancelled',
-  );
-
-  const isEmbeddedShellFocused = toolCalls.some((t) =>
-    isThisShellFocused(
-      t.request.name,
-      t.status,
-      t.status === 'executing' ? t.pid : undefined,
-      activeShellPtyId,
-      embeddedShellFocused,
-    ),
-  );
-
-  const isShellCommand = toolCalls.some((t) => isShellTool(t.request.name));
-  const borderColor =
-    (isShellCommand && hasPending) || isEmbeddedShellFocused
-      ? theme.ui.symbol
-      : hasPending
-        ? theme.status.warning
-        : theme.border.default;
-
-  const borderDimColor =
-    hasPending && (!isShellCommand || !isEmbeddedShellFocused);
-
-  return { borderColor, borderDimColor };
 }
 
 /**
@@ -430,9 +391,11 @@ export const useGeminiStream = (
           borderTop: isFirst,
           borderBottom: isLastInBatch,
           ...getToolGroupBorderAppearance(
-            toolCalls,
+            { type: 'tool_group', tools: toolCalls },
             activeShellPtyId,
             !!isShellFocused,
+            [],
+            backgroundShells,
           ),
         });
         addItem(historyItem);
@@ -451,6 +414,7 @@ export const useGeminiStream = (
     addItem,
     activeShellPtyId,
     isShellFocused,
+    backgroundShells,
   ]);
 
   const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
@@ -461,9 +425,11 @@ export const useGeminiStream = (
     const items: HistoryItemWithoutId[] = [];
 
     const appearance = getToolGroupBorderAppearance(
-      toolCalls,
+      { type: 'tool_group', tools: toolCalls },
       activeShellPtyId,
       !!isShellFocused,
+      [],
+      backgroundShells,
     );
 
     if (remainingTools.length > 0) {
@@ -524,7 +490,13 @@ export const useGeminiStream = (
     }
 
     return items;
-  }, [toolCalls, pushedToolCallIds, activeShellPtyId, isShellFocused]);
+  }, [
+    toolCalls,
+    pushedToolCallIds,
+    activeShellPtyId,
+    isShellFocused,
+    backgroundShells,
+  ]);
 
   const lastQueryRef = useRef<PartListUnion | null>(null);
   const lastPromptIdRef = useRef<string | null>(null);
