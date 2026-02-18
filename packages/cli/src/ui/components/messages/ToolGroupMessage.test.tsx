@@ -7,7 +7,11 @@
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
-import type { IndividualToolCallDisplay } from '../../types.js';
+import type {
+  HistoryItem,
+  HistoryItemWithoutId,
+  IndividualToolCallDisplay,
+} from '../../types.js';
 import { Scrollable } from '../shared/Scrollable.js';
 import {
   makeFakeConfig,
@@ -40,9 +44,16 @@ describe('<ToolGroupMessage />', () => {
   });
 
   const baseProps = {
-    groupId: 1,
     terminalWidth: 80,
   };
+
+  const createItem = (
+    tools: IndividualToolCallDisplay[],
+  ): HistoryItem | HistoryItemWithoutId => ({
+    id: 1,
+    type: 'tool_group',
+    tools,
+  });
 
   const baseMockConfig = makeFakeConfig({
     model: 'gemini-pro',
@@ -56,12 +67,18 @@ describe('<ToolGroupMessage />', () => {
   describe('Golden Snapshots', () => {
     it('renders single successful tool call', () => {
       const toolCalls = [createToolCall()];
+      const item = createItem(toolCalls);
       const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
@@ -81,9 +98,10 @@ describe('<ToolGroupMessage />', () => {
           },
         }),
       ];
+      const item = createItem(toolCalls);
 
       const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         { config: baseMockConfig },
       );
 
@@ -113,13 +131,19 @@ describe('<ToolGroupMessage />', () => {
           status: CoreToolCallStatus.Error,
         }),
       ];
+      const item = createItem(toolCalls);
 
       const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
@@ -153,13 +177,19 @@ describe('<ToolGroupMessage />', () => {
           status: CoreToolCallStatus.Scheduled,
         }),
       ];
+      const item = createItem(toolCalls);
 
       const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
@@ -188,16 +218,23 @@ describe('<ToolGroupMessage />', () => {
           resultDisplay: 'More output here',
         }),
       ];
+      const item = createItem(toolCalls);
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
+          item={item}
           toolCalls={toolCalls}
           availableTerminalHeight={10}
         />,
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
@@ -213,16 +250,23 @@ describe('<ToolGroupMessage />', () => {
             'This is a very long description that might cause wrapping issues',
         }),
       ];
+      const item = createItem(toolCalls);
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
+          item={item}
           toolCalls={toolCalls}
           terminalWidth={40}
         />,
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
@@ -231,12 +275,19 @@ describe('<ToolGroupMessage />', () => {
     });
 
     it('renders empty tool calls array', () => {
+      const toolCalls: IndividualToolCallDisplay[] = [];
+      const item = createItem(toolCalls);
       const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={[]} />,
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: [] }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: [],
+              },
+            ],
           },
         },
       );
@@ -260,14 +311,20 @@ describe('<ToolGroupMessage />', () => {
           resultDisplay: 'line1\nline2',
         }),
       ];
+      const item = createItem(toolCalls);
       const { lastFrame, unmount } = renderWithProviders(
         <Scrollable height={10} hasFocus={true} scrollToBottom={true}>
-          <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />
+          <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />
         </Scrollable>,
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
@@ -285,12 +342,18 @@ describe('<ToolGroupMessage />', () => {
           outputFile: '/path/to/output.txt',
         }),
       ];
+      const item = createItem(toolCalls);
       const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
@@ -307,6 +370,7 @@ describe('<ToolGroupMessage />', () => {
           resultDisplay: 'line1\nline2\nline3\nline4\nline5',
         }),
       ];
+      const item1 = createItem(toolCalls1);
       const toolCalls2 = [
         createToolCall({
           callId: '2',
@@ -315,18 +379,33 @@ describe('<ToolGroupMessage />', () => {
           resultDisplay: 'line1',
         }),
       ];
+      const item2 = createItem(toolCalls2);
 
       const { lastFrame, unmount } = renderWithProviders(
         <Scrollable height={6} hasFocus={true} scrollToBottom={true}>
-          <ToolGroupMessage {...baseProps} toolCalls={toolCalls1} />
-          <ToolGroupMessage {...baseProps} toolCalls={toolCalls2} />
+          <ToolGroupMessage
+            {...baseProps}
+            item={item1}
+            toolCalls={toolCalls1}
+          />
+          <ToolGroupMessage
+            {...baseProps}
+            item={item2}
+            toolCalls={toolCalls2}
+          />
         </Scrollable>,
         {
           config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [
-              { type: 'tool_group', tools: toolCalls1 },
-              { type: 'tool_group', tools: toolCalls2 },
+              {
+                type: 'tool_group',
+                tools: toolCalls1,
+              },
+              {
+                type: 'tool_group',
+                tools: toolCalls2,
+              },
             ],
           },
         },
@@ -344,12 +423,18 @@ describe('<ToolGroupMessage />', () => {
           status: CoreToolCallStatus.Success,
         }),
       ];
+      const item = createItem(toolCalls);
       const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
@@ -366,12 +451,18 @@ describe('<ToolGroupMessage />', () => {
           status: CoreToolCallStatus.Success,
         }),
       ];
+      const item = createItem(toolCalls);
       const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
@@ -396,16 +487,23 @@ describe('<ToolGroupMessage />', () => {
           resultDisplay: '', // No result
         }),
       ];
+      const item = createItem(toolCalls);
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
+          item={item}
           toolCalls={toolCalls}
           availableTerminalHeight={20}
         />,
         {
           config: baseMockConfig,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
@@ -453,9 +551,10 @@ describe('<ToolGroupMessage />', () => {
             resultDisplay,
           }),
         ];
+        const item = createItem(toolCalls);
 
         const { lastFrame, unmount } = renderWithProviders(
-          <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+          <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
           { config: baseMockConfig },
         );
 
@@ -481,9 +580,10 @@ describe('<ToolGroupMessage />', () => {
           status: CoreToolCallStatus.Scheduled,
         }),
       ];
+      const item = createItem(toolCalls);
 
       const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         { config: baseMockConfig },
       );
 
@@ -502,10 +602,12 @@ describe('<ToolGroupMessage />', () => {
           status: CoreToolCallStatus.Executing,
         }),
       ];
+      const item = createItem(toolCalls);
 
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
+          item={item}
           toolCalls={toolCalls}
           borderBottom={false}
         />,
@@ -540,9 +642,10 @@ describe('<ToolGroupMessage />', () => {
           approvalMode: mode,
         }),
       ];
+      const item = createItem(toolCalls);
 
       const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         { config: baseMockConfig },
       );
 
