@@ -46,6 +46,7 @@ import type { SlashCommandProcessorResult } from '../types.js';
 import { MessageType, StreamingState } from '../types.js';
 
 import type { LoadedSettings } from '../../config/settings.js';
+import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
 
 // --- MOCKS ---
 const mockSendMessageStream = vi
@@ -3318,6 +3319,90 @@ describe('useGeminiStream', () => {
           expect.any(Number),
         );
       });
+    });
+  });
+
+  describe('Stream Splitting', () => {
+    it('should not add empty history item when splitting message results in empty or whitespace-only beforeText', async () => {
+      // Mock split point to always be 0, causing beforeText to be empty
+      vi.mocked(findLastSafeSplitPoint).mockReturnValue(0);
+
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield { type: ServerGeminiEventType.Content, value: 'test content' };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('user query');
+      });
+
+      await waitFor(() => {
+        // We expect the stream to be processed.
+        // Since beforeText is empty (0 split), addItem should NOT be called for it.
+        // addItem IS called for the user query "user query".
+      });
+
+      // Check addItem calls.
+      // It should be called for user query and for the content.
+      expect(mockAddItem).toHaveBeenCalledTimes(2);
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'user', text: 'user query' }),
+        expect.any(Number),
+      );
+      expect(mockAddItem).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          type: 'gemini_content',
+          text: 'test content',
+        }),
+        expect.any(Number),
+      );
+
+      // Verify that pendingHistoryItem is empty after (afterText).
+      expect(result.current.pendingHistoryItems.length).toEqual(0);
+
+      // Reset mock
+      vi.mocked(findLastSafeSplitPoint).mockReset();
+      vi.mocked(findLastSafeSplitPoint).mockImplementation(
+        (s: string) => s.length,
+      );
+    });
+
+    it('should add whitespace-only history item when splitting message', async () => {
+      // Input: "   content"
+      // Split at 3 -> before: "   ", after: "content"
+      vi.mocked(findLastSafeSplitPoint).mockReturnValue(3);
+
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield { type: ServerGeminiEventType.Content, value: '   content' };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('user query');
+      });
+
+      await waitFor(() => {});
+
+      expect(mockAddItem).toHaveBeenCalledTimes(3);
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'user', text: 'user query' }),
+        expect.any(Number),
+      );
+      expect(mockAddItem).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          type: 'gemini_content',
+          text: 'content',
+        }),
+        expect.any(Number),
+      );
+
+      expect(result.current.pendingHistoryItems.length).toEqual(0);
     });
   });
 });
