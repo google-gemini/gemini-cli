@@ -1595,7 +1595,8 @@ const SETTINGS_SCHEMA = {
             category: 'Experimental',
             requiresRestart: true,
             default: false,
-            description: 'Enable the Gemma Model Router.',
+            description:
+              'Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
             showInDialog: true,
           },
           classifier: {
@@ -1622,7 +1623,8 @@ const SETTINGS_SCHEMA = {
                 category: 'Experimental',
                 requiresRestart: true,
                 default: 'gemma3-1b-gpu-custom',
-                description: 'The model to use for the classifier.',
+                description:
+                  'The model to use for the classifier. Only tested on `gemma3-1b-gpu-custom`.',
                 showInDialog: false,
               },
             },

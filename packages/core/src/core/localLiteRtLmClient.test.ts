@@ -99,4 +99,27 @@ describe('LocalLiteRtLmClient', () => {
 test-reminder`,
     );
   });
+
+  it('should pass abortSignal to generateContent', async () => {
+    mockGenerateContent.mockResolvedValue({
+      text: '{"key": "value"}',
+    });
+
+    const client = new LocalLiteRtLmClient(mockConfig);
+    const controller = new AbortController();
+    await client.generateJson(
+      [],
+      'test-instruction',
+      undefined,
+      controller.signal,
+    );
+
+    expect(mockGenerateContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          abortSignal: controller.signal,
+        }),
+      }),
+    );
+  });
 });

@@ -420,7 +420,9 @@ describe('SettingsSchema', () => {
       expect(enabled.default).toBe(false);
       expect(enabled.requiresRestart).toBe(true);
       expect(enabled.showInDialog).toBe(true);
-      expect(enabled.description).toBe('Enable the Gemma Model Router.');
+      expect(enabled.description).toBe(
+        'Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
+      );
 
       const classifier = gemmaModelRouter.properties.classifier;
       expect(classifier).toBeDefined();
@@ -447,7 +449,9 @@ describe('SettingsSchema', () => {
       expect(model.default).toBe('gemma3-1b-gpu-custom');
       expect(model.requiresRestart).toBe(true);
       expect(model.showInDialog).toBe(false);
-      expect(model.description).toBe('The model to use for the classifier.');
+      expect(model.description).toBe(
+        'The model to use for the classifier. Only tested on `gemma3-1b-gpu-custom`.',
+      );
     });
   });
 

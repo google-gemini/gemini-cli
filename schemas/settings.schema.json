@@ -1524,8 +1524,8 @@
           "properties": {
             "enabled": {
               "title": "Enable Gemma Model Router",
-              "description": "Enable the Gemma Model Router.",
-              "markdownDescription": "Enable the Gemma Model Router.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "description": "Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.",
+              "markdownDescription": "Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
               "default": false,
               "type": "boolean"
             },
@@ -1545,8 +1545,8 @@
                 },
                 "model": {
                   "title": "Model",
-                  "description": "The model to use for the classifier.",
-                  "markdownDescription": "The model to use for the classifier.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `gemma3-1b-gpu-custom`",
+                  "description": "The model to use for the classifier. Only tested on `gemma3-1b-gpu-custom`.",
+                  "markdownDescription": "The model to use for the classifier. Only tested on `gemma3-1b-gpu-custom`.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `gemma3-1b-gpu-custom`",
                   "default": "gemma3-1b-gpu-custom",
                   "type": "string"
                 }

@@ -10,6 +10,7 @@ export default defineConfig({
   test: {
     reporters: ['default', 'junit'],
     timeout: 30000,
+    testTimeout: 10000,
     hookTimeout: 30000,
     silent: true,
     setupFiles: ['./test-setup.ts'],
