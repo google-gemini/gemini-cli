@@ -166,6 +166,8 @@ const baseMockUiState = {
     proQuotaRequest: null,
     validationRequest: null,
   },
+  hintMode: false,
+  hintBuffer: '',
 };
 
 export const mockAppState: AppState = {
@@ -219,6 +221,10 @@ const mockUIActions: UIActions = {
   setActiveBackgroundShellPid: vi.fn(),
   setIsBackgroundShellListOpen: vi.fn(),
   setAuthContext: vi.fn(),
+  onHintInput: vi.fn(),
+  onHintBackspace: vi.fn(),
+  onHintClear: vi.fn(),
+  onHintSubmit: vi.fn(),
   handleRestart: vi.fn(),
   handleNewAgentsSelect: vi.fn(),
 };

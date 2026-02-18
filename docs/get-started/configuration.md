@@ -121,6 +121,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable update notification prompts.
   - **Default:** `true`
 
+- **`general.enableNotifications`** (boolean):
+  - **Description:** Enable run-event notifications for action-required prompts
+    and session completion. Currently macOS only.
+  - **Default:** `false`
+
 - **`general.checkpointing.enabled`** (boolean):
   - **Description:** Enable session checkpointing for recovery
   - **Default:** `false`
@@ -939,6 +944,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable planning features (Plan Mode and tools).
   - **Default:** `false`
   - **Requires restart:** Yes
+
+- **`experimental.modelSteering`** (boolean):
+  - **Description:** Enable model steering (user hints) to guide the model
+    during tool execution.
+  - **Default:** `false`
 
 #### `skills`
 

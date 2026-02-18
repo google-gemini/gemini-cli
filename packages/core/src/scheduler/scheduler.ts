@@ -39,6 +39,11 @@ import {
   type ToolConfirmationRequest,
 } from '../confirmation-bus/types.js';
 import { runWithToolCallContext } from '../utils/toolCallContext.js';
+import {
+  coreEvents,
+  CoreEvent,
+  type McpProgressPayload,
+} from '../utils/events.js';
 
 interface SchedulerQueueItem {
   requests: ToolCallRequestInfo[];
@@ -115,7 +120,24 @@ export class Scheduler {
     this.modifier = new ToolModificationHandler();
 
     this.setupMessageBusListener(this.messageBus);
+
+    coreEvents.on(CoreEvent.McpProgress, this.handleMcpProgress);
   }
+
+  dispose(): void {
+    coreEvents.off(CoreEvent.McpProgress, this.handleMcpProgress);
+  }
+
+  private readonly handleMcpProgress = (payload: McpProgressPayload) => {
+    const callId = payload.callId;
+    this.state.updateStatus(callId, CoreToolCallStatus.Executing, {
+      progressMessage: payload.message,
+      progressPercent:
+        payload.total && payload.total > 0
+          ? (payload.progress / payload.total) * 100
+          : undefined,
+    });
+  };
 
   private setupMessageBusListener(messageBus: MessageBus): void {
     if (Scheduler.subscribedMessageBuses.has(messageBus)) {

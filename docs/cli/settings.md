@@ -27,6 +27,7 @@ they appear in the UI.
 | Vim Mode                 | `general.vimMode`                  | Enable Vim keybindings                                                                                                                                                         | `false`     |
 | Default Approval Mode    | `general.defaultApprovalMode`      | The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet. | `"default"` |
 | Enable Auto Update       | `general.enableAutoUpdate`         | Enable automatic updates.                                                                                                                                                      | `true`      |
+| Enable Notifications     | `general.enableNotifications`      | Enable run-event notifications for action-required prompts and session completion. Currently macOS only.                                                                       | `false`     |
 | Enable Prompt Completion | `general.enablePromptCompletion`   | Enable AI-powered prompt completion suggestions while typing.                                                                                                                  | `false`     |
 | Debug Keystroke Logging  | `general.debugKeystrokeLogging`    | Enable debug logging of keystrokes to the console.                                                                                                                             | `false`     |
 | Enable Session Cleanup   | `general.sessionRetention.enabled` | Enable automatic session cleanup                                                                                                                                               | `false`     |
@@ -131,6 +132,7 @@ they appear in the UI.
 | Enable Tool Output Masking | `experimental.toolOutputMasking.enabled` | Enables tool output masking to save tokens.                                         | `true`  |
 | Use OSC 52 Paste           | `experimental.useOSC52Paste`             | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false` |
 | Plan                       | `experimental.plan`                      | Enable planning features (Plan Mode and tools).                                     | `false` |
+| Model Steering             | `experimental.modelSteering`             | Enable model steering (user hints) to guide the model during tool execution.        | `false` |
 
 ### Skills
 
