@@ -13,14 +13,14 @@ npm install -g @google/gemini-cli@preview
 
 ## Highlights
 
-- Introduced the initial SDK package with support for custom skills and dynamic
+- **Initial SDK Package:** Introduced the initial SDK package with support for custom skills and dynamic
   system instructions.
-- Refined Plan Mode with support for enabling skills, improved agentic
+- **Refined Plan Mode:** Refined Plan Mode with support for enabling skills, improved agentic
   execution, and project exploration without planning.
-- Enhanced CLI UI with a new clean UI toggle, minimal-mode bleed-through, and
+- **Enhanced CLI UI:** Enhanced CLI UI with a new clean UI toggle, minimal-mode bleed-through, and
   support for Ctrl-Z suspension.
-- Added the `--policy` flag to support user-defined policies.
-- Added Solarized Dark and Solarized Light themes.
+- **`--policy` flag:** Added the `--policy` flag to support user-defined policies.
+- **New Themes:** Added Solarized Dark and Solarized Light themes.
 
 ## What's Changed
 
