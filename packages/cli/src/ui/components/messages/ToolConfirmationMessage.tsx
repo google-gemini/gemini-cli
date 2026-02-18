@@ -326,7 +326,7 @@ export const ToolConfirmationMessage: React.FC<
     } else if (confirmationDetails.type === 'mcp') {
       // mcp tool confirmation
       const mcpProps = confirmationDetails;
-      question = `Allow execution of MCP tool "${sanitizeForDisplay(mcpProps.toolName)}" from server "${sanitizeForDisplay(mcpProps.serverName)}"?`;
+      question = `Allow execution of MCP tool "${stripUnsafeCharacters(mcpProps.toolName)}" from server "${stripUnsafeCharacters(mcpProps.serverName)}"?`;
     }
 
     if (confirmationDetails.type === 'edit') {
