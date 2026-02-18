@@ -15,6 +15,8 @@ import { Holiday } from './builtin/dark/holiday.js';
 import { DefaultLight } from './builtin/light/default-light.js';
 import { DefaultDark } from './builtin/dark/default.js';
 import { ShadesOfPurple } from './builtin/dark/shades-of-purple.js';
+import { SolarizedDark } from './builtin/dark/solarized-dark.js';
+import { SolarizedLight } from './builtin/light/solarized-light.js';
 import { XCode } from './builtin/light/xcode.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -68,6 +70,8 @@ class ThemeManager {
       GoogleCode,
       Holiday,
       ShadesOfPurple,
+      SolarizedDark,
+      SolarizedLight,
       XCode,
       ANSI,
       ANSILight,

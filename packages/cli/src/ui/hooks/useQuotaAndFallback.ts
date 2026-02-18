@@ -83,16 +83,21 @@ export function useQuotaAndFallback({
           `/auth to switch to API key.`,
         ].filter(Boolean);
         message = messageLines.join('\n');
-      } else if (
-        error instanceof ModelNotFoundError &&
-        VALID_GEMINI_MODELS.has(failedModel)
-      ) {
+      } else if (error instanceof ModelNotFoundError) {
         isModelNotFoundError = true;
-        const messageLines = [
-          `It seems like you don't have access to ${failedModel}.`,
-          `Your admin might have disabled the access. Contact them to enable the Preview Release Channel.`,
-        ];
-        message = messageLines.join('\n');
+        if (VALID_GEMINI_MODELS.has(failedModel)) {
+          const messageLines = [
+            `It seems like you don't have access to ${failedModel}.`,
+            `Your admin might have disabled the access. Contact them to enable the Preview Release Channel.`,
+          ];
+          message = messageLines.join('\n');
+        } else {
+          const messageLines = [
+            `Model "${failedModel}" was not found or is invalid.`,
+            `/model to switch models.`,
+          ];
+          message = messageLines.join('\n');
+        }
       } else {
         const messageLines = [
           `We are currently experiencing high demand.`,

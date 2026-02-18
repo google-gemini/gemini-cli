@@ -656,7 +656,10 @@ export class GeminiClient {
     }
 
     // availability logic
-    const modelConfigKey: ModelConfigKey = { model: modelToUse };
+    const modelConfigKey: ModelConfigKey = {
+      model: modelToUse,
+      isChatModel: true,
+    };
     const { model: finalModel } = applyModelSelection(
       this.config,
       modelConfigKey,
