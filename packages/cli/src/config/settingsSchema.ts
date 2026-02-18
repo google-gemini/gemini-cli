@@ -236,6 +236,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable update notification prompts.',
         showInDialog: false,
       },
+      enableNotifications: {
+        type: 'boolean',
+        label: 'Enable Notifications',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable run-event notifications for action-required prompts and session completion. Currently macOS only.',
+        showInDialog: true,
+      },
       checkpointing: {
         type: 'object',
         label: 'Checkpointing',

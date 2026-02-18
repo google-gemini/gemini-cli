@@ -72,7 +72,7 @@ describe('useFocus', () => {
   it('should initialize with focus and enable focus reporting', () => {
     const { result } = renderFocusHook();
 
-    expect(result.current).toBe(true);
+    expect(result.current.isFocused).toBe(true);
     expect(stdout.write).toHaveBeenCalledWith('\x1b[?1004h');
   });
 
@@ -80,7 +80,7 @@ describe('useFocus', () => {
     const { result } = renderFocusHook();
 
     // Initial state is focused
-    expect(result.current).toBe(true);
+    expect(result.current.isFocused).toBe(true);
 
     // Simulate focus-out event
     act(() => {
@@ -88,7 +88,7 @@ describe('useFocus', () => {
     });
 
     // State should now be unfocused
-    expect(result.current).toBe(false);
+    expect(result.current.isFocused).toBe(false);
   });
 
   it('should set isFocused to true when a focus-in event is received', () => {
@@ -98,7 +98,7 @@ describe('useFocus', () => {
     act(() => {
       stdin.emit('data', '\x1b[O');
     });
-    expect(result.current).toBe(false);
+    expect(result.current.isFocused).toBe(false);
 
     // Simulate focus-in event
     act(() => {
@@ -106,7 +106,7 @@ describe('useFocus', () => {
     });
 
     // State should now be focused
-    expect(result.current).toBe(true);
+    expect(result.current.isFocused).toBe(true);
   });
 
   it('should clean up and disable focus reporting on unmount', () => {
@@ -130,22 +130,22 @@ describe('useFocus', () => {
     act(() => {
       stdin.emit('data', '\x1b[O');
     });
-    expect(result.current).toBe(false);
+    expect(result.current.isFocused).toBe(false);
 
     act(() => {
       stdin.emit('data', '\x1b[O');
     });
-    expect(result.current).toBe(false);
+    expect(result.current.isFocused).toBe(false);
 
     act(() => {
       stdin.emit('data', '\x1b[I');
     });
-    expect(result.current).toBe(true);
+    expect(result.current.isFocused).toBe(true);
 
     act(() => {
       stdin.emit('data', '\x1b[I');
     });
-    expect(result.current).toBe(true);
+    expect(result.current.isFocused).toBe(true);
   });
 
   it('restores focus on keypress after focus is lost', () => {
@@ -155,12 +155,25 @@ describe('useFocus', () => {
     act(() => {
       stdin.emit('data', '\x1b[O');
     });
-    expect(result.current).toBe(false);
+    expect(result.current.isFocused).toBe(false);
 
     // Simulate a keypress
     act(() => {
       stdin.emit('data', 'a');
     });
-    expect(result.current).toBe(true);
+    expect(result.current.isFocused).toBe(true);
+  });
+
+  it('tracks whether any focus event has been received', () => {
+    const { result } = renderFocusHook();
+
+    expect(result.current.hasReceivedFocusEvent).toBe(false);
+
+    act(() => {
+      stdin.emit('data', '\x1b[O');
+    });
+
+    expect(result.current.hasReceivedFocusEvent).toBe(true);
+    expect(result.current.isFocused).toBe(false);
   });
 });
