@@ -88,8 +88,6 @@ export const MainContent = () => {
             terminalWidth={mainAreaWidth}
             item={{ ...item, id: 0 }}
             isPending={true}
-            activeShellPtyId={uiState.activePtyId}
-            embeddedShellFocused={uiState.embeddedShellFocused}
           />
         ))}
         {showConfirmationQueue && confirmingTool && (
@@ -103,8 +101,6 @@ export const MainContent = () => {
       isAlternateBuffer,
       availableTerminalHeight,
       mainAreaWidth,
-      uiState.activePtyId,
-      uiState.embeddedShellFocused,
       showConfirmationQueue,
       confirmingTool,
     ],
