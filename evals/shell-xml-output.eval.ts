@@ -37,19 +37,24 @@ cat <<EOF
 </html>
 EOF
 
-After running the command, tell me:
-1. The title of the page.
-2. The value of the 'data-auth' attribute for the div with id 'telemetry'.
-3. The CPU metric value.
-4. What markers were mentioned in the telemetry paragraph.`,
+After running the command, provide the answer as a JSON object with the following keys:
+- "title": The title of the page.
+- "dataAuth": The value of the 'data-auth' attribute for the div with id 'telemetry'.
+- "cpuMetric": The CPU metric value.
+- "markers": An array of markers mentioned in the telemetry paragraph.`,
     assert: async (rig, result) => {
       await rig.waitForToolCall('run_shell_command');
-      const lowerResult = result.toLowerCase();
-      expect(lowerResult).toContain('system diagnostic report');
-      expect(result).toContain('SECRET_123');
-      expect(result).toContain('12%');
-      expect(result).toContain('</output>');
-      expect(result).toContain(']]>');
+      const jsonMatch = result.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error(`Expected JSON output but none found in: ${result}`);
+      }
+      const data = JSON.parse(jsonMatch[0]);
+      expect(data.title).toMatch(/system diagnostic report/i);
+      expect(data.dataAuth).toBe('SECRET_123');
+      expect(data.cpuMetric).toContain('12%');
+      const trimmedMarkers = data.markers.map((m: string) => m.trim());
+      expect(trimmedMarkers).toContain('</output>');
+      expect(trimmedMarkers).toContain(']]>');
     },
   });
 
