@@ -40,7 +40,7 @@ Gemini CLI uses this tool to ensure technical accuracy:
 
 ## Next steps
 
-- Explore the [Command reference](../cli/commands.md) for a detailed guide to
-  slash commands.
-- See the [Configuration guide](../get-started/configuration.md) for settings
+- Explore the [Command reference](../reference/commands.md) for a detailed guide
+  to slash commands.
+- See the [Configuration guide](../reference/configuration.md) for settings
   reference.
