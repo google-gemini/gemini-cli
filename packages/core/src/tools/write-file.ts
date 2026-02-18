@@ -356,6 +356,8 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         );
       }
 
+      llmSuccessMessageParts.push(`Here is the updated code:\n${finalContent}`);
+
       // Log file operation for telemetry (without diff_stat to avoid double-counting)
       const mimetype = getSpecificMimeType(this.resolvedPath);
       const programmingLanguage = getLanguageFromFilePath(this.resolvedPath);

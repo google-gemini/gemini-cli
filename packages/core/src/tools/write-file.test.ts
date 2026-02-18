@@ -831,6 +831,20 @@ describe('WriteFileTool', () => {
         }
       },
     );
+
+    it('should include the file content in llmContent', async () => {
+      const filePath = path.join(rootDir, 'content_check.txt');
+      const content = 'This is the content that should be returned.';
+      mockEnsureCorrectFileContent.mockResolvedValue(content);
+
+      const params = { file_path: filePath, content };
+      const invocation = tool.build(params);
+
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('Here is the updated code:');
+      expect(result.llmContent).toContain(content);
+    });
   });
 
   describe('workspace boundary validation', () => {
