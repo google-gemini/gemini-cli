@@ -789,7 +789,7 @@ export const useGeminiStream = (
         // broken up so that there are more "statically" rendered.
         const beforeText = newGeminiMessageBuffer.substring(0, splitPoint);
         const afterText = newGeminiMessageBuffer.substring(splitPoint);
-        if (beforeText.trim().length > 0) {
+        if (beforeText.length > 0) {
           addItem(
             {
               // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
