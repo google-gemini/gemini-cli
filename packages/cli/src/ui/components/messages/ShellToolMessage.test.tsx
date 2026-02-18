@@ -88,20 +88,16 @@ describe('<ShellToolMessage />', () => {
           CoreToolCallStatus.Executing,
         );
         updateStatus = setStatus;
-        return (
-          <ShellToolMessage
-            {...baseProps}
-            status={status}
-            embeddedShellFocused={true}
-            activeShellPtyId={1}
-            ptyId={1}
-          />
-        );
+        return <ShellToolMessage {...baseProps} status={status} ptyId={1} />;
       };
 
       const { lastFrame } = renderWithProviders(<Wrapper />, {
         uiActions,
-        uiState: { streamingState: StreamingState.Idle },
+        uiState: {
+          streamingState: StreamingState.Idle,
+          embeddedShellFocused: true,
+          activePtyId: 1,
+        },
       });
 
       // Verify it is initially focused
@@ -143,21 +139,29 @@ describe('<ShellToolMessage />', () => {
         'renders in Alternate Buffer mode while focused',
         {
           status: CoreToolCallStatus.Executing,
-          embeddedShellFocused: true,
-          activeShellPtyId: 1,
           ptyId: 1,
         },
-        { useAlternateBuffer: true },
+        {
+          useAlternateBuffer: true,
+          uiState: {
+            embeddedShellFocused: true,
+            activePtyId: 1,
+          },
+        },
       ],
       [
         'renders in Alternate Buffer mode while unfocused',
         {
           status: CoreToolCallStatus.Executing,
-          embeddedShellFocused: false,
-          activeShellPtyId: 1,
           ptyId: 1,
         },
-        { useAlternateBuffer: true },
+        {
+          useAlternateBuffer: true,
+          uiState: {
+            embeddedShellFocused: false,
+            activePtyId: 1,
+          },
+        },
       ],
     ])('%s', async (_, props, options) => {
       const { lastFrame } = renderShell(props, options);
@@ -199,12 +203,16 @@ describe('<ShellToolMessage />', () => {
           resultDisplay: LONG_OUTPUT,
           renderOutputAsMarkdown: false,
           availableTerminalHeight,
-          activeShellPtyId: 1,
-          ptyId: focused ? 1 : 2,
+          ptyId: 1,
           status: CoreToolCallStatus.Executing,
-          embeddedShellFocused: focused,
         },
-        { useAlternateBuffer: true },
+        {
+          useAlternateBuffer: true,
+          uiState: {
+            activePtyId: focused ? 1 : 2,
+            embeddedShellFocused: focused,
+          },
+        },
       );
 
       await waitFor(() => {
