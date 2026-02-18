@@ -23,6 +23,7 @@ import * as fs from 'node:fs';
 import { promptIdContext } from './promptIdContext.js';
 import { debugLogger } from './debugLogger.js';
 import { LRUCache } from 'mnemonist';
+import { LlmRole } from '../telemetry/types.js';
 
 const CODE_CORRECTION_SYSTEM_PROMPT = `
 You are an expert code-editing assistant. Your task is to analyze a failed edit attempt and provide a corrected version of the text snippets.
@@ -439,6 +440,7 @@ Return ONLY the corrected target snippet in the specified JSON format with the k
       abortSignal,
       systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
       promptId: getPromptId(),
+      role: LlmRole.UTILITY_EDIT_CORRECTOR,
     });
 
     if (
@@ -528,6 +530,7 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
       abortSignal,
       systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
       promptId: getPromptId(),
+      role: LlmRole.UTILITY_EDIT_CORRECTOR,
     });
 
     if (
@@ -598,6 +601,7 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
       abortSignal,
       systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
       promptId: getPromptId(),
+      role: LlmRole.UTILITY_EDIT_CORRECTOR,
     });
 
     if (
@@ -665,6 +669,7 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
       abortSignal,
       systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
       promptId: getPromptId(),
+      role: LlmRole.UTILITY_EDIT_CORRECTOR,
     });
 
     if (

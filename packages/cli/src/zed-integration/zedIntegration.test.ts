@@ -25,6 +25,7 @@ import {
   type GeminiChat,
   type Config,
   type MessageBus,
+  LlmRole,
 } from '@google/gemini-cli-core';
 import {
   SettingScope,
@@ -615,7 +616,8 @@ describe('Session', () => {
         }),
       ]),
       expect.anything(),
-      expect.anything(),
+      expect.any(AbortSignal),
+      LlmRole.MAIN,
     );
   });
 

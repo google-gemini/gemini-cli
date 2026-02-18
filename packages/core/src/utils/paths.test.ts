@@ -13,6 +13,7 @@ import {
   unescapePath,
   isSubpath,
   shortenPath,
+  normalizePath,
   resolveToRealPath,
 } from './paths.js';
 
@@ -519,5 +520,48 @@ describe('resolveToRealPath', () => {
     const expected = p;
 
     expect(resolveToRealPath(input)).toBe(expected);
+  });
+});
+
+describe('normalizePath', () => {
+  it('should resolve a relative path to an absolute path', () => {
+    const result = normalizePath('some/relative/path');
+    expect(result).toMatch(/^\/|^[a-z]:\//);
+  });
+
+  it('should convert all backslashes to forward slashes', () => {
+    const result = normalizePath(path.resolve('some', 'path'));
+    expect(result).not.toContain('\\');
+  });
+
+  describe.skipIf(process.platform !== 'win32')('on Windows', () => {
+    it('should lowercase the entire path', () => {
+      const result = normalizePath('C:\\Users\\TEST');
+      expect(result).toBe(result.toLowerCase());
+    });
+
+    it('should normalize drive letters to lowercase', () => {
+      const result = normalizePath('C:\\');
+      expect(result).toMatch(/^c:\//);
+    });
+
+    it('should handle mixed separators', () => {
+      const result = normalizePath('C:/Users\\Test/file.txt');
+      expect(result).not.toContain('\\');
+      expect(result).toMatch(/^c:\/users\/test\/file\.txt$/);
+    });
+  });
+
+  describe.skipIf(process.platform === 'win32')('on POSIX', () => {
+    it('should preserve case', () => {
+      const result = normalizePath('/usr/Local/Bin');
+      expect(result).toContain('Local');
+      expect(result).toContain('Bin');
+    });
+
+    it('should use forward slashes', () => {
+      const result = normalizePath('/usr/local/bin');
+      expect(result).toBe('/usr/local/bin');
+    });
   });
 });

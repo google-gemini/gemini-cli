@@ -33,8 +33,13 @@ describe('GeminiRespondingSpinner', () => {
   const mockUseIsScreenReaderEnabled = vi.mocked(useIsScreenReaderEnabled);
 
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
     mockUseIsScreenReaderEnabled.mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('renders spinner when responding', () => {

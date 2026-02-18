@@ -1,19 +1,19 @@
-# Extensions on Gemini CLI: Best practices
+# Gemini CLI extension best practices
 
 This guide covers best practices for developing, securing, and maintaining
 Gemini CLI extensions.
 
 ## Development
 
-Developing extensions for Gemini CLI is intended to be a lightweight, iterative
-process.
+Developing extensions for Gemini CLI is a lightweight, iterative process. Use
+these strategies to build robust and efficient extensions.
 
 ### Structure your extension
 
-While simple extensions can just be a few files, we recommend a robust structure
-for complex extensions:
+While simple extensions may contain only a few files, we recommend a organized
+structure for complex projects.
 
-```
+```text
 my-extension/
 ├── package.json
 ├── tsconfig.json
@@ -24,47 +24,50 @@ my-extension/
 └── dist/
 ```
 
-- **Use TypeScript**: We strongly recommend using TypeScript for type safety and
-  better tooling.
-- **Separate source and build**: Keep your source code in `src` and build to
-  `dist`.
-- **Bundle dependencies**: If your extension has many dependencies, consider
-  bundling them (e.g., with `esbuild` or `webpack`) to reduce install time and
-  potential conflicts.
+- **Use TypeScript:** We strongly recommend using TypeScript for type safety and
+  improved developer experience.
+- **Separate source and build:** Keep your source code in `src/` and output
+  build artifacts to `dist/`.
+- **Bundle dependencies:** If your extension has many dependencies, bundle them
+  using a tool like `esbuild` to reduce installation time and avoid conflicts.
 
 ### Iterate with `link`
 
-Use `gemini extensions link` to develop locally without constantly reinstalling:
+Use the `gemini extensions link` command to develop locally without reinstalling
+your extension after every change.
 
 ```bash
 cd my-extension
 gemini extensions link .
 ```
 
-Changes to your code (after rebuilding) will be immediately available in the CLI
-on restart.
+Changes to your code are immediately available in the CLI after you rebuild the
+project and restart the session.
 
 ### Use `GEMINI.md` effectively
 
-Your `GEMINI.md` file provides context to the model. Keep it focused:
+Your `GEMINI.md` file provides essential context to the model.
 
-- **Do:** Explain high-level goals and how to use the provided tools.
-- **Don't:** Dump your entire documentation.
-- **Do:** Use clear, concise language.
+- **Focus on goals:** Explain the high-level purpose of the extension and how to
+  interact with its tools.
+- **Be concise:** Avoid dumping exhaustive documentation into the file. Use
+  clear, direct language.
+- **Provide examples:** Include brief examples of how the model should use
+  specific tools or commands.
 
 ## Security
 
-When building a Gemini CLI extension, follow general security best practices
-(such as least privilege and input validation) to reduce risk.
+Follow the principle of least privilege and rigorous input validation when
+building extensions.
 
 ### Minimal permissions
 
-When defining tools in your MCP server, only request the permissions necessary.
-Avoid giving the model broad access (like full shell access) if a more
-restricted set of tools will suffice.
+Only request the permissions your MCP server needs to function. Avoid giving the
+model broad access (such as full shell access) if restricted tools are
+sufficient.
 
-If you must use powerful tools like `run_shell_command`, consider restricting
-them to specific commands in your `gemini-extension.json`:
+If your extension uses powerful tools like `run_shell_command`, restrict them in
+your `gemini-extension.json` file:
 
 ```json
 {
@@ -73,27 +76,26 @@ them to specific commands in your `gemini-extension.json`:
 }
 ```
 
-This ensures that even if the model tries to execute a dangerous command, it
-will be blocked at the CLI level.
+This ensures the CLI blocks dangerous commands even if the model attempts to
+execute them.
 
 ### Validate inputs
 
-Your MCP server is running on the user's machine. Always validate inputs to your
-tools to prevent arbitrary code execution or filesystem access outside the
-intended scope.
+Your MCP server runs on the user's machine. Always validate tool inputs to
+prevent arbitrary code execution or unauthorized filesystem access.
 
 ```typescript
-// Good: Validating paths
+// Example: Validating paths
 if (!path.resolve(inputPath).startsWith(path.resolve(allowedDir) + path.sep)) {
   throw new Error('Access denied');
 }
 ```
 
-### Sensitive settings
+### Secure sensitive settings
 
-If your extension requires API keys, use the `sensitive: true` option in
-`gemini-extension.json`. This ensures keys are stored securely in the system
-keychain and obfuscated in the UI.
+If your extension requires API keys or other secrets, use the `sensitive: true`
+option in your manifest. This ensures keys are stored in the system keychain and
+obfuscated in the CLI output.
 
 ```json
 "settings": [
@@ -105,35 +107,82 @@ keychain and obfuscated in the UI.
 ]
 ```
 
-## Releasing
+## Release
 
-You can upload your extension directly to GitHub to list it in the gallery.
-Gemini CLI extensions also offers support for more complicated
-[releases](releasing.md).
+Follow standard versioning and release practices to ensure a smooth experience
+for your users.
 
 ### Semantic versioning
 
-Follow [Semantic Versioning](https://semver.org/).
+Follow [Semantic Versioning (SemVer)](https://semver.org/) to communicate
+changes clearly.
 
-- **Major**: Breaking changes (renaming tools, changing arguments).
-- **Minor**: New features (new tools, commands).
-- **Patch**: Bug fixes.
+- **Major:** Breaking changes (e.g., renaming tools or changing arguments).
+- **Minor:** New features (e.g., adding new tools or commands).
+- **Patch:** Bug fixes and performance improvements.
 
-### Release Channels
+### Release channels
 
-Use git branches to manage release channels (e.g., `main` for stable, `dev` for
-bleeding edge). This allows users to choose their stability level:
+Use Git branches to manage release channels. This lets users choose between
+stability and the latest features.
 
 ```bash
-# Stable
+# Install the stable version (default branch)
 gemini extensions install github.com/user/repo
 
-# Dev
+# Install the development version
 gemini extensions install github.com/user/repo --ref dev
 ```
 
 ### Clean artifacts
 
-If you are using GitHub Releases, ensure your release artifacts only contain the
-necessary files (`dist/`, `gemini-extension.json`, `package.json`). Exclude
-`node_modules` (users will install them) and `src/` to keep downloads small.
+When using GitHub Releases, ensure your archives only contain necessary files
+(such as `dist/`, `gemini-extension.json`, and `package.json`). Exclude
+`node_modules/` and `src/` to minimize download size.
+
+## Test and verify
+
+Test your extension thoroughly before releasing it to users.
+
+- **Manual verification:** Use `gemini extensions link` to test your extension
+  in a live CLI session. Verify that tools appear in the debug console (F12) and
+  that custom commands resolve correctly.
+- **Automated testing:** If your extension includes an MCP server, write unit
+  tests for your tool logic using a framework like Vitest or Jest. You can test
+  MCP tools in isolation by mocking the transport layer.
+
+## Troubleshooting
+
+Use these tips to diagnose and fix common extension issues.
+
+### Extension not loading
+
+If your extension doesn't appear in `/extensions list`:
+
+- **Check the manifest:** Ensure `gemini-extension.json` is in the root
+  directory and contains valid JSON.
+- **Verify the name:** The `name` field in the manifest must match the extension
+  directory name exactly.
+- **Restart the CLI:** Extensions are loaded at the start of a session. Restart
+  Gemini CLI after making changes to the manifest or linking a new extension.
+
+### MCP server failures
+
+If your tools aren't working as expected:
+
+- **Check the logs:** View the CLI logs to see if the MCP server failed to
+  start.
+- **Test the command:** Run the server's `command` and `args` directly in your
+  terminal to ensure it starts correctly outside of Gemini CLI.
+- **Debug console:** In interactive mode, press **F12** to open the debug
+  console and inspect tool calls and responses.
+
+### Command conflicts
+
+If a custom command isn't responding:
+
+- **Check precedence:** Remember that user and project commands take precedence
+  over extension commands. Use the prefixed name (e.g., `/extension.command`) to
+  verify the extension's version.
+- **Help command:** Run `/help` to see a list of all available commands and
+  their sources.

@@ -1,18 +1,19 @@
-# Getting started with Gemini CLI extensions
+# Build Gemini CLI extensions
 
-This guide will walk you through creating your first Gemini CLI extension.
-You'll learn how to set up a new extension, add a custom tool via an MCP server,
-create a custom command, and provide context to the model with a `GEMINI.md`
-file.
+Gemini CLI extensions let you expand the capabilities of Gemini CLI by adding
+custom tools, commands, and context. This guide walks you through creating your
+first extension, from setting up a template to adding custom functionality and
+linking it for local development.
 
 ## Prerequisites
 
-Before you start, make sure you have the Gemini CLI installed and a basic
+Before you start, ensure you have the Gemini CLI installed and a basic
 understanding of Node.js.
 
-## When to use what
+## Extension features
 
-Extensions offer a variety of ways to customize Gemini CLI.
+Extensions offer several ways to customize Gemini CLI. Use this table to decide
+which features your extension needs.
 
 | Feature                                                        | What it is                                                                                                         | When to use it                                                                                                                                                                                                                                                                                 | Invoked by            |
 | :------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------- |
@@ -21,11 +22,12 @@ Extensions offer a variety of ways to customize Gemini CLI.
 | **[Context file (`GEMINI.md`)](reference.md#contextfilename)** | A markdown file containing instructions that are loaded into the model's context at the start of every session.    | Use this to define the "personality" of your extension, set coding standards, or provide essential knowledge that the model should always have.                                                                                                                                                | CLI provides to model |
 | **[Agent skills](../cli/skills.md)**                           | A specialized set of instructions and workflows that the model activates only when needed.                         | Use this for complex, occasional tasks (like "create a PR" or "audit security") to avoid cluttering the main context window when the skill isn't being used.                                                                                                                                   | Model                 |
 | **[Hooks](../hooks/index.md)**                                 | A way to intercept and customize the CLI's behavior at specific lifecycle events (e.g., before/after a tool call). | Use this when you want to automate actions based on what the model is doing, like validating tool arguments, logging activity, or modifying the model's input/output.                                                                                                                          | CLI                   |
+| **[Custom themes](reference.md#themes)**                       | A set of color definitions to personalize the CLI UI.                                                              | Use this to provide a unique visual identity for your extension or to offer specialized high-contrast or thematic color schemes.                                                                                                                                                               | User (via /theme)     |
 
 ## Step 1: Create a new extension
 
-The easiest way to start is by using one of the built-in templates. We'll use
-the `mcp-server` example as our foundation.
+The easiest way to start is by using a built-in template. We'll use the
+`mcp-server` example as our foundation.
 
 Run the following command to create a new directory called `my-first-extension`
 with the template files:
@@ -34,7 +36,7 @@ with the template files:
 gemini extensions new my-first-extension mcp-server
 ```
 
-This will create a new directory with the following structure:
+This creates a directory with the following structure:
 
 ```
 my-first-extension/
@@ -45,12 +47,11 @@ my-first-extension/
 
 ## Step 2: Understand the extension files
 
-Let's look at the key files in your new extension.
+Your new extension contains several key files that define its behavior.
 
 ### `gemini-extension.json`
 
-This is the manifest file for your extension. It tells Gemini CLI how to load
-and use your extension.
+The manifest file tells Gemini CLI how to load and use your extension.
 
 ```json
 {
@@ -68,17 +69,15 @@ and use your extension.
 
 - `name`: The unique name for your extension.
 - `version`: The version of your extension.
-- `mcpServers`: This section defines one or more Model Context Protocol (MCP)
-  servers. MCP servers are how you can add new tools for the model to use.
-  - `command`, `args`, `cwd`: These fields specify how to start your server.
-    Notice the use of the `${extensionPath}` variable, which Gemini CLI replaces
-    with the absolute path to your extension's installation directory. This
-    allows your extension to work regardless of where it's installed.
+- `mcpServers`: Defines Model Context Protocol (MCP) servers to add new tools.
+  - `command`, `args`, `cwd`: Specify how to start your server. The
+    `${extensionPath}` variable is replaced with the absolute path to your
+    extension's directory.
 
 ### `example.js`
 
-This file contains the source code for your MCP server. It's a simple Node.js
-server that uses the `@modelcontextprotocol/sdk`.
+This file contains the source code for your MCP server. It uses the
+`@modelcontextprotocol/sdk` to define tools.
 
 ```javascript
 /**
@@ -120,24 +119,49 @@ server.registerTool(
   },
 );
 
-// ... (prompt registration omitted for brevity)
-
 const transport = new StdioServerTransport();
 await server.connect(transport);
 ```
 
-This server defines a single tool called `fetch_posts` that fetches data from a
-public API.
-
 ### `package.json`
 
-This is the standard configuration file for a Node.js project. It defines
-dependencies and scripts.
+The standard configuration file for a Node.js project. It defines dependencies
+and scripts for your extension.
 
-## Step 3: Link your extension
+## Step 3: Add extension settings
 
-Before you can use the extension, you need to link it to your Gemini CLI
-installation for local development.
+Some extensions need configuration, such as API keys or user preferences. Let's
+add a setting for an API key.
+
+1.  Open `gemini-extension.json`.
+2.  Add a `settings` array to the configuration:
+
+    ```json
+    {
+      "name": "mcp-server-example",
+      "version": "1.0.0",
+      "settings": [
+        {
+          "name": "API Key",
+          "description": "The API key for the service.",
+          "envVar": "MY_SERVICE_API_KEY",
+          "sensitive": true
+        }
+      ],
+      "mcpServers": {
+        // ...
+      }
+    }
+    ```
+
+When a user installs this extension, Gemini CLI will prompt them to enter the
+"API Key". The value will be stored securely in the system keychain (because
+`sensitive` is true) and injected into the MCP server's process as the
+`MY_SERVICE_API_KEY` environment variable.
+
+## Step 4: Link your extension
+
+Link your extension to your Gemini CLI installation for local development.
 
 1.  **Install dependencies:**
 
@@ -149,20 +173,19 @@ installation for local development.
 2.  **Link the extension:**
 
     The `link` command creates a symbolic link from the Gemini CLI extensions
-    directory to your development directory. This means any changes you make
-    will be reflected immediately without needing to reinstall.
+    directory to your development directory. Changes you make are reflected
+    immediately.
 
     ```bash
     gemini extensions link .
     ```
 
-Now, restart your Gemini CLI session. The new `fetch_posts` tool will be
-available. You can test it by asking: "fetch posts".
+Restart your Gemini CLI session to use the new `fetch_posts` tool. Test it by
+asking: "fetch posts".
 
-## Step 4: Add a custom command
+## Step 5: Add a custom command
 
-Custom commands provide a way to create shortcuts for complex prompts. Let's add
-a command that searches for a pattern in your code.
+Custom commands create shortcuts for complex prompts.
 
 1.  Create a `commands` directory and a subdirectory for your command group:
 
@@ -181,18 +204,17 @@ a command that searches for a pattern in your code.
     """
     ```
 
-    This command, `/fs:grep-code`, will take an argument, run the `grep` shell
-    command with it, and pipe the results into a prompt for summarization.
+    This command, `/fs:grep-code`, takes an argument, runs the `grep` shell
+    command, and pipes the results into a prompt for summarization.
 
-After saving the file, restart the Gemini CLI. You can now run
-`/fs:grep-code "some pattern"` to use your new command.
+After saving the file, restart Gemini CLI. Run `/fs:grep-code "some pattern"` to
+use your new command.
 
-## Step 5: Add a custom `GEMINI.md`
+## Step 6: Add a custom `GEMINI.md`
 
-You can provide persistent context to the model by adding a `GEMINI.md` file to
-your extension. This is useful for giving the model instructions on how to
-behave or information about your extension's tools. Note that you may not always
-need this for extensions built to expose commands and prompts.
+Provide persistent context to the model by adding a `GEMINI.md` file to your
+extension. This is useful for setting behavior or providing essential tool
+information.
 
 1.  Create a file named `GEMINI.md` in the root of your extension directory:
 
@@ -203,7 +225,7 @@ need this for extensions built to expose commands and prompts.
     posts, use the `fetch_posts` tool. Be concise in your responses.
     ```
 
-2.  Update your `gemini-extension.json` to tell the CLI to load this file:
+2.  Update your `gemini-extension.json` to load this file:
 
     ```json
     {
@@ -220,14 +242,13 @@ need this for extensions built to expose commands and prompts.
     }
     ```
 
-Restart the CLI again. The model will now have the context from your `GEMINI.md`
-file in every session where the extension is active.
+Restart Gemini CLI. The model now has the context from your `GEMINI.md` file in
+every session where the extension is active.
 
-## (Optional) Step 6: Add an Agent Skill
+## (Optional) Step 7: Add an Agent Skill
 
-[Agent Skills](../cli/skills.md) let you bundle specialized expertise and
-procedural workflows. Unlike `GEMINI.md`, which provides persistent context,
-skills are activated only when needed, saving context tokens.
+[Agent Skills](../cli/skills.md) bundle specialized expertise and workflows.
+Skills are activated only when needed, which saves context tokens.
 
 1.  Create a `skills` directory and a subdirectory for your skill:
 
@@ -254,28 +275,18 @@ skills are activated only when needed, saving context tokens.
     3. Suggest remediation steps for any findings.
     ```
 
-Skills bundled with your extension are automatically discovered and can be
-activated by the model during a session when it identifies a relevant task.
+Gemini CLI automatically discovers skills bundled with your extension. The model
+activates them when it identifies a relevant task.
 
-## Step 7: Release your extension
+## Step 8: Release your extension
 
-Once you're happy with your extension, you can share it with others. The two
-primary ways of releasing extensions are via a Git repository or through GitHub
-Releases. Using a public Git repository is the simplest method.
+When your extension is ready, share it with others via a Git repository or
+GitHub Releases. Refer to the [Extension Releasing Guide](./releasing.md) for
+detailed instructions and learn how to list your extension in the gallery.
 
-For detailed instructions on both methods, please refer to the
-[Extension Releasing Guide](./releasing.md).
+## Next steps
 
-## Conclusion
-
-You've successfully created a Gemini CLI extension! You learned how to:
-
-- Bootstrap a new extension from a template.
-- Add custom tools with an MCP server.
-- Create convenient custom commands.
-- Provide persistent context to the model.
-- Bundle specialized Agent Skills.
-- Link your extension for local development.
-
-From here, you can explore more advanced features and build powerful new
-capabilities into the Gemini CLI.
+- [Extension reference](reference.md): Deeply understand the extension format,
+  commands, and configuration.
+- [Best practices](best-practices.md): Learn strategies for building great
+  extensions.

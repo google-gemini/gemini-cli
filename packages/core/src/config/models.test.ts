@@ -10,6 +10,8 @@ import {
   resolveClassifierModel,
   isGemini3Model,
   isGemini2Model,
+  isCustomModel,
+  supportsModernFeatures,
   isAutoModel,
   getDisplayString,
   DEFAULT_GEMINI_MODEL,
@@ -24,6 +26,50 @@ import {
   PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL_AUTO,
 } from './models.js';
+
+describe('isCustomModel', () => {
+  it('should return true for models not starting with gemini-', () => {
+    expect(isCustomModel('testing')).toBe(true);
+    expect(isCustomModel('gpt-4')).toBe(true);
+    expect(isCustomModel('claude-3')).toBe(true);
+  });
+
+  it('should return false for Gemini models', () => {
+    expect(isCustomModel('gemini-1.5-pro')).toBe(false);
+    expect(isCustomModel('gemini-2.0-flash')).toBe(false);
+    expect(isCustomModel('gemini-3-pro-preview')).toBe(false);
+  });
+
+  it('should return false for aliases that resolve to Gemini models', () => {
+    expect(isCustomModel(GEMINI_MODEL_ALIAS_AUTO)).toBe(false);
+    expect(isCustomModel(GEMINI_MODEL_ALIAS_PRO)).toBe(false);
+  });
+});
+
+describe('supportsModernFeatures', () => {
+  it('should return true for Gemini 3 models', () => {
+    expect(supportsModernFeatures('gemini-3-pro-preview')).toBe(true);
+    expect(supportsModernFeatures('gemini-3-flash-preview')).toBe(true);
+  });
+
+  it('should return true for custom models', () => {
+    expect(supportsModernFeatures('testing')).toBe(true);
+    expect(supportsModernFeatures('some-custom-model')).toBe(true);
+  });
+
+  it('should return false for older Gemini models', () => {
+    expect(supportsModernFeatures('gemini-2.5-pro')).toBe(false);
+    expect(supportsModernFeatures('gemini-2.5-flash')).toBe(false);
+    expect(supportsModernFeatures('gemini-2.0-flash')).toBe(false);
+    expect(supportsModernFeatures('gemini-1.5-pro')).toBe(false);
+    expect(supportsModernFeatures('gemini-1.0-pro')).toBe(false);
+  });
+
+  it('should return true for modern aliases', () => {
+    expect(supportsModernFeatures(GEMINI_MODEL_ALIAS_PRO)).toBe(true);
+    expect(supportsModernFeatures(GEMINI_MODEL_ALIAS_AUTO)).toBe(true);
+  });
+});
 
 describe('isGemini3Model', () => {
   it('should return true for gemini-3 models', () => {

@@ -26,7 +26,7 @@ exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows - for Canceled 
 
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows MockRespondingSpinner for Executing status when streamingState is Responding 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ⊶  test-tool A tool for testing                                              │
+│ MockRespondingSpinnertest-tool A tool for testing                            │
 │                                                                              │
 │ Test result                                                                  │"
 `;
@@ -40,14 +40,14 @@ exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows o for Pending s
 
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows paused spinner for Executing status when streamingState is Idle 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  test-tool A tool for testing                                              │
+│ MockRespondingSpinnertest-tool A tool for testing                            │
 │                                                                              │
 │ Test result                                                                  │"
 `;
 
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows paused spinner for Executing status when streamingState is WaitingForConfirmation 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  test-tool A tool for testing                                              │
+│ MockRespondingSpinnertest-tool A tool for testing                            │
 │                                                                              │
 │ Test result                                                                  │"
 `;

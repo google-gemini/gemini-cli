@@ -483,7 +483,7 @@ avoid collecting potentially sensitive information from user prompts.
 You can enforce a specific authentication method for all users by setting the
 `enforcedAuthType` in the system-level `settings.json` file. This prevents users
 from choosing a different authentication method. See the
-[Authentication docs](./authentication.md) for more details.
+[Authentication docs](../get-started/authentication.md) for more details.
 
 **Example:** Enforce the use of Google login for all users.
 

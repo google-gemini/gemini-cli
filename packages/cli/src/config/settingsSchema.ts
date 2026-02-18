@@ -236,6 +236,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable update notification prompts.',
         showInDialog: false,
       },
+      enableNotifications: {
+        type: 'boolean',
+        label: 'Enable Notifications',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable run-event notifications for action-required prompts and session completion. Currently macOS only.',
+        showInDialog: true,
+      },
       checkpointing: {
         type: 'object',
         label: 'Checkpointing',
@@ -947,6 +957,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: undefined as MemoryImportFormat | undefined,
         description: 'The format to use when importing memory.',
+        showInDialog: false,
+      },
+      includeDirectoryTree: {
+        type: 'boolean',
+        label: 'Include Directory Tree',
+        category: 'Context',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Whether to include the directory tree of the current working directory in the initial request to the model.',
         showInDialog: false,
       },
       discoveryMaxDirs: {

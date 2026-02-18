@@ -216,8 +216,18 @@ describe('App', () => {
 
     const stateWithConfirmingTool = {
       ...mockUIState,
-      pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
-      pendingGeminiHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+      pendingHistoryItems: [
+        {
+          type: 'tool_group',
+          tools: toolCalls,
+        },
+      ],
+      pendingGeminiHistoryItems: [
+        {
+          type: 'tool_group',
+          tools: toolCalls,
+        },
+      ],
     } as UIState;
 
     const configWithExperiment = makeFakeConfig();

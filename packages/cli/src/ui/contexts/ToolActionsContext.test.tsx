@@ -15,6 +15,7 @@ import {
   MessageBusType,
   IdeClient,
   CoreToolCallStatus,
+  type SerializableConfirmationDetails,
 } from '@google/gemini-cli-core';
 import { type IndividualToolCallDisplay } from '../types.js';
 
@@ -181,5 +182,45 @@ describe('ToolActionsContext', () => {
     });
 
     expect(result.current.isDiffingEnabled).toBe(false);
+  });
+
+  it('calls local onConfirm for tools without correlationId', async () => {
+    const mockOnConfirm = vi.fn().mockResolvedValue(undefined);
+    const legacyTool: IndividualToolCallDisplay = {
+      callId: 'legacy-call',
+      name: 'legacy-tool',
+      description: 'desc',
+      status: CoreToolCallStatus.AwaitingApproval,
+      resultDisplay: undefined,
+      confirmationDetails: {
+        type: 'exec',
+        title: 'exec',
+        command: 'ls',
+        rootCommand: 'ls',
+        rootCommands: ['ls'],
+        onConfirm: mockOnConfirm,
+      } as unknown as SerializableConfirmationDetails,
+    };
+
+    const { result } = renderHook(() => useToolActions(), {
+      wrapper: ({ children }) => (
+        <ToolActionsProvider config={mockConfig} toolCalls={[legacyTool]}>
+          {children}
+        </ToolActionsProvider>
+      ),
+    });
+
+    await act(async () => {
+      await result.current.confirm(
+        'legacy-call',
+        ToolConfirmationOutcome.ProceedOnce,
+      );
+    });
+
+    expect(mockOnConfirm).toHaveBeenCalledWith(
+      ToolConfirmationOutcome.ProceedOnce,
+      undefined,
+    );
+    expect(mockMessageBus.publish).not.toHaveBeenCalled();
   });
 });
