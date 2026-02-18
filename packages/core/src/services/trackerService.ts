@@ -6,7 +6,8 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { TrackerTask } from './trackerTypes.js';
+import { randomBytes } from 'node:crypto';
+import { TrackerTaskSchema, type TrackerTask } from './trackerTypes.js';
 
 export class TrackerService {
   private readonly trackerDir: string;
@@ -28,7 +29,7 @@ export class TrackerService {
    * Generates a 6-character hex ID.
    */
   private generateId(): string {
-    return Math.random().toString(16).substring(2, 8).padEnd(6, '0');
+    return randomBytes(3).toString('hex');
   }
 
   /**
@@ -53,8 +54,8 @@ export class TrackerService {
     const taskPath = path.join(this.tasksDir, `${id}.json`);
     try {
       const content = await fs.readFile(taskPath, 'utf8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return JSON.parse(content) as TrackerTask;
+      const data: unknown = JSON.parse(content);
+      return TrackerTaskSchema.parse(data);
     } catch (error) {
       if (
         error &&
@@ -82,8 +83,8 @@ export class TrackerService {
             path.join(this.tasksDir, f),
             'utf8',
           );
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          return JSON.parse(content) as TrackerTask;
+          const data: unknown = JSON.parse(content);
+          return TrackerTaskSchema.parse(data);
         }),
       );
       return tasks;
@@ -159,10 +160,17 @@ export class TrackerService {
   private async validateNoCircularDependencies(
     task: TrackerTask,
   ): Promise<void> {
+    const allTasks = await this.listTasks();
+    const taskMap = new Map<string, TrackerTask>(
+      allTasks.map((t) => [t.id, t]),
+    );
+    // Ensure the current (possibly unsaved) task state is used
+    taskMap.set(task.id, task);
+
     const visited = new Set<string>();
     const stack = new Set<string>();
 
-    const check = async (currentId: string) => {
+    const check = (currentId: string) => {
       if (stack.has(currentId)) {
         throw new Error(
           `Circular dependency detected involving task ${currentId}.`,
@@ -175,17 +183,16 @@ export class TrackerService {
       visited.add(currentId);
       stack.add(currentId);
 
-      const currentTask =
-        currentId === task.id ? task : await this.getTask(currentId);
+      const currentTask = taskMap.get(currentId);
       if (currentTask) {
         for (const depId of currentTask.dependencies) {
-          await check(depId);
+          check(depId);
         }
       }
 
       stack.delete(currentId);
     };
 
-    await check(task.id);
+    check(task.id);
   }
 }

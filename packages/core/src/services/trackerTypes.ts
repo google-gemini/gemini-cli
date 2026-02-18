@@ -4,18 +4,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type TaskType = 'epic' | 'task' | 'bug';
+import { z } from 'zod';
 
-export type TaskStatus = 'open' | 'in_progress' | 'blocked' | 'closed';
+export const TaskTypeSchema = z.enum(['epic', 'task', 'bug']);
+export type TaskType = z.infer<typeof TaskTypeSchema>;
 
-export interface TrackerTask {
-  id: string;
-  title: string;
-  description: string;
-  type: TaskType;
-  status: TaskStatus;
-  parentId?: string;
-  dependencies: string[];
-  subagentSessionId?: string;
-  metadata?: Record<string, unknown>;
-}
+export const TaskStatusSchema = z.enum([
+  'open',
+  'in_progress',
+  'blocked',
+  'closed',
+]);
+export type TaskStatus = z.infer<typeof TaskStatusSchema>;
+
+export const TrackerTaskSchema = z.object({
+  id: z.string().length(6),
+  title: z.string(),
+  description: z.string(),
+  type: TaskTypeSchema,
+  status: TaskStatusSchema,
+  parentId: z.string().optional(),
+  dependencies: z.array(z.string()),
+  subagentSessionId: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export type TrackerTask = z.infer<typeof TrackerTaskSchema>;
