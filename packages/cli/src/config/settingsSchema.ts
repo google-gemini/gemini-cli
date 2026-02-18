@@ -1593,6 +1593,15 @@ const SETTINGS_SCHEMA = {
         description: 'Enable planning features (Plan Mode and tools).',
         showInDialog: true,
       },
+      taskTracker: {
+        type: 'boolean',
+        label: 'Task Tracker',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable task tracker tools.',
+        showInDialog: true,
+      },
     },
   },
 
