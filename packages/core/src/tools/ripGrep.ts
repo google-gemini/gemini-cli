@@ -161,7 +161,6 @@ export interface RipGrepToolParams {
 interface GrepMatch {
   filePath: string;
   absolutePath: string;
-  absolutePath: string;
   lineNumber: number;
   line: string;
   isContext?: boolean;
@@ -329,11 +328,10 @@ class GrepToolInvocation extends BaseToolInvocation<
               fileMatches[0].absolutePath,
               'utf8',
             );
-            fileLines = content.split(/?
-/);
+            fileLines = content.split(/\r?\n/);
           } catch (err) {
             debugLogger.warn(
-              \`Failed to read file for context: \${fileMatches[0].absolutePath}\`,
+              `Failed to read file for context: ${fileMatches[0].absolutePath}`,
               err,
             );
           }
@@ -358,7 +356,9 @@ class GrepToolInvocation extends BaseToolInvocation<
                   });
                   seenLines.add(i + 1);
                 } else if (i + 1 === match.lineNumber) {
-                  const index = newFileMatches.findIndex(m => m.lineNumber === i + 1);
+                  const index = newFileMatches.findIndex(
+                    (m) => m.lineNumber === i + 1,
+                  );
                   if (index !== -1) {
                     newFileMatches[index].isContext = false;
                   }

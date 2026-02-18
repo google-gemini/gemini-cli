@@ -928,7 +928,7 @@ class EditToolInvocation
           : `Successfully modified file: ${this.params.file_path} (${editData.occurrences} replacements).`,
       ];
       const snippet = getDiffContextSnippet(
-        originalContent,
+        editData.currentContent ?? '',
         finalContent,
         5,
       );
