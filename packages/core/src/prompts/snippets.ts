@@ -467,6 +467,9 @@ ${options.planModeToolsList}
    )}.
    - **Directives:** If the request is a **Directive** (e.g., "Fix bug Y"), follow the workflow below to create and approve a plan.
 4. **Plan Storage:** Save plans as Markdown (.md) using descriptive filenames (e.g., \`feature-x.md\`).
+5. **Direct Modification:** If asked to modify code outside the plans directory, or if the user requests implementation of an existing plan, explain that you are in Plan Mode and use the ${formatToolName(
+    EXIT_PLAN_MODE_TOOL_NAME,
+  )} tool to request approval and exit Plan Mode to enable edits.
 
 ## Required Plan Structure
 When writing the plan file, you MUST include the following structure:
