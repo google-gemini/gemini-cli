@@ -8,10 +8,10 @@ import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
 import { assertModelHasOutput } from '../integration-tests/test-helper.js';
 
-describe.skip('Hierarchical Memory', () => {
+describe('Hierarchical Memory', () => {
   const conflictResolutionTest =
     'Agent follows hierarchy for contradictory instructions';
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: conflictResolutionTest,
     params: {
       settings: {
@@ -47,7 +47,7 @@ What is my favorite fruit? Tell me just the name of the fruit.`,
   });
 
   const provenanceAwarenessTest = 'Agent is aware of memory provenance';
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: provenanceAwarenessTest,
     params: {
       settings: {
@@ -86,7 +86,7 @@ Provide the answer as an XML block like this:
   });
 
   const extensionVsGlobalTest = 'Extension memory wins over Global memory';
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: extensionVsGlobalTest,
     params: {
       settings: {
