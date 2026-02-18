@@ -31,6 +31,26 @@ export function isJetBrainsTerminal(): boolean {
 }
 
 /**
+ * Detects if the current terminal supports true color (24-bit).
+ */
+export function supportsTrueColor(): boolean {
+  // Check COLORTERM environment variable
+  if (
+    process.env['COLORTERM'] === 'truecolor' ||
+    process.env['COLORTERM'] === '24bit'
+  ) {
+    return true;
+  }
+
+  // Check if stdout supports 24-bit color depth
+  if (process.stdout.getColorDepth && process.stdout.getColorDepth() >= 24) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Returns a list of compatibility warnings based on the current environment.
  */
 export function getCompatibilityWarnings(): string[] {
@@ -45,6 +65,12 @@ export function getCompatibilityWarnings(): string[] {
   if (isJetBrainsTerminal()) {
     warnings.push(
       '⚠️ JetBrains terminal detected. You may experience rendering or scrolling issues. Using an external terminal (e.g., Windows Terminal, iTerm2) is recommended.',
+    );
+  }
+
+  if (!supportsTrueColor()) {
+    warnings.push(
+      '⚠️ True color (24-bit) support not detected. Using a terminal with true color enabled will result in a better visual experience.',
     );
   }
 

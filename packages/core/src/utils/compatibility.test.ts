@@ -9,6 +9,7 @@ import os from 'node:os';
 import {
   isWindows10,
   isJetBrainsTerminal,
+  supportsTrueColor,
   getCompatibilityWarnings,
 } from './compatibility.js';
 
@@ -20,11 +21,15 @@ vi.mock('node:os', () => ({
 }));
 
 describe('compatibility', () => {
+  const originalGetColorDepth = process.stdout.getColorDepth;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    process.stdout.getColorDepth = vi.fn().mockReturnValue(24);
   });
 
   afterEach(() => {
+    process.stdout.getColorDepth = originalGetColorDepth;
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
   });
@@ -66,15 +71,45 @@ describe('compatibility', () => {
     });
   });
 
+  describe('supportsTrueColor', () => {
+    it('should return true when COLORTERM is truecolor', () => {
+      vi.stubEnv('COLORTERM', 'truecolor');
+      expect(supportsTrueColor()).toBe(true);
+    });
+
+    it('should return true when COLORTERM is 24bit', () => {
+      vi.stubEnv('COLORTERM', '24bit');
+      expect(supportsTrueColor()).toBe(true);
+    });
+
+    it('should return true when getColorDepth returns >= 24', () => {
+      vi.stubEnv('COLORTERM', '');
+      vi.mocked(process.stdout.getColorDepth).mockReturnValue(24);
+      expect(supportsTrueColor()).toBe(true);
+    });
+
+    it('should return false when true color is not supported', () => {
+      vi.stubEnv('COLORTERM', '');
+      vi.mocked(process.stdout.getColorDepth).mockReturnValue(8);
+      expect(supportsTrueColor()).toBe(false);
+    });
+  });
+
   describe('getCompatibilityWarnings', () => {
+    beforeEach(() => {
+      // Default to supporting true color to keep existing tests simple
+      vi.stubEnv('COLORTERM', 'truecolor');
+    });
+
     it('should return Windows 10 warning when detected', () => {
       vi.mocked(os.platform).mockReturnValue('win32');
       vi.mocked(os.release).mockReturnValue('10.0.19041');
       vi.stubEnv('TERMINAL_EMULATOR', '');
 
       const warnings = getCompatibilityWarnings();
-      expect(warnings).toHaveLength(1);
-      expect(warnings[0]).toContain('Windows 10 detected');
+      expect(warnings).toContain(
+        '⚠️ Windows 10 detected. Some UI features like smooth scrolling may be degraded. Windows 11 is recommended for the best experience.',
+      );
     });
 
     it('should return JetBrains warning when detected', () => {
@@ -82,24 +117,41 @@ describe('compatibility', () => {
       vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
 
       const warnings = getCompatibilityWarnings();
-      expect(warnings).toHaveLength(1);
-      expect(warnings[0]).toContain('JetBrains terminal detected');
+      expect(warnings).toContain(
+        '⚠️ JetBrains terminal detected. You may experience rendering or scrolling issues. Using an external terminal (e.g., Windows Terminal, iTerm2) is recommended.',
+      );
     });
 
-    it('should return both warnings when both are detected', () => {
+    it('should return true color warning when not supported', () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.stubEnv('TERMINAL_EMULATOR', '');
+      vi.stubEnv('COLORTERM', '');
+      vi.mocked(process.stdout.getColorDepth).mockReturnValue(8);
+
+      const warnings = getCompatibilityWarnings();
+      expect(warnings).toContain(
+        '⚠️ True color (24-bit) support not detected. Using a terminal with true color enabled will result in a better visual experience.',
+      );
+    });
+
+    it('should return all warnings when all are detected', () => {
       vi.mocked(os.platform).mockReturnValue('win32');
       vi.mocked(os.release).mockReturnValue('10.0.19041');
       vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
+      vi.stubEnv('COLORTERM', '');
+      vi.mocked(process.stdout.getColorDepth).mockReturnValue(8);
 
       const warnings = getCompatibilityWarnings();
-      expect(warnings).toHaveLength(2);
+      expect(warnings).toHaveLength(3);
       expect(warnings[0]).toContain('Windows 10 detected');
       expect(warnings[1]).toContain('JetBrains terminal detected');
+      expect(warnings[2]).toContain('True color (24-bit) support not detected');
     });
 
-    it('should return no warnings in a standard environment', () => {
+    it('should return no warnings in a standard environment with true color', () => {
       vi.mocked(os.platform).mockReturnValue('darwin');
       vi.stubEnv('TERMINAL_EMULATOR', '');
+      vi.stubEnv('COLORTERM', 'truecolor');
 
       const warnings = getCompatibilityWarnings();
       expect(warnings).toHaveLength(0);
