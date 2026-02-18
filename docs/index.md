@@ -94,8 +94,10 @@ Technical reference documentation for each capability of Gemini CLI.
 - **[Model routing](./cli/model-routing.md):** Automatic fallback resilience.
 - **[Plan mode (experimental)](./cli/plan-mode.md):** Use a safe, read-only mode
   for planning complex changes.
+- **[Remote Agents](./core/remote-agents.md):** Connecting to and using remote agents.
 - **[Sandboxing](./cli/sandbox.md):** Isolate tool execution.
 - **[Shell (tool)](./tools/shell.md):** Detailed system execution parameters.
+- **[Subagents](./core/subagents.md):** Using specialized agents for specific tasks.
 - **[Telemetry](./cli/telemetry.md):** Usage and performance metric details.
 - **[Todo (tool)](./tools/todos.md):** Progress tracking specification.
 - **[Token caching](./cli/token-caching.md):** Performance optimization.
@@ -127,14 +129,13 @@ Settings and customization options for Gemini CLI.
 
 Deep technical documentation and API specifications.
 
-- **[Architecture overview](./architecture.md):** System design and components.
 - **[Command reference](./cli/commands.md):** Detailed slash command guide.
 - **[Configuration reference](./get-started/configuration.md):** Settings and
   environment variables.
-- **[Core concepts](./core/concepts.md):** Fundamental terminology and
-  definitions.
 - **[Keyboard shortcuts](./cli/keyboard-shortcuts.md):** Productivity tips.
+- **[Memory import processor](./core/memport.md):** How Gemini CLI processes memory from various sources.
 - **[Policy engine](./core/policy-engine.md):** Fine-grained execution control.
+- **[Tools API](./core/tools-api.md):** The API for defining and using tools.
 
 ## Resources
 
@@ -144,3 +145,17 @@ Support, release history, and legal information.
 - **[Changelogs](./changelogs/index.md):** Highlights and notable changes.
 - **[Quota and pricing](./quota-and-pricing.md):** Limits and billing details.
 - **[Terms and privacy](./tos-privacy.md):** Official notices and terms.
+
+## Development
+
+- **[Contribution guide](./contributing.md):** How to contribute to Gemini CLI.
+- **[Integration testing](./integration-tests.md):** Running integration tests.
+- **[Issue and PR automation](./issue-and-pr-automation.md):** Automation for issues and pull requests.
+- **[Local development](./local-development.md):** Setting up a local development environment.
+- **[NPM package structure](./npm.md):** The structure of the NPM packages.
+
+## Releases
+
+- **[Release notes](./changelogs/index.md):** Release notes for all versions.
+- **[Stable release](./changelogs/latest.md):** The latest stable release.
+- **[Preview release](./changelogs/preview.md):** The latest preview release.
