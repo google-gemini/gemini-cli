@@ -363,6 +363,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             this.params.command,
           );
           parts.push(`<error><![CDATA[${finalError}]]></error>`);
+        }
 
         if (result.exitCode !== null) {
           parts.push(`<exit_code>${result.exitCode}</exit_code>`);
