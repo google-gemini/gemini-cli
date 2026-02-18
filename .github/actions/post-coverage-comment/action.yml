@@ -31,10 +31,10 @@ runs:
       id: prep_coverage_comment
       shell: bash
       run: |
-        cli_json_file="${{ inputs.cli_json_file }}"
-        core_json_file="${{ inputs.core_json_file }}"
-        cli_full_text_summary_file="${{ inputs.cli_full_text_summary_file }}"
-        core_full_text_summary_file="${{ inputs.core_full_text_summary_file }}"
+        cli_json_file="${INPUTS_CLI_JSON_FILE}"
+        core_json_file="${INPUTS_CORE_JSON_FILE}"
+        cli_full_text_summary_file="${INPUTS_CLI_FULL_TEXT_SUMMARY_FILE}"
+        core_full_text_summary_file="${INPUTS_CORE_FULL_TEXT_SUMMARY_FILE}"
         comment_file="coverage-comment.md"
 
         # Extract percentages using jq for the main table
@@ -94,7 +94,14 @@ runs:
         echo "</details>" >> "$comment_file"
         echo "" >> "$comment_file"
 
-        echo "_For detailed HTML reports, please see the 'coverage-reports-${{ inputs.node_version }}-${{ inputs.os }}' artifact from the main CI run._" >> "$comment_file"
+        echo "_For detailed HTML reports, please see the 'coverage-reports-${INPUTS_NODE_VERSION}-${INPUTS_OS}' artifact from the main CI run._" >> "$comment_file"
+      env:
+        INPUTS_CLI_JSON_FILE: ${{ inputs.cli_json_file }}
+        INPUTS_CORE_JSON_FILE: ${{ inputs.core_json_file }}
+        INPUTS_CLI_FULL_TEXT_SUMMARY_FILE: ${{ inputs.cli_full_text_summary_file }}
+        INPUTS_CORE_FULL_TEXT_SUMMARY_FILE: ${{ inputs.core_full_text_summary_file }}
+        INPUTS_NODE_VERSION: ${{ inputs.node_version }}
+        INPUTS_OS: ${{ inputs.os }}
 
     - name: Post Coverage Comment
       uses: thollander/actions-comment-pull-request@v3
