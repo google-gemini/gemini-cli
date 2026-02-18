@@ -174,7 +174,7 @@ function pruneHistory(history: Content[]): Content[] {
           if (output.includes('Match at line') && (output.includes('L') && output.includes('-'))) {
              // This is a Greedy Grep output. Prune it.
              const lines = output.split('\n');
-             const preservedLines = lines.filter(l => l.startsWith('Found') || l.startsWith('File:') || l.includes('> L'));
+             const preservedLines = lines.filter((l: string) => l.startsWith('Found') || l.startsWith('File:') || l.includes('> L'));
              const prunedOutput = preservedLines.join('\n') + '\n[... context pruned for token efficiency ...]';
              return {
                ...part,
