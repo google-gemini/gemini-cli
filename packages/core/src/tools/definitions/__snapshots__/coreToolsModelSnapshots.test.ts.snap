@@ -1089,7 +1089,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: grep_search_ripgrep 1`] = `
 {
-  "description": "Searches for a regular expression pattern within file contents. This tool is FAST and optimized, powered by ripgrep. PREFERRED over standard `run_shell_command("grep ...")` due to better performance and automatic output limiting (defaults to 100 matches, but can be increased via `total_max_matches`).",
+  "description": "Searches for a regular expression pattern within file contents. This tool is FAST and optimized, powered by ripgrep. PREFERRED over standard \`run_shell_command("grep ...")\` due to better performance and automatic output limiting (defaults to 100 matches, but can be increased via \`total_max_matches\`).",
   "name": "grep_search",
   "parametersJsonSchema": {
     "properties": {
