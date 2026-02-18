@@ -37,7 +37,7 @@ on GitHub.
   ([#18311](https://github.com/google-gemini/gemini-cli/pull/18311) by
   @skeshive).
 
-## Announcements: v0.28.0 - 2026-02-03
+## Announcements: v0.28.0 - 2026-02-10
 
 - **Slash Command:** We've added a new `/prompt-suggest` slash command to help
   you generate prompt suggestions
