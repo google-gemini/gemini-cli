@@ -108,7 +108,7 @@ describe('compatibility', () => {
 
       const warnings = getCompatibilityWarnings();
       expect(warnings).toContain(
-        '⚠️ Windows 10 detected. Some UI features like smooth scrolling may be degraded. Windows 11 is recommended for the best experience.',
+        'Warning: Windows 10 detected. Some UI features like smooth scrolling may be degraded. Windows 11 is recommended for the best experience.',
       );
     });
 
@@ -118,7 +118,7 @@ describe('compatibility', () => {
 
       const warnings = getCompatibilityWarnings();
       expect(warnings).toContain(
-        '⚠️ JetBrains terminal detected. You may experience rendering or scrolling issues. Using an external terminal (e.g., Windows Terminal, iTerm2) is recommended.',
+        'Warning: JetBrains terminal detected. You may experience rendering or scrolling issues. Using an external terminal (e.g., Windows Terminal, iTerm2) is recommended.',
       );
     });
 
@@ -130,7 +130,7 @@ describe('compatibility', () => {
 
       const warnings = getCompatibilityWarnings();
       expect(warnings).toContain(
-        '⚠️ True color (24-bit) support not detected. Using a terminal with true color enabled will result in a better visual experience.',
+        'Warning: True color (24-bit) support not detected. Using a terminal with true color enabled will result in a better visual experience.',
       );
     });
 

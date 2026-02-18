@@ -58,19 +58,19 @@ export function getCompatibilityWarnings(): string[] {
 
   if (isWindows10()) {
     warnings.push(
-      '⚠️ Windows 10 detected. Some UI features like smooth scrolling may be degraded. Windows 11 is recommended for the best experience.',
+      'Warning: Windows 10 detected. Some UI features like smooth scrolling may be degraded. Windows 11 is recommended for the best experience.',
     );
   }
 
   if (isJetBrainsTerminal()) {
     warnings.push(
-      '⚠️ JetBrains terminal detected. You may experience rendering or scrolling issues. Using an external terminal (e.g., Windows Terminal, iTerm2) is recommended.',
+      'Warning: JetBrains terminal detected. You may experience rendering or scrolling issues. Using an external terminal (e.g., Windows Terminal, iTerm2) is recommended.',
     );
   }
 
   if (!supportsTrueColor()) {
     warnings.push(
-      '⚠️ True color (24-bit) support not detected. Using a terminal with true color enabled will result in a better visual experience.',
+      'Warning: True color (24-bit) support not detected. Using a terminal with true color enabled will result in a better visual experience.',
     );
   }
 
