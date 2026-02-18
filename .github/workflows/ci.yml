@@ -374,13 +374,20 @@ jobs:
     steps:
       - name: 'Check all job results'
         run: |
-          if [[ (${{ needs.lint.result }} != 'success' && ${{ needs.lint.result }} != 'skipped') || \
-               (${{ needs.link_checker.result }} != 'success' && ${{ needs.link_checker.result }} != 'skipped') || \
-               (${{ needs.test_linux.result }} != 'success' && ${{ needs.test_linux.result }} != 'skipped') || \
-               (${{ needs.test_mac.result }} != 'success' && ${{ needs.test_mac.result }} != 'skipped') || \
-               (${{ needs.codeql.result }} != 'success' && ${{ needs.codeql.result }} != 'skipped') || \
-               (${{ needs.bundle_size.result }} != 'success' && ${{ needs.bundle_size.result }} != 'skipped') ]]; then
+          if [[ (${NEEDS_LINT_RESULT} != 'success' && ${NEEDS_LINT_RESULT} != 'skipped') || \
+               (${NEEDS_LINK_CHECKER_RESULT} != 'success' && ${NEEDS_LINK_CHECKER_RESULT} != 'skipped') || \
+               (${NEEDS_TEST_LINUX_RESULT} != 'success' && ${NEEDS_TEST_LINUX_RESULT} != 'skipped') || \
+               (${NEEDS_TEST_MAC_RESULT} != 'success' && ${NEEDS_TEST_MAC_RESULT} != 'skipped') || \
+               (${NEEDS_CODEQL_RESULT} != 'success' && ${NEEDS_CODEQL_RESULT} != 'skipped') || \
+               (${NEEDS_BUNDLE_SIZE_RESULT} != 'success' && ${NEEDS_BUNDLE_SIZE_RESULT} != 'skipped') ]]; then
             echo "One or more CI jobs failed."
             exit 1
           fi
           echo "All CI jobs passed!"
+        env:
+          NEEDS_LINT_RESULT: ${{ needs.lint.result }}
+          NEEDS_LINK_CHECKER_RESULT: ${{ needs.link_checker.result }}
+          NEEDS_TEST_LINUX_RESULT: ${{ needs.test_linux.result }}
+          NEEDS_TEST_MAC_RESULT: ${{ needs.test_mac.result }}
+          NEEDS_CODEQL_RESULT: ${{ needs.codeql.result }}
+          NEEDS_BUNDLE_SIZE_RESULT: ${{ needs.bundle_size.result }}
