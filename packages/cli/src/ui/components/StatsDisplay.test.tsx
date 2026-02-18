@@ -93,6 +93,7 @@ describe('<StatsDisplay />', () => {
             thoughts: 100,
             tool: 50,
           },
+          roles: {},
         },
         'gemini-2.5-flash': {
           api: { totalRequests: 5, totalErrors: 1, totalLatencyMs: 4500 },
@@ -105,6 +106,7 @@ describe('<StatsDisplay />', () => {
             thoughts: 2000,
             tool: 1000,
           },
+          roles: {},
         },
       },
     });
@@ -133,6 +135,7 @@ describe('<StatsDisplay />', () => {
             thoughts: 0,
             tool: 0,
           },
+          roles: {},
         },
       },
       tools: {
@@ -227,6 +230,7 @@ describe('<StatsDisplay />', () => {
               thoughts: 0,
               tool: 0,
             },
+            roles: {},
           },
         },
       });
@@ -411,6 +415,7 @@ describe('<StatsDisplay />', () => {
               thoughts: 0,
               tool: 0,
             },
+            roles: {},
           },
         },
       });

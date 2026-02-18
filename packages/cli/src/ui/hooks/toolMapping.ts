@@ -23,10 +23,15 @@ import {
  */
 export function mapToDisplay(
   toolOrTools: ToolCall[] | ToolCall,
-  options: { borderTop?: boolean; borderBottom?: boolean } = {},
+  options: {
+    borderTop?: boolean;
+    borderBottom?: boolean;
+    borderColor?: string;
+    borderDimColor?: boolean;
+  } = {},
 ): HistoryItemToolGroup {
   const toolCalls = Array.isArray(toolOrTools) ? toolOrTools : [toolOrTools];
-  const { borderTop, borderBottom } = options;
+  const { borderTop, borderBottom, borderColor, borderDimColor } = options;
 
   const toolDisplays = toolCalls.map((call): IndividualToolCallDisplay => {
     let description: string;
@@ -104,5 +109,7 @@ export function mapToDisplay(
     tools: toolDisplays,
     borderTop,
     borderBottom,
+    borderColor,
+    borderDimColor,
   };
 }
