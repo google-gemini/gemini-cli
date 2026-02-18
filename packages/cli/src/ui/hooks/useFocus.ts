@@ -16,12 +16,10 @@ export const DISABLE_FOCUS_REPORTING = '\x1b[?1004l';
 export const FOCUS_IN = '\x1b[I';
 export const FOCUS_OUT = '\x1b[O';
 
-export interface FocusState {
+export const useFocus = (): {
   isFocused: boolean;
   hasReceivedFocusEvent: boolean;
-}
-
-export const useFocusState = (): FocusState => {
+} => {
   const { stdin } = useStdin();
   const { stdout } = useStdout();
   const [isFocused, setIsFocused] = useState(true);
@@ -71,5 +69,3 @@ export const useFocusState = (): FocusState => {
     hasReceivedFocusEvent,
   };
 };
-
-export const useFocus = () => useFocusState().isFocused;

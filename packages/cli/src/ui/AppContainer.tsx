@@ -106,7 +106,7 @@ import { type BackgroundShell } from './hooks/shellCommandProcessor.js';
 import { useVim } from './hooks/vim.js';
 import { type LoadableSettingScope, SettingScope } from '../config/settings.js';
 import { type InitializationResult } from '../core/initializer.js';
-import { useFocusState } from './hooks/useFocus.js';
+import { useFocus } from './hooks/useFocus.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { KeypressPriority } from './contexts/KeypressContext.js';
 import { keyMatchers, Command } from './keyMatchers.js';
@@ -1250,7 +1250,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     sanitizationConfig: config.sanitizationConfig,
   });
 
-  const { isFocused, hasReceivedFocusEvent } = useFocusState();
+  const { isFocused, hasReceivedFocusEvent } = useFocus();
 
   // Context file names computation
   const contextFileNames = useMemo(() => {
@@ -1845,7 +1845,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const nightly = props.version.includes('nightly');
 
-  
   const dialogsVisible =
     (shouldShowRetentionWarning && retentionCheckComplete) ||
     shouldShowIdePrompt ||

@@ -187,7 +187,7 @@ vi.mock('./hooks/useTerminalTheme.js', () => ({
 import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
-import { useFocusState } from './hooks/useFocus.js';
+import { useFocus } from './hooks/useFocus.js';
 
 // Mock external utilities
 vi.mock('../utils/events.js');
@@ -296,7 +296,7 @@ describe('AppContainer State Management', () => {
   const mockedUseHookDisplayState = useHookDisplayState as Mock;
   const mockedUseTerminalTheme = useTerminalTheme as Mock;
   const mockedUseShellInactivityStatus = useShellInactivityStatus as Mock;
-  const mockedUseFocusState = useFocusState as Mock;
+  const mockedUseFocusState = useFocus as Mock;
 
   const DEFAULT_GEMINI_STREAM_MOCK = {
     streamingState: 'idle',
