@@ -73,8 +73,12 @@
       },
       { "label": "Model routing", "slug": "docs/cli/model-routing" },
       { "label": "Model selection", "slug": "docs/cli/model" },
-      { "label": "Plan mode (experimental)", "slug": "docs/cli/plan-mode" },
-      { "label": "Remote Agents", "slug": "docs/core/remote-agents" },
+      { "label": "Plan mode", "badge": "🧪", "slug": "docs/cli/plan-mode" },
+      {
+        "label": "Remote subagents",
+        "badge": "🧪",
+        "slug": "docs/core/remote-agents"
+      },
       { "label": "Rewind", "slug": "docs/cli/rewind" },
       { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
       { "label": "Settings", "slug": "docs/cli/settings" },
