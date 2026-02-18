@@ -29,6 +29,8 @@ import {
   DEFAULT_TOTAL_MAX_MATCHES,
   DEFAULT_SEARCH_TIMEOUT_MS,
 } from './constants.js';
+import { RIP_GREP_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 function getRgCandidateFilenames(): readonly string[] {
   return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
@@ -101,6 +103,16 @@ export interface RipGrepToolParams {
    * File pattern to include in the search (e.g. "*.js", "*.{ts,tsx}")
    */
   include?: string;
+
+  /**
+   * Optional: A regular expression pattern to exclude from the search results.
+   */
+  exclude_pattern?: string;
+
+  /**
+   * Optional: If true, only the file paths of the matches will be returned.
+   */
+  names_only?: boolean;
 
   /**
    * If true, searches case-sensitively. Defaults to false.
@@ -244,6 +256,7 @@ class GrepToolInvocation extends BaseToolInvocation<
           pattern: this.params.pattern,
           path: searchDirAbs,
           include: this.params.include,
+          exclude_pattern: this.params.exclude_pattern,
           case_sensitive: this.params.case_sensitive,
           fixed_strings: this.params.fixed_strings,
           context: this.params.context,
@@ -299,6 +312,16 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       const wasTruncated = matchCount >= totalMaxMatches;
 
+      if (this.params.names_only) {
+        const filePaths = Object.keys(matchesByFile).sort();
+        let llmContent = `Found ${filePaths.length} files with matches for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}${wasTruncated ? ` (results limited to ${totalMaxMatches} matches for performance)` : ''}:\n`;
+        llmContent += filePaths.join('\n');
+        return {
+          llmContent: llmContent.trim(),
+          returnDisplay: `Found ${filePaths.length} files${wasTruncated ? ' (limited)' : ''}`,
+        };
+      }
+
       let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}${wasTruncated ? ` (results limited to ${totalMaxMatches} matches for performance)` : ''}:\n---\n`;
 
       for (const filePath in matchesByFile) {
@@ -330,6 +353,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     pattern: string;
     path: string;
     include?: string;
+    exclude_pattern?: string;
     case_sensitive?: boolean;
     fixed_strings?: boolean;
     context?: number;
@@ -344,6 +368,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       pattern,
       path: absolutePath,
       include,
+      exclude_pattern,
       case_sensitive,
       fixed_strings,
       context,
@@ -423,9 +448,18 @@ class GrepToolInvocation extends BaseToolInvocation<
       });
 
       let matchesFound = 0;
+      let excludeRegex: RegExp | null = null;
+      if (exclude_pattern) {
+        excludeRegex = new RegExp(exclude_pattern, case_sensitive ? '' : 'i');
+      }
+
       for await (const line of generator) {
         const match = this.parseRipgrepJsonLine(line, absolutePath);
         if (match) {
+          if (excludeRegex && excludeRegex.test(match.line)) {
+            continue;
+          }
+
           results.push(match);
           if (!match.isContext) {
             matchesFound++;
@@ -527,71 +561,9 @@ export class RipGrepTool extends BaseDeclarativeTool<
     super(
       RipGrepTool.Name,
       'SearchText',
-      'Searches for a regular expression pattern within file contents. Max 100 matches.',
+      RIP_GREP_DEFINITION.base.description!,
       Kind.Search,
-      {
-        properties: {
-          pattern: {
-            description:
-              "The pattern to search for. By default, treated as a Rust-flavored regular expression. Use '\\b' for precise symbol matching (e.g., '\\bMatchMe\\b').",
-            type: 'string',
-          },
-          dir_path: {
-            description:
-              "Directory or file to search. Directories are searched recursively. Relative paths are resolved against current working directory. Defaults to current working directory ('.') if omitted.",
-            type: 'string',
-          },
-          include: {
-            description:
-              "Glob pattern to filter files (e.g., '*.ts', 'src/**'). Recommended for large repositories to reduce noise. Defaults to all files if omitted.",
-            type: 'string',
-          },
-          case_sensitive: {
-            description:
-              'If true, search is case-sensitive. Defaults to false (ignore case) if omitted.',
-            type: 'boolean',
-          },
-          fixed_strings: {
-            description:
-              'If true, treats the `pattern` as a literal string instead of a regular expression. Defaults to false (basic regex) if omitted.',
-            type: 'boolean',
-          },
-          context: {
-            description:
-              'Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.',
-            type: 'integer',
-          },
-          after: {
-            description:
-              'Show this many lines after each match (equivalent to grep -A). Defaults to 0 if omitted.',
-            type: 'integer',
-          },
-          before: {
-            description:
-              'Show this many lines before each match (equivalent to grep -B). Defaults to 0 if omitted.',
-            type: 'integer',
-          },
-          no_ignore: {
-            description:
-              'If true, searches all files including those usually ignored (like in .gitignore, build/, dist/, etc). Defaults to false if omitted.',
-            type: 'boolean',
-          },
-          max_matches_per_file: {
-            description:
-              'Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.',
-            type: 'integer',
-            minimum: 1,
-          },
-          total_max_matches: {
-            description:
-              'Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.',
-            type: 'integer',
-            minimum: 1,
-          },
-        },
-        required: ['pattern'],
-        type: 'object',
-      },
+      RIP_GREP_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
@@ -615,6 +587,14 @@ export class RipGrepTool extends BaseDeclarativeTool<
         new RegExp(params.pattern);
       } catch (error) {
         return `Invalid regular expression pattern provided: ${params.pattern}. Error: ${getErrorMessage(error)}`;
+      }
+    }
+
+    if (params.exclude_pattern) {
+      try {
+        new RegExp(params.exclude_pattern);
+      } catch (error) {
+        return `Invalid exclude regular expression pattern provided: ${params.exclude_pattern}. Error: ${getErrorMessage(error)}`;
       }
     }
 
@@ -677,5 +657,9 @@ export class RipGrepTool extends BaseDeclarativeTool<
       _toolName,
       _toolDisplayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(RIP_GREP_DEFINITION, modelId);
   }
 }

@@ -129,7 +129,7 @@ export type KeyBindingConfig = {
 export const defaultKeyBindings: KeyBindingConfig = {
   // Basic Controls
   [Command.RETURN]: [{ key: 'return' }],
-  [Command.ESCAPE]: [{ key: 'escape' }],
+  [Command.ESCAPE]: [{ key: 'escape' }, { key: '[', ctrl: true }],
   [Command.QUIT]: [{ key: 'c', ctrl: true }],
   [Command.EXIT]: [{ key: 'd', ctrl: true }],
 
@@ -178,6 +178,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.DELETE_WORD_FORWARD]: [
     { key: 'delete', ctrl: true },
     { key: 'delete', alt: true },
+    { key: 'd', alt: true },
   ],
   [Command.DELETE_CHAR_LEFT]: [{ key: 'backspace' }, { key: 'h', ctrl: true }],
   [Command.DELETE_CHAR_RIGHT]: [{ key: 'delete' }, { key: 'd', ctrl: true }],
@@ -286,10 +287,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]: [{ key: 'tab', shift: false }],
   [Command.BACKGROUND_SHELL_SELECT]: [{ key: 'return' }],
   [Command.BACKGROUND_SHELL_ESCAPE]: [{ key: 'escape' }],
-  [Command.SHOW_MORE_LINES]: [
-    { key: 'o', ctrl: true },
-    { key: 's', ctrl: true },
-  ],
+  [Command.SHOW_MORE_LINES]: [{ key: 'o', ctrl: true }],
   [Command.EXPAND_PASTE]: [{ key: 'o', ctrl: true }],
   [Command.FOCUS_SHELL_INPUT]: [{ key: 'tab', shift: false }],
   [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'tab', shift: true }],
@@ -499,9 +497,9 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.TOGGLE_COPY_MODE]: 'Toggle copy mode when in alternate buffer mode.',
   [Command.TOGGLE_YOLO]: 'Toggle YOLO (auto-approval) mode for tool calls.',
   [Command.CYCLE_APPROVAL_MODE]:
-    'Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only).',
+    'Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). Plan mode is skipped when the agent is busy.',
   [Command.SHOW_MORE_LINES]:
-    'Expand a height-constrained response to show additional lines when not in alternate buffer mode.',
+    'Expand and collapse blocks of content when not in alternate buffer mode.',
   [Command.EXPAND_PASTE]:
     'Expand or collapse a paste placeholder when cursor is over placeholder.',
   [Command.BACKGROUND_SHELL_SELECT]:
@@ -516,12 +514,12 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.UNFOCUS_BACKGROUND_SHELL_LIST]:
     'Move focus from background shell list to Gemini.',
   [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]:
-    'Show warning when trying to unfocus background shell via Tab.',
+    'Show warning when trying to move focus away from background shell.',
   [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]:
-    'Show warning when trying to unfocus shell input via Tab.',
+    'Show warning when trying to move focus away from shell input.',
   [Command.FOCUS_SHELL_INPUT]: 'Move focus from Gemini to the active shell.',
   [Command.UNFOCUS_SHELL_INPUT]: 'Move focus from the shell back to Gemini.',
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
   [Command.RESTART_APP]: 'Restart the application.',
-  [Command.SUSPEND_APP]: 'Suspend the application (not yet implemented).',
+  [Command.SUSPEND_APP]: 'Suspend the CLI and move it to the background.',
 };

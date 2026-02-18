@@ -31,12 +31,12 @@
 decision = "deny"
 priority = 60
 modes = ["plan"]
-deny_message = "You are in Plan Mode - adjust your prompt to only use read and search tools."
+deny_message = "You are in Plan Mode with access to read-only tools. Execution of scripts (including those from skills) is blocked."
 
 # Explicitly Allow Read-Only Tools in Plan mode.
 
 [[rule]]
-toolName = ["glob", "grep_search", "list_directory", "read_file", "google_web_search"]
+toolName = ["glob", "grep_search", "list_directory", "read_file", "google_web_search", "activate_skill"]
 decision = "allow"
 priority = 70
 modes = ["plan"]
@@ -53,4 +53,4 @@ toolName = ["write_file", "replace"]
 decision = "allow"
 priority = 70
 modes = ["plan"]
-argsPattern = "\"file_path\":\"[^\"]+/\\.gemini/tmp/[a-zA-Z0-9_-]+/plans/[a-zA-Z0-9_-]+\\.md\""
+argsPattern = "\"file_path\":\"[^\"]+/\\.gemini/tmp/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+/plans/[a-zA-Z0-9_-]+\\.md\""

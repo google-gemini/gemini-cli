@@ -12,7 +12,7 @@ import type { Todo } from '@google/gemini-cli-core';
 import type { UIState } from '../../contexts/UIStateContext.js';
 import { UIStateContext } from '../../contexts/UIStateContext.js';
 import type { HistoryItem } from '../../types.js';
-import { ToolCallStatus } from '../../types.js';
+import { CoreToolCallStatus } from '@google/gemini-cli-core';
 
 const createTodoHistoryItem = (todos: Todo[]): HistoryItem =>
   ({
@@ -22,7 +22,7 @@ const createTodoHistoryItem = (todos: Todo[]): HistoryItem =>
       {
         name: 'write_todos',
         callId: 'tool-1',
-        status: ToolCallStatus.Success,
+        status: CoreToolCallStatus.Success,
         resultDisplay: {
           todos,
         },
