@@ -127,6 +127,7 @@ import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath } from '../utils/paths.js';
 
 export interface AccessibilitySettings {
+  /** @deprecated Use ui.loadingPhrases instead. */
   enableLoadingPhrases?: boolean;
   screenReader?: boolean;
 }

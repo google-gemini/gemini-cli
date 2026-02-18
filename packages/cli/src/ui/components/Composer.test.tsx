@@ -388,16 +388,16 @@ describe('Composer', () => {
       expect(output).not.toContain('ShortcutsHint');
     });
 
-    it('renders LoadingIndicator without thought when accessibility disables loading phrases', () => {
+    it('renders LoadingIndicator without thought when loadingPhrases is off', () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         thought: { subject: 'Hidden', description: 'Should not show' },
       });
-      const config = createMockConfig({
-        getAccessibility: vi.fn(() => ({ enableLoadingPhrases: false })),
+      const settings = createMockSettings({
+        merged: { ui: { loadingPhrases: 'off' } },
       });
 
-      const { lastFrame } = renderComposer(uiState, undefined, config);
+      const { lastFrame } = renderComposer(uiState, settings);
 
       const output = lastFrame();
       expect(output).toContain('LoadingIndicator');

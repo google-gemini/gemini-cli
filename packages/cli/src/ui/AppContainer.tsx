@@ -1534,6 +1534,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     streamingState,
     shouldShowFocusHint,
     retryStatus,
+    loadingPhrasesMode: settings.merged.ui.loadingPhrases,
+    customWittyPhrases: settings.merged.ui.customWittyPhrases,
   });
 
   const handleGlobalKeypress = useCallback(

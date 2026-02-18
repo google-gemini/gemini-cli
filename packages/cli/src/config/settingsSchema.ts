@@ -653,6 +653,22 @@ const SETTINGS_SCHEMA = {
         description: 'Show the spinner during operations.',
         showInDialog: true,
       },
+      loadingPhrases: {
+        type: 'enum',
+        label: 'Loading Phrases',
+        category: 'UI',
+        requiresRestart: false,
+        default: 'tips',
+        description:
+          'What to show while the model is working: tips, witty comments, both, or nothing.',
+        showInDialog: true,
+        options: [
+          { value: 'tips', label: 'Tips' },
+          { value: 'witty', label: 'Witty' },
+          { value: 'all', label: 'All' },
+          { value: 'off', label: 'Off' },
+        ],
+      },
       customWittyPhrases: {
         type: 'array',
         label: 'Custom Witty Phrases',
@@ -681,8 +697,9 @@ const SETTINGS_SCHEMA = {
             category: 'UI',
             requiresRestart: true,
             default: true,
-            description: 'Enable loading phrases during operations.',
-            showInDialog: true,
+            description:
+              '@deprecated Use ui.loadingPhrases instead. Enable loading phrases during operations.',
+            showInDialog: false,
           },
           screenReader: {
             type: 'boolean',
