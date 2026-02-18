@@ -352,7 +352,6 @@ export function getDisplayValue(
   key: string,
   scopeSettings: Settings,
   _mergedSettings: Settings,
-  restartChangedKeys: Set<string>,
 ): string {
   const definition = getSettingDefinition(key);
   const existsInScope = settingExistsInScope(key, scopeSettings);
@@ -373,8 +372,7 @@ export function getDisplayValue(
     valueString = option?.label ?? `${value}`;
   }
 
-  // Mark with asterisk if setting exists in current scope OR is a pending restart-required change
-  if (existsInScope || restartChangedKeys.has(key)) {
+  if (existsInScope) {
     return `${valueString}*`;
   }
 

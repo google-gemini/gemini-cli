@@ -9,7 +9,10 @@ import { Box, Text } from 'ink';
 import chalk from 'chalk';
 import { theme } from '../../semantic-colors.js';
 import type { LoadableSettingScope } from '../../../config/settings.js';
-import type { SettingsValue } from '../../../config/settingsSchema.js';
+import type {
+  SettingsType,
+  SettingsValue,
+} from '../../../config/settingsSchema.js';
 import { getScopeItems } from '../../../utils/dialogScopeUtils.js';
 import { RadioButtonSelect } from './RadioButtonSelect.js';
 import { TextInput } from './TextInput.js';
@@ -34,7 +37,7 @@ export interface SettingsDialogItem {
   /** Optional description below label */
   description?: string;
   /** Item type for determining interaction behavior */
-  type: 'boolean' | 'number' | 'string' | 'enum' | 'array' | 'object';
+  type: SettingsType;
   /** Pre-formatted display value (with * if modified) */
   displayValue: string;
   /** Grey out value (at default) */

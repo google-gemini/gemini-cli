@@ -728,14 +728,8 @@ describe('SettingsUtils', () => {
           const mergedSettings = makeMockSettings({
             ui: { theme: NumberEnum.THREE },
           });
-          const modifiedSettings = new Set<string>();
 
-          const result = getDisplayValue(
-            'ui.theme',
-            settings,
-            mergedSettings,
-            modifiedSettings,
-          );
+          const result = getDisplayValue('ui.theme', settings, mergedSettings);
 
           expect(result).toBe('Three*');
         });
@@ -765,13 +759,11 @@ describe('SettingsUtils', () => {
               },
             },
           } as unknown as SettingsSchemaType);
-          const modifiedSettings = new Set<string>();
 
           const result = getDisplayValue(
             'ui.theme',
             makeMockSettings({}),
             makeMockSettings({}),
-            modifiedSettings,
           );
           expect(result).toBe('Three');
         });
@@ -784,14 +776,8 @@ describe('SettingsUtils', () => {
           const mergedSettings = makeMockSettings({
             ui: { theme: StringEnum.BAR },
           });
-          const modifiedSettings = new Set<string>();
 
-          const result = getDisplayValue(
-            'ui.theme',
-            settings,
-            mergedSettings,
-            modifiedSettings,
-          );
+          const result = getDisplayValue('ui.theme', settings, mergedSettings);
           expect(result).toBe('Bar*');
         });
 
@@ -805,14 +791,8 @@ describe('SettingsUtils', () => {
           } as unknown as SettingsSchemaType);
           const settings = makeMockSettings({ ui: { theme: 'xyz' } });
           const mergedSettings = makeMockSettings({ ui: { theme: 'xyz' } });
-          const modifiedSettings = new Set<string>();
 
-          const result = getDisplayValue(
-            'ui.theme',
-            settings,
-            mergedSettings,
-            modifiedSettings,
-          );
+          const result = getDisplayValue('ui.theme', settings, mergedSettings);
           expect(result).toBe('xyz*');
         });
 
@@ -824,13 +804,11 @@ describe('SettingsUtils', () => {
               },
             },
           } as unknown as SettingsSchemaType);
-          const modifiedSettings = new Set<string>();
 
           const result = getDisplayValue(
             'ui.theme',
             makeMockSettings({}),
             makeMockSettings({}),
-            modifiedSettings,
           );
           expect(result).toBe('Bar');
         });
@@ -843,13 +821,11 @@ describe('SettingsUtils', () => {
         const mergedSettings = makeMockSettings({
           ui: { requiresRestart: false },
         });
-        const restartChangedKeys = new Set<string>();
 
         const result = getDisplayValue(
           'ui.requiresRestart',
           settings,
           mergedSettings,
-          restartChangedKeys,
         );
         expect(result).toBe('false*');
       });
@@ -859,13 +835,11 @@ describe('SettingsUtils', () => {
         const mergedSettings = makeMockSettings({
           ui: { requiresRestart: false },
         });
-        const restartChangedKeys = new Set<string>();
 
         const result = getDisplayValue(
           'ui.requiresRestart',
           settings,
           mergedSettings,
-          restartChangedKeys,
         );
         expect(result).toBe('false'); // shows default value
       });
@@ -875,13 +849,11 @@ describe('SettingsUtils', () => {
         const mergedSettings = makeMockSettings({
           ui: { requiresRestart: true },
         }); // inherited merged value differs from schema default (false)
-        const restartChangedKeys = new Set<string>();
 
         const result = getDisplayValue(
           'ui.requiresRestart',
           settings,
           mergedSettings,
-          restartChangedKeys,
         );
         expect(result).toBe('false');
       });
@@ -891,31 +863,13 @@ describe('SettingsUtils', () => {
         const mergedSettings = makeMockSettings({
           ui: { requiresRestart: true },
         });
-        const restartChangedKeys = new Set<string>();
 
         const result = getDisplayValue(
           'ui.requiresRestart',
           settings,
           mergedSettings,
-          restartChangedKeys,
         );
         expect(result).toBe('true*');
-      });
-
-      it('should show value with * when key is in restartChangedKeys (even if not in scope)', () => {
-        const settings = makeMockSettings({}); // setting doesn't exist in scope originally
-        const mergedSettings = makeMockSettings({
-          ui: { requiresRestart: false },
-        });
-        const restartChangedKeys = new Set<string>(['ui.requiresRestart']);
-
-        const result = getDisplayValue(
-          'ui.requiresRestart',
-          settings,
-          mergedSettings,
-          restartChangedKeys,
-        );
-        expect(result).toBe('false*'); // default value with * because it's in restartChangedKeys
       });
     });
 

@@ -225,12 +225,7 @@ export function SettingsDialog({
       const type: SettingsType = definition?.type ?? 'string';
 
       // Get the display value (with * indicator if modified)
-      const displayValue = getDisplayValue(
-        key,
-        scopeSettings,
-        mergedSettings,
-        restartChangedKeys,
-      );
+      const displayValue = getDisplayValue(key, scopeSettings, mergedSettings);
 
       // Get the scope message (e.g., "(Modified in Workspace)")
       const scopeMessage = getScopeMessageForSetting(
@@ -258,7 +253,7 @@ export function SettingsDialog({
         editValue,
       };
     });
-  }, [settingKeys, selectedScope, settings, restartChangedKeys]);
+  }, [settingKeys, selectedScope, settings]);
 
   const { filteredItems, searchBuffer, maxLabelWidth } = useFuzzyList({
     items,
