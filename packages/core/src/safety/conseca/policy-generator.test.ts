@@ -9,6 +9,7 @@ import { generatePolicy } from './policy-generator.js';
 import { SafetyCheckDecision } from '../protocol.js';
 import type { Config } from '../../config/config.js';
 import type { ContentGenerator } from '../../core/contentGenerator.js';
+import { LlmRole } from '../../telemetry/index.js';
 
 describe('policy_generator', () => {
   let mockConfig: Config;
@@ -70,6 +71,7 @@ describe('policy_generator', () => {
         contents: expect.any(Array),
       }),
       'conseca-policy-generation',
+      LlmRole.SUBAGENT,
     );
     expect(result.policy).toEqual(mockPolicy);
     expect(result.error).toBeUndefined();

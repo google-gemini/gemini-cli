@@ -14,6 +14,8 @@ import { safeTemplateReplace } from '../../utils/textUtils.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../../config/models.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
+import { LlmRole } from '../../telemetry/index.js';
+
 const CONSECA_ENFORCEMENT_PROMPT = `
 You are a security enforcement engine. Your goal is to check if a specific tool call complies with a given security policy.
 
@@ -107,7 +109,8 @@ export async function enforcePolicy(
           },
         ],
       },
-      'conseca-enforcement',
+      'conseca-policy-enforcement',
+      LlmRole.SUBAGENT,
     );
 
     const responseText = getResponseText(result);
@@ -122,8 +125,7 @@ export async function enforcePolicy(
     }
 
     try {
-      const parsed: z.infer<typeof EnforcementResultSchema> =
-        JSON.parse(responseText);
+      const parsed = EnforcementResultSchema.parse(JSON.parse(responseText));
       debugLogger.debug(`[Conseca] Enforcement Parsed:`, parsed);
 
       let decision: SafetyCheckDecision;

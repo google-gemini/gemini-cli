@@ -10,6 +10,7 @@ import type { Config } from '../../config/config.js';
 import type { ContentGenerator } from '../../core/contentGenerator.js';
 import { SafetyCheckDecision } from '../protocol.js';
 import type { FunctionCall } from '@google/genai';
+import { LlmRole } from '../../telemetry/index.js';
 
 describe('policy_enforcer', () => {
   let mockConfig: Config;
@@ -68,7 +69,8 @@ describe('policy_enforcer', () => {
           }),
         ]),
       }),
-      'conseca-enforcement',
+      'conseca-policy-enforcement',
+      LlmRole.SUBAGENT,
     );
     expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
   });

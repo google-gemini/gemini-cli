@@ -117,7 +117,10 @@ function ruleMatches(
     if (rule.toolName === '*') {
       // Match all tools
     } else if (isWildcardPattern(rule.toolName)) {
-      if (!toolCall.name || !matchesWildcard(rule.toolName, toolCall.name)) {
+      if (
+        !toolCall.name ||
+        !matchesWildcard(rule.toolName, toolCall.name, serverName)
+      ) {
         return false;
       }
     } else if (toolCall.name !== rule.toolName) {
