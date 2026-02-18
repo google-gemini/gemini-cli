@@ -108,6 +108,8 @@ export interface IndividualToolCallDisplay {
   outputFile?: string;
   correlationId?: string;
   approvalMode?: ApprovalMode;
+  progressMessage?: string;
+  progressPercent?: number;
 }
 
 export interface CompressionProps {
