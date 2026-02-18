@@ -100,6 +100,48 @@ describe('FeatureGate', () => {
     expect(gate.enabled('testGA')).toBe(true);
   });
 
+  it('should return feature info with metadata', () => {
+    const gate = DefaultFeatureGate.deepCopy();
+    gate.add({
+      feat1: [
+        {
+          preRelease: FeatureStage.Alpha,
+          since: '0.1.0',
+          description: 'Feature 1',
+        },
+      ],
+      feat2: [
+        {
+          preRelease: FeatureStage.Beta,
+          since: '0.2.0',
+          until: '0.3.0',
+          description: 'Feature 2',
+        },
+      ],
+    });
+
+    const info = gate.getFeatureInfo();
+    const feat1 = info.find((f) => f.key === 'feat1');
+    const feat2 = info.find((f) => f.key === 'feat2');
+
+    expect(feat1).toEqual({
+      key: 'feat1',
+      enabled: false,
+      stage: FeatureStage.Alpha,
+      since: '0.1.0',
+      until: undefined,
+      description: 'Feature 1',
+    });
+    expect(feat2).toEqual({
+      key: 'feat2',
+      enabled: true,
+      stage: FeatureStage.Beta,
+      since: '0.2.0',
+      until: '0.3.0',
+      description: 'Feature 2',
+    });
+  });
+
   it('should respect allAlpha/allBeta toggles', () => {
     const gate = DefaultFeatureGate.deepCopy();
     gate.add({

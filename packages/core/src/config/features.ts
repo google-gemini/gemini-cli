@@ -68,6 +68,18 @@ export interface FeatureSpec {
 }
 
 /**
+ * FeatureInfo provides a summary of a feature's current state and metadata.
+ */
+export interface FeatureInfo {
+  key: string;
+  enabled: boolean;
+  stage: FeatureStage;
+  since?: string;
+  until?: string;
+  description?: string;
+}
+
+/**
  * FeatureGate provides a read-only interface to query feature status.
  */
 export interface FeatureGate {
@@ -79,6 +91,10 @@ export interface FeatureGate {
    * Returns all known feature keys.
    */
   knownFeatures(): string[];
+  /**
+   * Returns all features with their status and metadata.
+   */
+  getFeatureInfo(): FeatureInfo[];
   /**
    * Returns a mutable copy of the current gate.
    */
@@ -187,6 +203,22 @@ class FeatureGateImpl implements MutableFeatureGate {
 
   knownFeatures(): string[] {
     return Array.from(this.specs.keys());
+  }
+
+  getFeatureInfo(): FeatureInfo[] {
+    return Array.from(this.specs.entries())
+      .map(([key, specs]) => {
+        const latestSpec = specs[specs.length - 1];
+        return {
+          key,
+          enabled: this.enabled(key),
+          stage: latestSpec.preRelease,
+          since: latestSpec.since,
+          until: latestSpec.until,
+          description: latestSpec.description,
+        };
+      })
+      .sort((a, b) => a.key.localeCompare(b.key));
   }
 
   deepCopy(): MutableFeatureGate {

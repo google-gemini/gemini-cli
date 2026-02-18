@@ -15,13 +15,14 @@ import {
   type SkillDefinition,
   type AgentDefinition,
   type ApprovalMode,
+  type FeatureInfo,
   CoreToolCallStatus,
   checkExhaustive,
 } from '@google/gemini-cli-core';
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
 
-export type { ThoughtSummary, SkillDefinition };
+export type { ThoughtSummary, SkillDefinition, FeatureInfo };
 
 export enum AuthState {
   // Attempting to authenticate or re-authenticate
@@ -273,6 +274,11 @@ export type HistoryItemSkillsList = HistoryItemBase & {
   showDescriptions: boolean;
 };
 
+export type HistoryItemFeaturesList = HistoryItemBase & {
+  type: 'features_list';
+  features: FeatureInfo[];
+};
+
 export type AgentDefinitionJson = Pick<
   AgentDefinition,
   'name' | 'displayName' | 'description' | 'kind'
@@ -370,6 +376,7 @@ export type HistoryItemWithoutId =
   | HistoryItemExtensionsList
   | HistoryItemToolsList
   | HistoryItemSkillsList
+  | HistoryItemFeaturesList
   | HistoryItemAgentsList
   | HistoryItemMcpStatus
   | HistoryItemChatList
@@ -395,6 +402,7 @@ export enum MessageType {
   EXTENSIONS_LIST = 'extensions_list',
   TOOLS_LIST = 'tools_list',
   SKILLS_LIST = 'skills_list',
+  FEATURES_LIST = 'features_list',
   AGENTS_LIST = 'agents_list',
   MCP_STATUS = 'mcp_status',
   CHAT_LIST = 'chat_list',
