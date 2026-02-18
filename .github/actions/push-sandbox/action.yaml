@@ -45,8 +45,8 @@ runs:
       id: 'image_tag'
       shell: 'bash'
       run: |-
-        SHELL_TAG_NAME="${{ inputs.github-ref-name }}"
-        FINAL_TAG="${{ inputs.github-sha }}"
+        SHELL_TAG_NAME="${INPUTS_GITHUB_REF_NAME}"
+        FINAL_TAG="${INPUTS_GITHUB_SHA}"
         if [[ "$SHELL_TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
           echo "Release detected."
           FINAL_TAG="${SHELL_TAG_NAME#v}"
@@ -55,22 +55,28 @@ runs:
         fi
         echo "Determined image tag: $FINAL_TAG"
         echo "FINAL_TAG=$FINAL_TAG" >> $GITHUB_OUTPUT
+      env:
+        INPUTS_GITHUB_REF_NAME: ${{ inputs.github-ref-name }}
+        INPUTS_GITHUB_SHA: ${{ inputs.github-sha }}
     - name: 'build'
       id: 'docker_build'
       shell: 'bash'
       env:
         GEMINI_SANDBOX_IMAGE_TAG: '${{ steps.image_tag.outputs.FINAL_TAG }}'
         GEMINI_SANDBOX: 'docker'
+        STEPS_IMAGE_TAG_OUTPUTS_FINAL_TAG: ${{ steps.image_tag.outputs.FINAL_TAG }}
       run: |-
         npm run build:sandbox -- \
-          --image ghcr.io/${{ github.repository}}/sandbox:${{ steps.image_tag.outputs.FINAL_TAG }} \
+          --image ghcr.io/${{ github.repository}}/sandbox:${STEPS_IMAGE_TAG_OUTPUTS_FINAL_TAG} \
           --output-file final_image_uri.txt
         echo "uri=$(cat final_image_uri.txt)" >> $GITHUB_OUTPUT
     - name: 'publish'
       shell: 'bash'
       if: "${{ inputs.dry-run == 'false' }}"
       run: |-
-        docker push "${{ steps.docker_build.outputs.uri }}"
+        docker push "${STEPS_DOCKER_BUILD_OUTPUTS_URI}"
+      env:
+        STEPS_DOCKER_BUILD_OUTPUTS_URI: ${{ steps.docker_build.outputs.uri }}
     - name: 'Create issue on failure'
       if: |-
         ${{ failure() }}

@@ -253,8 +253,10 @@ jobs:
     steps:
       - name: 'Check E2E test results'
         run: |
-          if [[ ${{ needs.e2e_linux.result }} != 'success' ]]; then
+          if [[ ${NEEDS_E2E_LINUX_RESULT} != 'success' ]]; then
             echo "The required E2E test job failed."
             exit 1
           fi
           echo "All required E2E test jobs passed!"
+        env:
+          NEEDS_E2E_LINUX_RESULT: ${{ needs.e2e_linux.result }}
