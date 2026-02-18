@@ -975,6 +975,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // Handle Tab key for ghost text acceptance
       if (
         key.name === 'tab' &&
+        !key.shift &&
         !completion.showSuggestions &&
         completion.promptCompletion.text
       ) {
