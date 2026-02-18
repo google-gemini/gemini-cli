@@ -9,6 +9,7 @@ import { useCallback, useContext, useMemo, useState } from 'react';
 import { Box, Text } from 'ink';
 import {
   PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL,
@@ -37,6 +38,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const preferredModel = config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
 
   const shouldShowPreviewModels = config?.getHasAccessToPreviewModel();
+  const useGemini31 = config?.getGemini31LaunchedSync?.() ?? false;
 
   const manualModelSelected = useMemo(() => {
     const manualModels = [
@@ -44,6 +46,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       DEFAULT_GEMINI_FLASH_MODEL,
       DEFAULT_GEMINI_FLASH_LITE_MODEL,
       PREVIEW_GEMINI_MODEL,
+      PREVIEW_GEMINI_3_1_MODEL,
       PREVIEW_GEMINI_FLASH_MODEL,
     ];
     if (manualModels.includes(preferredModel)) {
@@ -94,13 +97,14 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       list.unshift({
         value: PREVIEW_GEMINI_MODEL_AUTO,
         title: getDisplayString(PREVIEW_GEMINI_MODEL_AUTO),
-        description:
-          'Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash',
+        description: useGemini31
+          ? 'Let Gemini CLI decide the best model for the task: gemini-3.1-pro, gemini-3-flash'
+          : 'Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash',
         key: PREVIEW_GEMINI_MODEL_AUTO,
       });
     }
     return list;
-  }, [shouldShowPreviewModels, manualModelSelected]);
+  }, [shouldShowPreviewModels, manualModelSelected, useGemini31]);
 
   const manualOptions = useMemo(() => {
     const list = [
@@ -124,9 +128,9 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     if (shouldShowPreviewModels) {
       list.unshift(
         {
-          value: PREVIEW_GEMINI_MODEL,
-          title: PREVIEW_GEMINI_MODEL,
-          key: PREVIEW_GEMINI_MODEL,
+          value: useGemini31 ? PREVIEW_GEMINI_3_1_MODEL : PREVIEW_GEMINI_MODEL,
+          title: useGemini31 ? PREVIEW_GEMINI_3_1_MODEL : PREVIEW_GEMINI_MODEL,
+          key: useGemini31 ? PREVIEW_GEMINI_3_1_MODEL : PREVIEW_GEMINI_MODEL,
         },
         {
           value: PREVIEW_GEMINI_FLASH_MODEL,
@@ -136,7 +140,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       );
     }
     return list;
-  }, [shouldShowPreviewModels]);
+  }, [shouldShowPreviewModels, useGemini31]);
 
   const options = view === 'main' ? mainOptions : manualOptions;
 
