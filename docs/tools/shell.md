@@ -120,8 +120,8 @@ tools to detect if they are being run from within the Gemini CLI.
 
 ## Command restrictions
 
-> **IMPORTANT:** The `tools.core` setting is an **allowlist for ALL built-in
-> tools**, not just shell commands. When you set `tools.core` to any value, ONLY
+> **Important:** The `tools.core` setting is an **allowlist for *all* built-in
+> tools**, not just shell commands. When you set `tools.core` to any value, *only*
 > the tools explicitly listed will be enabled. This includes all built-in tools
 > like `read_file`, `write_file`, `glob`, `grep_search`, `list_directory`,
 > `replace`, etc. See
