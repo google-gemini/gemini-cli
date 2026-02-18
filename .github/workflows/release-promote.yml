@@ -360,23 +360,28 @@ jobs:
       - name: 'Create and switch to a new branch'
         id: 'release_branch'
         run: |
-          BRANCH_NAME="chore/nightly-version-bump-${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"
+          BRANCH_NAME="chore/nightly-version-bump-${NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION}"
           git switch -c "${BRANCH_NAME}"
           echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
+        env:
+          NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION: ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}
 
       - name: 'Update package versions'
-        run: 'npm run release:version "${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"'
+        run: 'npm run release:version "${NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION}"'
+        env:
+          NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION: ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}
 
       - name: 'Commit and Push package versions'
         env:
           BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
           DRY_RUN: '${{ github.event.inputs.dry_run }}'
+          NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION: ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}
         run: |-
           git add package.json packages/*/package.json
           if [ -f package-lock.json ]; then
             git add package-lock.json
           fi
-          git commit -m "chore(release): bump version to ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"
+          git commit -m "chore(release): bump version to ${NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION}"
           if [[ "${DRY_RUN}" == "false" ]]; then
             echo "Pushing release branch to remote..."
             git push --set-upstream origin "${BRANCH_NAME}"
