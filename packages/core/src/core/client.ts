@@ -560,6 +560,7 @@ export class GeminiClient {
     let turn = new Turn(this.getChat(), prompt_id);
 
     this.sessionTurnCount++;
+    debugLogger.debug(`[LegacyLoop] processTurn started. sessionTurnCount: ${this.sessionTurnCount}, prompt_id: ${prompt_id}`);
     if (
       this.config.getMaxSessionTurns() > 0 &&
       this.sessionTurnCount > this.config.getMaxSessionTurns()
@@ -792,6 +793,7 @@ export class GeminiClient {
     isInvalidStreamRetry: boolean = false,
     displayContent?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    debugLogger.debug(`[LegacyLoop] sendMessageStream started. prompt_id: ${prompt_id}, turns left: ${turns}`);
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
     }

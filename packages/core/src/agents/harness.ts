@@ -170,8 +170,9 @@ export class AgentHarness {
     try {
       while (this.turnCounter < maxTurnsLimit) {
         const promptId = `${this.behavior.agentId}#${this.turnCounter}`;
+        const historySize = this.chat?.getHistory().length || 0;
         debugLogger.debug(
-          `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Starting turn ${this.turnCounter} (promptId: ${promptId})`,
+          `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Starting turn ${this.turnCounter} (promptId: ${promptId}). History size: ${historySize} messages.`,
         );
 
         if (combinedSignal.aborted) {
@@ -265,9 +266,9 @@ export class AgentHarness {
 
           // Subagent activity reporting
           if (this.behavior.name !== 'main') {
+            const behaviorWithDef = this.behavior as SubagentBehavior;
             const displayName =
-              (this.behavior as any).definition?.displayName ||
-              this.behavior.name;
+              behaviorWithDef.definition.displayName || this.behavior.name;
 
             if (event.type === GeminiEventType.Thought) {
               yield {
@@ -387,108 +388,67 @@ export class AgentHarness {
                                       `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] isGoalReached check: ${goalReached}`,
                                     );
                           
-                                    if (goalReached) {
-                                      terminateReason = AgentTerminateMode.GOAL;
-                                      debugLogger.debug(
-                                        `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Goal reached. Processing findings for ${toolResults.length} tool results.`,
-                                      );
-                          
-                                      // Extract results from the 'complete_task' tool call arguments
-                                      for (const r of toolResults) {
-                                        const completeCall = turn.pendingToolCalls.find(
-                                          (c) => c.name === TASK_COMPLETE_TOOL_NAME,
-                                        );
-                          
-                                        let findingsText: string | undefined;
-                          
-                                                      if (r.name === TASK_COMPLETE_TOOL_NAME && completeCall) {
-                                                        const outputName =
-                                                          (this.behavior as SubagentBehavior).definition?.outputConfig
-                                                            ?.outputName || 'result';
-                                                        const rawFindings =
-                                                          completeCall.args[outputName] || completeCall.args['result'];
-                                        
-                                                        debugLogger.debug(
-                                                          `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Extracting from complete_task args (${outputName}). Found: ${!!rawFindings}`,
-                                                        );
-                                        
-                                                        if (rawFindings !== undefined) {
-                                                          // CAPTURE RAW DATA: Don't stringify if it's an object/array,
-                                                          // we need to preserve structure for the parent model.
-                                                          turn.submittedOutput = rawFindings as any;
-                                                          
-                                                          findingsText =
-                                                            typeof rawFindings === 'object'
-                                                              ? JSON.stringify(rawFindings, null, 2)
-                                                              : String(rawFindings);
-                                                        }
-                                                      } else {
-                                                        const findings =
-                                                          (r.result?.data as any)?.result || r.result?.resultDisplay;
-                                                        if (findings !== undefined) {
-                                                          findingsText = String(findings);
-                                                          // Also capture as raw if not already set
-                                                          if (turn.submittedOutput === undefined) {
-                                                              turn.submittedOutput = findings;
-                                                          }
-                                                        }
-                                                      }
-                                        
-                                                      if (findingsText) {
-                                                        debugLogger.debug(
-                                                          `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Captured findings text. Length: ${findingsText.length}`,
-                                                        );
-                                                                                  if (this.chat) {
-                                            // Ensure the chat session records the final text result so future turns or getResponseText() can see it
-                                            this.chat.addHistory({
-                                              role: 'model',
-                                              parts: [{ text: findingsText }],
-                                            });
-                                          }
-                                        }
-                                      }
-                          
-                                      return turn;
+                              if (goalReached) {
+                                terminateReason = AgentTerminateMode.GOAL;
+                                debugLogger.debug(
+                                  `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Goal reached. Processing findings for ${toolResults.length} tool results.`,
+                                );
+                    
+                                // Extract results from the 'complete_task' tool call arguments
+                                for (const r of toolResults) {
+                                  const completeCall = turn.pendingToolCalls.find(
+                                    (c) => c.name === TASK_COMPLETE_TOOL_NAME,
+                                  );
+                    
+                                  let findingsText: string | undefined;
+                    
+                                  if (r.name === TASK_COMPLETE_TOOL_NAME && completeCall) {
+                                    const behaviorWithDef = this.behavior as SubagentBehavior;
+                                    const outputName =
+                                      behaviorWithDef.definition.outputConfig.outputName ||
+                                      'result';
+                                    const args = completeCall.args as Record<string, unknown>;
+                                    const rawFindings = args[outputName] || args['result'];
+                    
+                                    debugLogger.debug(
+                                      `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Extracting from complete_task args (${outputName}). Found: ${!!rawFindings}`,
+                                    );
+                    
+                                    if (rawFindings !== undefined) {
+                                      // CAPTURE RAW DATA: Don't stringify if it's an object/array,
+                                      // we need to preserve structure for the parent model.
+                                      turn.submittedOutput = rawFindings as string;
+                    
+                                      findingsText =
+                                        typeof rawFindings === 'object'
+                                          ? JSON.stringify(rawFindings, null, 2)
+                                          : String(rawFindings);
                                     }
-                                              
-          currentRequest = toolResults.map((r) => {
-            // For subagents, we want to return the raw result to the LLM, not the human-friendly display.
-            const tool = this.toolRegistry.getTool(r.name);
-            if (tool instanceof SubagentTool) {
-              const outputName =
-                (tool as any).definition?.outputConfig?.outputName || 'result';
-              const findings = (r.result?.data as any)?.[outputName] || (r.result?.data as any)?.['result'];
-
-              debugLogger.debug(`[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Subagent tool ${r.name} findings type: ${typeof findings}. Using outputName: ${outputName}`);
-
-              if (findings !== undefined && 'functionResponse' in r.part && r.part.functionResponse) {
-                const responsePayload = { [outputName]: findings };
-                debugLogger.debug(`[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Sending tool response keys: ${Object.keys(responsePayload).join(', ')}`);
-                
-                return {
-                  functionResponse: {
-                    ...r.part.functionResponse,
-                    response: responsePayload,
-                  },
-                };
+                                  } else {
+                                    const findings =
+                                      (r.result?.data as Record<string, unknown> | undefined)?.[
+                                        'result'
+                                      ] || r.result?.resultDisplay;
+                                    if (findings !== undefined) {
+                                      findingsText = String(findings);
+                                      // Also capture as raw if not already set
+                                      if (turn.submittedOutput === undefined) {
+                                        turn.submittedOutput = findings as string;
+                                      }
+                                    }
+                                  }
+                                            
+                          if (findingsText) {
+                debugLogger.debug(
+                  `[AgentHarness] [${this.behavior.name}:${this.behavior.agentId}] Captured findings text. Length: ${findingsText.length}`,
+                );
               }
             }
 
-            // Fallback for other tools: Ensure the LLM "sees" the rich result display if it's available.
-            if (
-              r.result?.resultDisplay &&
-              'functionResponse' in r.part &&
-              r.part.functionResponse
-            ) {
-              return {
-                functionResponse: {
-                  ...r.part.functionResponse,
-                  response: { result: String(r.result.resultDisplay) },
-                },
-              };
-            }
-            return r.part;
-          });
+            return turn;
+          }
+                                              
+          currentRequest = toolResults.map((r) => r.part);
           this.turnCounter++;
           if (this.turnCounter >= maxTurnsLimit) {
             terminateReason = AgentTerminateMode.MAX_TURNS;

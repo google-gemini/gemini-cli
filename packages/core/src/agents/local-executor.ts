@@ -235,12 +235,23 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     onWaitingForConfirmation?: (waiting: boolean) => void,
   ): Promise<AgentTurnResult> {
     const promptId = `${this.agentId}#${turnCounter}`;
+    debugLogger.debug(
+      `[LegacySubagent] [${this.definition.name}:${this.agentId}] Starting turn ${turnCounter} (promptId: ${promptId})`,
+    );
 
     await this.tryCompressChat(chat, promptId);
 
     const { functionCalls } = await promptIdContext.run(promptId, async () =>
       this.callModel(chat, currentMessage, combinedSignal, promptId),
     );
+
+    if (functionCalls.length > 0) {
+      debugLogger.debug(
+        `[LegacySubagent] [${this.definition.name}:${this.agentId}] Model made ${
+          functionCalls.length
+        } function calls: ${functionCalls.map((fc) => fc.name).join(', ')}`,
+      );
+    }
 
     if (combinedSignal.aborted) {
       const terminateReason = timeoutSignal.aborted

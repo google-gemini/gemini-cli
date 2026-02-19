@@ -95,14 +95,14 @@ export class HarnessSubagentInvocation extends BaseToolInvocation<
             updateOutput(`🤖💭 ${lastThought}\n`);
 
             // Also publish to message bus so UI hooks can see it regardless of where they listen
-            this.messageBus.publish({
+            void this.messageBus.publish({
               type: 'subagent-activity',
               activity: {
                 agentName: this.definition.name,
                 type: 'THOUGHT',
                 data: { subject: lastThought },
               },
-            } as any);
+            } as never);
           } else if (
             event.type === GeminiEventType.SubagentActivity &&
             'value' in event
@@ -113,10 +113,10 @@ export class HarnessSubagentInvocation extends BaseToolInvocation<
             }
 
             // Forward the core activity to the global bus
-            this.messageBus.publish({
+            void this.messageBus.publish({
               type: 'subagent-activity',
               activity: event.value,
-            } as any);
+            } as never);
           }
         }
       }
@@ -126,7 +126,7 @@ export class HarnessSubagentInvocation extends BaseToolInvocation<
       }
 
       // 1. Initialize result with the explicit submitted output if available
-      let finalResultRaw: any = turn.submittedOutput;
+      let finalResultRaw: unknown = turn.submittedOutput;
       let finalResultString: string | undefined;
 
       // 2. Fallback: If no explicit output, try textual response
@@ -140,6 +140,8 @@ export class HarnessSubagentInvocation extends BaseToolInvocation<
         }
       }
 
+      const outputName = this.definition.outputConfig?.outputName || 'result';
+
       // 3. Fallback: If still no result, extract from 'complete_task' tool call arguments (Directly from the turn)
       if (finalResultRaw === undefined) {
         const completeCall = turn.pendingToolCalls?.find(
@@ -150,8 +152,6 @@ export class HarnessSubagentInvocation extends BaseToolInvocation<
           debugLogger.debug(
             `[AgentHarness] [Invocation:${this.definition.name}] Found 'complete_task' call in pending tool calls.`,
           );
-          const outputName =
-            this.definition.outputConfig?.outputName || 'result';
           finalResultRaw =
             completeCall.args[outputName] || completeCall.args['result'];
 
@@ -210,11 +210,13 @@ export class HarnessSubagentInvocation extends BaseToolInvocation<
               'functionCall' in callPart &&
               callPart.functionCall
             ) {
-              const outputName =
-                this.definition.outputConfig?.outputName || 'result';
               finalResultRaw =
-                (callPart.functionCall.args as any)?.[outputName] ||
-                (callPart.functionCall.args as any)?.['result'];
+                (callPart.functionCall.args as Record<string, unknown>)?.[
+                  outputName
+                ] ||
+                (callPart.functionCall.args as Record<string, unknown>)?.[
+                  'result'
+                ];
               if (finalResultRaw !== undefined) {
                 debugLogger.debug(
                   `[AgentHarness] [Invocation:${this.definition.name}] Extracted result from history function call.`,
@@ -225,9 +227,10 @@ export class HarnessSubagentInvocation extends BaseToolInvocation<
         }
       }
 
-      finalResultString = typeof finalResultRaw === 'object' 
-        ? JSON.stringify(finalResultRaw, null, 2) 
-        : String(finalResultRaw ?? 'Task completed.');
+      finalResultString =
+        typeof finalResultRaw === 'object'
+          ? JSON.stringify(finalResultRaw, null, 2)
+          : String(finalResultRaw ?? 'Task completed.');
 
       const displayContent = `
 Subagent ${this.definition.name} Finished (Harness Mode)
@@ -240,20 +243,27 @@ ${finalResultString}
         updateOutput(displayContent);
       }
 
-      const outputName = this.definition.outputConfig?.outputName || 'result';
-
       // Parse as JSON if it's a string that looks like an object, to satisfy schema requirements
       let finalResultData = finalResultRaw ?? 'Task completed.';
-      if (typeof finalResultData === 'string' && finalResultData.trim().startsWith('{')) {
-          try {
-              finalResultData = JSON.parse(finalResultData);
-              debugLogger.debug(`[AgentHarness] [Invocation:${this.definition.name}] Parsed string result into JSON object.`);
-          } catch (e) {
-              // Not valid JSON, keep as string
-          }
+      if (
+        typeof finalResultData === 'string' &&
+        finalResultData.trim().startsWith('{')
+      ) {
+        try {
+          finalResultData = JSON.parse(finalResultData);
+          debugLogger.debug(
+            `[AgentHarness] [Invocation:${this.definition.name}] Parsed string result into JSON object.`,
+          );
+        } catch (_e) {
+          // Not valid JSON, keep as string
+        }
       }
 
-      const outputName = this.definition.outputConfig?.outputName || 'result';
+      debugLogger.debug(
+        `[AgentHarness] [Invocation:${this.definition.name}] Returning data to parent: ${JSON.stringify(
+          finalResultData,
+        ).slice(0, 500)}...`,
+      );
 
       return {
         llmContent: [{ text: finalResultString }],

@@ -801,7 +801,11 @@ export async function loadCliConfig(
       argv.experimentalEnableAgents ?? settings.experimental?.enableAgents,
     enableAgentHarness:
       argv.experimentalAgentHarness ??
-      settings.experimental?.enableAgentHarness,
+      (process.env['GEMINI_ENABLE_AGENT_HARNESS'] === 'true'
+        ? true
+        : process.env['GEMINI_ENABLE_AGENT_HARNESS'] === 'false'
+          ? false
+          : settings.experimental?.enableAgentHarness),
 
     plan: settings.experimental?.plan,
     enableEventDrivenScheduler: true,
