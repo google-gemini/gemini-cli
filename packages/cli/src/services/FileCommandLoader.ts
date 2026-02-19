@@ -34,11 +34,10 @@ import {
 } from './prompt-processors/shellProcessor.js';
 import { AtFileProcessor } from './prompt-processors/atFileProcessor.js';
 import { sanitizeForDisplay } from '../ui/utils/textUtils.js';
-import { getUsername } from '../utils/osUtils.js';
 
 interface CommandDirectory {
   path: string;
-  sourceLabel: string;
+  namespace: string;
   extensionName?: string;
   extensionId?: string;
 }
@@ -69,13 +68,11 @@ export class FileCommandLoader implements ICommandLoader {
   private readonly projectRoot: string;
   private readonly folderTrustEnabled: boolean;
   private readonly isTrustedFolder: boolean;
-  private readonly username: string;
 
   constructor(private readonly config: Config | null) {
     this.folderTrustEnabled = !!config?.getFolderTrust();
     this.isTrustedFolder = !!config?.isTrustedFolder();
     this.projectRoot = config?.getProjectRoot() || process.cwd();
-    this.username = getUsername();
   }
 
   /**
@@ -115,7 +112,7 @@ export class FileCommandLoader implements ICommandLoader {
           this.parseAndAdaptFile(
             path.join(dirInfo.path, file),
             dirInfo.path,
-            dirInfo.sourceLabel,
+            dirInfo.namespace,
             dirInfo.extensionName,
             dirInfo.extensionId,
           ),
@@ -158,13 +155,13 @@ export class FileCommandLoader implements ICommandLoader {
     // 1. User commands
     dirs.push({
       path: Storage.getUserCommandsDir(),
-      sourceLabel: this.username,
+      namespace: 'user',
     });
 
     // 2. Project commands (override user commands)
     dirs.push({
       path: storage.getProjectCommandsDir(),
-      sourceLabel: path.basename(this.projectRoot),
+      namespace: 'workspace',
     });
 
     // 3. Extension commands (processed last to detect all conflicts)
@@ -176,7 +173,7 @@ export class FileCommandLoader implements ICommandLoader {
 
       const extensionCommandDirs = activeExtensions.map((ext) => ({
         path: path.join(ext.path, 'commands'),
-        sourceLabel: ext.name,
+        namespace: ext.name,
         extensionName: ext.name,
         extensionId: ext.id,
       }));
@@ -191,13 +188,14 @@ export class FileCommandLoader implements ICommandLoader {
    * Parses a single .toml file and transforms it into a SlashCommand object.
    * @param filePath The absolute path to the .toml file.
    * @param baseDir The root command directory for name calculation.
+   * @param namespace The namespace of the command.
    * @param extensionName Optional extension name to prefix commands with.
    * @returns A promise resolving to a SlashCommand, or null if the file is invalid.
    */
   private async parseAndAdaptFile(
     filePath: string,
     baseDir: string,
-    sourceLabel: string,
+    namespace: string,
     extensionName: string | undefined,
     extensionId: string | undefined,
   ): Promise<SlashCommand | null> {
@@ -258,13 +256,10 @@ export class FileCommandLoader implements ICommandLoader {
       })
       .join(':');
 
-    // Add source label tag for all file-based commands
     const defaultDescription = `Custom command from ${path.basename(filePath)}`;
-    const rawDescription = validDef.description || defaultDescription;
-    const description = sanitizeForDisplay(
-      `[${sourceLabel}] ${rawDescription}`,
-      100,
-    );
+    let description = validDef.description || defaultDescription;
+
+    description = sanitizeForDisplay(description, 100);
 
     const processors: IPromptProcessor[] = [];
     const usesArgs = validDef.prompt.includes(SHORTHAND_ARGS_PLACEHOLDER);
@@ -296,6 +291,7 @@ export class FileCommandLoader implements ICommandLoader {
 
     return {
       name: baseCommandName,
+      namespace,
       description,
       kind: CommandKind.FILE,
       extensionName,

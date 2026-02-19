@@ -385,9 +385,7 @@ describe('FileCommandLoader', () => {
     const commands = await loader.loadCommands(signal);
     const command = commands[0];
     expect(command).toBeDefined();
-    expect(command.description).toBe(
-      '[mock-user] Custom command from test.toml',
-    );
+    expect(command.description).toBe('Custom command from test.toml');
   });
 
   it('uses the provided description', async () => {
@@ -402,7 +400,7 @@ describe('FileCommandLoader', () => {
     const commands = await loader.loadCommands(signal);
     const command = commands[0];
     expect(command).toBeDefined();
-    expect(command.description).toBe('[mock-user] My test command');
+    expect(command.description).toBe('My test command');
   });
 
   it('should sanitize colons in filenames to prevent namespace conflicts', async () => {
@@ -587,7 +585,7 @@ describe('FileCommandLoader', () => {
 
       const extCommand = commands.find((cmd) => cmd.name === 'ext');
       expect(extCommand?.extensionName).toBe('test-ext');
-      expect(extCommand?.description).toMatch(/^\[test-ext\]/);
+      expect(extCommand?.description).toBe('Custom command from ext.toml');
     });
 
     it('extension commands have extensionName metadata for conflict resolution', async () => {
@@ -675,7 +673,7 @@ describe('FileCommandLoader', () => {
 
       expect(commands[2].name).toBe('deploy');
       expect(commands[2].extensionName).toBe('test-ext');
-      expect(commands[2].description).toMatch(/^\[test-ext\]/);
+      expect(commands[2].description).toBe('Custom command from deploy.toml');
       const result2 = await commands[2].action?.(
         createMockCommandContext({
           invocation: {
@@ -752,7 +750,7 @@ describe('FileCommandLoader', () => {
       expect(commands).toHaveLength(1);
       expect(commands[0].name).toBe('active');
       expect(commands[0].extensionName).toBe('active-ext');
-      expect(commands[0].description).toMatch(/^\[active-ext\]/);
+      expect(commands[0].description).toBe('Custom command from active.toml');
     });
 
     it('handles missing extension commands directory gracefully', async () => {
@@ -835,7 +833,7 @@ describe('FileCommandLoader', () => {
 
       const nestedCmd = commands.find((cmd) => cmd.name === 'b:c');
       expect(nestedCmd?.extensionName).toBe('a');
-      expect(nestedCmd?.description).toMatch(/^\[a\]/);
+      expect(nestedCmd?.description).toBe('Custom command from c.toml');
       expect(nestedCmd).toBeDefined();
       const result = await nestedCmd!.action?.(
         createMockCommandContext({
@@ -1387,10 +1385,8 @@ describe('FileCommandLoader', () => {
       const loader = new FileCommandLoader(null);
       const commands = await loader.loadCommands(signal);
       expect(commands).toHaveLength(1);
-      // Newlines and tabs become spaces, ANSI is stripped, prepended with [mock-user]
-      expect(commands[0].description).toBe(
-        '[mock-user] Line 1 Line 2 Tabbed Red text',
-      );
+      // Newlines and tabs become spaces, ANSI is stripped
+      expect(commands[0].description).toBe('Line 1 Line 2 Tabbed Red text');
     });
 
     it('truncates long descriptions', async () => {
@@ -1406,14 +1402,12 @@ describe('FileCommandLoader', () => {
       const commands = await loader.loadCommands(signal);
       expect(commands).toHaveLength(1);
       expect(commands[0].description.length).toBe(100);
-      expect(commands[0].description).toBe(
-        '[mock-user] ' + 'd'.repeat(85) + '...',
-      );
+      expect(commands[0].description).toBe('d'.repeat(97) + '...');
     });
   });
 
-  describe('sourceLabel Assignment', () => {
-    it('uses the username for user commands', async () => {
+  describe('command namespace', () => {
+    it('is "user" for user commands', async () => {
       const userCommandsDir = Storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
@@ -1424,9 +1418,9 @@ describe('FileCommandLoader', () => {
       const loader = new FileCommandLoader(null);
       const commands = await loader.loadCommands(signal);
 
-      expect(commands[0].description).toBe(
-        '[mock-user] Custom command from test.toml',
-      );
+      expect(commands[0].name).toBe('test');
+      expect(commands[0].namespace).toBe('user');
+      expect(commands[0].description).toBe('Custom command from test.toml');
     });
 
     it.each([
@@ -1439,9 +1433,8 @@ describe('FileCommandLoader', () => {
         projectRoot: 'C:\\Users\\test\\projects\\win-project',
       },
     ])(
-      'uses the project root basename for project commands ($name)',
+      'is "workspace" for project commands ($name)',
       async ({ projectRoot }) => {
-        const expectedLabel = path.basename(projectRoot);
         const projectCommandsDir = path.join(
           projectRoot,
           GEMINI_DIR,
@@ -1466,13 +1459,15 @@ describe('FileCommandLoader', () => {
         const commands = await loader.loadCommands(signal);
 
         const projectCmd = commands.find((c) => c.name === 'project');
+        expect(projectCmd).toBeDefined();
+        expect(projectCmd?.namespace).toBe('workspace');
         expect(projectCmd?.description).toBe(
-          `[${expectedLabel}] Custom command from project.toml`,
+          `Custom command from project.toml`,
         );
       },
     );
 
-    it('uses the extension name for extension commands', async () => {
+    it('is the extension name for extension commands', async () => {
       const extensionDir = path.join(
         process.cwd(),
         GEMINI_DIR,
@@ -1510,7 +1505,9 @@ describe('FileCommandLoader', () => {
       const commands = await loader.loadCommands(signal);
 
       const extCmd = commands.find((c) => c.name === 'ext');
-      expect(extCmd?.description).toBe('[my-ext] Custom command from ext.toml');
+      expect(extCmd).toBeDefined();
+      expect(extCmd?.namespace).toBe('my-ext');
+      expect(extCmd?.description).toBe('Custom command from ext.toml');
     });
   });
 });

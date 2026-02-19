@@ -192,6 +192,12 @@ export interface SlashCommand {
   kind: CommandKind;
 
   /**
+   * Optional namespace for the command (e.g., 'user', 'workspace', 'extensionName').
+   * If provided, the command will be registered as 'namespace:name'.
+   */
+  namespace?: string;
+
+  /**
    * Controls whether the command auto-executes when selected with Enter.
    *
    * If true, pressing Enter on the suggestion will execute the command immediately.
