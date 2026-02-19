@@ -10,11 +10,9 @@ import { randomBytes } from 'node:crypto';
 import { TrackerTaskSchema, type TrackerTask } from './trackerTypes.js';
 
 export class TrackerService {
-  private readonly trackerDir: string;
   private readonly tasksDir: string;
 
-  constructor(private readonly workspaceRoot: string) {
-    this.trackerDir = path.join(this.workspaceRoot, '.tracker');
+  constructor(private readonly trackerDir: string) {
     this.tasksDir = path.join(this.trackerDir, 'tasks');
   }
 

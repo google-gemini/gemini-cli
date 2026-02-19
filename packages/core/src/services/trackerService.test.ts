@@ -12,23 +12,23 @@ import { TrackerService } from './trackerService.js';
 import type { TrackerTask } from './trackerTypes.js';
 
 describe('TrackerService', () => {
-  let testRootDir: string;
+  let testTrackerDir: string;
   let service: TrackerService;
 
   beforeEach(async () => {
-    testRootDir = await fs.mkdtemp(
+    testTrackerDir = await fs.mkdtemp(
       path.join(os.tmpdir(), 'tracker-service-test-'),
     );
-    service = new TrackerService(testRootDir);
+    service = new TrackerService(testTrackerDir);
   });
 
   afterEach(async () => {
-    await fs.rm(testRootDir, { recursive: true, force: true });
+    await fs.rm(testTrackerDir, { recursive: true, force: true });
   });
 
   it('should initialize the tracker directory', async () => {
     await service.ensureInitialized();
-    const tasksDir = path.join(testRootDir, '.tracker', 'tasks');
+    const tasksDir = path.join(testTrackerDir, 'tasks');
     const stats = await fs.stat(tasksDir);
     expect(stats.isDirectory()).toBe(true);
   });
