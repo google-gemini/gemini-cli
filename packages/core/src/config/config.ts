@@ -128,6 +128,7 @@ import { isSubpath } from '../utils/paths.js';
 import { UserHintService } from './userHintService.js';
 
 export interface AccessibilitySettings {
+  /** @deprecated Use ui.loadingPhrases instead. */
   enableLoadingPhrases?: boolean;
   screenReader?: boolean;
 }

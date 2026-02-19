@@ -305,13 +305,20 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Show the spinner during operations.
   - **Default:** `true`
 
+- **`ui.loadingPhrases`** (enum):
+  - **Description:** What to show while the model is working: tips, witty
+    comments, both, or nothing.
+  - **Default:** `"tips"`
+  - **Values:** `"tips"`, `"witty"`, `"all"`, `"off"`
+
 - **`ui.customWittyPhrases`** (array):
   - **Description:** Custom witty phrases to display during loading. When
     provided, the CLI cycles through these instead of the defaults.
   - **Default:** `[]`
 
 - **`ui.accessibility.enableLoadingPhrases`** (boolean):
-  - **Description:** Enable loading phrases during operations.
+  - **Description:** @deprecated Use ui.loadingPhrases instead. Enable loading
+    phrases during operations.
   - **Default:** `true`
   - **Requires restart:** Yes
 
