@@ -9,19 +9,21 @@ import { render } from '../../test-utils/render.js';
 import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
 
 describe('QueuedMessageDisplay', () => {
-  it('renders nothing when message queue is empty', () => {
-    const { lastFrame, unmount } = render(
+  it('renders nothing when message queue is empty', async () => {
+    const { lastFrame, waitUntilReady, unmount } = render(
       <QueuedMessageDisplay messageQueue={[]} />,
     );
+    await waitUntilReady();
 
-    expect(lastFrame()).toBe('');
+    expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
 
-  it('displays single queued message', () => {
-    const { lastFrame, unmount } = render(
+  it('displays single queued message', async () => {
+    const { lastFrame, waitUntilReady, unmount } = render(
       <QueuedMessageDisplay messageQueue={['First message']} />,
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Queued (press ↑ to edit):');
@@ -29,16 +31,17 @@ describe('QueuedMessageDisplay', () => {
     unmount();
   });
 
-  it('displays multiple queued messages', () => {
+  it('displays multiple queued messages', async () => {
     const messageQueue = [
       'First queued message',
       'Second queued message',
       'Third queued message',
     ];
 
-    const { lastFrame, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <QueuedMessageDisplay messageQueue={messageQueue} />,
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Queued (press ↑ to edit):');
@@ -48,7 +51,7 @@ describe('QueuedMessageDisplay', () => {
     unmount();
   });
 
-  it('shows overflow indicator when more than 3 messages are queued', () => {
+  it('shows overflow indicator when more than 3 messages are queued', async () => {
     const messageQueue = [
       'Message 1',
       'Message 2',
@@ -57,9 +60,10 @@ describe('QueuedMessageDisplay', () => {
       'Message 5',
     ];
 
-    const { lastFrame, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <QueuedMessageDisplay messageQueue={messageQueue} />,
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Queued (press ↑ to edit):');
@@ -72,12 +76,13 @@ describe('QueuedMessageDisplay', () => {
     unmount();
   });
 
-  it('normalizes whitespace in messages', () => {
+  it('normalizes whitespace in messages', async () => {
     const messageQueue = ['Message   with\tmultiple\n  whitespace'];
 
-    const { lastFrame, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <QueuedMessageDisplay messageQueue={messageQueue} />,
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Queued (press ↑ to edit):');

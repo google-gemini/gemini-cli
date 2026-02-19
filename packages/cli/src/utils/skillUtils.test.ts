@@ -24,49 +24,66 @@ describe('skillUtils', () => {
     vi.restoreAllMocks();
   });
 
+  const itif = (condition: boolean) => (condition ? it : it.skip);
+
   describe('linkSkill', () => {
-    it('should successfully link from a local directory', async () => {
-      // Create a mock skill directory
-      const mockSkillSourceDir = path.join(tempDir, 'mock-skill-source');
-      const skillSubDir = path.join(mockSkillSourceDir, 'test-skill');
-      await fs.mkdir(skillSubDir, { recursive: true });
-      await fs.writeFile(
-        path.join(skillSubDir, 'SKILL.md'),
-        '---\nname: test-skill\ndescription: test\n---\nbody',
-      );
+    // TODO: issue 19388 - Enable linkSkill tests on Windows
+    itif(process.platform !== 'win32')(
+      'should successfully link from a local directory',
+      async () => {
+        // Create a mock skill directory
+        const mockSkillSourceDir = path.join(tempDir, 'mock-skill-source');
+        const skillSubDir = path.join(mockSkillSourceDir, 'test-skill');
+        await fs.mkdir(skillSubDir, { recursive: true });
+        await fs.writeFile(
+          path.join(skillSubDir, 'SKILL.md'),
+          '---\nname: test-skill\ndescription: test\n---\nbody',
+        );
 
-      const skills = await linkSkill(mockSkillSourceDir, 'workspace', () => {});
-      expect(skills.length).toBe(1);
-      expect(skills[0].name).toBe('test-skill');
+        const skills = await linkSkill(
+          mockSkillSourceDir,
+          'workspace',
+          () => {},
+        );
+        expect(skills.length).toBe(1);
+        expect(skills[0].name).toBe('test-skill');
 
-      const linkedPath = path.join(tempDir, '.gemini/skills', 'test-skill');
-      const stats = await fs.lstat(linkedPath);
-      expect(stats.isSymbolicLink()).toBe(true);
+        const linkedPath = path.join(tempDir, '.gemini/skills', 'test-skill');
+        const stats = await fs.lstat(linkedPath);
+        expect(stats.isSymbolicLink()).toBe(true);
 
-      const linkTarget = await fs.readlink(linkedPath);
-      expect(path.resolve(linkTarget)).toBe(path.resolve(skillSubDir));
-    });
+        const linkTarget = await fs.readlink(linkedPath);
+        expect(path.resolve(linkTarget)).toBe(path.resolve(skillSubDir));
+      },
+    );
 
-    it('should overwrite existing skill at destination', async () => {
-      const mockSkillSourceDir = path.join(tempDir, 'mock-skill-source');
-      const skillSubDir = path.join(mockSkillSourceDir, 'test-skill');
-      await fs.mkdir(skillSubDir, { recursive: true });
-      await fs.writeFile(
-        path.join(skillSubDir, 'SKILL.md'),
-        '---\nname: test-skill\ndescription: test\n---\nbody',
-      );
+    itif(process.platform !== 'win32')(
+      'should overwrite existing skill at destination',
+      async () => {
+        const mockSkillSourceDir = path.join(tempDir, 'mock-skill-source');
+        const skillSubDir = path.join(mockSkillSourceDir, 'test-skill');
+        await fs.mkdir(skillSubDir, { recursive: true });
+        await fs.writeFile(
+          path.join(skillSubDir, 'SKILL.md'),
+          '---\nname: test-skill\ndescription: test\n---\nbody',
+        );
 
-      const targetDir = path.join(tempDir, '.gemini/skills');
-      await fs.mkdir(targetDir, { recursive: true });
-      const existingPath = path.join(targetDir, 'test-skill');
-      await fs.mkdir(existingPath);
+        const targetDir = path.join(tempDir, '.gemini/skills');
+        await fs.mkdir(targetDir, { recursive: true });
+        const existingPath = path.join(targetDir, 'test-skill');
+        await fs.mkdir(existingPath);
 
-      const skills = await linkSkill(mockSkillSourceDir, 'workspace', () => {});
-      expect(skills.length).toBe(1);
+        const skills = await linkSkill(
+          mockSkillSourceDir,
+          'workspace',
+          () => {},
+        );
+        expect(skills.length).toBe(1);
 
-      const stats = await fs.lstat(existingPath);
-      expect(stats.isSymbolicLink()).toBe(true);
-    });
+        const stats = await fs.lstat(existingPath);
+        expect(stats.isSymbolicLink()).toBe(true);
+      },
+    );
 
     it('should abort linking if consent is rejected', async () => {
       const mockSkillSourceDir = path.join(tempDir, 'mock-skill-source');
@@ -127,7 +144,7 @@ describe('skillUtils', () => {
       skillPath,
       'workspace',
       undefined,
-      () => {},
+      async () => {},
     );
     expect(skills.length).toBeGreaterThan(0);
     expect(skills[0].name).toBe('weather-skill');
@@ -157,7 +174,7 @@ describe('skillUtils', () => {
       mockSkillDir,
       'workspace',
       undefined,
-      () => {},
+      async () => {},
     );
     expect(skills.length).toBe(1);
     expect(skills[0].name).toBe('test-skill');
@@ -183,7 +200,7 @@ describe('skillUtils', () => {
         mockSkillDir,
         'workspace',
         undefined,
-        () => {},
+        async () => {},
         requestConsent,
       ),
     ).rejects.toThrow('Skill installation cancelled by user.');

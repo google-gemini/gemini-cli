@@ -32,27 +32,33 @@ describe('ShowMoreLines', () => {
     [new Set(['1']), StreamingState.Responding, true], // Streaming
   ])(
     'renders nothing when: overflow=%s, streaming=%s, constrain=%s',
-    (overflowingIds, streamingState, constrainHeight) => {
+    async (overflowingIds, streamingState, constrainHeight) => {
       mockUseOverflowState.mockReturnValue({ overflowingIds } as NonNullable<
         ReturnType<typeof useOverflowState>
       >);
       mockUseStreamingContext.mockReturnValue(streamingState);
-      const { lastFrame } = render(
+      const { lastFrame, waitUntilReady, unmount } = render(
         <ShowMoreLines constrainHeight={constrainHeight} />,
       );
-      expect(lastFrame()).toBe('');
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toBe('');
+      unmount();
     },
   );
 
   it.each([[StreamingState.Idle], [StreamingState.WaitingForConfirmation]])(
     'renders message when overflowing and state is %s',
-    (streamingState) => {
+    async (streamingState) => {
       mockUseOverflowState.mockReturnValue({
         overflowingIds: new Set(['1']),
       } as NonNullable<ReturnType<typeof useOverflowState>>);
       mockUseStreamingContext.mockReturnValue(streamingState);
-      const { lastFrame } = render(<ShowMoreLines constrainHeight={true} />);
+      const { lastFrame, waitUntilReady, unmount } = render(
+        <ShowMoreLines constrainHeight={true} />,
+      );
+      await waitUntilReady();
       expect(lastFrame()).toContain('Press ctrl-o to show more lines');
+      unmount();
     },
   );
 });

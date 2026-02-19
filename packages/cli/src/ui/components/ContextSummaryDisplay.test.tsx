@@ -21,12 +21,14 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const renderWithWidth = (
+const renderWithWidth = async (
   width: number,
   props: React.ComponentProps<typeof ContextSummaryDisplay>,
 ) => {
   useTerminalSizeMock.mockReturnValue({ columns: width, rows: 24 });
-  return render(<ContextSummaryDisplay {...props} />);
+  const result = render(<ContextSummaryDisplay {...props} />);
+  await result.waitUntilReady();
+  return result;
 };
 
 describe('<ContextSummaryDisplay />', () => {
@@ -42,7 +44,7 @@ describe('<ContextSummaryDisplay />', () => {
     skillCount: 1,
   };
 
-  it('should render on a single line on a wide screen', () => {
+  it('should render on a single line on a wide screen', async () => {
     const props = {
       ...baseProps,
       geminiMdFileCount: 1,
@@ -54,12 +56,12 @@ describe('<ContextSummaryDisplay />', () => {
         },
       },
     };
-    const { lastFrame, unmount } = renderWithWidth(120, props);
+    const { lastFrame, unmount } = await renderWithWidth(120, props);
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('should render on multiple lines on a narrow screen', () => {
+  it('should render on multiple lines on a narrow screen', async () => {
     const props = {
       ...baseProps,
       geminiMdFileCount: 1,
@@ -71,12 +73,12 @@ describe('<ContextSummaryDisplay />', () => {
         },
       },
     };
-    const { lastFrame, unmount } = renderWithWidth(60, props);
+    const { lastFrame, unmount } = await renderWithWidth(60, props);
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('should switch layout at the 80-column breakpoint', () => {
+  it('should switch layout at the 80-column breakpoint', async () => {
     const props = {
       ...baseProps,
       geminiMdFileCount: 1,
@@ -90,23 +92,19 @@ describe('<ContextSummaryDisplay />', () => {
     };
 
     // At 80 columns, should be on one line
-    const { lastFrame: wideFrame, unmount: unmountWide } = renderWithWidth(
-      80,
-      props,
-    );
-    expect(wideFrame()!.includes('\n')).toBe(false);
+    const { lastFrame: wideFrame, unmount: unmountWide } =
+      await renderWithWidth(80, props);
+    expect(wideFrame().trim().includes('\n')).toBe(false);
     unmountWide();
 
     // At 79 columns, should be on multiple lines
-    const { lastFrame: narrowFrame, unmount: unmountNarrow } = renderWithWidth(
-      79,
-      props,
-    );
-    expect(narrowFrame()!.includes('\n')).toBe(true);
-    expect(narrowFrame()!.split('\n').length).toBe(4);
+    const { lastFrame: narrowFrame, unmount: unmountNarrow } =
+      await renderWithWidth(79, props);
+    expect(narrowFrame().trim().includes('\n')).toBe(true);
+    expect(narrowFrame().trim().split('\n').length).toBe(4);
     unmountNarrow();
   });
-  it('should not render empty parts', () => {
+  it('should not render empty parts', async () => {
     const props = {
       ...baseProps,
       geminiMdFileCount: 0,
@@ -119,7 +117,7 @@ describe('<ContextSummaryDisplay />', () => {
         },
       },
     };
-    const { lastFrame, unmount } = renderWithWidth(60, props);
+    const { lastFrame, unmount } = await renderWithWidth(60, props);
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });

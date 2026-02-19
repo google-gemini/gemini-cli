@@ -55,13 +55,14 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 
 "╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool-1 Description 1. This is a long description that will need to b… │
 │──────────────────────────────────────────────────────────────────────────│
-│                                                                          │                                           ▄
-│ ✓  tool-2 Description 2                                                  │                                           █
-│                                                                          │                                           █
-│ line1                                                                    │                                           █
-│ line2                                                                    │                                           █
-╰──────────────────────────────────────────────────────────────────────────╯                                           █
-                                                                                                                       █"
+│                                                                          │                       ▄
+│ ✓  tool-2 Description 2                                                  │                       █
+│                                                                          │                       █
+│ line1                                                                    │                       █
+│ line2                                                                    │                       █
+╰──────────────────────────────────────────────────────────────────────────╯                       █
+                                                                                                   █
+"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls including shell command 1`] = `
@@ -113,9 +114,10 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders two tool groups where
 "╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool-2 Description 2                                                  │
 │                                                                          │
-│ line1                                                                    │                                           ▄
-╰──────────────────────────────────────────────────────────────────────────╯                                           █
-                                                                                                                       █"
+│ line1                                                                    │                       ▄
+╰──────────────────────────────────────────────────────────────────────────╯                       █
+                                                                                                   █
+"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders with limited terminal height 1`] = `

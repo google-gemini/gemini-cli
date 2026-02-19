@@ -43,8 +43,11 @@ const mockCommands: readonly SlashCommand[] = [
 ];
 
 describe('Help Component', () => {
-  it('should not render hidden commands', () => {
-    const { lastFrame, unmount } = render(<Help commands={mockCommands} />);
+  it('should not render hidden commands', async () => {
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <Help commands={mockCommands} />,
+    );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toContain('/test');
@@ -52,8 +55,11 @@ describe('Help Component', () => {
     unmount();
   });
 
-  it('should not render hidden subcommands', () => {
-    const { lastFrame, unmount } = render(<Help commands={mockCommands} />);
+  it('should not render hidden subcommands', async () => {
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <Help commands={mockCommands} />,
+    );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toContain('visible-child');
@@ -61,8 +67,11 @@ describe('Help Component', () => {
     unmount();
   });
 
-  it('should render keyboard shortcuts', () => {
-    const { lastFrame, unmount } = render(<Help commands={mockCommands} />);
+  it('should render keyboard shortcuts', async () => {
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <Help commands={mockCommands} />,
+    );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toContain('Keyboard Shortcuts:');
