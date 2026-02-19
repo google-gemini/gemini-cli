@@ -49,6 +49,8 @@ describe('ide-connection-utils', () => {
 
     vi.spyOn(process, 'cwd').mockReturnValue('/test/workspace/sub-dir');
     vi.mocked(os.tmpdir).mockReturnValue('/tmp');
+    vi.mocked(os.platform).mockReturnValue('linux');
+    vi.spyOn(process, 'kill').mockImplementation(() => true);
   });
 
   afterEach(() => {
@@ -131,6 +133,159 @@ describe('ide-connection-utils', () => {
       const result = await getConnectionConfigFromFile(12345);
 
       expect(result).toEqual(validConfig);
+    });
+
+    it('should fall back to a different PID if it matches the current workspace', async () => {
+      const targetPid = 12345;
+      const otherPid = 67890;
+      const validConfig = {
+        port: '5678',
+        workspacePath: '/test/workspace',
+      };
+      vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
+        new Error('not found'),
+      );
+      (
+        vi.mocked(fs.promises.readdir) as Mock<
+          (path: fs.PathLike) => Promise<string[]>
+        >
+      ).mockResolvedValue([`gemini-ide-server-${otherPid}-111.json`]);
+      vi.mocked(fs.promises.readFile).mockResolvedValueOnce(
+        JSON.stringify(validConfig),
+      );
+
+      const result = await getConnectionConfigFromFile(targetPid);
+
+      expect(result).toEqual(validConfig);
+      expect(fs.promises.readFile).toHaveBeenCalledWith(
+        path.join(
+          '/tmp',
+          'gemini',
+          'ide',
+          `gemini-ide-server-${otherPid}-111.json`,
+        ),
+        'utf8',
+      );
+    });
+
+    it('should prioritize the target PID over other PIDs', async () => {
+      const targetPid = 12345;
+      const otherPid = 67890;
+      const targetConfig = { port: '1111', workspacePath: '/test/workspace' };
+      const otherConfig = { port: '2222', workspacePath: '/test/workspace' };
+
+      vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
+        new Error('not found'),
+      );
+      (
+        vi.mocked(fs.promises.readdir) as Mock<
+          (path: fs.PathLike) => Promise<string[]>
+        >
+      ).mockResolvedValue([
+        `gemini-ide-server-${otherPid}-1.json`,
+        `gemini-ide-server-${targetPid}-1.json`,
+      ]);
+
+      // readFile will be called for both files in the sorted order.
+      // We expect targetPid file to be first.
+      vi.mocked(fs.promises.readFile)
+        .mockResolvedValueOnce(JSON.stringify(targetConfig))
+        .mockResolvedValueOnce(JSON.stringify(otherConfig));
+
+      const result = await getConnectionConfigFromFile(targetPid);
+
+      expect(result).toEqual(targetConfig);
+      expect(fs.promises.readFile).toHaveBeenCalledWith(
+        path.join(
+          '/tmp',
+          'gemini',
+          'ide',
+          `gemini-ide-server-${targetPid}-1.json`,
+        ),
+        'utf8',
+      );
+    });
+
+    it('should prioritize an alive process over a dead one', async () => {
+      const targetPid = 12345; // target not present
+      const alivePid = 22222;
+      const deadPid = 11111;
+      const aliveConfig = { port: '2222', workspacePath: '/test/workspace' };
+      const deadConfig = { port: '1111', workspacePath: '/test/workspace' };
+
+      vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
+        new Error('not found'),
+      );
+      (
+        vi.mocked(fs.promises.readdir) as Mock<
+          (path: fs.PathLike) => Promise<string[]>
+        >
+      ).mockResolvedValue([
+        `gemini-ide-server-${deadPid}-1.json`,
+        `gemini-ide-server-${alivePid}-1.json`,
+      ]);
+
+      vi.spyOn(process, 'kill').mockImplementation((pid) => {
+        if (pid === alivePid) return true;
+        throw new Error('dead');
+      });
+
+      vi.mocked(fs.promises.readFile)
+        .mockResolvedValueOnce(JSON.stringify(aliveConfig))
+        .mockResolvedValueOnce(JSON.stringify(deadConfig));
+
+      const result = await getConnectionConfigFromFile(targetPid);
+
+      expect(result).toEqual(aliveConfig);
+      expect(fs.promises.readFile).toHaveBeenCalledWith(
+        path.join(
+          '/tmp',
+          'gemini',
+          'ide',
+          `gemini-ide-server-${alivePid}-1.json`,
+        ),
+        'utf8',
+      );
+    });
+
+    it('should prioritize the largest PID (newest) among alive processes', async () => {
+      const targetPid = 12345; // target not present
+      const oldPid = 20000;
+      const newPid = 30000;
+      const oldConfig = { port: '2000', workspacePath: '/test/workspace' };
+      const newConfig = { port: '3000', workspacePath: '/test/workspace' };
+
+      vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
+        new Error('not found'),
+      );
+      (
+        vi.mocked(fs.promises.readdir) as Mock<
+          (path: fs.PathLike) => Promise<string[]>
+        >
+      ).mockResolvedValue([
+        `gemini-ide-server-${oldPid}-1.json`,
+        `gemini-ide-server-${newPid}-1.json`,
+      ]);
+
+      // Both are alive
+      vi.spyOn(process, 'kill').mockImplementation(() => true);
+
+      vi.mocked(fs.promises.readFile)
+        .mockResolvedValueOnce(JSON.stringify(newConfig))
+        .mockResolvedValueOnce(JSON.stringify(oldConfig));
+
+      const result = await getConnectionConfigFromFile(targetPid);
+
+      expect(result).toEqual(newConfig);
+      expect(fs.promises.readFile).toHaveBeenCalledWith(
+        path.join(
+          '/tmp',
+          'gemini',
+          'ide',
+          `gemini-ide-server-${newPid}-1.json`,
+        ),
+        'utf8',
+      );
     });
 
     it('should return the first valid config when multiple workspaces are valid', async () => {
