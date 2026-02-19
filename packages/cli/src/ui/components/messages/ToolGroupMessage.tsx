@@ -148,7 +148,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       */
       width={terminalWidth}
       paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
-      marginBottom={1}
+      marginBottom={borderBottomOverride === false ? 0 : 1}
     >
       {visibleToolCalls.map((tool, index) => {
         const isFirst = index === 0;

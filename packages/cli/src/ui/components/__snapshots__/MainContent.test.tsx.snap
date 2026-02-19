@@ -107,3 +107,18 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Unc
 ShowMoreLines
 "
 `;
+
+exports[`MainContent > renders a split tool group without a gap between static and pending areas 1`] = `
+"AppHeader(full)
+╭──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool A tool for testing                                                              │
+│                                                                                              │
+│ Part 1                                                                                       │
+│                                                                                              │
+│ ✓  test-tool A tool for testing                                                              │
+│                                                                                              │
+│ Part 2                                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+ShowMoreLines
+"
+`;
