@@ -13,14 +13,6 @@ import {
 } from '../components/shared/text-buffer.js';
 import { getCachedStringWidth } from '../utils/textUtils.js';
 
-interface FzfResult {
-  item: string;
-  start: number;
-  end: number;
-  score: number;
-  positions?: number[];
-}
-
 export interface GenericListItem {
   key: string;
   label: string;
@@ -32,6 +24,7 @@ export interface UseFuzzyListProps<T extends GenericListItem> {
   items: T[];
   initialQuery?: string;
   onSearch?: (query: string) => void;
+  disableFiltering?: boolean;
 }
 
 export interface UseFuzzyListResult<T extends GenericListItem> {
@@ -46,6 +39,7 @@ export function useFuzzyList<T extends GenericListItem>({
   items,
   initialQuery = '',
   onSearch,
+  disableFiltering = false,
 }: UseFuzzyListProps<T>): UseFuzzyListResult<T> {
   // Search state
   const [searchQuery, setSearchQuery] = useState(initialQuery);
@@ -54,54 +48,81 @@ export function useFuzzyList<T extends GenericListItem>({
   );
 
   // FZF instance for fuzzy searching
-  const { fzfInstance, searchMap } = useMemo(() => {
-    const map = new Map<string, string>();
-    const searchItems: string[] = [];
-
-    items.forEach((item) => {
-      searchItems.push(item.label);
-      map.set(item.label.toLowerCase(), item.key);
-    });
-
-    const fzf = new AsyncFzf(searchItems, {
+  // FZF instance for fuzzy searching - skip if filtering is disabled
+  const fzfInstance = useMemo(() => {
+    if (disableFiltering) return null;
+    return new AsyncFzf(items, {
       fuzzy: 'v2',
       casing: 'case-insensitive',
+      selector: (item: T) => item.label,
     });
-    return { fzfInstance: fzf, searchMap: map };
-  }, [items]);
+  }, [items, disableFiltering]);
 
   // Perform search
   useEffect(() => {
     let active = true;
-    if (!searchQuery.trim() || !fzfInstance) {
+    if (!searchQuery.trim() || (!fzfInstance && !disableFiltering)) {
       setFilteredKeys(items.map((i) => i.key));
       return;
     }
 
     const doSearch = async () => {
-      const results = await fzfInstance.find(searchQuery);
+      // If filtering is disabled, or no query/fzf, just return all items (or handle external search elsewhere)
+      if (disableFiltering) {
+        onSearch?.(searchQuery);
+        // When filtering is disabled, we assume the items passed in are already filtered
+        // so we set filteredKeys to all items
+        const allKeys = items.map((i) => i.key);
+        setFilteredKeys((prev) => {
+          if (
+            prev.length === allKeys.length &&
+            prev.every((key, index) => key === allKeys[index])
+          ) {
+            return prev;
+          }
+          return allKeys;
+        });
+        return;
+      }
 
-      if (!active) return;
+      if (fzfInstance) {
+        const results = await fzfInstance.find(searchQuery);
 
-      const matchedKeys = new Set<string>();
-      results.forEach((res: FzfResult) => {
-        const key = searchMap.get(res.item.toLowerCase());
-        if (key) matchedKeys.add(key);
-      });
-      setFilteredKeys(Array.from(matchedKeys));
-      onSearch?.(searchQuery);
+        if (!active) return;
+
+        const matchedKeys = results.map((res: { item: T }) => res.item.key);
+        setFilteredKeys((prev) => {
+          if (
+            prev.length === matchedKeys.length &&
+            prev.every((key, index) => key === matchedKeys[index])
+          ) {
+            return prev;
+          }
+          return matchedKeys;
+        });
+        onSearch?.(searchQuery);
+      }
     };
 
     void doSearch().catch((error) => {
       // eslint-disable-next-line no-console
       console.error('Search failed:', error);
-      setFilteredKeys(items.map((i) => i.key)); // Reset to all items on error
+      const allKeys = items.map((i) => i.key);
+      setFilteredKeys((prev) => {
+        if (
+          prev.length === allKeys.length &&
+          prev.every((key, index) => key === allKeys[index])
+        ) {
+          return prev;
+        }
+        return allKeys;
+      });
     });
 
     return () => {
       active = false;
     };
-  }, [searchQuery, fzfInstance, searchMap, items, onSearch]);
+  }, [searchQuery, fzfInstance, items, onSearch, disableFiltering]);
 
   // Get mainAreaWidth for search buffer viewport from UIState
   const { mainAreaWidth } = useUIState();
@@ -121,9 +142,10 @@ export function useFuzzyList<T extends GenericListItem>({
 
   // Filtered items to display
   const filteredItems = useMemo(() => {
+    if (disableFiltering) return items;
     if (!searchQuery) return items;
     return items.filter((item) => filteredKeys.includes(item.key));
-  }, [items, filteredKeys, searchQuery]);
+  }, [items, filteredKeys, searchQuery, disableFiltering]);
 
   // Calculate max label width for alignment
   const maxLabelWidth = useMemo(() => {
@@ -133,10 +155,7 @@ export function useFuzzyList<T extends GenericListItem>({
       const labelFull =
         item.label + (item.scopeMessage ? ` ${item.scopeMessage}` : '');
       const lWidth = getCachedStringWidth(labelFull);
-      const dWidth = item.description
-        ? getCachedStringWidth(item.description)
-        : 0;
-      max = Math.max(max, lWidth, dWidth);
+      max = Math.max(max, lWidth);
     });
     return max;
   }, [items]);
