@@ -37,18 +37,18 @@ import { LlmRole } from '../telemetry/types.js';
  * Default threshold for compression token count as a fraction of the model's
  * token limit. If the chat history exceeds this threshold, it will be compressed.
  */
-export const DEFAULT_COMPRESSION_TOKEN_THRESHOLD = 0.5;
+const DEFAULT_COMPRESSION_TOKEN_THRESHOLD = 0.5;
 
 /**
  * The fraction of the latest chat history to keep. A value of 0.3
  * means that only the last 30% of the chat history will be kept after compression.
  */
-export const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
+const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
 
 /**
  * The budget for function response tokens in the preserved history.
  */
-export const COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET = 50_000;
+const COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET = 50_000;
 
 /**
  * Returns the index of the oldest item to keep when compressing. May return
