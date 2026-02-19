@@ -4,29 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { experimentCommand } from './experimentCommand.js';
-import { CommandKind } from './types.js';
+import { CommandKind, type CommandContext } from './types.js';
 import { MessageType } from '../types.js';
 import { SettingScope } from '../../config/settings.js';
 
 describe('experimentCommand', () => {
-  let mockContext: {
-    services: {
-      config: {
-        getExperimentValue: vi.Mock;
-      };
-      settings: {
-        merged: {
-          experimental: Record<string, unknown>;
-        };
-        setValue: vi.Mock;
-      };
-    };
-    ui: {
-      addItem: vi.Mock;
-    };
-  };
+  let mockContext: CommandContext;
 
   beforeEach(() => {
     mockContext = {
@@ -44,7 +29,11 @@ describe('experimentCommand', () => {
       ui: {
         addItem: vi.fn(),
       },
-    };
+      session: {
+        stats: {},
+        sessionShellAllowlist: new Set(),
+      },
+    } as unknown as CommandContext;
   });
 
   it('should have the correct name and description', () => {
@@ -59,7 +48,9 @@ describe('experimentCommand', () => {
     );
 
     it('should list experiments', async () => {
-      mockContext.services.config.getExperimentValue.mockReturnValue(true);
+      (mockContext.services.config!.getExperimentValue as Mock).mockReturnValue(
+        true,
+      );
       await listCommand?.action!(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
