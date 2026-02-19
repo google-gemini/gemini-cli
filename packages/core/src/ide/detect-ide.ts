@@ -16,6 +16,7 @@ export const IDE_DEFINITIONS = {
   vscodefork: { name: 'vscodefork', displayName: 'IDE' },
   positron: { name: 'positron', displayName: 'Positron' },
   antigravity: { name: 'antigravity', displayName: 'Antigravity' },
+  neovim: { name: 'neovim', displayName: 'Neovim' },
   sublimetext: { name: 'sublimetext', displayName: 'Sublime Text' },
   jetbrains: { name: 'jetbrains', displayName: 'JetBrains IDE' },
   intellijidea: { name: 'intellijidea', displayName: 'IntelliJ IDEA' },
@@ -44,9 +45,16 @@ export function isJetBrains(): boolean {
     .includes('jetbrains');
 }
 
+export function isNeovim(): boolean {
+  return !!(process.env['NVIM'] || process.env['NVIM_LISTEN_ADDRESS']);
+}
+
 export function detectIdeFromEnv(): IdeInfo {
   if (process.env['ANTIGRAVITY_CLI_ALIAS']) {
     return IDE_DEFINITIONS.antigravity;
+  }
+  if (isNeovim()) {
+    return IDE_DEFINITIONS.neovim;
   }
   if (process.env['__COG_BASHRC_SOURCED']) {
     return IDE_DEFINITIONS.devin;
@@ -149,6 +157,7 @@ export function detectIde(
 
   // Only VS Code, Sublime Text and JetBrains integrations are currently supported.
   if (
+    !isNeovim() &&
     process.env['TERM_PROGRAM'] !== 'vscode' &&
     process.env['TERM_PROGRAM'] !== 'sublime' &&
     !isJetBrains()

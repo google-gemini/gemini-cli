@@ -62,6 +62,18 @@ describe('ide-installer', () => {
       expect(installer).not.toBeNull();
       expect(installer?.install).toEqual(expect.any(Function));
     });
+
+    it('returns a NeovimInstaller for "neovim"', async () => {
+      const installer = getIdeInstaller(IDE_DEFINITIONS.neovim);
+
+      expect(installer).not.toBeNull();
+      expect(installer?.install).toEqual(expect.any(Function));
+
+      const result = await installer!.install();
+      expect(result.success).toBe(true);
+      expect(result.shouldEnableIdeMode).toBe(false);
+      expect(result.message).toContain('Neovim IDE integration is in beta');
+    });
   });
 
   describe('VsCodeInstaller', () => {

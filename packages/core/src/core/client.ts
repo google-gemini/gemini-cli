@@ -49,7 +49,7 @@ import {
   NextSpeakerCheckEvent,
 } from '../telemetry/types.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
-import type { IdeContext, File } from '../ide/types.js';
+import type { IdeContext, File, DiagnosticFile } from '../ide/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -403,6 +403,11 @@ export class GeminiClient {
         contextData['otherOpenFiles'] = otherOpenFiles;
       }
 
+      const diagnostics = currentIdeContext.workspaceState?.diagnostics || [];
+      if (diagnostics.length > 0) {
+        contextData['diagnostics'] = diagnostics;
+      }
+
       if (Object.keys(contextData).length === 0) {
         return { contextParts: [], newIdeContext: currentIdeContext };
       }
@@ -510,6 +515,16 @@ export class GeminiClient {
           path: null,
           previousPath: lastActiveFile.path,
         };
+      }
+
+      const lastDiagnostics: DiagnosticFile[] =
+        this.lastSentIdeContext.workspaceState?.diagnostics || [];
+      const currentDiagnostics: DiagnosticFile[] =
+        currentIdeContext.workspaceState?.diagnostics || [];
+      if (
+        JSON.stringify(lastDiagnostics) !== JSON.stringify(currentDiagnostics)
+      ) {
+        changes['diagnosticsChanged'] = currentDiagnostics;
       }
 
       if (Object.keys(changes).length === 0) {

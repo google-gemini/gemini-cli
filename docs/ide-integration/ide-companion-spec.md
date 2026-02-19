@@ -1,6 +1,6 @@
 # Gemini CLI companion plugin: Interface specification
 
-> Last Updated: September 15, 2025
+> Last Updated: February 19, 2026
 
 This document defines the contract for building a companion plugin to enable
 Gemini CLI's IDE mode. For VS Code, these features (native diffing, context
@@ -25,7 +25,21 @@ Protocol (MCP)**.
 - **Port:** The server **MUST** listen on a dynamically assigned port (i.e.,
   listen on port `0`).
 
-### 2. Discovery mechanism: The port file
+### 2. Transport layer: MCP over stdio (optional)
+
+The plugin **MAY** expose an MCP server over stdio. This is useful when an HTTP
+server cannot be started or when the CLI is responsible for launching the
+companion sidecar.
+
+- **Command discovery:** The plugin **MUST** set the following environment
+  variables in the integrated terminal:
+  - `GEMINI_CLI_IDE_SERVER_STDIO_COMMAND`: The command to launch the sidecar.
+  - `GEMINI_CLI_IDE_SERVER_STDIO_ARGS`: A JSON array of arguments for the
+    command.
+- **Precedence:** If both HTTP and stdio are available, the CLI prefers HTTP and
+  falls back to stdio only if the HTTP connection fails.
+
+### 3. Discovery mechanism: The port file
 
 For Gemini CLI to connect, it needs to discover which IDE instance it's running
 in and what port your server is using. The plugin **MUST** facilitate this by
@@ -53,6 +67,10 @@ creating a "discovery file."
     "ideInfo": {
       "name": "vscode",
       "displayName": "VS Code"
+    },
+    "stdio": {
+      "command": "node",
+      "args": ["path/to/sidecar.js", "--stdio"]
     }
   }
   ```
@@ -72,6 +90,10 @@ creating a "discovery file."
       (e.g., `vscode`, `jetbrains`).
     - `displayName` (string, required): A user-friendly name for the IDE (e.g.,
       `VS Code`, `JetBrains IDE`).
+  - `stdio` (object, optional): stdio connection info. If present, the CLI may
+    attempt stdio when HTTP is unavailable.
+    - `command` (string, required): The command to launch the sidecar.
+    - `args` (array of strings, optional): Command arguments.
 
 - **Authentication:** To secure the connection, the plugin **MUST** generate a
   unique, secret token and include it in the discovery file. The CLI will then
@@ -111,6 +133,7 @@ to the CLI whenever the user's context changes.
     workspaceState?: {
       openFiles?: File[];
       isTrusted?: boolean;
+      diagnostics?: DiagnosticFile[];
     };
   }
 
@@ -129,6 +152,25 @@ to the CLI whenever the user's context changes.
     };
     // The text currently selected by the user
     selectedText?: string;
+  }
+
+  interface DiagnosticFile {
+    // Absolute path to the file
+    path: string;
+    // Last updated Unix timestamp (for ordering)
+    timestamp: number;
+    items: DiagnosticItem[];
+  }
+
+  interface DiagnosticItem {
+    range: {
+      start: { line: number; character: number };
+      end: { line: number; character: number };
+    };
+    severity: 'error' | 'warning' | 'info' | 'hint';
+    message: string;
+    source?: string;
+    code?: string | number;
   }
   ```
 
@@ -151,7 +193,8 @@ and truncation steps before sending the information to the model.
   on setting `isActive: true` and providing cursor/selection details only for
   the currently focused file.
 - **Truncation:** To manage token limits, the CLI truncates both the file list
-  (to 10 files) and the `selectedText` (to 16KB).
+  (to 10 files) and the `selectedText` (to 16KB). Diagnostics are truncated to
+  20 files, 50 items per file, and 500 characters per message.
 
 While the CLI handles the final truncation, it is highly recommended that your
 plugin also limits the amount of context it sends.

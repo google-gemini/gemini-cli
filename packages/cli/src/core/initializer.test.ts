@@ -48,6 +48,8 @@ describe('initializer', () => {
   let mockSettings: LoadedSettings;
   let mockIdeClient: {
     connect: ReturnType<typeof vi.fn>;
+    getCurrentIde: ReturnType<typeof vi.fn>;
+    getConnectionTransport: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -68,6 +70,8 @@ describe('initializer', () => {
     } as unknown as LoadedSettings;
     mockIdeClient = {
       connect: vi.fn(),
+      getCurrentIde: vi.fn(),
+      getConnectionTransport: vi.fn(),
     };
     vi.mocked(IdeClient.getInstance).mockResolvedValue(
       mockIdeClient as unknown as IdeClient,

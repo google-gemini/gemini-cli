@@ -11,6 +11,7 @@ import {
   logIdeConnection,
   IdeConnectionEvent,
   IdeConnectionType,
+  IDE_DEFINITIONS,
 } from '@google/gemini-cli-core';
 import {
   getIdeInstaller,
@@ -26,6 +27,10 @@ import type {
 } from './types.js';
 import { CommandKind } from './types.js';
 import { SettingScope } from '../../config/settings.js';
+
+function isNeovimEnv(): boolean {
+  return !!(process.env['NVIM'] || process.env['NVIM_LISTEN_ADDRESS']);
+}
 
 function getIdeStatusMessage(ideClient: IdeClient): {
   messageType: 'info' | 'error';
@@ -127,7 +132,13 @@ async function setIdeModeAndSyncConnection(
   const ideClient = await IdeClient.getInstance();
   if (value) {
     await ideClient.connect(options);
-    logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.SESSION));
+    logIdeConnection(
+      config,
+      new IdeConnectionEvent(IdeConnectionType.SESSION, {
+        ide: ideClient.getCurrentIde(),
+        transport: ideClient.getConnectionTransport(),
+      }),
+    );
   } else {
     await ideClient.disconnect();
   }
@@ -137,6 +148,9 @@ export const ideCommand = async (): Promise<SlashCommand> => {
   const ideClient = await IdeClient.getInstance();
   const currentIDE = ideClient.getCurrentIde();
   if (!currentIDE) {
+    const neovimMessage = isNeovimEnv()
+      ? 'Neovim IDE integration is in beta. Enable it by setting ide.neovimBetaEnabled to true in your settings and restarting Gemini CLI.'
+      : '';
     return {
       name: 'ide',
       description: 'Manage IDE integration',
@@ -146,7 +160,8 @@ export const ideCommand = async (): Promise<SlashCommand> => {
         ({
           type: 'message',
           messageType: 'error',
-          content: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: Antigravity, VS Code, or VS Code forks.`,
+          content:
+            `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: Antigravity, VS Code, VS Code forks, or Neovim (beta). ${neovimMessage}`.trim(),
         }) as const,
     };
   }
@@ -209,7 +224,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
         },
         Date.now(),
       );
-      if (result.success) {
+      if (result.success && result.shouldEnableIdeMode !== false) {
         context.services.settings.setValue(
           SettingScope.User,
           'ide.enabled',
@@ -257,6 +272,19 @@ export const ideCommand = async (): Promise<SlashCommand> => {
     kind: CommandKind.BUILT_IN,
     autoExecute: true,
     action: async (context: CommandContext) => {
+      if (
+        ideClient.getCurrentIde()?.name === IDE_DEFINITIONS.neovim.name &&
+        !(context.services.settings.merged.ide?.neovimBetaEnabled ?? false)
+      ) {
+        context.ui.addItem(
+          {
+            type: 'error',
+            text: 'Neovim IDE integration is in beta. Enable it by setting ide.neovimBetaEnabled to true in your settings and restarting Gemini CLI.',
+          },
+          Date.now(),
+        );
+        return;
+      }
       context.services.settings.setValue(
         SettingScope.User,
         'ide.enabled',

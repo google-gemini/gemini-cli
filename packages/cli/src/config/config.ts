@@ -457,6 +457,12 @@ export async function loadCliConfig(
   const includeDirectoryTree = settings.context?.includeDirectoryTree ?? true;
 
   const ideMode = settings.ide?.enabled ?? false;
+  const neovimBetaEnabled = settings.ide?.neovimBetaEnabled ?? false;
+  if (neovimBetaEnabled) {
+    process.env['GEMINI_CLI_NEOVIM_BETA_ENABLED'] = 'true';
+  } else {
+    delete process.env['GEMINI_CLI_NEOVIM_BETA_ENABLED'];
+  }
 
   const folderTrust =
     process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true' ||

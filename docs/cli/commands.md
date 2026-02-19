@@ -161,7 +161,8 @@ Slash commands provide meta-level control over the CLI itself.
   - **`enable`**:
     - **Description:** Enable IDE integration.
   - **`install`**:
-    - **Description:** Install required IDE companion.
+    - **Description:** Install required IDE companion. For Neovim (beta), this
+      prints setup snippets and does not modify your config.
   - **`status`**:
     - **Description:** Check status of IDE integration.
 

@@ -38,6 +38,7 @@ describe('ideCommand', () => {
       getCurrentIde: vi.fn(),
       getConnectionStatus: vi.fn(),
       getDetectedIdeDisplayName: vi.fn(),
+      getConnectionTransport: vi.fn(),
     } as unknown as core.IdeClient;
 
     vi.mocked(core.IdeClient.getInstance).mockResolvedValue(mockIdeClient);
@@ -52,6 +53,11 @@ describe('ideCommand', () => {
       services: {
         settings: {
           setValue: vi.fn(),
+          merged: {
+            ide: {
+              neovimBetaEnabled: false,
+            },
+          },
         },
         config: {
           getIdeMode: vi.fn(),
