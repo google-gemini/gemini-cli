@@ -14,8 +14,8 @@ provides direct access to the Markdown files in the `docs/` directory.
 `get_internal_docs` takes one optional argument:
 
 - `path` (string, optional): The relative path to a specific documentation file
-  (for example, `cli/commands.md`). If omitted, the tool returns a list of all
-  available documentation paths.
+  (for example, `reference/commands.md`). If omitted, the tool returns a list of
+  all available documentation paths.
 
 ## Usage
 
@@ -40,7 +40,7 @@ Gemini CLI uses this tool to ensure technical accuracy:
 
 ## Next steps
 
-- Explore the [Command reference](../cli/commands.md) for a detailed guide to
-  slash commands.
-- See the [Configuration guide](../get-started/configuration.md) for settings
+- Explore the [Command reference](../reference/commands.md) for a detailed guide
+  to slash commands.
+- See the [Configuration guide](../reference/configuration.md) for settings
   reference.
