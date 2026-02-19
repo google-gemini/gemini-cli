@@ -5,10 +5,11 @@
  */
 
 import * as fs from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import * as path from 'node:path';
 import stripJsonComments from 'strip-json-comments';
-import { debugLogger, GEMINI_DIR } from '@google/gemini-cli-core';
+import { GEMINI_DIR } from '../utils/paths.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import { isNodeError } from '../utils/errors.js';
 
 export interface FolderDiscoveryResults {
   commands: string[];
@@ -42,7 +43,7 @@ export class FolderTrustDiscoveryService {
     };
 
     const geminiDir = path.join(workspaceDir, GEMINI_DIR);
-    if (!existsSync(geminiDir)) {
+    if (!(await this.exists(geminiDir))) {
       return results;
     }
 
@@ -60,7 +61,7 @@ export class FolderTrustDiscoveryService {
     results: FolderDiscoveryResults,
   ) {
     const commandsDir = path.join(geminiDir, 'commands');
-    if (existsSync(commandsDir)) {
+    if (await this.exists(commandsDir)) {
       try {
         const files = await fs.readdir(commandsDir, { recursive: true });
         results.commands = files
@@ -79,13 +80,13 @@ export class FolderTrustDiscoveryService {
     results: FolderDiscoveryResults,
   ) {
     const skillsDir = path.join(geminiDir, 'skills');
-    if (existsSync(skillsDir)) {
+    if (await this.exists(skillsDir)) {
       try {
         const entries = await fs.readdir(skillsDir, { withFileTypes: true });
         for (const entry of entries) {
           if (entry.isDirectory()) {
             const skillMdPath = path.join(skillsDir, entry.name, 'SKILL.md');
-            if (existsSync(skillMdPath)) {
+            if (await this.exists(skillMdPath)) {
               results.skills.push(entry.name);
             }
           }
@@ -103,7 +104,7 @@ export class FolderTrustDiscoveryService {
     results: FolderDiscoveryResults,
   ) {
     const settingsPath = path.join(geminiDir, 'settings.json');
-    if (!existsSync(settingsPath)) return;
+    if (!(await this.exists(settingsPath))) return;
 
     try {
       const content = await fs.readFile(settingsPath, 'utf-8');
@@ -198,5 +199,17 @@ export class FolderTrustDiscoveryService {
 
   private static isRecord(val: unknown): val is Record<string, unknown> {
     return !!val && typeof val === 'object' && !Array.isArray(val);
+  }
+
+  private static async exists(filePath: string): Promise<boolean> {
+    try {
+      await fs.stat(filePath);
+      return true;
+    } catch (e) {
+      if (isNodeError(e) && e.code === 'ENOENT') {
+        return false;
+      }
+      throw e;
+    }
   }
 }

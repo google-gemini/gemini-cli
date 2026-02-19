@@ -14,12 +14,14 @@ import {
 } from '../../config/trustedFolders.js';
 import * as process from 'node:process';
 import { type HistoryItemWithoutId, MessageType } from '../types.js';
-import { coreEvents, ExitCodes, isHeadlessMode } from '@google/gemini-cli-core';
-import { runExitCleanup } from '../../utils/cleanup.js';
 import {
+  coreEvents,
+  ExitCodes,
+  isHeadlessMode,
   FolderTrustDiscoveryService,
   type FolderDiscoveryResults,
-} from '../../services/FolderTrustDiscoveryService.js';
+} from '@google/gemini-cli-core';
+import { runExitCleanup } from '../../utils/cleanup.js';
 
 export const useFolderTrust = (
   settings: LoadedSettings,

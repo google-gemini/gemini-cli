@@ -27,6 +27,7 @@ import type {
   FallbackIntent,
   ValidationIntent,
   AgentDefinition,
+  FolderDiscoveryResults,
 } from '@google/gemini-cli-core';
 import { type TransientMessageType } from '../../utils/events.js';
 import type { DOMElement } from 'ink';
@@ -54,7 +55,6 @@ import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { type RestartReason } from '../hooks/useIdeTrustListener.js';
 import type { TerminalBackgroundColor } from '../utils/terminalCapabilityManager.js';
 import type { BackgroundShell } from '../hooks/shellCommandProcessor.js';
-import type { FolderDiscoveryResults } from '../../services/FolderTrustDiscoveryService.js';
 
 export interface QuotaState {
   userTier: UserTierId | undefined;

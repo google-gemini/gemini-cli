@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { FolderTrustDiscoveryService } from './FolderTrustDiscoveryService.js';
-import { GEMINI_DIR } from '@google/gemini-cli-core';
+import { GEMINI_DIR } from '../utils/paths.js';
 
 describe('FolderTrustDiscoveryService', () => {
   let tempDir: string;
@@ -21,6 +21,7 @@ describe('FolderTrustDiscoveryService', () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 

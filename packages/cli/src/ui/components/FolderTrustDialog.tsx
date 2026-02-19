@@ -18,8 +18,10 @@ import * as process from 'node:process';
 import * as path from 'node:path';
 import { relaunchApp } from '../../utils/processUtils.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
-import { ExitCodes } from '@google/gemini-cli-core';
-import type { FolderDiscoveryResults } from '../../services/FolderTrustDiscoveryService.js';
+import {
+  ExitCodes,
+  type FolderDiscoveryResults,
+} from '@google/gemini-cli-core';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';

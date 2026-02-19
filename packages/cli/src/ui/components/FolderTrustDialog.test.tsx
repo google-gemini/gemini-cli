@@ -42,6 +42,10 @@ describe('FolderTrustDialog', () => {
     mockedRows.current = 24;
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('should render the dialog with title and description', async () => {
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} />,

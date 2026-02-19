@@ -26,12 +26,6 @@ import * as trustedFolders from '../../config/trustedFolders.js';
 import { coreEvents, ExitCodes, isHeadlessMode } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
 
-vi.mock('../../services/FolderTrustDiscoveryService.js', () => ({
-  FolderTrustDiscoveryService: {
-    discover: vi.fn(() => new Promise(() => {})),
-  },
-}));
-
 const mockedCwd = vi.hoisted(() => vi.fn());
 const mockedExit = vi.hoisted(() => vi.fn());
 
@@ -42,6 +36,9 @@ vi.mock('@google/gemini-cli-core', async () => {
   return {
     ...actual,
     isHeadlessMode: vi.fn().mockReturnValue(false),
+    FolderTrustDiscoveryService: {
+      discover: vi.fn(() => new Promise(() => {})),
+    },
   };
 });
 
