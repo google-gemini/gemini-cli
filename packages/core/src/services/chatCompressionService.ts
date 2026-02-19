@@ -296,7 +296,7 @@ export class ChatCompressionService {
           info: {
             originalTokenCount,
             newTokenCount: truncatedTokenCount,
-            compressionStatus: CompressionStatus.COMPRESSED,
+            compressionStatus: CompressionStatus.CONTENT_TRUNCATED,
           },
         };
       }
