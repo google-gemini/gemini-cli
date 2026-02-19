@@ -22,7 +22,10 @@ import { ToolCallEvent } from '../telemetry/types.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { ToolModificationHandler } from '../scheduler/tool-modifier.js';
 import { getToolSuggestion } from '../utils/tool-utils.js';
-import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
+import type {
+  ToolConfirmationRequest,
+  SerializableConfirmationDetails,
+} from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
@@ -787,7 +790,7 @@ export class CoreToolScheduler {
         await updatePolicy(
           toolCall.tool,
           outcome,
-          toolCall.confirmationDetails,
+          toolCall.confirmationDetails as SerializableConfirmationDetails,
           {
             config: this.config,
             messageBus: this.messageBus,
