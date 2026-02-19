@@ -325,12 +325,19 @@ export function createChatBridgeRoutes(config: ChatBridgeConfig): Router {
         }
 
         if (isAddOnsFormat) {
-          // Wrap in Workspace Add-ons response format
-          const addOnsResponse = wrapAddOnsResponse(response);
-          logger.info(
-            `[ChatBridge] Add-ons response: ${JSON.stringify(addOnsResponse).substring(0, 200)}`,
-          );
-          res.json(addOnsResponse);
+          // If the handler returned an empty response (messages pushed via
+          // Chat API), return a bare {} so Add-ons doesn't try to create
+          // an empty message — which causes Google Chat to retry the webhook.
+          if (!response.text && !response.cardsV2 && !response.actionResponse) {
+            logger.info(`[ChatBridge] Add-ons response: {} (empty ack)`);
+            res.json({});
+          } else {
+            const addOnsResponse = wrapAddOnsResponse(response);
+            logger.info(
+              `[ChatBridge] Add-ons response: ${JSON.stringify(addOnsResponse).substring(0, 200)}`,
+            );
+            res.json(addOnsResponse);
+          }
         } else {
           res.json(response);
         }
