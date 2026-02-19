@@ -34,6 +34,7 @@ npm install -g @google/gemini-cli@preview
 - Revert "fix(mcp): ensure MCP transport is closed to prevent memory leaks" by
   @skeshive in [#18771](https://github.com/google-gemini/gemini-cli/pull/18771)
 - chore(release): bump version to 0.30.0-nightly.20260210.a2174751d by
+  @gemini-cli-robot in
   [#18772](https://github.com/google-gemini/gemini-cli/pull/18772)
 - chore: cleanup unused and add unlisted dependencies in packages/core by
   @adamfweidman in
@@ -310,4 +311,4 @@ npm install -g @google/gemini-cli@preview
   [#19008](https://github.com/google-gemini/gemini-cli/pull/19008)
 
 **Full changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.28.0-preview.0...v0.30.0-preview.1
+https://github.com/google-gemini/gemini-cli/compare/v0.29.0-preview.5...v0.30.0-preview.1
