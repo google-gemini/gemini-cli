@@ -111,7 +111,8 @@ export function getPolicyTier(
  */
 export function formatPolicyError(error: PolicyFileError): string {
   const tierLabel = error.tier.toUpperCase();
-  let message = `[${tierLabel}] Policy file error in ${error.fileName}:\n`;
+  const severityLabel = error.severity === 'warning' ? 'warning' : 'error';
+  let message = `[${tierLabel}] Policy file ${severityLabel} in ${error.fileName}:\n`;
   message += `  ${error.message}`;
   if (error.details) {
     message += `\n${error.details}`;
@@ -193,7 +194,10 @@ export async function createPolicyEngineConfig(
   // coreEvents has a buffer that will display these once the UI is ready
   if (errors.length > 0) {
     for (const error of errors) {
-      coreEvents.emitFeedback('error', formatPolicyError(error));
+      coreEvents.emitFeedback(
+        error.severity ?? 'error',
+        formatPolicyError(error),
+      );
     }
   }
 
