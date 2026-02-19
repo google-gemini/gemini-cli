@@ -171,7 +171,7 @@ export class ClassifierStrategy implements RoutingStrategy {
       const useGemini3_1 = (await config.getGemini31Launched?.()) ?? false;
       const useCustomToolModel =
         useGemini3_1 &&
-        config.getContentGeneratorConfig().authType !== AuthType.USE_VERTEX_AI;
+        config.getContentGeneratorConfig().authType === AuthType.USE_GEMINI;
       const selectedModel = resolveClassifierModel(
         model,
         routerResponse.model_choice,
