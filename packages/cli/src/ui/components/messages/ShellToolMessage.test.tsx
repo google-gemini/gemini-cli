@@ -9,12 +9,15 @@ import {
   ShellToolMessage,
   type ShellToolMessageProps,
 } from './ShellToolMessage.js';
-import { StreamingState, ToolCallStatus } from '../../types.js';
-import type { Config } from '@google/gemini-cli-core';
+import { StreamingState } from '../../types.js';
+import {
+  type Config,
+  SHELL_TOOL_NAME,
+  CoreToolCallStatus,
+} from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SHELL_TOOL_NAME } from '@google/gemini-cli-core';
 import { SHELL_COMMAND_NAME, ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 
 describe('<ShellToolMessage />', () => {
@@ -23,7 +26,7 @@ describe('<ShellToolMessage />', () => {
     name: SHELL_COMMAND_NAME,
     description: 'A shell command',
     resultDisplay: 'Test result',
-    status: ToolCallStatus.Executing,
+    status: CoreToolCallStatus.Executing,
     terminalWidth: 80,
     confirmationDetails: undefined,
     emphasis: 'medium',
@@ -62,7 +65,7 @@ describe('<ShellToolMessage />', () => {
       ['SHELL_COMMAND_NAME', SHELL_COMMAND_NAME],
       ['SHELL_TOOL_NAME', SHELL_TOOL_NAME],
     ])('clicks inside the shell area sets focus for %s', async (_, name) => {
-      const { stdin, lastFrame, simulateClick } = renderShell(
+      const { lastFrame, simulateClick } = renderShell(
         { name },
         { mouseEventsEnabled: true },
       );
@@ -71,32 +74,30 @@ describe('<ShellToolMessage />', () => {
         expect(lastFrame()).toContain('A shell command');
       });
 
-      await simulateClick(stdin, 2, 2);
+      await simulateClick(2, 2);
 
       await waitFor(() => {
         expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(true);
       });
     });
     it('resets focus when shell finishes', async () => {
-      let updateStatus: (s: ToolCallStatus) => void = () => {};
+      let updateStatus: (s: CoreToolCallStatus) => void = () => {};
 
       const Wrapper = () => {
-        const [status, setStatus] = React.useState(ToolCallStatus.Executing);
-        updateStatus = setStatus;
-        return (
-          <ShellToolMessage
-            {...baseProps}
-            status={status}
-            embeddedShellFocused={true}
-            activeShellPtyId={1}
-            ptyId={1}
-          />
+        const [status, setStatus] = React.useState(
+          CoreToolCallStatus.Executing,
         );
+        updateStatus = setStatus;
+        return <ShellToolMessage {...baseProps} status={status} ptyId={1} />;
       };
 
       const { lastFrame } = renderWithProviders(<Wrapper />, {
         uiActions,
-        uiState: { streamingState: StreamingState.Idle },
+        uiState: {
+          streamingState: StreamingState.Idle,
+          embeddedShellFocused: true,
+          activePtyId: 1,
+        },
       });
 
       // Verify it is initially focused
@@ -106,7 +107,7 @@ describe('<ShellToolMessage />', () => {
 
       // Now update status to Success
       await act(async () => {
-        updateStatus(ToolCallStatus.Success);
+        updateStatus(CoreToolCallStatus.Success);
       });
 
       // Should call setEmbeddedShellFocused(false) because isThisShellFocused became false
@@ -121,44 +122,51 @@ describe('<ShellToolMessage />', () => {
     it.each([
       [
         'renders in Executing state',
-        { status: ToolCallStatus.Executing },
+        { status: CoreToolCallStatus.Executing },
         undefined,
       ],
       [
         'renders in Success state (history mode)',
-        { status: ToolCallStatus.Success },
+        { status: CoreToolCallStatus.Success },
         undefined,
       ],
       [
         'renders in Error state',
-        { status: ToolCallStatus.Error, resultDisplay: 'Error output' },
+        { status: CoreToolCallStatus.Error, resultDisplay: 'Error output' },
         undefined,
       ],
       [
         'renders in Alternate Buffer mode while focused',
         {
-          status: ToolCallStatus.Executing,
-          embeddedShellFocused: true,
-          activeShellPtyId: 1,
+          status: CoreToolCallStatus.Executing,
           ptyId: 1,
         },
-        { useAlternateBuffer: true },
+        {
+          useAlternateBuffer: true,
+          uiState: {
+            embeddedShellFocused: true,
+            activePtyId: 1,
+          },
+        },
       ],
       [
         'renders in Alternate Buffer mode while unfocused',
         {
-          status: ToolCallStatus.Executing,
-          embeddedShellFocused: false,
-          activeShellPtyId: 1,
+          status: CoreToolCallStatus.Executing,
           ptyId: 1,
         },
-        { useAlternateBuffer: true },
+        {
+          useAlternateBuffer: true,
+          uiState: {
+            embeddedShellFocused: false,
+            activePtyId: 1,
+          },
+        },
       ],
     ])('%s', async (_, props, options) => {
-      const { lastFrame } = renderShell(props, options);
-      await waitFor(() => {
-        expect(lastFrame()).toMatchSnapshot();
-      });
+      const { lastFrame, waitUntilReady } = renderShell(props, options);
+      await waitUntilReady();
+      expect(lastFrame()).toMatchSnapshot();
     });
   });
 
@@ -189,24 +197,27 @@ describe('<ShellToolMessage />', () => {
         false,
       ],
     ])('%s', async (_, availableTerminalHeight, expectedMaxLines, focused) => {
-      const { lastFrame } = renderShell(
+      const { lastFrame, waitUntilReady } = renderShell(
         {
           resultDisplay: LONG_OUTPUT,
           renderOutputAsMarkdown: false,
           availableTerminalHeight,
-          activeShellPtyId: 1,
-          ptyId: focused ? 1 : 2,
-          status: ToolCallStatus.Executing,
-          embeddedShellFocused: focused,
+          ptyId: 1,
+          status: CoreToolCallStatus.Executing,
         },
-        { useAlternateBuffer: true },
+        {
+          useAlternateBuffer: true,
+          uiState: {
+            activePtyId: focused ? 1 : 2,
+            embeddedShellFocused: focused,
+          },
+        },
       );
 
-      await waitFor(() => {
-        const frame = lastFrame();
-        expect(frame!.match(/Line \d+/g)?.length).toBe(expectedMaxLines);
-        expect(frame).toMatchSnapshot();
-      });
+      await waitUntilReady();
+      const frame = lastFrame();
+      expect(frame.match(/Line \d+/g)?.length).toBe(expectedMaxLines);
+      expect(frame).toMatchSnapshot();
     });
   });
 });

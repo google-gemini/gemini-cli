@@ -15,6 +15,7 @@ import type {
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { ToolErrorType } from '../tools/tool-error.js';
 import type { SerializableConfirmationDetails } from '../confirmation-bus/types.js';
+import { type ApprovalMode } from '../policy/types.js';
 
 export const ROOT_SCHEDULER_ID = 'root';
 
@@ -65,6 +66,7 @@ export type ValidatingToolCall = {
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
   schedulerId?: string;
+  approvalMode?: ApprovalMode;
 };
 
 export type ScheduledToolCall = {
@@ -75,6 +77,7 @@ export type ScheduledToolCall = {
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
   schedulerId?: string;
+  approvalMode?: ApprovalMode;
 };
 
 export type ErroredToolCall = {
@@ -85,6 +88,7 @@ export type ErroredToolCall = {
   durationMs?: number;
   outcome?: ToolConfirmationOutcome;
   schedulerId?: string;
+  approvalMode?: ApprovalMode;
 };
 
 export type SuccessfulToolCall = {
@@ -96,6 +100,7 @@ export type SuccessfulToolCall = {
   durationMs?: number;
   outcome?: ToolConfirmationOutcome;
   schedulerId?: string;
+  approvalMode?: ApprovalMode;
 };
 
 export type ExecutingToolCall = {
@@ -104,10 +109,13 @@ export type ExecutingToolCall = {
   tool: AnyDeclarativeTool;
   invocation: AnyToolInvocation;
   liveOutput?: string | AnsiOutput;
+  progressMessage?: string;
+  progressPercent?: number;
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
   pid?: number;
   schedulerId?: string;
+  approvalMode?: ApprovalMode;
 };
 
 export type CancelledToolCall = {
@@ -119,6 +127,7 @@ export type CancelledToolCall = {
   durationMs?: number;
   outcome?: ToolConfirmationOutcome;
   schedulerId?: string;
+  approvalMode?: ApprovalMode;
 };
 
 export type WaitingToolCall = {
@@ -141,6 +150,7 @@ export type WaitingToolCall = {
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
   schedulerId?: string;
+  approvalMode?: ApprovalMode;
 };
 
 export type Status = ToolCall['status'];

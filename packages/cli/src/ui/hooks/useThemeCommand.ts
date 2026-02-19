@@ -31,6 +31,7 @@ export const useThemeCommand = (
   setThemeError: (error: string | null) => void,
   addItem: UseHistoryManagerReturn['addItem'],
   initialThemeError: string | null,
+  refreshStatic: () => void,
 ): UseThemeCommandReturn => {
   const [isThemeDialogOpen, setIsThemeDialogOpen] =
     useState(!!initialThemeError);
@@ -102,12 +103,13 @@ export const useThemeCommand = (
           themeManager.loadCustomThemes(loadedSettings.merged.ui.customThemes);
         }
         applyTheme(loadedSettings.merged.ui.theme); // Apply the current theme
+        refreshStatic();
         setThemeError(null);
       } finally {
         setIsThemeDialogOpen(false); // Close the dialog
       }
     },
-    [applyTheme, loadedSettings, setThemeError],
+    [applyTheme, loadedSettings, refreshStatic, setThemeError],
   );
 
   return {

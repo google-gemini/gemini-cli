@@ -141,6 +141,7 @@ const MAC_ALT_KEY_CHARACTER_MAP: Record<string, string> = {
   '\u00B5': 'm', // "µ" toggle markup view
   '\u03A9': 'z', // "Ω" Option+z
   '\u00B8': 'Z', // "¸" Option+Shift+z
+  '\u2202': 'd', // "∂" delete word forward
 };
 
 function nonKeyboardEventFilter(

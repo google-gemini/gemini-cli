@@ -24,6 +24,7 @@ import {
   GEN_AI_AGENT_DESCRIPTION,
   GEN_AI_AGENT_NAME,
 } from '../telemetry/constants.js';
+import { formatUserHintsForModel } from '../utils/fastAckHelper.js';
 
 export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
   constructor(
@@ -71,6 +72,8 @@ export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
 }
 
 class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
+  private readonly startIndex: number;
+
   constructor(
     params: AgentInputs,
     private readonly definition: AgentDefinition,
@@ -85,6 +88,7 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
       _toolName ?? definition.name,
       _toolDisplayName ?? definition.displayName ?? definition.name,
     );
+    this.startIndex = config.userHintService.getLatestHintIndex();
   }
 
   getDescription(): string {
@@ -94,7 +98,10 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
   override async shouldConfirmExecute(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    const invocation = this.buildSubInvocation(this.definition, this.params);
+    const invocation = this.buildSubInvocation(
+      this.definition,
+      this.withUserHints(this.params),
+    );
     return invocation.shouldConfirmExecute(abortSignal);
   }
 
@@ -113,7 +120,10 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
       );
     }
 
-    const invocation = this.buildSubInvocation(this.definition, this.params);
+    const invocation = this.buildSubInvocation(
+      this.definition,
+      this.withUserHints(this.params),
+    );
 
     return runInDevTraceSpan(
       {
@@ -125,6 +135,30 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
       },
       () => invocation.execute(signal, updateOutput),
     );
+  }
+
+  private withUserHints(agentArgs: AgentInputs): AgentInputs {
+    if (this.definition.kind !== 'remote') {
+      return agentArgs;
+    }
+
+    const userHints = this.config.userHintService.getUserHintsAfter(
+      this.startIndex,
+    );
+    const formattedHints = formatUserHintsForModel(userHints);
+    if (!formattedHints) {
+      return agentArgs;
+    }
+
+    const query = agentArgs['query'];
+    if (typeof query !== 'string' || query.trim().length === 0) {
+      return agentArgs;
+    }
+
+    return {
+      ...agentArgs,
+      query: `${formattedHints}\n\n${query}`,
+    };
   }
 
   private buildSubInvocation(

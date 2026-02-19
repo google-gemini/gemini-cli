@@ -22,6 +22,7 @@ import {
   CoreToolCallStatus,
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
+import type { ApprovalMode } from '../policy/types.js';
 import { PolicyDecision } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
@@ -39,6 +40,11 @@ import {
 } from '../confirmation-bus/types.js';
 import { runWithToolCallContext } from '../utils/toolCallContext.js';
 import { GeminiCliOperation } from '../telemetry/constants.js';
+import {
+  coreEvents,
+  CoreEvent,
+  type McpProgressPayload,
+} from '../utils/events.js';
 
 interface SchedulerQueueItem {
   requests: ToolCallRequestInfo[];
@@ -115,7 +121,24 @@ export class Scheduler {
     this.modifier = new ToolModificationHandler();
 
     this.setupMessageBusListener(this.messageBus);
+
+    coreEvents.on(CoreEvent.McpProgress, this.handleMcpProgress);
   }
+
+  dispose(): void {
+    coreEvents.off(CoreEvent.McpProgress, this.handleMcpProgress);
+  }
+
+  private readonly handleMcpProgress = (payload: McpProgressPayload) => {
+    const callId = payload.callId;
+    this.state.updateStatus(callId, CoreToolCallStatus.Executing, {
+      progressMessage: payload.message,
+      progressPercent:
+        payload.total && payload.total > 0
+          ? (payload.progress / payload.total) * 100
+          : undefined,
+    });
+  };
 
   private setupMessageBusListener(messageBus: MessageBus): void {
     if (Scheduler.subscribedMessageBuses.has(messageBus)) {
@@ -250,6 +273,7 @@ export class Scheduler {
     this.isProcessing = true;
     this.isCancelling = false;
     this.state.clearBatch();
+    const currentApprovalMode = this.config.getApprovalMode();
 
     try {
       const toolRegistry = this.config.getToolRegistry();
@@ -267,10 +291,15 @@ export class Scheduler {
               enrichedRequest,
               toolRegistry.getAllToolNames(),
             ),
+            approvalMode: currentApprovalMode,
           };
         }
 
-        return this._validateAndCreateToolCall(enrichedRequest, tool);
+        return this._validateAndCreateToolCall(
+          enrichedRequest,
+          tool,
+          currentApprovalMode,
+        );
       });
 
       this.state.enqueue(newCalls);
@@ -304,6 +333,7 @@ export class Scheduler {
   private _validateAndCreateToolCall(
     request: ToolCallRequestInfo,
     tool: AnyDeclarativeTool,
+    approvalMode: ApprovalMode,
   ): ValidatingToolCall | ErroredToolCall {
     return runWithToolCallContext(
       {
@@ -321,6 +351,7 @@ export class Scheduler {
             invocation,
             startTime: Date.now(),
             schedulerId: this.schedulerId,
+            approvalMode,
           };
         } catch (e) {
           return {
@@ -334,6 +365,7 @@ export class Scheduler {
             ),
             durationMs: 0,
             schedulerId: this.schedulerId,
+            approvalMode,
           };
         }
       },

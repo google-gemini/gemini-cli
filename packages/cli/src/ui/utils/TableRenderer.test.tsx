@@ -8,7 +8,7 @@ import { TableRenderer } from './TableRenderer.js';
 import { renderWithProviders } from '../../test-utils/render.js';
 
 describe('TableRenderer', () => {
-  it('renders a 3x3 table correctly', () => {
+  it('renders a 3x3 table correctly', async () => {
     const headers = ['Header 1', 'Header 2', 'Header 3'];
     const rows = [
       ['Row 1, Col 1', 'Row 1, Col 2', 'Row 1, Col 3'],
@@ -17,22 +17,24 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 80;
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Header 1');
     expect(output).toContain('Row 1, Col 1');
     expect(output).toContain('Row 3, Col 3');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('renders a table with long headers and 4 columns correctly', () => {
+  it('renders a table with long headers and 4 columns correctly', async () => {
     const headers = [
       'Very Long Column Header One',
       'Very Long Column Header Two',
@@ -46,13 +48,14 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 80;
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     // Since terminalWidth is 80 and headers are long, they might be truncated.
@@ -60,9 +63,10 @@ describe('TableRenderer', () => {
     expect(output).toContain('Data 1.1');
     expect(output).toContain('Data 3.4');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('wraps long cell content correctly', () => {
+  it('wraps long cell content correctly', async () => {
     const headers = ['Col 1', 'Col 2', 'Col 3'];
     const rows = [
       [
@@ -73,21 +77,23 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 50;
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('This is a very');
     expect(output).toContain('long cell');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('wraps all long columns correctly', () => {
+  it('wraps all long columns correctly', async () => {
     const headers = ['Col 1', 'Col 2', 'Col 3'];
     const rows = [
       [
@@ -98,20 +104,22 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 60;
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('wrapping in');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('wraps mixed long and short columns correctly', () => {
+  it('wraps mixed long and short columns correctly', async () => {
     const headers = ['Short', 'Long', 'Medium'];
     const rows = [
       [
@@ -122,22 +130,24 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 50;
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Tiny');
     expect(output).toContain('definitely needs');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
   // The snapshot looks weird but checked on VS Code terminal and it looks fine
-  it('wraps columns with punctuation correctly', () => {
+  it('wraps columns with punctuation correctly', async () => {
     const headers = ['Punctuation 1', 'Punctuation 2', 'Punctuation 3'];
     const rows = [
       [
@@ -148,40 +158,44 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 60;
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Start. Stop.');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('strips bold markers from headers and renders them correctly', () => {
+  it('strips bold markers from headers and renders them correctly', async () => {
     const headers = ['**Bold Header**', 'Normal Header', '**Another Bold**'];
     const rows = [['Data 1', 'Data 2', 'Data 3']];
     const terminalWidth = 50;
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     // The output should NOT contain the literal '**'
     expect(output).not.toContain('**Bold Header**');
     expect(output).toContain('Bold Header');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('handles wrapped bold headers without showing markers', () => {
+  it('handles wrapped bold headers without showing markers', async () => {
     const headers = [
       '**Very Long Bold Header That Will Wrap**',
       'Short',
@@ -190,22 +204,24 @@ describe('TableRenderer', () => {
     const rows = [['Data 1', 'Data 2', 'Data 3']];
     const terminalWidth = 40;
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     // Markers should be gone
     expect(output).not.toContain('**');
     expect(output).toContain('Very Long');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('renders a complex table with mixed content lengths correctly', () => {
+  it('renders a complex table with mixed content lengths correctly', async () => {
     const headers = [
       'Comprehensive Architectural Specification for the Distributed Infrastructure Layer',
       'Implementation Details for the High-Throughput Asynchronous Message Processing Pipeline with Extended Scalability Features and Redundancy Protocols',
@@ -231,7 +247,7 @@ describe('TableRenderer', () => {
 
     const terminalWidth = 160;
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
@@ -239,6 +255,7 @@ describe('TableRenderer', () => {
       />,
       { width: terminalWidth },
     );
+    await waitUntilReady();
 
     const output = lastFrame();
 
@@ -255,6 +272,7 @@ describe('TableRenderer', () => {
     expect(output).toContain('Doe');
 
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
   it.each([
@@ -298,8 +316,8 @@ describe('TableRenderer', () => {
       terminalWidth: 80,
       expected: ['Mixed 😃 中文', '你好 😃', 'こんにちは 🚀'],
     },
-  ])('$name', ({ headers, rows, terminalWidth, expected }) => {
-    const { lastFrame } = renderWithProviders(
+  ])('$name', async ({ headers, rows, terminalWidth, expected }) => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
@@ -307,12 +325,14 @@ describe('TableRenderer', () => {
       />,
       { width: terminalWidth },
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     expected.forEach((text) => {
       expect(output).toContain(text);
     });
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
   it.each([
@@ -328,16 +348,17 @@ describe('TableRenderer', () => {
       rows: [['Data 1', 'Data 2']],
       expected: ['Header 1', 'Header 2', 'Header 3', 'Data 1', 'Data 2'],
     },
-  ])('$name', ({ headers, rows, expected }) => {
+  ])('$name', async ({ headers, rows, expected }) => {
     const terminalWidth = 50;
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     expected.forEach((text) => {

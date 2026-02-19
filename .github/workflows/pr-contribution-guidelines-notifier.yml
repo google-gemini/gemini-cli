@@ -19,7 +19,7 @@ jobs:
           APP_ID: '${{ secrets.APP_ID }}'
         if: |-
           ${{ env.APP_ID != '' }}
-        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
+        uses: 'actions/create-github-app-token@v2'
         with:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'
@@ -35,6 +35,37 @@ jobs:
             const pr_number = context.payload.pull_request.number;
 
             // 1. Check if the PR author is a maintainer
+            // Check team membership (most reliable for private org members)
+            let isTeamMember = false;
+            const teams = ['gemini-cli-maintainers', 'gemini-cli-askmode-approvers', 'gemini-cli-docs'];
+            for (const team_slug of teams) {
+              try {
+                const members = await github.paginate(github.rest.teams.listMembersInOrg, {
+                  org: org,
+                  team_slug: team_slug
+                });
+                if (members.some(m => m.login.toLowerCase() === username.toLowerCase())) {
+                  isTeamMember = true;
+                  core.info(`${username} is a member of ${team_slug}. No notification needed.`);
+                  break;
+                }
+              } catch (e) {
+                core.warning(`Failed to fetch team members from ${team_slug}: ${e.message}`);
+              }
+            }
+
+            if (isTeamMember) return;
+
+            // Check author_association from webhook payload
+            const authorAssociation = context.payload.pull_request.author_association;
+            const isRepoMaintainer = ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(authorAssociation);
+
+            if (isRepoMaintainer) {
+              core.info(`${username} is a maintainer (author_association: ${authorAssociation}). No notification needed.`);
+              return;
+            }
+
+            // Check if author is a Googler
             const isGoogler = async (login) => {
               try {
                 const orgs = ['googlers', 'google'];
@@ -55,11 +86,8 @@ jobs:
               return false;
             };
 
-            const authorAssociation = context.payload.pull_request.author_association;
-            const isRepoMaintainer = ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(authorAssociation);
-
-            if (isRepoMaintainer || await isGoogler(username)) {
-              core.info(`${username} is a maintainer or Googler. No notification needed.`);
+            if (await isGoogler(username)) {
+              core.info(`${username} is a Googler. No notification needed.`);
               return;
             }
 

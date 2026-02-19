@@ -34,21 +34,27 @@ describe('ShortcutsHelp', () => {
     ),
   )(
     'renders correctly in $name mode on $platform.name',
-    ({ width, platform }) => {
+    async ({ width, platform }) => {
       Object.defineProperty(process, 'platform', {
         value: platform.value,
       });
 
-      const { lastFrame } = renderWithProviders(<ShortcutsHelp />, {
-        width,
-      });
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <ShortcutsHelp />,
+        {
+          width,
+        },
+      );
+      await waitUntilReady();
       expect(lastFrame()).toContain('shell mode');
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     },
   );
 
-  it('always shows Tab Tab focus UI shortcut', () => {
+  it('always shows Tab Tab focus UI shortcut', async () => {
     const rendered = renderWithProviders(<ShortcutsHelp />);
+    await rendered.waitUntilReady();
     expect(rendered.lastFrame()).toContain('Tab Tab');
     rendered.unmount();
   });
