@@ -38,7 +38,7 @@ export function isCloudShell(): boolean {
   return !!(process.env['EDITOR_IN_CLOUD_SHELL'] || process.env['CLOUD_SHELL']);
 }
 
-export function isJetBrains(): boolean {
+function isJetBrains(): boolean {
   return !!process.env['TERMINAL_EMULATOR']
     ?.toLowerCase()
     .includes('jetbrains');
