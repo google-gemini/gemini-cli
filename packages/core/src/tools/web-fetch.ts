@@ -103,7 +103,11 @@ export interface WebFetchToolParams {
   /**
    * The prompt containing URL(s) (up to 20) and instructions for processing their content.
    */
-  prompt: string;
+  prompt?: string;
+  /**
+   * Direct URL to fetch (experimental mode).
+   */
+  url?: string;
 }
 
 interface ErrorWithStatus extends Error {
@@ -125,7 +129,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
   }
 
   private async executeFallback(signal: AbortSignal): Promise<ToolResult> {
-    const { validUrls: urls } = parsePrompt(this.params.prompt);
+    const { validUrls: urls } = parsePrompt(this.params.prompt!);
     // For now, we only support one URL for fallback
     let url = urls[0];
 
@@ -213,10 +217,12 @@ ${textContent}
   }
 
   getDescription(): string {
+    if (this.params.url) {
+      return `Fetching content from: ${this.params.url}`;
+    }
+    const prompt = this.params.prompt || '';
     const displayPrompt =
-      this.params.prompt.length > 100
-        ? this.params.prompt.substring(0, 97) + '...'
-        : this.params.prompt;
+      prompt.length > 100 ? prompt.substring(0, 97) + '...' : prompt;
     return `Processing URLs and instructions from prompt: "${displayPrompt}"`;
   }
 
@@ -229,10 +235,19 @@ ${textContent}
       return false;
     }
 
-    // Perform GitHub URL conversion here to differentiate between user-provided
-    // URL and the actual URL to be fetched.
-    const { validUrls } = parsePrompt(this.params.prompt);
-    const urls = validUrls.map((url) => {
+    let urls: string[] = [];
+    let prompt = this.params.prompt || '';
+
+    if (this.params.url) {
+      urls = [this.params.url];
+      prompt = `Fetch ${this.params.url}`;
+    } else if (this.params.prompt) {
+      const { validUrls } = parsePrompt(this.params.prompt);
+      urls = validUrls;
+    }
+
+    // Perform GitHub URL conversion here
+    urls = urls.map((url) => {
       if (url.includes('github.com') && url.includes('/blob/')) {
         return url
           .replace('github.com', 'raw.githubusercontent.com')
@@ -244,7 +259,7 @@ ${textContent}
     const confirmationDetails: ToolCallConfirmationDetails = {
       type: 'info',
       title: `Confirm Web Fetch`,
-      prompt: this.params.prompt,
+      prompt,
       urls,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
@@ -260,8 +275,22 @@ ${textContent}
   }
 
   private async executeExperimental(_signal: AbortSignal): Promise<ToolResult> {
-    const { validUrls: urls } = parsePrompt(this.params.prompt);
-    let url = urls[0];
+    let url: string;
+    if (this.params.url) {
+      url = new URL(this.params.url).href;
+    } else if (this.params.prompt) {
+      const { validUrls } = parsePrompt(this.params.prompt);
+      url = validUrls[0];
+    } else {
+      return {
+        llmContent: 'Error: No URL provided.',
+        returnDisplay: 'Error: No URL provided.',
+        error: {
+          message: 'No URL provided.',
+          type: ToolErrorType.INVALID_TOOL_PARAMS,
+        },
+      };
+    }
 
     // Convert GitHub blob URL to raw URL
     if (url.includes('github.com') && url.includes('/blob/')) {
@@ -372,7 +401,7 @@ Response: ${rawResponseText}`;
     if (this.config.getUseExperimentalWebFetch()) {
       return this.executeExperimental(signal);
     }
-    const userPrompt = this.params.prompt;
+    const userPrompt = this.params.prompt!;
     const { validUrls: urls } = parsePrompt(userPrompt);
     const url = urls[0];
     const isPrivate = isPrivateIp(url);
@@ -543,6 +572,18 @@ export class WebFetchTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: WebFetchToolParams,
   ): string | null {
+    if (this.config.getUseExperimentalWebFetch()) {
+      if (!params.url) {
+        return "The 'url' parameter is required.";
+      }
+      try {
+        new URL(params.url);
+      } catch {
+        return `Invalid URL: "${params.url}"`;
+      }
+      return null;
+    }
+
     if (!params.prompt || params.prompt.trim() === '') {
       return "The 'prompt' parameter cannot be empty and must contain URL(s) and instructions.";
     }
@@ -576,6 +617,25 @@ export class WebFetchTool extends BaseDeclarativeTool<
   }
 
   override getSchema(modelId?: string) {
-    return resolveToolDeclaration(WEB_FETCH_DEFINITION, modelId);
+    const schema = resolveToolDeclaration(WEB_FETCH_DEFINITION, modelId);
+    if (this.config.getUseExperimentalWebFetch()) {
+      return {
+        ...schema,
+        description:
+          'Fetch content from a URL directly. Send multiple requests for this tool if multiple URL fetches are needed.',
+        parametersJsonSchema: {
+          type: 'object',
+          properties: {
+            url: {
+              type: 'string',
+              description:
+                'The URL to fetch. Must be a valid http or https URL.',
+            },
+          },
+          required: ['url'],
+        },
+      };
+    }
+    return schema;
   }
 }

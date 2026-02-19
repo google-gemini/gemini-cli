@@ -179,32 +179,81 @@ describe('WebFetchTool', () => {
   });
 
   describe('validateToolParamValues', () => {
-    it.each([
-      {
-        name: 'empty prompt',
-        prompt: '',
-        expectedError: "The 'prompt' parameter cannot be empty",
-      },
-      {
-        name: 'prompt with no URLs',
-        prompt: 'hello world',
-        expectedError: "The 'prompt' must contain at least one valid URL",
-      },
-      {
-        name: 'prompt with malformed URLs',
-        prompt: 'fetch httpshttps://example.com',
-        expectedError: 'Error(s) in prompt URLs:',
-      },
-    ])('should throw if $name', ({ prompt, expectedError }) => {
-      const tool = new WebFetchTool(mockConfig, bus);
-      expect(() => tool.build({ prompt })).toThrow(expectedError);
+    describe('standard mode', () => {
+      it.each([
+        {
+          name: 'empty prompt',
+          prompt: '',
+          expectedError: "The 'prompt' parameter cannot be empty",
+        },
+        {
+          name: 'prompt with no URLs',
+          prompt: 'hello world',
+          expectedError: "The 'prompt' must contain at least one valid URL",
+        },
+        {
+          name: 'prompt with malformed URLs',
+          prompt: 'fetch httpshttps://example.com',
+          expectedError: 'Error(s) in prompt URLs:',
+        },
+      ])('should throw if $name', ({ prompt, expectedError }) => {
+        const tool = new WebFetchTool(mockConfig, bus);
+        expect(() => tool.build({ prompt })).toThrow(expectedError);
+      });
+
+      it('should pass if prompt contains at least one valid URL', () => {
+        const tool = new WebFetchTool(mockConfig, bus);
+        expect(() =>
+          tool.build({ prompt: 'fetch https://example.com' }),
+        ).not.toThrow();
+      });
     });
 
-    it('should pass if prompt contains at least one valid URL', () => {
+    describe('experimental mode', () => {
+      beforeEach(() => {
+        vi.spyOn(mockConfig, 'getUseExperimentalWebFetch').mockReturnValue(
+          true,
+        );
+      });
+
+      it('should throw if url is missing', () => {
+        const tool = new WebFetchTool(mockConfig, bus);
+        expect(() => tool.build({ prompt: 'foo' })).toThrow(
+          "params must have required property 'url'",
+        );
+      });
+
+      it('should throw if url is invalid', () => {
+        const tool = new WebFetchTool(mockConfig, bus);
+        expect(() => tool.build({ url: 'not-a-url' })).toThrow(
+          'Invalid URL: "not-a-url"',
+        );
+      });
+
+      it('should pass if url is valid', () => {
+        const tool = new WebFetchTool(mockConfig, bus);
+        expect(() => tool.build({ url: 'https://example.com' })).not.toThrow();
+      });
+    });
+  });
+
+  describe('getSchema', () => {
+    it('should return standard schema by default', () => {
       const tool = new WebFetchTool(mockConfig, bus);
-      expect(() =>
-        tool.build({ prompt: 'fetch https://example.com' }),
-      ).not.toThrow();
+      const schema = tool.getSchema();
+      expect(schema.parametersJsonSchema).toHaveProperty('properties.prompt');
+      expect(schema.parametersJsonSchema).not.toHaveProperty('properties.url');
+    });
+
+    it('should return experimental schema when enabled', () => {
+      vi.spyOn(mockConfig, 'getUseExperimentalWebFetch').mockReturnValue(true);
+      const tool = new WebFetchTool(mockConfig, bus);
+      const schema = tool.getSchema();
+      expect(schema.parametersJsonSchema).toHaveProperty('properties.url');
+      expect(schema.parametersJsonSchema).not.toHaveProperty(
+        'properties.prompt',
+      );
+      expect(schema.parametersJsonSchema).toHaveProperty('required', ['url']);
     });
   });
 
@@ -370,6 +419,24 @@ describe('WebFetchTool', () => {
         title: 'Confirm Web Fetch',
         prompt: 'fetch https://example.com',
         urls: ['https://example.com/'],
+        onConfirm: expect.any(Function),
+      });
+    });
+
+    it('should handle URL param in confirmation details', async () => {
+      vi.spyOn(mockConfig, 'getUseExperimentalWebFetch').mockReturnValue(true);
+      const tool = new WebFetchTool(mockConfig, bus);
+      const params = { url: 'https://example.com' };
+      const invocation = tool.build(params);
+      const confirmationDetails = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      expect(confirmationDetails).toEqual({
+        type: 'info',
+        title: 'Confirm Web Fetch',
+        prompt: 'Fetch https://example.com',
+        urls: ['https://example.com'],
         onConfirm: expect.any(Function),
       });
     });
@@ -619,7 +686,7 @@ describe('WebFetchTool', () => {
       });
 
       const tool = new WebFetchTool(mockConfig, bus);
-      const params = { prompt: 'fetch https://example.com' };
+      const params = { url: 'https://example.com' };
       const invocation = tool.build(params);
       const result = await invocation.execute(new AbortController().signal);
 
@@ -646,7 +713,7 @@ describe('WebFetchTool', () => {
       });
 
       const tool = new WebFetchTool(mockConfig, bus);
-      const params = { prompt: 'fetch https://example.com' };
+      const params = { url: 'https://example.com' };
       const invocation = tool.build(params);
       await invocation.execute(new AbortController().signal);
 
@@ -678,7 +745,7 @@ describe('WebFetchTool', () => {
       });
 
       const tool = new WebFetchTool(mockConfig, bus);
-      const params = { prompt: 'fetch https://example.com/image.png' };
+      const params = { url: 'https://example.com/image.png' };
       const invocation = tool.build(params);
       const result = await invocation.execute(new AbortController().signal);
 
@@ -699,7 +766,7 @@ describe('WebFetchTool', () => {
       });
 
       const tool = new WebFetchTool(mockConfig, bus);
-      const params = { prompt: 'fetch https://example.com/404' };
+      const params = { url: 'https://example.com/404' };
       const invocation = tool.build(params);
       const result = await invocation.execute(new AbortController().signal);
 
