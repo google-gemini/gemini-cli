@@ -28,7 +28,7 @@ describe('TrackerService', () => {
 
   it('should initialize the tracker directory', async () => {
     await service.ensureInitialized();
-    const tasksDir = path.join(testTrackerDir, 'tasks');
+    const tasksDir = testTrackerDir;
     const stats = await fs.stat(tasksDir);
     expect(stats.isDirectory()).toBe(true);
   });

@@ -12,8 +12,8 @@ import { TrackerTaskSchema, type TrackerTask } from './trackerTypes.js';
 export class TrackerService {
   private readonly tasksDir: string;
 
-  constructor(private readonly trackerDir: string) {
-    this.tasksDir = path.join(this.trackerDir, 'tasks');
+  constructor(readonly trackerDir: string) {
+    this.tasksDir = trackerDir;
   }
 
   /**
