@@ -121,6 +121,12 @@ code spans, ensuring that `@` imports inside these regions are properly ignored.
 This provides robust handling of nested code blocks and complex Markdown
 structures.
 
+## HTML comment handling
+
+The import processor removes HTML comments from memory content before resolving
+imports. Any `@` imports inside HTML comments are ignored, and the comments do
+not appear in the final prompt.
+
 ## Import tree structure
 
 The processor returns an import tree that shows the hierarchy of imported files,

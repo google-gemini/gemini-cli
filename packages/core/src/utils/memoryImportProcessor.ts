@@ -163,6 +163,33 @@ function findCodeRegions(content: string): Array<[number, number]> {
   return regions;
 }
 
+function stripHtmlComments(content: string): string {
+  if (!content.includes('<!--')) return content;
+
+  let result = '';
+  let cursor = 0;
+  const len = content.length;
+
+  while (cursor < len) {
+    const start = content.indexOf('<!--', cursor);
+    if (start === -1) {
+      result += content.slice(cursor);
+      break;
+    }
+
+    result += content.slice(cursor, start);
+
+    const end = content.indexOf('-->', start + 4);
+    if (end === -1) {
+      break;
+    }
+
+    cursor = end + 3;
+  }
+
+  return result;
+}
+
 /**
  * Processes import statements in GEMINI.md content
  * Supports @path/to/file syntax for importing content from other files
@@ -186,6 +213,8 @@ export async function processImports(
   projectRoot?: string,
   importFormat: 'flat' | 'tree' = 'tree',
 ): Promise<ProcessImportsResult> {
+  content = stripHtmlComments(content);
+
   if (!projectRoot) {
     projectRoot = await findProjectRoot(basePath);
   }
@@ -216,6 +245,7 @@ export async function processImports(
       filePath: string,
       depth: number,
     ) {
+      const sanitizedContent = stripHtmlComments(fileContent);
       // Normalize the file path to ensure consistent comparison
       const normalizedPath = path.normalize(filePath);
 
@@ -226,11 +256,11 @@ export async function processImports(
       processedFiles.add(normalizedPath);
 
       // Add this file to the flat list
-      flatFiles.push({ path: normalizedPath, content: fileContent });
+      flatFiles.push({ path: normalizedPath, content: sanitizedContent });
 
       // Find imports in this file
-      const codeRegions = findCodeRegions(fileContent);
-      const imports = findImports(fileContent);
+      const codeRegions = findCodeRegions(sanitizedContent);
+      const imports = findImports(sanitizedContent);
 
       // Process imports in reverse order to handle indices correctly
       for (let i = imports.length - 1; i >= 0; i--) {
