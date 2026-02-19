@@ -259,7 +259,119 @@ ${textContent}
     return confirmationDetails;
   }
 
+  private async executeExperimental(_signal: AbortSignal): Promise<ToolResult> {
+    const { validUrls: urls } = parsePrompt(this.params.prompt);
+    let url = urls[0];
+
+    // Convert GitHub blob URL to raw URL
+    if (url.includes('github.com') && url.includes('/blob/')) {
+      url = url
+        .replace('github.com', 'raw.githubusercontent.com')
+        .replace('/blob/', '/');
+    }
+
+    try {
+      const response = await retryWithBackoff(
+        async () => {
+          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
+            headers: {
+              Accept:
+                'text/markdown, text/plain;q=0.9, application/json;q=0.9, text/html;q=0.8, */*;q=0.5',
+            },
+          });
+          return res;
+        },
+        {
+          retryFetchErrors: this.config.getRetryFetchErrors(),
+        },
+      );
+
+      const contentType = response.headers.get('content-type') || '';
+      const status = response.status;
+
+      if (status >= 400) {
+        const rawResponseText = await response.text();
+        const headers: Record<string, string> = {};
+        response.headers.forEach((value, key) => {
+          headers[key] = value;
+        });
+        const errorContent = `Request failed with status ${status}
+Headers: ${JSON.stringify(headers, null, 2)}
+Response: ${rawResponseText}`;
+        return {
+          llmContent: errorContent,
+          returnDisplay: `Failed to fetch ${url} (Status: ${status})`,
+        };
+      }
+
+      const lowContentType = contentType.toLowerCase();
+      if (
+        lowContentType.includes('text/markdown') ||
+        lowContentType.includes('text/plain') ||
+        lowContentType.includes('application/json')
+      ) {
+        const text = await response.text();
+        return {
+          llmContent: text.substring(0, MAX_CONTENT_LENGTH),
+          returnDisplay: `Fetched ${contentType} content from ${url}`,
+        };
+      }
+
+      if (lowContentType.includes('text/html')) {
+        const html = await response.text();
+        const textContent = convert(html, {
+          wordwrap: false,
+          selectors: [{ selector: 'a', options: { ignoreHref: false } }],
+        });
+        return {
+          llmContent: textContent.substring(0, MAX_CONTENT_LENGTH),
+          returnDisplay: `Fetched and converted HTML content from ${url}`,
+        };
+      }
+
+      if (
+        lowContentType.startsWith('image/') ||
+        lowContentType.startsWith('video/') ||
+        lowContentType === 'application/pdf'
+      ) {
+        const buffer = await response.arrayBuffer();
+        const base64Data = Buffer.from(buffer).toString('base64');
+        return {
+          llmContent: {
+            inlineData: {
+              data: base64Data,
+              mimeType: contentType.split(';')[0],
+            },
+          },
+          returnDisplay: `Fetched ${contentType} from ${url}`,
+        };
+      }
+
+      // Fallback for unknown types - try as text
+      const text = await response.text();
+      return {
+        llmContent: text.substring(0, MAX_CONTENT_LENGTH),
+        returnDisplay: `Fetched ${contentType || 'unknown'} content from ${url}`,
+      };
+    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const error = e as Error;
+      const errorMessage = `Error during experimental fetch for ${url}: ${error.message}`;
+      return {
+        llmContent: `Error: ${errorMessage}`,
+        returnDisplay: `Error: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.WEB_FETCH_FALLBACK_FAILED,
+        },
+      };
+    }
+  }
+
   async execute(signal: AbortSignal): Promise<ToolResult> {
+    if (this.config.getUseExperimentalWebFetch()) {
+      return this.executeExperimental(signal);
+    }
     const userPrompt = this.params.prompt;
     const { validUrls: urls } = parsePrompt(userPrompt);
     const url = urls[0];

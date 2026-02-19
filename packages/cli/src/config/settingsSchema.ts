@@ -1654,6 +1654,16 @@ const SETTINGS_SCHEMA = {
           'Enable model steering (user hints) to guide the model during tool execution.',
         showInDialog: true,
       },
+      useExperimentalWebFetch: {
+        type: 'boolean',
+        label: 'Use Experimental Web Fetch',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable experimental web fetch behavior that bypasses LLM summarization.',
+        showInDialog: true,
+      },
     },
   },
 

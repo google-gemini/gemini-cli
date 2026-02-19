@@ -134,6 +134,7 @@ they appear in the UI.
 | Use OSC 52 Paste           | `experimental.useOSC52Paste`             | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false` |
 | Plan                       | `experimental.plan`                      | Enable planning features (Plan Mode and tools).                                     | `false` |
 | Model Steering             | `experimental.modelSteering`             | Enable model steering (user hints) to guide the model during tool execution.        | `false` |
+| Use Experimental Web Fetch | `experimental.useExperimentalWebFetch`   | Enable experimental web fetch behavior that bypasses LLM summarization.             | `false` |
 
 ### Skills
 

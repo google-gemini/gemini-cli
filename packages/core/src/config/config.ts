@@ -454,6 +454,7 @@ export interface ConfigParameters {
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
+  useExperimentalWebFetch?: boolean;
   output?: OutputSettings;
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
@@ -614,6 +615,7 @@ export class Config {
   readonly interactive: boolean;
   private readonly ptyInfo: string;
   private readonly trustedFolder: boolean | undefined;
+  private readonly useExperimentalWebFetch: boolean;
   private readonly useRipgrep: boolean;
   private readonly enableInteractiveShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
@@ -805,6 +807,7 @@ export class Config {
     this.interactive = params.interactive ?? false;
     this.ptyInfo = params.ptyInfo ?? 'child_process';
     this.trustedFolder = params.trustedFolder;
+    this.useExperimentalWebFetch = params.useExperimentalWebFetch ?? false;
     this.useRipgrep = params.useRipgrep ?? true;
     this.useBackgroundColor = params.useBackgroundColor ?? true;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
@@ -1997,6 +2000,10 @@ export class Config {
 
   getApprovedPlanPath(): string | undefined {
     return this.approvedPlanPath;
+  }
+
+  getUseExperimentalWebFetch(): boolean {
+    return this.useExperimentalWebFetch;
   }
 
   setApprovedPlanPath(path: string | undefined): void {
