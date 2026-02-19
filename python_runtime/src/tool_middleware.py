@@ -1,5 +1,5 @@
 # python_runtime/src/tool_middleware.py
-# The Kernel: Enforces justification and auditing via Governance Schema.
+# The Kernel: Enforces justification, auditing, and INPUT VALIDATION.
 
 import functools
 import datetime
@@ -14,8 +14,6 @@ if os.path.exists(GOVERNANCE_FILE):
     try:
         with open(GOVERNANCE_FILE, 'r') as f:
             schema = json.load(f)
-            # Extract justification constraints from JSON Schema
-            # Structure: definitions -> SovereignToolInvocation -> properties -> justification
             props = schema.get('definitions', {}).get('SovereignToolInvocation', {}).get('properties', {})
             justification_rules = props.get('justification', {})
             SCHEMA_CONSTRAINTS['min_len'] = justification_rules.get('minLength', 10)
@@ -24,13 +22,16 @@ if os.path.exists(GOVERNANCE_FILE):
     except Exception as e:
         print(f"[KERNEL] Warning: Failed to load governance schema: {e}")
 
-def with_sovereign_gate(tool_name: str, func):
+def with_sovereign_gate(tool_name: str, func, validator=None):
     """
     Wraps a raw tool with the Sovereign Gate.
-    Enforces justification length based on loaded schema.
+    Enforces:
+    1. Justification length (from Governance Schema).
+    2. Input Validation (if validator is provided).
     """
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
+        # 1. Justification Check
         justification = kwargs.pop('justification', None)
         if justification is None and args:
             if len(args) > func.__code__.co_argcount:
@@ -48,6 +49,13 @@ def with_sovereign_gate(tool_name: str, func):
 
         if len(justification) > max_len:
             raise ValueError(f"SOVEREIGNTY VIOLATION: Justification too long (Max: {max_len}).")
+
+        # 2. Input Validation (Security Patch)
+        if validator:
+            try:
+                validator(*args, **kwargs)
+            except ValueError as e:
+                raise ValueError(f"SECURITY VIOLATION: Input validation failed for '{tool_name}': {e}")
 
         timestamp = datetime.datetime.now().isoformat()
         print(f"[AUDIT] {timestamp} | TOOL: {tool_name} | JUSTIFICATION: {justification}")
