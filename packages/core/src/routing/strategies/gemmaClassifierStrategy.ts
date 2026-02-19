@@ -177,6 +177,12 @@ ${formattedHistory}
     if (!gemmaRouterSettings?.enabled) {
       return null;
     }
+
+    // Only the gemma3-1b-gpu-custom model has been tested and verified.
+    if (gemmaRouterSettings.classifier?.model !== 'gemma3-1b-gpu-custom') {
+      throw new Error('Only gemma3-1b-gpu-custom has been tested');
+    }
+
     try {
       const historySlice = context.history.slice(-HISTORY_SEARCH_WINDOW);
 

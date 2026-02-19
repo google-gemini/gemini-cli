@@ -33,7 +33,10 @@ describe('GemmaClassifierStrategy', () => {
     mockGenerateJson = vi.fn();
 
     mockConfig = {
-      getGemmaModelRouterSettings: vi.fn().mockReturnValue({ enabled: true }),
+      getGemmaModelRouterSettings: vi.fn().mockReturnValue({
+        enabled: true,
+        classifier: { model: 'gemma3-1b-gpu-custom' },
+      }),
       getModel: () => DEFAULT_GEMINI_MODEL,
       getPreviewFeatures: () => false,
     } as unknown as Config;
@@ -63,6 +66,22 @@ describe('GemmaClassifierStrategy', () => {
       mockLocalLiteRtLmClient,
     );
     expect(decision).toBeNull();
+  });
+
+  it('should throw an error if the model is not gemma3-1b-gpu-custom', async () => {
+    vi.mocked(mockConfig.getGemmaModelRouterSettings).mockReturnValue({
+      enabled: true,
+      classifier: { model: 'other-model' },
+    });
+
+    await expect(
+      strategy.route(
+        mockContext,
+        mockConfig,
+        mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
+      ),
+    ).rejects.toThrow('Only gemma3-1b-gpu-custom has been tested');
   });
 
   it('should call generateJson with the correct parameters', async () => {
