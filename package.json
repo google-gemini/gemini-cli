@@ -129,6 +129,7 @@
     "ink": "npm:@jrichman/ink@6.4.11",
     "latest-version": "^9.0.0",
     "proper-lockfile": "^4.1.2",
+    "punycode": "^2.3.1",
     "simple-git": "^3.28.0"
   },
   "optionalDependencies": {
