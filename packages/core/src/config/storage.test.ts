@@ -182,7 +182,7 @@ describe('Storage – additional helpers', () => {
     it('listProjectChatFiles returns sorted sessions from chats directory', async () => {
       const readdirSpy = vi
         .spyOn(fs.promises, 'readdir')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        /* eslint-disable @typescript-eslint/no-explicit-any */
         .mockResolvedValue([
           'session-1.json',
           'session-2.json',
@@ -191,15 +191,19 @@ describe('Storage – additional helpers', () => {
 
       const statSpy = vi
         .spyOn(fs.promises, 'stat')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .mockImplementation(async (p: any) => {
-          if (p.endsWith('session-1.json')) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            return { mtime: new Date('2026-02-01'), mtimeMs: 1000 } as any;
+          if (p.toString().endsWith('session-1.json')) {
+            return {
+              mtime: new Date('2026-02-01'),
+              mtimeMs: 1000,
+            } as any;
           }
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          return { mtime: new Date('2026-02-02'), mtimeMs: 2000 } as any;
+          return {
+            mtime: new Date('2026-02-02'),
+            mtimeMs: 2000,
+          } as any;
         });
+      /* eslint-enable @typescript-eslint/no-explicit-any */
 
       const sessions = await storage.listProjectChatFiles();
 
