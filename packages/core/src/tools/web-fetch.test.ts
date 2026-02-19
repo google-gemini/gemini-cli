@@ -70,14 +70,55 @@ const mockFetch = (url: string, response: Partial<Response> | Error) =>
       if (response instanceof Error) {
         throw response;
       }
+
+      const headers = response.headers || new Headers();
+
+      // If we have text/arrayBuffer but no body, create a body mock
+      let body = response.body;
+      if (!body) {
+        let content: Uint8Array | undefined;
+        if (response.text) {
+          const text = await response.text();
+          content = new TextEncoder().encode(text);
+        } else if (response.arrayBuffer) {
+          const ab = await response.arrayBuffer();
+          content = new Uint8Array(ab);
+        }
+
+        if (content) {
+          body = {
+            getReader: () => {
+              let sent = false;
+              return {
+                read: async () => {
+                  if (sent) return { done: true, value: undefined };
+                  sent = true;
+                  return { done: false, value: content };
+                },
+                releaseLock: () => {},
+                cancel: async () => {},
+              };
+            },
+          } as unknown as ReadableStream;
+        }
+      }
+
       return {
         ok: response.status ? response.status < 400 : true,
         status: 200,
-        headers: new Headers(),
-        text: () => Promise.resolve(''),
-        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+        headers,
+        text: response.text || (() => Promise.resolve('')),
+        arrayBuffer:
+          response.arrayBuffer || (() => Promise.resolve(new ArrayBuffer(0))),
+        body: body || {
+          getReader: () => ({
+            read: async () => ({ done: true, value: undefined }),
+            releaseLock: () => {},
+            cancel: async () => {},
+          }),
+        },
         ...response,
-      } as Response;
+      } as unknown as Response;
     });
 
 describe('parsePrompt', () => {
@@ -774,6 +815,46 @@ describe('WebFetchTool', () => {
       expect(result.llmContent).toContain('val');
       expect(result.llmContent).toContain(errorBody);
       expect(result.returnDisplay).toContain('Failed to fetch');
+    });
+
+    it('should throw error if Content-Length exceeds limit', async () => {
+      mockFetch('https://example.com/large', {
+        headers: new Headers({
+          'content-length': (11 * 1024 * 1024).toString(),
+        }),
+      });
+
+      const tool = new WebFetchTool(mockConfig, bus);
+      const invocation = tool.build({ url: 'https://example.com/large' });
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).toContain('Error');
+      expect(result.llmContent).toContain('exceeds size limit');
+    });
+
+    it('should throw error if stream exceeds limit', async () => {
+      const largeChunk = new Uint8Array(11 * 1024 * 1024);
+      mockFetch('https://example.com/large-stream', {
+        body: {
+          getReader: () => ({
+            read: vi
+              .fn()
+              .mockResolvedValueOnce({ done: false, value: largeChunk })
+              .mockResolvedValueOnce({ done: true }),
+            releaseLock: vi.fn(),
+            cancel: vi.fn().mockResolvedValue(undefined),
+          }),
+        } as unknown as ReadableStream,
+      });
+
+      const tool = new WebFetchTool(mockConfig, bus);
+      const invocation = tool.build({
+        url: 'https://example.com/large-stream',
+      });
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).toContain('Error');
+      expect(result.llmContent).toContain('exceeds size limit');
     });
   });
 });

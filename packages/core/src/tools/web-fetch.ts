@@ -36,6 +36,7 @@ import { resolveToolDeclaration } from './definitions/resolver.js';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
+const MAX_EXPERIMENTAL_FETCH_SIZE = 10 * 1024 * 1024; // 10MB
 
 /**
  * Parses a prompt to extract valid URLs and identify malformed ones.
@@ -158,7 +159,11 @@ class WebFetchToolInvocation extends BaseToolInvocation<
         },
       );
 
-      const rawContent = await response.text();
+      const bodyBuffer = await this.readResponseWithLimit(
+        response,
+        MAX_EXPERIMENTAL_FETCH_SIZE,
+      );
+      const rawContent = bodyBuffer.toString('utf8');
       const contentType = response.headers.get('content-type') || '';
       let textContent: string;
 
@@ -274,6 +279,40 @@ ${textContent}
     return confirmationDetails;
   }
 
+  private async readResponseWithLimit(
+    response: Response,
+    limit: number,
+  ): Promise<Buffer> {
+    const contentLength = response.headers.get('content-length');
+    if (contentLength && parseInt(contentLength, 10) > limit) {
+      throw new Error(`Content exceeds size limit of ${limit} bytes`);
+    }
+
+    if (!response.body) {
+      return Buffer.alloc(0);
+    }
+
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalLength = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        totalLength += value.length;
+        if (totalLength > limit) {
+          // Attempt to cancel the reader to stop the stream
+          await reader.cancel().catch(() => {});
+          throw new Error(`Content exceeds size limit of ${limit} bytes`);
+        }
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    return Buffer.concat(chunks);
+  }
+
   private async executeExperimental(_signal: AbortSignal): Promise<ToolResult> {
     let url: string;
     if (this.params.url) {
@@ -317,9 +356,13 @@ ${textContent}
 
       const contentType = response.headers.get('content-type') || '';
       const status = response.status;
+      const bodyBuffer = await this.readResponseWithLimit(
+        response,
+        MAX_EXPERIMENTAL_FETCH_SIZE,
+      );
 
       if (status >= 400) {
-        const rawResponseText = await response.text();
+        const rawResponseText = bodyBuffer.toString('utf8');
         const headers: Record<string, string> = {};
         response.headers.forEach((value, key) => {
           headers[key] = value;
@@ -339,7 +382,7 @@ Response: ${rawResponseText}`;
         lowContentType.includes('text/plain') ||
         lowContentType.includes('application/json')
       ) {
-        const text = await response.text();
+        const text = bodyBuffer.toString('utf8');
         return {
           llmContent: text.substring(0, MAX_CONTENT_LENGTH),
           returnDisplay: `Fetched ${contentType} content from ${url}`,
@@ -347,7 +390,7 @@ Response: ${rawResponseText}`;
       }
 
       if (lowContentType.includes('text/html')) {
-        const html = await response.text();
+        const html = bodyBuffer.toString('utf8');
         const textContent = convert(html, {
           wordwrap: false,
           selectors: [{ selector: 'a', options: { ignoreHref: false } }],
@@ -363,8 +406,7 @@ Response: ${rawResponseText}`;
         lowContentType.startsWith('video/') ||
         lowContentType === 'application/pdf'
       ) {
-        const buffer = await response.arrayBuffer();
-        const base64Data = Buffer.from(buffer).toString('base64');
+        const base64Data = bodyBuffer.toString('base64');
         return {
           llmContent: {
             inlineData: {
@@ -377,7 +419,7 @@ Response: ${rawResponseText}`;
       }
 
       // Fallback for unknown types - try as text
-      const text = await response.text();
+      const text = bodyBuffer.toString('utf8');
       return {
         llmContent: text.substring(0, MAX_CONTENT_LENGTH),
         returnDisplay: `Fetched ${contentType || 'unknown'} content from ${url}`,
