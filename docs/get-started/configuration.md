@@ -1,16 +1,5 @@
 # Gemini CLI configuration
 
-> **Note on configuration format, 9/17/25:** The format of the `settings.json`
-> file has been updated to a new, more organized structure.
->
-> - The new format will be supported in the stable release starting
->   **[09/10/25]**.
-> - Automatic migration from the old format to the new format will begin on
->   **[09/17/25]**.
->
-> For details on the previous format, please see the
-> [v1 Configuration documentation](./configuration-v1.md).
-
 Gemini CLI offers several ways to configure its behavior, including environment
 variables, command-line arguments, and settings files. This document outlines
 the different configuration methods and available settings.
@@ -132,6 +121,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable update notification prompts.
   - **Default:** `true`
 
+- **`general.enableNotifications`** (boolean):
+  - **Description:** Enable run-event notifications for action-required prompts
+    and session completion. Currently macOS only.
+  - **Default:** `false`
+
 - **`general.checkpointing.enabled`** (boolean):
   - **Description:** Enable session checkpointing for recovery
   - **Default:** `false`
@@ -228,6 +222,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`ui.showCompatibilityWarnings`** (boolean):
+  - **Description:** Show warnings about terminal or OS compatibility issues.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
 - **`ui.hideTips`** (boolean):
   - **Description:** Hide helpful tips in the UI
   - **Default:** `false`
@@ -306,13 +305,20 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Show the spinner during operations.
   - **Default:** `true`
 
+- **`ui.loadingPhrases`** (enum):
+  - **Description:** What to show while the model is working: tips, witty
+    comments, both, or nothing.
+  - **Default:** `"tips"`
+  - **Values:** `"tips"`, `"witty"`, `"all"`, `"off"`
+
 - **`ui.customWittyPhrases`** (array):
   - **Description:** Custom witty phrases to display during loading. When
     provided, the CLI cycles through these instead of the defaults.
   - **Default:** `[]`
 
 - **`ui.accessibility.enableLoadingPhrases`** (boolean):
-  - **Description:** Enable loading phrases during operations.
+  - **Description:** @deprecated Use ui.loadingPhrases instead. Enable loading
+    phrases during operations.
   - **Default:** `true`
   - **Requires restart:** Yes
 
@@ -484,6 +490,19 @@ their corresponding top-level category object in your `settings.json` file.
           "generateContentConfig": {
             "temperature": 0.3,
             "maxOutputTokens": 16000,
+            "thinkingConfig": {
+              "thinkingBudget": 0
+            }
+          }
+        }
+      },
+      "fast-ack-helper": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-2.5-flash-lite",
+          "generateContentConfig": {
+            "temperature": 0.2,
+            "maxOutputTokens": 120,
             "thinkingConfig": {
               "thinkingBudget": 0
             }
@@ -929,14 +948,26 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`experimental.useOSC52Paste`** (boolean):
-  - **Description:** Use OSC 52 sequence for pasting instead of clipboardy
-    (useful for remote sessions).
+  - **Description:** Use OSC 52 for pasting. This may be more robust than the
+    default system when using remote terminal sessions (if your terminal is
+    configured to allow it).
+  - **Default:** `false`
+
+- **`experimental.useOSC52Copy`** (boolean):
+  - **Description:** Use OSC 52 for copying. This may be more robust than the
+    default system when using remote terminal sessions (if your terminal is
+    configured to allow it).
   - **Default:** `false`
 
 - **`experimental.plan`** (boolean):
   - **Description:** Enable planning features (Plan Mode and tools).
   - **Default:** `false`
   - **Requires restart:** Yes
+
+- **`experimental.modelSteering`** (boolean):
+  - **Description:** Enable model steering (user hints) to guide the model
+    during tool execution.
+  - **Default:** `false`
 
 #### `skills`
 

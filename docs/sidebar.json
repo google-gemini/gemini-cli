@@ -19,6 +19,10 @@
         "slug": "docs/cli/tutorials/file-management"
       },
       {
+        "label": "Get started with Agent skills",
+        "slug": "docs/cli/tutorials/skills-getting-started"
+      },
+      {
         "label": "Manage context and memory",
         "slug": "docs/cli/tutorials/memory-management"
       },
@@ -39,10 +43,6 @@
         "slug": "docs/cli/tutorials/web-tools"
       },
       {
-        "label": "Get started with skills",
-        "slug": "docs/cli/tutorials/skills-getting-started"
-      },
-      {
         "label": "Set up an MCP server",
         "slug": "docs/cli/tutorials/mcp-setup"
       },
@@ -52,115 +52,48 @@
   {
     "label": "Features",
     "items": [
+      { "label": "Agent Skills", "slug": "docs/cli/skills" },
       {
-        "label": "/about - About Gemini CLI",
-        "link": "/docs/cli/commands/#about"
-      },
-      {
-        "label": "/auth - Authentication",
+        "label": "Authentication",
         "slug": "docs/get-started/authentication"
       },
-      { "label": "/bug - Report a bug", "link": "/docs/cli/commands/#bug" },
-      { "label": "/chat - Chat history", "link": "/docs/cli/commands/#chat" },
-      { "label": "/clear - Clear screen", "link": "/docs/cli/commands/#clear" },
+      { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
       {
-        "label": "/compress - Compress context",
-        "link": "/docs/cli/commands/#compress"
-      },
-      { "label": "/copy - Copy output", "link": "/docs/cli/commands/#copy" },
-      {
-        "label": "/directory - Manage workspace",
-        "link": "/docs/cli/commands/#directory-or-dir"
-      },
-      {
-        "label": "/docs - Open documentation",
-        "link": "/docs/cli/commands/#docs"
-      },
-      {
-        "label": "/editor - Select editor",
-        "link": "/docs/cli/commands/#editor"
-      },
-      {
-        "label": "/extensions - Manage extensions",
+        "label": "Extensions",
         "slug": "docs/extensions/index"
       },
-      { "label": "/help - Show help", "link": "/docs/cli/commands/#help-or" },
-      { "label": "/hooks - Hooks", "slug": "docs/hooks" },
-      { "label": "/ide - IDE integration", "slug": "docs/ide-integration" },
+      { "label": "Headless mode", "slug": "docs/cli/headless" },
+      { "label": "Help", "link": "/docs/cli/commands/#help-or" },
+      { "label": "Hooks", "slug": "docs/hooks" },
+      { "label": "IDE integration", "slug": "docs/ide-integration" },
+      { "label": "MCP servers", "slug": "docs/tools/mcp-server" },
       {
-        "label": "/init - Initialize context",
-        "link": "/docs/cli/commands/#init"
-      },
-      { "label": "/mcp - MCP servers", "slug": "docs/tools/mcp-server" },
-
-      {
-        "label": "/memory - Manage memory",
+        "label": "Memory management",
         "link": "/docs/cli/commands/#memory"
       },
-      { "label": "/model - Model selection", "slug": "docs/cli/model" },
+      { "label": "Model routing", "slug": "docs/cli/model-routing" },
+      { "label": "Model selection", "slug": "docs/cli/model" },
+      { "label": "Plan mode", "badge": "🧪", "slug": "docs/cli/plan-mode" },
+      { "label": "Subagents", "badge": "🧪", "slug": "docs/core/subagents" },
       {
-        "label": "/policies - Manage policies",
-        "link": "/docs/cli/commands/#policies"
+        "label": "Remote subagents",
+        "badge": "🧪",
+        "slug": "docs/core/remote-agents"
       },
+      { "label": "Rewind", "slug": "docs/cli/rewind" },
+      { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
+      { "label": "Settings", "slug": "docs/cli/settings" },
       {
-        "label": "/privacy - Privacy notice",
-        "link": "/docs/cli/commands/#privacy"
-      },
-      {
-        "label": "/quit - Exit CLI",
-        "link": "/docs/cli/commands/#quit-or-exit"
-      },
-      { "label": "/restore - Restore files", "slug": "docs/cli/checkpointing" },
-      {
-        "label": "/resume - Resume session",
-
-        "link": "/docs/cli/commands/#resume"
-      },
-      { "label": "/rewind - Rewind", "slug": "docs/cli/rewind" },
-      { "label": "/settings - Settings", "slug": "docs/cli/settings" },
-      {
-        "label": "/setup-github - GitHub setup",
-        "link": "/docs/cli/commands/#setup-github"
-      },
-      {
-        "label": "/shells - Manage processes",
+        "label": "Shell",
         "link": "/docs/cli/commands/#shells-or-bashes"
       },
-      { "label": "/skills - Agent skills", "slug": "docs/cli/skills" },
       {
-        "label": "/stats - Session statistics",
+        "label": "Stats",
         "link": "/docs/cli/commands/#stats"
       },
-      {
-        "label": "/terminal-setup - Terminal keybindings",
-        "link": "/docs/cli/commands/#terminal-setup"
-      },
-      { "label": "/theme - Themes", "slug": "docs/cli/themes" },
-      { "label": "/tools - List tools", "link": "/docs/cli/commands/#tools" },
-      { "label": "/vim - Vim mode", "link": "/docs/cli/commands/#vim" },
-
-      {
-        "label": "Activate skill (tool)",
-        "slug": "docs/tools/activate-skill"
-      },
-      { "label": "Ask user (tool)", "slug": "docs/tools/ask-user" },
-      { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
-      { "label": "File system (tool)", "slug": "docs/tools/file-system" },
-      { "label": "Headless mode", "slug": "docs/cli/headless" },
-      {
-        "label": "Internal documentation (tool)",
-        "slug": "docs/tools/internal-docs"
-      },
-      { "label": "Memory (tool)", "slug": "docs/tools/memory" },
-      { "label": "Model routing", "slug": "docs/cli/model-routing" },
-      { "label": "Plan mode (experimental)", "slug": "docs/cli/plan-mode" },
-      { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
-      { "label": "Shell (tool)", "slug": "docs/tools/shell" },
       { "label": "Telemetry", "slug": "docs/cli/telemetry" },
-      { "label": "Todo (tool)", "slug": "docs/tools/todos" },
       { "label": "Token caching", "slug": "docs/cli/token-caching" },
-      { "label": "Web fetch (tool)", "slug": "docs/tools/web-fetch" },
-      { "label": "Web search (tool)", "slug": "docs/tools/web-search" }
+      { "label": "Tools", "link": "/docs/cli/commands/#tools" }
     ]
   },
   {
@@ -186,26 +119,40 @@
   {
     "label": "Extensions",
     "items": [
-      { "label": "Introduction", "slug": "docs/extensions" },
       {
-        "label": "Writing extensions",
+        "label": "Overview",
+        "slug": "docs/extensions"
+      },
+      {
+        "label": "User guide: Install and manage",
+        "link": "/docs/extensions/#manage-extensions"
+      },
+      {
+        "label": "Developer guide: Build extensions",
         "slug": "docs/extensions/writing-extensions"
       },
-      { "label": "Reference", "slug": "docs/extensions/reference" },
-      { "label": "Best practices", "slug": "docs/extensions/best-practices" },
-      { "label": "Releasing", "slug": "docs/extensions/releasing" }
+      {
+        "label": "Developer guide: Best practices",
+        "slug": "docs/extensions/best-practices"
+      },
+      {
+        "label": "Developer guide: Releasing",
+        "slug": "docs/extensions/releasing"
+      },
+      {
+        "label": "Developer guide: Reference",
+        "slug": "docs/extensions/reference"
+      }
     ]
   },
   {
     "label": "Reference",
     "items": [
-      { "label": "Architecture", "slug": "docs/architecture" },
       { "label": "Command reference", "slug": "docs/cli/commands" },
       {
         "label": "Configuration reference",
         "slug": "docs/get-started/configuration"
       },
-      { "label": "Core concepts", "slug": "docs/core/concepts" },
       { "label": "Keyboard shortcuts", "slug": "docs/cli/keyboard-shortcuts" },
       { "label": "Memory import processor", "slug": "docs/core/memport" },
       { "label": "Policy engine", "slug": "docs/core/policy-engine" },
