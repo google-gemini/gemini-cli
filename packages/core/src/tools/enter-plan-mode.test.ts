@@ -24,7 +24,7 @@ describe('EnterPlanModeTool', () => {
     mockConfig = {
       setApprovalMode: vi.fn(),
       storage: {
-        getProjectTempPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
+        getPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
       } as unknown as Config['storage'],
     };
     tool = new EnterPlanModeTool(

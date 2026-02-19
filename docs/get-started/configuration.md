@@ -131,6 +131,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`general.plan.directory`** (string):
+  - **Description:** The directory where planning artifacts are stored. If not
+    specified, defaults to the system temporary directory.
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
 - **`general.enablePromptCompletion`** (boolean):
   - **Description:** Enable AI-powered prompt completion suggestions while
     typing.

@@ -141,6 +141,10 @@ export interface SummarizeToolOutputSettings {
   tokenBudget?: number;
 }
 
+export interface PlanSettings {
+  directory?: string;
+}
+
 export interface TelemetrySettings {
   enabled?: boolean;
   target?: TelemetryTarget;
@@ -483,6 +487,7 @@ export interface ConfigParameters {
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
   plan?: boolean;
+  planSettings?: PlanSettings;
   modelSteering?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
@@ -836,6 +841,7 @@ export class Config {
     this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir, this.sessionId);
+    this.storage.setCustomPlansDir(params.planSettings?.directory);
 
     this.fakeResponses = params.fakeResponses;
     this.recordResponses = params.recordResponses;
@@ -949,7 +955,7 @@ export class Config {
 
     // Add plans directory to workspace context for plan file storage
     if (this.planEnabled) {
-      const plansDir = this.storage.getProjectTempPlansDir();
+      const plansDir = this.storage.getPlansDir();
       await fs.promises.mkdir(plansDir, { recursive: true });
       this.workspaceContext.addDirectory(plansDir);
     }
