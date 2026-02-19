@@ -23,7 +23,6 @@ interface MaxSizedBoxProps {
   maxHeight?: number;
   overflowDirection?: 'top' | 'bottom';
   additionalHiddenLinesCount?: number;
-  onOverflowChange?: (isOverflowing: boolean) => void;
 }
 
 /**
@@ -36,7 +35,6 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
   maxHeight,
   overflowDirection = 'top',
   additionalHiddenLinesCount = 0,
-  onOverflowChange,
 }) => {
   const id = useId();
   const { addOverflowingId, removeOverflowingId } = useOverflowActions() || {};
@@ -72,10 +70,6 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
   const isOverflowing =
     (effectiveMaxHeight !== undefined && contentHeight > effectiveMaxHeight) ||
     additionalHiddenLinesCount > 0;
-
-  useEffect(() => {
-    onOverflowChange?.(isOverflowing);
-  }, [isOverflowing, onOverflowChange]);
 
   // If we're overflowing, we need to hide at least 1 line for the message.
   const visibleContentHeight =
@@ -121,7 +115,7 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
       flexShrink={0}
     >
       {totalHiddenLines > 0 && overflowDirection === 'top' && (
-        <Text color={theme.text.primary} wrap="truncate">
+        <Text color={theme.text.secondary} wrap="truncate">
           ... first {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}{' '}
           hidden ...
         </Text>
@@ -142,7 +136,7 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
         </Box>
       </Box>
       {totalHiddenLines > 0 && overflowDirection === 'bottom' && (
-        <Text color={theme.text.primary} wrap="truncate">
+        <Text color={theme.text.secondary} wrap="truncate">
           ... last {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}{' '}
           hidden ...
         </Text>

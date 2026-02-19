@@ -123,8 +123,38 @@ describe('FolderTrustDiscoveryService', () => {
     await fs.writeFile(path.join(geminiDir, 'settings.json'), 'invalid json');
 
     const results = await FolderTrustDiscoveryService.discover(tempDir);
-    expect(results.mcps).toHaveLength(0);
-    expect(results.hooks).toHaveLength(0);
+    expect(results.discoveryErrors[0]).toContain(
+      'Failed to discover settings: Unexpected token',
+    );
+  });
+
+  it('should handle null settings.json', async () => {
+    const geminiDir = path.join(tempDir, GEMINI_DIR);
+    await fs.mkdir(geminiDir, { recursive: true });
+    await fs.writeFile(path.join(geminiDir, 'settings.json'), 'null');
+
+    const results = await FolderTrustDiscoveryService.discover(tempDir);
+    expect(results.discoveryErrors).toHaveLength(0);
+    expect(results.settings).toHaveLength(0);
+  });
+
+  it('should handle array settings.json', async () => {
+    const geminiDir = path.join(tempDir, GEMINI_DIR);
+    await fs.mkdir(geminiDir, { recursive: true });
+    await fs.writeFile(path.join(geminiDir, 'settings.json'), '[]');
+
+    const results = await FolderTrustDiscoveryService.discover(tempDir);
+    expect(results.discoveryErrors).toHaveLength(0);
+    expect(results.settings).toHaveLength(0);
+  });
+
+  it('should handle string settings.json', async () => {
+    const geminiDir = path.join(tempDir, GEMINI_DIR);
+    await fs.mkdir(geminiDir, { recursive: true });
+    await fs.writeFile(path.join(geminiDir, 'settings.json'), '"string"');
+
+    const results = await FolderTrustDiscoveryService.discover(tempDir);
+    expect(results.discoveryErrors).toHaveLength(0);
     expect(results.settings).toHaveLength(0);
   });
 });

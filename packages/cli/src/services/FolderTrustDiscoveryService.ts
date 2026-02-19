@@ -8,7 +8,7 @@ import * as fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import * as path from 'node:path';
 import stripJsonComments from 'strip-json-comments';
-import { GEMINI_DIR } from '@google/gemini-cli-core';
+import { debugLogger, GEMINI_DIR } from '@google/gemini-cli-core';
 
 export interface FolderDiscoveryResults {
   commands: string[];
@@ -68,7 +68,7 @@ export class FolderTrustDiscoveryService {
           .map((f) => path.basename(f, '.toml'));
       } catch (e) {
         results.discoveryErrors.push(
-          `Failed to discover commands: ${(e as Error).message}`,
+          `Failed to discover commands: ${e instanceof Error ? e.message : String(e)}`,
         );
       }
     }
@@ -92,7 +92,7 @@ export class FolderTrustDiscoveryService {
         }
       } catch (e) {
         results.discoveryErrors.push(
-          `Failed to discover skills: ${(e as Error).message}`,
+          `Failed to discover skills: ${e instanceof Error ? e.message : String(e)}`,
         );
       }
     }
@@ -107,10 +107,12 @@ export class FolderTrustDiscoveryService {
 
     try {
       const content = await fs.readFile(settingsPath, 'utf-8');
-      const settings = JSON.parse(stripJsonComments(content)) as Record<
-        string,
-        unknown
-      >;
+      const settings = JSON.parse(stripJsonComments(content)) as unknown;
+
+      if (!this.isRecord(settings)) {
+        debugLogger.debug('Settings must be a JSON object');
+        return;
+      }
 
       results.settings = Object.keys(settings).filter(
         (key) => !['mcpServers', 'hooks', '$schema'].includes(key),
@@ -119,31 +121,18 @@ export class FolderTrustDiscoveryService {
       results.securityWarnings = this.collectSecurityWarnings(settings);
 
       const mcpServers = settings['mcpServers'];
-      if (
-        mcpServers &&
-        typeof mcpServers === 'object' &&
-        !Array.isArray(mcpServers)
-      ) {
+      if (this.isRecord(mcpServers)) {
         results.mcps = Object.keys(mcpServers);
       }
 
       const hooksConfig = settings['hooks'];
-      if (
-        hooksConfig &&
-        typeof hooksConfig === 'object' &&
-        !Array.isArray(hooksConfig)
-      ) {
+      if (this.isRecord(hooksConfig)) {
         const hooks = new Set<string>();
         for (const event of Object.values(hooksConfig)) {
           if (!Array.isArray(event)) continue;
           for (const hook of event) {
-            if (
-              hook &&
-              typeof hook === 'object' &&
-              'command' in hook &&
-              typeof (hook as Record<string, unknown>)['command'] === 'string'
-            ) {
-              hooks.add((hook as Record<string, string>)['command']);
+            if (this.isRecord(hook) && typeof hook['command'] === 'string') {
+              hooks.add(hook['command']);
             }
           }
         }
@@ -151,7 +140,7 @@ export class FolderTrustDiscoveryService {
       }
     } catch (e) {
       results.discoveryErrors.push(
-        `Failed to discover settings: ${(e as Error).message}`,
+        `Failed to discover settings: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
   }
@@ -161,16 +150,22 @@ export class FolderTrustDiscoveryService {
   ): string[] {
     const warnings: string[] = [];
 
-    const tools = settings['tools'] as Record<string, unknown> | undefined;
-    const experimental = settings['experimental'] as
-      | Record<string, unknown>
-      | undefined;
-    const security = settings['security'] as
-      | Record<string, unknown>
-      | undefined;
-    const folderTrust = security?.['folderTrust'] as
-      | Record<string, unknown>
-      | undefined;
+    const tools = this.isRecord(settings['tools'])
+      ? settings['tools']
+      : undefined;
+
+    const experimental = this.isRecord(settings['experimental'])
+      ? settings['experimental']
+      : undefined;
+
+    const security = this.isRecord(settings['security'])
+      ? settings['security']
+      : undefined;
+
+    const folderTrust =
+      security && this.isRecord(security['folderTrust'])
+        ? security['folderTrust']
+        : undefined;
 
     const allowedTools = tools?.['allowed'];
 
@@ -199,5 +194,9 @@ export class FolderTrustDiscoveryService {
     }
 
     return warnings;
+  }
+
+  private static isRecord(val: unknown): val is Record<string, unknown> {
+    return !!val && typeof val === 'object' && !Array.isArray(val);
   }
 }

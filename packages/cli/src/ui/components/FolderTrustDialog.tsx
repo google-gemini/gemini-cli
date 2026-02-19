@@ -8,6 +8,7 @@ import { Box, Text } from 'ink';
 import type React from 'react';
 import { useEffect, useState, useCallback } from 'react';
 import { theme } from '../semantic-colors.js';
+import stripAnsi from 'strip-ansi';
 import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { MaxSizedBox } from './shared/MaxSizedBox.js';
@@ -153,7 +154,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
           </Text>
           {discoveryResults.discoveryErrors.map((error, i) => (
             <Box key={i} marginLeft={2}>
-              <Text color={theme.status.error}>• {error}</Text>
+              <Text color={theme.status.error}>• {stripAnsi(error)}</Text>
             </Box>
           ))}
         </Box>
@@ -166,7 +167,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
           </Text>
           {discoveryResults.securityWarnings.map((warning, i) => (
             <Box key={i} marginLeft={2}>
-              <Text color={theme.status.warning}>• {warning}</Text>
+              <Text color={theme.status.warning}>• {stripAnsi(warning)}</Text>
             </Box>
           ))}
         </Box>
@@ -184,7 +185,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
               </Text>
               {group.items.map((item, idx) => (
                 <Box key={idx} marginLeft={2}>
-                  <Text color={theme.text.primary}>- {item}</Text>
+                  <Text color={theme.text.primary}>- {stripAnsi(item)}</Text>
                 </Box>
               ))}
             </Box>

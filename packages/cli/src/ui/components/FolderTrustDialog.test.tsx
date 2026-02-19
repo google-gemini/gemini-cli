@@ -55,7 +55,7 @@ describe('FolderTrustDialog', () => {
     unmount();
   });
 
-  it('should truncate discovery results when they exceed maxDiscoveryHeight', () => {
+  it('should truncate discovery results when they exceed maxDiscoveryHeight', async () => {
     // maxDiscoveryHeight = 24 - 15 = 9.
     const discoveryResults = {
       commands: Array.from({ length: 10 }, (_, i) => `cmd${i}`),
@@ -66,7 +66,7 @@ describe('FolderTrustDialog', () => {
       discoveryErrors: [],
       securityWarnings: [],
     };
-    const { lastFrame, unmount } = renderWithProviders(
+    const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
       <FolderTrustDialog
         onSelect={vi.fn()}
         discoveryResults={discoveryResults}
@@ -78,12 +78,13 @@ describe('FolderTrustDialog', () => {
       },
     );
 
+    await waitUntilReady();
     expect(lastFrame()).toContain('This folder contains:');
     expect(lastFrame()).toContain('hidden');
     unmount();
   });
 
-  it('should adjust maxHeight based on terminal rows', () => {
+  it('should adjust maxHeight based on terminal rows', async () => {
     mockedRows.current = 14; // maxHeight = 14 - 10 = 4
     const discoveryResults = {
       commands: ['cmd1', 'cmd2', 'cmd3', 'cmd4', 'cmd5'],
@@ -94,7 +95,7 @@ describe('FolderTrustDialog', () => {
       discoveryErrors: [],
       securityWarnings: [],
     };
-    const { lastFrame, unmount } = renderWithProviders(
+    const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
       <FolderTrustDialog
         onSelect={vi.fn()}
         discoveryResults={discoveryResults}
@@ -106,13 +107,14 @@ describe('FolderTrustDialog', () => {
       },
     );
 
+    await waitUntilReady();
     // With maxHeight=4, the intro text (4 lines) will take most of the space.
     // The discovery results will likely be hidden.
     expect(lastFrame()).toContain('hidden');
     unmount();
   });
 
-  it('should use minimum maxHeight of 4', () => {
+  it('should use minimum maxHeight of 4', async () => {
     mockedRows.current = 8; // 8 - 10 = -2, should use 4
     const discoveryResults = {
       commands: ['cmd1', 'cmd2', 'cmd3', 'cmd4', 'cmd5'],
@@ -123,7 +125,7 @@ describe('FolderTrustDialog', () => {
       discoveryErrors: [],
       securityWarnings: [],
     };
-    const { lastFrame, unmount } = renderWithProviders(
+    const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
       <FolderTrustDialog
         onSelect={vi.fn()}
         discoveryResults={discoveryResults}
@@ -135,6 +137,7 @@ describe('FolderTrustDialog', () => {
       },
     );
 
+    await waitUntilReady();
     expect(lastFrame()).toContain('hidden');
     unmount();
   });
@@ -312,7 +315,7 @@ describe('FolderTrustDialog', () => {
       unmount();
     });
 
-    it('should display discovery results when provided', () => {
+    it('should display discovery results when provided', async () => {
       mockedRows.current = 40; // Increase height to show all results
       const discoveryResults = {
         commands: ['cmd1', 'cmd2'],
@@ -323,7 +326,7 @@ describe('FolderTrustDialog', () => {
         discoveryErrors: [],
         securityWarnings: [],
       };
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <FolderTrustDialog
           onSelect={vi.fn()}
           discoveryResults={discoveryResults}
@@ -331,6 +334,7 @@ describe('FolderTrustDialog', () => {
         { width: 80 },
       );
 
+      await waitUntilReady();
       expect(lastFrame()).toContain('This folder contains:');
       expect(lastFrame()).toContain('• Commands (2):');
       expect(lastFrame()).toContain('- cmd1');
@@ -347,7 +351,7 @@ describe('FolderTrustDialog', () => {
       unmount();
     });
 
-    it('should display security warnings when provided', () => {
+    it('should display security warnings when provided', async () => {
       const discoveryResults = {
         commands: [],
         mcps: [],
@@ -357,19 +361,20 @@ describe('FolderTrustDialog', () => {
         discoveryErrors: [],
         securityWarnings: ['Dangerous setting detected!'],
       };
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <FolderTrustDialog
           onSelect={vi.fn()}
           discoveryResults={discoveryResults}
         />,
       );
 
+      await waitUntilReady();
       expect(lastFrame()).toContain('Security Warnings:');
       expect(lastFrame()).toContain('Dangerous setting detected!');
       unmount();
     });
 
-    it('should display discovery errors when provided', () => {
+    it('should display discovery errors when provided', async () => {
       const discoveryResults = {
         commands: [],
         mcps: [],
@@ -379,19 +384,20 @@ describe('FolderTrustDialog', () => {
         discoveryErrors: ['Failed to load custom commands'],
         securityWarnings: [],
       };
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <FolderTrustDialog
           onSelect={vi.fn()}
           discoveryResults={discoveryResults}
         />,
       );
 
+      await waitUntilReady();
       expect(lastFrame()).toContain('Discovery Errors:');
       expect(lastFrame()).toContain('Failed to load custom commands');
       unmount();
     });
 
-    it('should use scrolling instead of truncation when alternate buffer is enabled and expanded', () => {
+    it('should use scrolling instead of truncation when alternate buffer is enabled and expanded', async () => {
       const discoveryResults = {
         commands: Array.from({ length: 20 }, (_, i) => `cmd${i}`),
         mcps: [],
@@ -401,7 +407,7 @@ describe('FolderTrustDialog', () => {
         discoveryErrors: [],
         securityWarnings: [],
       };
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <FolderTrustDialog
           onSelect={vi.fn()}
           discoveryResults={discoveryResults}
@@ -413,10 +419,47 @@ describe('FolderTrustDialog', () => {
         },
       );
 
+      await waitUntilReady();
       // In alternate buffer + expanded, the title should be visible (StickyHeader)
       expect(lastFrame()).toContain('Do you trust the files in this folder?');
       // And it should NOT use MaxSizedBox truncation
       expect(lastFrame()).not.toContain('hidden');
+      unmount();
+    });
+
+    it('should strip ANSI codes from discovery results', async () => {
+      const ansiRed = '\u001b[31m';
+      const ansiReset = '\u001b[39m';
+
+      const discoveryResults = {
+        commands: [`${ansiRed}cmd-with-ansi${ansiReset}`],
+        mcps: [`${ansiRed}mcp-with-ansi${ansiReset}`],
+        hooks: [`${ansiRed}hook-with-ansi${ansiReset}`],
+        skills: [`${ansiRed}skill-with-ansi${ansiReset}`],
+        settings: [`${ansiRed}setting-with-ansi${ansiReset}`],
+        discoveryErrors: [`${ansiRed}error-with-ansi${ansiReset}`],
+        securityWarnings: [`${ansiRed}warning-with-ansi${ansiReset}`],
+      };
+
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <FolderTrustDialog
+          onSelect={vi.fn()}
+          discoveryResults={discoveryResults}
+        />,
+        { width: 100, uiState: { terminalHeight: 40 } },
+      );
+
+      await waitUntilReady();
+      const output = lastFrame();
+
+      expect(output).toContain('cmd-with-ansi');
+      expect(output).toContain('mcp-with-ansi');
+      expect(output).toContain('hook-with-ansi');
+      expect(output).toContain('skill-with-ansi');
+      expect(output).toContain('setting-with-ansi');
+      expect(output).toContain('error-with-ansi');
+      expect(output).toContain('warning-with-ansi');
+
       unmount();
     });
   });
