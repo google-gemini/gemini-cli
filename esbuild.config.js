@@ -88,6 +88,7 @@ const cliConfig = {
   plugins: createWasmPlugins(),
   alias: {
     'is-in-ci': path.resolve(__dirname, 'packages/cli/src/patches/is-in-ci.ts'),
+    punycode: 'punycode/',
   },
   metafile: true,
 };
@@ -103,6 +104,9 @@ const a2aServerConfig = {
     'process.env.CLI_VERSION': JSON.stringify(pkg.version),
   },
   plugins: createWasmPlugins(),
+  alias: {
+    punycode: 'punycode/',
+  },
 };
 
 Promise.allSettled([
