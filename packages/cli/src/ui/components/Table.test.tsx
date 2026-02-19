@@ -9,7 +9,7 @@ import { Table } from './Table.js';
 import { Text } from 'ink';
 
 describe('Table', () => {
-  it('should render headers and data correctly', () => {
+  it('should render headers and data correctly', async () => {
     const columns = [
       { key: 'id', header: 'ID', width: 5 },
       { key: 'name', header: 'Name', flexGrow: 1 },
@@ -19,7 +19,11 @@ describe('Table', () => {
       { id: 2, name: 'Bob' },
     ];
 
-    const { lastFrame } = render(<Table columns={columns} data={data} />, 100);
+    const { lastFrame, waitUntilReady } = render(
+      <Table columns={columns} data={data} />,
+      100,
+    );
+    await waitUntilReady?.();
     const output = lastFrame();
 
     expect(output).toContain('ID');
@@ -31,7 +35,7 @@ describe('Table', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('should support custom cell rendering', () => {
+  it('should support custom cell rendering', async () => {
     const columns = [
       {
         key: 'value',
@@ -44,17 +48,25 @@ describe('Table', () => {
     ];
     const data = [{ value: 10 }];
 
-    const { lastFrame } = render(<Table columns={columns} data={data} />, 100);
+    const { lastFrame, waitUntilReady } = render(
+      <Table columns={columns} data={data} />,
+      100,
+    );
+    await waitUntilReady?.();
     const output = lastFrame();
 
     expect(output).toContain('20');
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('should handle undefined values gracefully', () => {
+  it('should handle undefined values gracefully', async () => {
     const columns = [{ key: 'name', header: 'Name', flexGrow: 1 }];
     const data: Array<{ name: string | undefined }> = [{ name: undefined }];
-    const { lastFrame } = render(<Table columns={columns} data={data} />, 100);
+    const { lastFrame, waitUntilReady } = render(
+      <Table columns={columns} data={data} />,
+      100,
+    );
+    await waitUntilReady?.();
     const output = lastFrame();
     expect(output).toContain('undefined');
   });

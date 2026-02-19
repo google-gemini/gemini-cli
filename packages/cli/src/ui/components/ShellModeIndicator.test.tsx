@@ -9,9 +9,13 @@ import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { describe, it, expect } from 'vitest';
 
 describe('ShellModeIndicator', () => {
-  it('renders correctly', () => {
-    const { lastFrame } = render(<ShellModeIndicator />);
+  it('renders correctly', async () => {
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <ShellModeIndicator />,
+    );
+    await waitUntilReady();
     expect(lastFrame()).toContain('shell mode enabled');
     expect(lastFrame()).toContain('esc to disable');
+    unmount();
   });
 });

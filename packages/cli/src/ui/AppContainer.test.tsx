@@ -14,9 +14,8 @@ import {
   type Mock,
   type MockedObject,
 } from 'vitest';
-import { render, persistentStateMock } from '../test-utils/render.js';
+import { render, cleanup, persistentStateMock } from '../test-utils/render.js';
 import { waitFor } from '../test-utils/async.js';
-import { cleanup } from 'ink-testing-library';
 import { act, useContext, type ReactElement } from 'react';
 import { AppContainer } from './AppContainer.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
