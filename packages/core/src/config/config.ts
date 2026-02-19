@@ -114,7 +114,11 @@ import { AcknowledgedAgentsService } from '../agents/acknowledgedAgents.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentTool } from '../agents/subagent-tool.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
-import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
+import {
+  ExperimentFlags,
+  ExperimentMetadata,
+  getExperimentFlagName,
+} from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
@@ -475,6 +479,8 @@ export interface ConfigParameters {
   disabledHooks?: string[];
   projectHooks?: { [K in HookEventName]?: HookDefinition[] };
   enableAgents?: boolean;
+  experimentalSettings?: Record<string, unknown>;
+  experimentalCliArgs?: Record<string, unknown>;
   enableEventDrivenScheduler?: boolean;
   skillsSupport?: boolean;
   disabledSkills?: string[];
@@ -665,6 +671,8 @@ export class Config {
 
   private readonly enableAgents: boolean;
   private agents: AgentSettings;
+  private readonly experimentalSettings: Record<string, unknown>;
+  private readonly experimentalCliArgs: Record<string, unknown>;
   private readonly enableEventDrivenScheduler: boolean;
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
@@ -760,6 +768,8 @@ export class Config {
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
+    this.experimentalSettings = params.experimentalSettings ?? {};
+    this.experimentalCliArgs = params.experimentalCliArgs ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
@@ -2554,6 +2564,62 @@ export class Config {
    */
   getExperiments(): Experiments | undefined {
     return this.experiments;
+  }
+
+  /**
+   * Resolves the value of an experiment flag based on priority:
+   * 1. Command-line argument (--experiment-<flag-name>)
+   * 2. Local setting (experimental.<flag-name>)
+   * 3. Remote experiment
+   * 4. Default value
+   */
+  getExperimentValue<T extends boolean | number | string>(
+    flagId: number,
+  ): T | undefined {
+    const flagName = getExperimentFlagName(flagId);
+    if (!flagName) {
+      return undefined;
+    }
+
+    // 1. Command-line argument
+    const cliValue = this.experimentalCliArgs[flagName];
+    if (cliValue !== undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return cliValue as T;
+    }
+
+    // 2. Local setting
+    const settingValue = this.experimentalSettings[flagName];
+    if (settingValue !== undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return settingValue as T;
+    }
+
+    // 3. Remote experiment
+    const remoteFlag = this.experiments?.flags[flagId];
+    if (remoteFlag) {
+      const val =
+        remoteFlag.boolValue ??
+        remoteFlag.floatValue ??
+        remoteFlag.intValue ??
+        remoteFlag.stringValue;
+      if (val !== undefined) {
+        // Handle string representation of numbers if necessary
+        if (typeof val === 'string' && !isNaN(Number(val))) {
+          const metadata = ExperimentMetadata[flagId];
+          if (metadata?.type === 'number') {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            return Number(val) as unknown as T;
+          }
+        }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        return val as unknown as T;
+      }
+    }
+
+    // 4. Default value from metadata
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return ExperimentMetadata[flagId]?.defaultValue as unknown as T;
   }
 
   /**

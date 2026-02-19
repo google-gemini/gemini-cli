@@ -94,6 +94,7 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
+  [key: string]: unknown;
 }
 
 export async function parseArguments(
@@ -285,6 +286,16 @@ export async function parseArguments(
         .option('accept-raw-output-risk', {
           type: 'boolean',
           description: 'Suppress the security warning when using --raw-output.',
+        })
+        .option('experiment', {
+          type: 'array',
+          string: true,
+          nargs: 1,
+          description:
+            'Override experiment flags locally (format: flag=value, comma-separated or multiple --experiment)',
+          coerce: (exps: string[]) =>
+            // Handle comma-separated values
+            exps.flatMap((e) => e.split(',').map((s) => s.trim())),
         }),
     )
     // Register MCP subcommands
@@ -341,7 +352,6 @@ export async function parseArguments(
     .alias('v', 'version')
     .help()
     .alias('h', 'help')
-    .strict()
     .demandCommand(0, 0) // Allow base command to run with no subcommands
     .exitProcess(false);
 
@@ -742,6 +752,22 @@ export async function loadCliConfig(
     }
   }
 
+  const experimentalCliArgs: Record<string, unknown> = {};
+  if (argv['experiment'] && Array.isArray(argv['experiment'])) {
+    for (const entry of argv['experiment']) {
+      const [key, ...valueParts] = entry.split('=');
+      const value = valueParts.join('=');
+      if (key && value !== undefined) {
+        // Simple type inference for CLI args
+        if (value === 'true') experimentalCliArgs[key] = true;
+        else if (value === 'false') experimentalCliArgs[key] = false;
+        else if (!isNaN(Number(value)))
+          experimentalCliArgs[key] = Number(value);
+        else experimentalCliArgs[key] = value;
+      }
+    }
+  }
+
   return new Config({
     sessionId,
     clientVersion: await getVersion(),
@@ -814,6 +840,8 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
+    experimentalSettings: settings.experimental,
+    experimentalCliArgs,
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,

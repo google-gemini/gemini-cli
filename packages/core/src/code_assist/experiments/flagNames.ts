@@ -84,3 +84,15 @@ export const ExperimentMetadata: Record<number, ExperimentMetadataEntry> = {
     defaultValue: true,
   },
 };
+
+/**
+ * Gets the name of an experiment flag from its ID.
+ */
+export function getExperimentFlagName(flagId: number): string | undefined {
+  for (const [name, id] of Object.entries(ExperimentFlags)) {
+    if (id === flagId) {
+      return name.toLowerCase().replace(/_/g, '-');
+    }
+  }
+  return undefined;
+}
