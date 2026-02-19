@@ -118,11 +118,11 @@ describe('AgentConfigDialog', () => {
     mockOnSave = vi.fn();
   });
 
-  const renderDialog = (
+  const renderDialog = async (
     settings: LoadedSettings,
     definition: AgentDefinition = createMockAgentDefinition(),
-  ) =>
-    render(
+  ) => {
+    const result = render(
       <KeypressProvider>
         <AgentConfigDialog
           agentName="test-agent"
@@ -134,18 +134,21 @@ describe('AgentConfigDialog', () => {
         />
       </KeypressProvider>,
     );
+    await result.waitUntilReady();
+    return result;
+  };
 
   describe('rendering', () => {
-    it('should render the dialog with title', () => {
+    it('should render the dialog with title', async () => {
       const settings = createMockSettings();
-      const { lastFrame } = renderDialog(settings);
-
+      const { lastFrame, unmount } = await renderDialog(settings);
       expect(lastFrame()).toContain('Configure: Test Agent');
+      unmount();
     });
 
-    it('should render all configuration fields', () => {
+    it('should render all configuration fields', async () => {
       const settings = createMockSettings();
-      const { lastFrame } = renderDialog(settings);
+      const { lastFrame, unmount } = await renderDialog(settings);
       const frame = lastFrame();
 
       expect(frame).toContain('Enabled');
@@ -156,44 +159,53 @@ describe('AgentConfigDialog', () => {
       expect(frame).toContain('Max Output Tokens');
       expect(frame).toContain('Max Time (minutes)');
       expect(frame).toContain('Max Turns');
+      unmount();
     });
 
-    it('should render scope selector', () => {
+    it('should render scope selector', async () => {
       const settings = createMockSettings();
-      const { lastFrame } = renderDialog(settings);
+      const { lastFrame, unmount } = await renderDialog(settings);
 
       expect(lastFrame()).toContain('Apply To');
       expect(lastFrame()).toContain('User Settings');
       expect(lastFrame()).toContain('Workspace Settings');
+      unmount();
     });
 
-    it('should render help text', () => {
+    it('should render help text', async () => {
       const settings = createMockSettings();
-      const { lastFrame } = renderDialog(settings);
+      const { lastFrame, unmount } = await renderDialog(settings);
 
       expect(lastFrame()).toContain('Use Enter to select');
       expect(lastFrame()).toContain('Tab to change focus');
       expect(lastFrame()).toContain('Esc to close');
+      unmount();
     });
   });
 
   describe('keyboard navigation', () => {
     it('should close dialog on Escape', async () => {
       const settings = createMockSettings();
-      const { stdin } = renderDialog(settings);
+      const { stdin, waitUntilReady, unmount } = await renderDialog(settings);
 
       await act(async () => {
         stdin.write(TerminalKeys.ESCAPE);
+      });
+      // Escape key has a 50ms timeout in KeypressContext, so we need to wrap waitUntilReady in act
+      await act(async () => {
+        await waitUntilReady();
       });
 
       await waitFor(() => {
         expect(mockOnClose).toHaveBeenCalled();
       });
+      unmount();
     });
 
     it('should navigate down with arrow key', async () => {
       const settings = createMockSettings();
-      const { lastFrame, stdin } = renderDialog(settings);
+      const { lastFrame, stdin, waitUntilReady, unmount } =
+        await renderDialog(settings);
 
       // Initially first item (Enabled) should be active
       expect(lastFrame()).toContain('●');
@@ -202,16 +214,19 @@ describe('AgentConfigDialog', () => {
       await act(async () => {
         stdin.write(TerminalKeys.DOWN_ARROW);
       });
+      await waitUntilReady();
 
       await waitFor(() => {
         // Model field should now be highlighted
         expect(lastFrame()).toContain('Model');
       });
+      unmount();
     });
 
     it('should switch focus with Tab', async () => {
       const settings = createMockSettings();
-      const { lastFrame, stdin } = renderDialog(settings);
+      const { lastFrame, stdin, waitUntilReady, unmount } =
+        await renderDialog(settings);
 
       // Initially settings section is focused
       expect(lastFrame()).toContain('> Configure: Test Agent');
@@ -220,22 +235,25 @@ describe('AgentConfigDialog', () => {
       await act(async () => {
         stdin.write(TerminalKeys.TAB);
       });
+      await waitUntilReady();
 
       await waitFor(() => {
         expect(lastFrame()).toContain('> Apply To');
       });
+      unmount();
     });
   });
 
   describe('boolean toggle', () => {
     it('should toggle enabled field on Enter', async () => {
       const settings = createMockSettings();
-      const { stdin } = renderDialog(settings);
+      const { stdin, waitUntilReady, unmount } = await renderDialog(settings);
 
       // Press Enter to toggle the first field (Enabled)
       await act(async () => {
         stdin.write(TerminalKeys.ENTER);
       });
+      await waitUntilReady();
 
       await waitFor(() => {
         expect(settings.setValue).toHaveBeenCalledWith(
@@ -245,11 +263,12 @@ describe('AgentConfigDialog', () => {
         );
         expect(mockOnSave).toHaveBeenCalled();
       });
+      unmount();
     });
   });
 
   describe('default values', () => {
-    it('should show values from agent definition as defaults', () => {
+    it('should show values from agent definition as defaults', async () => {
       const definition = createMockAgentDefinition({
         modelConfig: {
           model: 'gemini-2.0-flash',
@@ -263,29 +282,31 @@ describe('AgentConfigDialog', () => {
         },
       });
       const settings = createMockSettings();
-      const { lastFrame } = renderDialog(settings, definition);
+      const { lastFrame, unmount } = await renderDialog(settings, definition);
       const frame = lastFrame();
 
       expect(frame).toContain('gemini-2.0-flash');
       expect(frame).toContain('0.7');
       expect(frame).toContain('10');
       expect(frame).toContain('20');
+      unmount();
     });
 
-    it('should show experimental agents as disabled by default', () => {
+    it('should show experimental agents as disabled by default', async () => {
       const definition = createMockAgentDefinition({
         experimental: true,
       });
       const settings = createMockSettings();
-      const { lastFrame } = renderDialog(settings, definition);
+      const { lastFrame, unmount } = await renderDialog(settings, definition);
 
       // Experimental agents default to disabled
       expect(lastFrame()).toContain('false');
+      unmount();
     });
   });
 
   describe('existing overrides', () => {
-    it('should show existing override values with * indicator', () => {
+    it('should show existing override values with * indicator', async () => {
       const settings = createMockSettings({
         agents: {
           overrides: {
@@ -298,12 +319,13 @@ describe('AgentConfigDialog', () => {
           },
         },
       });
-      const { lastFrame } = renderDialog(settings);
+      const { lastFrame, unmount } = await renderDialog(settings);
       const frame = lastFrame();
 
       // Should show the overridden values
       expect(frame).toContain('custom-model');
       expect(frame).toContain('false');
+      unmount();
     });
   });
 });

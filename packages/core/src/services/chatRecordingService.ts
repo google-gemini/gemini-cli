@@ -455,6 +455,8 @@ export class ChatRecordingService {
         conversation.lastUpdated = new Date().toISOString();
         const newContent = JSON.stringify(conversation, null, 2);
         this.cachedLastConvData = newContent;
+        // Ensure directory exists before writing (handles cases where temp dir was cleaned)
+        fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
         fs.writeFileSync(this.conversationFile, newContent);
       }
     } catch (error) {

@@ -454,6 +454,7 @@ export async function loadCliConfig(
   }
 
   const memoryImportFormat = settings.context?.importFormat || 'tree';
+  const includeDirectoryTree = settings.context?.includeDirectoryTree ?? true;
 
   const ideMode = settings.ide?.enabled ?? false;
 
@@ -554,11 +555,13 @@ export async function loadCliConfig(
         break;
       case 'plan':
         if (!(settings.experimental?.plan ?? false)) {
-          throw new Error(
-            'Approval mode "plan" is only available when experimental.plan is enabled.',
+          debugLogger.warn(
+            'Approval mode "plan" is only available when experimental.plan is enabled. Falling back to "default".',
           );
+          approvalMode = ApprovalMode.DEFAULT;
+        } else {
+          approvalMode = ApprovalMode.PLAN;
         }
-        approvalMode = ApprovalMode.PLAN;
         break;
       case 'default':
         approvalMode = ApprovalMode.DEFAULT;
@@ -745,6 +748,7 @@ export async function loadCliConfig(
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
     targetDir: cwd,
+    includeDirectoryTree,
     includeDirectories,
     loadMemoryFromIncludeDirectories:
       settings.context?.loadMemoryFromIncludeDirectories || false,
@@ -814,6 +818,7 @@ export async function loadCliConfig(
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
+    modelSteering: settings.experimental?.modelSteering,
     toolOutputMasking: settings.experimental?.toolOutputMasking,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,

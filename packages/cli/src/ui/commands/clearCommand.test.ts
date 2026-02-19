@@ -27,9 +27,11 @@ import { uiTelemetryService } from '@google/gemini-cli-core';
 describe('clearCommand', () => {
   let mockContext: CommandContext;
   let mockResetChat: ReturnType<typeof vi.fn>;
+  let mockHintClear: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     mockResetChat = vi.fn().mockResolvedValue(undefined);
+    mockHintClear = vi.fn();
     const mockGetChatRecordingService = vi.fn();
     vi.clearAllMocks();
 
@@ -50,12 +52,15 @@ describe('clearCommand', () => {
             fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
             fireSessionStartEvent: vi.fn().mockResolvedValue(undefined),
           }),
+          userHintService: {
+            clear: mockHintClear,
+          },
         },
       },
     });
   });
 
-  it('should set debug message, reset chat, reset telemetry, and clear UI when config is available', async () => {
+  it('should set debug message, reset chat, reset telemetry, clear hints, and clear UI when config is available', async () => {
     if (!clearCommand.action) {
       throw new Error('clearCommand must have an action.');
     }
@@ -68,6 +73,7 @@ describe('clearCommand', () => {
     expect(mockContext.ui.setDebugMessage).toHaveBeenCalledTimes(1);
 
     expect(mockResetChat).toHaveBeenCalledTimes(1);
+    expect(mockHintClear).toHaveBeenCalledTimes(1);
     expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledWith(0);
     expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledTimes(1);
     expect(mockContext.ui.clear).toHaveBeenCalledTimes(1);

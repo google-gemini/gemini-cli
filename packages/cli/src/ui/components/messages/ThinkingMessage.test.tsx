@@ -9,28 +9,32 @@ import { renderWithProviders } from '../../../test-utils/render.js';
 import { ThinkingMessage } from './ThinkingMessage.js';
 
 describe('ThinkingMessage', () => {
-  it('renders subject line', () => {
-    const { lastFrame } = renderWithProviders(
+  it('renders subject line', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ThinkingMessage
         thought={{ subject: 'Planning', description: 'test' }}
       />,
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('uses description when subject is empty', () => {
-    const { lastFrame } = renderWithProviders(
+  it('uses description when subject is empty', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ThinkingMessage
         thought={{ subject: '', description: 'Processing details' }}
       />,
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('renders full mode with left border and full text', () => {
-    const { lastFrame } = renderWithProviders(
+  it('renders full mode with left border and full text', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ThinkingMessage
         thought={{
           subject: 'Planning',
@@ -38,12 +42,14 @@ describe('ThinkingMessage', () => {
         }}
       />,
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('indents summary line correctly', () => {
-    const { lastFrame } = renderWithProviders(
+  it('indents summary line correctly', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ThinkingMessage
         thought={{
           subject: 'Summary line',
@@ -51,12 +57,14 @@ describe('ThinkingMessage', () => {
         }}
       />,
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('normalizes escaped newline tokens', () => {
-    const { lastFrame } = renderWithProviders(
+  it('normalizes escaped newline tokens', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ThinkingMessage
         thought={{
           subject: 'Matching the Blocks',
@@ -64,15 +72,19 @@ describe('ThinkingMessage', () => {
         }}
       />,
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('renders empty state gracefully', () => {
-    const { lastFrame } = renderWithProviders(
+  it('renders empty state gracefully', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ThinkingMessage thought={{ subject: '', description: '' }} />,
     );
+    await waitUntilReady();
 
-    expect(lastFrame()).toBe('');
+    expect(lastFrame({ allowEmpty: true })).toBe('');
+    unmount();
   });
 });

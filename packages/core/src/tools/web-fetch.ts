@@ -27,6 +27,7 @@ import {
   logWebFetchFallbackAttempt,
   WebFetchFallbackAttemptEvent,
 } from '../telemetry/index.js';
+import { LlmRole } from '../telemetry/llmRole.js';
 import { WEB_FETCH_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { retryWithBackoff } from '../utils/retry.js';
@@ -189,6 +190,7 @@ ${textContent}
         { model: 'web-fetch-fallback' },
         [{ role: 'user', parts: [{ text: fallbackPrompt }] }],
         signal,
+        LlmRole.UTILITY_TOOL,
       );
       const resultText = getResponseText(result) || '';
       return {
@@ -278,6 +280,7 @@ ${textContent}
         { model: 'web-fetch' },
         [{ role: 'user', parts: [{ text: userPrompt }] }],
         signal, // Pass signal
+        LlmRole.UTILITY_TOOL,
       );
 
       debugLogger.debug(

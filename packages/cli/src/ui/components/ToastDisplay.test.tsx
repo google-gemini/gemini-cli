@@ -101,65 +101,73 @@ describe('ToastDisplay', () => {
     });
   });
 
-  it('renders nothing by default', () => {
-    const { lastFrame } = renderToastDisplay();
-    expect(lastFrame()).toBe('');
+  it('renders nothing by default', async () => {
+    const { lastFrame, waitUntilReady } = renderToastDisplay();
+    await waitUntilReady();
+    expect(lastFrame({ allowEmpty: true })).toBe('');
   });
 
-  it('renders Ctrl+C prompt', () => {
-    const { lastFrame } = renderToastDisplay({
+  it('renders Ctrl+C prompt', async () => {
+    const { lastFrame, waitUntilReady } = renderToastDisplay({
       ctrlCPressedOnce: true,
     });
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders warning message', () => {
-    const { lastFrame } = renderToastDisplay({
+  it('renders warning message', async () => {
+    const { lastFrame, waitUntilReady } = renderToastDisplay({
       transientMessage: {
         text: 'This is a warning',
         type: TransientMessageType.Warning,
       },
     });
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders hint message', () => {
-    const { lastFrame } = renderToastDisplay({
+  it('renders hint message', async () => {
+    const { lastFrame, waitUntilReady } = renderToastDisplay({
       transientMessage: {
         text: 'This is a hint',
         type: TransientMessageType.Hint,
       },
     });
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders Ctrl+D prompt', () => {
-    const { lastFrame } = renderToastDisplay({
+  it('renders Ctrl+D prompt', async () => {
+    const { lastFrame, waitUntilReady } = renderToastDisplay({
       ctrlDPressedOnce: true,
     });
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders Escape prompt when buffer is empty', () => {
-    const { lastFrame } = renderToastDisplay({
+  it('renders Escape prompt when buffer is empty', async () => {
+    const { lastFrame, waitUntilReady } = renderToastDisplay({
       showEscapePrompt: true,
       history: [{ id: 1, type: 'user', text: 'test' }] as HistoryItem[],
     });
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders Escape prompt when buffer is NOT empty', () => {
-    const { lastFrame } = renderToastDisplay({
+  it('renders Escape prompt when buffer is NOT empty', async () => {
+    const { lastFrame, waitUntilReady } = renderToastDisplay({
       showEscapePrompt: true,
       buffer: { text: 'some text' } as TextBuffer,
     });
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders Queue Error Message', () => {
-    const { lastFrame } = renderToastDisplay({
+  it('renders Queue Error Message', async () => {
+    const { lastFrame, waitUntilReady } = renderToastDisplay({
       queueErrorMessage: 'Queue Error',
     });
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 });

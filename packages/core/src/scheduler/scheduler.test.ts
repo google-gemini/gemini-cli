@@ -85,6 +85,7 @@ import {
   getToolCallContext,
   type ToolCallContext,
 } from '../utils/toolCallContext.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
 
 describe('Scheduler (Orchestrator)', () => {
   let scheduler: Scheduler;
@@ -1240,6 +1241,32 @@ describe('Scheduler (Orchestrator)', () => {
       expect(capturedContext!.callId).toBe(req1.callId);
       expect(capturedContext!.schedulerId).toBe(schedulerId);
       expect(capturedContext!.parentCallId).toBe(parentCallId);
+    });
+  });
+
+  describe('Cleanup', () => {
+    it('should unregister McpProgress listener on dispose()', () => {
+      const onSpy = vi.spyOn(coreEvents, 'on');
+      const offSpy = vi.spyOn(coreEvents, 'off');
+
+      const s = new Scheduler({
+        config: mockConfig,
+        messageBus: mockMessageBus,
+        getPreferredEditor,
+        schedulerId: 'cleanup-test',
+      });
+
+      expect(onSpy).toHaveBeenCalledWith(
+        CoreEvent.McpProgress,
+        expect.any(Function),
+      );
+
+      s.dispose();
+
+      expect(offSpy).toHaveBeenCalledWith(
+        CoreEvent.McpProgress,
+        expect.any(Function),
+      );
     });
   });
 });

@@ -22,7 +22,7 @@ vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
 
 const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
 
-const renderWithMockedStats = (metrics: SessionMetrics) => {
+const renderWithMockedStats = async (metrics: SessionMetrics) => {
   useSessionStatsMock.mockReturnValue({
     stats: {
       sessionId: 'test-session-id',
@@ -36,12 +36,14 @@ const renderWithMockedStats = (metrics: SessionMetrics) => {
     startNewPrompt: vi.fn(),
   });
 
-  return render(<ToolStatsDisplay />);
+  const result = render(<ToolStatsDisplay />);
+  await result.waitUntilReady();
+  return result;
 };
 
 describe('<ToolStatsDisplay />', () => {
-  it('should render "no tool calls" message when there are no active tools', () => {
-    const { lastFrame } = renderWithMockedStats({
+  it('should render "no tool calls" message when there are no active tools', async () => {
+    const { lastFrame, unmount } = await renderWithMockedStats({
       models: {},
       tools: {
         totalCalls: 0,
@@ -66,10 +68,11 @@ describe('<ToolStatsDisplay />', () => {
       'No tool calls have been made in this session.',
     );
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('should display stats for a single tool correctly', () => {
-    const { lastFrame } = renderWithMockedStats({
+  it('should display stats for a single tool correctly', async () => {
+    const { lastFrame, unmount } = await renderWithMockedStats({
       models: {},
       tools: {
         totalCalls: 1,
@@ -106,10 +109,11 @@ describe('<ToolStatsDisplay />', () => {
     const output = lastFrame();
     expect(output).toContain('test-tool');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('should display stats for multiple tools correctly', () => {
-    const { lastFrame } = renderWithMockedStats({
+  it('should display stats for multiple tools correctly', async () => {
+    const { lastFrame, unmount } = await renderWithMockedStats({
       models: {},
       tools: {
         totalCalls: 3,
@@ -159,10 +163,11 @@ describe('<ToolStatsDisplay />', () => {
     expect(output).toContain('tool-a');
     expect(output).toContain('tool-b');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('should handle large values without wrapping or overlapping', () => {
-    const { lastFrame } = renderWithMockedStats({
+  it('should handle large values without wrapping or overlapping', async () => {
+    const { lastFrame, unmount } = await renderWithMockedStats({
       models: {},
       tools: {
         totalCalls: 999999999,
@@ -197,10 +202,11 @@ describe('<ToolStatsDisplay />', () => {
     });
 
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('should handle zero decisions gracefully', () => {
-    const { lastFrame } = renderWithMockedStats({
+  it('should handle zero decisions gracefully', async () => {
+    const { lastFrame, unmount } = await renderWithMockedStats({
       models: {},
       tools: {
         totalCalls: 1,
@@ -240,5 +246,6 @@ describe('<ToolStatsDisplay />', () => {
     expect(output).toContain('Overall Agreement Rate:');
     expect(output).toContain('--');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 });

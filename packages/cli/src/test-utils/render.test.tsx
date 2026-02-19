@@ -5,36 +5,48 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, act } from 'react';
 import { Text } from 'ink';
 import { renderHook, render } from './render.js';
 import { waitFor } from './async.js';
 
 describe('render', () => {
-  it('should render a component', () => {
-    const { lastFrame } = render(<Text>Hello World</Text>);
-    expect(lastFrame()).toBe('Hello World');
+  it('should render a component', async () => {
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <Text>Hello World</Text>,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toBe('Hello World\n');
+    unmount();
   });
 
-  it('should support rerender', () => {
-    const { lastFrame, rerender } = render(<Text>Hello</Text>);
-    expect(lastFrame()).toBe('Hello');
+  it('should support rerender', async () => {
+    const { lastFrame, rerender, waitUntilReady, unmount } = render(
+      <Text>Hello</Text>,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toBe('Hello\n');
 
-    rerender(<Text>World</Text>);
-    expect(lastFrame()).toBe('World');
+    await act(async () => {
+      rerender(<Text>World</Text>);
+    });
+    await waitUntilReady();
+    expect(lastFrame()).toBe('World\n');
+    unmount();
   });
 
-  it('should support unmount', () => {
-    const cleanup = vi.fn();
+  it('should support unmount', async () => {
+    const cleanupMock = vi.fn();
     function TestComponent() {
-      useEffect(() => cleanup, []);
+      useEffect(() => cleanupMock, []);
       return <Text>Hello</Text>;
     }
 
-    const { unmount } = render(<TestComponent />);
+    const { unmount, waitUntilReady } = render(<TestComponent />);
+    await waitUntilReady();
     unmount();
 
-    expect(cleanup).toHaveBeenCalled();
+    expect(cleanupMock).toHaveBeenCalled();
   });
 });
 
@@ -48,49 +60,74 @@ describe('renderHook', () => {
       return { count, value };
     };
 
-    const { result, rerender } = renderHook(useTestHook, {
-      initialProps: { value: 1 },
-    });
+    const { result, rerender, waitUntilReady, unmount } = renderHook(
+      useTestHook,
+      {
+        initialProps: { value: 1 },
+      },
+    );
+    await waitUntilReady();
 
     expect(result.current.value).toBe(1);
     await waitFor(() => expect(result.current.count).toBe(1));
 
     // Rerender with new props
-    rerender({ value: 2 });
+    await act(async () => {
+      rerender({ value: 2 });
+    });
+    await waitUntilReady();
     expect(result.current.value).toBe(2);
     await waitFor(() => expect(result.current.count).toBe(2));
 
     // Rerender without arguments should use previous props (value: 2)
     // This would previously crash or pass undefined if not fixed
-    rerender();
+    await act(async () => {
+      rerender();
+    });
+    await waitUntilReady();
     expect(result.current.value).toBe(2);
     // Count should not increase because value didn't change
     await waitFor(() => expect(result.current.count).toBe(2));
+    unmount();
   });
 
-  it('should handle initial render without props', () => {
+  it('should handle initial render without props', async () => {
     const useTestHook = () => {
       const [count, setCount] = useState(0);
       return { count, increment: () => setCount((c) => c + 1) };
     };
 
-    const { result, rerender } = renderHook(useTestHook);
+    const { result, rerender, waitUntilReady, unmount } =
+      renderHook(useTestHook);
+    await waitUntilReady();
 
     expect(result.current.count).toBe(0);
 
-    rerender();
+    await act(async () => {
+      rerender();
+    });
+    await waitUntilReady();
     expect(result.current.count).toBe(0);
+    unmount();
   });
 
-  it('should update props if undefined is passed explicitly', () => {
+  it('should update props if undefined is passed explicitly', async () => {
     const useTestHook = (val: string | undefined) => val;
-    const { result, rerender } = renderHook(useTestHook, {
-      initialProps: 'initial',
-    });
+    const { result, rerender, waitUntilReady, unmount } = renderHook(
+      useTestHook,
+      {
+        initialProps: 'initial' as string | undefined,
+      },
+    );
+    await waitUntilReady();
 
     expect(result.current).toBe('initial');
 
-    rerender(undefined);
+    await act(async () => {
+      rerender(undefined);
+    });
+    await waitUntilReady();
     expect(result.current).toBeUndefined();
+    unmount();
   });
 });

@@ -138,11 +138,15 @@ describe('useAuth', () => {
         },
       }) as LoadedSettings;
 
-    it('should initialize with Unauthenticated state', () => {
+    it('should initialize with Unauthenticated state', async () => {
       const { result } = renderHook(() =>
         useAuthCommand(createSettings(AuthType.LOGIN_WITH_GOOGLE), mockConfig),
       );
       expect(result.current.authState).toBe(AuthState.Unauthenticated);
+
+      await waitFor(() => {
+        expect(result.current.authState).toBe(AuthState.Authenticated);
+      });
     });
 
     it('should set error if no auth type is selected and no env key', async () => {

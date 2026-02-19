@@ -56,38 +56,41 @@ describe('EditorSettingsDialog', () => {
   const renderWithProvider = (ui: React.ReactNode) =>
     render(<KeypressProvider>{ui}</KeypressProvider>);
 
-  it('renders correctly', () => {
-    const { lastFrame } = renderWithProvider(
+  it('renders correctly', async () => {
+    const { lastFrame, waitUntilReady } = renderWithProvider(
       <EditorSettingsDialog
         onSelect={vi.fn()}
         settings={mockSettings}
         onExit={vi.fn()}
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('calls onSelect when an editor is selected', () => {
+  it('calls onSelect when an editor is selected', async () => {
     const onSelect = vi.fn();
-    const { lastFrame } = renderWithProvider(
+    const { lastFrame, waitUntilReady } = renderWithProvider(
       <EditorSettingsDialog
         onSelect={onSelect}
         settings={mockSettings}
         onExit={vi.fn()}
       />,
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toContain('VS Code');
   });
 
   it('switches focus between editor and scope sections on Tab', async () => {
-    const { lastFrame, stdin } = renderWithProvider(
+    const { lastFrame, stdin, waitUntilReady } = renderWithProvider(
       <EditorSettingsDialog
         onSelect={vi.fn()}
         settings={mockSettings}
         onExit={vi.fn()}
       />,
     );
+    await waitUntilReady();
 
     // Initial focus on editor
     expect(lastFrame()).toContain('> Select Editor');
@@ -97,6 +100,7 @@ describe('EditorSettingsDialog', () => {
     await act(async () => {
       stdin.write('\t');
     });
+    await waitUntilReady();
 
     // Focus should be on scope
     await waitFor(() => {
@@ -115,6 +119,7 @@ describe('EditorSettingsDialog', () => {
     await act(async () => {
       stdin.write('\t');
     });
+    await waitUntilReady();
 
     // Focus should be back on editor
     await waitFor(() => {
@@ -124,24 +129,26 @@ describe('EditorSettingsDialog', () => {
 
   it('calls onExit when Escape is pressed', async () => {
     const onExit = vi.fn();
-    const { stdin } = renderWithProvider(
+    const { stdin, waitUntilReady } = renderWithProvider(
       <EditorSettingsDialog
         onSelect={vi.fn()}
         settings={mockSettings}
         onExit={onExit}
       />,
     );
+    await waitUntilReady();
 
     await act(async () => {
       stdin.write('\u001B'); // Escape
     });
+    await waitUntilReady();
 
     await waitFor(() => {
       expect(onExit).toHaveBeenCalled();
     });
   });
 
-  it('shows modified message when setting exists in other scope', () => {
+  it('shows modified message when setting exists in other scope', async () => {
     const settingsWithOtherScope = {
       forScope: (_scope: string) => ({
         settings: {
@@ -157,13 +164,14 @@ describe('EditorSettingsDialog', () => {
       },
     } as unknown as LoadedSettings;
 
-    const { lastFrame } = renderWithProvider(
+    const { lastFrame, waitUntilReady } = renderWithProvider(
       <EditorSettingsDialog
         onSelect={vi.fn()}
         settings={settingsWithOtherScope}
         onExit={vi.fn()}
       />,
     );
+    await waitUntilReady();
 
     const frame = lastFrame() || '';
     if (!frame.includes('(Also modified')) {

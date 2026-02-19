@@ -166,7 +166,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: exit_plan_mode 1`] = `
 {
-  "description": "Signals that the planning phase is complete and requests user approval to start implementation.",
+  "description": "Finalizes the planning phase and transitions to implementation by presenting the plan for user approval. This tool MUST be used to exit Plan Mode before any source code edits can be performed. Call this whenever a plan is ready or the user requests implementation.",
   "name": "exit_plan_mode",
   "parametersJsonSchema": {
     "properties": {
@@ -955,7 +955,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: exit_plan_mode 1`] = `
 {
-  "description": "Signals that the planning phase is complete and requests user approval to start implementation.",
+  "description": "Finalizes the planning phase and transitions to implementation by presenting the plan for user approval. This tool MUST be used to exit Plan Mode before any source code edits can be performed. Call this whenever a plan is ready or the user requests implementation.",
   "name": "exit_plan_mode",
   "parametersJsonSchema": {
     "properties": {
