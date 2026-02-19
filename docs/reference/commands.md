@@ -217,7 +217,7 @@ Slash commands provide meta-level control over the CLI itself.
       model.
   - **Note:** For more details on how `GEMINI.md` files contribute to
     hierarchical memory, see the
-    [CLI Configuration documentation](../get-started/configuration.md).
+    [CLI Configuration documentation](./configuration.md).
 
 ### `/model`
 
@@ -254,7 +254,7 @@ Slash commands provide meta-level control over the CLI itself.
   checkpoints to restore from.
 - **Usage:** `/restore [tool_call_id]`
 - **Note:** Only available if checkpointing is configured via
-  [settings](../get-started/configuration.md). See
+  [settings](./configuration.md). See
   [Checkpointing documentation](../cli/checkpointing.md) for more details.
 
 ### `/rewind`

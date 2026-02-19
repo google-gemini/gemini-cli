@@ -167,6 +167,6 @@ gemini -s -p "run shell command: mount | grep workspace"
 
 ## Related documentation
 
-- [Configuration](../get-started/configuration.md): Full configuration options.
+- [Configuration](../reference/configuration.md): Full configuration options.
 - [Commands](./commands.md): Available commands.
-- [Troubleshooting](../troubleshooting.md): General troubleshooting.
+- [Troubleshooting](../resources/troubleshooting.md): General troubleshooting.
