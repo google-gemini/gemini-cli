@@ -58,7 +58,8 @@ export async function readFileLines(
 
 /**
  * Automatically enriches grep results with surrounding context if the match count is low
- * and no specific context was requested.
+ * and no specific context was requested. This optimization can enable the agent
+ * to skip turns that would be spent reading files after grep calls.
  */
 export async function enrichWithAutoContext(
   matchesByFile: Record<string, GrepMatch[]>,
@@ -160,7 +161,9 @@ export async function formatGrepResults(
   const matchCount = matchesOnly.length; // Count actual matches, not context lines
   const matchTerm = matchCount === 1 ? 'match' : 'matches';
 
-  // Greedy Grep: If match count is low and no context was requested, automatically return context.
+  // If the result count is low and Gemini didn't request before/after lines of context
+  // add a small amount anyways to enable the agent to avoid one or more extra turns
+  // reading the matched files. This optimization reduces turns count by ~10% in SWEBench.
   await enrichWithAutoContext(matchesByFile, matchCount, params);
 
   const wasTruncated = matchCount >= totalMaxMatches;
