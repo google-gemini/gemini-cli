@@ -40,13 +40,16 @@ export const useFolderTrust = (
     const { isTrusted: trusted } = isWorkspaceTrusted(settings.merged);
 
     if (trusted === undefined || trusted === false) {
-      void FolderTrustDiscoveryService.discover(process.cwd()).then(
-        (results) => {
+      void FolderTrustDiscoveryService.discover(process.cwd())
+        .then((results) => {
           if (isMounted) {
             setDiscoveryResults(results);
           }
-        },
-      );
+        })
+        .catch(() => {
+          // Silently ignore discovery errors as they are handled within the service
+          // and reported via results.discoveryErrors if successful.
+        });
     }
 
     const showUntrustedMessage = () => {
