@@ -28,10 +28,12 @@
     "@google/gemini-cli-core": "file:../core",
     "chalk": "^5.4.1",
     "ora": "^8.2.0",
+    "yargs": "^17.7.2",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/yargs": "^17.0.33",
     "tsx": "^4.20.3",
     "typescript": "^5.3.3",
     "vitest": "^3.1.1"
