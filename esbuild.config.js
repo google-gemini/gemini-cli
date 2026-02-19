@@ -23,10 +23,7 @@ const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 const pkg = require(path.resolve(__dirname, 'package.json'));
 
-const punycodePath = path.resolve(
-  __dirname,
-  'node_modules/punycode/punycode.js',
-);
+const punycodePath = require.resolve('punycode');
 const punycodePlugin = {
   name: 'punycode-userland',
   setup(build) {
