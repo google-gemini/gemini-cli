@@ -22,6 +22,7 @@ import fs from 'node:fs';
 import { MockTool } from '../test-utils/mock-tool.js';
 import { ToolErrorType } from './tool-error.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 vi.mock('node:fs');
 
@@ -216,6 +217,7 @@ describe('ToolRegistry', () => {
     unsubscribe: vi.fn(),
   } as unknown as MessageBus;
   let mockConfigGetToolDiscoveryCommand: ReturnType<typeof vi.spyOn>;
+  let mockConfigGetEnableToolDiscovery: ReturnType<typeof vi.spyOn>;
   let mockConfigGetExcludedTools: MockInstance<
     typeof Config.prototype.getExcludeTools
   >;
@@ -242,6 +244,12 @@ describe('ToolRegistry', () => {
       config,
       'getToolDiscoveryCommand',
     );
+    mockConfigGetEnableToolDiscovery = vi.spyOn(
+      config,
+      'getEnableToolDiscovery',
+    );
+    mockConfigGetEnableToolDiscovery.mockReturnValue(true);
+
     mockConfigGetExcludedTools = vi.spyOn(config, 'getExcludeTools');
     vi.spyOn(config, 'getMcpServers');
     vi.spyOn(config, 'getMcpServerCommand');
@@ -472,6 +480,22 @@ describe('ToolRegistry', () => {
   });
 
   describe('discoverTools', () => {
+    it('should warn and skip discovery if enableToolDiscovery is false', async () => {
+      const discoveryCommand = 'my-discovery-command';
+      mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
+      mockConfigGetEnableToolDiscovery.mockReturnValue(false);
+
+      const warnSpy = vi.spyOn(debugLogger, 'warn');
+      const mockSpawn = vi.mocked(spawn);
+
+      await toolRegistry.discoverAllTools();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Tool discovery is disabled by default'),
+      );
+      expect(mockSpawn).not.toHaveBeenCalled();
+    });
+
     it('should will preserve tool parametersJsonSchema during discovery from command', async () => {
       const discoveryCommand = 'my-discovery-command';
       mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);

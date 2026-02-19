@@ -1265,6 +1265,13 @@
           "markdownDescription": "Command to run for tool discovery.\n\n- Category: `Tools`\n- Requires restart: `yes`",
           "type": "string"
         },
+        "enableToolDiscovery": {
+          "title": "Enable Tool Discovery",
+          "description": "Enables the tool discovery feature using `tools.discoveryCommand`.",
+          "markdownDescription": "Enables the tool discovery feature using `tools.discoveryCommand`.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "callCommand": {
           "title": "Tool Call Command",
           "description": "Defines a custom shell command for invoking discovered tools. The command must take the tool name as the first argument, read JSON arguments from stdin, and emit JSON results on stdout.",
