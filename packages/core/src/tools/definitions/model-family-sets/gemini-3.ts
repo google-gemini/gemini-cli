@@ -290,10 +290,8 @@ The user has the ability to modify \`content\`. If modified, this will be stated
 
   replace: {
     name: EDIT_TOOL_NAME,
-    description: `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting.
-The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
-
-CRITICAL for \`old_string\`: Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. For single replacements (default), this string must uniquely identify the single instance to change; if it matches multiple locations, the tool will fail unless \`expected_replacements\` is specified.`,
+    description: `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences ONLY when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting.
+The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -307,7 +305,7 @@ CRITICAL for \`old_string\`: Include at least 3 lines of context BEFORE and AFTE
         },
         old_string: {
           description:
-            'The exact literal text to replace, unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
+            'The exact literal text to replace, unescaped. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
           type: 'string',
         },
         new_string: {
