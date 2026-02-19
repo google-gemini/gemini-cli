@@ -92,6 +92,7 @@ export function handleAutoUpdate(
     stdio: 'ignore',
     shell: true,
     detached: true,
+    timeout: 300000, // 5 minutes
   });
   // Un-reference the child process to allow the parent to exit independently.
   updateProcess.unref();

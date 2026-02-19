@@ -301,6 +301,7 @@ describe('handleAutoUpdate', () => {
         shell: true,
         stdio: 'ignore',
         detached: true,
+        timeout: 300000,
       },
     );
   });
