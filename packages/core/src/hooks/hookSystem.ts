@@ -425,4 +425,24 @@ export class HookSystem {
       );
     }
   }
+
+  /**
+   * Fire a Notification hook when an interactive shell is waiting for user input.
+   * Use matcher "ShellInteraction" in Notification hook config to receive this.
+   * @see https://github.com/google-gemini/gemini-cli/issues/19527
+   */
+  async fireShellInteractionNotificationEvent(
+    message: string = 'Interactive shell waiting for user input',
+    details: Record<string, unknown> = {},
+  ): Promise<void> {
+    try {
+      await this.hookEventHandler.fireNotificationEvent(
+        NotificationType.ShellInteraction,
+        message,
+        { ...details, source: 'interactive_shell' },
+      );
+    } catch (error) {
+      debugLogger.debug('ShellInteraction NotificationEvent failed:', error);
+    }
+  }
 }
