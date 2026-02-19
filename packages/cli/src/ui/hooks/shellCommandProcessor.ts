@@ -300,6 +300,10 @@ export const useShellCommandProcessor = (
         let isBinaryStream = false;
         let binaryBytesReceived = 0;
 
+        const outputFileName = `gemini_shell_output_${crypto.randomBytes(6).toString('hex')}.log`;
+        const outputFilePath = path.join(os.tmpdir(), outputFileName);
+        const outputStream = fs.createWriteStream(outputFilePath);
+
         const initialToolDisplay: IndividualToolCallDisplay = {
           callId,
           name: SHELL_COMMAND_NAME,
@@ -343,11 +347,22 @@ export const useShellCommandProcessor = (
                 let shouldUpdate = false;
 
                 switch (event.type) {
+                  case 'raw_data':
+                    if (!isBinaryStream) {
+                      outputStream.write(event.chunk);
+                    }
+                    break;
                   case 'data':
                     if (isBinaryStream) break;
                     if (typeof event.chunk === 'string') {
                       if (typeof cumulativeStdout === 'string') {
                         cumulativeStdout += event.chunk;
+                        // Keep a small buffer for the UI to prevent memory spikes and Ink lagging
+                        const MAX_UI_LENGTH = 100000; // 100KB
+                        if (cumulativeStdout.length > MAX_UI_LENGTH) {
+                          cumulativeStdout =
+                            cumulativeStdout.slice(-MAX_UI_LENGTH);
+                        }
                       } else {
                         cumulativeStdout = event.chunk;
                       }
@@ -433,6 +448,7 @@ export const useShellCommandProcessor = (
           }
 
           const result = await resultPromise;
+          outputStream.end();
           setPendingHistoryItem(null);
 
           if (result.backgrounded && result.pid) {
@@ -447,6 +463,17 @@ export const useShellCommandProcessor = (
           } else {
             mainContent =
               result.output.trim() || '(Command produced no output)';
+            if (outputStream.bytesWritten > 0) {
+              const warning = `[Full command output saved to: ${outputFilePath}]`;
+              mainContent = mainContent.includes(
+                '[GEMINI_CLI_WARNING: Output truncated.',
+              )
+                ? mainContent.replace(
+                    /\[GEMINI_CLI_WARNING: Output truncated\..*?\]/,
+                    warning,
+                  )
+                : `${mainContent}\n\n${warning}`;
+            }
           }
 
           let finalOutput = mainContent;
@@ -506,6 +533,9 @@ export const useShellCommandProcessor = (
           );
         } finally {
           abortSignal.removeEventListener('abort', abortHandler);
+          if (!outputStream.closed) {
+            outputStream.destroy();
+          }
           if (pwdFilePath && fs.existsSync(pwdFilePath)) {
             fs.unlinkSync(pwdFilePath);
           }

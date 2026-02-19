@@ -5,6 +5,7 @@
  */
 
 import fsPromises from 'node:fs/promises';
+import fs from 'node:fs';
 import path from 'node:path';
 import os, { EOL } from 'node:os';
 import crypto from 'node:crypto';
@@ -177,6 +178,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
     const onAbort = () => combinedController.abort();
 
+    const outputFileName = `gemini_shell_output_${crypto.randomBytes(6).toString('hex')}.log`;
+    const outputFilePath = path.join(os.tmpdir(), outputFileName);
+    const outputStream = fs.createWriteStream(outputFilePath);
+
     try {
       // pgrep is not available on Windows, so we can't get background PIDs
       const commandToExecute = isWindows
@@ -231,31 +236,41 @@ export class ShellToolInvocation extends BaseToolInvocation<
           cwd,
           (event: ShellOutputEvent) => {
             resetTimeout(); // Reset timeout on any event
-            if (!updateOutput) {
-              return;
-            }
-
-            let shouldUpdate = false;
 
             switch (event.type) {
+              case 'raw_data':
+                if (!isBinaryStream) {
+                  outputStream.write(event.chunk);
+                }
+                break;
               case 'data':
                 if (isBinaryStream) break;
                 cumulativeOutput = event.chunk;
-                shouldUpdate = true;
+                if (updateOutput && !this.params.is_background) {
+                  updateOutput(cumulativeOutput);
+                  lastUpdateTime = Date.now();
+                }
                 break;
               case 'binary_detected':
                 isBinaryStream = true;
                 cumulativeOutput =
                   '[Binary output detected. Halting stream...]';
-                shouldUpdate = true;
+                if (updateOutput && !this.params.is_background) {
+                  updateOutput(cumulativeOutput);
+                }
                 break;
               case 'binary_progress':
                 isBinaryStream = true;
                 cumulativeOutput = `[Receiving binary output... ${formatBytes(
                   event.bytesReceived,
                 )} received]`;
-                if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
-                  shouldUpdate = true;
+                if (
+                  updateOutput &&
+                  !this.params.is_background &&
+                  Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS
+                ) {
+                  updateOutput(cumulativeOutput);
+                  lastUpdateTime = Date.now();
                 }
                 break;
               case 'exit':
@@ -263,11 +278,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
               default: {
                 throw new Error('An unhandled ShellOutputEvent was found.');
               }
-            }
-
-            if (shouldUpdate && !this.params.is_background) {
-              updateOutput(cumulativeOutput);
-              lastUpdateTime = Date.now();
             }
           },
           combinedController.signal,
@@ -295,6 +305,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
 
       const result = await resultPromise;
+      outputStream.end();
 
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {
@@ -381,6 +392,18 @@ export class ShellToolInvocation extends BaseToolInvocation<
         llmContent = llmContentParts.join('\n');
       }
 
+      if (outputStream.bytesWritten > 0) {
+        const fileMsg = `[Full command output saved to: ${outputFilePath}]`;
+        if (llmContent.includes('[GEMINI_CLI_WARNING: Output truncated.')) {
+          llmContent = llmContent.replace(
+            /\[GEMINI_CLI_WARNING: Output truncated\..*?\]/,
+            fileMsg,
+          );
+        } else {
+          llmContent = `${llmContent}${EOL}${EOL}${fileMsg}`;
+        }
+      }
+
       let returnDisplayMessage = '';
       if (this.config.getDebugMode()) {
         returnDisplayMessage = llmContent;
@@ -407,6 +430,24 @@ export class ShellToolInvocation extends BaseToolInvocation<
           }
           // If output is empty and command succeeded (code 0, no error/signal/abort),
           // returnDisplayMessage will remain empty, which is fine.
+        }
+      }
+
+      if (outputStream.bytesWritten > 0) {
+        const fileMsg = `[Full command output saved to: ${outputFilePath}]`;
+        if (
+          returnDisplayMessage.includes(
+            '[GEMINI_CLI_WARNING: Output truncated.',
+          )
+        ) {
+          returnDisplayMessage = returnDisplayMessage.replace(
+            /\[GEMINI_CLI_WARNING: Output truncated\..*?\]/,
+            fileMsg,
+          );
+        } else if (returnDisplayMessage) {
+          returnDisplayMessage = `${returnDisplayMessage}${EOL}${EOL}${fileMsg}`;
+        } else {
+          returnDisplayMessage = fileMsg;
         }
       }
 
@@ -442,6 +483,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
       };
     } finally {
       if (timeoutTimer) clearTimeout(timeoutTimer);
+      if (!outputStream.closed) {
+        outputStream.destroy();
+      }
       signal.removeEventListener('abort', onAbort);
       timeoutController.signal.removeEventListener('abort', onAbort);
       try {
