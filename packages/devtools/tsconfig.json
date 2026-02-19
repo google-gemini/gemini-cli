@@ -3,8 +3,10 @@
   "compilerOptions": {
     "lib": ["DOM", "DOM.Iterable", "ES2023"],
     "jsx": "react-jsx",
-    "allowImportingTsExtensions": true,
-    "noEmit": true
+    "skipLibCheck": true,
+    "composite": true,
+    "noEmit": false,
+    "outDir": "dist"
   },
   "include": ["src", "client/src"]
 }
