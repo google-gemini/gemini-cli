@@ -737,6 +737,42 @@ describe('Server Config (config.ts)', () => {
     );
   });
 
+  describe('Plan Settings', () => {
+    const testCases = [
+      {
+        name: 'should pass custom plan directory to storage',
+        planSettings: { directory: 'custom-plans' },
+        expected: 'custom-plans',
+      },
+      {
+        name: 'should call setCustomPlansDir with undefined if directory is not provided',
+        planSettings: {},
+        expected: undefined,
+      },
+      {
+        name: 'should call setCustomPlansDir with undefined if planSettings is not provided',
+        planSettings: undefined,
+        expected: undefined,
+      },
+    ];
+
+    testCases.forEach(({ name, planSettings, expected }) => {
+      it(`${name}`, () => {
+        const setCustomPlansDirSpy = vi.spyOn(
+          Storage.prototype,
+          'setCustomPlansDir',
+        );
+        new Config({
+          ...baseParams,
+          planSettings,
+        });
+
+        expect(setCustomPlansDirSpy).toHaveBeenCalledWith(expected);
+        setCustomPlansDirSpy.mockRestore();
+      });
+    });
+  });
+
   describe('Telemetry Settings', () => {
     it('should return default telemetry target if not provided', () => {
       const params: ConfigParameters = {
@@ -2501,7 +2537,7 @@ describe('Plans Directory Initialization', () => {
 
     await config.initialize();
 
-    const plansDir = config.storage.getProjectTempPlansDir();
+    const plansDir = config.storage.getPlansDir();
     expect(fs.promises.mkdir).toHaveBeenCalledWith(plansDir, {
       recursive: true,
     });
@@ -2518,7 +2554,7 @@ describe('Plans Directory Initialization', () => {
 
     await config.initialize();
 
-    const plansDir = config.storage.getProjectTempPlansDir();
+    const plansDir = config.storage.getPlansDir();
     expect(fs.promises.mkdir).not.toHaveBeenCalledWith(plansDir, {
       recursive: true,
     });
