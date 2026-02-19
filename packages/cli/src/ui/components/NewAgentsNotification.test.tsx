@@ -29,17 +29,18 @@ describe('NewAgentsNotification', () => {
   ];
   const onSelect = vi.fn();
 
-  it('renders agent list', () => {
-    const { lastFrame, unmount } = render(
+  it('renders agent list', async () => {
+    const { lastFrame, waitUntilReady, unmount } = render(
       <NewAgentsNotification agents={mockAgents} onSelect={onSelect} />,
     );
+    await waitUntilReady();
 
     const frame = lastFrame();
     expect(frame).toMatchSnapshot();
     unmount();
   });
 
-  it('truncates list if more than 5 agents', () => {
+  it('truncates list if more than 5 agents', async () => {
     const manyAgents = Array.from({ length: 7 }, (_, i) => ({
       name: `Agent ${i}`,
       description: `Description ${i}`,
@@ -48,9 +49,10 @@ describe('NewAgentsNotification', () => {
       inputConfig: { inputSchema: {} },
     }));
 
-    const { lastFrame, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <NewAgentsNotification agents={manyAgents} onSelect={onSelect} />,
     );
+    await waitUntilReady();
 
     const frame = lastFrame();
     expect(frame).toMatchSnapshot();

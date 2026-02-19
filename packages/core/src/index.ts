@@ -28,6 +28,7 @@ export * from './commands/memory.js';
 export * from './commands/types.js';
 
 // Export Core Logic
+export * from './core/baseLlmClient.js';
 export * from './core/client.js';
 export * from './core/contentGenerator.js';
 export * from './core/loggingContentGenerator.js';
@@ -88,6 +89,7 @@ export * from './utils/formatters.js';
 export * from './utils/generateContentResponseUtilities.js';
 export * from './utils/filesearch/fileSearch.js';
 export * from './utils/errorParsing.js';
+export * from './utils/fastAckHelper.js';
 export * from './utils/workspaceContext.js';
 export * from './utils/environmentContext.js';
 export * from './utils/ignorePatterns.js';
@@ -178,6 +180,7 @@ export { OAuthUtils } from './mcp/oauth-utils.js';
 // Export telemetry functions
 export * from './telemetry/index.js';
 export { sessionId, createSessionId } from './utils/session.js';
+export * from './utils/compatibility.js';
 export * from './utils/browser.js';
 export { Storage } from './config/storage.js';
 
