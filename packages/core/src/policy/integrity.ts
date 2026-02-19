@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import { Storage } from '../config/storage.js';
 import { readPolicyFiles } from './toml-loader.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { isNodeError } from '../utils/errors.js';
 
 export enum IntegrityStatus {
   MATCH = 'MATCH',
@@ -120,15 +121,19 @@ export class PolicyIntegrityManager {
     const storagePath = Storage.getPolicyIntegrityStoragePath();
     try {
       const content = await fs.readFile(storagePath, 'utf-8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return JSON.parse(content) as StoredIntegrityData;
-    } catch (error) {
+      const parsed: unknown = JSON.parse(content);
       if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        (error as Record<string, unknown>)['code'] === 'ENOENT'
+        typeof parsed === 'object' &&
+        parsed !== null &&
+        Object.values(parsed).every((v) => typeof v === 'string')
       ) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        return parsed as StoredIntegrityData;
+      }
+      debugLogger.warn('Invalid policy integrity data format');
+      return {};
+    } catch (error) {
+      if (isNodeError(error) && error.code === 'ENOENT') {
         return {};
       }
       debugLogger.error('Failed to load policy integrity data', error);

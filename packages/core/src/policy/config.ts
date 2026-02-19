@@ -29,6 +29,7 @@ import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
+import { isNodeError } from '../utils/errors.js';
 
 import { isDirectorySecure } from '../utils/security.js';
 
@@ -444,10 +445,16 @@ export function createPolicyUpdater(
             let existingData: { rule?: TomlRule[] } = {};
             try {
               const fileContent = await fs.readFile(policyFile, 'utf-8');
-              existingData = toml.parse(fileContent) as { rule?: TomlRule[] };
+              const parsed = toml.parse(fileContent);
+              if (
+                typeof parsed === 'object' &&
+                parsed !== null &&
+                (!('rule' in parsed) || Array.isArray(parsed['rule']))
+              ) {
+                existingData = parsed as { rule?: TomlRule[] };
+              }
             } catch (error) {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-              if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+              if (!isNodeError(error) || error.code !== 'ENOENT') {
                 debugLogger.warn(
                   `Failed to parse ${policyFile}, overwriting with new policy.`,
                   error,

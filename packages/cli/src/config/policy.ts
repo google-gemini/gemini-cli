@@ -16,7 +16,7 @@ import {
   IntegrityStatus,
   Storage,
   type PolicyUpdateConfirmationRequest,
-  debugLogger,
+  writeToStderr,
 } from '@google/gemini-cli-core';
 import { type Settings } from './settings.js';
 
@@ -57,9 +57,8 @@ export async function resolveWorkspacePolicyState(options: {
   cwd: string;
   trustedFolder: boolean;
   interactive: boolean;
-  acceptChangedPolicies: boolean;
 }): Promise<WorkspacePolicyState> {
-  const { cwd, trustedFolder, interactive, acceptChangedPolicies } = options;
+  const { cwd, trustedFolder, interactive } = options;
 
   let workspacePoliciesDir: string | undefined;
   let policyUpdateConfirmationRequest:
@@ -85,30 +84,26 @@ export async function resolveWorkspacePolicyState(options: {
     ) {
       // No workspace policies found
       workspacePoliciesDir = undefined;
+    } else if (interactive) {
+      // Policies changed or are new, and we are in interactive mode
+      policyUpdateConfirmationRequest = {
+        scope: 'workspace',
+        identifier: cwd,
+        policyDir: potentialWorkspacePoliciesDir,
+        newHash: integrityResult.hash,
+      };
     } else {
-      // Policies changed or are new
-      if (acceptChangedPolicies) {
-        debugLogger.warn(
-          'WARNING: Workspace policies changed or are new. Auto-accepting due to --accept-changed-policies flag.',
-        );
-        await integrityManager.acceptIntegrity(
-          'workspace',
-          cwd,
-          integrityResult.hash,
-        );
-        workspacePoliciesDir = potentialWorkspacePoliciesDir;
-      } else if (interactive) {
-        policyUpdateConfirmationRequest = {
-          scope: 'workspace',
-          identifier: cwd,
-          policyDir: potentialWorkspacePoliciesDir,
-          newHash: integrityResult.hash,
-        };
-      } else {
-        debugLogger.warn(
-          'WARNING: Workspace policies changed or are new. Loading default policies only. Use --accept-changed-policies to accept.',
-        );
-      }
+      // Non-interactive mode: warn and automatically accept/load
+      await integrityManager.acceptIntegrity(
+        'workspace',
+        cwd,
+        integrityResult.hash,
+      );
+      workspacePoliciesDir = potentialWorkspacePoliciesDir;
+      // debugLogger.warn here doesn't show up in the terminal. It is showing up only in debug mode on the debug console
+      writeToStderr(
+        'WARNING: Workspace policies changed or are new. Automatically accepting and loading them in non-interactive mode.\n',
+      );
     }
   }
 

@@ -15,14 +15,19 @@ import {
   PolicyIntegrityManager,
 } from '@google/gemini-cli-core';
 
+const { mockAcceptIntegrity } = vi.hoisted(() => ({
+  mockAcceptIntegrity: vi.fn(),
+}));
+
 // Mock PolicyIntegrityManager
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const original = (await importOriginal()) as any;
+  const original =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...original,
     PolicyIntegrityManager: vi.fn().mockImplementation(() => ({
-      acceptIntegrity: vi.fn().mockResolvedValue(undefined),
+      acceptIntegrity: mockAcceptIntegrity,
+      checkIntegrity: vi.fn(),
     })),
   };
 });
@@ -51,8 +56,8 @@ describe('PolicyUpdateDialog', () => {
     vi.clearAllMocks();
   });
 
-  it('renders correctly and matches snapshot', () => {
-    const { lastFrame } = renderWithProviders(
+  it('renders correctly and matches snapshot', async () => {
+    const { lastFrame, waitUntilReady } = renderWithProviders(
       <PolicyUpdateDialog
         config={mockConfig}
         request={mockRequest}
@@ -60,6 +65,7 @@ describe('PolicyUpdateDialog', () => {
       />,
     );
 
+    await waitUntilReady();
     const output = lastFrame();
     expect(output).toMatchSnapshot();
     expect(output).toContain('New or changed workspace policies detected');

@@ -5,7 +5,7 @@
  */
 
 import { Box, Text } from 'ink';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import type React from 'react';
 import {
   type Config,
@@ -34,18 +34,29 @@ export const PolicyUpdateDialog: React.FC<PolicyUpdateDialogProps> = ({
   request,
   onClose,
 }) => {
+  const isProcessing = useRef(false);
+
   const handleSelect = useCallback(
     async (choice: PolicyUpdateChoice) => {
-      if (choice === PolicyUpdateChoice.ACCEPT) {
-        const integrityManager = new PolicyIntegrityManager();
-        await integrityManager.acceptIntegrity(
-          request.scope,
-          request.identifier,
-          request.newHash,
-        );
-        await config.loadWorkspacePolicies(request.policyDir);
+      if (isProcessing.current) {
+        return;
       }
-      onClose();
+
+      isProcessing.current = true;
+      try {
+        if (choice === PolicyUpdateChoice.ACCEPT) {
+          const integrityManager = new PolicyIntegrityManager();
+          await integrityManager.acceptIntegrity(
+            request.scope,
+            request.identifier,
+            request.newHash,
+          );
+          await config.loadWorkspacePolicies(request.policyDir);
+        }
+        onClose();
+      } finally {
+        isProcessing.current = false;
+      }
     },
     [config, request, onClose],
   );

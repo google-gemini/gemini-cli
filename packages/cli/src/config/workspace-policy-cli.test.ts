@@ -10,7 +10,6 @@ import { loadCliConfig, type CliArgs } from './config.js';
 import { createTestMergedSettings } from './settings.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
-import { debugLogger } from '@google/gemini-cli-core';
 
 // Mock dependencies
 vi.mock('./trustedFolders.js', () => ({
@@ -133,7 +132,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
     );
   });
 
-  it('should warn and NOT pass workspacePoliciesDir if integrity MISMATCH in non-interactive mode', async () => {
+  it('should automatically accept and load workspacePoliciesDir if integrity MISMATCH in non-interactive mode', async () => {
     vi.mocked(isWorkspaceTrusted).mockReturnValue({
       isTrusted: true,
       source: 'file',
@@ -147,33 +146,6 @@ describe('Workspace-Level Policy CLI Integration', () => {
 
     const settings = createTestMergedSettings();
     const argv = { prompt: 'do something' } as unknown as CliArgs;
-
-    await loadCliConfig(settings, 'test-session', argv, { cwd: MOCK_CWD });
-
-    expect(debugLogger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('Workspace policies changed or are new'),
-    );
-    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
-      expect.objectContaining({
-        workspacePoliciesDir: undefined,
-      }),
-      expect.anything(),
-    );
-  });
-
-  it('should accept policies if --accept-changed-policies is passed', async () => {
-    vi.mocked(isWorkspaceTrusted).mockReturnValue({
-      isTrusted: true,
-      source: 'file',
-    });
-    mockCheckIntegrity.mockResolvedValue({
-      status: 'mismatch',
-      hash: 'new-hash',
-      fileCount: 1,
-    });
-
-    const settings = createTestMergedSettings();
-    const argv = { acceptChangedPolicies: true } as unknown as CliArgs;
 
     await loadCliConfig(settings, 'test-session', argv, { cwd: MOCK_CWD });
 

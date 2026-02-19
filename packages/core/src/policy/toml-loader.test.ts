@@ -363,6 +363,21 @@ priority = -1
       expect(result.errors[0].fileName).toBe('invalid.toml');
       expect(result.errors[0].errorType).toBe('schema_validation');
     });
+
+    it('should transform safety checker priorities based on tier', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[safety_checker]]
+toolName = "write_file"
+priority = 100
+[safety_checker.checker]
+type = "in-process"
+name = "allowed-path"
+`);
+
+      expect(result.checkers).toHaveLength(1);
+      expect(result.checkers[0].priority).toBe(1.1); // tier 1 + 100/1000
+      expect(result.checkers[0].source).toBe('Default: test.toml');
+    });
   });
 
   describe('Negative Tests', () => {

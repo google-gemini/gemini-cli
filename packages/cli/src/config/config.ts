@@ -97,7 +97,6 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
-  acceptChangedPolicies: boolean | undefined;
 }
 
 export async function parseArguments(
@@ -289,11 +288,6 @@ export async function parseArguments(
         .option('accept-raw-output-risk', {
           type: 'boolean',
           description: 'Suppress the security warning when using --raw-output.',
-        })
-        .option('accept-changed-policies', {
-          type: 'boolean',
-          description:
-            'Automatically accept changed workspace policies (use with caution).',
         }),
     )
     // Register MCP subcommands
@@ -706,7 +700,6 @@ export async function loadCliConfig(
       cwd,
       trustedFolder,
       interactive,
-      acceptChangedPolicies: argv.acceptChangedPolicies ?? false,
     });
 
   const policyEngineConfig = await createPolicyEngineConfig(

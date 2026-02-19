@@ -647,7 +647,7 @@ export class Config {
   private readonly useWriteTodos: boolean;
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
-  private readonly policyUpdateConfirmationRequest:
+  private policyUpdateConfirmationRequest:
     | PolicyUpdateConfirmationRequest
     | undefined;
   private readonly outputSettings: OutputSettings;
@@ -1754,6 +1754,10 @@ export class Config {
       () => WORKSPACE_POLICY_TIER,
     );
 
+    // Clear existing workspace policies to prevent duplicates/stale rules
+    this.policyEngine.removeRulesByTier(WORKSPACE_POLICY_TIER);
+    this.policyEngine.removeCheckersByTier(WORKSPACE_POLICY_TIER);
+
     for (const rule of rules) {
       this.policyEngine.addRule(rule);
     }
@@ -1762,8 +1766,7 @@ export class Config {
       this.policyEngine.addChecker(checker);
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
-    (this as any).policyUpdateConfirmationRequest = undefined;
+    this.policyUpdateConfirmationRequest = undefined;
 
     debugLogger.debug(`Workspace policies loaded from: ${policyDir}`);
   }

@@ -17,6 +17,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import toml from '@iarna/toml';
 import { z, type ZodError } from 'zod';
+import { isNodeError } from '../utils/errors.js';
 
 /**
  * Schema for a single policy rule in the TOML file (before transformation).
@@ -152,12 +153,10 @@ export async function readPolicyFiles(
       filesToLoad = [path.basename(policyPath)];
     }
   } catch (e) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const error = e as NodeJS.ErrnoException;
-    if (error.code === 'ENOENT') {
+    if (isNodeError(e) && e.code === 'ENOENT') {
       return [];
     }
-    throw error;
+    throw e;
   }
 
   const results: PolicyFile[] = [];
@@ -279,15 +278,13 @@ export async function loadPoliciesFromToml(
     try {
       policyFiles = await readPolicyFiles(p);
     } catch (e) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const error = e as NodeJS.ErrnoException;
       errors.push({
         filePath: p,
         fileName: path.basename(p),
         tier: tierName,
         errorType: 'file_read',
         message: `Failed to read policy path`,
-        details: error.message,
+        details: isNodeError(e) ? e.message : String(e),
       });
       continue;
     }
@@ -466,10 +463,11 @@ export async function loadPoliciesFromToml(
 
                 const safetyCheckerRule: SafetyCheckerRule = {
                   toolName: effectiveToolName,
-                  priority: checker.priority,
+                  priority: transformPriority(checker.priority, tier),
                   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                   checker: checker.checker as SafetyCheckerConfig,
                   modes: checker.modes,
+                  source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,
                 };
 
                 if (argsPattern) {
@@ -513,17 +511,15 @@ export async function loadPoliciesFromToml(
 
         checkers.push(...parsedCheckers);
       } catch (e) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const error = e as NodeJS.ErrnoException;
         // Catch-all for unexpected errors
-        if (error.code !== 'ENOENT') {
+        if (!isNodeError(e) || e.code !== 'ENOENT') {
           errors.push({
             filePath,
             fileName: file,
             tier: tierName,
             errorType: 'file_read',
             message: 'Failed to read policy file',
-            details: error.message,
+            details: isNodeError(e) ? e.message : String(e),
           });
         }
       }

@@ -182,6 +182,12 @@ export interface SafetyCheckerRule {
    * If undefined or empty, it applies to all modes.
    */
   modes?: ApprovalMode[];
+
+  /**
+   * Source of the rule.
+   * e.g. "my-policies.toml", "Workspace: project.toml", etc.
+   */
+  source?: string;
 }
 
 export interface HookExecutionContext {
