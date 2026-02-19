@@ -87,7 +87,7 @@ describe('ToolConfirmationMessage', () => {
     unmount();
   });
 
-  it('should display WarningMessage for deceptive URLs in info type', () => {
+  it('should display WarningMessage for deceptive URLs in info type', async () => {
     const confirmationDetails: SerializableConfirmationDetails = {
       type: 'info',
       title: 'Confirm Web Fetch',
@@ -95,7 +95,7 @@ describe('ToolConfirmationMessage', () => {
       urls: ['https://täst.com'],
     };
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
@@ -105,15 +105,18 @@ describe('ToolConfirmationMessage', () => {
       />,
     );
 
+    await waitUntilReady();
+
     const output = lastFrame();
     expect(output).toContain('Deceptive URL(s) detected');
     expect(output).toContain('Original: https://täst.com');
     expect(output).toContain(
       'Actual Host (Punycode): https://xn--tst-qla.com/',
     );
+    unmount();
   });
 
-  it('should display WarningMessage for deceptive URLs in exec type commands', () => {
+  it('should display WarningMessage for deceptive URLs in exec type commands', async () => {
     const confirmationDetails: SerializableConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Execution',
@@ -122,7 +125,7 @@ describe('ToolConfirmationMessage', () => {
       rootCommands: ['curl'],
     };
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
@@ -131,6 +134,8 @@ describe('ToolConfirmationMessage', () => {
         terminalWidth={80}
       />,
     );
+
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Deceptive URL(s) detected');
@@ -138,9 +143,10 @@ describe('ToolConfirmationMessage', () => {
     expect(output).toContain(
       'Actual Host (Punycode): https://xn--xample-2of.com/',
     );
+    unmount();
   });
 
-  it('should aggregate multiple deceptive URLs into a single WarningMessage', () => {
+  it('should aggregate multiple deceptive URLs into a single WarningMessage', async () => {
     const confirmationDetails: SerializableConfirmationDetails = {
       type: 'info',
       title: 'Confirm Web Fetch',
@@ -148,7 +154,7 @@ describe('ToolConfirmationMessage', () => {
       urls: ['https://еxample.com', 'https://täst.com'],
     };
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
@@ -158,13 +164,15 @@ describe('ToolConfirmationMessage', () => {
       />,
     );
 
+    await waitUntilReady();
+
     const output = lastFrame();
     expect(output).toContain('Deceptive URL(s) detected');
     expect(output).toContain('Original: https://еxample.com/');
     expect(output).toContain('Original: https://täst.com/');
+    unmount();
   });
 
-  it('should display multiple commands for exec type when provided', () => {
   it('should display multiple commands for exec type when provided', async () => {
     const confirmationDetails: SerializableConfirmationDetails = {
       type: 'exec',
