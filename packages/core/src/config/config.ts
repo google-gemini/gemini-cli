@@ -2160,41 +2160,36 @@ export class Config {
   }
 
   async getUserCaching(): Promise<boolean | undefined> {
-    await this.ensureExperimentsLoaded();
-
-    return this.experiments?.flags[ExperimentFlags.USER_CACHING]?.boolValue;
+    return this.getExperimentValue<boolean>(ExperimentFlags.USER_CACHING);
   }
 
   async getNumericalRoutingEnabled(): Promise<boolean> {
-    await this.ensureExperimentsLoaded();
-
-    return !!this.experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING]
-      ?.boolValue;
+    return (
+      this.getExperimentValue<boolean>(
+        ExperimentFlags.ENABLE_NUMERICAL_ROUTING,
+      ) ?? false
+    );
   }
 
   async getClassifierThreshold(): Promise<number | undefined> {
-    await this.ensureExperimentsLoaded();
-
-    const flag = this.experiments?.flags[ExperimentFlags.CLASSIFIER_THRESHOLD];
-    if (flag?.intValue !== undefined) {
-      return parseInt(flag.intValue, 10);
-    }
-    return flag?.floatValue;
+    return this.getExperimentValue<number>(
+      ExperimentFlags.CLASSIFIER_THRESHOLD,
+    );
   }
 
   async getBannerTextNoCapacityIssues(): Promise<string> {
-    await this.ensureExperimentsLoaded();
     return (
-      this.experiments?.flags[ExperimentFlags.BANNER_TEXT_NO_CAPACITY_ISSUES]
-        ?.stringValue ?? ''
+      this.getExperimentValue<string>(
+        ExperimentFlags.BANNER_TEXT_NO_CAPACITY_ISSUES,
+      ) ?? ''
     );
   }
 
   async getBannerTextCapacityIssues(): Promise<string> {
-    await this.ensureExperimentsLoaded();
     return (
-      this.experiments?.flags[ExperimentFlags.BANNER_TEXT_CAPACITY_ISSUES]
-        ?.stringValue ?? ''
+      this.getExperimentValue<string>(
+        ExperimentFlags.BANNER_TEXT_CAPACITY_ISSUES,
+      ) ?? ''
     );
   }
 
