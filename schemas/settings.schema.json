@@ -405,6 +405,14 @@
           "default": true,
           "type": "boolean"
         },
+        "loadingPhrases": {
+          "title": "Loading Phrases",
+          "description": "What to show while the model is working: tips, witty comments, both, or nothing.",
+          "markdownDescription": "What to show while the model is working: tips, witty comments, both, or nothing.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `tips`",
+          "default": "tips",
+          "type": "string",
+          "enum": ["tips", "witty", "all", "off"]
+        },
         "customWittyPhrases": {
           "title": "Custom Witty Phrases",
           "description": "Custom witty phrases to display during loading. When provided, the CLI cycles through these instead of the defaults.",
@@ -424,8 +432,8 @@
           "properties": {
             "enableLoadingPhrases": {
               "title": "Enable Loading Phrases",
-              "description": "Enable loading phrases during operations.",
-              "markdownDescription": "Enable loading phrases during operations.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+              "description": "@deprecated Use ui.loadingPhrases instead. Enable loading phrases during operations.",
+              "markdownDescription": "@deprecated Use ui.loadingPhrases instead. Enable loading phrases during operations.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },

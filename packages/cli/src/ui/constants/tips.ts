@@ -24,7 +24,7 @@ export const INFORMATIVE_TIPS = [
   'Show memory usage for performance monitoring (/settings)…',
   'Show line numbers in the chat for easier reference (/settings)…',
   'Show citations to see where the model gets information (/settings)…',
-  'Disable loading phrases for a quieter experience (/settings)…',
+  'Customize loading phrases: tips, witty, all, or off (/settings)…',
   'Add custom witty phrases to the loading screen (settings.json)…',
   'Use alternate screen buffer to preserve shell history (/settings)…',
   'Choose a specific Gemini model for conversations (/settings)…',
