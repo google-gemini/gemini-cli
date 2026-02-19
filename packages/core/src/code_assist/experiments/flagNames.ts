@@ -96,3 +96,11 @@ export function getExperimentFlagName(flagId: number): string | undefined {
   }
   return undefined;
 }
+
+/**
+ * Gets the ID of an experiment flag from its kebab-case name.
+ */
+export function getExperimentFlagIdFromName(name: string): number | undefined {
+  const constantName = name.toUpperCase().replace(/-/g, '_');
+  return (ExperimentFlags as Record<string, number>)[constantName];
+}
