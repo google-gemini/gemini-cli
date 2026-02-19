@@ -74,9 +74,6 @@ export function getPolicyDirectories(
     dirs.push(workspacePoliciesDir);
   }
 
-  // Admin tier (highest priority)
-  dirs.push(Storage.getSystemPoliciesDir());
-
   // Default tier (lowest priority)
   dirs.push(defaultPoliciesDir ?? DEFAULT_CORE_POLICIES_DIR);
 
@@ -180,11 +177,7 @@ export async function createPolicyEngineConfig(
   const policyDirs = getPolicyDirectories(
     defaultPoliciesDir,
     settings.policyPaths,
-<<<<<<< HEAD
-    settings.workspacePoliciesDir,
-=======
     workspacePoliciesDir,
->>>>>>> 45fcd9869 (Fix: Enable write_file in Plan Mode via workspace policy)
   );
   const securePolicyDirs = await filterSecurePolicyDirectories(policyDirs);
 

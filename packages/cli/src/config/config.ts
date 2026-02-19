@@ -813,12 +813,8 @@ export async function loadCliConfig(
     coreTools: settings.tools?.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
     policyEngineConfig,
-<<<<<<< HEAD
     policyUpdateConfirmationRequest,
-    excludeTools,
-=======
     excludeTools: finalExcludeTools,
->>>>>>> 45fcd9869 (Fix: Enable write_file in Plan Mode via workspace policy)
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
     mcpServerCommand,
