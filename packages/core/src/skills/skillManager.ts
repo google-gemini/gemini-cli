@@ -8,6 +8,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Storage } from '../config/storage.js';
 import { type SkillDefinition, loadSkillsFromDir } from './skillLoader.js';
+import { SkillMatcher } from './skillMatcher.js';
 import type { GeminiCLIExtension } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
@@ -202,5 +203,12 @@ export class SkillManager {
    */
   isSkillActive(name: string): boolean {
     return this.activeSkillNames.has(name);
+  }
+
+  /**
+   * Finds and returns the names of skills that match the provided prompt.
+   */
+  findMatchingSkills(prompt: string): string[] {
+    return SkillMatcher.findMatches(this.getSkills(), prompt);
   }
 }

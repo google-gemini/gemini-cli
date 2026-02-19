@@ -794,6 +794,18 @@ export class GeminiClient {
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
+
+      // Auto-activate matching skills based on user prompt
+      const promptText = partToString(request);
+      const skillManager = this.config.getSkillManager();
+      const matchingSkillNames = skillManager.findMatchingSkills(promptText);
+
+      for (const skillName of matchingSkillNames) {
+        if (!skillManager.isSkillActive(skillName)) {
+          skillManager.activateSkill(skillName);
+          debugLogger.debug(`Auto-activated skill: ${skillName}`);
+        }
+      }
     }
 
     const hooksEnabled = this.config.getEnableHooks();
