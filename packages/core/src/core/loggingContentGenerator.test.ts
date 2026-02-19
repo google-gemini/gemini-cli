@@ -137,6 +137,27 @@ describe('LoggingContentGenerator', () => {
       const errorEvent = vi.mocked(logApiError).mock.calls[0][1];
       expect(errorEvent.duration_ms).toBe(1000);
     });
+
+    it('should NOT log error on AbortError (user cancellation)', async () => {
+      const req = {
+        contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+        model: 'gemini-pro',
+      };
+      const userPromptId = 'prompt-123';
+      const abortError = new Error('Aborted');
+      abortError.name = 'AbortError';
+      vi.mocked(wrapped.generateContent).mockRejectedValue(abortError);
+
+      await expect(
+        loggingContentGenerator.generateContent(
+          req,
+          userPromptId,
+          LlmRole.MAIN,
+        ),
+      ).rejects.toThrow(abortError);
+
+      expect(logApiError).not.toHaveBeenCalled();
+    });
   });
 
   describe('generateContentStream', () => {
@@ -232,6 +253,67 @@ describe('LoggingContentGenerator', () => {
       );
       const errorEvent = vi.mocked(logApiError).mock.calls[0][1];
       expect(errorEvent.duration_ms).toBe(1000);
+    });
+
+    it('should NOT log error on AbortError during connection phase', async () => {
+      const req = {
+        contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+        model: 'gemini-pro',
+      };
+      const userPromptId = 'prompt-123';
+      const abortError = new Error('Aborted');
+      abortError.name = 'AbortError';
+      vi.mocked(wrapped.generateContentStream).mockRejectedValue(abortError);
+
+      await expect(
+        loggingContentGenerator.generateContentStream(
+          req,
+          userPromptId,
+          LlmRole.MAIN,
+        ),
+      ).rejects.toThrow(abortError);
+
+      expect(logApiError).not.toHaveBeenCalled();
+    });
+
+    it('should NOT log error on AbortError during stream iteration', async () => {
+      const req = {
+        contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+        model: 'gemini-pro',
+      };
+      const userPromptId = 'prompt-123';
+      const abortError = new Error('Aborted');
+      abortError.name = 'AbortError';
+
+      async function* createAbortingGenerator() {
+        yield {
+          candidates: [],
+          text: undefined,
+          functionCalls: undefined,
+          executableCode: undefined,
+          codeExecutionResult: undefined,
+          data: undefined,
+        } as unknown as GenerateContentResponse;
+        throw abortError;
+      }
+
+      vi.mocked(wrapped.generateContentStream).mockResolvedValue(
+        createAbortingGenerator(),
+      );
+
+      const stream = await loggingContentGenerator.generateContentStream(
+        req,
+        userPromptId,
+        LlmRole.MAIN,
+      );
+
+      await expect(async () => {
+        for await (const _ of stream) {
+          // consume stream
+        }
+      }).rejects.toThrow(abortError);
+
+      expect(logApiError).not.toHaveBeenCalled();
     });
 
     it('should set latest API request in config for main agent requests', async () => {

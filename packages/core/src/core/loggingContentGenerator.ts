@@ -251,6 +251,9 @@ export class LoggingContentGenerator implements ContentGenerator {
             .catch((e) => debugLogger.debug('quota refresh failed', e));
           return response;
         } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') {
+            throw error;
+          }
           const durationMs = Date.now() - startTime;
           this._logApiError(
             durationMs,
@@ -309,6 +312,9 @@ export class LoggingContentGenerator implements ContentGenerator {
             role,
           );
         } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') {
+            throw error;
+          }
           const durationMs = Date.now() - startTime;
           this._logApiError(
             durationMs,
@@ -392,6 +398,9 @@ export class LoggingContentGenerator implements ContentGenerator {
         durationMs,
       };
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw error;
+      }
       spanMetadata.error = error;
       const durationMs = Date.now() - startTime;
       this._logApiError(
