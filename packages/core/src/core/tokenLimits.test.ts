@@ -10,6 +10,7 @@ import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_3_1_PRO_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
 } from '../config/models.js';
@@ -23,6 +24,7 @@ describe('tokenLimit', () => {
 
   it('should return the correct token limit for preview models', () => {
     expect(tokenLimit(PREVIEW_GEMINI_MODEL)).toBe(1_048_576);
+    expect(tokenLimit(PREVIEW_GEMINI_3_1_PRO_MODEL)).toBe(1_048_576);
     expect(tokenLimit(PREVIEW_GEMINI_FLASH_MODEL)).toBe(1_048_576);
   });
 

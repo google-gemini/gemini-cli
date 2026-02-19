@@ -19,11 +19,11 @@ Use the following command in Gemini CLI:
 
 Running this command will open a dialog with your options:
 
-| Option            | Description                                                    | Models                                                                 |
-| ----------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Auto (Gemini 3)   | Let the system choose the best Gemini 3 model for your task.   | gemini-3-pro-preview (if enabled), gemini-3-flash-preview (if enabled) |
-| Auto (Gemini 2.5) | Let the system choose the best Gemini 2.5 model for your task. | gemini-2.5-pro, gemini-2.5-flash                                       |
-| Manual            | Select a specific model.                                       | Any available model.                                                   |
+| Option            | Description                                                    | Models                                                                                   |
+| ----------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Auto (Gemini 3)   | Let the system choose the best Gemini 3 model for your task.   | gemini-3-pro-preview (if enabled), gemini-3-flash-preview (if enabled)                   |
+| Auto (Gemini 2.5) | Let the system choose the best Gemini 2.5 model for your task. | gemini-2.5-pro, gemini-2.5-flash                                                         |
+| Manual            | Select a specific model.                                       | Any available model (e.g. gemini-3.1-pro-preview, gemini-3-pro-preview, gemini-2.5-pro). |
 
 We recommend selecting one of the above **Auto** options. However, you can
 select **Manual** to select a specific model from those available.

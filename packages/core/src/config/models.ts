@@ -5,6 +5,7 @@
  */
 
 export const PREVIEW_GEMINI_MODEL = 'gemini-3-pro-preview';
+export const PREVIEW_GEMINI_3_1_PRO_MODEL = 'gemini-3.1-pro-preview';
 export const PREVIEW_GEMINI_FLASH_MODEL = 'gemini-3-flash-preview';
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
@@ -12,6 +13,7 @@ export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
 
 export const VALID_GEMINI_MODELS = new Set([
   PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_3_1_PRO_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -83,7 +85,8 @@ export function resolveClassifierModel(
     }
     if (
       requestedModel === PREVIEW_GEMINI_MODEL_AUTO ||
-      requestedModel === PREVIEW_GEMINI_MODEL
+      requestedModel === PREVIEW_GEMINI_MODEL ||
+      requestedModel === PREVIEW_GEMINI_3_1_PRO_MODEL
     ) {
       return PREVIEW_GEMINI_FLASH_MODEL;
     }
@@ -101,6 +104,8 @@ export function getDisplayString(model: string) {
       return PREVIEW_GEMINI_MODEL;
     case GEMINI_MODEL_ALIAS_FLASH:
       return PREVIEW_GEMINI_FLASH_MODEL;
+    case PREVIEW_GEMINI_3_1_PRO_MODEL:
+      return 'Gemini 3.1 Pro (preview)';
     default:
       return model;
   }
@@ -115,6 +120,7 @@ export function getDisplayString(model: string) {
 export function isPreviewModel(model: string): boolean {
   return (
     model === PREVIEW_GEMINI_MODEL ||
+    model === PREVIEW_GEMINI_3_1_PRO_MODEL ||
     model === PREVIEW_GEMINI_FLASH_MODEL ||
     model === PREVIEW_GEMINI_MODEL_AUTO
   );
@@ -186,5 +192,6 @@ export function isAutoModel(model: string): boolean {
  * @returns True if the model supports multimodal function responses.
  */
 export function supportsMultimodalFunctionResponse(model: string): boolean {
-  return model.startsWith('gemini-3-');
+  // Gemini 3 and 3.1 (e.g. gemini-3-pro-preview, gemini-3.1-pro-preview)
+  return /^gemini-3(\.|-|$)/.test(model);
 }

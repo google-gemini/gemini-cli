@@ -119,6 +119,9 @@ describe('modelStringToModelConfigAlias', () => {
     expect(modelStringToModelConfigAlias('gemini-3-pro-preview')).toBe(
       'chat-compression-3-pro',
     );
+    expect(modelStringToModelConfigAlias('gemini-3.1-pro-preview')).toBe(
+      'chat-compression-3.1-pro',
+    );
     expect(modelStringToModelConfigAlias('gemini-2.5-pro')).toBe(
       'chat-compression-2.5-pro',
     );

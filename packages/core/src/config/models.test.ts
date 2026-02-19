@@ -16,6 +16,7 @@ import {
   getDisplayString,
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_3_1_PRO_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   supportsMultimodalFunctionResponse,
@@ -38,6 +39,7 @@ describe('isCustomModel', () => {
     expect(isCustomModel('gemini-1.5-pro')).toBe(false);
     expect(isCustomModel('gemini-2.0-flash')).toBe(false);
     expect(isCustomModel('gemini-3-pro-preview')).toBe(false);
+    expect(isCustomModel('gemini-3.1-pro-preview')).toBe(false);
   });
 
   it('should return false for aliases that resolve to Gemini models', () => {
@@ -49,6 +51,7 @@ describe('isCustomModel', () => {
 describe('supportsModernFeatures', () => {
   it('should return true for Gemini 3 models', () => {
     expect(supportsModernFeatures('gemini-3-pro-preview')).toBe(true);
+    expect(supportsModernFeatures('gemini-3.1-pro-preview')).toBe(true);
     expect(supportsModernFeatures('gemini-3-flash-preview')).toBe(true);
   });
 
@@ -75,6 +78,7 @@ describe('isGemini3Model', () => {
   it('should return true for gemini-3 models', () => {
     expect(isGemini3Model('gemini-3-pro-preview')).toBe(true);
     expect(isGemini3Model('gemini-3-flash-preview')).toBe(true);
+    expect(isGemini3Model('gemini-3.1-pro-preview')).toBe(true);
   });
 
   it('should return true for aliases that resolve to Gemini 3', () => {
@@ -115,6 +119,12 @@ describe('getDisplayString', () => {
     );
   });
 
+  it('should return Gemini 3.1 Pro (preview) for gemini-3.1-pro-preview', () => {
+    expect(getDisplayString(PREVIEW_GEMINI_3_1_PRO_MODEL)).toBe(
+      'Gemini 3.1 Pro (preview)',
+    );
+  });
+
   it('should return the model name as is for other models', () => {
     expect(getDisplayString('custom-model')).toBe('custom-model');
     expect(getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL)).toBe(
@@ -124,8 +134,11 @@ describe('getDisplayString', () => {
 });
 
 describe('supportsMultimodalFunctionResponse', () => {
-  it('should return true for gemini-3 model', () => {
+  it('should return true for gemini-3 and gemini-3.1 models', () => {
     expect(supportsMultimodalFunctionResponse('gemini-3-pro')).toBe(true);
+    expect(supportsMultimodalFunctionResponse('gemini-3-pro-preview')).toBe(
+      true,
+    );
   });
 
   it('should return false for gemini-2 models', () => {
@@ -226,6 +239,12 @@ describe('resolveClassifierModel', () => {
     expect(
       resolveClassifierModel(
         PREVIEW_GEMINI_MODEL_AUTO,
+        GEMINI_MODEL_ALIAS_FLASH,
+      ),
+    ).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+    expect(
+      resolveClassifierModel(
+        PREVIEW_GEMINI_3_1_PRO_MODEL,
         GEMINI_MODEL_ALIAS_FLASH,
       ),
     ).toBe(PREVIEW_GEMINI_FLASH_MODEL);
