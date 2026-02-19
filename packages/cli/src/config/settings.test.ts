@@ -2032,6 +2032,85 @@ describe('Settings Loading and Merging', () => {
           }),
         }),
       );
+
+      // Check that enableLoadingPhrases: false was further migrated to loadingPhrases: 'off'
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'ui',
+        expect.objectContaining({
+          loadingPhrases: 'off',
+        }),
+      );
+    });
+
+    it('should migrate enableLoadingPhrases: false to loadingPhrases: off', () => {
+      const userSettingsContent = {
+        ui: {
+          accessibility: {
+            enableLoadingPhrases: false,
+          },
+        },
+      };
+
+      const loadedSettings = createMockSettings(userSettingsContent);
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+
+      migrateDeprecatedSettings(loadedSettings);
+
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'ui',
+        expect.objectContaining({
+          loadingPhrases: 'off',
+        }),
+      );
+    });
+
+    it('should not migrate enableLoadingPhrases: true to loadingPhrases', () => {
+      const userSettingsContent = {
+        ui: {
+          accessibility: {
+            enableLoadingPhrases: true,
+          },
+        },
+      };
+
+      const loadedSettings = createMockSettings(userSettingsContent);
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+
+      migrateDeprecatedSettings(loadedSettings);
+
+      // Should not set loadingPhrases when enableLoadingPhrases is true
+      const uiCalls = setValueSpy.mock.calls.filter((call) => call[1] === 'ui');
+      for (const call of uiCalls) {
+        const uiValue = call[2] as Record<string, unknown>;
+        expect(uiValue).not.toHaveProperty('loadingPhrases');
+      }
+    });
+
+    it('should not overwrite existing loadingPhrases during migration', () => {
+      const userSettingsContent = {
+        ui: {
+          loadingPhrases: 'witty',
+          accessibility: {
+            enableLoadingPhrases: false,
+          },
+        },
+      };
+
+      const loadedSettings = createMockSettings(userSettingsContent);
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+
+      migrateDeprecatedSettings(loadedSettings);
+
+      // Should not overwrite existing loadingPhrases
+      const uiCalls = setValueSpy.mock.calls.filter((call) => call[1] === 'ui');
+      for (const call of uiCalls) {
+        const uiValue = call[2] as Record<string, unknown>;
+        if (uiValue['loadingPhrases'] !== undefined) {
+          expect(uiValue['loadingPhrases']).toBe('witty');
+        }
+      }
     });
 
     it('should prioritize new settings over deprecated ones and respect removeDeprecated flag', () => {
