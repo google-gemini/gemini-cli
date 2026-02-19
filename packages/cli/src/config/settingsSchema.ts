@@ -266,6 +266,27 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      plan: {
+        type: 'object',
+        label: 'Plan',
+        category: 'General',
+        requiresRestart: true,
+        default: {},
+        description: 'Planning features configuration.',
+        showInDialog: false,
+        properties: {
+          directory: {
+            type: 'string',
+            label: 'Plan Directory',
+            category: 'General',
+            requiresRestart: true,
+            default: undefined as string | undefined,
+            description:
+              'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.',
+            showInDialog: true,
+          },
+        },
+      },
       enablePromptCompletion: {
         type: 'boolean',
         label: 'Enable Prompt Completion',
@@ -1313,6 +1334,7 @@ const SETTINGS_SCHEMA = {
       },
     },
   },
+
   useWriteTodos: {
     type: 'boolean',
     label: 'Use WriteTodos',

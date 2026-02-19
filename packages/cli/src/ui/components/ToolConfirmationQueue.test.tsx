@@ -49,7 +49,7 @@ describe('ToolConfirmationQueue', () => {
       readFile: vi.fn().mockResolvedValue('Plan content'),
     }),
     storage: {
-      getProjectTempPlansDir: () => '/mock/temp/plans',
+      getPlansDir: () => '/mock/temp/plans',
     },
   } as unknown as Config;
 
