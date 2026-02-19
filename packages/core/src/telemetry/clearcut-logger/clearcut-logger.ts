@@ -615,14 +615,17 @@ export class ClearcutLogger {
 
     // Add hardware information only to the start session event
     const cpus = os.cpus();
-    data.push(
-      {
+    if (cpus && cpus.length > 0) {
+      data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_INFO,
         value: cpus[0].model,
-      },
+      });
+    }
+
+    data.push(
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_CORES,
-        value: cpus.length.toString(),
+        value: os.availableParallelism().toString(),
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_RAM_TOTAL_GB,
