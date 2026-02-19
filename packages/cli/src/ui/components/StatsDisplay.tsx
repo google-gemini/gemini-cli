@@ -415,7 +415,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   const useGemini3_1 = config.getGemini31LaunchedSync?.() ?? false;
   const useCustomToolModel =
     useGemini3_1 &&
-    config.getContentGeneratorConfig().authType !== AuthType.USE_VERTEX_AI;
+    config.getContentGeneratorConfig().authType === AuthType.USE_GEMINI;
   const pooledRemaining = quotaStats?.remaining;
   const pooledLimit = quotaStats?.limit;
   const pooledResetTime = quotaStats?.resetTime;

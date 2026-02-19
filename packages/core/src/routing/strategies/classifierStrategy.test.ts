@@ -18,6 +18,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
 } from '../../config/models.js';
 import { promptIdContext } from '../../utils/promptIdContext.js';
@@ -364,7 +365,7 @@ describe('ClassifierStrategy', () => {
         mockBaseLlmClient,
       );
 
-      expect(decision?.model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
+      expect(decision?.model).toBe(PREVIEW_GEMINI_3_1_MODEL);
     });
 
     it('should route to PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL when Gemini 3.1 is launched and auth is USE_GEMINI', async () => {

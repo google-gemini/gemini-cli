@@ -560,7 +560,7 @@ describe('NumericalClassifierStrategy', () => {
         mockBaseLlmClient,
       );
 
-      expect(decision?.model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
+      expect(decision?.model).toBe(PREVIEW_GEMINI_3_1_MODEL);
     });
     it('should route to PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL when Gemini 3.1 is launched and auth is USE_GEMINI', async () => {
       vi.mocked(mockConfig.getGemini31Launched).mockResolvedValue(true);
