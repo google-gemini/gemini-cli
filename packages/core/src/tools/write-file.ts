@@ -357,6 +357,8 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         );
       }
 
+      // Return a diff of the file before and after the write so that the agent
+      // can avoid the need to spend a turn doing a verification read.
       const snippet = getDiffContextSnippet(
         isNewFile ? '' : originalContent,
         finalContent,

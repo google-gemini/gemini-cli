@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -25,15 +25,18 @@ export function groupMatchesByFile(
   allMatches: GrepMatch[],
 ): Record<string, GrepMatch[]> {
   const groups: Record<string, GrepMatch[]> = {};
+
   for (const match of allMatches) {
     if (!groups[match.filePath]) {
       groups[match.filePath] = [];
     }
     groups[match.filePath].push(match);
   }
+
   for (const filePath in groups) {
     groups[filePath].sort((a, b) => a.lineNumber - b.lineNumber);
   }
+
   return groups;
 }
 
