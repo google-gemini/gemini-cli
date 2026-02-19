@@ -49,11 +49,12 @@ powerful tool for developers.
 - **Full Validation:** `npm run preflight` (Heaviest check; runs clean, install,
   build, lint, type check, and tests. Recommended before submitting PRs. Due to
   its long runtime, only run this at the very end of a code implementation task.
-  If it fails, use faster, targeted commands (e.g., `npm run test`,
-  `npm run lint`, or workspace-specific tests) to iterate on fixes before
-  re-running `preflight`. For simple, non-code changes like documentation or
-  prompting updates, skip `preflight` at the end of the task and wait for PR
-  validation.)
+  **CRITICAL:** If `preflight` fails, **DO NOT** re-run it directly to debug.
+  Instead, identify the failing tests and iterate on them individually using
+  workspace-specific test commands until they pass. Only after all individual
+  failures are resolved should you attempt to run `preflight` one final time.
+  For simple, non-code changes like documentation or prompting updates, skip
+  `preflight` at the end of the task and wait for PR validation.)
 - **Individual Checks:** `npm run lint` / `npm run format` / `npm run typecheck`
 
 ## Development Conventions
