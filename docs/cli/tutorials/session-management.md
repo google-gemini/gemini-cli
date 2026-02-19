@@ -101,5 +101,5 @@ This creates a new branch of history without losing your original work.
 - Learn about [Checkpointing](../../cli/checkpointing.md) to understand the
   underlying safety mechanism.
 - Explore [Task planning](task-planning.md) to keep complex sessions organized.
-- See the [Command reference](../../cli/commands.md) for all `/chat` and
+- See the [Command reference](../../reference/commands.md) for all `/chat` and
   `/resume` options.

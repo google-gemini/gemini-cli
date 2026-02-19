@@ -130,7 +130,7 @@ The manifest file defines the extension's behavior and configuration.
 - `description`: A short summary shown in the extension gallery.
 - <a id="mcp-servers"></a>`mcpServers`: A map of Model Context Protocol (MCP)
   servers. Extension servers follow the same format as standard
-  [CLI configuration](../get-started/configuration.md).
+  [CLI configuration](../reference/configuration.md).
 - `contextFileName`: The name of the context file (defaults to `GEMINI.md`). Can
   also be an array of strings to load multiple context files.
 - `excludeTools`: An array of tools to block from the model. You can restrict
