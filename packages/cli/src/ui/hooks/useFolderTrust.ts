@@ -103,8 +103,6 @@ export const useFolderTrust = (
       onTrustChange(currentIsTrusted);
       setIsTrusted(currentIsTrusted);
 
-      // logic: we restart if the trust state *effectively* changes from the previous state.
-      // previous state was `isTrusted`. If undefined, we assume false (untrusted).
       const wasTrusted = isTrusted ?? false;
 
       if (wasTrusted !== currentIsTrusted) {

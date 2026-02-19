@@ -103,57 +103,56 @@ export class FolderTrustDiscoveryService {
     results: FolderDiscoveryResults,
   ) {
     const settingsPath = path.join(geminiDir, 'settings.json');
-    if (existsSync(settingsPath)) {
-      try {
-        const content = await fs.readFile(settingsPath, 'utf-8');
-        const settings = JSON.parse(stripJsonComments(content)) as Record<
-          string,
-          unknown
-        >;
+    if (!existsSync(settingsPath)) return;
 
-        const EXCLUDED_KEYS = ['mcpServers', 'hooks', '$schema'];
-        results.settings = Object.keys(settings).filter(
-          (key) => !EXCLUDED_KEYS.includes(key),
-        );
+    try {
+      const content = await fs.readFile(settingsPath, 'utf-8');
+      const settings = JSON.parse(stripJsonComments(content)) as Record<
+        string,
+        unknown
+      >;
 
-        results.securityWarnings = this.collectSecurityWarnings(settings);
+      results.settings = Object.keys(settings).filter(
+        (key) => !['mcpServers', 'hooks', '$schema'].includes(key),
+      );
 
-        if (
-          settings['mcpServers'] &&
-          typeof settings['mcpServers'] === 'object' &&
-          !Array.isArray(settings['mcpServers'])
-        ) {
-          results.mcps = Object.keys(settings['mcpServers']);
-        }
+      results.securityWarnings = this.collectSecurityWarnings(settings);
 
-        const hooksConfig = settings['hooks'];
-        if (
-          hooksConfig &&
-          typeof hooksConfig === 'object' &&
-          !Array.isArray(hooksConfig)
-        ) {
-          const hooks = new Set<string>();
-          for (const event of Object.values(hooksConfig)) {
-            if (Array.isArray(event)) {
-              for (const hook of event) {
-                if (
-                  hook &&
-                  typeof hook === 'object' &&
-                  'command' in hook &&
-                  typeof hook.command === 'string'
-                ) {
-                  hooks.add(hook.command);
-                }
-              }
+      const mcpServers = settings['mcpServers'];
+      if (
+        mcpServers &&
+        typeof mcpServers === 'object' &&
+        !Array.isArray(mcpServers)
+      ) {
+        results.mcps = Object.keys(mcpServers);
+      }
+
+      const hooksConfig = settings['hooks'];
+      if (
+        hooksConfig &&
+        typeof hooksConfig === 'object' &&
+        !Array.isArray(hooksConfig)
+      ) {
+        const hooks = new Set<string>();
+        for (const event of Object.values(hooksConfig)) {
+          if (!Array.isArray(event)) continue;
+          for (const hook of event) {
+            if (
+              hook &&
+              typeof hook === 'object' &&
+              'command' in hook &&
+              typeof (hook as Record<string, unknown>)['command'] === 'string'
+            ) {
+              hooks.add((hook as Record<string, string>)['command']);
             }
           }
-          results.hooks = Array.from(hooks);
         }
-      } catch (e) {
-        results.discoveryErrors.push(
-          `Failed to discover settings: ${(e as Error).message}`,
-        );
+        results.hooks = Array.from(hooks);
       }
+    } catch (e) {
+      results.discoveryErrors.push(
+        `Failed to discover settings: ${(e as Error).message}`,
+      );
     }
   }
 
@@ -162,41 +161,41 @@ export class FolderTrustDiscoveryService {
   ): string[] {
     const warnings: string[] = [];
 
-    // 1. tools.allowed
     const tools = settings['tools'] as Record<string, unknown> | undefined;
-    const toolsAllowed = tools?.['allowed'];
-    if (Array.isArray(toolsAllowed) && toolsAllowed.length > 0) {
-      warnings.push(
-        'This project auto-approves certain tools (tools.allowed).',
-      );
-    }
-
-    // 2. experimental.enableAgents
     const experimental = settings['experimental'] as
       | Record<string, unknown>
       | undefined;
-    if (experimental?.['enableAgents'] === true) {
-      warnings.push('This project enables autonomous agents (enableAgents).');
-    }
-
-    // 3. security.folderTrust.enabled
     const security = settings['security'] as
       | Record<string, unknown>
       | undefined;
     const folderTrust = security?.['folderTrust'] as
       | Record<string, unknown>
       | undefined;
-    if (folderTrust?.['enabled'] === false) {
-      warnings.push(
-        'This project attempts to disable folder trust (security.folderTrust.enabled).',
-      );
-    }
 
-    // 4. tools.sandbox
-    if (tools?.['sandbox'] === false) {
-      warnings.push(
-        'This project disables the security sandbox (tools.sandbox).',
-      );
+    const allowedTools = tools?.['allowed'];
+
+    const checks = [
+      {
+        condition: Array.isArray(allowedTools) && allowedTools.length > 0,
+        message: 'This project auto-approves certain tools (tools.allowed).',
+      },
+      {
+        condition: experimental?.['enableAgents'] === true,
+        message: 'This project enables autonomous agents (enableAgents).',
+      },
+      {
+        condition: folderTrust?.['enabled'] === false,
+        message:
+          'This project attempts to disable folder trust (security.folderTrust.enabled).',
+      },
+      {
+        condition: tools?.['sandbox'] === false,
+        message: 'This project disables the security sandbox (tools.sandbox).',
+      },
+    ];
+
+    for (const check of checks) {
+      if (check.condition) warnings.push(check.message);
     }
 
     return warnings;

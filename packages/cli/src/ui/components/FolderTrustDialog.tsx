@@ -127,9 +127,17 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
   const overhead = 3 + options.length + 2 + 1 + 2;
   const scrollableHeight = Math.max(4, terminalHeight - overhead);
 
+  const groups = [
+    { label: 'Commands', items: discoveryResults?.commands ?? [] },
+    { label: 'MCP Servers', items: discoveryResults?.mcps ?? [] },
+    { label: 'Hooks', items: discoveryResults?.hooks ?? [] },
+    { label: 'Skills', items: discoveryResults?.skills ?? [] },
+    { label: 'Setting overrides', items: discoveryResults?.settings ?? [] },
+  ].filter((g) => g.items.length > 0);
+
   const discoveryContent = (
     <Box flexDirection="column">
-      <Box flexDirection="column" marginBottom={1}>
+      <Box marginBottom={1}>
         <Text color={theme.text.primary}>
           Trusting a folder allows Gemini CLI to load its local configurations,
           including custom commands, hooks, MCP servers, agent skills, and
@@ -143,8 +151,8 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
           <Text color={theme.status.error} bold>
             ❌ Discovery Errors:
           </Text>
-          {discoveryResults.discoveryErrors.map((error, index) => (
-            <Box key={index} marginLeft={2}>
+          {discoveryResults.discoveryErrors.map((error, i) => (
+            <Box key={i} marginLeft={2}>
               <Text color={theme.status.error}>• {error}</Text>
             </Box>
           ))}
@@ -153,12 +161,12 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
 
       {hasWarnings && (
         <Box flexDirection="column" marginBottom={1}>
-          <Text color={theme.status.error} bold>
+          <Text color={theme.status.warning} bold>
             ⚠️ Security Warnings:
           </Text>
-          {discoveryResults.securityWarnings.map((warning, index) => (
-            <Box key={index} marginLeft={2}>
-              <Text color={theme.status.error}>• {warning}</Text>
+          {discoveryResults.securityWarnings.map((warning, i) => (
+            <Box key={i} marginLeft={2}>
+              <Text color={theme.status.warning}>• {warning}</Text>
             </Box>
           ))}
         </Box>
@@ -169,32 +177,35 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
           <Text color={theme.text.primary} bold>
             This folder contains:
           </Text>
-          {[
-            { label: 'Commands', items: discoveryResults.commands },
-            { label: 'MCP Servers', items: discoveryResults.mcps },
-            { label: 'Hooks', items: discoveryResults.hooks },
-            { label: 'Skills', items: discoveryResults.skills },
-            {
-              label: 'Setting overrides',
-              items: discoveryResults.settings,
-            },
-          ]
-            .filter((group) => group.items.length > 0)
-            .map((group) => (
-                <Box key={group.label} flexDirection="column" marginLeft={2}>
-                  <Text color={theme.text.primary} bold>
-                    • {group.label} ({group.items.length}):
-                  </Text>
-                  {group.items.map((item, idx) => (
-                    <Box key={idx} marginLeft={2}>
-                      <Text color={theme.text.primary}>- {item}</Text>
-                    </Box>
-                  ))}
+          {groups.map((group) => (
+            <Box key={group.label} flexDirection="column" marginLeft={2}>
+              <Text color={theme.text.primary} bold>
+                • {group.label} ({group.items.length}):
+              </Text>
+              {group.items.map((item, idx) => (
+                <Box key={idx} marginLeft={2}>
+                  <Text color={theme.text.primary}>- {item}</Text>
                 </Box>
               ))}
+            </Box>
+          ))}
         </Box>
       )}
     </Box>
+  );
+
+  const title = (
+    <Text bold color={theme.text.primary}>
+      Do you trust the files in this folder?
+    </Text>
+  );
+
+  const selectOptions = (
+    <RadioButtonSelect
+      items={options}
+      onSelect={onSelect}
+      isFocused={!isRestarting}
+    />
   );
 
   const renderContent = () => {
@@ -207,9 +218,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
             borderColor={borderColor}
             borderDimColor={false}
           >
-            <Text bold color={theme.text.primary}>
-              Do you trust the files in this folder?
-            </Text>
+            {title}
           </StickyHeader>
 
           <Box
@@ -232,12 +241,8 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
               </Box>
             </Scrollable>
 
-            <Box paddingX={1} marginTop={1} marginBottom={1}>
-              <RadioButtonSelect
-                items={options}
-                onSelect={onSelect}
-                isFocused={!isRestarting}
-              />
+            <Box paddingX={1} marginY={1}>
+              {selectOptions}
             </Box>
           </Box>
 
@@ -263,11 +268,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
         padding={1}
         width="100%"
       >
-        <Box flexDirection="column" marginBottom={1}>
-          <Text bold color={theme.text.primary}>
-            Do you trust the files in this folder?
-          </Text>
-        </Box>
+        <Box marginBottom={1}>{title}</Box>
 
         <MaxSizedBox
           maxHeight={isExpanded ? undefined : Math.max(4, terminalHeight - 12)}
@@ -276,13 +277,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
           {discoveryContent}
         </MaxSizedBox>
 
-        <Box marginTop={1}>
-          <RadioButtonSelect
-            items={options}
-            onSelect={onSelect}
-            isFocused={!isRestarting}
-          />
-        </Box>
+        <Box marginTop={1}>{selectOptions}</Box>
       </Box>
     );
   };
