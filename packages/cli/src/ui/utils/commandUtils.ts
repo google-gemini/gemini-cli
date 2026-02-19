@@ -9,6 +9,7 @@ import clipboardy from 'clipboardy';
 import type { SlashCommand } from '../commands/types.js';
 import fs from 'node:fs';
 import type { Writable } from 'node:stream';
+import type { Settings } from '../../config/settingsSchema.js';
 
 /**
  * Checks if a query string potentially represents an '@' command.
@@ -157,8 +158,13 @@ const isWindowsTerminal = (): boolean =>
 
 const isDumbTerm = (): boolean => (process.env['TERM'] ?? '') === 'dumb';
 
-const shouldUseOsc52 = (tty: TtyTarget): boolean =>
-  Boolean(tty) && !isDumbTerm() && (isSSH() || isWSL() || isWindowsTerminal());
+const shouldUseOsc52 = (tty: TtyTarget, settings?: Settings): boolean =>
+  Boolean(tty) &&
+  !isDumbTerm() &&
+  (settings?.experimental?.useOSC52Copy ||
+    isSSH() ||
+    isWSL() ||
+    isWindowsTerminal());
 
 const safeUtf8Truncate = (buf: Buffer, maxBytes: number): Buffer => {
   if (buf.length <= maxBytes) return buf;
@@ -237,12 +243,15 @@ const writeAll = (stream: Writable, data: string): Promise<void> =>
   });
 
 // Copies a string snippet to the clipboard with robust OSC-52 support.
-export const copyToClipboard = async (text: string): Promise<void> => {
+export const copyToClipboard = async (
+  text: string,
+  settings?: Settings,
+): Promise<void> => {
   if (!text) return;
 
   const tty = await pickTty();
 
-  if (shouldUseOsc52(tty)) {
+  if (shouldUseOsc52(tty, settings)) {
     const osc = buildOsc52(text);
     const payload = inTmux()
       ? wrapForTmux(osc)
