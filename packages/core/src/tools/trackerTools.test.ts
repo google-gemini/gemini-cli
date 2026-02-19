@@ -46,9 +46,12 @@ describe('Tracker Tools Integration', () => {
     const result = await tool.buildAndExecute({}, getSignal());
 
     expect(result.llmContent).toContain('Task tracker initialized');
-    const tasksDir = path.join(tempDir, '.tracker', 'tasks');
+    const trackerDir = config.getTrackerService().trackerDir;
+    const tasksDir = path.join(trackerDir, 'tasks');
     const stats = await fs.stat(tasksDir);
     expect(stats.isDirectory()).toBe(true);
+    // Verify it is NOT in the tempDir root (which was the old behavior)
+    expect(trackerDir).not.toBe(path.join(tempDir, '.tracker'));
   });
 
   it('creates and lists tasks', async () => {
