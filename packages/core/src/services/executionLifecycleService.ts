@@ -36,6 +36,14 @@ export interface ExecutionHandle {
 
 export type ExecutionOutputEvent =
   | {
+      type: 'raw_data';
+      chunk: string;
+    }
+  | {
+      type: 'file_data';
+      chunk: string;
+    }
+  | {
       type: 'data';
       chunk: string | AnsiOutput;
     }

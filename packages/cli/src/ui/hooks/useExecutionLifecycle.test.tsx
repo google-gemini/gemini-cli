@@ -144,6 +144,11 @@ describe('useExecutionLifecycle', () => {
           enableEnvironmentVariableRedaction: false,
         },
       }),
+      getTruncateToolOutputThreshold: () => 40000,
+      storage: {
+        getProjectTempDir: () => '/tmp/project',
+      },
+      getSessionId: () => 'test-session',
     } as unknown as Config;
     mockGeminiClient = { addHistory: vi.fn() } as unknown as GeminiClient;
 
@@ -154,6 +159,16 @@ describe('useExecutionLifecycle', () => {
     );
     mockIsBinary.mockReturnValue(false);
     vi.mocked(fs.existsSync).mockReturnValue(false);
+
+    vi.mocked(fs.createWriteStream).mockReturnValue({
+      write: vi.fn(),
+      end: vi.fn().mockImplementation((cb: () => void) => {
+        if (cb) cb();
+      }),
+      destroy: vi.fn(),
+      bytesWritten: 0,
+      closed: false,
+    } as unknown as fs.WriteStream);
 
     mockShellExecutionService.mockImplementation((_cmd, _cwd, callback) => {
       mockShellOutputCallback = callback;

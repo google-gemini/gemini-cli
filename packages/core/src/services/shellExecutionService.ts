@@ -120,6 +120,8 @@ interface ActivePty {
   maxSerializedLines?: number;
   command: string;
   sessionId?: string;
+  lastSerializedOutput?: AnsiOutput;
+  lastCommittedLine: number;
 }
 
 interface ActiveChildProcess {
@@ -146,6 +148,48 @@ const findLastContentLine = (
     }
   }
   return -1;
+};
+
+const emitPendingLines = (
+  activePty: ActivePty,
+  pid: number,
+  onOutputEvent: (event: ShellOutputEvent) => void,
+  forceAll = false,
+) => {
+  const buffer = activePty.headlessTerminal.buffer.active;
+  const limit = forceAll ? buffer.length : buffer.baseY;
+
+  let chunks = '';
+  for (let i = activePty.lastCommittedLine + 1; i < limit; i++) {
+    const line = buffer.getLine(i);
+    if (!line) continue;
+
+    let trimRight = true;
+    let isNextLineWrapped = false;
+    if (i + 1 < buffer.length) {
+      const nextLine = buffer.getLine(i + 1);
+      if (nextLine?.isWrapped) {
+        isNextLineWrapped = true;
+        trimRight = false;
+      }
+    }
+
+    const lineContent = line.translateToString(trimRight);
+    chunks += lineContent;
+    if (!isNextLineWrapped) {
+      chunks += '\n';
+    }
+  }
+
+  if (chunks.length > 0) {
+    const event: ShellOutputEvent = {
+      type: 'file_data',
+      chunk: chunks,
+    };
+    onOutputEvent(event);
+    ExecutionLifecycleService.emitEvent(pid, event);
+    activePty.lastCommittedLine = limit - 1;
+  }
 };
 
 const getFullBufferText = (terminal: pkg.Terminal, startLine = 0): string => {
@@ -784,6 +828,15 @@ export class ShellExecutionService {
           if (remaining) {
             state.output += remaining;
             if (isStreamingRawContent) {
+              const rawEvent: ShellOutputEvent = {
+                type: 'raw_data',
+                chunk: remaining,
+              };
+              onOutputEvent(rawEvent);
+              if (child.pid) {
+                ExecutionLifecycleService.emitEvent(child.pid, rawEvent);
+              }
+
               const event: ShellOutputEvent = {
                 type: 'data',
                 chunk: remaining,
@@ -791,6 +844,15 @@ export class ShellExecutionService {
               onOutputEvent(event);
               if (child.pid) {
                 ExecutionLifecycleService.emitEvent(child.pid, event);
+              }
+
+              const fileEvent: ShellOutputEvent = {
+                type: 'file_data',
+                chunk: stripAnsi(remaining),
+              };
+              onOutputEvent(fileEvent);
+              if (child.pid) {
+                ExecutionLifecycleService.emitEvent(child.pid, fileEvent);
               }
             }
           }
@@ -800,6 +862,15 @@ export class ShellExecutionService {
           if (remaining) {
             state.output += remaining;
             if (isStreamingRawContent) {
+              const rawEvent: ShellOutputEvent = {
+                type: 'raw_data',
+                chunk: remaining,
+              };
+              onOutputEvent(rawEvent);
+              if (child.pid) {
+                ExecutionLifecycleService.emitEvent(child.pid, rawEvent);
+              }
+
               const event: ShellOutputEvent = {
                 type: 'data',
                 chunk: remaining,
@@ -807,6 +878,15 @@ export class ShellExecutionService {
               onOutputEvent(event);
               if (child.pid) {
                 ExecutionLifecycleService.emitEvent(child.pid, event);
+              }
+
+              const fileEvent: ShellOutputEvent = {
+                type: 'file_data',
+                chunk: stripAnsi(remaining),
+              };
+              onOutputEvent(fileEvent);
+              if (child.pid) {
+                ExecutionLifecycleService.emitEvent(child.pid, fileEvent);
               }
             }
           }
@@ -934,6 +1014,7 @@ export class ShellExecutionService {
         maxSerializedLines: shellExecutionConfig.maxSerializedLines,
         command: shellExecutionConfig.originalCommand ?? commandToExecute,
         sessionId: shellExecutionConfig.sessionId,
+        lastCommittedLine: -1,
       });
 
       const result = ExecutionLifecycleService.attachExecution(ptyPid, {
@@ -1099,9 +1180,36 @@ export class ShellExecutionService {
         }, 68);
       };
 
-      headlessTerminal.onScroll(() => {
+      let lastYdisp = 0;
+      let hasReachedMax = false;
+      const scrollbackLimit = shellExecutionConfig.scrollback ?? SCROLLBACK_LIMIT;
+
+      headlessTerminal.onScroll((ydisp) => {
         if (!isWriting) {
           render();
+        }
+
+        if (
+          ydisp === scrollbackLimit &&
+          lastYdisp === scrollbackLimit &&
+          hasReachedMax
+        ) {
+          const activePty = this.activePtys.get(ptyPid);
+          if (activePty) {
+            activePty.lastCommittedLine--;
+          }
+        }
+        if (
+          ydisp === scrollbackLimit &&
+          headlessTerminal.buffer.active.length === scrollbackLimit + rows
+        ) {
+          hasReachedMax = true;
+        }
+        lastYdisp = ydisp;
+
+        const activePtyForEmit = this.activePtys.get(ptyPid);
+        if (activePtyForEmit) {
+          emitPendingLines(activePtyForEmit, ptyPid, onOutputEvent);
         }
       });
 
@@ -1490,6 +1598,7 @@ export class ShellExecutionService {
         startLine,
         endLine,
       );
+      activePty.lastSerializedOutput = bufferData;
       const event: ShellOutputEvent = { type: 'data', chunk: bufferData };
       ExecutionLifecycleService.emitEvent(pid, event);
     }

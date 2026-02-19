@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fsPromises from 'node:fs/promises';
+import { debugLogger } from '../utils/debugLogger.js';
 import {
   ToolErrorType,
   ToolOutputTruncatedEvent,
@@ -138,6 +140,16 @@ export class ToolExecutor {
           }
 
           if (signal.aborted) {
+            if (toolResult.fullOutputFilePath) {
+              await fsPromises
+                .unlink(toolResult.fullOutputFilePath)
+                .catch((error) => {
+                  debugLogger.warn(
+                    `Failed to delete temporary tool output file on abort: ${toolResult.fullOutputFilePath}`,
+                    error,
+                  );
+                });
+            }
             completedToolCall = await this.createCancelledResult(
               call,
               'User cancelled tool execution.',
@@ -368,11 +380,49 @@ export class ToolExecutor {
     call: ToolCall,
     toolResult: ToolResult,
   ): Promise<SuccessfulToolCall> {
-    const { truncatedContent: content, outputFile } =
+    let { truncatedContent: content, outputFile } =
       await this.truncateOutputIfNeeded(call, toolResult.llmContent);
 
     const toolName = call.request.originalRequestName || call.request.name;
     const callId = call.request.callId;
+
+    if (toolResult.fullOutputFilePath) {
+      const threshold = this.config.getTruncateToolOutputThreshold();
+      if (
+        threshold > 0 &&
+        typeof content === 'string' &&
+        content.length > threshold
+      ) {
+        const { outputFile: savedPath } = await moveToolOutputToFile(
+          toolResult.fullOutputFilePath,
+          toolName,
+          callId,
+          this.config.storage.getProjectTempDir(),
+          this.config.getSessionId(),
+        );
+        outputFile = savedPath;
+        content = formatTruncatedToolOutput(content, outputFile, threshold);
+
+        logToolOutputTruncated(
+          this.config,
+          new ToolOutputTruncatedEvent(call.request.prompt_id, {
+            toolName,
+            originalContentLength: content.length, // approximation
+            truncatedContentLength: content.length,
+            threshold,
+          }),
+        );
+      } else {
+        try {
+          await fsPromises.unlink(toolResult.fullOutputFilePath);
+        } catch (error) {
+          debugLogger.warn(
+            `Failed to delete temporary tool output file: ${toolResult.fullOutputFilePath}`,
+            error,
+          );
+        }
+      }
+    }
 
     const response = convertToFunctionResponse(
       toolName,
