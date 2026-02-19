@@ -1,16 +1,5 @@
 # Gemini CLI configuration
 
-> **Note on configuration format, 9/17/25:** The format of the `settings.json`
-> file has been updated to a new, more organized structure.
->
-> - The new format will be supported in the stable release starting
->   **[09/10/25]**.
-> - Automatic migration from the old format to the new format will begin on
->   **[09/17/25]**.
->
-> For details on the previous format, please see the
-> [v1 Configuration documentation](./configuration-v1.md).
-
 Gemini CLI offers several ways to configure its behavior, including environment
 variables, command-line arguments, and settings files. This document outlines
 the different configuration methods and available settings.
@@ -132,6 +121,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable update notification prompts.
   - **Default:** `true`
 
+- **`general.enableNotifications`** (boolean):
+  - **Description:** Enable run-event notifications for action-required prompts
+    and session completion. Currently macOS only.
+  - **Default:** `false`
+
 - **`general.checkpointing.enabled`** (boolean):
   - **Description:** Enable session checkpointing for recovery
   - **Default:** `false`
@@ -157,8 +151,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`general.sessionRetention.maxAge`** (string):
-  - **Description:** Maximum age of sessions to keep (e.g., "30d", "7d", "24h",
-    "1w")
+  - **Description:** Automatically delete chats older than this time period
+    (e.g., "30d", "7d", "24h", "1w")
   - **Default:** `undefined`
 
 - **`general.sessionRetention.maxCount`** (number):
@@ -169,6 +163,11 @@ their corresponding top-level category object in your `settings.json` file.
 - **`general.sessionRetention.minRetention`** (string):
   - **Description:** Minimum retention period (safety limit, defaults to "1d")
   - **Default:** `"1d"`
+
+- **`general.sessionRetention.warningAcknowledged`** (boolean):
+  - **Description:** INTERNAL: Whether the user has acknowledged the session
+    retention warning
+  - **Default:** `false`
 
 #### `output`
 
@@ -220,6 +219,11 @@ their corresponding top-level category object in your `settings.json` file.
 - **`ui.showHomeDirectoryWarning`** (boolean):
   - **Description:** Show a warning when running Gemini CLI in the home
     directory.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`ui.showCompatibilityWarnings`** (boolean):
+  - **Description:** Show warnings about terminal or OS compatibility issues.
   - **Default:** `true`
   - **Requires restart:** Yes
 
@@ -485,6 +489,19 @@ their corresponding top-level category object in your `settings.json` file.
           }
         }
       },
+      "fast-ack-helper": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-2.5-flash-lite",
+          "generateContentConfig": {
+            "temperature": 0.2,
+            "maxOutputTokens": 120,
+            "thinkingConfig": {
+              "thinkingBudget": 0
+            }
+          }
+        }
+      },
       "edit-corrector": {
         "extends": "base",
         "modelConfig": {
@@ -627,6 +644,11 @@ their corresponding top-level category object in your `settings.json` file.
 - **`context.importFormat`** (string):
   - **Description:** The format to use when importing memory.
   - **Default:** `undefined`
+
+- **`context.includeDirectoryTree`** (boolean):
+  - **Description:** Whether to include the directory tree of the current
+    working directory in the initial request to the model.
+  - **Default:** `true`
 
 - **`context.discoveryMaxDirs`** (number):
   - **Description:** Maximum number of directories to search for memory.
@@ -927,6 +949,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable planning features (Plan Mode and tools).
   - **Default:** `false`
   - **Requires restart:** Yes
+
+- **`experimental.modelSteering`** (boolean):
+  - **Description:** Enable model steering (user hints) to guide the model
+    during tool execution.
+  - **Default:** `false`
 
 #### `skills`
 
@@ -1374,10 +1401,9 @@ for that specific session.
   - Specifies the Gemini model to use for this session.
   - Example: `npm start -- --model gemini-3-pro-preview`
 - **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
+  - **Deprecated:** Use positional arguments instead.
   - Used to pass a prompt directly to the command. This invokes Gemini CLI in a
     non-interactive mode.
-  - For scripting examples, use the `--output-format json` flag to get
-    structured output.
 - **`--prompt-interactive <your_prompt>`** (**`-i <your_prompt>`**):
   - Starts an interactive session with the provided prompt as the initial input.
   - The prompt is processed within the interactive session, not before it.

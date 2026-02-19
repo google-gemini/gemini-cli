@@ -18,10 +18,13 @@ import {
   ReadManyFilesTool,
   REFERENCE_CONTENT_START,
   REFERENCE_CONTENT_END,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { Buffer } from 'node:buffer';
-import type { HistoryItem, IndividualToolCallDisplay } from '../types.js';
-import { ToolCallStatus } from '../types.js';
+import type {
+  HistoryItemToolGroup,
+  IndividualToolCallDisplay,
+} from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 
 const REF_CONTENT_HEADER = `\n${REFERENCE_CONTENT_START}`;
@@ -409,7 +412,7 @@ async function readMcpResources(
           callId: `mcp-resource-${resource.serverName}-${resource.uri}`,
           name: `resources/read (${resource.serverName})`,
           description: resource.uri,
-          status: ToolCallStatus.Success,
+          status: CoreToolCallStatus.Success,
           resultDisplay: `Successfully read resource ${resource.uri}`,
           confirmationDetails: undefined,
         } as IndividualToolCallDisplay,
@@ -423,7 +426,7 @@ async function readMcpResources(
           callId: `mcp-resource-${resource.serverName}-${resource.uri}`,
           name: `resources/read (${resource.serverName})`,
           description: resource.uri,
-          status: ToolCallStatus.Error,
+          status: CoreToolCallStatus.Error,
           resultDisplay: `Error reading resource ${resource.uri}: ${getErrorMessage(error)}`,
           confirmationDetails: undefined,
         } as IndividualToolCallDisplay,
@@ -447,7 +450,9 @@ async function readMcpResources(
   }
 
   if (hasError) {
-    const firstError = displays.find((d) => d.status === ToolCallStatus.Error);
+    const firstError = displays.find(
+      (d) => d.status === CoreToolCallStatus.Error,
+    );
     return {
       parts: [],
       displays,
@@ -500,7 +505,7 @@ async function readLocalFiles(
       callId: `client-read-${userMessageTimestamp}`,
       name: readManyFilesTool.displayName,
       description: invocation.getDescription(),
-      status: ToolCallStatus.Success,
+      status: CoreToolCallStatus.Success,
       resultDisplay:
         result.returnDisplay ||
         `Successfully read: ${fileLabelsForDisplay.join(', ')}`,
@@ -559,7 +564,7 @@ async function readLocalFiles(
       description:
         invocation?.getDescription() ??
         'Error attempting to execute tool to read files',
-      status: ToolCallStatus.Error,
+      status: CoreToolCallStatus.Error,
       resultDisplay: `Error reading files (${fileLabelsForDisplay.join(', ')}): ${getErrorMessage(error)}`,
       confirmationDetails: undefined,
     };
@@ -695,7 +700,7 @@ export async function handleAtCommand({
       {
         type: 'tool_group',
         tools: allDisplays,
-      } as Omit<HistoryItem, 'id'>,
+      } as HistoryItemToolGroup,
       userMessageTimestamp,
     );
   }

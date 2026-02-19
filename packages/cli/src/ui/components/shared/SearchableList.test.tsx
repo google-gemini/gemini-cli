@@ -107,8 +107,9 @@ describe('SearchableList', () => {
     );
   };
 
-  it('should render all items initially', () => {
-    const { lastFrame } = renderList();
+  it('should render all items initially', async () => {
+    const { lastFrame, waitUntilReady } = renderList();
+    await waitUntilReady();
     const frame = lastFrame();
 
     // Check for title

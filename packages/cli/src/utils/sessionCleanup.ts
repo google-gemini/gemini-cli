@@ -174,7 +174,10 @@ export async function cleanupExpiredSessions(
 /**
  * Identifies sessions that should be deleted (corrupted or expired based on retention policy)
  */
-async function identifySessionsToDelete(
+/**
+ * Identifies sessions that should be deleted (corrupted or expired based on retention policy)
+ */
+export async function identifySessionsToDelete(
   allFiles: SessionFileEntry[],
   retentionConfig: SessionRetentionSettings,
 ): Promise<SessionFileEntry[]> {

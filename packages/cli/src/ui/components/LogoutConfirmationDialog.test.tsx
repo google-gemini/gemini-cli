@@ -22,20 +22,25 @@ describe('LogoutConfirmationDialog', () => {
     vi.clearAllMocks();
   });
 
-  it('should render the dialog with title, description, and hint', () => {
-    const { lastFrame } = renderWithProviders(
+  it('should render the dialog with title, description, and hint', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <LogoutConfirmationDialog onSelect={vi.fn()} />,
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toContain('You are now logged out.');
     expect(lastFrame()).toContain(
       'Login again to continue using Gemini CLI, or exit the application.',
     );
     expect(lastFrame()).toContain('(Use Enter to select, Esc to close)');
+    unmount();
   });
 
-  it('should render RadioButtonSelect with Login and Exit options', () => {
-    renderWithProviders(<LogoutConfirmationDialog onSelect={vi.fn()} />);
+  it('should render RadioButtonSelect with Login and Exit options', async () => {
+    const { waitUntilReady, unmount } = renderWithProviders(
+      <LogoutConfirmationDialog onSelect={vi.fn()} />,
+    );
+    await waitUntilReady();
 
     expect(RadioButtonSelect).toHaveBeenCalled();
     const mockCall = vi.mocked(RadioButtonSelect).mock.calls[0][0];
@@ -44,43 +49,60 @@ describe('LogoutConfirmationDialog', () => {
       { label: 'Exit', value: LogoutChoice.EXIT, key: 'exit' },
     ]);
     expect(mockCall.isFocused).toBe(true);
+    unmount();
   });
 
   it('should call onSelect with LOGIN when Login is selected', async () => {
     const onSelect = vi.fn();
-    renderWithProviders(<LogoutConfirmationDialog onSelect={onSelect} />);
+    const { waitUntilReady, unmount } = renderWithProviders(
+      <LogoutConfirmationDialog onSelect={onSelect} />,
+    );
+    await waitUntilReady();
 
     const mockCall = vi.mocked(RadioButtonSelect).mock.calls[0][0];
     await act(async () => {
       mockCall.onSelect(LogoutChoice.LOGIN);
     });
+    await waitUntilReady();
 
     expect(onSelect).toHaveBeenCalledWith(LogoutChoice.LOGIN);
+    unmount();
   });
 
   it('should call onSelect with EXIT when Exit is selected', async () => {
     const onSelect = vi.fn();
-    renderWithProviders(<LogoutConfirmationDialog onSelect={onSelect} />);
+    const { waitUntilReady, unmount } = renderWithProviders(
+      <LogoutConfirmationDialog onSelect={onSelect} />,
+    );
+    await waitUntilReady();
 
     const mockCall = vi.mocked(RadioButtonSelect).mock.calls[0][0];
     await act(async () => {
       mockCall.onSelect(LogoutChoice.EXIT);
     });
+    await waitUntilReady();
 
     expect(onSelect).toHaveBeenCalledWith(LogoutChoice.EXIT);
+    unmount();
   });
 
-  it('should call onSelect with EXIT when escape key is pressed', () => {
+  it('should call onSelect with EXIT when escape key is pressed', async () => {
     const onSelect = vi.fn();
-    const { stdin } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = renderWithProviders(
       <LogoutConfirmationDialog onSelect={onSelect} />,
     );
+    await waitUntilReady();
 
-    act(() => {
+    await act(async () => {
       // Send kitty escape key sequence
       stdin.write('\u001b[27u');
     });
+    // Escape key has a 50ms timeout in KeypressContext, so we need to wrap waitUntilReady in act
+    await act(async () => {
+      await waitUntilReady();
+    });
 
     expect(onSelect).toHaveBeenCalledWith(LogoutChoice.EXIT);
+    unmount();
   });
 });
