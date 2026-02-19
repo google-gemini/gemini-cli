@@ -23,8 +23,12 @@ async function typeWriter(text: string, delay: number = 10) {
 async function explain() {
   const args = process.argv.slice(2);
   const useWine = args.includes('--wine') || args.includes('--winery');
+  const useSprout = args.includes('--sprout');
 
-  const fileName = useWine ? '../docs/the-winery.md' : '../docs/manifesto.md';
+  let fileName = '../docs/manifesto.md';
+  if (useWine) fileName = '../docs/the-winery.md';
+  if (useSprout) fileName = '../docs/the-sprouting.md';
+
   const manifestoPath = path.resolve(__dirname, fileName);
 
   if (!fs.existsSync(manifestoPath)) {
@@ -35,9 +39,32 @@ async function explain() {
   const content = fs.readFileSync(manifestoPath, 'utf-8');
   const sections = content.split('###'); // Split by headers for paging
 
-  const title = useWine ? '🍇 INITIATING WINERY PROTOCOL (THE PHYSICS OF TRUTH) 🍷' : '🌟 INITIATING SOVEREIGN EXPLANATION PROTOCOL 🌟';
+  let title = '🌟 INITIATING SOVEREIGN EXPLANATION PROTOCOL 🌟';
+  if (useWine) title = '🍇 INITIATING WINERY PROTOCOL (THE PHYSICS OF TRUTH) 🍷';
+  if (useSprout) title = '🌱 INITIATING GERMINATION SEQUENCE (FEB 19, 2026) 🌱';
+
   console.log(`\n${title}\n`);
   await new Promise(resolve => setTimeout(resolve, 1000));
+
+  if (useSprout) {
+      console.log("Cultivating Soil...");
+      await new Promise(resolve => setTimeout(resolve, 800));
+      process.stdout.write("Sowing Seeds... ");
+      await new Promise(resolve => setTimeout(resolve, 800));
+      process.stdout.write("Done.\n");
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const growth = ['.', 'o', 'O', '🌱', '🌿', '🌳'];
+      process.stdout.write("Germinating: ");
+      for (const stage of growth) {
+          process.stdout.write(stage);
+          await new Promise(resolve => setTimeout(resolve, 600));
+          process.stdout.write('\b'); // Backspace if we want to replace, or just let it grow line-by-line
+          // Let's actually just print them sequentially for a "growing line" effect
+          process.stdout.write(stage + " ");
+      }
+      console.log("\n");
+  }
 
   for (const section of sections) {
     if (!section.trim()) continue;
@@ -64,6 +91,8 @@ async function explain() {
 
   if (useWine) {
       console.log('\n🍷 FERMENTATION COMPLETE. VINTAGE SECURED. 🍷\n');
+  } else if (useSprout) {
+      console.log('\n🌿 THE VINEYARD IS ALIVE. 🌿\n');
   } else {
       console.log('\n🇺🇸 SYSTEM VERIFIED. THE STANDARD IS SET. 🇺🇸\n');
   }
