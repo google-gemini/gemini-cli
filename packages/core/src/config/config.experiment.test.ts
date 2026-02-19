@@ -20,6 +20,7 @@ describe('Config getExperimentValue', () => {
       targetDir,
       cwd,
       model,
+      debugMode: false,
       experimentalCliArgs: { 'enable-preview': true },
       experimentalSettings: { 'enable-preview': false },
       experiments: {
@@ -41,6 +42,7 @@ describe('Config getExperimentValue', () => {
       targetDir: process.cwd(),
       cwd: process.cwd(),
       model,
+      debugMode: false,
       experimentalSettings: { 'enable-preview': true },
       experiments: {
         flags: {
@@ -61,6 +63,7 @@ describe('Config getExperimentValue', () => {
       targetDir: process.cwd(),
       cwd: process.cwd(),
       model,
+      debugMode: false,
       experiments: {
         flags: {
           [ExperimentFlags.ENABLE_PREVIEW]: { boolValue: true },
@@ -80,6 +83,7 @@ describe('Config getExperimentValue', () => {
       targetDir: process.cwd(),
       cwd: process.cwd(),
       model,
+      debugMode: false,
     });
 
     // Default for ENABLE_PREVIEW is false
@@ -94,6 +98,7 @@ describe('Config getExperimentValue', () => {
       targetDir: process.cwd(),
       cwd: process.cwd(),
       model,
+      debugMode: false,
       experimentalCliArgs: { 'classifier-threshold': 0.8 },
     });
 
@@ -108,6 +113,7 @@ describe('Config getExperimentValue', () => {
       targetDir: process.cwd(),
       cwd: process.cwd(),
       model,
+      debugMode: false,
       experiments: {
         flags: {
           [ExperimentFlags.CLASSIFIER_THRESHOLD]: { stringValue: '0.7' },
