@@ -286,6 +286,70 @@ describe('Hooks System Integration', () => {
     });
   });
 
+  describe('Command Hooks - Output override', () => {
+    it('should override the output from AfterTool hooks', async () => {
+      rig.setup('should override the output from AfterTool hooks', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.after-tool-override.responses',
+        ),
+      });
+
+      const scriptPath = rig.createScript(
+        'after_tool_context.cjs',
+        "console.log(JSON.stringify({hookSpecificOutput: {hookEventName: 'AfterTool', toolOutput: '{\"key\":\"value\"}'}}));",
+      );
+
+      const command = `node "${scriptPath}"`;
+      rig.setup('should override the output from AfterTool hooks', {
+        settings: {
+          hooksConfig: {
+            enabled: true,
+          },
+          hooks: {
+            AfterTool: [
+              {
+                matcher: 'read_file',
+                sequential: true,
+                hooks: [
+                  {
+                    type: 'command',
+                    command: normalizePath(command),
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      // Create a test file to read
+      rig.createFile('test-file.txt', 'This is test content');
+
+      await rig.run({
+        args: 'Read the contents of test-file.txt and tell me what it contains',
+      });
+
+      // Should find read_file tool call
+      const foundReadFile = await rig.waitForToolCall('read_file');
+      expect(foundReadFile).toBeTruthy();
+
+      // Should generate hook telemetry
+      const hookTelemetryFound = rig.readHookLogs();
+      expect(hookTelemetryFound.length).toBeGreaterThan(0);
+      expect(hookTelemetryFound[0].hookCall.hook_event_name).toBe('AfterTool');
+      expect(hookTelemetryFound[0].hookCall.hook_name).toBe(
+        normalizePath(command),
+      );
+      expect(hookTelemetryFound[0].hookCall.hook_input).toBeDefined();
+      expect(hookTelemetryFound[0].hookCall.hook_output).toBeDefined();
+      expect(hookTelemetryFound[0].hookCall.exit_code).toBe(0);
+      expect(hookTelemetryFound[0].hookCall.stdout).toBeDefined();
+      expect(hookTelemetryFound[0].hookCall.stderr).toBeDefined();
+    });
+  });
+
   describe('BeforeModel Hooks - LLM Request Modification', () => {
     it('should modify LLM requests with BeforeModel hooks', async () => {
       // Create a hook script that replaces the LLM request with a modified version

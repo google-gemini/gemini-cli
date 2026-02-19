@@ -394,8 +394,8 @@ export class AfterToolHookOutput extends DefaultHookOutput {
    * Get modified tool output if provided by hook
    */
   getModifiedToolOutput(): string | undefined {
-    if (this.hookSpecificOutput && 'tool_output' in this.hookSpecificOutput) {
-      const output = this.hookSpecificOutput['tool_output'];
+    if (this.hookSpecificOutput && 'toolOutput' in this.hookSpecificOutput) {
+      const output = this.hookSpecificOutput['toolOutput'];
       if (typeof output === 'string') {
         return output;
       }
@@ -479,7 +479,7 @@ export interface AfterToolOutput extends HookOutput {
   hookSpecificOutput?: {
     hookEventName: 'AfterTool';
     additionalContext?: string;
-    tool_output?: string;
+    toolOutput?: string;
   };
 }
 
