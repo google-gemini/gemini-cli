@@ -81,6 +81,13 @@
           "default": true,
           "type": "boolean"
         },
+        "enableNotifications": {
+          "title": "Enable Notifications",
+          "description": "Enable run-event notifications for action-required prompts and session completion. Currently macOS only.",
+          "markdownDescription": "Enable run-event notifications for action-required prompts and session completion. Currently macOS only.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "checkpointing": {
           "title": "Checkpointing",
           "description": "Session checkpointing settings.",
@@ -252,6 +259,13 @@
           "title": "Show Home Directory Warning",
           "description": "Show a warning when running Gemini CLI in the home directory.",
           "markdownDescription": "Show a warning when running Gemini CLI in the home directory.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "showCompatibilityWarnings": {
+          "title": "Show Compatibility Warnings",
+          "description": "Show warnings about terminal or OS compatibility issues.",
+          "markdownDescription": "Show warnings about terminal or OS compatibility issues.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
@@ -1573,8 +1587,15 @@
         },
         "useOSC52Paste": {
           "title": "Use OSC 52 Paste",
-          "description": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).",
-          "markdownDescription": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "description": "Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).",
+          "markdownDescription": "Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "useOSC52Copy": {
+          "title": "Use OSC 52 Copy",
+          "description": "Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).",
+          "markdownDescription": "Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -1582,6 +1603,13 @@
           "title": "Plan",
           "description": "Enable planning features (Plan Mode and tools).",
           "markdownDescription": "Enable planning features (Plan Mode and tools).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "modelSteering": {
+          "title": "Model Steering",
+          "description": "Enable model steering (user hints) to guide the model during tool execution.",
+          "markdownDescription": "Enable model steering (user hints) to guide the model during tool execution.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         }

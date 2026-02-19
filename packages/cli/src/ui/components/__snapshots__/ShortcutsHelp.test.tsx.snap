@@ -11,7 +11,8 @@ exports[`ShortcutsHelp > renders correctly in 'narrow' mode on 'linux' 1`] = `
  Ctrl+V paste images
  Alt+M raw markdown mode
  Ctrl+R reverse-search history
- Ctrl+X open external editor"
+ Ctrl+X open external editor
+"
 `;
 
 exports[`ShortcutsHelp > renders correctly in 'narrow' mode on 'mac' 1`] = `
@@ -25,7 +26,8 @@ exports[`ShortcutsHelp > renders correctly in 'narrow' mode on 'mac' 1`] = `
  Ctrl+V paste images
  Option+M raw markdown mode
  Ctrl+R reverse-search history
- Ctrl+X open external editor"
+ Ctrl+X open external editor
+"
 `;
 
 exports[`ShortcutsHelp > renders correctly in 'wide' mode on 'linux' 1`] = `
@@ -33,7 +35,8 @@ exports[`ShortcutsHelp > renders correctly in 'wide' mode on 'linux' 1`] = `
  ! shell mode                    Shift+Tab cycle mode            Ctrl+V paste images
  @ select file or folder         Ctrl+Y YOLO mode                Alt+M raw markdown mode
  Esc Esc clear & rewind          Ctrl+R reverse-search history   Ctrl+X open external editor
- Tab Tab focus UI"
+ Tab Tab focus UI
+"
 `;
 
 exports[`ShortcutsHelp > renders correctly in 'wide' mode on 'mac' 1`] = `
@@ -41,5 +44,6 @@ exports[`ShortcutsHelp > renders correctly in 'wide' mode on 'mac' 1`] = `
  ! shell mode                    Shift+Tab cycle mode            Ctrl+V paste images
  @ select file or folder         Ctrl+Y YOLO mode                Option+M raw markdown mode
  Esc Esc clear & rewind          Ctrl+R reverse-search history   Ctrl+X open external editor
- Tab Tab focus UI"
+ Tab Tab focus UI
+"
 `;

@@ -236,6 +236,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable update notification prompts.',
         showInDialog: false,
       },
+      enableNotifications: {
+        type: 'boolean',
+        label: 'Enable Notifications',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable run-event notifications for action-required prompts and session completion. Currently macOS only.',
+        showInDialog: true,
+      },
       checkpointing: {
         type: 'object',
         label: 'Checkpointing',
@@ -473,6 +483,15 @@ const SETTINGS_SCHEMA = {
         default: true,
         description:
           'Show a warning when running Gemini CLI in the home directory.',
+        showInDialog: true,
+      },
+      showCompatibilityWarnings: {
+        type: 'boolean',
+        label: 'Show Compatibility Warnings',
+        category: 'UI',
+        requiresRestart: true,
+        default: true,
+        description: 'Show warnings about terminal or OS compatibility issues.',
         showInDialog: true,
       },
       hideTips: {
@@ -1613,7 +1632,17 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description:
-          'Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).',
+          'Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).',
+        showInDialog: true,
+      },
+      useOSC52Copy: {
+        type: 'boolean',
+        label: 'Use OSC 52 Copy',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).',
         showInDialog: true,
       },
       plan: {
@@ -1623,6 +1652,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Enable planning features (Plan Mode and tools).',
+        showInDialog: true,
+      },
+      modelSteering: {
+        type: 'boolean',
+        label: 'Model Steering',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable model steering (user hints) to guide the model during tool execution.',
         showInDialog: true,
       },
     },

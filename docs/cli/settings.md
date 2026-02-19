@@ -27,6 +27,7 @@ they appear in the UI.
 | Vim Mode                 | `general.vimMode`                  | Enable Vim keybindings                                                                                                                                                         | `false`     |
 | Default Approval Mode    | `general.defaultApprovalMode`      | The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet. | `"default"` |
 | Enable Auto Update       | `general.enableAutoUpdate`         | Enable automatic updates.                                                                                                                                                      | `true`      |
+| Enable Notifications     | `general.enableNotifications`      | Enable run-event notifications for action-required prompts and session completion. Currently macOS only.                                                                       | `false`     |
 | Enable Prompt Completion | `general.enablePromptCompletion`   | Enable AI-powered prompt completion suggestions while typing.                                                                                                                  | `false`     |
 | Debug Keystroke Logging  | `general.debugKeystrokeLogging`    | Enable debug logging of keystrokes to the console.                                                                                                                             | `false`     |
 | Enable Session Cleanup   | `general.sessionRetention.enabled` | Enable automatic session cleanup                                                                                                                                               | `false`     |
@@ -49,6 +50,7 @@ they appear in the UI.
 | Show Thoughts in Title               | `ui.showStatusInTitle`                  | Show Gemini CLI model thoughts in the terminal window title during the working phase                                                                              | `false` |
 | Dynamic Window Title                 | `ui.dynamicWindowTitle`                 | Update the terminal window title with current status icons (Ready: ◇, Action Required: ✋, Working: ✦)                                                            | `true`  |
 | Show Home Directory Warning          | `ui.showHomeDirectoryWarning`           | Show a warning when running Gemini CLI in the home directory.                                                                                                     | `true`  |
+| Show Compatibility Warnings          | `ui.showCompatibilityWarnings`          | Show warnings about terminal or OS compatibility issues.                                                                                                          | `true`  |
 | Hide Tips                            | `ui.hideTips`                           | Hide helpful tips in the UI                                                                                                                                       | `false` |
 | Show Shortcuts Hint                  | `ui.showShortcutsHint`                  | Show the "? for shortcuts" hint above the input.                                                                                                                  | `true`  |
 | Hide Banner                          | `ui.hideBanner`                         | Hide the application banner                                                                                                                                       | `false` |
@@ -126,11 +128,13 @@ they appear in the UI.
 
 ### Experimental
 
-| UI Label                   | Setting                                  | Description                                                                         | Default |
-| -------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------- | ------- |
-| Enable Tool Output Masking | `experimental.toolOutputMasking.enabled` | Enables tool output masking to save tokens.                                         | `true`  |
-| Use OSC 52 Paste           | `experimental.useOSC52Paste`             | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false` |
-| Plan                       | `experimental.plan`                      | Enable planning features (Plan Mode and tools).                                     | `false` |
+| UI Label                   | Setting                                  | Description                                                                                                                                               | Default |
+| -------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Enable Tool Output Masking | `experimental.toolOutputMasking.enabled` | Enables tool output masking to save tokens.                                                                                                               | `true`  |
+| Use OSC 52 Paste           | `experimental.useOSC52Paste`             | Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
+| Use OSC 52 Copy            | `experimental.useOSC52Copy`              | Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
+| Plan                       | `experimental.plan`                      | Enable planning features (Plan Mode and tools).                                                                                                           | `false` |
+| Model Steering             | `experimental.modelSteering`             | Enable model steering (user hints) to guide the model during tool execution.                                                                              | `false` |
 
 ### Skills
 

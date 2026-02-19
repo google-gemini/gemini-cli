@@ -65,10 +65,10 @@ describe('<ToolGroupMessage />', () => {
   });
 
   describe('Golden Snapshots', () => {
-    it('renders single successful tool call', () => {
+    it('renders single successful tool call', async () => {
       const toolCalls = [createToolCall()];
       const item = createItem(toolCalls);
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
@@ -82,11 +82,12 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
 
-    it('hides confirming tools (standard behavior)', () => {
+    it('hides confirming tools (standard behavior)', async () => {
       const toolCalls = [
         createToolCall({
           callId: 'confirm-tool',
@@ -100,17 +101,18 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item = createItem(toolCalls);
 
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         { config: baseMockConfig },
       );
 
       // Should render nothing because all tools in the group are confirming
-      expect(lastFrame()).toBe('');
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toBe('');
       unmount();
     });
 
-    it('renders multiple tool calls with different statuses (only visible ones)', () => {
+    it('renders multiple tool calls with different statuses (only visible ones)', async () => {
       const toolCalls = [
         createToolCall({
           callId: 'tool-1',
@@ -133,7 +135,7 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item = createItem(toolCalls);
 
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
@@ -148,6 +150,7 @@ describe('<ToolGroupMessage />', () => {
         },
       );
       // pending-tool should be hidden
+      await waitUntilReady();
       const output = lastFrame();
       expect(output).toContain('successful-tool');
       expect(output).not.toContain('pending-tool');
@@ -156,7 +159,7 @@ describe('<ToolGroupMessage />', () => {
       unmount();
     });
 
-    it('renders mixed tool calls including shell command', () => {
+    it('renders mixed tool calls including shell command', async () => {
       const toolCalls = [
         createToolCall({
           callId: 'tool-1',
@@ -179,7 +182,7 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item = createItem(toolCalls);
 
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
@@ -194,6 +197,7 @@ describe('<ToolGroupMessage />', () => {
         },
       );
       // write_file (Pending) should be hidden
+      await waitUntilReady();
       const output = lastFrame();
       expect(output).toContain('read_file');
       expect(output).toContain('run_shell_command');
@@ -202,7 +206,7 @@ describe('<ToolGroupMessage />', () => {
       unmount();
     });
 
-    it('renders with limited terminal height', () => {
+    it('renders with limited terminal height', async () => {
       const toolCalls = [
         createToolCall({
           callId: 'tool-1',
@@ -219,7 +223,7 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
       const item = createItem(toolCalls);
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
           item={item}
@@ -238,11 +242,12 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
 
-    it('renders with narrow terminal width', () => {
+    it('renders with narrow terminal width', async () => {
       const toolCalls = [
         createToolCall({
           name: 'very-long-tool-name-that-might-wrap',
@@ -251,7 +256,7 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
       const item = createItem(toolCalls);
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
           item={item}
@@ -270,14 +275,15 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
 
-    it('renders empty tool calls array', () => {
+    it('renders empty tool calls array', async () => {
       const toolCalls: IndividualToolCallDisplay[] = [];
       const item = createItem(toolCalls);
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
@@ -291,11 +297,12 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
 
-    it('renders header when scrolled', () => {
+    it('renders header when scrolled', async () => {
       const toolCalls = [
         createToolCall({
           callId: '1',
@@ -312,7 +319,7 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
       const item = createItem(toolCalls);
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <Scrollable height={10} hasFocus={true} scrollToBottom={true}>
           <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />
         </Scrollable>,
@@ -328,11 +335,12 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
 
-    it('renders tool call with outputFile', () => {
+    it('renders tool call with outputFile', async () => {
       const toolCalls = [
         createToolCall({
           callId: 'tool-output-file',
@@ -343,7 +351,7 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
       const item = createItem(toolCalls);
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
@@ -357,11 +365,12 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
 
-    it('renders two tool groups where only the last line of the previous group is visible', () => {
+    it('renders two tool groups where only the last line of the previous group is visible', async () => {
       const toolCalls1 = [
         createToolCall({
           callId: '1',
@@ -381,7 +390,7 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item2 = createItem(toolCalls2);
 
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <Scrollable height={6} hasFocus={true} scrollToBottom={true}>
           <ToolGroupMessage
             {...baseProps}
@@ -410,13 +419,14 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
   });
 
   describe('Border Color Logic', () => {
-    it('uses yellow border for shell commands even when successful', () => {
+    it('uses yellow border for shell commands even when successful', async () => {
       const toolCalls = [
         createToolCall({
           name: 'run_shell_command',
@@ -424,7 +434,7 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
       const item = createItem(toolCalls);
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
@@ -438,11 +448,12 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
 
-    it('uses gray border when all tools are successful and no shell commands', () => {
+    it('uses gray border when all tools are successful and no shell commands', async () => {
       const toolCalls = [
         createToolCall({ status: CoreToolCallStatus.Success }),
         createToolCall({
@@ -452,7 +463,7 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
       const item = createItem(toolCalls);
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
@@ -466,13 +477,14 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
   });
 
   describe('Height Calculation', () => {
-    it('calculates available height correctly with multiple tools with results', () => {
+    it('calculates available height correctly with multiple tools with results', async () => {
       const toolCalls = [
         createToolCall({
           callId: 'tool-1',
@@ -488,7 +500,7 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
       const item = createItem(toolCalls);
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
           item={item}
@@ -507,7 +519,8 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
   });
@@ -542,7 +555,7 @@ describe('<ToolGroupMessage />', () => {
       },
     ])(
       'filtering logic for status=$status and hasResult=$resultDisplay',
-      ({ status, resultDisplay, shouldHide }) => {
+      async ({ status, resultDisplay, shouldHide }) => {
         const toolCalls = [
           createToolCall({
             callId: `ask-user-${status}`,
@@ -553,13 +566,14 @@ describe('<ToolGroupMessage />', () => {
         ];
         const item = createItem(toolCalls);
 
-        const { lastFrame, unmount } = renderWithProviders(
+        const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
           <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
           { config: baseMockConfig },
         );
+        await waitUntilReady();
 
         if (shouldHide) {
-          expect(lastFrame()).toBe('');
+          expect(lastFrame({ allowEmpty: true })).toBe('');
         } else {
           expect(lastFrame()).toMatchSnapshot();
         }
@@ -567,7 +581,7 @@ describe('<ToolGroupMessage />', () => {
       },
     );
 
-    it('shows other tools when ask_user is filtered out', () => {
+    it('shows other tools when ask_user is filtered out', async () => {
       const toolCalls = [
         createToolCall({
           callId: 'other-tool',
@@ -582,16 +596,17 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item = createItem(toolCalls);
 
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         { config: baseMockConfig },
       );
 
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
 
-    it('renders nothing when only tool is in-progress AskUser with borderBottom=false', () => {
+    it('renders nothing when only tool is in-progress AskUser with borderBottom=false', async () => {
       // AskUser tools in progress are rendered by AskUserDialog, not ToolGroupMessage.
       // When AskUser is the only tool and borderBottom=false (no border to close),
       // the component should render nothing.
@@ -604,7 +619,7 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item = createItem(toolCalls);
 
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
           item={item}
@@ -614,7 +629,8 @@ describe('<ToolGroupMessage />', () => {
         { config: baseMockConfig },
       );
       // AskUser tools in progress are rendered by AskUserDialog, so we expect nothing.
-      expect(lastFrame()).toBe('');
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toBe('');
       unmount();
     });
   });
@@ -634,27 +650,32 @@ describe('<ToolGroupMessage />', () => {
       },
       { name: READ_FILE_DISPLAY_NAME, mode: ApprovalMode.PLAN, visible: true },
       { name: GLOB_DISPLAY_NAME, mode: ApprovalMode.PLAN, visible: true },
-    ])('filtering logic for $name in $mode mode', ({ name, mode, visible }) => {
-      const toolCalls = [
-        createToolCall({
-          callId: 'test-call',
-          name,
-          approvalMode: mode,
-        }),
-      ];
-      const item = createItem(toolCalls);
+    ])(
+      'filtering logic for $name in $mode mode',
+      async ({ name, mode, visible }) => {
+        const toolCalls = [
+          createToolCall({
+            callId: 'test-call',
+            name,
+            approvalMode: mode,
+          }),
+        ];
+        const item = createItem(toolCalls);
 
-      const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
-        { config: baseMockConfig },
-      );
+        const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+          <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+          { config: baseMockConfig },
+        );
 
-      if (visible) {
-        expect(lastFrame()).toContain(name);
-      } else {
-        expect(lastFrame()).toBe('');
-      }
-      unmount();
-    });
+        await waitUntilReady();
+
+        if (visible) {
+          expect(lastFrame()).toContain(name);
+        } else {
+          expect(lastFrame({ allowEmpty: true })).toBe('');
+        }
+        unmount();
+      },
+    );
   });
 });
