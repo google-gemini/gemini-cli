@@ -93,7 +93,7 @@ Environment variables can be used to override the settings in the file.
 `true` or `1` will enable the feature. Any other value will disable it.
 
 For detailed information about all configuration options, see the
-[Configuration guide](../get-started/configuration.md).
+[Configuration guide](../reference/configuration.md).
 
 ## Google Cloud telemetry
 

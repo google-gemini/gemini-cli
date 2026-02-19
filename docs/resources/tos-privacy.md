@@ -10,8 +10,8 @@ and Privacy Notices applicable to those services apply to such access and use.
 Your Gemini CLI Usage Statistics are handled in accordance with Google's Privacy
 Policy.
 
-**Note:** See [quotas and pricing](/docs/quota-and-pricing.md) for the quota and
-pricing details that apply to your usage of the Gemini CLI.
+**Note:** See [quotas and pricing](/docs/resources/quota-and-pricing.md) for the
+quota and pricing details that apply to your usage of the Gemini CLI.
 
 ## Supported authentication methods
 
@@ -93,4 +93,4 @@ backend, these Terms of Service and Privacy Notice documents apply:
 
 You may opt-out from sending Gemini CLI Usage Statistics to Google by following
 the instructions available here:
-[Usage Statistics Configuration](https://github.com/google-gemini/gemini-cli/blob/main/docs/get-started/configuration.md#usage-statistics).
+[Usage Statistics Configuration](https://github.com/google-gemini/gemini-cli/blob/main/docs/reference/configuration.md#usage-statistics).

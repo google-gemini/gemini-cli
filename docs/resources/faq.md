@@ -104,7 +104,7 @@ The Gemini CLI configuration is stored in two `settings.json` files:
 1.  In your home directory: `~/.gemini/settings.json`.
 2.  In your project's root directory: `./.gemini/settings.json`.
 
-Refer to [Gemini CLI Configuration](./get-started/configuration.md) for more
+Refer to [Gemini CLI Configuration](../reference/configuration.md) for more
 details.
 
 ## Google AI Pro/Ultra and subscription FAQs

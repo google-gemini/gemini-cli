@@ -93,7 +93,7 @@ topics on:
   - **Cause:** When sandboxing is enabled, Gemini CLI may attempt operations
     that are restricted by your sandbox configuration, such as writing outside
     the project directory or system temp directory.
-  - **Solution:** Refer to the [Configuration: Sandboxing](./cli/sandbox.md)
+  - **Solution:** Refer to the [Configuration: Sandboxing](../cli/sandbox.md)
     documentation for more information, including how to customize your sandbox
     configuration.
 
