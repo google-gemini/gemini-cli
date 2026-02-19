@@ -1,0 +1,13 @@
+context_hash: d09e436bb1db463e7425b28158a986d2f06229dac5e6ea164996ca30067f70f3
+meta:
+  id: REFUSAL-d09e436bb1db463e
+  timestamp: '2026-02-19T17:47:58.701274'
+  tool: test_ledger
+  type: STOCHASTIC_DRIFT_NULLIFICATION
+physics:
+  anchor_markers: []
+  drift_markers:
+  - maybe
+  - guess
+  resonance_score: -4.9361
+  threshold: 5.0

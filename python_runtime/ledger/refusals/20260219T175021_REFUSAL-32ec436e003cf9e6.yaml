@@ -1,0 +1,11 @@
+context_hash: 32ec436e003cf9e608898ee0d1344a84b1c7fdf3cfb1ba59b9f3652478e67aac
+meta:
+  id: REFUSAL-32ec436e003cf9e6
+  timestamp: '2026-02-19T17:50:21.409098'
+  tool: create_file
+  type: STOCHASTIC_DRIFT_NULLIFICATION
+physics:
+  anchor_markers: []
+  drift_markers: []
+  resonance_score: 0.6
+  threshold: 5.0

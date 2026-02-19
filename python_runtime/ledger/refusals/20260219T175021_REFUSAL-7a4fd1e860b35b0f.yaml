@@ -1,0 +1,12 @@
+context_hash: 7a4fd1e860b35b0f495b4bae9fb9575f69db7193d582a6f685c853b9c287493e
+meta:
+  id: REFUSAL-7a4fd1e860b35b0f
+  timestamp: '2026-02-19T17:50:21.404716'
+  tool: create_file
+  type: STOCHASTIC_DRIFT_NULLIFICATION
+physics:
+  anchor_markers:
+  - absolute
+  drift_markers: []
+  resonance_score: 2.218
+  threshold: 5.0
