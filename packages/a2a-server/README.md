@@ -216,7 +216,7 @@ gcloud run deploy gemini-chat-bridge \
   --cpu=1 \
   --timeout=60 \
   --concurrency=80 \
-  --max-instances=5 \
+  --max-instances=1 \
   --set-env-vars="A2A_SERVER_URL=$A2A_URL,GCS_BUCKET_NAME=gemini-a2a-sessions-$PROJECT_ID"
 ```
 
@@ -342,3 +342,15 @@ flushed to GCS every 30 seconds and restored on startup.
 The Chat bridge includes `thread.name` in all responses. If replies still appear
 at the top level, ensure the webhook event includes thread information. DM
 conversations always thread correctly; spaces may need threading enabled.
+
+## Known Limitations
+
+- **Google Chat 4096 character limit**: Long agent responses may be truncated by
+  Google Chat. The bridge does not currently split messages into chunks.
+- **Single bridge instance**: The bridge uses `max-instances=1` so that the
+  in-memory async processing guard works correctly. This means no redundancy
+  during deploys (brief downtime during revision rollover).
+- **Tool confirmation in streaming mode**: When the A2A server has
+  `GEMINI_YOLO_MODE=false`, tool confirmations via streaming may not return text
+  due to an SDK-level issue (executor aborts on SSE disconnect). Server YOLO
+  mode works correctly.

@@ -333,6 +333,58 @@ export class A2ABridgeClient {
   }
 
   /**
+   * Sends a tool confirmation via streaming (SSE) so the caller can
+   * follow the full task lifecycle after approval.
+   */
+  sendToolConfirmationStream(
+    callId: string,
+    outcome: string,
+    taskId: string,
+    options: { contextId?: string },
+  ): AsyncGenerator<A2AStreamEventData, void, undefined> {
+    if (!this.client) {
+      throw new Error('A2A client not initialized. Call initialize() first.');
+    }
+
+    const actionPart: Part = {
+      kind: 'data',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      data: [
+        {
+          version: 'v0.10',
+          action: {
+            name: 'tool_confirmation',
+            surfaceId: `tool_approval_${taskId}_${callId}`,
+            sourceComponentId:
+              outcome === 'cancel' ? 'reject_button' : 'approve_button',
+            timestamp: new Date().toISOString(),
+            context: { callId, outcome, taskId },
+          },
+        },
+      ] as unknown as Record<string, unknown>,
+      metadata: {
+        mimeType: A2UI_MIME_TYPE,
+      },
+    } as Part;
+
+    const params: MessageSendParams = {
+      message: {
+        kind: 'message',
+        role: 'user',
+        messageId: uuidv4(),
+        parts: [actionPart],
+        contextId: options.contextId,
+        taskId,
+        metadata: {
+          extensions: [A2UI_EXTENSION_URI],
+        },
+      },
+    };
+
+    return this.client.sendMessageStream(params);
+  }
+
+  /**
    * Sends multiple tool confirmations in a single A2A message.
    * Needed when the agent requests multiple tool approvals at once —
    * sending them one at a time with blocking mode would hang because
@@ -394,5 +446,65 @@ export class A2ABridgeClient {
     };
 
     return this.client.sendMessage(params);
+  }
+
+  /**
+   * Sends batch tool confirmations via streaming (SSE) so the caller can
+   * follow the full task lifecycle after approval. Returns an async generator
+   * that yields events until the task reaches a terminal state.
+   */
+  sendBatchToolConfirmationsStream(
+    approvals: Array<{ callId: string; outcome: string; taskId: string }>,
+    options: { contextId?: string },
+  ): AsyncGenerator<A2AStreamEventData, void, undefined> {
+    if (!this.client) {
+      throw new Error('A2A client not initialized. Call initialize() first.');
+    }
+
+    const parts: Part[] = approvals.map(
+      (approval) =>
+        ({
+          kind: 'data',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          data: [
+            {
+              version: 'v0.10',
+              action: {
+                name: 'tool_confirmation',
+                surfaceId: `tool_approval_${approval.taskId}_${approval.callId}`,
+                sourceComponentId:
+                  approval.outcome === 'cancel'
+                    ? 'reject_button'
+                    : 'approve_button',
+                timestamp: new Date().toISOString(),
+                context: {
+                  callId: approval.callId,
+                  outcome: approval.outcome,
+                  taskId: approval.taskId,
+                },
+              },
+            },
+          ] as unknown as Record<string, unknown>,
+          metadata: {
+            mimeType: A2UI_MIME_TYPE,
+          },
+        }) as Part,
+    );
+
+    const params: MessageSendParams = {
+      message: {
+        kind: 'message',
+        role: 'user',
+        messageId: uuidv4(),
+        parts,
+        contextId: options.contextId,
+        taskId: approvals[0]?.taskId,
+        metadata: {
+          extensions: [A2UI_EXTENSION_URI],
+        },
+      },
+    };
+
+    return this.client.sendMessageStream(params);
   }
 }

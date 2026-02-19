@@ -69,6 +69,7 @@ export function renderResponse(
   response: A2AResponse,
   threadKey?: string,
   threadName?: string,
+  webhookUrl?: string,
 ): ChatResponse {
   const parts = extractAllParts(response);
   const textContent = extractTextFromParts(parts);
@@ -94,7 +95,7 @@ export function renderResponse(
   // so we skip rendering approval cards for those.
   for (const approval of dedupedApprovals) {
     if (approval.status === 'awaiting_approval') {
-      cards.push(renderToolApprovalCard(approval));
+      cards.push(renderToolApprovalCard(approval, webhookUrl));
     }
   }
 
@@ -353,7 +354,10 @@ function extractCommandSummary(approval: ToolApprovalInfo): string {
  * Renders a tool approval surface as a compact Google Chat Card V2
  * with clickable Approve/Reject buttons.
  */
-function renderToolApprovalCard(approval: ToolApprovalInfo): ChatCardV2 {
+function renderToolApprovalCard(
+  approval: ToolApprovalInfo,
+  webhookUrl?: string,
+): ChatCardV2 {
   const widgets: ChatWidget[] = [];
   const toolLabel = approval.displayName || approval.name;
 
@@ -391,7 +395,7 @@ function renderToolApprovalCard(approval: ToolApprovalInfo): ChatCardV2 {
           text: 'Approve',
           onClick: {
             action: {
-              function: 'tool_confirmation',
+              function: webhookUrl ?? 'tool_confirmation',
               parameters: [
                 { key: 'callId', value: approval.callId },
                 { key: 'outcome', value: 'proceed_once' },
@@ -404,7 +408,7 @@ function renderToolApprovalCard(approval: ToolApprovalInfo): ChatCardV2 {
           text: 'Always Allow',
           onClick: {
             action: {
-              function: 'tool_confirmation',
+              function: webhookUrl ?? 'tool_confirmation',
               parameters: [
                 { key: 'callId', value: approval.callId },
                 { key: 'outcome', value: 'proceed_always_tool' },
@@ -417,7 +421,7 @@ function renderToolApprovalCard(approval: ToolApprovalInfo): ChatCardV2 {
           text: 'Reject',
           onClick: {
             action: {
-              function: 'tool_confirmation',
+              function: webhookUrl ?? 'tool_confirmation',
               parameters: [
                 { key: 'callId', value: approval.callId },
                 { key: 'outcome', value: 'cancel' },
@@ -466,17 +470,18 @@ export function extractFromStreamEvent(event: A2AStreamEventData): {
     taskId = event.taskId;
     contextId = event.contextId;
 
-    // Extract parts from the status message
     const parts: Part[] = event.status?.message?.parts ?? [];
-    const a2uiGroups = extractA2UIParts(parts);
-    for (const messages of a2uiGroups) {
-      parseA2UIMessages(messages, toolApprovals, agentResponses, thoughts);
-    }
 
-    // Also extract plain text
+    // Extract plain text FIRST (incremental chunks) so A2UI accumulated
+    // text is added AFTER — backward iteration will prefer A2UI.
     const plainText = extractTextFromParts(parts);
     if (plainText) {
       agentResponses.push({ text: plainText, status: '' });
+    }
+
+    const a2uiGroups = extractA2UIParts(parts);
+    for (const messages of a2uiGroups) {
+      parseA2UIMessages(messages, toolApprovals, agentResponses, thoughts);
     }
   } else if (event.kind === 'task') {
     state = event.status?.state;
@@ -484,28 +489,30 @@ export function extractFromStreamEvent(event: A2AStreamEventData): {
     contextId = event.contextId;
 
     const parts = extractAllParts(event);
-    const a2uiGroups = extractA2UIParts(parts);
-    for (const messages of a2uiGroups) {
-      parseA2UIMessages(messages, toolApprovals, agentResponses, thoughts);
-    }
 
     const plainText = extractTextFromParts(parts);
     if (plainText) {
       agentResponses.push({ text: plainText, status: '' });
+    }
+
+    const a2uiGroups = extractA2UIParts(parts);
+    for (const messages of a2uiGroups) {
+      parseA2UIMessages(messages, toolApprovals, agentResponses, thoughts);
     }
   } else if (event.kind === 'message') {
     contextId = event.contextId;
     taskId = event.taskId;
 
     const parts: Part[] = event.parts ?? [];
-    const a2uiGroups = extractA2UIParts(parts);
-    for (const messages of a2uiGroups) {
-      parseA2UIMessages(messages, toolApprovals, agentResponses, thoughts);
-    }
 
     const plainText = extractTextFromParts(parts);
     if (plainText) {
       agentResponses.push({ text: plainText, status: '' });
+    }
+
+    const a2uiGroups = extractA2UIParts(parts);
+    for (const messages of a2uiGroups) {
+      parseA2UIMessages(messages, toolApprovals, agentResponses, thoughts);
     }
   }
 

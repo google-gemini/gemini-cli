@@ -16,16 +16,9 @@ import { SessionStore } from './session-store.js';
 import {
   A2ABridgeClient,
   type A2AStreamEventData,
-  extractIdsFromResponse,
-  extractAllParts,
-  extractTextFromParts,
 } from './a2a-bridge-client.js';
 import { ChatApiClient } from './chat-api-client.js';
-import {
-  renderResponse,
-  extractFromStreamEvent,
-  extractToolApprovals,
-} from './response-renderer.js';
+import { renderResponse, extractFromStreamEvent } from './response-renderer.js';
 import { logger } from '../utils/logger.js';
 
 const TERMINAL_STATES = new Set([
@@ -40,6 +33,8 @@ export class ChatBridgeHandler {
   private a2aClient: A2ABridgeClient;
   private chatApiClient: ChatApiClient;
   private initialized = false;
+  /** Full webhook URL for card button actions (HTTP Add-ons need a URL, not a function name). */
+  private webhookUrl: string | undefined;
 
   constructor(
     private config: ChatBridgeConfig,
@@ -52,6 +47,12 @@ export class ChatBridgeHandler {
       new ChatApiClient({
         serviceAccountKeyPath: config.serviceAccountKeyPath,
       });
+    // For HTTP Add-ons, card button action.function must be a full HTTPS URL.
+    // Set CHAT_WEBHOOK_URL env var to the bridge's public webhook endpoint.
+    this.webhookUrl = process.env['CHAT_WEBHOOK_URL'] || undefined;
+    if (this.webhookUrl) {
+      logger.info(`[ChatBridge] Button action URL: ${this.webhookUrl}`);
+    }
   }
 
   /**
@@ -288,76 +289,104 @@ export class ChatBridgeHandler {
     session.asyncProcessing = true;
 
     try {
-      const response = await this.a2aClient.sendToolConfirmation(
+      // Stream the tool confirmation to collect text as it arrives
+      const stream = this.a2aClient.sendToolConfirmationStream(
         approval.callId,
         outcome,
         approval.taskId,
         { contextId: session.contextId },
       );
 
+      let lastText = '';
+      let lastTaskId: string | undefined;
+      let lastContextId: string | undefined;
+      let lastState: string | undefined;
+      let sentResponse = false;
+
+      for await (const streamEvent of stream) {
+        if (session.cancelled) break;
+
+        const extracted = extractFromStreamEvent(streamEvent);
+        if (extracted.taskId) lastTaskId = extracted.taskId;
+        if (extracted.contextId) lastContextId = extracted.contextId;
+        if (extracted.state) lastState = extracted.state;
+        if (extracted.text) lastText = extracted.text;
+
+        // Check for new tool approvals
+        const pending = extracted.toolApprovals.filter(
+          (a) => a.status === 'awaiting_approval',
+        );
+        if (pending.length > 0) {
+          if (session.yoloMode) {
+            // YOLO: auto-approve via streaming
+            const autoResult = await this.autoApproveTools(
+              session,
+              pending,
+              lastContextId,
+            );
+            if (autoResult.lastContextId)
+              lastContextId = autoResult.lastContextId;
+            if (autoResult.lastTaskId) lastTaskId = autoResult.lastTaskId;
+            if (autoResult.lastState) lastState = autoResult.lastState;
+            if (autoResult.text) lastText = autoResult.text;
+          } else {
+            // Non-YOLO: push approval card
+            session.pendingToolApproval = {
+              callId: pending[0].callId,
+              taskId: pending[0].taskId,
+              toolName: pending[0].displayName || pending[0].name,
+            };
+            // Build a minimal task response for the card renderer
+            const cardResponse = renderResponse(
+              {
+                kind: 'task',
+                id: pending[0].taskId,
+                contextId: lastContextId ?? session.contextId,
+                status: {
+                  state: 'input-required',
+                  timestamp: new Date().toISOString(),
+                  message:
+                    streamEvent.kind === 'status-update'
+                      ? streamEvent.status?.message
+                      : undefined,
+                },
+                history: [],
+                artifacts: [],
+              },
+              message.thread.threadKey || threadName,
+              threadName,
+              this.webhookUrl,
+            );
+            await this.chatApiClient.sendMessage(spaceName, threadName, {
+              text: cardResponse.text,
+              cardsV2: cardResponse.cardsV2,
+            });
+            sentResponse = true;
+            logger.info(
+              `[ChatBridge] Pushed approval card after confirmation: ${pending[0].displayName || pending[0].name}`,
+            );
+          }
+          break;
+        }
+      }
+
       if (session.cancelled) return;
 
-      const { contextId: newCtxId, taskId: newTaskId } =
-        extractIdsFromResponse(response);
-      if (newCtxId) session.contextId = newCtxId;
-      this.sessionStore.updateTaskId(threadName, newTaskId);
-
-      // Check for new pending approvals in the response
-      const newApprovals = extractToolApprovals(response).filter(
-        (a) => a.status === 'awaiting_approval',
+      // Update session IDs
+      if (lastContextId) session.contextId = lastContextId;
+      const isTerminal = lastState ? TERMINAL_STATES.has(lastState) : false;
+      this.sessionStore.updateTaskId(
+        threadName,
+        isTerminal ? undefined : lastTaskId,
       );
 
-      if (session.yoloMode && newApprovals.length > 0) {
-        // YOLO: auto-approve any new tools
-        const autoResult = await this.autoApproveTools(
-          session,
-          newApprovals,
-          session.contextId,
-        );
-        if (autoResult.lastContextId)
-          session.contextId = autoResult.lastContextId;
-        if (autoResult.lastTaskId !== undefined) {
-          const isTerminal = autoResult.lastState
-            ? TERMINAL_STATES.has(autoResult.lastState)
-            : false;
-          this.sessionStore.updateTaskId(
-            threadName,
-            isTerminal ? undefined : autoResult.lastTaskId,
-          );
-        }
-        if (autoResult.text) {
-          await this.chatApiClient.sendMessage(spaceName, threadName, {
-            text: autoResult.text,
-          });
-        }
-      } else if (newApprovals.length > 0) {
-        // Non-YOLO: push new approval card
-        session.pendingToolApproval = {
-          callId: newApprovals[0].callId,
-          taskId: newApprovals[0].taskId,
-          toolName: newApprovals[0].displayName || newApprovals[0].name,
-        };
-        const rendered = renderResponse(
-          response,
-          message.thread.threadKey || threadName,
-          threadName,
-        );
+      // Push final text if we haven't already pushed a card
+      if (lastText && !sentResponse) {
         await this.chatApiClient.sendMessage(spaceName, threadName, {
-          text: rendered.text,
-          cardsV2: rendered.cardsV2,
+          text: lastText,
         });
         logger.info(
-          `[ChatBridge] Pushed new approval card after confirmation: ${newApprovals[0].displayName || newApprovals[0].name}`,
-        );
-      } else {
-        // No more approvals — push the agent's response
-        const rendered = renderResponse(response);
-        const responseText = rendered.text || '_Agent completed._';
-        await this.chatApiClient.sendMessage(spaceName, threadName, {
-          text: responseText,
-        });
-        logger.info(
-          `[ChatBridge] Pushed post-approval response (${responseText.length} chars)`,
+          `[ChatBridge] Pushed post-approval response (${lastText.length} chars): "${lastText.substring(0, 200)}"`,
         );
       }
     } catch (error) {
@@ -408,6 +437,19 @@ export class ChatBridgeHandler {
       let lastState: string | undefined;
       let sentFinalResponse = false;
 
+      let eventCount = 0;
+      // Track the latest pending approvals across events — only act on them
+      // when the server signals input-required (meaning it actually needs input).
+      // In server YOLO mode, tools are auto-approved so the stream continues
+      // past the brief 'awaiting_approval' status without hitting input-required.
+      let latestPendingApprovals: Array<{
+        callId: string;
+        taskId: string;
+        name: string;
+        displayName: string;
+      }> = [];
+      let approvalStatusMessage: unknown;
+
       for await (const streamEvent of stream) {
         // Check if session was cancelled (e.g. by /reset)
         if (session.cancelled) {
@@ -417,42 +459,79 @@ export class ChatBridgeHandler {
           break;
         }
 
+        eventCount++;
         const extracted = extractFromStreamEvent(streamEvent);
 
         if (extracted.taskId) lastTaskId = extracted.taskId;
         if (extracted.contextId) lastContextId = extracted.contextId;
         if (extracted.state) lastState = extracted.state;
 
-        // Check for tool approvals needing user input
-        const pendingApprovals = extracted.toolApprovals.filter(
+        // Log each event for debugging
+        logger.info(
+          `[ChatBridge] Stream event #${eventCount}: kind=${streamEvent.kind}, ` +
+            `state=${extracted.state ?? 'n/a'}, text=${extracted.text.length} chars, ` +
+            `approvals=${extracted.toolApprovals.filter((a) => a.status === 'awaiting_approval').length}`,
+        );
+
+        // Track latest text content
+        if (extracted.text) {
+          lastText = extracted.text;
+        }
+
+        // Track tool approvals — always update with latest state so
+        // stale approvals are cleared when the server auto-approves.
+        const pending = extracted.toolApprovals.filter(
           (a) => a.status === 'awaiting_approval',
         );
-        if (pendingApprovals.length > 0) {
-          // YOLO mode: auto-approve all tools without user interaction
-          if (session.yoloMode) {
-            const autoApproved = await this.autoApproveTools(
-              session,
-              pendingApprovals,
-              lastContextId,
-            );
-            if (autoApproved.lastContextId)
-              lastContextId = autoApproved.lastContextId;
-            if (autoApproved.lastTaskId) lastTaskId = autoApproved.lastTaskId;
-            if (autoApproved.lastState) lastState = autoApproved.lastState;
-            if (autoApproved.text) lastText = autoApproved.text;
-            // Auto-approval loop handles everything; break out of stream
-            break;
-          }
+        latestPendingApprovals = pending;
+        if (pending.length > 0) {
+          approvalStatusMessage =
+            streamEvent.kind === 'status-update'
+              ? streamEvent.status?.message
+              : undefined;
+        }
 
+        // On terminal or input-required state, stop streaming.
+        // input-required means the server is asking for user action
+        // (tool approval or follow-up message).
+        if (
+          extracted.state &&
+          (TERMINAL_STATES.has(extracted.state) ||
+            extracted.state === 'input-required')
+        ) {
+          break;
+        }
+      }
+
+      logger.info(
+        `[ChatBridge] Stream complete: ${eventCount} events, ` +
+          `state=${lastState ?? 'none'}, text=${lastText.length} chars, ` +
+          `pendingApprovals=${latestPendingApprovals.length}`,
+      );
+
+      // Handle pending approvals (only relevant when server sent input-required)
+      if (latestPendingApprovals.length > 0 && lastState === 'input-required') {
+        if (session.yoloMode) {
+          // Bridge YOLO mode: auto-approve all tools
+          const autoApproved = await this.autoApproveTools(
+            session,
+            latestPendingApprovals,
+            lastContextId,
+          );
+          if (autoApproved.lastContextId)
+            lastContextId = autoApproved.lastContextId;
+          if (autoApproved.lastTaskId) lastTaskId = autoApproved.lastTaskId;
+          if (autoApproved.lastState) lastState = autoApproved.lastState;
+          if (autoApproved.text) lastText = autoApproved.text;
+        } else {
           // Non-YOLO: push approval card and wait for user input
-          const firstApproval = pendingApprovals[0];
+          const firstApproval = latestPendingApprovals[0];
           session.pendingToolApproval = {
             callId: firstApproval.callId,
             taskId: firstApproval.taskId,
             toolName: firstApproval.displayName || firstApproval.name,
           };
 
-          // Push tool approval card to Chat
           const approvalResponse = renderResponse(
             {
               kind: 'task',
@@ -461,16 +540,17 @@ export class ChatBridgeHandler {
               status: {
                 state: 'input-required',
                 timestamp: new Date().toISOString(),
-                message:
-                  streamEvent.kind === 'status-update'
-                    ? streamEvent.status?.message
-                    : undefined,
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+                message: approvalStatusMessage as
+                  | import('@a2a-js/sdk').Message
+                  | undefined,
               },
               history: [],
               artifacts: [],
             },
             message.thread.threadKey || threadName,
             threadName,
+            this.webhookUrl,
           );
 
           await this.chatApiClient.sendMessage(spaceName, threadName, {
@@ -482,25 +562,6 @@ export class ChatBridgeHandler {
           logger.info(
             `[ChatBridge] Pushed tool approval card: ${firstApproval.displayName || firstApproval.name}`,
           );
-          // Break immediately — the server is waiting for the client to
-          // respond to the approval. If we keep waiting for stream events,
-          // asyncProcessing stays true and the user's "approve" message
-          // hits the async guard.
-          break;
-        }
-
-        // Track latest text content
-        if (extracted.text) {
-          lastText = extracted.text;
-        }
-
-        // On terminal or input-required state, stop streaming
-        if (
-          extracted.state &&
-          (TERMINAL_STATES.has(extracted.state) ||
-            extracted.state === 'input-required')
-        ) {
-          break;
         }
       }
 
@@ -527,7 +588,7 @@ export class ChatBridgeHandler {
           text: lastText,
         });
         logger.info(
-          `[ChatBridge] Pushed final response (${lastText.length} chars)`,
+          `[ChatBridge] Pushed final response (${lastText.length} chars): "${lastText.substring(0, 200)}"`,
         );
       } else if (!lastText && !sentFinalResponse) {
         await this.chatApiClient.sendMessage(spaceName, threadName, {
@@ -595,10 +656,10 @@ export class ChatBridgeHandler {
   }
 
   /**
-   * Auto-approves tool calls in YOLO mode.
-   * Sends all pending approvals in a single batch message to avoid hanging
-   * when the agent needs ALL tools approved before proceeding.
-   * Loops if the response contains further approval requests.
+   * Auto-approves tool calls in YOLO mode using streaming.
+   * Sends approvals and collects streamed text from the SSE response.
+   * The A2A server streams text incrementally and closes with final:true
+   * at input-required (more tools) or completed (done).
    */
   private async autoApproveTools(
     session: SessionInfo,
@@ -621,20 +682,19 @@ export class ChatBridgeHandler {
     let lastState: string | undefined;
     let lastText: string | undefined;
     const approvedNames: string[] = [];
-    const MAX_ROUNDS = 10;
+    const MAX_ROUNDS = 20;
 
     for (let round = 0; round < MAX_ROUNDS && !session.cancelled; round++) {
       if (approvalsToProcess.length === 0) break;
 
-      // Log what we're approving
       for (const a of approvalsToProcess) {
         const label = a.displayName || a.name;
         logger.info(`[ChatBridge] YOLO auto-approving: ${label}`);
         approvedNames.push(label);
       }
 
-      // Send ALL approvals in a single batch message
-      const response = await this.a2aClient.sendBatchToolConfirmations(
+      // Stream tool confirmations — text arrives incrementally via SSE
+      const stream = this.a2aClient.sendBatchToolConfirmationsStream(
         approvalsToProcess.map((a) => ({
           callId: a.callId,
           outcome: 'proceed_once',
@@ -643,28 +703,41 @@ export class ChatBridgeHandler {
         { contextId: lastContextId ?? session.contextId },
       );
 
-      const { contextId: newCtxId, taskId: newTaskId } =
-        extractIdsFromResponse(response);
-      if (newCtxId) lastContextId = newCtxId;
-      if (newTaskId) lastTaskId = newTaskId;
+      approvalsToProcess = [];
 
-      if (response.kind === 'task' && response.status?.state) {
-        lastState = response.status.state;
+      // Consume the stream, collecting text and detecting new tool approvals
+      let eventCount = 0;
+      for await (const event of stream) {
+        if (session.cancelled) break;
+        eventCount++;
+
+        const extracted = extractFromStreamEvent(event);
+        if (extracted.taskId) lastTaskId = extracted.taskId;
+        if (extracted.contextId) lastContextId = extracted.contextId;
+        if (extracted.state) lastState = extracted.state;
+        if (extracted.text) lastText = extracted.text;
+
+        logger.info(
+          `[ChatBridge] YOLO event #${eventCount}: kind=${event.kind}, ` +
+            `state=${extracted.state ?? 'n/a'}, text=${extracted.text.length} chars`,
+        );
+
+        // New tool approvals → break to send them in next round
+        const pending = extracted.toolApprovals.filter(
+          (a) => a.status === 'awaiting_approval',
+        );
+        if (pending.length > 0) {
+          approvalsToProcess = pending;
+          break;
+        }
       }
 
-      // Extract text from this response
-      const responseParts = extractAllParts(response);
-      const responseText = extractTextFromParts(responseParts);
-      if (responseText) lastText = responseText;
-
-      // Break if terminal
-      if (lastState && TERMINAL_STATES.has(lastState)) break;
-
-      // Check for more pending approvals
-      const newApprovals = extractToolApprovals(response).filter(
-        (a) => a.status === 'awaiting_approval',
+      logger.info(
+        `[ChatBridge] YOLO round ${round}: state=${lastState ?? 'none'}, ` +
+          `text=${lastText?.length ?? 0} chars, newApprovals=${approvalsToProcess.length}`,
       );
-      approvalsToProcess = newApprovals;
+
+      if (lastState && TERMINAL_STATES.has(lastState)) break;
     }
 
     logger.info(
@@ -698,7 +771,10 @@ export class ChatBridgeHandler {
       `[ChatBridge] CARD_CLICKED: function=${action.actionMethodName}`,
     );
 
-    if (action.actionMethodName === 'tool_confirmation') {
+    if (
+      action.actionMethodName === 'tool_confirmation' ||
+      action.actionMethodName === this.webhookUrl
+    ) {
       const params = action.parameters || [];
       const paramMap = new Map(params.map((p) => [p.key, p.value]));
       const callId = paramMap.get('callId');
