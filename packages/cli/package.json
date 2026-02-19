@@ -31,7 +31,6 @@
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.12.0",
     "@google/gemini-cli-core": "file:../core",
-    "@google/gemini-cli-devtools": "file:../devtools",
     "@google/genai": "1.30.0",
     "@iarna/toml": "^2.2.5",
     "@modelcontextprotocol/sdk": "^1.23.0",
@@ -72,6 +71,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@google/gemini-cli-devtools": "file:../devtools",
     "@google/gemini-cli-test-utils": "file:../test-utils",
     "@types/command-exists": "^1.2.3",
     "@types/hast": "^3.0.4",
