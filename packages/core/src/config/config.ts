@@ -145,6 +145,7 @@ export interface TelemetrySettings {
   target?: TelemetryTarget;
   otlpEndpoint?: string;
   otlpProtocol?: 'grpc' | 'http';
+  otlpHeaders?: Record<string, string>;
   logPrompts?: boolean;
   outfile?: string;
   useCollector?: boolean;
@@ -722,6 +723,7 @@ export class Config {
       target: params.telemetry?.target ?? DEFAULT_TELEMETRY_TARGET,
       otlpEndpoint: params.telemetry?.otlpEndpoint ?? DEFAULT_OTLP_ENDPOINT,
       otlpProtocol: params.telemetry?.otlpProtocol,
+      otlpHeaders: params.telemetry?.otlpHeaders,
       logPrompts: params.telemetry?.logPrompts ?? true,
       outfile: params.telemetry?.outfile,
       useCollector: params.telemetry?.useCollector,
@@ -1846,8 +1848,12 @@ export class Config {
     return this.telemetrySettings.useCollector ?? false;
   }
 
-  getTelemetryUseCliAuth(): boolean {
+getTelemetryUseCliAuth(): boolean {
     return this.telemetrySettings.useCliAuth ?? false;
+  }
+
+  getTelemetryOtlpHeaders(): Record<string, string> {
+    return this.telemetrySettings.otlpHeaders ?? {};
   }
 
   getGeminiClient(): GeminiClient {
