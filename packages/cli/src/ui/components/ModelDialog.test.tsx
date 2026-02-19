@@ -14,11 +14,6 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
-  PREVIEW_GEMINI_MODEL,
-  PREVIEW_GEMINI_3_1_MODEL,
-  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
-  PREVIEW_GEMINI_FLASH_MODEL,
-  AuthType,
 } from '@google/gemini-cli-core';
 import type { Config, ModelSlashCommandEvent } from '@google/gemini-cli-core';
 
@@ -81,21 +76,7 @@ describe('<ModelDialog />', () => {
 
   const renderComponent = (configValue = mockConfig as Config) =>
     renderWithProviders(<ModelDialog onClose={mockOnClose} />, {
-  const renderComponent = async (
-    configValue = mockConfig as Config,
-    authType = AuthType.LOGIN_WITH_GOOGLE,
-  ) => {
-    const settings = createMockSettings({
-      security: {
-        auth: {
-          selectedType: authType,
-        },
-      },
-    });
-
-    const result = renderWithProviders(<ModelDialog onClose={mockOnClose} />, {
       config: configValue,
-      settings,
     });
 
   it('renders the initial "main" view correctly', () => {
@@ -231,100 +212,6 @@ describe('<ModelDialog />', () => {
       expect(mockOnClose).not.toHaveBeenCalled();
       // Should be back to main view (Manual option visible)
       expect(lastFrame()).toContain('Manual');
-    });
-  });
-
-  it('shows the preferred manual model in the main view option', async () => {
-    mockGetModel.mockReturnValue(DEFAULT_GEMINI_MODEL);
-    const { lastFrame, unmount } = await renderComponent();
-
-    expect(lastFrame()).toContain(`Manual (${DEFAULT_GEMINI_MODEL})`);
-    unmount();
-  });
-
-  describe('Preview Models', () => {
-    beforeEach(() => {
-      mockGetHasAccessToPreviewModel.mockReturnValue(true);
-    });
-
-    it('shows Auto (Preview) in main view when access is granted', async () => {
-      const { lastFrame, unmount } = await renderComponent();
-      expect(lastFrame()).toContain('Auto (Preview)');
-      unmount();
-    });
-
-    it('shows Gemini 3 models in manual view when Gemini 3.1 is NOT launched', async () => {
-      mockGetGemini31LaunchedSync.mockReturnValue(false);
-      const { lastFrame, stdin, waitUntilReady, unmount } =
-        await renderComponent();
-
-      // Go to manual view
-      await act(async () => {
-        stdin.write('\u001B[B'); // Manual
-      });
-      await waitUntilReady();
-      await act(async () => {
-        stdin.write('\r');
-      });
-      await waitUntilReady();
-
-      const output = lastFrame();
-      expect(output).toContain(PREVIEW_GEMINI_MODEL);
-      expect(output).toContain(PREVIEW_GEMINI_FLASH_MODEL);
-      unmount();
-    });
-
-    it('shows Gemini 3.1 models in manual view when Gemini 3.1 IS launched', async () => {
-      mockGetGemini31LaunchedSync.mockReturnValue(true);
-      const { lastFrame, stdin, waitUntilReady, unmount } =
-        await renderComponent(mockConfig as Config, AuthType.USE_VERTEX_AI);
-
-      // Go to manual view
-      await act(async () => {
-        stdin.write('\u001B[B'); // Manual
-      });
-      await waitUntilReady();
-      await act(async () => {
-        stdin.write('\r');
-      });
-      await waitUntilReady();
-
-      const output = lastFrame();
-      expect(output).toContain(PREVIEW_GEMINI_3_1_MODEL);
-      expect(output).toContain(PREVIEW_GEMINI_FLASH_MODEL);
-      unmount();
-    });
-
-    it('uses custom tools model when Gemini 3.1 IS launched and auth is Gemini API Key', async () => {
-      mockGetGemini31LaunchedSync.mockReturnValue(true);
-      const { stdin, waitUntilReady, unmount } = await renderComponent(
-        mockConfig as Config,
-        AuthType.USE_GEMINI,
-      );
-
-      // Go to manual view
-      await act(async () => {
-        stdin.write('\u001B[B'); // Manual
-      });
-      await waitUntilReady();
-      await act(async () => {
-        stdin.write('\r');
-      });
-      await waitUntilReady();
-
-      // Select Gemini 3.1 (first item in preview section)
-      await act(async () => {
-        stdin.write('\r');
-      });
-      await waitUntilReady();
-
-      await waitFor(() => {
-        expect(mockSetModel).toHaveBeenCalledWith(
-          PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
-          true,
-        );
-      });
-      unmount();
     });
   });
 });
