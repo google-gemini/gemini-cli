@@ -47,7 +47,7 @@ describe('Tracker Tools Integration', () => {
 
     expect(result.llmContent).toContain('Task tracker initialized');
     const trackerDir = config.getTrackerService().trackerDir;
-    const tasksDir = path.join(trackerDir, 'tasks');
+    const tasksDir = trackerDir;
     const stats = await fs.stat(tasksDir);
     expect(stats.isDirectory()).toBe(true);
     // Verify it is NOT in the tempDir root (which was the old behavior)

@@ -1913,7 +1913,7 @@ export class Config {
   getTrackerService(): TrackerService {
     if (!this.trackerService) {
       this.trackerService = new TrackerService(
-        this.storage.getProjectTempTrackerDir(this.sessionId),
+        this.storage.getProjectTempTrackerDir(),
       );
     }
     return this.trackerService;

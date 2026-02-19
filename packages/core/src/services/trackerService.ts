@@ -13,7 +13,7 @@ export class TrackerService {
   private readonly tasksDir: string;
 
   constructor(readonly trackerDir: string) {
-    this.tasksDir = path.join(this.trackerDir, 'tasks');
+    this.tasksDir = trackerDir;
   }
 
   /**
