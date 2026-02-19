@@ -297,7 +297,7 @@ describe('Hooks System Integration', () => {
 
       const scriptPath = rig.createScript(
         'after_tool_context.cjs',
-        "console.log(JSON.stringify({hookSpecificOutput: {hookEventName: 'AfterTool', toolOutput: '{\"key\":\"value\"}'}}));",
+        "console.log(JSON.stringify({hookSpecificOutput: {hookEventName: 'AfterTool', tool_output: '{\"key\":\"value\"}'}}));",
       );
 
       const command = `node "${scriptPath}"`;
