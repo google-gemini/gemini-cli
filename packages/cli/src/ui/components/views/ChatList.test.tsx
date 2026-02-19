@@ -21,29 +21,36 @@ const mockChats: ChatDetail[] = [
 ];
 
 describe('<ChatList />', () => {
-  it('renders correctly with a list of chats', () => {
-    const { lastFrame, unmount } = render(<ChatList chats={mockChats} />);
+  it('renders correctly with a list of chats', async () => {
+    const { lastFrame, unmount, waitUntilReady } = render(
+      <ChatList chats={mockChats} />,
+    );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('renders correctly with no chats', () => {
-    const { lastFrame, unmount } = render(<ChatList chats={[]} />);
+  it('renders correctly with no chats', async () => {
+    const { lastFrame, unmount, waitUntilReady } = render(
+      <ChatList chats={[]} />,
+    );
+    await waitUntilReady();
     expect(lastFrame()).toContain('No saved conversation checkpoints found.');
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('handles invalid date formats gracefully', () => {
+  it('handles invalid date formats gracefully', async () => {
     const mockChatsWithInvalidDate: ChatDetail[] = [
       {
         name: 'bad-date-chat',
         mtime: 'an-invalid-date-string',
       },
     ];
-    const { lastFrame, unmount } = render(
+    const { lastFrame, unmount, waitUntilReady } = render(
       <ChatList chats={mockChatsWithInvalidDate} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toContain('(Invalid Date)');
     expect(lastFrame()).toMatchSnapshot();
     unmount();

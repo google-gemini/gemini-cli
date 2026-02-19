@@ -34,6 +34,8 @@ import {
   coreEvents,
   CoreEvent,
   CoreToolCallStatus,
+  buildUserSteeringHintPrompt,
+  generateSteeringAckMessage,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -55,6 +57,7 @@ import type {
   HistoryItemThinking,
   HistoryItemWithoutId,
   HistoryItemToolGroup,
+  HistoryItemInfo,
   IndividualToolCallDisplay,
   SlashCommandProcessorResult,
   HistoryItemModel,
@@ -191,6 +194,7 @@ export const useGeminiStream = (
   terminalWidth: number,
   terminalHeight: number,
   isShellFocused?: boolean,
+  consumeUserHint?: () => string | null,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const [retryStatus, setRetryStatus] = useState<RetryAttemptPayload | null>(
@@ -819,16 +823,18 @@ export const useGeminiStream = (
         // broken up so that there are more "statically" rendered.
         const beforeText = newGeminiMessageBuffer.substring(0, splitPoint);
         const afterText = newGeminiMessageBuffer.substring(splitPoint);
-        addItem(
-          {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            type: pendingHistoryItemRef.current?.type as
-              | 'gemini'
-              | 'gemini_content',
-            text: beforeText,
-          },
-          userMessageTimestamp,
-        );
+        if (beforeText.length > 0) {
+          addItem(
+            {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              type: pendingHistoryItemRef.current?.type as
+                | 'gemini'
+                | 'gemini_content',
+              text: beforeText,
+            },
+            userMessageTimestamp,
+          );
+        }
         setPendingHistoryItem({ type: 'gemini_content', text: afterText });
         newGeminiMessageBuffer = afterText;
       }
@@ -1602,6 +1608,29 @@ export const useGeminiStream = (
       const responsesToSend: Part[] = geminiTools.flatMap(
         (toolCall) => toolCall.response.responseParts,
       );
+
+      if (consumeUserHint) {
+        const userHint = consumeUserHint();
+        if (userHint && userHint.trim().length > 0) {
+          const hintText = userHint.trim();
+          responsesToSend.unshift({
+            text: buildUserSteeringHintPrompt(hintText),
+          });
+          void generateSteeringAckMessage(
+            config.getBaseLlmClient(),
+            hintText,
+          ).then((ackText) => {
+            addItem({
+              type: 'info',
+              icon: '· ',
+              color: theme.text.secondary,
+              marginBottom: 1,
+              text: ackText,
+            } as HistoryItemInfo);
+          });
+        }
+      }
+
       const callIdsToMarkAsSubmitted = geminiTools.map(
         (toolCall) => toolCall.request.callId,
       );
@@ -1634,6 +1663,8 @@ export const useGeminiStream = (
       modelSwitchedFromQuotaError,
       addItem,
       registerBackgroundShell,
+      consumeUserHint,
+      config,
     ],
   );
 

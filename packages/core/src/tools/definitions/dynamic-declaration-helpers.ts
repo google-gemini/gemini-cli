@@ -118,7 +118,7 @@ export function getExitPlanModeDeclaration(
   return {
     name: EXIT_PLAN_MODE_TOOL_NAME,
     description:
-      'Signals that the planning phase is complete and requests user approval to start implementation.',
+      'Finalizes the planning phase and transitions to implementation by presenting the plan for user approval. This tool MUST be used to exit Plan Mode before any source code edits can be performed. Call this whenever a plan is ready or the user requests implementation.',
     parametersJsonSchema: {
       type: 'object',
       required: ['plan_path'],
