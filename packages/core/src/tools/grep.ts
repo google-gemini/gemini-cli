@@ -27,11 +27,7 @@ import { GREP_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { GREP_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
-import {
-  type GrepMatch,
-  groupMatchesByFile,
-  readFileLines,
-} from './grep-utils.js';
+import { type GrepMatch, formatGrepResults } from './grep-utils.js';
 
 // --- Interfaces ---
 
@@ -264,90 +260,12 @@ class GrepToolInvocation extends BaseToolInvocation<
         searchLocationDescription = `in path "${searchDirDisplay}"`;
       }
 
-      if (allMatches.length === 0) {
-        const noMatchMsg = `No matches found for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}.`;
-        return { llmContent: noMatchMsg, returnDisplay: `No matches found` };
-      }
-
-      const wasTruncated = allMatches.length >= totalMaxMatches;
-
-      // Group matches by file
-      const matchesByFile = groupMatchesByFile(allMatches);
-
-      const matchCount = allMatches.length;
-      const matchTerm = matchCount === 1 ? 'match' : 'matches';
-
-      if (this.params.names_only) {
-        const filePaths = Object.keys(matchesByFile).sort();
-        let llmContent = `Found ${filePaths.length} files with matches for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}${wasTruncated ? ` (results limited to ${totalMaxMatches} matches for performance)` : ''}:\n`;
-        llmContent += filePaths.join('\n');
-        return {
-          llmContent: llmContent.trim(),
-          returnDisplay: `Found ${filePaths.length} files${wasTruncated ? ' (limited)' : ''}`,
-        };
-      }
-
-      let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}`;
-
-      if (wasTruncated) {
-        llmContent += ` (results limited to ${totalMaxMatches} matches for performance)`;
-      }
-
-      llmContent += `:\n---\n`;
-
-      if (matchCount >= 1 && matchCount <= 3 && !this.params.names_only) {
-        const contextBudget = matchCount === 1 ? 50 : 15;
-        for (const filePath in matchesByFile) {
-          const fileMatches = matchesByFile[filePath];
-          const fileLines = await readFileLines(fileMatches[0].absolutePath);
-
-          llmContent += `File: ${filePath}\n`;
-
-          for (const match of fileMatches) {
-            if (fileLines) {
-              const startLine = Math.max(
-                0,
-                match.lineNumber - 1 - contextBudget,
-              );
-              const endLine = Math.min(
-                fileLines.length,
-                match.lineNumber - 1 + contextBudget + 1,
-              );
-              const contextLines = fileLines.slice(startLine, endLine);
-
-              llmContent += `Match at line ${match.lineNumber}:\n`;
-              contextLines.forEach((line, index) => {
-                const currentLineNumber = startLine + index + 1;
-                if (currentLineNumber === match.lineNumber) {
-                  llmContent += `> L${currentLineNumber}: ${line}\n`;
-                } else {
-                  llmContent += `  L${currentLineNumber}: ${line}\n`;
-                }
-              });
-              llmContent += '\n';
-            } else {
-              const trimmedLine = match.line.trim();
-              llmContent += `L${match.lineNumber}: ${trimmedLine}\n`;
-            }
-          }
-          llmContent += '---\n';
-        }
-      } else {
-        for (const filePath in matchesByFile) {
-          llmContent += `File: ${filePath}
-`;
-          matchesByFile[filePath].forEach((match) => {
-            const trimmedLine = match.line.trim();
-            llmContent += `L${match.lineNumber}: ${trimmedLine}\n`;
-          });
-          llmContent += '---\n';
-        }
-      }
-
-      return {
-        llmContent: llmContent.trim(),
-        returnDisplay: `Found ${matchCount} ${matchTerm}${wasTruncated ? ' (limited)' : ''}`,
-      };
+      return await formatGrepResults(
+        allMatches,
+        this.params,
+        searchLocationDescription,
+        totalMaxMatches,
+      );
     } catch (error) {
       debugLogger.warn(`Error during GrepLogic execution: ${error}`);
       const errorMessage = getErrorMessage(error);

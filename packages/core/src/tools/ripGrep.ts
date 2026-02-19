@@ -31,11 +31,7 @@ import {
 } from './constants.js';
 import { RIP_GREP_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
-import {
-  type GrepMatch,
-  groupMatchesByFile,
-  readFileLines,
-} from './grep-utils.js';
+import { type GrepMatch, formatGrepResults } from './grep-utils.js';
 
 function getRgCandidateFilenames(): readonly string[] {
   return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
@@ -283,99 +279,13 @@ class GrepToolInvocation extends BaseToolInvocation<
       }
 
       const searchLocationDescription = `in path "${searchDirDisplay}"`;
-      if (allMatches.length === 0) {
-        const noMatchMsg = `No matches found for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}.`;
-        return { llmContent: noMatchMsg, returnDisplay: `No matches found` };
-      }
 
-      const matchesByFile = groupMatchesByFile(allMatches);
-
-      const matchesOnly = allMatches.filter((m) => !m.isContext);
-      const matchCount = matchesOnly.length;
-      const matchTerm = matchCount === 1 ? 'match' : 'matches';
-
-      // Greedy Grep: If match count is low and no context was requested, automatically return context.
-      if (
-        matchCount >= 1 &&
-        matchCount <= 3 &&
-        !this.params.names_only &&
-        !this.params.context &&
-        !this.params.before &&
-        !this.params.after
-      ) {
-        const contextLines = matchCount === 1 ? 50 : 15;
-        for (const filePath in matchesByFile) {
-          const fileMatches = matchesByFile[filePath];
-          const fileLines = await readFileLines(fileMatches[0].absolutePath);
-
-          if (fileLines) {
-            const newFileMatches: GrepMatch[] = [];
-            const seenLines = new Set<number>();
-            for (const match of fileMatches) {
-              const startLine = Math.max(
-                0,
-                match.lineNumber - 1 - contextLines,
-              );
-              const endLine = Math.min(
-                fileLines.length,
-                match.lineNumber - 1 + contextLines + 1,
-              );
-              for (let i = startLine; i < endLine; i++) {
-                if (!seenLines.has(i + 1)) {
-                  newFileMatches.push({
-                    absolutePath: match.absolutePath,
-                    filePath: match.filePath,
-                    lineNumber: i + 1,
-                    line: fileLines[i],
-                    isContext: i + 1 !== match.lineNumber,
-                  });
-                  seenLines.add(i + 1);
-                } else if (i + 1 === match.lineNumber) {
-                  const index = newFileMatches.findIndex(
-                    (m) => m.lineNumber === i + 1,
-                  );
-                  if (index !== -1) {
-                    newFileMatches[index].isContext = false;
-                  }
-                }
-              }
-            }
-            matchesByFile[filePath] = newFileMatches.sort(
-              (a, b) => a.lineNumber - b.lineNumber,
-            );
-          }
-        }
-      }
-
-      const wasTruncated = matchCount >= totalMaxMatches;
-
-      if (this.params.names_only) {
-        const filePaths = Object.keys(matchesByFile).sort();
-        let llmContent = `Found ${filePaths.length} files with matches for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}${wasTruncated ? ` (results limited to ${totalMaxMatches} matches for performance)` : ''}:\n`;
-        llmContent += filePaths.join('\n');
-        return {
-          llmContent: llmContent.trim(),
-          returnDisplay: `Found ${filePaths.length} files${wasTruncated ? ' (limited)' : ''}`,
-        };
-      }
-
-      let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}${wasTruncated ? ` (results limited to ${totalMaxMatches} matches for performance)` : ''}:\n---\n`;
-
-      for (const filePath in matchesByFile) {
-        llmContent += `File: ${filePath}\n`;
-        matchesByFile[filePath].forEach((match) => {
-          const separator = match.isContext ? '-' : ':';
-          llmContent += `L${match.lineNumber}${separator} ${match.line}\n`;
-        });
-        llmContent += '---\n';
-      }
-
-      return {
-        llmContent: llmContent.trim(),
-        returnDisplay: `Found ${matchCount} ${matchTerm}${
-          wasTruncated ? ' (limited)' : ''
-        }`,
-      };
+      return await formatGrepResults(
+        allMatches,
+        this.params,
+        searchLocationDescription,
+        totalMaxMatches,
+      );
     } catch (error) {
       debugLogger.warn(`Error during GrepLogic execution: ${error}`);
       const errorMessage = getErrorMessage(error);

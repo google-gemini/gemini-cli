@@ -1180,7 +1180,10 @@ describe('RipGrepTool', () => {
         }),
       );
 
-      const params: RipGrepToolParams = { pattern: 'function\\s+\\w+\\s*\\(' };
+      const params: RipGrepToolParams = {
+        pattern: 'function\\s+\\w+\\s*\\(',
+        context: 0,
+      };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
 
@@ -1258,7 +1261,10 @@ describe('RipGrepTool', () => {
         }),
       );
 
-      const params: RipGrepToolParams = { pattern: '\\$\\d+\\.\\d+' };
+      const params: RipGrepToolParams = {
+        pattern: '\\$\\d+\\.\\d+',
+        context: 0,
+      };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
 
@@ -1370,7 +1376,7 @@ describe('RipGrepTool', () => {
           exitCode: 0,
         }),
       );
-      let params: RipGrepToolParams = { pattern: 'HELLO' };
+      let params: RipGrepToolParams = { pattern: 'HELLO', context: 0 };
       let invocation = grepTool.build(params);
       let result = await invocation.execute(abortSignal);
       expect(mockSpawn).toHaveBeenLastCalledWith(
@@ -1396,7 +1402,7 @@ describe('RipGrepTool', () => {
           exitCode: 0,
         }),
       );
-      params = { pattern: 'HELLO', case_sensitive: true };
+      params = { pattern: 'HELLO', case_sensitive: true, context: 0 };
       invocation = grepTool.build(params);
       result = await invocation.execute(abortSignal);
       expect(mockSpawn).toHaveBeenLastCalledWith(
@@ -1917,6 +1923,7 @@ describe('RipGrepTool', () => {
       const params: RipGrepToolParams = {
         pattern: 'match',
         total_max_matches: 2,
+        context: 0,
       };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
@@ -2000,6 +2007,7 @@ describe('RipGrepTool', () => {
       const params: RipGrepToolParams = {
         pattern: 'Copyright .* Google LLC',
         exclude_pattern: '2026',
+        context: 0,
       };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);

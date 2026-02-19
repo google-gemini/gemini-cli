@@ -53,3 +53,149 @@ export async function readFileLines(
     return null;
   }
 }
+
+/**
+ * Automatically enriches grep results with surrounding context if the match count is low
+ * and no specific context was requested.
+ */
+export async function enrichWithAutoContext(
+  matchesByFile: Record<string, GrepMatch[]>,
+  matchCount: number,
+  params: {
+    names_only?: boolean;
+    context?: number;
+    before?: number;
+    after?: number;
+  },
+): Promise<void> {
+  const { names_only, context, before, after } = params;
+
+  if (
+    matchCount >= 1 &&
+    matchCount <= 3 &&
+    !names_only &&
+    context === undefined &&
+    before === undefined &&
+    after === undefined
+  ) {
+    const contextLines = matchCount === 1 ? 50 : 15;
+    for (const filePath in matchesByFile) {
+      const fileMatches = matchesByFile[filePath];
+      if (fileMatches.length === 0) continue;
+
+      const fileLines = await readFileLines(fileMatches[0].absolutePath);
+
+      if (fileLines) {
+        const newFileMatches: GrepMatch[] = [];
+        const seenLines = new Set<number>();
+
+        // Sort matches to process them in order
+        fileMatches.sort((a, b) => a.lineNumber - b.lineNumber);
+
+        for (const match of fileMatches) {
+          const startLine = Math.max(0, match.lineNumber - 1 - contextLines);
+          const endLine = Math.min(
+            fileLines.length,
+            match.lineNumber - 1 + contextLines + 1,
+          );
+
+          for (let i = startLine; i < endLine; i++) {
+            const lineNum = i + 1;
+            if (!seenLines.has(lineNum)) {
+              newFileMatches.push({
+                absolutePath: match.absolutePath,
+                filePath: match.filePath,
+                lineNumber: lineNum,
+                line: fileLines[i],
+                isContext: lineNum !== match.lineNumber,
+              });
+              seenLines.add(lineNum);
+            } else if (lineNum === match.lineNumber) {
+              const existing = newFileMatches.find(
+                (m) => m.lineNumber === lineNum,
+              );
+              if (existing) {
+                existing.isContext = false;
+              }
+            }
+          }
+        }
+        matchesByFile[filePath] = newFileMatches.sort(
+          (a, b) => a.lineNumber - b.lineNumber,
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Formats the grep results for the LLM, including optional context.
+ */
+export async function formatGrepResults(
+  allMatches: GrepMatch[],
+  params: {
+    pattern: string;
+    names_only?: boolean;
+    include?: string;
+    // Context params to determine if auto-context should be skipped
+    context?: number;
+    before?: number;
+    after?: number;
+  },
+  searchLocationDescription: string,
+  totalMaxMatches: number,
+): Promise<{ llmContent: string; returnDisplay: string }> {
+  const { pattern, names_only, include } = params;
+
+  if (allMatches.length === 0) {
+    const noMatchMsg = `No matches found for pattern "${pattern}" ${searchLocationDescription}${include ? ` (filter: "${include}")` : ''}.`;
+    return { llmContent: noMatchMsg, returnDisplay: `No matches found` };
+  }
+
+  const matchesByFile = groupMatchesByFile(allMatches);
+
+  const matchesOnly = allMatches.filter((m) => !m.isContext);
+  const matchCount = matchesOnly.length; // Count actual matches, not context lines
+  const matchTerm = matchCount === 1 ? 'match' : 'matches';
+
+  // Greedy Grep: If match count is low and no context was requested, automatically return context.
+  await enrichWithAutoContext(matchesByFile, matchCount, params);
+
+  const wasTruncated = matchCount >= totalMaxMatches;
+
+  if (names_only) {
+    const filePaths = Object.keys(matchesByFile).sort();
+    let llmContent = `Found ${filePaths.length} files with matches for pattern "${pattern}" ${searchLocationDescription}${include ? ` (filter: "${include}")` : ''}${wasTruncated ? ` (results limited to ${totalMaxMatches} matches for performance)` : ''}:\n`;
+    llmContent += filePaths.join('\n');
+    return {
+      llmContent: llmContent.trim(),
+      returnDisplay: `Found ${filePaths.length} files${wasTruncated ? ' (limited)' : ''}`,
+    };
+  }
+
+  let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${pattern}" ${searchLocationDescription}${include ? ` (filter: "${include}")` : ''}`;
+
+  if (wasTruncated) {
+    llmContent += ` (results limited to ${totalMaxMatches} matches for performance)`;
+  }
+
+  llmContent += `:\n---\n`;
+
+  for (const filePath in matchesByFile) {
+    llmContent += `File: ${filePath}\n`;
+    matchesByFile[filePath].forEach((match) => {
+      // If isContext is undefined, assume it's a match (false)
+      const separator = match.isContext ? '-' : ':';
+      // trimEnd to avoid double newlines if line has them, but we want to preserve indentation
+      llmContent += `L${match.lineNumber}${separator} ${match.line.trimEnd()}\n`;
+    });
+    llmContent += '---\n';
+  }
+
+  return {
+    llmContent: llmContent.trim(),
+    returnDisplay: `Found ${matchCount} ${matchTerm}${
+      wasTruncated ? ' (limited)' : ''
+    }`,
+  };
+}
