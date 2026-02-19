@@ -7,7 +7,7 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execSync } from 'node:child_process';
 import * as os from 'node:os';
-import { detect as chardetDetect } from 'chardet';
+import { detect as chardetDetect, analyse as chardetAnalyse } from 'chardet';
 import { debugLogger } from './debugLogger.js';
 
 // Mock dependencies
@@ -29,12 +29,14 @@ describe('Shell Command Processor - Encoding Functions', () => {
   let mockedExecSync: ReturnType<typeof vi.mocked<typeof execSync>>;
   let mockedOsPlatform: ReturnType<typeof vi.mocked<() => string>>;
   let mockedChardetDetect: ReturnType<typeof vi.mocked<typeof chardetDetect>>;
+  let mockedChardetAnalyse: ReturnType<typeof vi.mocked<typeof chardetAnalyse>>;
 
   beforeEach(() => {
     consoleWarnSpy = vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
     mockedExecSync = vi.mocked(execSync);
     mockedOsPlatform = vi.mocked(os.platform);
     mockedChardetDetect = vi.mocked(chardetDetect);
+    mockedChardetAnalyse = vi.mocked(chardetAnalyse);
 
     // Reset the encoding cache before each test
     resetEncodingCache();
@@ -43,6 +45,7 @@ describe('Shell Command Processor - Encoding Functions', () => {
     delete process.env['LC_ALL'];
     delete process.env['LC_CTYPE'];
     delete process.env['LANG'];
+    delete process.env['GEMINI_CLI_ENCODING'];
   });
 
   afterEach(() => {
@@ -133,6 +136,63 @@ describe('Shell Command Processor - Encoding Functions', () => {
 
       const result = detectEncodingFromBuffer(buffer);
       expect(result).toBe(null);
+    });
+
+    it('should correctly identify valid UTF-8 content via strict check', () => {
+      const utf8Buffer = Buffer.from('Привет, мир!', 'utf8');
+      // We'll test this through getCachedEncodingForBuffer since strict check is internal
+      mockedOsPlatform.mockReturnValue('win32');
+      mockedExecSync.mockReturnValue('Active code page: 866');
+
+      const result = getCachedEncodingForBuffer(utf8Buffer);
+      expect(result).toBe('utf-8');
+    });
+
+    it('should fall back to system encoding when strict UTF-8 check fails', () => {
+      const cp866Buffer = Buffer.from([0xcf, 0xf0, 0xe8, 0xe2, 0xe5, 0xf2]); // "Привет" in CP866
+      mockedOsPlatform.mockReturnValue('win32');
+      mockedExecSync.mockReturnValue('Active code page: 866');
+
+      const result = getCachedEncodingForBuffer(cp866Buffer);
+      expect(result).toBe('cp866');
+    });
+
+    it('should respect GEMINI_CLI_ENCODING override', () => {
+      process.env['GEMINI_CLI_ENCODING'] = 'cp1251';
+      const buffer = Buffer.from('test');
+      const result = getCachedEncodingForBuffer(buffer);
+      expect(result).toBe('cp1251');
+    });
+
+    it('should normalize numeric GEMINI_CLI_ENCODING override', () => {
+      process.env['GEMINI_CLI_ENCODING'] = '866';
+      const buffer = Buffer.from('test');
+      const result = getCachedEncodingForBuffer(buffer);
+      expect(result).toBe('cp866');
+    });
+
+    it('should use heuristic UTF-8 detection if confidence is >= 90', () => {
+      const buffer = Buffer.from([0x80, 0x81]); // Invalid for strict but let's say chardet likes it
+      mockedChardetAnalyse.mockReturnValue([
+        { name: 'UTF-8', confidence: 95, lang: 'ru' },
+      ]);
+      mockedOsPlatform.mockReturnValue('win32');
+      mockedExecSync.mockReturnValue('Active code page: 866');
+
+      const result = getCachedEncodingForBuffer(buffer);
+      expect(result).toBe('utf-8');
+    });
+
+    it('should NOT use heuristic UTF-8 detection if confidence is < 90', () => {
+      const buffer = Buffer.from([0x80, 0x81]);
+      mockedChardetAnalyse.mockReturnValue([
+        { name: 'UTF-8', confidence: 85, lang: 'ru' },
+      ]);
+      mockedOsPlatform.mockReturnValue('win32');
+      mockedExecSync.mockReturnValue('Active code page: 866');
+
+      const result = getCachedEncodingForBuffer(buffer);
+      expect(result).toBe('cp866'); // Falls back to system
     });
   });
 
@@ -337,7 +397,7 @@ describe('Shell Command Processor - Encoding Functions', () => {
         throw new Error('locale command failed');
       });
 
-      const buffer = Buffer.from('test');
+      const buffer = Buffer.from([0x80, 0x81]); // Invalid UTF-8
       mockedChardetDetect.mockReturnValue('ISO-8859-1');
 
       const result = getCachedEncodingForBuffer(buffer);
@@ -356,7 +416,7 @@ describe('Shell Command Processor - Encoding Functions', () => {
         throw new Error('chardet failed');
       });
 
-      const buffer = Buffer.from('test');
+      const buffer = Buffer.from([0x80, 0x81]); // Invalid UTF-8
       const result = getCachedEncodingForBuffer(buffer);
       expect(result).toBe('utf-8');
     });
@@ -367,8 +427,8 @@ describe('Shell Command Processor - Encoding Functions', () => {
         throw new Error('locale command failed');
       });
 
-      const buffer1 = Buffer.from('test1');
-      const buffer2 = Buffer.from('test2');
+      const buffer1 = Buffer.from([0x80, 0x81]); // Invalid UTF-8
+      const buffer2 = Buffer.from([0x82, 0x83]); // Invalid UTF-8
 
       mockedChardetDetect
         .mockReturnValueOnce('ISO-8859-1')
@@ -386,7 +446,7 @@ describe('Shell Command Processor - Encoding Functions', () => {
       mockedOsPlatform.mockReturnValue('win32');
       mockedExecSync.mockReturnValue('Active code page: 1252');
 
-      const buffer = Buffer.from('test');
+      const buffer = Buffer.from([0x80, 0x81]); // Invalid UTF-8
       const result = getCachedEncodingForBuffer(buffer);
 
       expect(result).toBe('windows-1252');
@@ -404,8 +464,8 @@ describe('Shell Command Processor - Encoding Functions', () => {
         throw new Error('locale command failed');
       });
 
-      const buffer1 = Buffer.from('test1');
-      const buffer2 = Buffer.from('test2');
+      const buffer1 = Buffer.from([0x80, 0x81]); // Invalid UTF-8
+      const buffer2 = Buffer.from([0x82, 0x83]); // Invalid UTF-8
 
       mockedChardetDetect
         .mockReturnValueOnce('ISO-8859-1')
@@ -423,7 +483,7 @@ describe('Shell Command Processor - Encoding Functions', () => {
       expect(result2).toBe('utf-16');
 
       // Call a third time to verify cache is still used
-      const buffer3 = Buffer.from('test3');
+      const buffer3 = Buffer.from([0x84, 0x85]); // Invalid UTF-8
       mockedChardetDetect.mockReturnValueOnce('UTF-32');
       const result3 = getCachedEncodingForBuffer(buffer3);
 

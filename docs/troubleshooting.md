@@ -161,6 +161,17 @@ This is especially useful for scripting and automation.
   - Always run `npm run preflight` before committing code. This can catch many
     common issues related to formatting, linting, and type errors.
 
+- **Encoding issues on Windows (garbled characters/mojibake):**
+  - **Issue:** When running shell commands, Cyrillic or other non-ASCII
+    characters appear as "garbled" text (e.g., `ÐџÑЂÐёÐ²ÐµÑ‚`).
+  - **Cause:** This often happens on Windows when the command output encoding
+    doesn't match the system's active code page.
+  - **Solution:** Gemini CLI attempts to auto-detect the encoding, but you can
+    manually override it using the `GEMINI_CLI_ENCODING` environment variable.
+    - Example (PowerShell): `$env:GEMINI_CLI_ENCODING="utf-8"`
+    - Example (cmd): `set GEMINI_CLI_ENCODING=utf-8`
+    - You can also use numeric code pages, e.g., `866` for CP866.
+
 ## Existing GitHub issues similar to yours or creating new issues
 
 If you encounter an issue that was not covered here in this _Troubleshooting
