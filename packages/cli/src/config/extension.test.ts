@@ -781,11 +781,7 @@ describe('extension tests', () => {
       const extensions = await extensionManager.loadExtensions();
       expect(extensions).toHaveLength(1);
       expect(extensions[0].mcpServers).toEqual({
-        'test-server': {
-          command: 'echo',
-          args: ['hello'],
-          cwd: path.join(userExtensionsDir, 'test-extension'),
-        },
+        'test-server': { command: 'echo', args: ['hello'] },
       });
     });
 
