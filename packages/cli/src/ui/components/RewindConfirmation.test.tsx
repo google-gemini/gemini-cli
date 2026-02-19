@@ -15,7 +15,7 @@ describe('RewindConfirmation', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders correctly with stats', () => {
+  it('renders correctly with stats', async () => {
     const stats = {
       addedLines: 10,
       removedLines: 5,
@@ -23,7 +23,7 @@ describe('RewindConfirmation', () => {
       details: [{ fileName: 'test.ts', diff: '' }],
     };
     const onConfirm = vi.fn();
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <RewindConfirmation
         stats={stats}
         onConfirm={onConfirm}
@@ -31,14 +31,16 @@ describe('RewindConfirmation', () => {
       />,
       { width: 80 },
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
     expect(lastFrame()).toContain('Revert code changes');
+    unmount();
   });
 
-  it('renders correctly without stats', () => {
+  it('renders correctly without stats', async () => {
     const onConfirm = vi.fn();
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <RewindConfirmation
         stats={null}
         onConfirm={onConfirm}
@@ -46,15 +48,17 @@ describe('RewindConfirmation', () => {
       />,
       { width: 80 },
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
     expect(lastFrame()).not.toContain('Revert code changes');
     expect(lastFrame()).toContain('Rewind conversation');
+    unmount();
   });
 
   it('calls onConfirm with Cancel on Escape', async () => {
     const onConfirm = vi.fn();
-    const { stdin } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = renderWithProviders(
       <RewindConfirmation
         stats={null}
         onConfirm={onConfirm}
@@ -62,6 +66,7 @@ describe('RewindConfirmation', () => {
       />,
       { width: 80 },
     );
+    await waitUntilReady();
 
     await act(async () => {
       stdin.write('\x1b');
@@ -70,12 +75,13 @@ describe('RewindConfirmation', () => {
     await waitFor(() => {
       expect(onConfirm).toHaveBeenCalledWith(RewindOutcome.Cancel);
     });
+    unmount();
   });
 
-  it('renders timestamp when provided', () => {
+  it('renders timestamp when provided', async () => {
     const onConfirm = vi.fn();
     const timestamp = new Date().toISOString();
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <RewindConfirmation
         stats={null}
         onConfirm={onConfirm}
@@ -84,8 +90,10 @@ describe('RewindConfirmation', () => {
       />,
       { width: 80 },
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
     expect(lastFrame()).not.toContain('Revert code changes');
+    unmount();
   });
 });

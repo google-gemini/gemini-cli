@@ -269,7 +269,7 @@ describe('github.ts', () => {
 
     it('should return NOT_UPDATABLE if local extension config cannot be loaded', async () => {
       vi.mocked(mockExtensionManager.loadExtensionConfig).mockImplementation(
-        () => {
+        async () => {
           throw new Error('Config not found');
         },
       );

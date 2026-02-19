@@ -3,53 +3,62 @@
 exports[`Focus Hint > 'ShellToolMessage' > shows focus hint after delay even with NO output > after-delay-no-output 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │    Shell Command A tool for testing                           (Tab to focus) │
-│                                                                              │"
+│                                                                              │
+"
 `;
 
 exports[`Focus Hint > 'ShellToolMessage' > shows focus hint after delay even with NO output > initial-no-output 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │    Shell Command A tool for testing                                          │
-│                                                                              │"
+│                                                                              │
+"
 `;
 
 exports[`Focus Hint > 'ShellToolMessage' > shows focus hint after delay with output > after-delay-with-output 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │    Shell Command A tool for testing                           (Tab to focus) │
-│                                                                              │"
+│                                                                              │
+"
 `;
 
 exports[`Focus Hint > 'ShellToolMessage' > shows focus hint after delay with output > initial-with-output 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │    Shell Command A tool for testing                                          │
-│                                                                              │"
+│                                                                              │
+"
 `;
 
 exports[`Focus Hint > 'ToolMessage' > shows focus hint after delay even with NO output > after-delay-no-output 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │    Shell Command A tool for testing                           (Tab to focus) │
-│                                                                              │"
+│                                                                              │
+"
 `;
 
 exports[`Focus Hint > 'ToolMessage' > shows focus hint after delay even with NO output > initial-no-output 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │    Shell Command A tool for testing                                          │
-│                                                                              │"
+│                                                                              │
+"
 `;
 
 exports[`Focus Hint > 'ToolMessage' > shows focus hint after delay with output > after-delay-with-output 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │    Shell Command A tool for testing                           (Tab to focus) │
-│                                                                              │"
+│                                                                              │
+"
 `;
 
 exports[`Focus Hint > 'ToolMessage' > shows focus hint after delay with output > initial-with-output 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │    Shell Command A tool for testing                                          │
-│                                                                              │"
+│                                                                              │
+"
 `;
 
 exports[`Focus Hint > handles long descriptions by shrinking them to show the focus hint > long-description 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │    Shell Command AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA… (Tab to focus) │
-│                                                                              │"
+│                                                                              │
+"
 `;

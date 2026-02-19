@@ -21,9 +21,13 @@ vi.mock('../semantic-colors.js', () => ({
 }));
 
 describe('ThemedGradient', () => {
-  it('renders children', () => {
-    const { lastFrame } = render(<ThemedGradient>Hello</ThemedGradient>);
+  it('renders children', async () => {
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <ThemedGradient>Hello</ThemedGradient>,
+    );
+    await waitUntilReady();
     expect(lastFrame()).toContain('Hello');
+    unmount();
   });
 
   // Note: Testing actual gradient application is hard with ink-testing-library

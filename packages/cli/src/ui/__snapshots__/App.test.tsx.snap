@@ -61,7 +61,8 @@ Tips for getting started:
 2. Be specific for the best results.
 3. Create GEMINI.md files to customize your interactions with Gemini.
 4. /help for more information.
-Composer"
+Composer
+"
 `;
 
 exports[`App > Snapshots > renders with dialogs visible 1`] = `
@@ -124,19 +125,19 @@ Tips for getting started:
 3. Create GEMINI.md files to customize your interactions with Gemini.
 4. /help for more information.
 HistoryItemDisplay
-╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Action Required                                                                                                      │
-│                                                                                                                      │
-│ ?  ls list directory                                                                                                 │
-│                                                                                                                      │
-│ ls                                                                                                                   │
-│ Allow execution of: 'ls'?                                                                                            │
-│                                                                                                                      │
-│ ● 1. Allow once                                                                                                      │
-│   2. Allow for this session                                                                                          │
-│   3. No, suggest changes (esc)                                                                                       │
-│                                                                                                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Action Required                                                                                  │
+│                                                                                                  │
+│ ?  ls list directory                                                                             │
+│                                                                                                  │
+│ ls                                                                                               │
+│ Allow execution of: 'ls'?                                                                        │
+│                                                                                                  │
+│ ● 1. Allow once                                                                                  │
+│   2. Allow for this session                                                                      │
+│   3. No, suggest changes (esc)                                                                   │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 
 

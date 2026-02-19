@@ -376,14 +376,16 @@ exports[`<HistoryItemDisplay /> > renders InfoMessage for "info" type with multi
 "
 ℹ ⚡ Line 1
   ⚡ Line 2
-  ⚡ Line 3"
+  ⚡ Line 3
+"
 `;
 
 exports[`<HistoryItemDisplay /> > renders InfoMessage for "info" type with multi-line text (alternateBuffer=true) 1`] = `
 "
 ℹ ⚡ Line 1
   ⚡ Line 2
-  ⚡ Line 3"
+  ⚡ Line 3
+"
 `;
 
 exports[`<HistoryItemDisplay /> > thinking items > renders thinking item when enabled 1`] = `

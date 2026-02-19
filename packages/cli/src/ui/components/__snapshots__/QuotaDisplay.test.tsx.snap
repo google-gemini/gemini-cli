@@ -1,11 +1,26 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`QuotaDisplay > should NOT render reset time when terse is true 1`] = `"15%"`;
+exports[`QuotaDisplay > should NOT render reset time when terse is true 1`] = `
+"15%
+"
+`;
 
-exports[`QuotaDisplay > should render red when usage < 5% 1`] = `"/stats 4% usage remaining"`;
+exports[`QuotaDisplay > should render red when usage < 5% 1`] = `
+"/stats 4% usage remaining
+"
+`;
 
-exports[`QuotaDisplay > should render terse limit reached message 1`] = `"Limit reached"`;
+exports[`QuotaDisplay > should render terse limit reached message 1`] = `
+"Limit reached
+"
+`;
 
-exports[`QuotaDisplay > should render with reset time when provided 1`] = `"/stats 15% usage remaining, resets in 1h"`;
+exports[`QuotaDisplay > should render with reset time when provided 1`] = `
+"/stats 15% usage remaining, resets in 1h
+"
+`;
 
-exports[`QuotaDisplay > should render yellow when usage < 20% 1`] = `"/stats 15% usage remaining"`;
+exports[`QuotaDisplay > should render yellow when usage < 20% 1`] = `
+"/stats 15% usage remaining
+"
+`;
