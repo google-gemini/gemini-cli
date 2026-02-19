@@ -14,8 +14,14 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL,
+  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
+  AuthType,
 } from '@google/gemini-cli-core';
 import type { Config, ModelSlashCommandEvent } from '@google/gemini-cli-core';
+import { createMockSettings } from '../../test-utils/settings.js';
 
 // Mock dependencies
 const mockGetDisplayString = vi.fn();
@@ -42,12 +48,14 @@ describe('<ModelDialog />', () => {
   const mockGetModel = vi.fn();
   const mockOnClose = vi.fn();
   const mockGetHasAccessToPreviewModel = vi.fn();
+  const mockGetGemini31LaunchedSync = vi.fn();
 
   interface MockConfig extends Partial<Config> {
     setModel: (model: string, isTemporary?: boolean) => void;
     getModel: () => string;
     getHasAccessToPreviewModel: () => boolean;
     getIdeMode: () => boolean;
+    getGemini31LaunchedSync: () => boolean;
   }
 
   const mockConfig: MockConfig = {
@@ -55,12 +63,14 @@ describe('<ModelDialog />', () => {
     getModel: mockGetModel,
     getHasAccessToPreviewModel: mockGetHasAccessToPreviewModel,
     getIdeMode: () => false,
+    getGemini31LaunchedSync: mockGetGemini31LaunchedSync,
   };
 
   beforeEach(() => {
     vi.resetAllMocks();
     mockGetModel.mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO);
     mockGetHasAccessToPreviewModel.mockReturnValue(false);
+    mockGetGemini31LaunchedSync.mockReturnValue(false);
 
     // Default implementation for getDisplayString
     mockGetDisplayString.mockImplementation((val: string) => {
@@ -70,10 +80,23 @@ describe('<ModelDialog />', () => {
     });
   });
 
-  const renderComponent = (configValue = mockConfig as Config) =>
-    renderWithProviders(<ModelDialog onClose={mockOnClose} />, {
-      config: configValue,
+  const renderComponent = (
+    configValue = mockConfig as Config,
+    authType = AuthType.LOGIN_WITH_GOOGLE,
+  ) => {
+    const settings = createMockSettings({
+      security: {
+        auth: {
+          selectedType: authType,
+        },
+      },
     });
+
+    return renderWithProviders(<ModelDialog onClose={mockOnClose} />, {
+      config: configValue,
+      settings,
+    });
+  };
 
   it('renders the initial "main" view correctly', () => {
     const { lastFrame } = renderComponent();
@@ -208,6 +231,98 @@ describe('<ModelDialog />', () => {
       expect(mockOnClose).not.toHaveBeenCalled();
       // Should be back to main view (Manual option visible)
       expect(lastFrame()).toContain('Manual');
+    });
+  });
+
+  it('shows the preferred manual model in the main view option', () => {
+    mockGetModel.mockReturnValue(DEFAULT_GEMINI_MODEL);
+    const { lastFrame, unmount } = renderComponent();
+
+    expect(lastFrame()).toContain(`Manual (${DEFAULT_GEMINI_MODEL})`);
+    unmount();
+  });
+
+  describe('Preview Models', () => {
+    beforeEach(() => {
+      mockGetHasAccessToPreviewModel.mockReturnValue(true);
+    });
+
+    it('shows Auto (Preview) in main view when access is granted', () => {
+      const { lastFrame, unmount } = renderComponent();
+      expect(lastFrame()).toContain('Auto (Preview)');
+      unmount();
+    });
+
+    it('shows Gemini 3 models in manual view when Gemini 3.1 is NOT launched', async () => {
+      mockGetGemini31LaunchedSync.mockReturnValue(false);
+      const { lastFrame, stdin, unmount } = renderComponent();
+
+      // Go to manual view
+      await act(async () => {
+        stdin.write('\u001B[B'); // Manual
+      });
+      await act(async () => {
+        stdin.write('\r');
+      });
+
+      await waitFor(() => {
+        const output = lastFrame();
+        expect(output).toContain(PREVIEW_GEMINI_MODEL);
+        expect(output).toContain(PREVIEW_GEMINI_FLASH_MODEL);
+      });
+      unmount();
+    });
+
+    it('shows Gemini 3.1 models in manual view when Gemini 3.1 IS launched', async () => {
+      mockGetGemini31LaunchedSync.mockReturnValue(true);
+      const { lastFrame, stdin, unmount } = renderComponent(
+        mockConfig as Config,
+        AuthType.USE_VERTEX_AI,
+      );
+
+      // Go to manual view
+      await act(async () => {
+        stdin.write('\u001B[B'); // Manual
+      });
+      await act(async () => {
+        stdin.write('\r');
+      });
+
+      await waitFor(() => {
+        const output = lastFrame();
+        expect(output).toContain(PREVIEW_GEMINI_3_1_MODEL);
+        expect(output).toContain(PREVIEW_GEMINI_FLASH_MODEL);
+      });
+      unmount();
+    });
+
+    it('uses custom tools model when Gemini 3.1 IS launched and auth is Gemini API Key', async () => {
+      mockGetGemini31LaunchedSync.mockReturnValue(true);
+      const { stdin, unmount } = renderComponent(
+        mockConfig as Config,
+        AuthType.USE_GEMINI,
+      );
+
+      // Go to manual view
+      await act(async () => {
+        stdin.write('\u001B[B'); // Manual
+      });
+      await act(async () => {
+        stdin.write('\r');
+      });
+
+      // Select Gemini 3.1 (first item in preview section)
+      await act(async () => {
+        stdin.write('\r');
+      });
+
+      await waitFor(() => {
+        expect(mockSetModel).toHaveBeenCalledWith(
+          PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+          true,
+        );
+      });
+      unmount();
     });
   });
 });
