@@ -125,7 +125,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
       llmContent = `
 IMPORTANT: The file content has been truncated.
 Status: Showing lines ${start}-${end} of ${total} total lines.
-Action: To read more of the file, you can use the 'start_line' and 'end_line' parameters in a subsequent 'read_file' call.
+Action: To read more of the file, you can use the 'start_line' and 'end_line' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use start_line: ${end + 1}.
 
 --- FILE CONTENT (truncated) ---
 ${result.llmContent}`;

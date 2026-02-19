@@ -482,7 +482,10 @@ export async function processSingleFileContent(
           sliceStart = startLine ? startLine - 1 : 0;
           sliceEnd = endLine
             ? Math.min(endLine, originalLineCount)
-            : originalLineCount;
+            : Math.min(
+                sliceStart + DEFAULT_MAX_LINES_TEXT_FILE,
+                originalLineCount,
+              );
         } else {
           sliceEnd = Math.min(DEFAULT_MAX_LINES_TEXT_FILE, originalLineCount);
         }
