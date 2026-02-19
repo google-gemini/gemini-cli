@@ -15,6 +15,16 @@ import type { spawn } from 'node:child_process';
 
 let activeUpdatePromise: Promise<void> | null = null;
 
+/**
+ * Returns the active auto-update promise if an auto-update process is currently
+ * running, or `null` if no auto-update is in progress.
+ *
+ * This can be used by callers to await completion of an already-started
+ * auto-update without triggering a new update process.
+ *
+ * @returns {Promise<void> | null} The promise representing the running
+ * auto-update, or `null` if no update is currently running.
+ */
 export function getActiveUpdatePromise(): Promise<void> | null {
   return activeUpdatePromise;
 }
@@ -26,6 +36,10 @@ export function handleAutoUpdate(
   spawnFn: typeof spawn = spawnWrapper,
 ) {
   if (!info) {
+    return;
+  }
+
+  if (activeUpdatePromise) {
     return;
   }
 
@@ -83,7 +97,7 @@ export function handleAutoUpdate(
   updateProcess.unref();
 
   activeUpdatePromise = new Promise<void>((resolve) => {
-    updateProcess.on('close', (code) => {
+    updateProcess.once('close', (code) => {
       if (code === 0) {
         updateEventEmitter.emit('update-success', {
           message:
@@ -97,7 +111,7 @@ export function handleAutoUpdate(
       resolve();
     });
 
-    updateProcess.on('error', (err) => {
+    updateProcess.once('error', (err) => {
       updateEventEmitter.emit('update-failed', {
         message: `Automatic update failed. Please try updating manually. (error: ${err.message})`,
       });
