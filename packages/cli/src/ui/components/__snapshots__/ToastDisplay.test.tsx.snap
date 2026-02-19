@@ -1,15 +1,36 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`ToastDisplay > renders Ctrl+C prompt 1`] = `"Press Ctrl+C again to exit."`;
+exports[`ToastDisplay > renders Ctrl+C prompt 1`] = `
+"Press Ctrl+C again to exit.
+"
+`;
 
-exports[`ToastDisplay > renders Ctrl+D prompt 1`] = `"Press Ctrl+D again to exit."`;
+exports[`ToastDisplay > renders Ctrl+D prompt 1`] = `
+"Press Ctrl+D again to exit.
+"
+`;
 
-exports[`ToastDisplay > renders Escape prompt when buffer is NOT empty 1`] = `"Press Esc again to clear prompt."`;
+exports[`ToastDisplay > renders Escape prompt when buffer is NOT empty 1`] = `
+"Press Esc again to clear prompt.
+"
+`;
 
-exports[`ToastDisplay > renders Escape prompt when buffer is empty 1`] = `"Press Esc again to rewind."`;
+exports[`ToastDisplay > renders Escape prompt when buffer is empty 1`] = `
+"Press Esc again to rewind.
+"
+`;
 
-exports[`ToastDisplay > renders Queue Error Message 1`] = `"Queue Error"`;
+exports[`ToastDisplay > renders Queue Error Message 1`] = `
+"Queue Error
+"
+`;
 
-exports[`ToastDisplay > renders hint message 1`] = `"This is a hint"`;
+exports[`ToastDisplay > renders hint message 1`] = `
+"This is a hint
+"
+`;
 
-exports[`ToastDisplay > renders warning message 1`] = `"This is a warning"`;
+exports[`ToastDisplay > renders warning message 1`] = `
+"This is a warning
+"
+`;

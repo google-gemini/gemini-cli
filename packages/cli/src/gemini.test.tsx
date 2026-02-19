@@ -56,6 +56,20 @@ vi.mock('./nonInteractiveCli.js', () => ({
   runNonInteractive: runNonInteractiveSpy,
 }));
 
+const terminalNotificationMocks = vi.hoisted(() => ({
+  notifyViaTerminal: vi.fn().mockResolvedValue(true),
+  buildRunEventNotificationContent: vi.fn(() => ({
+    title: 'Session complete',
+    body: 'done',
+    subtitle: 'Run finished',
+  })),
+}));
+vi.mock('./utils/terminalNotifications.js', () => ({
+  notifyViaTerminal: terminalNotificationMocks.notifyViaTerminal,
+  buildRunEventNotificationContent:
+    terminalNotificationMocks.buildRunEventNotificationContent,
+}));
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
@@ -464,6 +478,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       query: undefined,
       yolo: undefined,
       approvalMode: undefined,
+      policy: undefined,
       allowedMcpServerNames: undefined,
       allowedTools: undefined,
       experimentalAcp: undefined,
@@ -836,6 +851,10 @@ describe('gemini.tsx main function kitty protocol', () => {
     expect(runNonInteractive).toHaveBeenCalled();
     const callArgs = vi.mocked(runNonInteractive).mock.calls[0][0];
     expect(callArgs.input).toBe('stdin-data\n\ntest-question');
+    expect(
+      terminalNotificationMocks.buildRunEventNotificationContent,
+    ).not.toHaveBeenCalled();
+    expect(terminalNotificationMocks.notifyViaTerminal).not.toHaveBeenCalled();
     expect(processExitSpy).toHaveBeenCalledWith(0);
     processExitSpy.mockRestore();
   });

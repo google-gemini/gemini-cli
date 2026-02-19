@@ -13,7 +13,7 @@ import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
-  ToolConfirmationOutcome,
+  type ToolConfirmationOutcome,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
@@ -27,9 +27,12 @@ import {
   logWebFetchFallbackAttempt,
   WebFetchFallbackAttemptEvent,
 } from '../telemetry/index.js';
+import { LlmRole } from '../telemetry/llmRole.js';
 import { WEB_FETCH_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { retryWithBackoff } from '../utils/retry.js';
+import { WEB_FETCH_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
@@ -187,6 +190,7 @@ ${textContent}
         { model: 'web-fetch-fallback' },
         [{ role: 'user', parts: [{ text: fallbackPrompt }] }],
         signal,
+        LlmRole.UTILITY_TOOL,
       );
       const resultText = getResponseText(result) || '';
       return {
@@ -242,14 +246,9 @@ ${textContent}
       title: `Confirm Web Fetch`,
       prompt: this.params.prompt,
       urls,
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          // No need to publish a policy update as the default policy for
-          // AUTO_EDIT already reflects always approving web-fetch.
-          this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
-        } else {
-          await this.publishPolicyUpdate(outcome);
-        }
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // Mode transitions (e.g. AUTO_EDIT) and policy updates are now
+        // handled centrally by the scheduler.
       },
     };
     return confirmationDetails;
@@ -276,6 +275,7 @@ ${textContent}
         { model: 'web-fetch' },
         [{ role: 'user', parts: [{ text: userPrompt }] }],
         signal, // Pass signal
+        LlmRole.UTILITY_TOOL,
       );
 
       debugLogger.debug(
@@ -414,19 +414,9 @@ export class WebFetchTool extends BaseDeclarativeTool<
     super(
       WebFetchTool.Name,
       'WebFetch',
-      "Processes content from URL(s), including local and private network addresses (e.g., localhost), embedded in a prompt. Include up to 20 URLs and instructions (e.g., summarize, extract specific data) directly in the 'prompt' parameter.",
+      WEB_FETCH_DEFINITION.base.description!,
       Kind.Fetch,
-      {
-        properties: {
-          prompt: {
-            description:
-              'A comprehensive prompt that includes the URL(s) (up to 20) to fetch and specific instructions on how to process their content (e.g., "Summarize https://example.com/article and extract key points from https://another.com/data"). All URLs to be fetched must be valid and complete, starting with "http://" or "https://", and be fully-formed with a valid hostname (e.g., a domain name like "example.com" or an IP address). For example, "https://example.com" is valid, but "example.com" is not.',
-            type: 'string',
-          },
-        },
-        required: ['prompt'],
-        type: 'object',
-      },
+      WEB_FETCH_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
@@ -466,5 +456,9 @@ export class WebFetchTool extends BaseDeclarativeTool<
       _toolName,
       _toolDisplayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(WEB_FETCH_DEFINITION, modelId);
   }
 }

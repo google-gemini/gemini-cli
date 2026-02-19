@@ -66,6 +66,8 @@ export interface UIState {
   history: HistoryItem[];
   historyManager: UseHistoryManagerReturn;
   isThemeDialogOpen: boolean;
+  shouldShowRetentionWarning: boolean;
+  sessionsToDeleteCount: number;
   themeError: string | null;
   isAuthenticating: boolean;
   isConfigInitialized: boolean;
@@ -128,6 +130,7 @@ export interface UIState {
   messageQueue: string[];
   queueErrorMessage: string | null;
   showApprovalModeIndicator: ApprovalMode;
+  allowPlanMode: boolean;
   // Quota-related state
   quota: QuotaState;
   currentModel: string;
@@ -174,6 +177,8 @@ export interface UIState {
   isBackgroundShellListOpen: boolean;
   adminSettingsChanged: boolean;
   newAgents: AgentDefinition[] | null;
+  hintMode: boolean;
+  hintBuffer: string;
   transientMessage: {
     text: string;
     type: TransientMessageType;

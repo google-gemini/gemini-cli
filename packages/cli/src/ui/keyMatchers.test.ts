@@ -130,6 +130,7 @@ describe('keyMatchers', () => {
       positive: [
         createKey('delete', { ctrl: true }),
         createKey('delete', { alt: true }),
+        createKey('d', { alt: true }),
       ],
       negative: [createKey('delete'), createKey('backspace', { ctrl: true })],
     },
@@ -344,11 +345,12 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.SHOW_MORE_LINES,
-      positive: [
+      positive: [createKey('o', { ctrl: true })],
+      negative: [
         createKey('s', { ctrl: true }),
-        createKey('o', { ctrl: true }),
+        createKey('s'),
+        createKey('l', { ctrl: true }),
       ],
-      negative: [createKey('s'), createKey('l', { ctrl: true })],
     },
 
     // Shell commands

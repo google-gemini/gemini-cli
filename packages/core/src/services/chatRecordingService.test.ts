@@ -13,6 +13,7 @@ import type {
   ToolCallRecord,
   MessageRecord,
 } from './chatRecordingService.js';
+import { CoreToolCallStatus } from '../scheduler/types.js';
 import type { Content, Part } from '@google/genai';
 import { ChatRecordingService } from './chatRecordingService.js';
 import type { Config } from '../config/config.js';
@@ -247,7 +248,7 @@ describe('ChatRecordingService', () => {
         id: 'tool-1',
         name: 'testTool',
         args: {},
-        status: 'awaiting_approval',
+        status: CoreToolCallStatus.AwaitingApproval,
         timestamp: new Date().toISOString(),
       };
       chatRecordingService.recordToolCalls('gemini-pro', [toolCall]);
@@ -274,7 +275,7 @@ describe('ChatRecordingService', () => {
         id: 'tool-1',
         name: 'testTool',
         args: {},
-        status: 'awaiting_approval',
+        status: CoreToolCallStatus.AwaitingApproval,
         timestamp: new Date().toISOString(),
       };
       chatRecordingService.recordToolCalls('gemini-pro', [toolCall]);
@@ -571,7 +572,7 @@ describe('ChatRecordingService', () => {
           name: 'list_files',
           args: { path: '.' },
           result: originalResult,
-          status: 'success',
+          status: CoreToolCallStatus.Success,
           timestamp: new Date().toISOString(),
         },
       ]);
@@ -650,7 +651,7 @@ describe('ChatRecordingService', () => {
           name: 'read_file',
           args: { path: 'image.png' },
           result: originalResult,
-          status: 'success',
+          status: CoreToolCallStatus.Success,
           timestamp: new Date().toISOString(),
         },
       ]);
@@ -707,7 +708,7 @@ describe('ChatRecordingService', () => {
           name: 'read_file',
           args: { path: 'test.txt' },
           result: [],
-          status: 'success',
+          status: CoreToolCallStatus.Success,
           timestamp: new Date().toISOString(),
         },
       ]);
@@ -742,6 +743,38 @@ describe('ChatRecordingService', () => {
       expect(result).toHaveLength(2);
       expect(result[0].text).toBe('Prefix metadata or text');
       expect(result[1].functionResponse!.id).toBe(callId);
+    });
+  });
+
+  describe('ENOENT (missing directory) handling', () => {
+    it('should ensure directory exists before writing conversation file', () => {
+      chatRecordingService.initialize();
+
+      const mkdirSyncSpy = vi.spyOn(fs, 'mkdirSync');
+      const writeFileSyncSpy = vi.spyOn(fs, 'writeFileSync');
+
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Hello after dir cleanup',
+        model: 'gemini-pro',
+      });
+
+      // mkdirSync should be called with the parent directory and recursive option
+      const conversationFile = chatRecordingService.getConversationFilePath()!;
+      expect(mkdirSyncSpy).toHaveBeenCalledWith(
+        path.dirname(conversationFile),
+        { recursive: true },
+      );
+
+      // mkdirSync should be called before writeFileSync
+      const mkdirCallOrder = mkdirSyncSpy.mock.invocationCallOrder;
+      const writeCallOrder = writeFileSyncSpy.mock.invocationCallOrder;
+      const lastMkdir = mkdirCallOrder[mkdirCallOrder.length - 1];
+      const lastWrite = writeCallOrder[writeCallOrder.length - 1];
+      expect(lastMkdir).toBeLessThan(lastWrite);
+
+      mkdirSyncSpy.mockRestore();
+      writeFileSyncSpy.mockRestore();
     });
   });
 });

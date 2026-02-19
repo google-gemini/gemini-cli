@@ -21,7 +21,11 @@ import {
   type MCPServerConfig,
 } from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
-import { type Settings, createTestMergedSettings } from './settings.js';
+import {
+  type Settings,
+  type MergedSettings,
+  createTestMergedSettings,
+} from './settings.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
@@ -141,6 +145,10 @@ vi.mock('@google/gemini-cli-core', async () => {
       defaultDecision: ServerConfig.PolicyDecision.ASK_USER,
       approvalMode: ServerConfig.ApprovalMode.DEFAULT,
     })),
+    getAdminErrorMessage: vi.fn(
+      (_feature) =>
+        `YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli`,
+    ),
     isHeadlessMode: vi.fn((opts) => {
       if (process.env['VITEST'] === 'true') {
         return (
@@ -1339,6 +1347,36 @@ describe('Approval mode tool exclusion logic', () => {
     ).rejects.toThrow(
       'Invalid approval mode: invalid_mode. Valid values are: yolo, auto_edit, plan, default',
     );
+  });
+
+  it('should fall back to default approval mode if plan mode is requested but not enabled', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      general: {
+        defaultApprovalMode: 'plan',
+      },
+      experimental: {
+        plan: false,
+      },
+    });
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
+  });
+
+  it('should allow plan approval mode if experimental plan is enabled', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      general: {
+        defaultApprovalMode: 'plan',
+      },
+      experimental: {
+        plan: true,
+      },
+    });
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.PLAN);
   });
 });
 
@@ -2552,9 +2590,8 @@ describe('loadCliConfig approval mode', () => {
       },
     });
 
-    await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Approval mode "plan" is only available when experimental.plan is enabled.',
-    );
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
   });
 
   it('should throw error when --approval-mode=plan is used but experimental.plan setting is missing', async () => {
@@ -2562,9 +2599,23 @@ describe('loadCliConfig approval mode', () => {
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({});
 
-    await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Approval mode "plan" is only available when experimental.plan is enabled.',
-    );
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
+  });
+
+  it('should pass planSettings.directory from settings to config', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      general: {
+        plan: {
+          directory: '.custom-plans',
+        },
+      },
+    } as unknown as MergedSettings);
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    const plansDir = config.storage.getPlansDir();
+    expect(plansDir).toContain('.custom-plans');
   });
 
   // --- Untrusted Folder Scenarios ---
@@ -2674,11 +2725,8 @@ describe('loadCliConfig approval mode', () => {
         experimental: { plan: false },
       });
       const argv = await parseArguments(settings);
-      await expect(
-        loadCliConfig(settings, 'test-session', argv),
-      ).rejects.toThrow(
-        'Approval mode "plan" is only available when experimental.plan is enabled.',
-      );
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
     });
   });
 });
@@ -3188,6 +3236,26 @@ describe('Policy Engine Integration in loadCliConfig', () => {
         tools: expect.objectContaining({
           exclude: expect.arrayContaining([SHELL_TOOL_NAME]),
         }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('should pass user-provided policy paths from --policy flag to createPolicyEngineConfig', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--policy',
+      '/path/to/policy1.toml,/path/to/policy2.toml',
+    ];
+    const settings = createTestMergedSettings();
+    const argv = await parseArguments(settings);
+
+    await loadCliConfig(settings, 'test-session', argv);
+
+    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        policyPaths: ['/path/to/policy1.toml', '/path/to/policy2.toml'],
       }),
       expect.anything(),
     );

@@ -125,8 +125,10 @@ import {
 } from '../telemetry/loggers.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath } from '../utils/paths.js';
+import { UserHintService } from './userHintService.js';
 
 export interface AccessibilitySettings {
+  /** @deprecated Use ui.loadingPhrases instead. */
   enableLoadingPhrases?: boolean;
   screenReader?: boolean;
 }
@@ -137,6 +139,10 @@ export interface BugCommandSettings {
 
 export interface SummarizeToolOutputSettings {
   tokenBudget?: number;
+}
+
+export interface PlanSettings {
+  directory?: string;
 }
 
 export interface TelemetrySettings {
@@ -436,6 +442,7 @@ export interface ConfigParameters {
   folderTrust?: boolean;
   ideMode?: boolean;
   loadMemoryFromIncludeDirectories?: boolean;
+  includeDirectoryTree?: boolean;
   importFormat?: 'tree' | 'flat';
   discoveryMaxDirs?: number;
   compressionThreshold?: number;
@@ -480,6 +487,8 @@ export interface ConfigParameters {
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
   plan?: boolean;
+  planSettings?: PlanSettings;
+  modelSteering?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
@@ -603,6 +612,7 @@ export class Config {
     | undefined;
   private readonly experimentalZedIntegration: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
+  private readonly includeDirectoryTree: boolean = true;
   private readonly importFormat: 'tree' | 'flat';
   private readonly discoveryMaxDirs: number;
   private readonly compressionThreshold: number | undefined;
@@ -619,7 +629,8 @@ export class Config {
   private readonly enablePromptCompletion: boolean = false;
   private readonly truncateToolOutputThreshold: number;
   private compressionTruncationCounter = 0;
-  private initialized: boolean = false;
+  private initialized = false;
+  private initPromise: Promise<void> | undefined;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
@@ -667,12 +678,13 @@ export class Config {
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
+  private readonly modelSteering: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
   private lastModeSwitchTime: number = Date.now();
-
+  readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
 
   constructor(params: ConfigParameters) {
@@ -761,6 +773,10 @@ export class Config {
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.experimentalJitContext = params.experimentalJitContext ?? false;
+    this.modelSteering = params.modelSteering ?? false;
+    this.userHintService = new UserHintService(() =>
+      this.isModelSteeringEnabled(),
+    );
     this.toolOutputMasking = {
       enabled: params.toolOutputMasking?.enabled ?? true,
       toolProtectionThreshold:
@@ -786,6 +802,7 @@ export class Config {
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.folderTrust = params.folderTrust ?? false;
     this.ideMode = params.ideMode ?? false;
+    this.includeDirectoryTree = params.includeDirectoryTree ?? true;
     this.loadMemoryFromIncludeDirectories =
       params.loadMemoryFromIncludeDirectories ?? false;
     this.importFormat = params.importFormat ?? 'tree';
@@ -824,6 +841,7 @@ export class Config {
     this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir, this.sessionId);
+    this.storage.setCustomPlansDir(params.planSettings?.directory);
 
     this.fakeResponses = params.fakeResponses;
     this.recordResponses = params.recordResponses;
@@ -914,14 +932,20 @@ export class Config {
   }
 
   /**
-   * Must only be called once, throws if called again.
+   * Dedups initialization requests using a shared promise that is only resolved
+   * once.
    */
   async initialize(): Promise<void> {
-    if (this.initialized) {
-      throw Error('Config was already initialized');
+    if (this.initPromise) {
+      return this.initPromise;
     }
-    this.initialized = true;
 
+    this.initPromise = this._initialize();
+
+    return this.initPromise;
+  }
+
+  private async _initialize(): Promise<void> {
     await this.storage.initialize();
 
     // Add pending directories to workspace context
@@ -931,7 +955,7 @@ export class Config {
 
     // Add plans directory to workspace context for plan file storage
     if (this.planEnabled) {
-      const plansDir = this.storage.getProjectTempPlansDir();
+      const plansDir = this.storage.getPlansDir();
       await fs.promises.mkdir(plansDir, { recursive: true });
       this.workspaceContext.addDirectory(plansDir);
     }
@@ -971,7 +995,7 @@ export class Config {
       }
     });
 
-    if (!this.interactive) {
+    if (!this.interactive || this.experimentalZedIntegration) {
       await mcpInitialization;
     }
 
@@ -1008,6 +1032,7 @@ export class Config {
 
     await this.geminiClient.initialize();
     this.syncPlanModeTools();
+    this.initialized = true;
   }
 
   getContentGenerator(): ContentGenerator {
@@ -1153,12 +1178,16 @@ export class Config {
     return this.remoteAdminSettings;
   }
 
-  setRemoteAdminSettings(settings: AdminControlsSettings): void {
+  setRemoteAdminSettings(settings: AdminControlsSettings | undefined): void {
     this.remoteAdminSettings = settings;
   }
 
   shouldLoadMemoryFromIncludeDirectories(): boolean {
     return this.loadMemoryFromIncludeDirectories;
+  }
+
+  getIncludeDirectoryTree(): boolean {
+    return this.includeDirectoryTree;
   }
 
   getImportFormat(): 'tree' | 'flat' {
@@ -1621,6 +1650,10 @@ export class Config {
 
   isJitContextEnabled(): boolean {
     return this.experimentalJitContext;
+  }
+
+  isModelSteeringEnabled(): boolean {
+    return this.modelSteering;
   }
 
   getToolOutputMaskingEnabled(): boolean {
