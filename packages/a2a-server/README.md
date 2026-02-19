@@ -345,8 +345,8 @@ conversations always thread correctly; spaces may need threading enabled.
 
 ## Known Limitations
 
-- **Google Chat 4096 character limit**: Long agent responses may be truncated by
-  Google Chat. The bridge does not currently split messages into chunks.
+- **Google Chat 4096 character limit**: Long agent responses are automatically
+  split into multiple messages at paragraph/line boundaries.
 - **Single bridge instance**: The bridge uses `max-instances=1` so that the
   in-memory async processing guard works correctly. This means no redundancy
   during deploys (brief downtime during revision rollover).
