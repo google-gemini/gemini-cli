@@ -31,21 +31,22 @@ describe('processUtils', () => {
   });
 
   it('should wait for active update promise if it exists', async () => {
-    let promiseResolved = false;
+    let resolveUpdate: () => void;
     const updatePromise = new Promise<void>((resolve) => {
-      setTimeout(() => {
-        promiseResolved = true;
-        resolve();
-      }, 50);
+      resolveUpdate = resolve;
     });
 
     vi.mocked(handleAutoUpdate.getActiveUpdatePromise).mockReturnValue(
       updatePromise,
     );
 
-    await relaunchApp();
+    const relaunchPromise = relaunchApp();
 
-    expect(promiseResolved).toBe(true);
+    expect(runExitCleanup).not.toHaveBeenCalled();
+
+    resolveUpdate!();
+    await relaunchPromise;
+
     expect(runExitCleanup).toHaveBeenCalledTimes(1);
     expect(processExit).toHaveBeenCalledWith(RELAUNCH_EXIT_CODE);
   });
