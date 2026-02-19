@@ -117,6 +117,12 @@ async function initOauthClient(
   authType: AuthType,
   config: Config,
 ): Promise<AuthClient> {
+  const recordOnboardingEndIfApplicable = () => {
+    if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+      recordOnboardingEnd(config);
+    }
+  };
+
   const credentials = await fetchCachedCredentials();
 
   if (
@@ -172,10 +178,6 @@ async function initOauthClient(
     }
 
     await triggerPostAuthCallbacks(tokens);
-
-    if (authType === AuthType.LOGIN_WITH_GOOGLE) {
-      recordOnboardingEnd(config);
-    }
   });
 
   if (credentials) {
@@ -200,10 +202,6 @@ async function initOauthClient(
         }
         debugLogger.log('Loaded cached credentials.');
         await triggerPostAuthCallbacks(credentials as Credentials);
-
-        if (authType === AuthType.LOGIN_WITH_GOOGLE) {
-          recordOnboardingEnd(config);
-        }
 
         return client;
       }
@@ -296,9 +294,7 @@ async function initOauthClient(
     }
 
     await triggerPostAuthCallbacks(client.credentials);
-    if (authType === AuthType.LOGIN_WITH_GOOGLE) {
-      recordOnboardingEnd(config);
-    }
+    recordOnboardingEndIfApplicable();
   } else {
     // In ACP mode, we skip the interactive consent and directly open the browser
     if (!config.getAcpMode()) {
@@ -405,9 +401,7 @@ async function initOauthClient(
     });
 
     await triggerPostAuthCallbacks(client.credentials);
-    if (authType === AuthType.LOGIN_WITH_GOOGLE) {
-      recordOnboardingEnd(config);
-    }
+    recordOnboardingEndIfApplicable();
   }
 
   return client;
