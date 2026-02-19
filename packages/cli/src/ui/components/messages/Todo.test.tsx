@@ -32,29 +32,37 @@ const createTodoHistoryItem = (todos: Todo[]): HistoryItem =>
 
 describe.each([true, false])(
   '<TodoTray /> (showFullTodos: %s)',
-  (showFullTodos: boolean) => {
-    const renderWithUiState = (uiState: Partial<UIState>) =>
-      render(
+  async (showFullTodos: boolean) => {
+    const renderWithUiState = async (uiState: Partial<UIState>) => {
+      const result = render(
         <UIStateContext.Provider value={uiState as UIState}>
           <TodoTray />
         </UIStateContext.Provider>,
       );
+      await result.waitUntilReady();
+      return result;
+    };
 
-    it('renders null when no todos are in the history', () => {
-      const { lastFrame } = renderWithUiState({ history: [], showFullTodos });
-      expect(lastFrame()).toMatchSnapshot();
+    it('renders null when no todos are in the history', async () => {
+      const { lastFrame, unmount } = await renderWithUiState({
+        history: [],
+        showFullTodos,
+      });
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
+      unmount();
     });
 
-    it('renders null when todo list is empty', () => {
-      const { lastFrame } = renderWithUiState({
+    it('renders null when todo list is empty', async () => {
+      const { lastFrame, unmount } = await renderWithUiState({
         history: [createTodoHistoryItem([])],
         showFullTodos,
       });
-      expect(lastFrame()).toMatchSnapshot();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
+      unmount();
     });
 
-    it('renders when todos exist but none are in progress', () => {
-      const { lastFrame } = renderWithUiState({
+    it('renders when todos exist but none are in progress', async () => {
+      const { lastFrame, unmount } = await renderWithUiState({
         history: [
           createTodoHistoryItem([
             { description: 'Pending Task', status: 'pending' },
@@ -65,10 +73,11 @@ describe.each([true, false])(
         showFullTodos,
       });
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
-    it('renders when todos exist and one is in progress', () => {
-      const { lastFrame } = renderWithUiState({
+    it('renders when todos exist and one is in progress', async () => {
+      const { lastFrame, unmount } = await renderWithUiState({
         history: [
           createTodoHistoryItem([
             { description: 'Pending Task', status: 'pending' },
@@ -80,10 +89,11 @@ describe.each([true, false])(
         showFullTodos,
       });
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
-    it('renders a todo list with long descriptions that wrap when full view is on', () => {
-      const { lastFrame } = render(
+    it('renders a todo list with long descriptions that wrap when full view is on', async () => {
+      const { lastFrame, waitUntilReady, unmount } = render(
         <Box width="50">
           <UIStateContext.Provider
             value={
@@ -110,11 +120,13 @@ describe.each([true, false])(
           </UIStateContext.Provider>
         </Box>,
       );
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
-    it('renders the most recent todo list when multiple write_todos calls are in history', () => {
-      const { lastFrame } = renderWithUiState({
+    it('renders the most recent todo list when multiple write_todos calls are in history', async () => {
+      const { lastFrame, unmount } = await renderWithUiState({
         history: [
           createTodoHistoryItem([
             { description: 'Older Task 1', status: 'completed' },
@@ -128,10 +140,11 @@ describe.each([true, false])(
         showFullTodos,
       });
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
-    it('renders full list when all todos are inactive', () => {
-      const { lastFrame } = renderWithUiState({
+    it('renders full list when all todos are inactive', async () => {
+      const { lastFrame, unmount } = await renderWithUiState({
         history: [
           createTodoHistoryItem([
             { description: 'Task 1', status: 'completed' },
@@ -140,7 +153,8 @@ describe.each([true, false])(
         ],
         showFullTodos,
       });
-      expect(lastFrame()).toMatchSnapshot();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
+      unmount();
     });
   },
 );

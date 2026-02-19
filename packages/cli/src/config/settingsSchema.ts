@@ -485,6 +485,15 @@ const SETTINGS_SCHEMA = {
           'Show a warning when running Gemini CLI in the home directory.',
         showInDialog: true,
       },
+      showCompatibilityWarnings: {
+        type: 'boolean',
+        label: 'Show Compatibility Warnings',
+        category: 'UI',
+        requiresRestart: true,
+        default: true,
+        description: 'Show warnings about terminal or OS compatibility issues.',
+        showInDialog: true,
+      },
       hideTips: {
         type: 'boolean',
         label: 'Hide Tips',
@@ -1650,6 +1659,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Enable planning features (Plan Mode and tools).',
+        showInDialog: true,
+      },
+      modelSteering: {
+        type: 'boolean',
+        label: 'Model Steering',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable model steering (user hints) to guide the model during tool execution.',
         showInDialog: true,
       },
     },

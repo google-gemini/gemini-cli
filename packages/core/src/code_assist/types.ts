@@ -355,4 +355,5 @@ export const FetchAdminControlsResponseSchema = z.object({
   strictModeDisabled: z.boolean().optional(),
   mcpSetting: McpSettingSchema.optional(),
   cliFeatureSetting: CliFeatureSettingSchema.optional(),
+  adminControlsApplicable: z.boolean().optional(),
 });
