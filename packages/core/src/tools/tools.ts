@@ -173,8 +173,8 @@ export abstract class BaseToolInvocation<
       type: 'info',
       title: `Confirm: ${this._toolDisplayName || this._toolName}`,
       prompt: this.getDescription(),
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        await this.publishPolicyUpdate(outcome);
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // Policy updates are now handled centrally by the scheduler
       },
     };
     return confirmationDetails;
