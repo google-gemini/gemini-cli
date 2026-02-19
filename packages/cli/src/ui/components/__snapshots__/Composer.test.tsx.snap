@@ -6,19 +6,22 @@ exports[`Composer > Snapshots > matches snapshot in idle state 1`] = `
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  ApprovalModeIndicator                                                                 StatusDisplay
 InputPrompt:   Type your message or @path/to/file
-Footer"
+Footer
+"
 `;
 
 exports[`Composer > Snapshots > matches snapshot in minimal UI mode 1`] = `
 "
                                                                                        ShortcutsHint
-InputPrompt:   Type your message or @path/to/file"
+InputPrompt:   Type your message or @path/to/file
+"
 `;
 
 exports[`Composer > Snapshots > matches snapshot in minimal UI mode while loading 1`] = `
 "
  LoadingIndicator
-InputPrompt:   Type your message or @path/to/file"
+InputPrompt:   Type your message or @path/to/file
+"
 `;
 
 exports[`Composer > Snapshots > matches snapshot in narrow view 1`] = `
@@ -31,7 +34,8 @@ ShortcutsHint
 StatusDisplay
 InputPrompt:   Type your message or
 @path/to/file
-Footer"
+Footer
+"
 `;
 
 exports[`Composer > Snapshots > matches snapshot while streaming 1`] = `
@@ -40,5 +44,6 @@ exports[`Composer > Snapshots > matches snapshot while streaming 1`] = `
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  ApprovalModeIndicator
 InputPrompt:   Type your message or @path/to/file
-Footer"
+Footer
+"
 `;

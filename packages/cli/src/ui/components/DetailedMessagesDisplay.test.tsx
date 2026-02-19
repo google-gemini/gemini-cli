@@ -28,8 +28,8 @@ vi.mock('./shared/ScrollableList.js', () => ({
 }));
 
 describe('DetailedMessagesDisplay', () => {
-  it('renders nothing when messages are empty', () => {
-    const { lastFrame } = render(
+  it('renders nothing when messages are empty', async () => {
+    const { lastFrame, waitUntilReady, unmount } = render(
       <DetailedMessagesDisplay
         messages={[]}
         maxHeight={10}
@@ -37,10 +37,12 @@ describe('DetailedMessagesDisplay', () => {
         hasFocus={false}
       />,
     );
-    expect(lastFrame()).toBe('');
+    await waitUntilReady();
+    expect(lastFrame({ allowEmpty: true })).toBe('');
+    unmount();
   });
 
-  it('renders messages correctly', () => {
+  it('renders messages correctly', async () => {
     const messages: ConsoleMessageItem[] = [
       { type: 'log', content: 'Log message', count: 1 },
       { type: 'warn', content: 'Warning message', count: 1 },
@@ -48,7 +50,7 @@ describe('DetailedMessagesDisplay', () => {
       { type: 'debug', content: 'Debug message', count: 1 },
     ];
 
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <DetailedMessagesDisplay
         messages={messages}
         maxHeight={20}
@@ -56,17 +58,19 @@ describe('DetailedMessagesDisplay', () => {
         hasFocus={true}
       />,
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('renders message counts', () => {
+  it('renders message counts', async () => {
     const messages: ConsoleMessageItem[] = [
       { type: 'log', content: 'Repeated message', count: 5 },
     ];
 
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <DetailedMessagesDisplay
         messages={messages}
         maxHeight={10}
@@ -74,8 +78,10 @@ describe('DetailedMessagesDisplay', () => {
         hasFocus={false}
       />,
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
+    unmount();
   });
 });

@@ -61,7 +61,7 @@ available combinations.
 | Show the next entry in history.              | `Ctrl + N (no Shift)` |
 | Start reverse search through history.        | `Ctrl + R`            |
 | Submit the selected reverse-search match.    | `Enter (no Ctrl)`     |
-| Accept a suggestion while reverse searching. | `Tab`                 |
+| Accept a suggestion while reverse searching. | `Tab (no Shift)`      |
 | Browse and rewind previous interactions.     | `Double Esc`          |
 
 #### Navigation
@@ -79,7 +79,7 @@ available combinations.
 
 | Action                                  | Keys                                               |
 | --------------------------------------- | -------------------------------------------------- |
-| Accept the inline suggestion.           | `Tab`<br />`Enter (no Ctrl)`                       |
+| Accept the inline suggestion.           | `Tab (no Shift)`<br />`Enter (no Ctrl)`            |
 | Move to the previous completion option. | `Up Arrow (no Shift)`<br />`Ctrl + P (no Shift)`   |
 | Move to the next completion option.     | `Down Arrow (no Shift)`<br />`Ctrl + N (no Shift)` |
 | Expand an inline suggestion.            | `Right Arrow`                                      |

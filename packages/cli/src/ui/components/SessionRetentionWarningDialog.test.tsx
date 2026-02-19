@@ -24,14 +24,15 @@ describe('SessionRetentionWarningDialog', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders correctly with warning message and session count', () => {
-    const { lastFrame } = renderWithProviders(
+  it('renders correctly with warning message and session count', async () => {
+    const { lastFrame, waitUntilReady } = renderWithProviders(
       <SessionRetentionWarningDialog
         onKeep120Days={vi.fn()}
         onKeep30Days={vi.fn()}
         sessionsToDeleteCount={42}
       />,
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toContain('Keep chat history');
     expect(lastFrame()).toContain(
@@ -43,14 +44,15 @@ describe('SessionRetentionWarningDialog', () => {
     expect(lastFrame()).toContain('No sessions will be deleted at this time');
   });
 
-  it('handles pluralization correctly for 1 session', () => {
-    const { lastFrame } = renderWithProviders(
+  it('handles pluralization correctly for 1 session', async () => {
+    const { lastFrame, waitUntilReady } = renderWithProviders(
       <SessionRetentionWarningDialog
         onKeep120Days={vi.fn()}
         onKeep30Days={vi.fn()}
         sessionsToDeleteCount={1}
       />,
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toContain('1 session will be deleted');
   });
@@ -59,13 +61,14 @@ describe('SessionRetentionWarningDialog', () => {
     const onKeep120Days = vi.fn();
     const onKeep30Days = vi.fn();
 
-    const { stdin } = renderWithProviders(
+    const { stdin, waitUntilReady } = renderWithProviders(
       <SessionRetentionWarningDialog
         onKeep120Days={onKeep120Days}
         onKeep30Days={onKeep30Days}
         sessionsToDeleteCount={10}
       />,
     );
+    await waitUntilReady();
 
     // Initial selection should be "Keep for 120 days" (index 1) because count > 0
     // Pressing Enter immediately should select it.
@@ -81,13 +84,14 @@ describe('SessionRetentionWarningDialog', () => {
     const onKeep120Days = vi.fn();
     const onKeep30Days = vi.fn();
 
-    const { stdin } = renderWithProviders(
+    const { stdin, waitUntilReady } = renderWithProviders(
       <SessionRetentionWarningDialog
         onKeep120Days={onKeep120Days}
         onKeep30Days={onKeep30Days}
         sessionsToDeleteCount={10}
       />,
     );
+    await waitUntilReady();
 
     // Default is index 1 (120 days). Move UP to index 0 (30 days).
     writeKey(stdin, '\x1b[A'); // Up arrow
@@ -100,13 +104,14 @@ describe('SessionRetentionWarningDialog', () => {
   });
 
   it('should match snapshot', async () => {
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = renderWithProviders(
       <SessionRetentionWarningDialog
         onKeep120Days={vi.fn()}
         onKeep30Days={vi.fn()}
         sessionsToDeleteCount={123}
       />,
     );
+    await waitUntilReady();
 
     // Initial render
     expect(lastFrame()).toMatchSnapshot();

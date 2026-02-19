@@ -495,6 +495,38 @@ describe('SchedulerStateManager', () => {
       expect(active.liveOutput).toBe('chunk 2');
       expect(active.pid).toBe(1234);
     });
+
+    it('should update progressMessage and progressPercent during executing updates', () => {
+      const call = createValidatingCall();
+      stateManager.enqueue([call]);
+      stateManager.dequeue();
+
+      // Update with progress
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Executing,
+        {
+          progressMessage: 'Starting...',
+          progressPercent: 10,
+        },
+      );
+      let active = stateManager.firstActiveCall as ExecutingToolCall;
+      expect(active.progressMessage).toBe('Starting...');
+      expect(active.progressPercent).toBe(10);
+
+      // Update progress further
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Executing,
+        {
+          progressMessage: 'Halfway!',
+          progressPercent: 50,
+        },
+      );
+      active = stateManager.firstActiveCall as ExecutingToolCall;
+      expect(active.progressMessage).toBe('Halfway!');
+      expect(active.progressPercent).toBe(50);
+    });
   });
 
   describe('Argument Updates', () => {

@@ -7,7 +7,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
-import { homedir } from '@google/gemini-cli-core';
+import { homedir, getCompatibilityWarnings } from '@google/gemini-cli-core';
 import type { Settings } from '../config/settingsSchema.js';
 import {
   isFolderTrustEnabled,
@@ -84,5 +84,11 @@ export async function getUserStartupWarnings(
   const results = await Promise.all(
     WARNING_CHECKS.map((check) => check.check(workspaceRoot, settings)),
   );
-  return results.filter((msg) => msg !== null);
+  const warnings = results.filter((msg) => msg !== null);
+
+  if (settings.ui?.showCompatibilityWarnings !== false) {
+    warnings.push(...getCompatibilityWarnings());
+  }
+
+  return warnings;
 }

@@ -16,7 +16,8 @@ exports[`<ToolStatsDisplay /> > should display stats for a single tool correctly
 │   » Modified:                                                  0   │
 │  ────────────────────────────────────────────────────────────────  │
 │   Overall Agreement Rate:                                 100.0%   │
-╰────────────────────────────────────────────────────────────────────╯"
+╰────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ToolStatsDisplay /> > should display stats for multiple tools correctly 1`] = `
@@ -36,7 +37,8 @@ exports[`<ToolStatsDisplay /> > should display stats for multiple tools correctl
 │   » Modified:                                                  1   │
 │  ────────────────────────────────────────────────────────────────  │
 │   Overall Agreement Rate:                                  33.3%   │
-╰────────────────────────────────────────────────────────────────────╯"
+╰────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ToolStatsDisplay /> > should handle large values without wrapping or overlapping 1`] = `
@@ -56,7 +58,8 @@ exports[`<ToolStatsDisplay /> > should handle large values without wrapping or o
 │   » Modified:                                              12345   │
 │  ────────────────────────────────────────────────────────────────  │
 │   Overall Agreement Rate:                                  55.6%   │
-╰────────────────────────────────────────────────────────────────────╯"
+╰────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ToolStatsDisplay /> > should handle zero decisions gracefully 1`] = `
@@ -75,12 +78,14 @@ exports[`<ToolStatsDisplay /> > should handle zero decisions gracefully 1`] = `
 │   » Modified:                                                  0   │
 │  ────────────────────────────────────────────────────────────────  │
 │   Overall Agreement Rate:                                     --   │
-╰────────────────────────────────────────────────────────────────────╯"
+╰────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ToolStatsDisplay /> > should render "no tool calls" message when there are no active tools 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
 │  No tool calls have been made in this session.                                                   │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;

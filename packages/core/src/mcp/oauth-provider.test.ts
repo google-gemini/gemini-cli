@@ -127,6 +127,7 @@ describe('MCPOAuthProvider', () => {
     clientId: 'test-client-id',
     clientSecret: 'test-client-secret',
     authorizationUrl: 'https://auth.example.com/authorize',
+    issuer: 'https://auth.example.com',
     tokenUrl: 'https://auth.example.com/token',
     scopes: ['read', 'write'],
     redirectUri: 'http://localhost:7777/oauth/callback',
@@ -620,6 +621,27 @@ describe('MCPOAuthProvider', () => {
           headers: { 'Content-Type': 'application/json' },
         }),
       );
+    });
+
+    it('should throw error when issuer is missing and dynamic registration is needed', async () => {
+      const configWithoutIssuer: MCPOAuthConfig = {
+        enabled: mockConfig.enabled,
+        authorizationUrl: mockConfig.authorizationUrl,
+        tokenUrl: mockConfig.tokenUrl,
+        scopes: mockConfig.scopes,
+        redirectUri: mockConfig.redirectUri,
+        audiences: mockConfig.audiences,
+      };
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+      });
+
+      const authProvider = new MCPOAuthProvider();
+
+      await expect(
+        authProvider.authenticate('test-server', configWithoutIssuer),
+      ).rejects.toThrow('Cannot perform dynamic registration without issuer');
     });
 
     it('should handle OAuth callback errors', async () => {

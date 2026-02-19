@@ -745,4 +745,36 @@ describe('ChatRecordingService', () => {
       expect(result[1].functionResponse!.id).toBe(callId);
     });
   });
+
+  describe('ENOENT (missing directory) handling', () => {
+    it('should ensure directory exists before writing conversation file', () => {
+      chatRecordingService.initialize();
+
+      const mkdirSyncSpy = vi.spyOn(fs, 'mkdirSync');
+      const writeFileSyncSpy = vi.spyOn(fs, 'writeFileSync');
+
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Hello after dir cleanup',
+        model: 'gemini-pro',
+      });
+
+      // mkdirSync should be called with the parent directory and recursive option
+      const conversationFile = chatRecordingService.getConversationFilePath()!;
+      expect(mkdirSyncSpy).toHaveBeenCalledWith(
+        path.dirname(conversationFile),
+        { recursive: true },
+      );
+
+      // mkdirSync should be called before writeFileSync
+      const mkdirCallOrder = mkdirSyncSpy.mock.invocationCallOrder;
+      const writeCallOrder = writeFileSyncSpy.mock.invocationCallOrder;
+      const lastMkdir = mkdirCallOrder[mkdirCallOrder.length - 1];
+      const lastWrite = writeCallOrder[writeCallOrder.length - 1];
+      expect(lastMkdir).toBeLessThan(lastWrite);
+
+      mkdirSyncSpy.mockRestore();
+      writeFileSyncSpy.mockRestore();
+    });
+  });
 });

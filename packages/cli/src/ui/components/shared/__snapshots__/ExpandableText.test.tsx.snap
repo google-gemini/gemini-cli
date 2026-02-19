@@ -2,26 +2,39 @@
 
 exports[`ExpandableText > creates centered window around match when collapsed 1`] = `
 "...ry/long/path/that/keeps/going/cd_/very/long/path/that/keeps/going/search-here/and/then/some/more/
-components//and/then/some/more/components//and/..."
+components//and/then/some/more/components//and/...
+"
 `;
 
-exports[`ExpandableText > highlights matched substring when expanded (text only visible) 1`] = `"run: git commit -m "feat: add search""`;
+exports[`ExpandableText > highlights matched substring when expanded (text only visible) 1`] = `
+"run: git commit -m "feat: add search"
+"
+`;
 
-exports[`ExpandableText > renders plain label when no match (short label) 1`] = `"simple command"`;
+exports[`ExpandableText > renders plain label when no match (short label) 1`] = `
+"simple command
+"
+`;
 
-exports[`ExpandableText > respects custom maxWidth 1`] = `"zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz..."`;
+exports[`ExpandableText > respects custom maxWidth 1`] = `
+"zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz...
+"
+`;
 
 exports[`ExpandableText > shows full long label when expanded and no match 1`] = `
 "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
-yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+"
 `;
 
 exports[`ExpandableText > truncates long label when collapsed and no match 1`] = `
 "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx..."
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...
+"
 `;
 
 exports[`ExpandableText > truncates match itself when match is very long 1`] = `
 "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx..."
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...
+"
 `;

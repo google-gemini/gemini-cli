@@ -1221,6 +1221,36 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should NOT autocomplete on Shift+Tab', async () => {
+    const suggestion = { label: 'about', value: 'about' };
+
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [suggestion],
+      activeSuggestionIndex: 0,
+      getCompletedText: vi.fn().mockReturnValue('/about'),
+    });
+
+    props.buffer.setText('/ab');
+    props.buffer.lines = ['/ab'];
+    props.buffer.cursor = [0, 3];
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\x1b[Z'); // Shift+Tab
+    });
+
+    // We need to wait a bit to ensure handleAutocomplete was NOT called
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it('should autocomplete custom commands from .toml files on Enter', async () => {
     const customCommand: SlashCommand = {
       name: 'find-capital',
@@ -2034,7 +2064,7 @@ describe('InputPrompt', () => {
         );
         await waitFor(() => {
           const frame = stdout.lastFrame();
-          const lines = frame!.split('\n');
+          const lines = frame.split('\n');
           // The line with the cursor should just be an inverted space inside the box border
           expect(
             lines.find((l) => l.includes(chalk.inverse(' '))),
@@ -2071,7 +2101,7 @@ describe('InputPrompt', () => {
         expect(frame).toContain('hello');
         expect(frame).toContain(`world${chalk.inverse(' ')}`);
 
-        const outputLines = frame!.split('\n');
+        const outputLines = frame.trim().split('\n');
         // The number of lines should be 2 for the border plus 3 for the content.
         expect(outputLines.length).toBe(5);
       });
@@ -2659,6 +2689,38 @@ describe('InputPrompt', () => {
       unmount();
     }, 15000);
 
+    it('should NOT autocomplete on Shift+Tab in reverse search', async () => {
+      const mockHandleAutocomplete = vi.fn();
+
+      mockedUseReverseSearchCompletion.mockReturnValue({
+        ...mockReverseSearchCompletion,
+        suggestions: [{ label: 'echo hello', value: 'echo hello' }],
+        showSuggestions: true,
+        activeSuggestionIndex: 0,
+        handleAutocomplete: mockHandleAutocomplete,
+      });
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x12'); // Ctrl+R
+      });
+
+      await act(async () => {
+        stdin.write('\x1b[Z'); // Shift+Tab
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(mockHandleAutocomplete).not.toHaveBeenCalled();
+      unmount();
+    });
+
     it('submits the highlighted entry on Enter and exits reverse-search', async () => {
       // Mock the reverse search completion to return suggestions
       mockedUseReverseSearchCompletion.mockReturnValue({
@@ -3035,6 +3097,39 @@ describe('InputPrompt', () => {
       },
     );
 
+    it('should NOT accept ghost text on Shift+Tab', async () => {
+      const mockAccept = vi.fn();
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: false,
+        suggestions: [],
+        promptCompletion: {
+          text: 'ghost text',
+          accept: mockAccept,
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: true,
+          markSelected: vi.fn(),
+        },
+      });
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x1b[Z'); // Shift+Tab
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(mockAccept).not.toHaveBeenCalled();
+      unmount();
+    });
+
     it('should not reveal clean UI details on Shift+Tab when hidden', async () => {
       mockedUseCommandCompletion.mockReturnValue({
         ...mockCommandCompletion,
@@ -3254,7 +3349,7 @@ describe('InputPrompt', () => {
         return <InputPrompt {...baseProps} buffer={buffer as TextBuffer} />;
       };
 
-      const { stdin, stdout, unmount, simulateClick } = renderWithProviders(
+      const { stdout, unmount, simulateClick } = renderWithProviders(
         <TestWrapper />,
         {
           mouseEventsEnabled: true,
@@ -3269,8 +3364,8 @@ describe('InputPrompt', () => {
       });
 
       // Simulate double-click to expand
-      await simulateClick(stdin, 5, 2);
-      await simulateClick(stdin, 5, 2);
+      await simulateClick(5, 2);
+      await simulateClick(5, 2);
 
       // 2. Verify expanded content is visible
       await waitFor(() => {
@@ -3278,8 +3373,8 @@ describe('InputPrompt', () => {
       });
 
       // Simulate double-click to collapse
-      await simulateClick(stdin, 5, 2);
-      await simulateClick(stdin, 5, 2);
+      await simulateClick(5, 2);
+      await simulateClick(5, 2);
 
       // 3. Verify placeholder is restored
       await waitFor(() => {
@@ -3345,7 +3440,7 @@ describe('InputPrompt', () => {
         return <InputPrompt {...baseProps} buffer={buffer as TextBuffer} />;
       };
 
-      const { stdin, stdout, unmount, simulateClick } = renderWithProviders(
+      const { stdout, unmount, simulateClick } = renderWithProviders(
         <TestWrapper />,
         {
           mouseEventsEnabled: true,
@@ -3360,8 +3455,8 @@ describe('InputPrompt', () => {
       });
 
       // Simulate double-click WAY to the right on the first line
-      await simulateClick(stdin, 100, 2);
-      await simulateClick(stdin, 100, 2);
+      await simulateClick(90, 2);
+      await simulateClick(90, 2);
 
       // Verify it is NOW collapsed
       await waitFor(() => {

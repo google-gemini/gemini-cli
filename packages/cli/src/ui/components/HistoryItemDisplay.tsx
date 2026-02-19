@@ -35,6 +35,7 @@ import { ChatList } from './views/ChatList.js';
 import { HooksList } from './views/HooksList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
 import { ThinkingMessage } from './messages/ThinkingMessage.js';
+import { HintMessage } from './messages/HintMessage.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 
@@ -64,6 +65,9 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       {/* Render standard message types */}
       {itemForDisplay.type === 'thinking' && inlineThinkingMode !== 'off' && (
         <ThinkingMessage thought={itemForDisplay.thought} />
+      )}
+      {itemForDisplay.type === 'hint' && (
+        <HintMessage text={itemForDisplay.text} />
       )}
       {itemForDisplay.type === 'user' && (
         <UserMessage text={itemForDisplay.text} width={terminalWidth} />
@@ -96,6 +100,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           text={itemForDisplay.text}
           icon={itemForDisplay.icon}
           color={itemForDisplay.color}
+          marginBottom={itemForDisplay.marginBottom}
         />
       )}
       {itemForDisplay.type === 'warning' && (

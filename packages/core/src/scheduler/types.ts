@@ -109,6 +109,8 @@ export type ExecutingToolCall = {
   tool: AnyDeclarativeTool;
   invocation: AnyToolInvocation;
   liveOutput?: string | AnsiOutput;
+  progressMessage?: string;
+  progressPercent?: number;
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
   pid?: number;

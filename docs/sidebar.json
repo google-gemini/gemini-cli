@@ -19,6 +19,10 @@
         "slug": "docs/cli/tutorials/file-management"
       },
       {
+        "label": "Get started with Agent skills",
+        "slug": "docs/cli/tutorials/skills-getting-started"
+      },
+      {
         "label": "Manage context and memory",
         "slug": "docs/cli/tutorials/memory-management"
       },
@@ -37,10 +41,6 @@
       {
         "label": "Web search and fetch",
         "slug": "docs/cli/tutorials/web-tools"
-      },
-      {
-        "label": "Get started with skills",
-        "slug": "docs/cli/tutorials/skills-getting-started"
       },
       {
         "label": "Set up an MCP server",
@@ -73,7 +73,13 @@
       },
       { "label": "Model routing", "slug": "docs/cli/model-routing" },
       { "label": "Model selection", "slug": "docs/cli/model" },
-      { "label": "Plan mode (experimental)", "slug": "docs/cli/plan-mode" },
+      { "label": "Plan mode", "badge": "🧪", "slug": "docs/cli/plan-mode" },
+      { "label": "Subagents", "badge": "🧪", "slug": "docs/core/subagents" },
+      {
+        "label": "Remote subagents",
+        "badge": "🧪",
+        "slug": "docs/core/remote-agents"
+      },
       { "label": "Rewind", "slug": "docs/cli/rewind" },
       { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
       { "label": "Settings", "slug": "docs/cli/settings" },
@@ -142,13 +148,11 @@
   {
     "label": "Reference",
     "items": [
-      { "label": "Architecture", "slug": "docs/architecture" },
       { "label": "Command reference", "slug": "docs/cli/commands" },
       {
         "label": "Configuration reference",
         "slug": "docs/get-started/configuration"
       },
-      { "label": "Core concepts", "slug": "docs/core/concepts" },
       { "label": "Keyboard shortcuts", "slug": "docs/cli/keyboard-shortcuts" },
       { "label": "Memory import processor", "slug": "docs/core/memport" },
       { "label": "Policy engine", "slug": "docs/core/policy-engine" },
