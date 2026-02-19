@@ -578,6 +578,50 @@ export class ChatRecordingService {
   }
 
   /**
+   * Asynchronously deletes the current session's chat file and tool outputs.
+   * This encapsulates the session ID logic and uses non-blocking I/O to avoid
+   * blocking the event loop on exit.
+   */
+  async deleteCurrentSessionAsync(): Promise<void> {
+    if (!this.conversationFile) {
+      return;
+    }
+
+    const sessionId = path.basename(this.conversationFile, '.json');
+
+    try {
+      const tempDir = this.config.storage.getProjectTempDir();
+      const chatsDir = path.join(tempDir, 'chats');
+      const sessionPath = path.join(chatsDir, `${sessionId}.json`);
+
+      await fs.promises.unlink(sessionPath).catch(() => {
+        // File may not exist; ignore.
+      });
+
+      // Cleanup tool outputs for this session
+      const safeSessionId = sanitizeFilenamePart(sessionId);
+      const toolOutputDir = path.join(
+        tempDir,
+        'tool-outputs',
+        `session-${safeSessionId}`,
+      );
+
+      // Robustness: Ensure the path is strictly within the tool-outputs base
+      const toolOutputsBase = path.join(tempDir, 'tool-outputs');
+      if (toolOutputDir.startsWith(toolOutputsBase)) {
+        await fs.promises
+          .rm(toolOutputDir, { recursive: true, force: true })
+          .catch(() => {
+            // Directory may not exist; ignore.
+          });
+      }
+    } catch (error) {
+      debugLogger.error('Error deleting current session.', error);
+      throw error;
+    }
+  }
+
+  /**
    * Rewinds the conversation to the state just before the specified message ID.
    * All messages from (and including) the specified ID onwards are removed.
    */

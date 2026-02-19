@@ -543,6 +543,18 @@ export const useSlashCommandProcessor = (
                   return { type: 'handled' };
                 }
                 case 'quit':
+                  if (result.deleteSession) {
+                    try {
+                      const chatRecordingService = config
+                        ?.getGeminiClient()
+                        ?.getChatRecordingService();
+                      if (chatRecordingService) {
+                        await chatRecordingService.deleteCurrentSessionAsync();
+                      }
+                    } catch {
+                      // Don't let deletion errors prevent exit.
+                    }
+                  }
                   actions.quit(result.messages);
                   return { type: 'handled' };
 

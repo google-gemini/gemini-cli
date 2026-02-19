@@ -33,11 +33,12 @@ describe('quitCommand', () => {
     });
 
     if (!quitCommand.action) throw new Error('Action is not defined');
-    const result = quitCommand.action(mockContext, 'quit');
+    const result = quitCommand.action(mockContext, '');
 
     expect(formatDuration).toHaveBeenCalledWith(3600000); // 1 hour in ms
     expect(result).toEqual({
       type: 'quit',
+      deleteSession: false,
       messages: [
         {
           type: 'user',
@@ -51,5 +52,55 @@ describe('quitCommand', () => {
         },
       ],
     });
+  });
+
+  it('sets deleteSession to true when --delete flag is provided', () => {
+    const mockContext = createMockCommandContext({
+      session: {
+        stats: {
+          sessionStartTime: new Date('2025-01-01T00:00:00Z'),
+        },
+      },
+    });
+
+    if (!quitCommand.action) throw new Error('Action is not defined');
+    const result = quitCommand.action(mockContext, '--delete');
+
+    expect(result).toEqual({
+      type: 'quit',
+      deleteSession: true,
+      messages: [
+        {
+          type: 'user',
+          text: '/quit',
+          id: expect.any(Number),
+        },
+        {
+          type: 'quit',
+          duration: '1h 0m 0s',
+          id: expect.any(Number),
+        },
+      ],
+    });
+  });
+
+  it('does not set deleteSession for unrecognized args', () => {
+    const mockContext = createMockCommandContext({
+      session: {
+        stats: {
+          sessionStartTime: new Date('2025-01-01T00:00:00Z'),
+        },
+      },
+    });
+
+    if (!quitCommand.action) throw new Error('Action is not defined');
+    const result = quitCommand.action(mockContext, 'some-random-arg');
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        type: 'quit',
+        deleteSession: false,
+      }),
+    );
   });
 });
