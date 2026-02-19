@@ -27,9 +27,8 @@ npm install -g @google/gemini-cli@latest
 
 After you’ve confirmed your version is 0.21.1 or later:
 
-1. Use the `/settings` command in Gemini CLI.
-2. Toggle **Preview Features** to `true`.
-3. Run `/model` and select **Auto (Gemini 3)**.
+1. Run `/model`.
+2. Select **Auto (Gemini 3)**.
 
 For more information, see [Gemini CLI model selection](../cli/model.md).
 
