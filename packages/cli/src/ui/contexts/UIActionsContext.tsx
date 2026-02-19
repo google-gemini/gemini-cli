@@ -20,7 +20,10 @@ import type { SessionInfo } from '../../utils/sessionUtils.js';
 import { type NewAgentsChoice } from '../components/NewAgentsNotification.js';
 
 export interface UIActions {
-  handleThemeSelect: (themeName: string, scope: LoadableSettingScope) => void;
+  handleThemeSelect: (
+    themeName: string,
+    scope: LoadableSettingScope,
+  ) => Promise<void>;
   closeThemeDialog: () => void;
   handleThemeHighlight: (themeName: string | undefined) => void;
   handleAuthSelect: (
@@ -52,7 +55,7 @@ export interface UIActions {
   setConstrainHeight: (value: boolean) => void;
   onEscapePromptChange: (show: boolean) => void;
   refreshStatic: () => void;
-  handleFinalSubmit: (value: string) => void;
+  handleFinalSubmit: (value: string) => Promise<void>;
   handleClearScreen: () => void;
   handleProQuotaChoice: (
     choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
@@ -67,12 +70,20 @@ export interface UIActions {
   handleApiKeySubmit: (apiKey: string) => Promise<void>;
   handleApiKeyCancel: () => void;
   setBannerVisible: (visible: boolean) => void;
+  setShortcutsHelpVisible: (visible: boolean) => void;
+  setCleanUiDetailsVisible: (visible: boolean) => void;
+  toggleCleanUiDetailsVisible: () => void;
+  revealCleanUiDetailsTemporarily: (durationMs?: number) => void;
   handleWarning: (message: string) => void;
   setEmbeddedShellFocused: (value: boolean) => void;
   dismissBackgroundShell: (pid: number) => void;
   setActiveBackgroundShellPid: (pid: number) => void;
   setIsBackgroundShellListOpen: (isOpen: boolean) => void;
   setAuthContext: (context: { requiresRestart?: boolean }) => void;
+  onHintInput: (char: string) => void;
+  onHintBackspace: () => void;
+  onHintClear: () => void;
+  onHintSubmit: (hint: string) => void;
   handleRestart: () => void;
   handleNewAgentsSelect: (choice: NewAgentsChoice) => Promise<void>;
 }

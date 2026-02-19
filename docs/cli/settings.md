@@ -22,14 +22,16 @@ they appear in the UI.
 
 ### General
 
-| UI Label                        | Setting                            | Description                                                   | Default |
-| ------------------------------- | ---------------------------------- | ------------------------------------------------------------- | ------- |
-| Preview Features (e.g., models) | `general.previewFeatures`          | Enable preview features (e.g., preview models).               | `false` |
-| Vim Mode                        | `general.vimMode`                  | Enable Vim keybindings                                        | `false` |
-| Enable Auto Update              | `general.enableAutoUpdate`         | Enable automatic updates.                                     | `true`  |
-| Enable Prompt Completion        | `general.enablePromptCompletion`   | Enable AI-powered prompt completion suggestions while typing. | `false` |
-| Debug Keystroke Logging         | `general.debugKeystrokeLogging`    | Enable debug logging of keystrokes to the console.            | `false` |
-| Enable Session Cleanup          | `general.sessionRetention.enabled` | Enable automatic session cleanup                              | `false` |
+| UI Label                 | Setting                            | Description                                                                                                                                                                    | Default     |
+| ------------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
+| Vim Mode                 | `general.vimMode`                  | Enable Vim keybindings                                                                                                                                                         | `false`     |
+| Default Approval Mode    | `general.defaultApprovalMode`      | The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet. | `"default"` |
+| Enable Auto Update       | `general.enableAutoUpdate`         | Enable automatic updates.                                                                                                                                                      | `true`      |
+| Enable Notifications     | `general.enableNotifications`      | Enable run-event notifications for action-required prompts and session completion. Currently macOS only.                                                                       | `false`     |
+| Enable Prompt Completion | `general.enablePromptCompletion`   | Enable AI-powered prompt completion suggestions while typing.                                                                                                                  | `false`     |
+| Debug Keystroke Logging  | `general.debugKeystrokeLogging`    | Enable debug logging of keystrokes to the console.                                                                                                                             | `false`     |
+| Enable Session Cleanup   | `general.sessionRetention.enabled` | Enable automatic session cleanup                                                                                                                                               | `false`     |
+| Keep chat history        | `general.sessionRetention.maxAge`  | Automatically delete chats older than this time period (e.g., "30d", "7d", "24h", "1w")                                                                                        | `undefined` |
 
 ### Output
 
@@ -44,10 +46,13 @@ they appear in the UI.
 | Auto Theme Switching                 | `ui.autoThemeSwitching`                 | Automatically switch between default light and dark themes based on terminal background color.                                                                    | `true`  |
 | Terminal Background Polling Interval | `ui.terminalBackgroundPollingInterval`  | Interval in seconds to poll the terminal background color.                                                                                                        | `60`    |
 | Hide Window Title                    | `ui.hideWindowTitle`                    | Hide the window title bar                                                                                                                                         | `false` |
+| Inline Thinking                      | `ui.inlineThinkingMode`                 | Display model thinking inline: off or full.                                                                                                                       | `"off"` |
 | Show Thoughts in Title               | `ui.showStatusInTitle`                  | Show Gemini CLI model thoughts in the terminal window title during the working phase                                                                              | `false` |
 | Dynamic Window Title                 | `ui.dynamicWindowTitle`                 | Update the terminal window title with current status icons (Ready: ◇, Action Required: ✋, Working: ✦)                                                            | `true`  |
 | Show Home Directory Warning          | `ui.showHomeDirectoryWarning`           | Show a warning when running Gemini CLI in the home directory.                                                                                                     | `true`  |
+| Show Compatibility Warnings          | `ui.showCompatibilityWarnings`          | Show warnings about terminal or OS compatibility issues.                                                                                                          | `true`  |
 | Hide Tips                            | `ui.hideTips`                           | Hide helpful tips in the UI                                                                                                                                       | `false` |
+| Show Shortcuts Hint                  | `ui.showShortcutsHint`                  | Show the "? for shortcuts" hint above the input.                                                                                                                  | `true`  |
 | Hide Banner                          | `ui.hideBanner`                         | Hide the application banner                                                                                                                                       | `false` |
 | Hide Context Summary                 | `ui.hideContextSummary`                 | Hide the context summary (GEMINI.md, MCP servers) above the input.                                                                                                | `false` |
 | Hide CWD                             | `ui.footer.hideCWD`                     | Hide the current working directory path in the footer.                                                                                                            | `false` |
@@ -96,16 +101,13 @@ they appear in the UI.
 
 ### Tools
 
-| UI Label                         | Setting                              | Description                                                                                                                                                                    | Default     |
-| -------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
-| Enable Interactive Shell         | `tools.shell.enableInteractiveShell` | Use node-pty for an interactive shell experience. Fallback to child_process still applies.                                                                                     | `true`      |
-| Show Color                       | `tools.shell.showColor`              | Show color in shell output.                                                                                                                                                    | `false`     |
-| Approval Mode                    | `tools.approvalMode`                 | The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet. | `"default"` |
-| Use Ripgrep                      | `tools.useRipgrep`                   | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.                                                                | `true`      |
-| Enable Tool Output Truncation    | `tools.enableToolOutputTruncation`   | Enable truncation of large tool outputs.                                                                                                                                       | `true`      |
-| Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold`  | Truncate tool output if it is larger than this many characters. Set to -1 to disable.                                                                                          | `4000000`   |
-| Tool Output Truncation Lines     | `tools.truncateToolOutputLines`      | The number of lines to keep when truncating tool output.                                                                                                                       | `1000`      |
-| Disable LLM Correction           | `tools.disableLLMCorrection`         | Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.     | `true`      |
+| UI Label                         | Setting                              | Description                                                                                                                                                                | Default |
+| -------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Enable Interactive Shell         | `tools.shell.enableInteractiveShell` | Use node-pty for an interactive shell experience. Fallback to child_process still applies.                                                                                 | `true`  |
+| Show Color                       | `tools.shell.showColor`              | Show color in shell output.                                                                                                                                                | `false` |
+| Use Ripgrep                      | `tools.useRipgrep`                   | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.                                                            | `true`  |
+| Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold`  | Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.                                                                 | `40000` |
+| Disable LLM Correction           | `tools.disableLLMCorrection`         | Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct. | `true`  |
 
 ### Security
 
@@ -118,12 +120,20 @@ they appear in the UI.
 | Folder Trust                          | `security.folderTrust.enabled`                  | Setting to track whether Folder trust is enabled.                                                                                                                       | `true`  |
 | Enable Environment Variable Redaction | `security.environmentVariableRedaction.enabled` | Enable redaction of environment variables that may contain secrets.                                                                                                     | `false` |
 
+### Advanced
+
+| UI Label                          | Setting                        | Description                                   | Default |
+| --------------------------------- | ------------------------------ | --------------------------------------------- | ------- |
+| Auto Configure Max Old Space Size | `advanced.autoConfigureMemory` | Automatically configure Node.js memory limits | `false` |
+
 ### Experimental
 
-| UI Label         | Setting                      | Description                                                                         | Default |
-| ---------------- | ---------------------------- | ----------------------------------------------------------------------------------- | ------- |
-| Use OSC 52 Paste | `experimental.useOSC52Paste` | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false` |
-| Plan             | `experimental.plan`          | Enable planning features (Plan Mode and tools).                                     | `false` |
+| UI Label                   | Setting                                  | Description                                                                         | Default |
+| -------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------- | ------- |
+| Enable Tool Output Masking | `experimental.toolOutputMasking.enabled` | Enables tool output masking to save tokens.                                         | `true`  |
+| Use OSC 52 Paste           | `experimental.useOSC52Paste`             | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false` |
+| Plan                       | `experimental.plan`                      | Enable planning features (Plan Mode and tools).                                     | `false` |
+| Model Steering             | `experimental.modelSteering`             | Enable model steering (user hints) to guide the model during tool execution.        | `false` |
 
 ### Skills
 

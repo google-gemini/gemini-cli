@@ -54,7 +54,7 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
         const observer = new ResizeObserver((entries) => {
           const entry = entries[0];
           if (entry) {
-            setContentHeight(entry.contentRect.height);
+            setContentHeight(Math.round(entry.contentRect.height));
           }
         });
         observer.observe(node);

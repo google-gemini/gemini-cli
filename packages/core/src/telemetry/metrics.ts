@@ -13,6 +13,8 @@ import type {
   ModelSlashCommandEvent,
   AgentFinishEvent,
   RecoveryAttemptEvent,
+  KeychainAvailabilityEvent,
+  TokenStorageInitializationEvent,
 } from './types.js';
 import { AuthType } from '../core/contentGenerator.js';
 import { getCommonAttributes } from './telemetryAttributes.js';
@@ -37,6 +39,8 @@ const MODEL_SLASH_COMMAND_CALL_COUNT =
   'gemini_cli.slash_command.model.call_count';
 const EVENT_HOOK_CALL_COUNT = 'gemini_cli.hook_call.count';
 const EVENT_HOOK_CALL_LATENCY = 'gemini_cli.hook_call.latency';
+const KEYCHAIN_AVAILABILITY_COUNT = 'gemini_cli.keychain.availability.count';
+const TOKEN_STORAGE_TYPE_COUNT = 'gemini_cli.token_storage.type.count';
 
 // Agent Metrics
 const AGENT_RUN_COUNT = 'gemini_cli.agent.run.count';
@@ -77,6 +81,7 @@ const COUNTER_DEFINITIONS = {
     description: 'Counts tool calls, tagged by function name and success.',
     valueType: ValueType.INT,
     assign: (c: Counter) => (toolCallCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       function_name: string;
       success: boolean;
@@ -88,6 +93,7 @@ const COUNTER_DEFINITIONS = {
     description: 'Counts API requests, tagged by model and status.',
     valueType: ValueType.INT,
     assign: (c: Counter) => (apiRequestCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       model: string;
       status_code?: number | string;
@@ -98,6 +104,7 @@ const COUNTER_DEFINITIONS = {
     description: 'Counts the total number of tokens used.',
     valueType: ValueType.INT,
     assign: (c: Counter) => (tokenUsageCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       model: string;
       type: 'input' | 'output' | 'thought' | 'cache' | 'tool';
@@ -113,6 +120,7 @@ const COUNTER_DEFINITIONS = {
     description: 'Counts file operations (create, read, update).',
     valueType: ValueType.INT,
     assign: (c: Counter) => (fileOperationCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       operation: FileOperation;
       lines?: number;
@@ -125,6 +133,7 @@ const COUNTER_DEFINITIONS = {
     description: 'Number of lines changed (from file diffs).',
     valueType: ValueType.INT,
     assign: (c: Counter) => (linesChangedCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       function_name?: string;
       type: 'added' | 'removed';
@@ -152,6 +161,7 @@ const COUNTER_DEFINITIONS = {
     description: 'Counts model routing failures.',
     valueType: ValueType.INT,
     assign: (c: Counter) => (modelRoutingFailureCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       'routing.decision_source': string;
       'routing.error_message': string;
@@ -161,6 +171,7 @@ const COUNTER_DEFINITIONS = {
     description: 'Counts model slash command calls.',
     valueType: ValueType.INT,
     assign: (c: Counter) => (modelSlashCommandCallCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       'slash_command.model.model_name': string;
     },
@@ -169,6 +180,7 @@ const COUNTER_DEFINITIONS = {
     description: 'Counts chat compression events.',
     valueType: ValueType.INT,
     assign: (c: Counter) => (chatCompressionCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       tokens_before: number;
       tokens_after: number;
@@ -178,6 +190,7 @@ const COUNTER_DEFINITIONS = {
     description: 'Counts agent runs, tagged by name and termination reason.',
     valueType: ValueType.INT,
     assign: (c: Counter) => (agentRunCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       agent_name: string;
       terminate_reason: string;
@@ -187,6 +200,7 @@ const COUNTER_DEFINITIONS = {
     description: 'Counts agent recovery attempts.',
     valueType: ValueType.INT,
     assign: (c: Counter) => (agentRecoveryAttemptCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       agent_name: string;
       reason: string;
@@ -210,6 +224,7 @@ const COUNTER_DEFINITIONS = {
     description: 'Counts plan executions (switching from Plan Mode).',
     valueType: ValueType.INT,
     assign: (c: Counter) => (planExecutionCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       approval_mode: string;
     },
@@ -218,10 +233,30 @@ const COUNTER_DEFINITIONS = {
     description: 'Counts hook calls, tagged by hook event name and success.',
     valueType: ValueType.INT,
     assign: (c: Counter) => (hookCallCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       hook_event_name: string;
       hook_name: string;
       success: boolean;
+    },
+  },
+  [KEYCHAIN_AVAILABILITY_COUNT]: {
+    description: 'Counts keychain availability checks.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (keychainAvailabilityCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      available: boolean;
+    },
+  },
+  [TOKEN_STORAGE_TYPE_COUNT]: {
+    description: 'Counts token storage type initializations.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (tokenStorageTypeCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      type: string;
+      forced: boolean;
     },
   },
 } as const;
@@ -232,6 +267,7 @@ const HISTOGRAM_DEFINITIONS = {
     unit: 'ms',
     valueType: ValueType.INT,
     assign: (h: Histogram) => (toolCallLatencyHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       function_name: string;
     },
@@ -241,6 +277,7 @@ const HISTOGRAM_DEFINITIONS = {
     unit: 'ms',
     valueType: ValueType.INT,
     assign: (h: Histogram) => (apiRequestLatencyHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       model: string;
     },
@@ -250,6 +287,7 @@ const HISTOGRAM_DEFINITIONS = {
     unit: 'ms',
     valueType: ValueType.INT,
     assign: (h: Histogram) => (modelRoutingLatencyHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       'routing.decision_model': string;
       'routing.decision_source': string;
@@ -260,6 +298,7 @@ const HISTOGRAM_DEFINITIONS = {
     unit: 'ms',
     valueType: ValueType.INT,
     assign: (h: Histogram) => (agentDurationHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       agent_name: string;
     },
@@ -276,6 +315,7 @@ const HISTOGRAM_DEFINITIONS = {
     unit: 'turns',
     valueType: ValueType.INT,
     assign: (h: Histogram) => (agentTurnsHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       agent_name: string;
     },
@@ -285,6 +325,7 @@ const HISTOGRAM_DEFINITIONS = {
     unit: 'ms',
     valueType: ValueType.INT,
     assign: (h: Histogram) => (agentRecoveryAttemptDurationHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       agent_name: string;
     },
@@ -294,6 +335,7 @@ const HISTOGRAM_DEFINITIONS = {
     unit: 'token',
     valueType: ValueType.INT,
     assign: (h: Histogram) => (genAiClientTokenUsageHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       'gen_ai.operation.name': string;
       'gen_ai.provider.name': string;
@@ -309,6 +351,7 @@ const HISTOGRAM_DEFINITIONS = {
     unit: 's',
     valueType: ValueType.DOUBLE,
     assign: (h: Histogram) => (genAiClientOperationDurationHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       'gen_ai.operation.name': string;
       'gen_ai.provider.name': string;
@@ -324,6 +367,7 @@ const HISTOGRAM_DEFINITIONS = {
     unit: 'ms',
     valueType: ValueType.INT,
     assign: (c: Histogram) => (hookCallLatencyHistogram = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       hook_event_name: string;
       hook_name: string;
@@ -337,6 +381,7 @@ const PERFORMANCE_COUNTER_DEFINITIONS = {
     description: 'Performance regression detection events.',
     valueType: ValueType.INT,
     assign: (c: Counter) => (regressionDetectionCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       metric: string;
       severity: 'low' | 'medium' | 'high';
@@ -353,6 +398,7 @@ const PERFORMANCE_HISTOGRAM_DEFINITIONS = {
     unit: 'ms',
     valueType: ValueType.DOUBLE,
     assign: (h: Histogram) => (startupTimeHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       phase: string;
       details?: Record<string, string | number | boolean>;
@@ -363,6 +409,7 @@ const PERFORMANCE_HISTOGRAM_DEFINITIONS = {
     unit: 'bytes',
     valueType: ValueType.INT,
     assign: (h: Histogram) => (memoryUsageGauge = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       memory_type: MemoryMetricType;
       component?: string;
@@ -389,6 +436,7 @@ const PERFORMANCE_HISTOGRAM_DEFINITIONS = {
     unit: 'ms',
     valueType: ValueType.INT,
     assign: (h: Histogram) => (toolExecutionBreakdownHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       function_name: string;
       phase: ToolExecutionPhase;
@@ -400,6 +448,7 @@ const PERFORMANCE_HISTOGRAM_DEFINITIONS = {
     unit: 'ratio',
     valueType: ValueType.DOUBLE,
     assign: (h: Histogram) => (tokenEfficiencyHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       model: string;
       metric: string;
@@ -411,6 +460,7 @@ const PERFORMANCE_HISTOGRAM_DEFINITIONS = {
     unit: 'ms',
     valueType: ValueType.INT,
     assign: (h: Histogram) => (apiRequestBreakdownHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       model: string;
       phase: ApiRequestPhase;
@@ -421,6 +471,7 @@ const PERFORMANCE_HISTOGRAM_DEFINITIONS = {
     unit: 'score',
     valueType: ValueType.DOUBLE,
     assign: (h: Histogram) => (performanceScoreGauge = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       category: string;
       baseline?: number;
@@ -432,6 +483,7 @@ const PERFORMANCE_HISTOGRAM_DEFINITIONS = {
     unit: 'percent',
     valueType: ValueType.DOUBLE,
     assign: (h: Histogram) => (regressionPercentageChangeHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       metric: string;
       severity: 'low' | 'medium' | 'high';
@@ -445,6 +497,7 @@ const PERFORMANCE_HISTOGRAM_DEFINITIONS = {
     unit: 'percent',
     valueType: ValueType.DOUBLE,
     assign: (h: Histogram) => (baselineComparisonHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       metric: string;
       category: string;
@@ -542,6 +595,8 @@ let planExecutionCounter: Counter | undefined;
 let slowRenderHistogram: Histogram | undefined;
 let hookCallCounter: Counter | undefined;
 let hookCallLatencyHistogram: Histogram | undefined;
+let keychainAvailabilityCounter: Counter | undefined;
+let tokenStorageTypeCounter: Counter | undefined;
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 let genAiClientTokenUsageHistogram: Histogram | undefined;
@@ -1248,4 +1303,33 @@ export function recordHookCallMetrics(
 
   hookCallCounter.add(1, metricAttributes);
   hookCallLatencyHistogram.record(durationMs, metricAttributes);
+}
+
+/**
+ * Records a metric for keychain availability.
+ */
+export function recordKeychainAvailability(
+  config: Config,
+  event: KeychainAvailabilityEvent,
+): void {
+  if (!keychainAvailabilityCounter || !isMetricsInitialized) return;
+  keychainAvailabilityCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    available: event.available,
+  });
+}
+
+/**
+ * Records a metric for token storage type initialization.
+ */
+export function recordTokenStorageInitialization(
+  config: Config,
+  event: TokenStorageInitializationEvent,
+): void {
+  if (!tokenStorageTypeCounter || !isMetricsInitialized) return;
+  tokenStorageTypeCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    type: event.type,
+    forced: event.forced,
+  });
 }

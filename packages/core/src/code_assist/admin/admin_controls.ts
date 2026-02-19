@@ -80,15 +80,6 @@ export function sanitizeAdminSettings(
   };
 }
 
-function isGaxiosError(error: unknown): error is { status: number } {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'status' in error &&
-    typeof (error as { status: unknown }).status === 'number'
-  );
-}
-
 /**
  * Fetches the admin controls from the server if enabled by experiment flag.
  * Safely handles polling start/stop based on the flag and server availability.
@@ -113,7 +104,7 @@ export async function fetchAdminControls(
 
   // If we already have settings (e.g. from IPC during relaunch), use them
   // to avoid blocking startup with another fetch. We'll still start polling.
-  if (cachedSettings) {
+  if (cachedSettings && Object.keys(cachedSettings).length !== 0) {
     currentSettings = cachedSettings;
     startAdminControlsPolling(server, server.projectId, onSettingsChanged);
     return cachedSettings;
@@ -123,22 +114,20 @@ export async function fetchAdminControls(
     const rawSettings = await server.fetchAdminControls({
       project: server.projectId,
     });
+
+    if (rawSettings.adminControlsApplicable !== true) {
+      stopAdminControlsPolling();
+      currentSettings = undefined;
+      return {};
+    }
+
     const sanitizedSettings = sanitizeAdminSettings(rawSettings);
     currentSettings = sanitizedSettings;
     startAdminControlsPolling(server, server.projectId, onSettingsChanged);
     return sanitizedSettings;
   } catch (e) {
-    // Non-enterprise users don't have access to fetch settings.
-    if (isGaxiosError(e) && e.status === 403) {
-      stopAdminControlsPolling();
-      currentSettings = undefined;
-      return {};
-    }
     debugLogger.error('Failed to fetch admin controls: ', e);
-    // If initial fetch fails, start polling to retry.
-    currentSettings = {};
-    startAdminControlsPolling(server, server.projectId, onSettingsChanged);
-    return {};
+    throw e;
   }
 }
 
@@ -162,17 +151,18 @@ export async function fetchAdminControlsOnce(
     const rawSettings = await server.fetchAdminControls({
       project: server.projectId,
     });
-    return sanitizeAdminSettings(rawSettings);
-  } catch (e) {
-    // Non-enterprise users don't have access to fetch settings.
-    if (isGaxiosError(e) && e.status === 403) {
+
+    if (rawSettings.adminControlsApplicable !== true) {
       return {};
     }
+
+    return sanitizeAdminSettings(rawSettings);
+  } catch (e) {
     debugLogger.error(
       'Failed to fetch admin controls: ',
       e instanceof Error ? e.message : e,
     );
-    return {};
+    throw e;
   }
 }
 
@@ -192,6 +182,13 @@ function startAdminControlsPolling(
         const rawSettings = await server.fetchAdminControls({
           project,
         });
+
+        if (rawSettings.adminControlsApplicable !== true) {
+          stopAdminControlsPolling();
+          currentSettings = undefined;
+          return;
+        }
+
         const newSettings = sanitizeAdminSettings(rawSettings);
 
         if (!isDeepStrictEqual(newSettings, currentSettings)) {
@@ -199,12 +196,6 @@ function startAdminControlsPolling(
           onSettingsChanged(newSettings);
         }
       } catch (e) {
-        // Non-enterprise users don't have access to fetch settings.
-        if (isGaxiosError(e) && e.status === 403) {
-          stopAdminControlsPolling();
-          currentSettings = undefined;
-          return;
-        }
         debugLogger.error('Failed to poll admin controls: ', e);
       }
     },
@@ -237,4 +228,26 @@ export function getAdminErrorMessage(
   const projectId = server?.projectId;
   const projectParam = projectId ? `?project=${projectId}` : '';
   return `${featureName} is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli${projectParam}`;
+}
+
+/**
+ * Returns a standardized error message for MCP servers blocked by the admin allowlist.
+ *
+ * @param blockedServers List of blocked server names
+ * @param config The application config
+ * @returns The formatted error message
+ */
+export function getAdminBlockedMcpServersMessage(
+  blockedServers: string[],
+  config: Config | undefined,
+): string {
+  const server = config ? getCodeAssistServer(config) : undefined;
+  const projectId = server?.projectId;
+  const projectParam = projectId ? `?project=${projectId}` : '';
+  const count = blockedServers.length;
+  const serverText = count === 1 ? 'server is' : 'servers are';
+
+  return `${count} MCP ${serverText} not allowlisted by your administrator. To enable ${
+    count === 1 ? 'it' : 'them'
+  }, please request an update to the settings at: https://goo.gle/manage-gemini-cli${projectParam}`;
 }

@@ -29,6 +29,7 @@ import { parseThought, type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { createUserContent } from '@google/genai';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { getCitations } from '../utils/generateContentResponseUtilities.js';
+import { LlmRole } from '../telemetry/types.js';
 
 import {
   type ToolCallRequestInfo,
@@ -233,6 +234,8 @@ export type ServerGeminiStreamEvent =
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
+  private callCounter = 0;
+
   readonly pendingToolCalls: ToolCallRequestInfo[] = [];
   private debugResponses: GenerateContentResponse[] = [];
   private pendingCitations = new Set<string>();
@@ -249,6 +252,7 @@ export class Turn {
     req: PartListUnion,
     signal: AbortSignal,
     displayContent?: PartListUnion,
+    role: LlmRole = LlmRole.MAIN,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     try {
       // Note: This assumes `sendMessageStream` yields events like
@@ -258,6 +262,7 @@ export class Turn {
         req,
         this.prompt_id,
         signal,
+        role,
         displayContent,
       );
 
@@ -382,7 +387,8 @@ export class Turn {
         error !== null &&
         'status' in error &&
         typeof (error as { status: unknown }).status === 'number'
-          ? (error as { status: number }).status
+          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            (error as { status: number }).status
           : undefined;
       const structuredError: StructuredError = {
         message: getErrorMessage(error),
@@ -398,11 +404,9 @@ export class Turn {
     fnCall: FunctionCall,
     traceId?: string,
   ): ServerGeminiStreamEvent | null {
-    const callId =
-      fnCall.id ??
-      `${fnCall.name}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const name = fnCall.name || 'undefined_tool_name';
     const args = fnCall.args || {};
+    const callId = fnCall.id ?? `${name}_${Date.now()}_${this.callCounter++}`;
 
     const toolCallRequest: ToolCallRequestInfo = {
       callId,

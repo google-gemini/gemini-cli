@@ -10,6 +10,7 @@ import { platform } from 'node:os';
 import * as dotenv from 'dotenv';
 import process from 'node:process';
 import {
+  CoreEvent,
   FatalConfigError,
   GEMINI_DIR,
   getErrorMessage,
@@ -181,6 +182,9 @@ export interface SessionRetentionSettings {
 
   /** Minimum retention period (safety limit, defaults to "1d") */
   minRetention?: string;
+
+  /** INTERNAL: Whether the user has acknowledged the session retention warning */
+  warningAcknowledged?: boolean;
 }
 
 export interface SettingsError {
@@ -194,6 +198,7 @@ export interface SettingsFile {
   originalSettings: Settings;
   path: string;
   rawJson?: string;
+  readOnly?: boolean;
 }
 
 function setNestedProperty(
@@ -212,6 +217,7 @@ function setNestedProperty(
     }
     const next = current[key];
     if (typeof next === 'object' && next !== null) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       current = next as Record<string, unknown>;
     } else {
       // This path is invalid, so we stop.
@@ -253,6 +259,7 @@ export function mergeSettings(
   // 3. User Settings
   // 4. Workspace Settings
   // 5. System Settings (as overrides)
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return customDeepMerge(
     getMergeStrategyForPath,
     schemaDefaults,
@@ -273,11 +280,26 @@ export function mergeSettings(
 export function createTestMergedSettings(
   overrides: Partial<Settings> = {},
 ): MergedSettings {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return customDeepMerge(
     getMergeStrategyForPath,
     getDefaultsFromSchema(),
     overrides,
   ) as MergedSettings;
+}
+
+/**
+ * An immutable snapshot of settings state.
+ * Used with useSyncExternalStore for reactive updates.
+ */
+export interface LoadedSettingsSnapshot {
+  system: SettingsFile;
+  systemDefaults: SettingsFile;
+  user: SettingsFile;
+  workspace: SettingsFile;
+  isTrusted: boolean;
+  errors: SettingsError[];
+  merged: MergedSettings;
 }
 
 export class LoadedSettings {
@@ -299,6 +321,7 @@ export class LoadedSettings {
       : this.createEmptyWorkspace(workspace);
     this.errors = errors;
     this._merged = this.computeMergedSettings();
+    this._snapshot = this.computeSnapshot();
   }
 
   readonly system: SettingsFile;
@@ -310,6 +333,7 @@ export class LoadedSettings {
 
   private _workspaceFile: SettingsFile;
   private _merged: MergedSettings;
+  private _snapshot: LoadedSettingsSnapshot;
   private _remoteAdminSettings: Partial<Settings> | undefined;
 
   get merged(): MergedSettings {
@@ -354,6 +378,7 @@ export class LoadedSettings {
 
       // The final admin settings are the defaults overridden by remote settings.
       // Any admin settings from files are ignored.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       merged.admin = customDeepMerge(
         (path: string[]) => getMergeStrategyForPath(['admin', ...path]),
         adminDefaults,
@@ -361,6 +386,36 @@ export class LoadedSettings {
       ) as MergedSettings['admin'];
     }
     return merged;
+  }
+
+  private computeSnapshot(): LoadedSettingsSnapshot {
+    const cloneSettingsFile = (file: SettingsFile): SettingsFile => ({
+      path: file.path,
+      rawJson: file.rawJson,
+      settings: structuredClone(file.settings),
+      originalSettings: structuredClone(file.originalSettings),
+    });
+    return {
+      system: cloneSettingsFile(this.system),
+      systemDefaults: cloneSettingsFile(this.systemDefaults),
+      user: cloneSettingsFile(this.user),
+      workspace: cloneSettingsFile(this.workspace),
+      isTrusted: this.isTrusted,
+      errors: [...this.errors],
+      merged: structuredClone(this._merged),
+    };
+  }
+
+  // Passing this along with getSnapshot to useSyncExternalStore allows for idiomatic reactivity on settings changes
+  // React will pass a listener fn into this subscribe fn
+  // that listener fn will perform an object identity check on the snapshot and trigger a React re render if the snapshot has changed
+  subscribe(listener: () => void): () => void {
+    coreEvents.on(CoreEvent.SettingsChanged, listener);
+    return () => coreEvents.off(CoreEvent.SettingsChanged, listener);
+  }
+
+  getSnapshot(): LoadedSettingsSnapshot {
+    return this._snapshot;
   }
 
   forScope(scope: LoadableSettingScope): SettingsFile {
@@ -378,25 +433,33 @@ export class LoadedSettings {
     }
   }
 
+  private isPersistable(settingsFile: SettingsFile): boolean {
+    return !settingsFile.readOnly;
+  }
+
   setValue(scope: LoadableSettingScope, key: string, value: unknown): void {
     const settingsFile = this.forScope(scope);
 
-    // Clone value to prevent reference sharing between settings and originalSettings
+    // Clone value to prevent reference sharing
     const valueToSet =
       typeof value === 'object' && value !== null
         ? structuredClone(value)
         : value;
 
     setNestedProperty(settingsFile.settings, key, valueToSet);
-    // Use a fresh clone for originalSettings to ensure total independence
-    setNestedProperty(
-      settingsFile.originalSettings,
-      key,
-      structuredClone(valueToSet),
-    );
+
+    if (this.isPersistable(settingsFile)) {
+      // Use a fresh clone for originalSettings to ensure total independence
+      setNestedProperty(
+        settingsFile.originalSettings,
+        key,
+        structuredClone(valueToSet),
+      );
+      saveSettings(settingsFile);
+    }
 
     this._merged = this.computeMergedSettings();
-    saveSettings(settingsFile);
+    this._snapshot = this.computeSnapshot();
     coreEvents.emitSettingsChanged();
   }
 
@@ -609,6 +672,7 @@ export function loadSettings(
           return { settings: {} };
         }
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const settingsObject = rawSettings as Record<string, unknown>;
 
         // Validate settings structure with Zod
@@ -716,24 +780,28 @@ export function loadSettings(
       settings: systemSettings,
       originalSettings: systemOriginalSettings,
       rawJson: systemResult.rawJson,
+      readOnly: true,
     },
     {
       path: systemDefaultsPath,
       settings: systemDefaultSettings,
       originalSettings: systemDefaultsOriginalSettings,
       rawJson: systemDefaultsResult.rawJson,
+      readOnly: true,
     },
     {
       path: USER_SETTINGS_PATH,
       settings: userSettings,
       originalSettings: userOriginalSettings,
       rawJson: userResult.rawJson,
+      readOnly: false,
     },
     {
-      path: workspaceSettingsPath,
+      path: realWorkspaceDir === realHomeDir ? '' : workspaceSettingsPath,
       settings: workspaceSettings,
       originalSettings: workspaceOriginalSettings,
       rawJson: workspaceResult.rawJson,
+      readOnly: realWorkspaceDir === realHomeDir,
     },
     isTrusted,
     settingsErrors,
@@ -758,17 +826,26 @@ export function migrateDeprecatedSettings(
   removeDeprecated = false,
 ): boolean {
   let anyModified = false;
+  const systemWarnings: Map<LoadableSettingScope, string[]> = new Map();
 
+  /**
+   * Helper to migrate a boolean setting and track it if it's deprecated.
+   */
   const migrateBoolean = (
     settings: Record<string, unknown>,
     oldKey: string,
     newKey: string,
+    prefix: string,
+    foundDeprecated?: string[],
   ): boolean => {
     let modified = false;
     const oldValue = settings[oldKey];
     const newValue = settings[newKey];
 
     if (typeof oldValue === 'boolean') {
+      if (foundDeprecated) {
+        foundDeprecated.push(prefix ? `${prefix}.${oldKey}` : oldKey);
+      }
       if (typeof newValue === 'boolean') {
         // Both exist, trust the new one
         if (removeDeprecated) {
@@ -788,7 +865,9 @@ export function migrateDeprecatedSettings(
   };
 
   const processScope = (scope: LoadableSettingScope) => {
-    const settings = loadedSettings.forScope(scope).settings;
+    const settingsFile = loadedSettings.forScope(scope);
+    const settings = settingsFile.settings;
+    const foundDeprecated: string[] = [];
 
     // Migrate general settings
     const generalSettings = settings.general as
@@ -799,18 +878,27 @@ export function migrateDeprecatedSettings(
       let modified = false;
 
       modified =
-        migrateBoolean(newGeneral, 'disableAutoUpdate', 'enableAutoUpdate') ||
-        modified;
+        migrateBoolean(
+          newGeneral,
+          'disableAutoUpdate',
+          'enableAutoUpdate',
+          'general',
+          foundDeprecated,
+        ) || modified;
       modified =
         migrateBoolean(
           newGeneral,
           'disableUpdateNag',
           'enableAutoUpdateNotification',
+          'general',
+          foundDeprecated,
         ) || modified;
 
       if (modified) {
         loadedSettings.setValue(scope, 'general', newGeneral);
-        anyModified = true;
+        if (!settingsFile.readOnly) {
+          anyModified = true;
+        }
       }
     }
 
@@ -818,6 +906,7 @@ export function migrateDeprecatedSettings(
     const uiSettings = settings.ui as Record<string, unknown> | undefined;
     if (uiSettings) {
       const newUi = { ...uiSettings };
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const accessibilitySettings = newUi['accessibility'] as
         | Record<string, unknown>
         | undefined;
@@ -829,11 +918,15 @@ export function migrateDeprecatedSettings(
             newAccessibility,
             'disableLoadingPhrases',
             'enableLoadingPhrases',
+            'ui.accessibility',
+            foundDeprecated,
           )
         ) {
           newUi['accessibility'] = newAccessibility;
           loadedSettings.setValue(scope, 'ui', newUi);
-          anyModified = true;
+          if (!settingsFile.readOnly) {
+            anyModified = true;
+          }
         }
       }
     }
@@ -844,6 +937,7 @@ export function migrateDeprecatedSettings(
       | undefined;
     if (contextSettings) {
       const newContext = { ...contextSettings };
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const fileFilteringSettings = newContext['fileFiltering'] as
         | Record<string, unknown>
         | undefined;
@@ -855,29 +949,86 @@ export function migrateDeprecatedSettings(
             newFileFiltering,
             'disableFuzzySearch',
             'enableFuzzySearch',
+            'context.fileFiltering',
+            foundDeprecated,
           )
         ) {
           newContext['fileFiltering'] = newFileFiltering;
           loadedSettings.setValue(scope, 'context', newContext);
-          anyModified = true;
+          if (!settingsFile.readOnly) {
+            anyModified = true;
+          }
+        }
+      }
+    }
+
+    // Migrate tools settings
+    const toolsSettings = settings.tools as Record<string, unknown> | undefined;
+    if (toolsSettings) {
+      if (toolsSettings['approvalMode'] !== undefined) {
+        foundDeprecated.push('tools.approvalMode');
+
+        const generalSettings =
+          (settings.general as Record<string, unknown> | undefined) || {};
+        const newGeneral = { ...generalSettings };
+
+        // Only set defaultApprovalMode if it's not already set
+        if (newGeneral['defaultApprovalMode'] === undefined) {
+          newGeneral['defaultApprovalMode'] = toolsSettings['approvalMode'];
+          loadedSettings.setValue(scope, 'general', newGeneral);
+          if (!settingsFile.readOnly) {
+            anyModified = true;
+          }
+        }
+
+        if (removeDeprecated) {
+          const newTools = { ...toolsSettings };
+          delete newTools['approvalMode'];
+          loadedSettings.setValue(scope, 'tools', newTools);
+          if (!settingsFile.readOnly) {
+            anyModified = true;
+          }
         }
       }
     }
 
     // Migrate experimental agent settings
-    anyModified =
-      migrateExperimentalSettings(
-        settings,
-        loadedSettings,
-        scope,
-        removeDeprecated,
-      ) || anyModified;
+    const experimentalModified = migrateExperimentalSettings(
+      settings,
+      loadedSettings,
+      scope,
+      removeDeprecated,
+      foundDeprecated,
+    );
+
+    if (experimentalModified) {
+      if (!settingsFile.readOnly) {
+        anyModified = true;
+      }
+    }
+
+    if (settingsFile.readOnly && foundDeprecated.length > 0) {
+      systemWarnings.set(scope, foundDeprecated);
+    }
   };
 
   processScope(SettingScope.User);
   processScope(SettingScope.Workspace);
   processScope(SettingScope.System);
   processScope(SettingScope.SystemDefaults);
+
+  if (systemWarnings.size > 0) {
+    for (const [scope, flags] of systemWarnings) {
+      const scopeName =
+        scope === SettingScope.SystemDefaults
+          ? 'system default'
+          : scope.toLowerCase();
+      coreEvents.emitFeedback(
+        'warning',
+        `The ${scopeName} configuration contains deprecated settings: [${flags.join(', ')}]. These could not be migrated automatically as system settings are read-only. Please update the system configuration manually.`,
+      );
+    }
+  }
 
   return anyModified;
 }
@@ -926,25 +1077,39 @@ function migrateExperimentalSettings(
   loadedSettings: LoadedSettings,
   scope: LoadableSettingScope,
   removeDeprecated: boolean,
+  foundDeprecated?: string[],
 ): boolean {
   const experimentalSettings = settings.experimental as
     | Record<string, unknown>
     | undefined;
+
   if (experimentalSettings) {
     const agentsSettings = {
       ...(settings.agents as Record<string, unknown> | undefined),
     };
     const agentsOverrides = {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       ...((agentsSettings['overrides'] as Record<string, unknown>) || {}),
     };
     let modified = false;
 
+    const migrateExperimental = (
+      oldKey: string,
+      migrateFn: (oldValue: Record<string, unknown>) => void,
+    ) => {
+      const old = experimentalSettings[oldKey];
+      if (old) {
+        foundDeprecated?.push(`experimental.${oldKey}`);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        migrateFn(old as Record<string, unknown>);
+        modified = true;
+      }
+    };
+
     // Migrate codebaseInvestigatorSettings -> agents.overrides.codebase_investigator
-    if (experimentalSettings['codebaseInvestigatorSettings']) {
-      const old = experimentalSettings[
-        'codebaseInvestigatorSettings'
-      ] as Record<string, unknown>;
+    migrateExperimental('codebaseInvestigatorSettings', (old) => {
       const override = {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         ...(agentsOverrides['codebase_investigator'] as
           | Record<string, unknown>
           | undefined),
@@ -953,6 +1118,7 @@ function migrateExperimentalSettings(
       if (old['enabled'] !== undefined) override['enabled'] = old['enabled'];
 
       const runConfig = {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         ...(override['runConfig'] as Record<string, unknown> | undefined),
       };
       if (old['maxNumTurns'] !== undefined)
@@ -963,16 +1129,19 @@ function migrateExperimentalSettings(
 
       if (old['model'] !== undefined || old['thinkingBudget'] !== undefined) {
         const modelConfig = {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           ...(override['modelConfig'] as Record<string, unknown> | undefined),
         };
         if (old['model'] !== undefined) modelConfig['model'] = old['model'];
         if (old['thinkingBudget'] !== undefined) {
           const generateContentConfig = {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             ...(modelConfig['generateContentConfig'] as
               | Record<string, unknown>
               | undefined),
           };
           const thinkingConfig = {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             ...(generateContentConfig['thinkingConfig'] as
               | Record<string, unknown>
               | undefined),
@@ -985,22 +1154,17 @@ function migrateExperimentalSettings(
       }
 
       agentsOverrides['codebase_investigator'] = override;
-      modified = true;
-    }
+    });
 
     // Migrate cliHelpAgentSettings -> agents.overrides.cli_help
-    if (experimentalSettings['cliHelpAgentSettings']) {
-      const old = experimentalSettings['cliHelpAgentSettings'] as Record<
-        string,
-        unknown
-      >;
+    migrateExperimental('cliHelpAgentSettings', (old) => {
       const override = {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         ...(agentsOverrides['cli_help'] as Record<string, unknown> | undefined),
       };
       if (old['enabled'] !== undefined) override['enabled'] = old['enabled'];
       agentsOverrides['cli_help'] = override;
-      modified = true;
-    }
+    });
 
     if (modified) {
       agentsSettings['overrides'] = agentsOverrides;

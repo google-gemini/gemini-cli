@@ -58,6 +58,9 @@ import { getModelConfigAlias } from './registry.js';
 import { getVersion } from '../utils/version.js';
 import { getToolCallContext } from '../utils/toolCallContext.js';
 import { scheduleAgentTools } from './agent-scheduler.js';
+import { DeadlineTimer } from '../utils/deadlineTimer.js';
+import { LlmRole } from '../telemetry/types.js';
+import { formatUserHintsForModel } from '../utils/fastAckHelper.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -231,6 +234,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     turnCounter: number,
     combinedSignal: AbortSignal,
     timeoutSignal: AbortSignal, // Pass the timeout controller's signal
+    onWaitingForConfirmation?: (waiting: boolean) => void,
   ): Promise<AgentTurnResult> {
     const promptId = `${this.agentId}#${turnCounter}`;
 
@@ -265,7 +269,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     }
 
     const { nextMessage, submittedOutput, taskCompleted } =
-      await this.processFunctionCalls(functionCalls, combinedSignal, promptId);
+      await this.processFunctionCalls(
+        functionCalls,
+        combinedSignal,
+        promptId,
+        onWaitingForConfirmation,
+      );
     if (taskCompleted) {
       const finalResult = submittedOutput ?? 'Task completed successfully.';
       return {
@@ -322,6 +331,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       | AgentTerminateMode.MAX_TURNS
       | AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
     externalSignal: AbortSignal, // The original signal passed to run()
+    onWaitingForConfirmation?: (waiting: boolean) => void,
   ): Promise<string | null> {
     this.emitActivity('THOUGHT_CHUNK', {
       text: `Execution limit reached (${reason}). Attempting one final recovery turn with a grace period.`,
@@ -355,6 +365,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         turnCounter, // This will be the "last" turn number
         combinedSignal,
         graceTimeoutController.signal, // Pass grace signal to identify a *grace* timeout
+        onWaitingForConfirmation,
       );
 
       if (
@@ -415,14 +426,22 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       this.definition.runConfig.maxTimeMinutes ?? DEFAULT_MAX_TIME_MINUTES;
     const maxTurns = this.definition.runConfig.maxTurns ?? DEFAULT_MAX_TURNS;
 
-    const timeoutController = new AbortController();
-    const timeoutId = setTimeout(
-      () => timeoutController.abort(new Error('Agent timed out.')),
+    const deadlineTimer = new DeadlineTimer(
       maxTimeMinutes * 60 * 1000,
+      'Agent timed out.',
     );
 
+    // Track time spent waiting for user confirmation to credit it back to the agent.
+    const onWaitingForConfirmation = (waiting: boolean) => {
+      if (waiting) {
+        deadlineTimer.pause();
+      } else {
+        deadlineTimer.resume();
+      }
+    };
+
     // Combine the external signal with the internal timeout signal.
-    const combinedSignal = AbortSignal.any([signal, timeoutController.signal]);
+    const combinedSignal = AbortSignal.any([signal, deadlineTimer.signal]);
 
     logAgentStart(
       this.runtimeContext,
@@ -445,44 +464,82 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       const query = this.definition.promptConfig.query
         ? templateString(this.definition.promptConfig.query, augmentedInputs)
         : DEFAULT_QUERY_STRING;
-      let currentMessage: Content = { role: 'user', parts: [{ text: query }] };
 
-      while (true) {
-        // Check for termination conditions like max turns.
-        const reason = this.checkTermination(turnCounter, maxTurns);
-        if (reason) {
-          terminateReason = reason;
-          break;
-        }
+      const pendingHintsQueue: string[] = [];
+      const hintListener = (hint: string) => {
+        pendingHintsQueue.push(hint);
+      };
+      // Capture the index of the last hint before starting to avoid re-injecting old hints.
+      // NOTE: Hints added AFTER this point will be broadcast to all currently running
+      // local agents via the listener below.
+      const startIndex =
+        this.runtimeContext.userHintService.getLatestHintIndex();
+      this.runtimeContext.userHintService.onUserHint(hintListener);
 
-        // Check for timeout or external abort.
-        if (combinedSignal.aborted) {
-          // Determine which signal caused the abort.
-          terminateReason = timeoutController.signal.aborted
-            ? AgentTerminateMode.TIMEOUT
-            : AgentTerminateMode.ABORTED;
-          break;
-        }
+      try {
+        const initialHints =
+          this.runtimeContext.userHintService.getUserHintsAfter(startIndex);
+        const formattedInitialHints = formatUserHintsForModel(initialHints);
 
-        const turnResult = await this.executeTurn(
-          chat,
-          currentMessage,
-          turnCounter++,
-          combinedSignal,
-          timeoutController.signal,
-        );
+        let currentMessage: Content = formattedInitialHints
+          ? {
+              role: 'user',
+              parts: [{ text: formattedInitialHints }, { text: query }],
+            }
+          : { role: 'user', parts: [{ text: query }] };
 
-        if (turnResult.status === 'stop') {
-          terminateReason = turnResult.terminateReason;
-          // Only set finalResult if the turn provided one (e.g., error or goal).
-          if (turnResult.finalResult) {
-            finalResult = turnResult.finalResult;
+        while (true) {
+          // Check for termination conditions like max turns.
+          const reason = this.checkTermination(turnCounter, maxTurns);
+          if (reason) {
+            terminateReason = reason;
+            break;
           }
-          break; // Exit the loop for *any* stop reason.
-        }
 
-        // If status is 'continue', update message for the next loop
-        currentMessage = turnResult.nextMessage;
+          // Check for timeout or external abort.
+          if (combinedSignal.aborted) {
+            // Determine which signal caused the abort.
+            terminateReason = deadlineTimer.signal.aborted
+              ? AgentTerminateMode.TIMEOUT
+              : AgentTerminateMode.ABORTED;
+            break;
+          }
+
+          const turnResult = await this.executeTurn(
+            chat,
+            currentMessage,
+            turnCounter++,
+            combinedSignal,
+            deadlineTimer.signal,
+            onWaitingForConfirmation,
+          );
+
+          if (turnResult.status === 'stop') {
+            terminateReason = turnResult.terminateReason;
+            // Only set finalResult if the turn provided one (e.g., error or goal).
+            if (turnResult.finalResult) {
+              finalResult = turnResult.finalResult;
+            }
+            break; // Exit the loop for *any* stop reason.
+          }
+
+          // If status is 'continue', update message for the next loop
+          currentMessage = turnResult.nextMessage;
+
+          // Check for new user steering hints collected via subscription
+          if (pendingHintsQueue.length > 0) {
+            const hintsToProcess = [...pendingHintsQueue];
+            pendingHintsQueue.length = 0;
+            const formattedHints = formatUserHintsForModel(hintsToProcess);
+            if (formattedHints) {
+              // Append hints to the current message (next turn)
+              currentMessage.parts ??= [];
+              currentMessage.parts.unshift({ text: formattedHints });
+            }
+          }
+        }
+      } finally {
+        this.runtimeContext.userHintService.offUserHint(hintListener);
       }
 
       // === UNIFIED RECOVERY BLOCK ===
@@ -498,6 +555,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           turnCounter, // Use current turnCounter for the recovery attempt
           terminateReason,
           signal, // Pass the external signal
+          onWaitingForConfirmation,
         );
 
         if (recoveryResult !== null) {
@@ -551,7 +609,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       if (
         error instanceof Error &&
         error.name === 'AbortError' &&
-        timeoutController.signal.aborted &&
+        deadlineTimer.signal.aborted &&
         !signal.aborted // Ensure the external signal was not the cause
       ) {
         terminateReason = AgentTerminateMode.TIMEOUT;
@@ -563,6 +621,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             turnCounter, // Use current turnCounter
             AgentTerminateMode.TIMEOUT,
             signal,
+            onWaitingForConfirmation,
           );
 
           if (recoveryResult !== null) {
@@ -591,7 +650,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       this.emitActivity('ERROR', { error: String(error) });
       throw error; // Re-throw other errors or external aborts.
     } finally {
-      clearTimeout(timeoutId);
+      deadlineTimer.abort();
       logAgentFinish(
         this.runtimeContext,
         new AgentFinishEvent(
@@ -679,6 +738,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       modelToUse = requestedModel;
     }
 
+    const role = LlmRole.SUBAGENT;
+
     const responseStream = await chat.sendMessageStream(
       {
         model: modelToUse,
@@ -687,6 +748,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       message.parts || [],
       promptId,
       signal,
+      role,
     );
 
     const functionCalls: FunctionCall[] = [];
@@ -779,6 +841,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     functionCalls: FunctionCall[],
     signal: AbortSignal,
     promptId: string,
+    onWaitingForConfirmation?: (waiting: boolean) => void,
   ): Promise<{
     nextMessage: Content;
     submittedOutput: string | null;
@@ -801,6 +864,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     for (const [index, functionCall] of functionCalls.entries()) {
       const callId = functionCall.id ?? `${promptId}-${index}`;
       const args = functionCall.args ?? {};
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const toolName = functionCall.name as string;
 
       this.emitActivity('TOOL_CALL_START', {
@@ -979,6 +1043,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           parentCallId: this.parentCallId,
           toolRegistry: this.toolRegistry,
           signal,
+          onWaitingForConfirmation,
         },
       );
 
@@ -1085,6 +1150,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         ...schema
       } = jsonSchema;
       completeTool.parameters!.properties![outputConfig.outputName] =
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         schema as Schema;
       completeTool.parameters!.required!.push(outputConfig.outputName);
     } else {

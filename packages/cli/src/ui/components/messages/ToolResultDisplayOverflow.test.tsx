@@ -7,13 +7,10 @@
 import { describe, it, expect } from 'vitest';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
 import { renderWithProviders } from '../../../test-utils/render.js';
-import {
-  StreamingState,
-  ToolCallStatus,
-  type IndividualToolCallDisplay,
-} from '../../types.js';
+import { StreamingState, type IndividualToolCallDisplay } from '../../types.js';
 import { OverflowProvider } from '../../contexts/OverflowContext.js';
 import { waitFor } from '../../../test-utils/async.js';
+import { CoreToolCallStatus } from '@google/gemini-cli-core';
 
 describe('ToolResultDisplay Overflow', () => {
   it('should display "press ctrl-o" hint when content overflows in ToolGroupMessage', async () => {
@@ -29,7 +26,7 @@ describe('ToolResultDisplay Overflow', () => {
         callId: 'call-1',
         name: 'test-tool',
         description: 'a test tool',
-        status: ToolCallStatus.Success,
+        status: CoreToolCallStatus.Success,
         resultDisplay,
         confirmationDetails: undefined,
       },
@@ -38,7 +35,7 @@ describe('ToolResultDisplay Overflow', () => {
     const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <ToolGroupMessage
-          groupId={1}
+          item={{ id: 1, type: 'tool_group', tools: toolCalls }}
           toolCalls={toolCalls}
           availableTerminalHeight={15} // Small height to force overflow
           terminalWidth={80}
@@ -49,6 +46,7 @@ describe('ToolResultDisplay Overflow', () => {
           streamingState: StreamingState.Idle,
           constrainHeight: true,
         },
+        useAlternateBuffer: false,
       },
     );
 

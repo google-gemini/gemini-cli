@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
 import type { Config } from '@google/gemini-cli-core';
-import { debugLogger, spawnAsync } from '@google/gemini-cli-core';
+import { debugLogger, spawnAsync, LlmRole } from '@google/gemini-cli-core';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
 
@@ -157,6 +157,7 @@ export const TriageDuplicates = ({
         '--json',
         'number,title,body,state,stateReason,labels,url,comments,author,reactionGroups',
       ]);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(stdout) as Candidate;
     } catch (err) {
       debugLogger.error(
@@ -278,8 +279,10 @@ Return a JSON object with:
         },
         abortSignal: new AbortController().signal,
         promptId: 'triage-duplicates',
+        role: LlmRole.UTILITY_TOOL,
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const rec = response as unknown as GeminiRecommendation;
 
       let canonical: Candidate | undefined;

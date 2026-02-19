@@ -129,6 +129,8 @@ describe('extensionsCommand', () => {
   let mockContext: CommandContext;
   const mockDispatchExtensionState = vi.fn();
   let mockExtensionLoader: unknown;
+  let mockReloadSkills: MockedFunction<() => Promise<void>>;
+  let mockReloadAgents: MockedFunction<() => Promise<void>>;
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -148,12 +150,19 @@ describe('extensionsCommand', () => {
 
     mockGetExtensions.mockReturnValue([inactiveExt, activeExt, allExt]);
     vi.mocked(open).mockClear();
+    mockReloadAgents = vi.fn().mockResolvedValue(undefined);
+    mockReloadSkills = vi.fn().mockResolvedValue(undefined);
+
     mockContext = createMockCommandContext({
       services: {
         config: {
           getExtensions: mockGetExtensions,
           getExtensionLoader: vi.fn().mockReturnValue(mockExtensionLoader),
           getWorkingDir: () => '/test/dir',
+          reloadSkills: mockReloadSkills,
+          getAgentRegistry: vi.fn().mockReturnValue({
+            reload: mockReloadAgents,
+          }),
         },
       },
       ui: {
@@ -281,7 +290,7 @@ describe('extensionsCommand', () => {
 
     it('should inform user if there are no extensions to update with --all', async () => {
       mockDispatchExtensionState.mockImplementationOnce(
-        (action: ExtensionUpdateAction) => {
+        async (action: ExtensionUpdateAction) => {
           if (action.type === 'SCHEDULE_UPDATE') {
             action.payload.onComplete([]);
           }
@@ -297,7 +306,7 @@ describe('extensionsCommand', () => {
 
     it('should call setPendingItem and addItem in a finally block on success', async () => {
       mockDispatchExtensionState.mockImplementationOnce(
-        (action: ExtensionUpdateAction) => {
+        async (action: ExtensionUpdateAction) => {
           if (action.type === 'SCHEDULE_UPDATE') {
             action.payload.onComplete([
               {
@@ -348,7 +357,7 @@ describe('extensionsCommand', () => {
 
     it('should update a single extension by name', async () => {
       mockDispatchExtensionState.mockImplementationOnce(
-        (action: ExtensionUpdateAction) => {
+        async (action: ExtensionUpdateAction) => {
           if (action.type === 'SCHEDULE_UPDATE') {
             action.payload.onComplete([
               {
@@ -373,7 +382,7 @@ describe('extensionsCommand', () => {
 
     it('should update multiple extensions by name', async () => {
       mockDispatchExtensionState.mockImplementationOnce(
-        (action: ExtensionUpdateAction) => {
+        async (action: ExtensionUpdateAction) => {
           if (action.type === 'SCHEDULE_UPDATE') {
             action.payload.onComplete([
               {
@@ -892,6 +901,27 @@ describe('extensionsCommand', () => {
         type: 'RESTARTED',
         payload: { name: 'ext2' },
       });
+      expect(mockReloadSkills).toHaveBeenCalled();
+      expect(mockReloadAgents).toHaveBeenCalled();
+    });
+
+    it('handles errors during skill or agent reload', async () => {
+      const mockExtensions = [
+        { name: 'ext1', isActive: true },
+      ] as GeminiCLIExtension[];
+      mockGetExtensions.mockReturnValue(mockExtensions);
+      mockReloadSkills.mockRejectedValue(new Error('Failed to reload skills'));
+
+      await restartAction!(mockContext, '--all');
+
+      expect(mockRestartExtension).toHaveBeenCalledWith(mockExtensions[0]);
+      expect(mockReloadSkills).toHaveBeenCalled();
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Failed to reload skills or agents: Failed to reload skills',
+        }),
+      );
     });
 
     it('restarts only specified active extensions', async () => {

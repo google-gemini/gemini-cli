@@ -21,8 +21,10 @@ import { FileOperation } from '../telemetry/metrics.js';
 import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
-import { READ_FILE_TOOL_NAME } from './tool-names.js';
+import { READ_FILE_TOOL_NAME, READ_FILE_DISPLAY_NAME } from './tool-names.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import { READ_FILE_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 /**
  * Parameters for the ReadFile tool
@@ -76,7 +78,10 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   }
 
   async execute(): Promise<ToolResult> {
-    const validationError = this.config.validatePathAccess(this.resolvedPath);
+    const validationError = this.config.validatePathAccess(
+      this.resolvedPath,
+      'read',
+    );
     if (validationError) {
       return {
         llmContent: validationError,
@@ -168,29 +173,10 @@ export class ReadFileTool extends BaseDeclarativeTool<
   ) {
     super(
       ReadFileTool.Name,
-      'ReadFile',
-      `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
+      READ_FILE_DISPLAY_NAME,
+      READ_FILE_DEFINITION.base.description!,
       Kind.Read,
-      {
-        properties: {
-          file_path: {
-            description: 'The path to the file to read.',
-            type: 'string',
-          },
-          offset: {
-            description:
-              "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
-            type: 'number',
-          },
-          limit: {
-            description:
-              "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
-            type: 'number',
-          },
-        },
-        required: ['file_path'],
-        type: 'object',
-      },
+      READ_FILE_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true,
       false,
@@ -213,7 +199,10 @@ export class ReadFileTool extends BaseDeclarativeTool<
       params.file_path,
     );
 
-    const validationError = this.config.validatePathAccess(resolvedPath);
+    const validationError = this.config.validatePathAccess(
+      resolvedPath,
+      'read',
+    );
     if (validationError) {
       return validationError;
     }
@@ -251,5 +240,9 @@ export class ReadFileTool extends BaseDeclarativeTool<
       _toolName,
       _toolDisplayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(READ_FILE_DEFINITION, modelId);
   }
 }

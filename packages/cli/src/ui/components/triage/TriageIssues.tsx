@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
 import type { Config } from '@google/gemini-cli-core';
-import { debugLogger, spawnAsync } from '@google/gemini-cli-core';
+import { debugLogger, spawnAsync, LlmRole } from '@google/gemini-cli-core';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
 import { TextInput } from '../shared/TextInput.js';
@@ -99,7 +99,6 @@ export const TriageIssues = ({
   const commentBuffer = useTextBuffer({
     initialText: '',
     viewport: { width: 80, height: 5 },
-    isValidPath: () => false,
   });
 
   const currentIssue = state.issues[state.currentIndex];
@@ -224,8 +223,10 @@ Return a JSON object with:
         },
         abortSignal: abortControllerRef.current.signal,
         promptId: 'triage-issues',
+        role: LlmRole.UTILITY_TOOL,
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return response as unknown as AnalysisResult;
     },
     [config],

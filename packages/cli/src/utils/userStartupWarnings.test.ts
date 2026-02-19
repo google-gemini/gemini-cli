@@ -13,6 +13,7 @@ import {
   isFolderTrustEnabled,
   isWorkspaceTrusted,
 } from '../config/trustedFolders.js';
+import { getCompatibilityWarnings } from '@google/gemini-cli-core';
 
 // Mock os.homedir to control the home directory in tests
 vi.mock('os', async (importOriginal) => {
@@ -29,6 +30,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     homedir: () => os.homedir(),
+    getCompatibilityWarnings: vi.fn().mockReturnValue([]),
   };
 });
 
@@ -51,11 +53,12 @@ describe('getUserStartupWarnings', () => {
       isTrusted: false,
       source: undefined,
     });
+    vi.mocked(getCompatibilityWarnings).mockReturnValue([]);
   });
 
   afterEach(async () => {
     await fs.rm(testRootDir, { recursive: true, force: true });
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe('home directory check', () => {
@@ -133,6 +136,29 @@ describe('getUserStartupWarnings', () => {
       const expectedWarning =
         'Could not verify the current directory due to a file system error.';
       expect(warnings).toEqual([expectedWarning, expectedWarning]);
+    });
+  });
+
+  describe('compatibility warnings', () => {
+    it('should include compatibility warnings by default', async () => {
+      vi.mocked(getCompatibilityWarnings).mockReturnValue(['Comp warning 1']);
+      const projectDir = path.join(testRootDir, 'project');
+      await fs.mkdir(projectDir);
+
+      const warnings = await getUserStartupWarnings({}, projectDir);
+      expect(warnings).toContain('Comp warning 1');
+    });
+
+    it('should not include compatibility warnings when showCompatibilityWarnings is false', async () => {
+      vi.mocked(getCompatibilityWarnings).mockReturnValue(['Comp warning 1']);
+      const projectDir = path.join(testRootDir, 'project');
+      await fs.mkdir(projectDir);
+
+      const warnings = await getUserStartupWarnings(
+        { ui: { showCompatibilityWarnings: false } },
+        projectDir,
+      );
+      expect(warnings).not.toContain('Comp warning 1');
     });
   });
 });

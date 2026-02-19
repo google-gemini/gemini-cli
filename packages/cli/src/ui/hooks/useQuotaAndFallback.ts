@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -78,22 +78,26 @@ export function useQuotaAndFallback({
         const messageLines = [
           `Usage limit reached for ${usageLimitReachedModel}.`,
           error.retryDelayMs ? getResetTimeMessage(error.retryDelayMs) : null,
-          `/stats for usage details`,
+          `/stats model for usage details`,
           `/model to switch models.`,
           `/auth to switch to API key.`,
         ].filter(Boolean);
         message = messageLines.join('\n');
-      } else if (
-        error instanceof ModelNotFoundError &&
-        VALID_GEMINI_MODELS.has(failedModel)
-      ) {
+      } else if (error instanceof ModelNotFoundError) {
         isModelNotFoundError = true;
-        const messageLines = [
-          `It seems like you don't have access to ${failedModel}.`,
-          `Learn more at https://goo.gle/enable-preview-features`,
-          `To disable ${failedModel}, disable "Preview features" in /settings.`,
-        ];
-        message = messageLines.join('\n');
+        if (VALID_GEMINI_MODELS.has(failedModel)) {
+          const messageLines = [
+            `It seems like you don't have access to ${failedModel}.`,
+            `Your admin might have disabled the access. Contact them to enable the Preview Release Channel.`,
+          ];
+          message = messageLines.join('\n');
+        } else {
+          const messageLines = [
+            `Model "${failedModel}" was not found or is invalid.`,
+            `/model to switch models.`,
+          ];
+          message = messageLines.join('\n');
+        }
       } else {
         const messageLines = [
           `We are currently experiencing high demand.`,

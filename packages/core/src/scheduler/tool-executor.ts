@@ -33,6 +33,7 @@ import type {
   SuccessfulToolCall,
   CancelledToolCall,
 } from './types.js';
+import { CoreToolCallStatus } from './types.js';
 
 export interface ToolExecutionContext {
   call: ToolCall;
@@ -81,7 +82,7 @@ export class ToolExecutor {
             const setPidCallback = (pid: number) => {
               const executingCall: ExecutingToolCall = {
                 ...call,
-                status: 'executing',
+                status: CoreToolCallStatus.Executing,
                 tool,
                 invocation,
                 pid,
@@ -170,7 +171,7 @@ export class ToolExecutor {
     }
 
     return {
-      status: 'cancelled',
+      status: CoreToolCallStatus.Cancelled,
       request: call.request,
       response: {
         callId: call.request.callId,
@@ -204,18 +205,11 @@ export class ToolExecutor {
     const toolName = call.request.name;
     const callId = call.request.callId;
 
-    if (
-      typeof content === 'string' &&
-      toolName === SHELL_TOOL_NAME &&
-      this.config.getEnableToolOutputTruncation() &&
-      this.config.getTruncateToolOutputThreshold() > 0 &&
-      this.config.getTruncateToolOutputLines() > 0
-    ) {
-      const originalContentLength = content.length;
+    if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
       const threshold = this.config.getTruncateToolOutputThreshold();
-      const lines = this.config.getTruncateToolOutputLines();
 
-      if (content.length > threshold) {
+      if (threshold > 0 && content.length > threshold) {
+        const originalContentLength = content.length;
         const { outputFile: savedPath } = await saveTruncatedToolOutput(
           content,
           toolName,
@@ -224,7 +218,7 @@ export class ToolExecutor {
           this.config.getSessionId(),
         );
         outputFile = savedPath;
-        content = formatTruncatedToolOutput(content, outputFile, lines);
+        content = formatTruncatedToolOutput(content, outputFile, threshold);
 
         logToolOutputTruncated(
           this.config,
@@ -233,7 +227,6 @@ export class ToolExecutor {
             originalContentLength,
             truncatedContentLength: content.length,
             threshold,
-            lines,
           }),
         );
       }
@@ -264,7 +257,7 @@ export class ToolExecutor {
     }
 
     return {
-      status: 'success',
+      status: CoreToolCallStatus.Success,
       request: call.request,
       tool: call.tool,
       response: successResponse,
@@ -289,7 +282,7 @@ export class ToolExecutor {
     const startTime = 'startTime' in call ? call.startTime : undefined;
 
     return {
-      status: 'error',
+      status: CoreToolCallStatus.Error,
       request: call.request,
       response,
       tool: call.tool,

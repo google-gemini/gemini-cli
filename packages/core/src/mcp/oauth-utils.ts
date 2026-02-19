@@ -101,6 +101,7 @@ export class OAuthUtils {
       if (!response.ok) {
         return null;
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return (await response.json()) as OAuthProtectedResourceMetadata;
     } catch (error) {
       debugLogger.debug(
@@ -124,6 +125,7 @@ export class OAuthUtils {
       if (!response.ok) {
         return null;
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return (await response.json()) as OAuthAuthorizationServerMetadata;
     } catch (error) {
       debugLogger.debug(
@@ -144,6 +146,7 @@ export class OAuthUtils {
   ): MCPOAuthConfig {
     return {
       authorizationUrl: metadata.authorization_endpoint,
+      issuer: metadata.issuer,
       tokenUrl: metadata.token_endpoint,
       scopes: metadata.scopes_supported || [],
       registrationUrl: metadata.registration_endpoint,

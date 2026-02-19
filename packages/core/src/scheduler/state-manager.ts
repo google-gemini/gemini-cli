@@ -17,6 +17,7 @@ import type {
   ExecutingToolCall,
   ToolCallResponseInfo,
 } from './types.js';
+import { CoreToolCallStatus } from './types.js';
 import { ROOT_SCHEDULER_ID } from './types.js';
 import type {
   ToolConfirmationOutcome,
@@ -98,17 +99,17 @@ export class SchedulerStateManager {
    */
   updateStatus(
     callId: string,
-    status: 'success',
+    status: CoreToolCallStatus.Success,
     data: ToolCallResponseInfo,
   ): void;
   updateStatus(
     callId: string,
-    status: 'error',
+    status: CoreToolCallStatus.Error,
     data: ToolCallResponseInfo,
   ): void;
   updateStatus(
     callId: string,
-    status: 'awaiting_approval',
+    status: CoreToolCallStatus.AwaitingApproval,
     data:
       | ToolCallConfirmationDetails
       | {
@@ -116,13 +117,20 @@ export class SchedulerStateManager {
           confirmationDetails: SerializableConfirmationDetails;
         },
   ): void;
-  updateStatus(callId: string, status: 'cancelled', data: string): void;
   updateStatus(
     callId: string,
-    status: 'executing',
+    status: CoreToolCallStatus.Cancelled,
+    data: string,
+  ): void;
+  updateStatus(
+    callId: string,
+    status: CoreToolCallStatus.Executing,
     data?: Partial<ExecutingToolCall>,
   ): void;
-  updateStatus(callId: string, status: 'scheduled' | 'validating'): void;
+  updateStatus(
+    callId: string,
+    status: CoreToolCallStatus.Scheduled | CoreToolCallStatus.Validating,
+  ): void;
   updateStatus(callId: string, status: Status, auxiliaryData?: unknown): void {
     const call = this.activeCalls.get(callId);
     if (!call) return;
@@ -152,7 +160,7 @@ export class SchedulerStateManager {
     newInvocation: AnyToolInvocation,
   ): void {
     const call = this.activeCalls.get(callId);
-    if (!call || call.status === 'error') return;
+    if (!call || call.status === CoreToolCallStatus.Error) return;
 
     this.activeCalls.set(
       callId,
@@ -179,7 +187,7 @@ export class SchedulerStateManager {
 
     while (this.queue.length > 0) {
       const queuedCall = this.queue.shift()!;
-      if (queuedCall.status === 'error') {
+      if (queuedCall.status === CoreToolCallStatus.Error) {
         this._completedBatch.push(queuedCall);
         this.onTerminalCall?.(queuedCall);
         continue;
@@ -222,7 +230,11 @@ export class SchedulerStateManager {
 
   private isTerminalCall(call: ToolCall): call is CompletedToolCall {
     const { status } = call;
-    return status === 'success' || status === 'error' || status === 'cancelled';
+    return (
+      status === CoreToolCallStatus.Success ||
+      status === CoreToolCallStatus.Error ||
+      status === CoreToolCallStatus.Cancelled
+    );
   }
 
   private transitionCall(
@@ -231,7 +243,7 @@ export class SchedulerStateManager {
     auxiliaryData?: unknown,
   ): ToolCall {
     switch (newStatus) {
-      case 'success': {
+      case CoreToolCallStatus.Success: {
         if (!this.isToolCallResponseInfo(auxiliaryData)) {
           throw new Error(
             `Invalid data for 'success' transition (callId: ${call.request.callId})`,
@@ -239,7 +251,7 @@ export class SchedulerStateManager {
         }
         return this.toSuccess(call, auxiliaryData);
       }
-      case 'error': {
+      case CoreToolCallStatus.Error: {
         if (!this.isToolCallResponseInfo(auxiliaryData)) {
           throw new Error(
             `Invalid data for 'error' transition (callId: ${call.request.callId})`,
@@ -247,7 +259,7 @@ export class SchedulerStateManager {
         }
         return this.toError(call, auxiliaryData);
       }
-      case 'awaiting_approval': {
+      case CoreToolCallStatus.AwaitingApproval: {
         if (!auxiliaryData) {
           throw new Error(
             `Missing data for 'awaiting_approval' transition (callId: ${call.request.callId})`,
@@ -255,9 +267,9 @@ export class SchedulerStateManager {
         }
         return this.toAwaitingApproval(call, auxiliaryData);
       }
-      case 'scheduled':
+      case CoreToolCallStatus.Scheduled:
         return this.toScheduled(call);
-      case 'cancelled': {
+      case CoreToolCallStatus.Cancelled: {
         if (typeof auxiliaryData !== 'string') {
           throw new Error(
             `Invalid reason (string) for 'cancelled' transition (callId: ${call.request.callId})`,
@@ -265,9 +277,9 @@ export class SchedulerStateManager {
         }
         return this.toCancelled(call, auxiliaryData);
       }
-      case 'validating':
+      case CoreToolCallStatus.Validating:
         return this.toValidating(call);
-      case 'executing': {
+      case CoreToolCallStatus.Executing: {
         if (
           auxiliaryData !== undefined &&
           !this.isExecutingToolCallPatch(auxiliaryData)
@@ -327,17 +339,18 @@ export class SchedulerStateManager {
     call: ToolCall,
     response: ToolCallResponseInfo,
   ): SuccessfulToolCall {
-    this.validateHasToolAndInvocation(call, 'success');
+    this.validateHasToolAndInvocation(call, CoreToolCallStatus.Success);
     const startTime = 'startTime' in call ? call.startTime : undefined;
     return {
       request: call.request,
       tool: call.tool,
       invocation: call.invocation,
-      status: 'success',
+      status: CoreToolCallStatus.Success,
       response,
       durationMs: startTime ? Date.now() - startTime : undefined,
       outcome: call.outcome,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 
@@ -348,17 +361,21 @@ export class SchedulerStateManager {
     const startTime = 'startTime' in call ? call.startTime : undefined;
     return {
       request: call.request,
-      status: 'error',
+      status: CoreToolCallStatus.Error,
       tool: 'tool' in call ? call.tool : undefined,
       response,
       durationMs: startTime ? Date.now() - startTime : undefined,
       outcome: call.outcome,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 
   private toAwaitingApproval(call: ToolCall, data: unknown): WaitingToolCall {
-    this.validateHasToolAndInvocation(call, 'awaiting_approval');
+    this.validateHasToolAndInvocation(
+      call,
+      CoreToolCallStatus.AwaitingApproval,
+    );
 
     let confirmationDetails:
       | ToolCallConfirmationDetails
@@ -370,19 +387,21 @@ export class SchedulerStateManager {
       confirmationDetails = data.confirmationDetails;
     } else {
       // TODO: Remove legacy callback shape once event-driven migration is complete
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       confirmationDetails = data as ToolCallConfirmationDetails;
     }
 
     return {
       request: call.request,
       tool: call.tool,
-      status: 'awaiting_approval',
+      status: CoreToolCallStatus.AwaitingApproval,
       correlationId,
       confirmationDetails,
       startTime: 'startTime' in call ? call.startTime : undefined,
       outcome: call.outcome,
       invocation: call.invocation,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 
@@ -399,20 +418,21 @@ export class SchedulerStateManager {
   }
 
   private toScheduled(call: ToolCall): ScheduledToolCall {
-    this.validateHasToolAndInvocation(call, 'scheduled');
+    this.validateHasToolAndInvocation(call, CoreToolCallStatus.Scheduled);
     return {
       request: call.request,
       tool: call.tool,
-      status: 'scheduled',
+      status: CoreToolCallStatus.Scheduled,
       startTime: 'startTime' in call ? call.startTime : undefined,
       outcome: call.outcome,
       invocation: call.invocation,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 
   private toCancelled(call: ToolCall, reason: string): CancelledToolCall {
-    this.validateHasToolAndInvocation(call, 'cancelled');
+    this.validateHasToolAndInvocation(call, CoreToolCallStatus.Cancelled);
     const startTime = 'startTime' in call ? call.startTime : undefined;
 
     // TODO: Refactor this tool-specific logic into the confirmation details payload.
@@ -443,7 +463,7 @@ export class SchedulerStateManager {
       request: call.request,
       tool: call.tool,
       invocation: call.invocation,
-      status: 'cancelled',
+      status: CoreToolCallStatus.Cancelled,
       response: {
         callId: call.request.callId,
         responseParts: [
@@ -463,11 +483,12 @@ export class SchedulerStateManager {
       durationMs: startTime ? Date.now() - startTime : undefined,
       outcome: call.outcome,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 
   private isWaitingToolCall(call: ToolCall): call is WaitingToolCall {
-    return call.status === 'awaiting_approval';
+    return call.status === CoreToolCallStatus.AwaitingApproval;
   }
 
   private patchCall<T extends ToolCall>(call: T, patch: Partial<T>): T {
@@ -475,36 +496,47 @@ export class SchedulerStateManager {
   }
 
   private toValidating(call: ToolCall): ValidatingToolCall {
-    this.validateHasToolAndInvocation(call, 'validating');
+    this.validateHasToolAndInvocation(call, CoreToolCallStatus.Validating);
     return {
       request: call.request,
       tool: call.tool,
-      status: 'validating',
+      status: CoreToolCallStatus.Validating,
       startTime: 'startTime' in call ? call.startTime : undefined,
       outcome: call.outcome,
       invocation: call.invocation,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 
   private toExecuting(call: ToolCall, data?: unknown): ExecutingToolCall {
-    this.validateHasToolAndInvocation(call, 'executing');
+    this.validateHasToolAndInvocation(call, CoreToolCallStatus.Executing);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const execData = data as Partial<ExecutingToolCall> | undefined;
     const liveOutput =
       execData?.liveOutput ??
       ('liveOutput' in call ? call.liveOutput : undefined);
     const pid = execData?.pid ?? ('pid' in call ? call.pid : undefined);
+    const progressMessage =
+      execData?.progressMessage ??
+      ('progressMessage' in call ? call.progressMessage : undefined);
+    const progressPercent =
+      execData?.progressPercent ??
+      ('progressPercent' in call ? call.progressPercent : undefined);
 
     return {
       request: call.request,
       tool: call.tool,
-      status: 'executing',
+      status: CoreToolCallStatus.Executing,
       startTime: 'startTime' in call ? call.startTime : undefined,
       outcome: call.outcome,
       invocation: call.invocation,
       liveOutput,
       pid,
+      progressMessage,
+      progressPercent,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 }

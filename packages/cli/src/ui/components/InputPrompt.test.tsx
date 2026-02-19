@@ -9,7 +9,7 @@ import { createMockSettings } from '../../test-utils/settings.js';
 import { waitFor } from '../../test-utils/async.js';
 import { act, useState } from 'react';
 import type { InputPromptProps } from './InputPrompt.js';
-import { InputPrompt } from './InputPrompt.js';
+import { InputPrompt, tryTogglePasteExpansion } from './InputPrompt.js';
 import type { TextBuffer } from './shared/text-buffer.js';
 import {
   calculateTransformationsForLine,
@@ -46,6 +46,11 @@ import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { cpLen } from '../utils/textUtils.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { Key } from '../hooks/useKeypress.js';
+import {
+  appEvents,
+  AppEvent,
+  TransientMessageType,
+} from '../../utils/events.js';
 
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCommandCompletion.js');
@@ -67,6 +72,10 @@ vi.mock('ink', async (importOriginal) => {
       <actual.Text {...props}>{children}</actual.Text>
     )),
   };
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 const mockSlashCommands: SlashCommand[] = [
@@ -140,8 +149,14 @@ describe('InputPrompt', () => {
   );
   const mockedUseKittyKeyboardProtocol = vi.mocked(useKittyKeyboardProtocol);
   const mockSetEmbeddedShellFocused = vi.fn();
+  const mockSetCleanUiDetailsVisible = vi.fn();
+  const mockToggleCleanUiDetailsVisible = vi.fn();
+  const mockRevealCleanUiDetailsTemporarily = vi.fn();
   const uiActions = {
     setEmbeddedShellFocused: mockSetEmbeddedShellFocused,
+    setCleanUiDetailsVisible: mockSetCleanUiDetailsVisible,
+    toggleCleanUiDetailsVisible: mockToggleCleanUiDetailsVisible,
+    revealCleanUiDetailsTemporarily: mockRevealCleanUiDetailsTemporarily,
   };
 
   beforeEach(() => {
@@ -272,7 +287,10 @@ describe('InputPrompt', () => {
       navigateDown: vi.fn(),
       handleSubmit: vi.fn(),
     };
-    mockedUseInputHistory.mockReturnValue(mockInputHistory);
+    mockedUseInputHistory.mockImplementation(({ onSubmit }) => {
+      mockInputHistory.handleSubmit = vi.fn((val) => onSubmit(val));
+      return mockInputHistory;
+    });
 
     mockReverseSearchCompletion = {
       suggestions: [],
@@ -1203,6 +1221,36 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should NOT autocomplete on Shift+Tab', async () => {
+    const suggestion = { label: 'about', value: 'about' };
+
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [suggestion],
+      activeSuggestionIndex: 0,
+      getCompletedText: vi.fn().mockReturnValue('/about'),
+    });
+
+    props.buffer.setText('/ab');
+    props.buffer.lines = ['/ab'];
+    props.buffer.cursor = [0, 3];
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\x1b[Z'); // Shift+Tab
+    });
+
+    // We need to wait a bit to ensure handleAutocomplete was NOT called
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it('should autocomplete custom commands from .toml files on Enter', async () => {
     const customCommand: SlashCommand = {
       name: 'find-capital',
@@ -1531,7 +1579,6 @@ describe('InputPrompt', () => {
       { color: 'black', name: 'black' },
       { color: '#000000', name: '#000000' },
       { color: '#000', name: '#000' },
-      { color: undefined, name: 'default (black)' },
       { color: 'white', name: 'white' },
       { color: '#ffffff', name: '#ffffff' },
       { color: '#fff', name: '#fff' },
@@ -1601,6 +1648,11 @@ describe('InputPrompt', () => {
 
       const { stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
+        {
+          uiState: {
+            terminalBackgroundColor: 'black',
+          } as Partial<UIState>,
+        },
       );
 
       await waitFor(() => {
@@ -2012,7 +2064,7 @@ describe('InputPrompt', () => {
         );
         await waitFor(() => {
           const frame = stdout.lastFrame();
-          const lines = frame!.split('\n');
+          const lines = frame.split('\n');
           // The line with the cursor should just be an inverted space inside the box border
           expect(
             lines.find((l) => l.includes(chalk.inverse(' '))),
@@ -2049,7 +2101,7 @@ describe('InputPrompt', () => {
         expect(frame).toContain('hello');
         expect(frame).toContain(`world${chalk.inverse(' ')}`);
 
-        const outputLines = frame!.split('\n');
+        const outputLines = frame.trim().split('\n');
         // The number of lines should be 2 for the border plus 3 for the content.
         expect(outputLines.length).toBe(5);
       });
@@ -2637,6 +2689,38 @@ describe('InputPrompt', () => {
       unmount();
     }, 15000);
 
+    it('should NOT autocomplete on Shift+Tab in reverse search', async () => {
+      const mockHandleAutocomplete = vi.fn();
+
+      mockedUseReverseSearchCompletion.mockReturnValue({
+        ...mockReverseSearchCompletion,
+        suggestions: [{ label: 'echo hello', value: 'echo hello' }],
+        showSuggestions: true,
+        activeSuggestionIndex: 0,
+        handleAutocomplete: mockHandleAutocomplete,
+      });
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x12'); // Ctrl+R
+      });
+
+      await act(async () => {
+        stdin.write('\x1b[Z'); // Shift+Tab
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(mockHandleAutocomplete).not.toHaveBeenCalled();
+      unmount();
+    });
+
     it('submits the highlighted entry on Enter and exits reverse-search', async () => {
       // Mock the reverse search completion to return suggestions
       mockedUseReverseSearchCompletion.mockReturnValue({
@@ -2933,29 +3017,29 @@ describe('InputPrompt', () => {
     });
   });
 
-  describe('Tab focus toggle', () => {
+  describe('Tab clean UI toggle', () => {
     it.each([
       {
-        name: 'should toggle focus in on Tab when no suggestions or ghost text',
+        name: 'should toggle clean UI details on double-Tab when no suggestions or ghost text',
         showSuggestions: false,
         ghostText: '',
         suggestions: [],
-        expectedFocusToggle: true,
+        expectedUiToggle: true,
       },
       {
-        name: 'should accept ghost text and NOT toggle focus on Tab',
+        name: 'should accept ghost text and NOT toggle clean UI details on Tab',
         showSuggestions: false,
         ghostText: 'ghost text',
         suggestions: [],
-        expectedFocusToggle: false,
+        expectedUiToggle: false,
         expectedAcceptCall: true,
       },
       {
-        name: 'should NOT toggle focus on Tab when suggestions are present',
+        name: 'should NOT toggle clean UI details on Tab when suggestions are present',
         showSuggestions: true,
         ghostText: '',
         suggestions: [{ label: 'test', value: 'test' }],
-        expectedFocusToggle: false,
+        expectedUiToggle: false,
       },
     ])(
       '$name',
@@ -2963,7 +3047,7 @@ describe('InputPrompt', () => {
         showSuggestions,
         ghostText,
         suggestions,
-        expectedFocusToggle,
+        expectedUiToggle,
         expectedAcceptCall,
       }) => {
         const mockAccept = vi.fn();
@@ -2985,21 +3069,24 @@ describe('InputPrompt', () => {
           <InputPrompt {...props} />,
           {
             uiActions,
-            uiState: { activePtyId: 1 },
+            uiState: {},
           },
         );
 
         await act(async () => {
           stdin.write('\t');
+          if (expectedUiToggle) {
+            stdin.write('\t');
+          }
         });
 
         await waitFor(() => {
-          if (expectedFocusToggle) {
-            expect(uiActions.setEmbeddedShellFocused).toHaveBeenCalledWith(
-              true,
-            );
+          if (expectedUiToggle) {
+            expect(uiActions.toggleCleanUiDetailsVisible).toHaveBeenCalled();
           } else {
-            expect(uiActions.setEmbeddedShellFocused).not.toHaveBeenCalled();
+            expect(
+              uiActions.toggleCleanUiDetailsVisible,
+            ).not.toHaveBeenCalled();
           }
 
           if (expectedAcceptCall) {
@@ -3009,6 +3096,108 @@ describe('InputPrompt', () => {
         unmount();
       },
     );
+
+    it('should NOT accept ghost text on Shift+Tab', async () => {
+      const mockAccept = vi.fn();
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: false,
+        suggestions: [],
+        promptCompletion: {
+          text: 'ghost text',
+          accept: mockAccept,
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: true,
+          markSelected: vi.fn(),
+        },
+      });
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x1b[Z'); // Shift+Tab
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(mockAccept).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should not reveal clean UI details on Shift+Tab when hidden', async () => {
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: false,
+        suggestions: [],
+        promptCompletion: {
+          text: '',
+          accept: vi.fn(),
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: false,
+          markSelected: vi.fn(),
+        },
+      });
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+          uiState: { activePtyId: 1, cleanUiDetailsVisible: false },
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x1b[Z');
+      });
+
+      await waitFor(() => {
+        expect(
+          uiActions.revealCleanUiDetailsTemporarily,
+        ).not.toHaveBeenCalled();
+      });
+      unmount();
+    });
+
+    it('should toggle clean UI details on double-Tab by default', async () => {
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: false,
+        suggestions: [],
+        promptCompletion: {
+          text: '',
+          accept: vi.fn(),
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: false,
+          markSelected: vi.fn(),
+        },
+      });
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+          uiState: {},
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\t');
+        stdin.write('\t');
+      });
+
+      await waitFor(() => {
+        expect(uiActions.toggleCleanUiDetailsVisible).toHaveBeenCalled();
+      });
+      unmount();
+    });
   });
 
   describe('mouse interaction', () => {
@@ -3160,7 +3349,7 @@ describe('InputPrompt', () => {
         return <InputPrompt {...baseProps} buffer={buffer as TextBuffer} />;
       };
 
-      const { stdin, stdout, unmount, simulateClick } = renderWithProviders(
+      const { stdout, unmount, simulateClick } = renderWithProviders(
         <TestWrapper />,
         {
           mouseEventsEnabled: true,
@@ -3175,8 +3364,8 @@ describe('InputPrompt', () => {
       });
 
       // Simulate double-click to expand
-      await simulateClick(stdin, 5, 2);
-      await simulateClick(stdin, 5, 2);
+      await simulateClick(5, 2);
+      await simulateClick(5, 2);
 
       // 2. Verify expanded content is visible
       await waitFor(() => {
@@ -3184,8 +3373,8 @@ describe('InputPrompt', () => {
       });
 
       // Simulate double-click to collapse
-      await simulateClick(stdin, 5, 2);
-      await simulateClick(stdin, 5, 2);
+      await simulateClick(5, 2);
+      await simulateClick(5, 2);
 
       // 3. Verify placeholder is restored
       await waitFor(() => {
@@ -3251,7 +3440,7 @@ describe('InputPrompt', () => {
         return <InputPrompt {...baseProps} buffer={buffer as TextBuffer} />;
       };
 
-      const { stdin, stdout, unmount, simulateClick } = renderWithProviders(
+      const { stdout, unmount, simulateClick } = renderWithProviders(
         <TestWrapper />,
         {
           mouseEventsEnabled: true,
@@ -3266,8 +3455,8 @@ describe('InputPrompt', () => {
       });
 
       // Simulate double-click WAY to the right on the first line
-      await simulateClick(stdin, 100, 2);
-      await simulateClick(stdin, 100, 2);
+      await simulateClick(90, 2);
+      await simulateClick(90, 2);
 
       // Verify it is NOW collapsed
       await waitFor(() => {
@@ -3826,11 +4015,265 @@ describe('InputPrompt', () => {
       unmount();
     });
   });
+
+  describe('Ctrl+O paste expansion', () => {
+    const CTRL_O = '\x0f'; // Ctrl+O key sequence
+
+    it('Ctrl+O triggers paste expansion via keybinding', async () => {
+      const id = '[Pasted Text: 10 lines]';
+      const toggleFn = vi.fn();
+      const buffer = {
+        ...props.buffer,
+        text: id,
+        cursor: [0, 0] as number[],
+        pastedContent: {
+          [id]: 'line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10',
+        },
+        transformationsByLine: [
+          [
+            {
+              logStart: 0,
+              logEnd: id.length,
+              logicalText: id,
+              collapsedText: id,
+              type: 'paste',
+              id,
+            },
+          ],
+        ],
+        expandedPaste: null,
+        getExpandedPasteAtLine: vi.fn().mockReturnValue(null),
+        togglePasteExpansion: toggleFn,
+      } as unknown as TextBuffer;
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} buffer={buffer} />,
+        { uiActions },
+      );
+
+      await act(async () => {
+        stdin.write(CTRL_O);
+      });
+
+      await waitFor(() => {
+        expect(toggleFn).toHaveBeenCalledWith(id, 0, 0);
+      });
+      unmount();
+    });
+
+    it.each([
+      {
+        name: 'hint appears on large paste via Ctrl+V',
+        text: 'line1\nline2\nline3\nline4\nline5\nline6',
+        method: 'ctrl-v',
+        expectHint: true,
+      },
+      {
+        name: 'hint does not appear for small pastes via Ctrl+V',
+        text: 'hello',
+        method: 'ctrl-v',
+        expectHint: false,
+      },
+      {
+        name: 'hint appears on large terminal paste event',
+        text: 'line1\nline2\nline3\nline4\nline5\nline6',
+        method: 'terminal-paste',
+        expectHint: true,
+      },
+    ])('$name', async ({ text, method, expectHint }) => {
+      vi.mocked(clipboardy.read).mockResolvedValue(text);
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+
+      const emitSpy = vi.spyOn(appEvents, 'emit');
+      const buffer = {
+        ...props.buffer,
+        handleInput: vi.fn().mockReturnValue(true),
+      } as unknown as TextBuffer;
+
+      // Need kitty protocol enabled for terminal paste events
+      if (method === 'terminal-paste') {
+        mockedUseKittyKeyboardProtocol.mockReturnValue({
+          enabled: true,
+          checking: false,
+        });
+      }
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt
+          {...props}
+          buffer={method === 'terminal-paste' ? buffer : props.buffer}
+        />,
+      );
+
+      await act(async () => {
+        if (method === 'ctrl-v') {
+          stdin.write('\x16'); // Ctrl+V
+        } else {
+          stdin.write(`\x1b[200~${text}\x1b[201~`);
+        }
+      });
+
+      await waitFor(() => {
+        if (expectHint) {
+          expect(emitSpy).toHaveBeenCalledWith(AppEvent.TransientMessage, {
+            message: 'Press Ctrl+O to expand pasted text',
+            type: TransientMessageType.Hint,
+          });
+        } else {
+          // If no hint expected, verify buffer was still updated
+          if (method === 'ctrl-v') {
+            expect(mockBuffer.insert).toHaveBeenCalledWith(text, {
+              paste: true,
+            });
+          } else {
+            expect(buffer.handleInput).toHaveBeenCalled();
+          }
+        }
+      });
+
+      if (!expectHint) {
+        expect(emitSpy).not.toHaveBeenCalledWith(
+          AppEvent.TransientMessage,
+          expect.any(Object),
+        );
+      }
+
+      emitSpy.mockRestore();
+      unmount();
+    });
+  });
+
+  describe('tryTogglePasteExpansion', () => {
+    it.each([
+      {
+        name: 'returns false when no pasted content exists',
+        cursor: [0, 0],
+        pastedContent: {},
+        getExpandedPasteAtLine: null,
+        expected: false,
+      },
+      {
+        name: 'expands placeholder under cursor',
+        cursor: [0, 2],
+        pastedContent: { '[Pasted Text: 6 lines]': 'content' },
+        transformations: [
+          {
+            logStart: 0,
+            logEnd: '[Pasted Text: 6 lines]'.length,
+            id: '[Pasted Text: 6 lines]',
+          },
+        ],
+        expected: true,
+        expectedToggle: ['[Pasted Text: 6 lines]', 0, 2],
+      },
+      {
+        name: 'collapses expanded paste when cursor is inside',
+        cursor: [1, 0],
+        pastedContent: { '[Pasted Text: 6 lines]': 'a\nb\nc' },
+        getExpandedPasteAtLine: '[Pasted Text: 6 lines]',
+        expected: true,
+        expectedToggle: ['[Pasted Text: 6 lines]', 1, 0],
+      },
+      {
+        name: 'expands placeholder when cursor is immediately after it',
+        cursor: [0, '[Pasted Text: 6 lines]'.length],
+        pastedContent: { '[Pasted Text: 6 lines]': 'content' },
+        transformations: [
+          {
+            logStart: 0,
+            logEnd: '[Pasted Text: 6 lines]'.length,
+            id: '[Pasted Text: 6 lines]',
+          },
+        ],
+        expected: true,
+        expectedToggle: [
+          '[Pasted Text: 6 lines]',
+          0,
+          '[Pasted Text: 6 lines]'.length,
+        ],
+      },
+      {
+        name: 'shows hint when cursor is not on placeholder but placeholders exist',
+        cursor: [0, 0],
+        pastedContent: { '[Pasted Text: 6 lines]': 'content' },
+        transformationsByLine: [
+          [],
+          [
+            {
+              logStart: 0,
+              logEnd: '[Pasted Text: 6 lines]'.length,
+              type: 'paste',
+              id: '[Pasted Text: 6 lines]',
+            },
+          ],
+        ],
+        expected: true,
+        expectedHint: 'Move cursor within placeholder to expand',
+      },
+    ])(
+      '$name',
+      ({
+        cursor,
+        pastedContent,
+        transformations,
+        transformationsByLine,
+        getExpandedPasteAtLine,
+        expected,
+        expectedToggle,
+        expectedHint,
+      }) => {
+        const id = '[Pasted Text: 6 lines]';
+        const buffer = {
+          cursor,
+          pastedContent,
+          transformationsByLine: transformationsByLine || [
+            transformations
+              ? transformations.map((t) => ({
+                  ...t,
+                  logicalText: id,
+                  collapsedText: id,
+                  type: 'paste',
+                }))
+              : [],
+          ],
+          getExpandedPasteAtLine: vi
+            .fn()
+            .mockReturnValue(getExpandedPasteAtLine),
+          togglePasteExpansion: vi.fn(),
+        } as unknown as TextBuffer;
+
+        const emitSpy = vi.spyOn(appEvents, 'emit');
+        expect(tryTogglePasteExpansion(buffer)).toBe(expected);
+
+        if (expectedToggle) {
+          expect(buffer.togglePasteExpansion).toHaveBeenCalledWith(
+            ...expectedToggle,
+          );
+        } else {
+          expect(buffer.togglePasteExpansion).not.toHaveBeenCalled();
+        }
+
+        if (expectedHint) {
+          expect(emitSpy).toHaveBeenCalledWith(AppEvent.TransientMessage, {
+            message: expectedHint,
+            type: TransientMessageType.Hint,
+          });
+        } else {
+          expect(emitSpy).not.toHaveBeenCalledWith(
+            AppEvent.TransientMessage,
+            expect.any(Object),
+          );
+        }
+        emitSpy.mockRestore();
+      },
+    );
+  });
+
   describe('History Navigation and Completion Suppression', () => {
     beforeEach(() => {
       props.userMessages = ['first message', 'second message'];
       // Mock useInputHistory to actually call onChange
-      mockedUseInputHistory.mockImplementation(({ onChange }) => ({
+      mockedUseInputHistory.mockImplementation(({ onChange, onSubmit }) => ({
         navigateUp: () => {
           onChange('second message', 'start');
           return true;
@@ -3839,7 +4282,7 @@ describe('InputPrompt', () => {
           onChange('first message', 'end');
           return true;
         },
-        handleSubmit: vi.fn(),
+        handleSubmit: vi.fn((val) => onSubmit(val)),
       }));
     });
 
@@ -4027,6 +4470,91 @@ describe('InputPrompt', () => {
         );
       });
     });
+  });
+
+  describe('shortcuts help visibility', () => {
+    it('opens shortcuts help with ? on empty prompt even when showShortcutsHint is false', async () => {
+      const setShortcutsHelpVisible = vi.fn();
+      const settings = createMockSettings({
+        ui: { showShortcutsHint: false },
+      });
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          settings,
+          uiActions: { setShortcutsHelpVisible },
+        },
+      );
+
+      await act(async () => {
+        stdin.write('?');
+      });
+
+      await waitFor(() => {
+        expect(setShortcutsHelpVisible).toHaveBeenCalledWith(true);
+      });
+      unmount();
+    });
+
+    it.each([
+      {
+        name: 'terminal paste event occurs',
+        input: '\x1b[200~pasted text\x1b[201~',
+      },
+      {
+        name: 'Ctrl+V (PASTE_CLIPBOARD) is pressed',
+        input: '\x16',
+        setupMocks: () => {
+          vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+          vi.mocked(clipboardy.read).mockResolvedValue('clipboard text');
+        },
+      },
+      {
+        name: 'mouse right-click paste occurs',
+        input: '\x1b[<2;1;1m',
+        mouseEventsEnabled: true,
+        setupMocks: () => {
+          vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+          vi.mocked(clipboardy.read).mockResolvedValue('clipboard text');
+        },
+      },
+      {
+        name: 'Ctrl+R hotkey is pressed',
+        input: '\x12',
+      },
+      {
+        name: 'Ctrl+X hotkey is pressed',
+        input: '\x18',
+      },
+      {
+        name: 'F12 hotkey is pressed',
+        input: '\x1b[24~',
+      },
+    ])(
+      'should close shortcuts help when a $name',
+      async ({ input, setupMocks, mouseEventsEnabled }) => {
+        setupMocks?.();
+        const setShortcutsHelpVisible = vi.fn();
+        const { stdin, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+          {
+            uiState: { shortcutsHelpVisible: true },
+            uiActions: { setShortcutsHelpVisible },
+            mouseEventsEnabled,
+          },
+        );
+
+        await act(async () => {
+          stdin.write(input);
+        });
+
+        await waitFor(() => {
+          expect(setShortcutsHelpVisible).toHaveBeenCalledWith(false);
+        });
+        unmount();
+      },
+    );
   });
 });
 

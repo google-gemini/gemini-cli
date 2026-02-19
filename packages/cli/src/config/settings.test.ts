@@ -1936,6 +1936,40 @@ describe('Settings Loading and Merging', () => {
       );
     });
 
+    it('should migrate tools.approvalMode to general.defaultApprovalMode', () => {
+      const userSettingsContent = {
+        tools: {
+          approvalMode: 'plan',
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      migrateDeprecatedSettings(loadedSettings, true);
+
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'general',
+        expect.objectContaining({ defaultApprovalMode: 'plan' }),
+      );
+
+      // Verify removal
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'tools',
+        expect.not.objectContaining({ approvalMode: 'plan' }),
+      );
+    });
+
     it('should migrate all 4 inverted boolean settings', () => {
       const userSettingsContent = {
         general: {
@@ -2078,7 +2112,7 @@ describe('Settings Loading and Merging', () => {
       );
     });
 
-    it('should migrate disableUpdateNag to enableAutoUpdateNotification in system and system defaults settings', () => {
+    it('should migrate disableUpdateNag to enableAutoUpdateNotification in memory but not save for system and system defaults settings', () => {
       const systemSettingsContent = {
         general: {
           disableUpdateNag: true,
@@ -2103,9 +2137,10 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
+      const feedbackSpy = mockCoreEvents.emitFeedback;
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
-      // Verify system settings were migrated
+      // Verify system settings were migrated in memory
       expect(settings.system.settings.general).toHaveProperty(
         'enableAutoUpdateNotification',
       );
@@ -2115,7 +2150,7 @@ describe('Settings Loading and Merging', () => {
         ],
       ).toBe(false);
 
-      // Verify system defaults settings were migrated
+      // Verify system defaults settings were migrated in memory
       expect(settings.systemDefaults.settings.general).toHaveProperty(
         'enableAutoUpdateNotification',
       );
@@ -2127,6 +2162,74 @@ describe('Settings Loading and Merging', () => {
 
       // Merged should also reflect it (system overrides defaults, but both are migrated)
       expect(settings.merged.general?.enableAutoUpdateNotification).toBe(false);
+
+      // Verify it was NOT saved back to disk
+      expect(updateSettingsFilePreservingFormat).not.toHaveBeenCalledWith(
+        getSystemSettingsPath(),
+        expect.anything(),
+      );
+      expect(updateSettingsFilePreservingFormat).not.toHaveBeenCalledWith(
+        getSystemDefaultsPath(),
+        expect.anything(),
+      );
+
+      // Verify warnings were shown
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining(
+          'The system configuration contains deprecated settings',
+        ),
+      );
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining(
+          'The system default configuration contains deprecated settings',
+        ),
+      );
+    });
+
+    it('should migrate experimental agent settings in system scope in memory but not save', () => {
+      const systemSettingsContent = {
+        experimental: {
+          codebaseInvestigatorSettings: {
+            enabled: true,
+          },
+        },
+      };
+
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath()) {
+            return JSON.stringify(systemSettingsContent);
+          }
+          return '{}';
+        },
+      );
+
+      const feedbackSpy = mockCoreEvents.emitFeedback;
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Verify it was migrated in memory
+      expect(settings.system.settings.agents?.overrides).toMatchObject({
+        codebase_investigator: {
+          enabled: true,
+        },
+      });
+
+      // Verify it was NOT saved back to disk
+      expect(updateSettingsFilePreservingFormat).not.toHaveBeenCalledWith(
+        getSystemSettingsPath(),
+        expect.anything(),
+      );
+
+      // Verify warnings were shown
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining(
+          'The system configuration contains deprecated settings: [experimental.codebaseInvestigatorSettings]',
+        ),
+      );
     });
 
     it('should migrate experimental agent settings to agents overrides', () => {
@@ -2440,6 +2543,50 @@ describe('Settings Loading and Merging', () => {
           prop2: 42,
         },
       });
+    });
+  });
+
+  describe('Reactivity & Snapshots', () => {
+    let loadedSettings: LoadedSettings;
+
+    beforeEach(() => {
+      const emptySettingsFile: SettingsFile = {
+        path: '/mock/path',
+        settings: {},
+        originalSettings: {},
+      };
+
+      loadedSettings = new LoadedSettings(
+        { ...emptySettingsFile, path: getSystemSettingsPath() },
+        { ...emptySettingsFile, path: getSystemDefaultsPath() },
+        { ...emptySettingsFile, path: USER_SETTINGS_PATH },
+        { ...emptySettingsFile, path: MOCK_WORKSPACE_SETTINGS_PATH },
+        true, // isTrusted
+        [],
+      );
+    });
+
+    it('getSnapshot() should return stable reference if no changes occur', () => {
+      const snap1 = loadedSettings.getSnapshot();
+      const snap2 = loadedSettings.getSnapshot();
+      expect(snap1).toBe(snap2);
+    });
+
+    it('setValue() should create a new snapshot reference and emit event', () => {
+      const oldSnapshot = loadedSettings.getSnapshot();
+      const oldUserRef = oldSnapshot.user.settings;
+
+      loadedSettings.setValue(SettingScope.User, 'ui.theme', 'high-contrast');
+
+      const newSnapshot = loadedSettings.getSnapshot();
+
+      expect(newSnapshot).not.toBe(oldSnapshot);
+      expect(newSnapshot.user.settings).not.toBe(oldUserRef);
+      expect(newSnapshot.user.settings.ui?.theme).toBe('high-contrast');
+
+      expect(newSnapshot.system.settings).not.toBe(oldSnapshot.system.settings);
+
+      expect(mockCoreEvents.emitSettingsChanged).toHaveBeenCalled();
     });
   });
 

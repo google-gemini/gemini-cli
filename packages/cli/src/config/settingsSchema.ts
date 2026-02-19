@@ -10,7 +10,6 @@
 // --------------------------------------------------------------------------
 
 import {
-  DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
   type MCPServerConfig,
@@ -153,6 +152,18 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  policyPaths: {
+    type: 'array',
+    label: 'Policy Paths',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: [] as string[],
+    description: 'Additional policy files or directories to load.',
+    showInDialog: false,
+    items: { type: 'string' },
+    mergeStrategy: MergeStrategy.UNION,
+  },
+
   general: {
     type: 'object',
     label: 'General',
@@ -162,15 +173,6 @@ const SETTINGS_SCHEMA = {
     description: 'General application settings.',
     showInDialog: false,
     properties: {
-      previewFeatures: {
-        type: 'boolean',
-        label: 'Preview Features (e.g., models)',
-        category: 'General',
-        requiresRestart: false,
-        default: false,
-        description: 'Enable preview features (e.g., preview models).',
-        showInDialog: true,
-      },
       preferredEditor: {
         type: 'string',
         label: 'Preferred Editor',
@@ -189,6 +191,33 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Vim keybindings',
         showInDialog: true,
       },
+      defaultApprovalMode: {
+        type: 'enum',
+        label: 'Default Approval Mode',
+        category: 'General',
+        requiresRestart: false,
+        default: 'default',
+        description: oneLine`
+          The default approval mode for tool execution.
+          'default' prompts for approval, 'auto_edit' auto-approves edit tools,
+          and 'plan' is read-only mode. 'yolo' is not supported yet.
+        `,
+        showInDialog: true,
+        options: [
+          { value: 'default', label: 'Default' },
+          { value: 'auto_edit', label: 'Auto Edit' },
+          { value: 'plan', label: 'Plan' },
+        ],
+      },
+      devtools: {
+        type: 'boolean',
+        label: 'DevTools',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description: 'Enable DevTools inspector on launch.',
+        showInDialog: false,
+      },
       enableAutoUpdate: {
         type: 'boolean',
         label: 'Enable Auto Update',
@@ -206,6 +235,16 @@ const SETTINGS_SCHEMA = {
         default: true,
         description: 'Enable update notification prompts.',
         showInDialog: false,
+      },
+      enableNotifications: {
+        type: 'boolean',
+        label: 'Enable Notifications',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable run-event notifications for action-required prompts and session completion. Currently macOS only.',
+        showInDialog: true,
       },
       checkpointing: {
         type: 'object',
@@ -275,13 +314,13 @@ const SETTINGS_SCHEMA = {
           },
           maxAge: {
             type: 'string',
-            label: 'Max Session Age',
+            label: 'Keep chat history',
             category: 'General',
             requiresRestart: false,
             default: undefined as string | undefined,
             description:
-              'Maximum age of sessions to keep (e.g., "30d", "7d", "24h", "1w")',
-            showInDialog: false,
+              'Automatically delete chats older than this time period (e.g., "30d", "7d", "24h", "1w")',
+            showInDialog: true,
           },
           maxCount: {
             type: 'number',
@@ -301,6 +340,16 @@ const SETTINGS_SCHEMA = {
             default: DEFAULT_MIN_RETENTION,
             description: `Minimum retention period (safety limit, defaults to "${DEFAULT_MIN_RETENTION}")`,
             showInDialog: false,
+          },
+          warningAcknowledged: {
+            type: 'boolean',
+            label: 'Warning Acknowledged',
+            category: 'General',
+            requiresRestart: false,
+            default: false,
+            showInDialog: false,
+            description:
+              'INTERNAL: Whether the user has acknowledged the session retention warning',
           },
         },
         description: 'Settings for automatic session cleanup.',
@@ -393,6 +442,19 @@ const SETTINGS_SCHEMA = {
         description: 'Hide the window title bar',
         showInDialog: true,
       },
+      inlineThinkingMode: {
+        type: 'enum',
+        label: 'Inline Thinking',
+        category: 'UI',
+        requiresRestart: false,
+        default: 'off',
+        description: 'Display model thinking inline: off or full.',
+        showInDialog: true,
+        options: [
+          { value: 'off', label: 'Off' },
+          { value: 'full', label: 'Full' },
+        ],
+      },
       showStatusInTitle: {
         type: 'boolean',
         label: 'Show Thoughts in Title',
@@ -423,6 +485,15 @@ const SETTINGS_SCHEMA = {
           'Show a warning when running Gemini CLI in the home directory.',
         showInDialog: true,
       },
+      showCompatibilityWarnings: {
+        type: 'boolean',
+        label: 'Show Compatibility Warnings',
+        category: 'UI',
+        requiresRestart: true,
+        default: true,
+        description: 'Show warnings about terminal or OS compatibility issues.',
+        showInDialog: true,
+      },
       hideTips: {
         type: 'boolean',
         label: 'Hide Tips',
@@ -430,6 +501,15 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description: 'Hide helpful tips in the UI',
+        showInDialog: true,
+      },
+      showShortcutsHint: {
+        type: 'boolean',
+        label: 'Show Shortcuts Hint',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description: 'Show the "? for shortcuts" hint above the input.',
         showInDialog: true,
       },
       hideBanner: {
@@ -888,6 +968,16 @@ const SETTINGS_SCHEMA = {
         description: 'The format to use when importing memory.',
         showInDialog: false,
       },
+      includeDirectoryTree: {
+        type: 'boolean',
+        label: 'Include Directory Tree',
+        category: 'Context',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Whether to include the directory tree of the current working directory in the initial request to the model.',
+        showInDialog: false,
+      },
       discoveryMaxDirs: {
         type: 'number',
         label: 'Memory Discovery Max Dirs',
@@ -1071,24 +1161,7 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      approvalMode: {
-        type: 'enum',
-        label: 'Approval Mode',
-        category: 'Tools',
-        requiresRestart: false,
-        default: 'default',
-        description: oneLine`
-          The default approval mode for tool execution.
-          'default' prompts for approval, 'auto_edit' auto-approves edit tools,
-          and 'plan' is read-only mode. 'yolo' is not supported yet.
-        `,
-        showInDialog: true,
-        options: [
-          { value: 'default', label: 'Default' },
-          { value: 'auto_edit', label: 'Auto Edit' },
-          { value: 'plan', label: 'Plan' },
-        ],
-      },
+
       core: {
         type: 'array',
         label: 'Core Tools',
@@ -1158,15 +1231,6 @@ const SETTINGS_SCHEMA = {
           'Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.',
         showInDialog: true,
       },
-      enableToolOutputTruncation: {
-        type: 'boolean',
-        label: 'Enable Tool Output Truncation',
-        category: 'General',
-        requiresRestart: true,
-        default: true,
-        description: 'Enable truncation of large tool outputs.',
-        showInDialog: true,
-      },
       truncateToolOutputThreshold: {
         type: 'number',
         label: 'Tool Output Truncation Threshold',
@@ -1174,16 +1238,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
         description:
-          'Truncate tool output if it is larger than this many characters. Set to -1 to disable.',
-        showInDialog: true,
-      },
-      truncateToolOutputLines: {
-        type: 'number',
-        label: 'Tool Output Truncation Lines',
-        category: 'General',
-        requiresRestart: true,
-        default: DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
-        description: 'The number of lines to keep when truncating tool output.',
+          'Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.',
         showInDialog: true,
       },
       disableLLMCorrection: {
@@ -1418,7 +1473,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Automatically configure Node.js memory limits',
-        showInDialog: false,
+        showInDialog: true,
       },
       dnsResolutionOrder: {
         type: 'string',
@@ -1467,7 +1522,7 @@ const SETTINGS_SCHEMA = {
         label: 'Tool Output Masking',
         category: 'Experimental',
         requiresRestart: true,
-        ignoreInDocs: true,
+        ignoreInDocs: false,
         default: {},
         description:
           'Advanced settings for tool output masking to manage context window efficiency.',
@@ -1478,9 +1533,9 @@ const SETTINGS_SCHEMA = {
             label: 'Enable Tool Output Masking',
             category: 'Experimental',
             requiresRestart: true,
-            default: false,
+            default: true,
             description: 'Enables tool output masking to save tokens.',
-            showInDialog: false,
+            showInDialog: true,
           },
           toolProtectionThreshold: {
             type: 'number',
@@ -1538,17 +1593,17 @@ const SETTINGS_SCHEMA = {
         label: 'Extension Configuration',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: 'Enable requesting and fetching of extension settings.',
         showInDialog: false,
       },
-      enableEventDrivenScheduler: {
+      extensionRegistry: {
         type: 'boolean',
-        label: 'Event Driven Scheduler',
+        label: 'Extension Registry Explore UI',
         category: 'Experimental',
         requiresRestart: true,
-        default: true,
-        description: 'Enables event-driven scheduler within the CLI session.',
+        default: false,
+        description: 'Enable extension registry explore UI.',
         showInDialog: false,
       },
       extensionReloading: {
@@ -1587,6 +1642,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Enable planning features (Plan Mode and tools).',
+        showInDialog: true,
+      },
+      modelSteering: {
+        type: 'boolean',
+        label: 'Model Steering',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable model steering (user hints) to guide the model during tool execution.',
         showInDialog: true,
       },
     },

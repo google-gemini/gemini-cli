@@ -14,6 +14,7 @@ import { setSimulate429 } from '../utils/testUtils.js';
 import { HookSystem } from '../hooks/hookSystem.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
+import { LlmRole } from '../telemetry/types.js';
 
 // Mock fs module
 vi.mock('node:fs', async (importOriginal) => {
@@ -78,7 +79,6 @@ describe('GeminiChat Network Retries', () => {
       getTelemetryLogPromptsEnabled: () => true,
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
-      getPreviewFeatures: () => false,
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: 'oauth-personal',
         model: 'test-model',
@@ -155,6 +155,7 @@ describe('GeminiChat Network Retries', () => {
       'test message',
       'prompt-id-retry-network',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
 
     const events: StreamEvent[] = [];
@@ -224,6 +225,7 @@ describe('GeminiChat Network Retries', () => {
       'test message',
       'prompt-id-retry-fetch',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
 
     const events: StreamEvent[] = [];
@@ -264,6 +266,7 @@ describe('GeminiChat Network Retries', () => {
       'test message',
       'prompt-id-no-retry',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
 
     await expect(async () => {
@@ -305,6 +308,7 @@ describe('GeminiChat Network Retries', () => {
       'test message',
       'prompt-id-ssl-retry',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
 
     const events: StreamEvent[] = [];
@@ -354,6 +358,7 @@ describe('GeminiChat Network Retries', () => {
       'test message',
       'prompt-id-connection-retry',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
 
     const events: StreamEvent[] = [];
@@ -385,6 +390,7 @@ describe('GeminiChat Network Retries', () => {
       'test message',
       'prompt-id-no-connection-retry',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
 
     await expect(async () => {
@@ -439,6 +445,7 @@ describe('GeminiChat Network Retries', () => {
       'test message',
       'prompt-id-ssl-mid-stream',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
 
     const events: StreamEvent[] = [];
