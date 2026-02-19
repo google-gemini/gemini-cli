@@ -245,8 +245,13 @@ export class Storage {
     return path.join(this.getProjectTempDir(), 'plans');
   }
 
-  getProjectTempTrackerDir(): string {
-    return path.join(this.getProjectTempDir(), 'tracker');
+  getProjectTempTrackerDir(sessionId: string): string {
+    return path.join(
+      this.getProjectTempDir(),
+      sessionId,
+      '.tracker',
+      sessionId,
+    );
   }
 
   getExtensionsDir(): string {
