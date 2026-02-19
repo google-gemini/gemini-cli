@@ -1,16 +1,5 @@
 # Gemini CLI configuration
 
-> **Note on configuration format, 9/17/25:** The format of the `settings.json`
-> file has been updated to a new, more organized structure.
->
-> - The new format will be supported in the stable release starting
->   **[09/10/25]**.
-> - Automatic migration from the old format to the new format will begin on
->   **[09/17/25]**.
->
-> For details on the previous format, please see the
-> [v1 Configuration documentation](./configuration-v1.md).
-
 Gemini CLI offers several ways to configure its behavior, including environment
 variables, command-line arguments, and settings files. This document outlines
 the different configuration methods and available settings.
