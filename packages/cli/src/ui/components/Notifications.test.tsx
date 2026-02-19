@@ -99,54 +99,64 @@ describe('Notifications', () => {
     mockUseIsScreenReaderEnabled.mockReturnValue(false);
   });
 
-  it('renders nothing when no notifications', () => {
-    const { lastFrame } = render(<Notifications />);
-    expect(lastFrame()).toBe('');
+  it('renders nothing when no notifications', async () => {
+    const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
+    await waitUntilReady();
+    expect(lastFrame({ allowEmpty: true })).toBe('');
+    unmount();
   });
 
   it.each([[['Warning 1']], [['Warning 1', 'Warning 2']]])(
     'renders startup warnings: %s',
-    (warnings) => {
+    async (warnings) => {
       mockUseAppContext.mockReturnValue({
         startupWarnings: warnings,
         version: '1.0.0',
       } as AppState);
-      const { lastFrame } = render(<Notifications />);
+      const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
+      await waitUntilReady();
       const output = lastFrame();
       warnings.forEach((warning) => {
         expect(output).toContain(warning);
       });
+      unmount();
     },
   );
 
-  it('renders init error', () => {
+  it('renders init error', async () => {
     mockUseUIState.mockReturnValue({
       initError: 'Something went wrong',
       streamingState: 'idle',
       updateInfo: null,
     } as unknown as UIState);
-    const { lastFrame } = render(<Notifications />);
+    const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('does not render init error when streaming', () => {
+  it('does not render init error when streaming', async () => {
     mockUseUIState.mockReturnValue({
       initError: 'Something went wrong',
       streamingState: 'responding',
       updateInfo: null,
     } as unknown as UIState);
-    const { lastFrame } = render(<Notifications />);
-    expect(lastFrame()).toBe('');
+    const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
+    await waitUntilReady();
+    expect(lastFrame({ allowEmpty: true })).toBe('');
+    unmount();
   });
 
-  it('renders update notification', () => {
+  it('renders update notification', async () => {
     mockUseUIState.mockReturnValue({
       initError: null,
       streamingState: 'idle',
       updateInfo: { message: 'Update available' },
     } as unknown as UIState);
-    const { lastFrame } = render(<Notifications />);
+    const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('renders screen reader nudge when enabled and not seen (no legacy file)', async () => {
@@ -154,7 +164,8 @@ describe('Notifications', () => {
     persistentStateMock.setData({ hasSeenScreenReaderNudge: false });
     mockFsAccess.mockRejectedValue(new Error('No legacy file'));
 
-    const { lastFrame } = render(<Notifications />);
+    const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
+    await waitUntilReady();
 
     expect(lastFrame()).toContain('screen reader-friendly view');
     expect(persistentStateMock.set).toHaveBeenCalledWith(
@@ -163,6 +174,7 @@ describe('Notifications', () => {
     );
 
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('migrates legacy screen reader nudge file', async () => {
@@ -170,9 +182,10 @@ describe('Notifications', () => {
     persistentStateMock.setData({ hasSeenScreenReaderNudge: undefined });
     mockFsAccess.mockResolvedValue(undefined);
 
-    render(<Notifications />);
+    const { waitUntilReady, unmount } = render(<Notifications />);
 
     await act(async () => {
+      await waitUntilReady();
       await waitFor(() => {
         expect(persistentStateMock.set).toHaveBeenCalledWith(
           'hasSeenScreenReaderNudge',
@@ -181,15 +194,18 @@ describe('Notifications', () => {
         expect(mockFsUnlink).toHaveBeenCalled();
       });
     });
+    unmount();
   });
 
   it('does not render screen reader nudge when already seen in persistent state', async () => {
     mockUseIsScreenReaderEnabled.mockReturnValue(true);
     persistentStateMock.setData({ hasSeenScreenReaderNudge: true });
 
-    const { lastFrame } = render(<Notifications />);
+    const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
+    await waitUntilReady();
 
-    expect(lastFrame()).toBe('');
+    expect(lastFrame({ allowEmpty: true })).toBe('');
     expect(persistentStateMock.set).not.toHaveBeenCalled();
+    unmount();
   });
 });

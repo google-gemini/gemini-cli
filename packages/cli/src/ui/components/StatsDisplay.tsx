@@ -178,7 +178,7 @@ const ModelUsageTable: React.FC<{
     : `Model Usage`;
 
   return (
-    <Box flexDirection="column" marginTop={1}>
+    <Box flexDirection="column" marginBottom={1}>
       {/* Header */}
       <Box alignItems="flex-end">
         <Box width={nameWidth}>
@@ -379,6 +379,7 @@ interface StatsDisplayProps {
   duration: string;
   title?: string;
   quotas?: RetrieveUserQuotaResponse;
+  footer?: string;
   selectedAuthType?: string;
   userEmail?: string;
   tier?: string;
@@ -390,6 +391,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   duration,
   title,
   quotas,
+  footer,
   selectedAuthType,
   userEmail,
   tier,
@@ -431,6 +433,13 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
         Session Stats
       </Text>
     );
+  };
+
+  const renderFooter = () => {
+    if (!footer) {
+      return null;
+    }
+    return <ThemedGradient bold>{footer}</ThemedGradient>;
   };
 
   return (
@@ -536,6 +545,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
         pooledLimit={pooledLimit}
         pooledResetTime={pooledResetTime}
       />
+      {renderFooter()}
     </Box>
   );
 };
