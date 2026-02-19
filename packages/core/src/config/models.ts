@@ -6,6 +6,8 @@
 
 export const PREVIEW_GEMINI_MODEL = 'gemini-3-pro-preview';
 export const PREVIEW_GEMINI_3_1_MODEL = 'gemini-3.1-pro-preview';
+export const PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL =
+  'gemini-3.1-pro-preview-customtools';
 export const PREVIEW_GEMINI_FLASH_MODEL = 'gemini-3-flash-preview';
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
@@ -14,6 +16,7 @@ export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
 export const VALID_GEMINI_MODELS = new Set([
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
+  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -45,18 +48,22 @@ export const DEFAULT_THINKING_MODE = 8192;
 export function resolveModel(
   requestedModel: string,
   useGemini3_1: boolean = false,
+  useCustomToolModel: boolean = false,
 ): string {
   switch (requestedModel) {
     case PREVIEW_GEMINI_MODEL:
-    case PREVIEW_GEMINI_MODEL_AUTO: {
-      return useGemini3_1 ? PREVIEW_GEMINI_3_1_MODEL : PREVIEW_GEMINI_MODEL;
+    case PREVIEW_GEMINI_MODEL_AUTO:
+    case GEMINI_MODEL_ALIAS_AUTO:
+    case GEMINI_MODEL_ALIAS_PRO: {
+      if (useGemini3_1) {
+        return useCustomToolModel
+          ? PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
+          : PREVIEW_GEMINI_3_1_MODEL;
+      }
+      return PREVIEW_GEMINI_MODEL;
     }
     case DEFAULT_GEMINI_MODEL_AUTO: {
       return DEFAULT_GEMINI_MODEL;
-    }
-    case GEMINI_MODEL_ALIAS_AUTO:
-    case GEMINI_MODEL_ALIAS_PRO: {
-      return useGemini3_1 ? PREVIEW_GEMINI_3_1_MODEL : PREVIEW_GEMINI_MODEL;
     }
     case GEMINI_MODEL_ALIAS_FLASH: {
       return PREVIEW_GEMINI_FLASH_MODEL;
@@ -80,6 +87,8 @@ export function resolveModel(
 export function resolveClassifierModel(
   requestedModel: string,
   modelAlias: string,
+  useGemini3_1: boolean = false,
+  useCustomToolModel: boolean = false,
 ): string {
   if (modelAlias === GEMINI_MODEL_ALIAS_FLASH) {
     if (
@@ -96,7 +105,7 @@ export function resolveClassifierModel(
     }
     return resolveModel(GEMINI_MODEL_ALIAS_FLASH);
   }
-  return resolveModel(requestedModel);
+  return resolveModel(requestedModel, useGemini3_1, useCustomToolModel);
 }
 export function getDisplayString(model: string) {
   switch (model) {
@@ -108,6 +117,8 @@ export function getDisplayString(model: string) {
       return PREVIEW_GEMINI_MODEL;
     case GEMINI_MODEL_ALIAS_FLASH:
       return PREVIEW_GEMINI_FLASH_MODEL;
+    case PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL:
+      return PREVIEW_GEMINI_3_1_MODEL;
     default:
       return model;
   }
@@ -135,11 +146,7 @@ export function isPreviewModel(model: string): boolean {
  * @returns True if the model is a Pro model.
  */
 export function isProModel(model: string): boolean {
-  return (
-    model === PREVIEW_GEMINI_MODEL ||
-    model === PREVIEW_GEMINI_3_1_MODEL ||
-    model === DEFAULT_GEMINI_MODEL
-  );
+  return model.toLowerCase().includes('pro');
 }
 
 /**
@@ -221,13 +228,24 @@ export function supportsMultimodalFunctionResponse(model: string): boolean {
 export function isActiveModel(
   model: string,
   useGemini3_1: boolean = false,
+  useCustomToolModel: boolean = false,
 ): boolean {
   if (!VALID_GEMINI_MODELS.has(model)) {
-    return false;
+    return true;
   }
   if (useGemini3_1) {
-    return model !== PREVIEW_GEMINI_MODEL;
+    if (model === PREVIEW_GEMINI_MODEL) {
+      return false;
+    }
+    if (useCustomToolModel) {
+      return model !== PREVIEW_GEMINI_3_1_MODEL;
+    } else {
+      return model !== PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL;
+    }
   } else {
-    return model !== PREVIEW_GEMINI_3_1_MODEL;
+    return (
+      model !== PREVIEW_GEMINI_3_1_MODEL &&
+      model !== PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
+    );
   }
 }

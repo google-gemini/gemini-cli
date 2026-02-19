@@ -19,11 +19,14 @@ import {
   ModelSlashCommandEvent,
   logModelSlashCommand,
   getDisplayString,
+  AuthType,
+  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
 import { DescriptiveRadioButtonSelect } from './shared/DescriptiveRadioButtonSelect.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 
 interface ModelDialogProps {
   onClose: () => void;
@@ -31,6 +34,7 @@ interface ModelDialogProps {
 
 export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const config = useContext(ConfigContext);
+  const settings = useSettings();
   const [view, setView] = useState<'main' | 'manual'>('main');
   const [persistMode, setPersistMode] = useState(false);
 
@@ -39,6 +43,9 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
 
   const shouldShowPreviewModels = config?.getHasAccessToPreviewModel();
   const useGemini31 = config?.getGemini31LaunchedSync?.() ?? false;
+  const selectedAuthType = settings.merged.security.auth.selectedType;
+  const useCustomToolModel =
+    useGemini31 && selectedAuthType !== AuthType.USE_VERTEX_AI;
 
   const manualModelSelected = useMemo(() => {
     const manualModels = [
@@ -47,6 +54,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       DEFAULT_GEMINI_FLASH_LITE_MODEL,
       PREVIEW_GEMINI_MODEL,
       PREVIEW_GEMINI_3_1_MODEL,
+      PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
       PREVIEW_GEMINI_FLASH_MODEL,
     ];
     if (manualModels.includes(preferredModel)) {
@@ -126,11 +134,19 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     ];
 
     if (shouldShowPreviewModels) {
+      const previewProModel = useGemini31
+        ? PREVIEW_GEMINI_3_1_MODEL
+        : PREVIEW_GEMINI_MODEL;
+
+      const previewProValue = useCustomToolModel
+        ? PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
+        : previewProModel;
+
       list.unshift(
         {
-          value: useGemini31 ? PREVIEW_GEMINI_3_1_MODEL : PREVIEW_GEMINI_MODEL,
-          title: useGemini31 ? PREVIEW_GEMINI_3_1_MODEL : PREVIEW_GEMINI_MODEL,
-          key: useGemini31 ? PREVIEW_GEMINI_3_1_MODEL : PREVIEW_GEMINI_MODEL,
+          value: previewProValue,
+          title: previewProModel,
+          key: previewProModel,
         },
         {
           value: PREVIEW_GEMINI_FLASH_MODEL,
@@ -140,7 +156,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       );
     }
     return list;
-  }, [shouldShowPreviewModels, useGemini31]);
+  }, [shouldShowPreviewModels, useGemini31, useCustomToolModel]);
 
   const options = view === 'main' ? mainOptions : manualOptions;
 
