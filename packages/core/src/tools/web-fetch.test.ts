@@ -553,7 +553,7 @@ describe('WebFetchTool', () => {
       expect(confirmationDetails).toBe(false);
     });
 
-    it('should call setApprovalMode when onConfirm is called with ProceedAlways', async () => {
+    it('should NOT call setApprovalMode when onConfirm is called with ProceedAlways (now handled by scheduler)', async () => {
       const tool = new WebFetchTool(mockConfig, bus);
       const params = { prompt: 'fetch https://example.com' };
       const invocation = tool.build(params);
@@ -571,9 +571,8 @@ describe('WebFetchTool', () => {
         );
       }
 
-      expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
-        ApprovalMode.AUTO_EDIT,
-      );
+      // Schedulers are now responsible for mode transitions via updatePolicy
+      expect(mockConfig.setApprovalMode).not.toHaveBeenCalled();
     });
   });
 
