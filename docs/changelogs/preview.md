@@ -1,4 +1,4 @@
-# Preview release: Release v0.30.0-preview.1
+# Preview release: v0.30.0-preview.1
 
 Released: February 19, 2026
 
