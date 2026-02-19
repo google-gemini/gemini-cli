@@ -555,11 +555,13 @@ export async function loadCliConfig(
         break;
       case 'plan':
         if (!(settings.experimental?.plan ?? false)) {
-          throw new Error(
-            'Approval mode "plan" is only available when experimental.plan is enabled.',
+          debugLogger.warn(
+            'Approval mode "plan" is only available when experimental.plan is enabled. Falling back to "default".',
           );
+          approvalMode = ApprovalMode.DEFAULT;
+        } else {
+          approvalMode = ApprovalMode.PLAN;
         }
-        approvalMode = ApprovalMode.PLAN;
         break;
       case 'default':
         approvalMode = ApprovalMode.DEFAULT;
@@ -816,6 +818,7 @@ export async function loadCliConfig(
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
+    modelSteering: settings.experimental?.modelSteering,
     toolOutputMasking: settings.experimental?.toolOutputMasking,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,

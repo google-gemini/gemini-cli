@@ -36,10 +36,11 @@ describe('FolderTrustDialog', () => {
     mockedCwd.mockReturnValue('/home/user/project');
   });
 
-  it('should render the dialog with title and description', () => {
-    const { lastFrame, unmount } = renderWithProviders(
+  it('should render the dialog with title and description', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} />,
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toContain('Do you trust this folder?');
     expect(lastFrame()).toContain(
@@ -50,12 +51,17 @@ describe('FolderTrustDialog', () => {
 
   it('should display exit message and call process.exit and not call onSelect when escape is pressed', async () => {
     const onSelect = vi.fn();
-    const { lastFrame, stdin, unmount } = renderWithProviders(
+    const { lastFrame, stdin, waitUntilReady, unmount } = renderWithProviders(
       <FolderTrustDialog onSelect={onSelect} isRestarting={false} />,
     );
+    await waitUntilReady();
 
-    act(() => {
+    await act(async () => {
       stdin.write('\u001b[27u'); // Press kitty escape key
+    });
+    // Escape key has a 50ms timeout in KeypressContext, so we need to wrap waitUntilReady in act
+    await act(async () => {
+      await waitUntilReady();
     });
 
     await waitFor(() => {
@@ -72,10 +78,11 @@ describe('FolderTrustDialog', () => {
     unmount();
   });
 
-  it('should display restart message when isRestarting is true', () => {
-    const { lastFrame, unmount } = renderWithProviders(
+  it('should display restart message when isRestarting is true', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toContain('Gemini CLI is restarting');
     unmount();
@@ -84,9 +91,10 @@ describe('FolderTrustDialog', () => {
   it('should call relaunchApp when isRestarting is true', async () => {
     vi.useFakeTimers();
     const relaunchApp = vi.spyOn(processUtils, 'relaunchApp');
-    const { unmount } = renderWithProviders(
+    const { waitUntilReady, unmount } = renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
     );
+    await waitUntilReady();
     await vi.advanceTimersByTimeAsync(250);
     expect(relaunchApp).toHaveBeenCalled();
     unmount();
@@ -96,9 +104,10 @@ describe('FolderTrustDialog', () => {
   it('should not call relaunchApp if unmounted before timeout', async () => {
     vi.useFakeTimers();
     const relaunchApp = vi.spyOn(processUtils, 'relaunchApp');
-    const { unmount } = renderWithProviders(
+    const { waitUntilReady, unmount } = renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
     );
+    await waitUntilReady();
 
     // Unmount immediately (before 250ms)
     unmount();
@@ -109,13 +118,15 @@ describe('FolderTrustDialog', () => {
   });
 
   it('should not call process.exit when "r" is pressed and isRestarting is false', async () => {
-    const { stdin, unmount } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={false} />,
     );
+    await waitUntilReady();
 
-    act(() => {
+    await act(async () => {
       stdin.write('r');
     });
+    await waitUntilReady();
 
     await waitFor(() => {
       expect(mockedExit).not.toHaveBeenCalled();
@@ -124,29 +135,32 @@ describe('FolderTrustDialog', () => {
   });
 
   describe('directory display', () => {
-    it('should correctly display the folder name for a nested directory', () => {
+    it('should correctly display the folder name for a nested directory', async () => {
       mockedCwd.mockReturnValue('/home/user/project');
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <FolderTrustDialog onSelect={vi.fn()} />,
       );
+      await waitUntilReady();
       expect(lastFrame()).toContain('Trust folder (project)');
       unmount();
     });
 
-    it('should correctly display the parent folder name for a nested directory', () => {
+    it('should correctly display the parent folder name for a nested directory', async () => {
       mockedCwd.mockReturnValue('/home/user/project');
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <FolderTrustDialog onSelect={vi.fn()} />,
       );
+      await waitUntilReady();
       expect(lastFrame()).toContain('Trust parent folder (user)');
       unmount();
     });
 
-    it('should correctly display an empty parent folder name for a directory directly under root', () => {
+    it('should correctly display an empty parent folder name for a directory directly under root', async () => {
       mockedCwd.mockReturnValue('/project');
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <FolderTrustDialog onSelect={vi.fn()} />,
       );
+      await waitUntilReady();
       expect(lastFrame()).toContain('Trust parent folder ()');
       unmount();
     });

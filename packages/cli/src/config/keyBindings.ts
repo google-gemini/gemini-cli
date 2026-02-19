@@ -178,6 +178,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.DELETE_WORD_FORWARD]: [
     { key: 'delete', ctrl: true },
     { key: 'delete', alt: true },
+    { key: 'd', alt: true },
   ],
   [Command.DELETE_CHAR_LEFT]: [{ key: 'backspace' }, { key: 'h', ctrl: true }],
   [Command.DELETE_CHAR_RIGHT]: [{ key: 'delete' }, { key: 'd', ctrl: true }],
@@ -211,7 +212,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.REVERSE_SEARCH]: [{ key: 'r', ctrl: true }],
   [Command.REWIND]: [{ key: 'double escape' }],
   [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return', ctrl: false }],
-  [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab' }],
+  [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab', shift: false }],
 
   // Navigation
   [Command.NAVIGATION_UP]: [{ key: 'up', shift: false }],
@@ -230,7 +231,10 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.DIALOG_PREV]: [{ key: 'tab', shift: true }],
 
   // Suggestions & Completions
-  [Command.ACCEPT_SUGGESTION]: [{ key: 'tab' }, { key: 'return', ctrl: false }],
+  [Command.ACCEPT_SUGGESTION]: [
+    { key: 'tab', shift: false },
+    { key: 'return', ctrl: false },
+  ],
   [Command.COMPLETION_UP]: [
     { key: 'up', shift: false },
     { key: 'p', shift: false, ctrl: true },

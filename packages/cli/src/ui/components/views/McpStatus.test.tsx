@@ -53,35 +53,41 @@ describe('McpStatus', () => {
     showSchema: false,
   };
 
-  it('renders correctly with a connected server', () => {
-    const { lastFrame, unmount } = render(<McpStatus {...baseProps} />);
+  it('renders correctly with a connected server', async () => {
+    const { lastFrame, unmount, waitUntilReady } = render(
+      <McpStatus {...baseProps} />,
+    );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('renders correctly with authenticated OAuth status', () => {
-    const { lastFrame, unmount } = render(
+  it('renders correctly with authenticated OAuth status', async () => {
+    const { lastFrame, unmount, waitUntilReady } = render(
       <McpStatus {...baseProps} authStatus={{ 'server-1': 'authenticated' }} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('renders correctly with expired OAuth status', () => {
-    const { lastFrame, unmount } = render(
+  it('renders correctly with expired OAuth status', async () => {
+    const { lastFrame, unmount, waitUntilReady } = render(
       <McpStatus {...baseProps} authStatus={{ 'server-1': 'expired' }} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('renders correctly with unauthenticated OAuth status', () => {
-    const { lastFrame, unmount } = render(
+  it('renders correctly with unauthenticated OAuth status', async () => {
+    const { lastFrame, unmount, waitUntilReady } = render(
       <McpStatus
         {...baseProps}
         authStatus={{ 'server-1': 'unauthenticated' }}
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
@@ -91,29 +97,34 @@ describe('McpStatus', () => {
       await import('@google/gemini-cli-core'),
       'getMCPServerStatus',
     ).mockReturnValue(MCPServerStatus.DISCONNECTED);
-    const { lastFrame, unmount } = render(<McpStatus {...baseProps} />);
+    const { lastFrame, unmount, waitUntilReady } = render(
+      <McpStatus {...baseProps} />,
+    );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('renders correctly when discovery is in progress', () => {
-    const { lastFrame, unmount } = render(
+  it('renders correctly when discovery is in progress', async () => {
+    const { lastFrame, unmount, waitUntilReady } = render(
       <McpStatus {...baseProps} discoveryInProgress={true} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('renders correctly with schema enabled', () => {
-    const { lastFrame, unmount } = render(
+  it('renders correctly with schema enabled', async () => {
+    const { lastFrame, unmount, waitUntilReady } = render(
       <McpStatus {...baseProps} showSchema={true} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('renders correctly with parametersJsonSchema', () => {
-    const { lastFrame, unmount } = render(
+  it('renders correctly with parametersJsonSchema', async () => {
+    const { lastFrame, unmount, waitUntilReady } = render(
       <McpStatus
         {...baseProps}
         tools={[
@@ -134,12 +145,13 @@ describe('McpStatus', () => {
         showSchema={true}
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('renders correctly with prompts', () => {
-    const { lastFrame, unmount } = render(
+  it('renders correctly with prompts', async () => {
+    const { lastFrame, unmount, waitUntilReady } = render(
       <McpStatus
         {...baseProps}
         prompts={[
@@ -151,12 +163,13 @@ describe('McpStatus', () => {
         ]}
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('renders correctly with resources', () => {
-    const { lastFrame, unmount } = render(
+  it('renders correctly with resources', async () => {
+    const { lastFrame, unmount, waitUntilReady } = render(
       <McpStatus
         {...baseProps}
         resources={[
@@ -169,39 +182,43 @@ describe('McpStatus', () => {
         ]}
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('renders correctly with a blocked server', () => {
-    const { lastFrame, unmount } = render(
+  it('renders correctly with a blocked server', async () => {
+    const { lastFrame, unmount, waitUntilReady } = render(
       <McpStatus
         {...baseProps}
         blockedServers={[{ name: 'server-1', extensionName: 'test-extension' }]}
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('renders correctly with a connecting server', () => {
-    const { lastFrame, unmount } = render(
+  it('renders correctly with a connecting server', async () => {
+    const { lastFrame, unmount, waitUntilReady } = render(
       <McpStatus {...baseProps} connectingServers={['server-1']} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('truncates resources when exceeding limit', () => {
+  it('truncates resources when exceeding limit', async () => {
     const manyResources = Array.from({ length: 25 }, (_, i) => ({
       serverName: 'server-1',
       name: `resource-${i + 1}`,
       uri: `file:///tmp/resource-${i + 1}.txt`,
     }));
 
-    const { lastFrame, unmount } = render(
+    const { lastFrame, unmount, waitUntilReady } = render(
       <McpStatus {...baseProps} resources={manyResources} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toContain('15 resources hidden');
     unmount();
   });
