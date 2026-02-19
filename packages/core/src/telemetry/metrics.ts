@@ -257,6 +257,7 @@ const COUNTER_DEFINITIONS = {
     assign: (c: Counter) => (tokenStorageTypeCounter = c),
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
+      type: string;
       forced: boolean;
     },
   },
