@@ -24,7 +24,13 @@ import { startStdioTransport } from './transport-stdio.js';
 
 const IDE_INFO = { name: 'neovim', displayName: 'Neovim' };
 const IDE_PID = process.ppid || process.pid;
-const BRIDGE_DIR = path.join(tmpdir(), 'gemini', 'ide', 'neovim', String(IDE_PID));
+const BRIDGE_DIR = path.join(
+  tmpdir(),
+  'gemini',
+  'ide',
+  'neovim',
+  String(IDE_PID),
+);
 const CONTEXT_FILE = path.join(BRIDGE_DIR, 'context.json');
 const REQUEST_DIR = path.join(BRIDGE_DIR, 'requests');
 const RESPONSE_DIR = path.join(BRIDGE_DIR, 'responses');

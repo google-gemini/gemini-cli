@@ -3,7 +3,7 @@ local M = {}
 local bridge_dir = nil
 local requests_dir = nil
 local responses_dir = nil
-local poll_timer = nil
+local fs_event_handle = nil
 
 local function ensure_dir(path)
   if vim.fn.isdirectory(path) == 0 then
@@ -211,12 +211,17 @@ function M.start_request_poll(dir)
   ensure_dir(requests_dir)
   ensure_dir(responses_dir)
 
-  if poll_timer then
+  if fs_event_handle then
     return
   end
 
-  poll_timer = vim.loop.new_timer()
-  poll_timer:start(200, 200, vim.schedule_wrap(poll_requests))
+  fs_event_handle = vim.loop.new_fs_event()
+  fs_event_handle:start(requests_dir, {}, vim.schedule_wrap(function(err)
+    if err then
+      return
+    end
+    poll_requests()
+  end))
 end
 
 return M

@@ -12,7 +12,7 @@ local function plugin_root()
 end
 
 local function bridge_dir()
-  return vim.loop.os_tmpdir() .. '/gemini/ide/neovim'
+  return vim.loop.os_tmpdir() .. '/gemini/ide/neovim/' .. vim.fn.getpid()
 end
 
 local function default_sidecar_path()

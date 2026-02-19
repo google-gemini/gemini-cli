@@ -154,9 +154,10 @@ export class IdeContextStore {
           }
 
           for (const item of diagnosticFile.items) {
-            if (item.message.length > IDE_MAX_DIAGNOSTIC_MESSAGE_LENGTH) {
+            const chars = Array.from(item.message);
+            if (chars.length > IDE_MAX_DIAGNOSTIC_MESSAGE_LENGTH) {
               item.message =
-                item.message.substring(0, IDE_MAX_DIAGNOSTIC_MESSAGE_LENGTH) +
+                chars.slice(0, IDE_MAX_DIAGNOSTIC_MESSAGE_LENGTH).join('') +
                 '... [TRUNCATED]';
             }
           }

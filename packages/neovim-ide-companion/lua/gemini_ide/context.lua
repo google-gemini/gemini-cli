@@ -15,13 +15,19 @@ local function ensure_dir(path)
   end
 end
 
-local function write_file(path, content)
-  local handle = io.open(path, 'w')
-  if not handle then
-    return
-  end
-  handle:write(content)
-  handle:close()
+local function write_file(filepath, content)
+  vim.loop.fs_open(filepath, 'w', 438, function(err_open, fd)
+    if err_open or not fd then
+      return
+    end
+    vim.loop.fs_write(fd, content, 0, function(err_write)
+      if err_write then
+        vim.loop.fs_close(fd, function() end)
+        return
+      end
+      vim.loop.fs_close(fd, function() end)
+    end)
+  end)
 end
 
 local function map_severity(severity)
