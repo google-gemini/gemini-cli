@@ -114,10 +114,22 @@ export interface ShellExecutionConfig {
  */
 export type ShellOutputEvent =
   | {
+      /** The event contains a chunk of raw output string before PTY render. */
+      type: 'raw_data';
+      /** The raw string chunk. */
+      chunk: string;
+    }
+  | {
       /** The event contains a chunk of output data. */
       type: 'data';
       /** The decoded string chunk. */
       chunk: string | AnsiOutput;
+    }
+  | {
+      /** The event contains a chunk of processed text data suitable for file logs. */
+      type: 'file_data';
+      /** The processed text chunk. */
+      chunk: string;
     }
   | {
       /** Signals that the output stream has been identified as binary. */
@@ -142,6 +154,8 @@ interface ActivePty {
   ptyProcess: IPty;
   headlessTerminal: pkg.Terminal;
   maxSerializedLines?: number;
+  lastSerializedOutput?: AnsiOutput;
+  lastCommittedLine: number;
 }
 
 interface ActiveChildProcess {
@@ -149,7 +163,6 @@ interface ActiveChildProcess {
   state: {
     output: string;
     truncated: boolean;
-    outputChunks: Buffer[];
   };
 }
 
@@ -188,6 +201,56 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
   }
 
   return lines.join('\n');
+};
+
+const emitPendingLines = (
+  activePty: ActivePty,
+  pid: number,
+  onOutputEvent: (event: ShellOutputEvent) => void,
+  forceAll = false,
+) => {
+  const buffer = activePty.headlessTerminal.buffer.active;
+  const cursorY = buffer.baseY + buffer.cursorY;
+  // If forceAll is true, we emit everything up to the end of the buffer.
+  // Otherwise, we only emit lines that are strictly before the cursor line
+  // (i.e. lines that are "committed" in the sense that the cursor has moved past them).
+  // Note: We use buffer.length because getLine(i) is valid for i < length.
+  const limit = forceAll ? buffer.length : cursorY;
+
+  let chunks = '';
+  // We start from the line after the last one we committed.
+  for (let i = activePty.lastCommittedLine + 1; i < limit; i++) {
+    const line = buffer.getLine(i);
+    if (!line) continue;
+
+    let trimRight = true;
+    // Check if the next line is wrapped. If so, this line continues on the next physical line.
+    // We should not append a newline character, and we should be careful about trimming.
+    let isNextLineWrapped = false;
+    if (i + 1 < buffer.length) {
+      const nextLine = buffer.getLine(i + 1);
+      if (nextLine?.isWrapped) {
+        isNextLineWrapped = true;
+        trimRight = false;
+      }
+    }
+
+    const lineContent = line.translateToString(trimRight);
+    chunks += lineContent;
+    if (!isNextLineWrapped) {
+      chunks += '\n';
+    }
+  }
+
+  if (chunks.length > 0) {
+    const event: ShellOutputEvent = {
+      type: 'file_data',
+      chunk: chunks,
+    };
+    onOutputEvent(event);
+    ShellExecutionService['emitEvent'](pid, event);
+    activePty.lastCommittedLine = limit - 1;
+  }
 };
 
 /**
@@ -325,7 +388,6 @@ export class ShellExecutionService {
       const state = {
         output: '',
         truncated: false,
-        outputChunks: [] as Buffer[],
       };
 
       if (child.pid) {
@@ -348,6 +410,8 @@ export class ShellExecutionService {
         let isStreamingRawContent = true;
         const MAX_SNIFF_SIZE = 4096;
         let sniffedBytes = 0;
+        const sniffChunks: Buffer[] = [];
+        let totalBytes = 0;
 
         const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
           if (!stdoutDecoder || !stderrDecoder) {
@@ -361,10 +425,11 @@ export class ShellExecutionService {
             }
           }
 
-          state.outputChunks.push(data);
+          totalBytes += data.length;
 
           if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-            const sniffBuffer = Buffer.concat(state.outputChunks.slice(0, 20));
+            sniffChunks.push(data);
+            const sniffBuffer = Buffer.concat(sniffChunks);
             sniffedBytes = sniffBuffer.length;
 
             if (isBinary(sniffBuffer)) {
@@ -390,18 +455,30 @@ export class ShellExecutionService {
             }
 
             if (decodedChunk) {
+              const rawEvent: ShellOutputEvent = {
+                type: 'raw_data',
+                chunk: decodedChunk,
+              };
+              onOutputEvent(rawEvent);
+              if (child.pid)
+                ShellExecutionService.emitEvent(child.pid, rawEvent);
+
               const event: ShellOutputEvent = {
                 type: 'data',
                 chunk: decodedChunk,
               };
               onOutputEvent(event);
               if (child.pid) ShellExecutionService.emitEvent(child.pid, event);
+
+              const fileEvent: ShellOutputEvent = {
+                type: 'file_data',
+                chunk: stripAnsi(decodedChunk),
+              };
+              onOutputEvent(fileEvent);
+              if (child.pid)
+                ShellExecutionService.emitEvent(child.pid, fileEvent);
             }
           } else {
-            const totalBytes = state.outputChunks.reduce(
-              (sum, chunk) => sum + chunk.length,
-              0,
-            );
             const event: ShellOutputEvent = {
               type: 'binary_progress',
               bytesReceived: totalBytes,
@@ -515,7 +592,7 @@ export class ShellExecutionService {
             }
           }
 
-          const finalBuffer = Buffer.concat(state.outputChunks);
+          const finalBuffer = Buffer.concat(sniffChunks);
 
           return { finalBuffer };
         }
@@ -603,12 +680,13 @@ export class ShellExecutionService {
           ptyProcess,
           headlessTerminal,
           maxSerializedLines: shellExecutionConfig.maxSerializedLines,
+          lastCommittedLine: -1,
         });
 
-        let processingChain = Promise.resolve();
         let decoder: TextDecoder | null = null;
         let output: string | AnsiOutput | null = null;
-        const outputChunks: Buffer[] = [];
+        const sniffChunks: Buffer[] = [];
+        let totalBytes = 0;
         const error: Error | null = null;
         let exited = false;
 
@@ -621,6 +699,11 @@ export class ShellExecutionService {
 
         const renderFn = () => {
           renderTimeout = null;
+
+          const activePty = this.activePtys.get(ptyProcess.pid);
+          if (activePty) {
+            emitPendingLines(activePty, ptyProcess.pid, onOutputEvent);
+          }
 
           if (!isStreamingRawContent) {
             return;
@@ -661,6 +744,10 @@ export class ShellExecutionService {
                 return token;
               }),
             );
+          }
+
+          if (activePty) {
+            activePty.lastSerializedOutput = newOutput;
           }
 
           let lastNonEmptyLine = -1;
@@ -720,66 +807,97 @@ export class ShellExecutionService {
           }, 68);
         };
 
-        headlessTerminal.onScroll(() => {
+        let lastYdisp = 0;
+        let hasReachedMax = false;
+        const scrollbackLimit =
+          shellExecutionConfig.scrollback ?? SCROLLBACK_LIMIT;
+
+        headlessTerminal.onScroll((ydisp) => {
           if (!isWriting) {
             render();
           }
+
+          if (
+            ydisp === scrollbackLimit &&
+            lastYdisp === scrollbackLimit &&
+            hasReachedMax
+          ) {
+            const activePty = this.activePtys.get(ptyProcess.pid);
+            if (activePty) {
+              activePty.lastCommittedLine--;
+            }
+          }
+          if (
+            ydisp === scrollbackLimit &&
+            headlessTerminal.buffer.active.length === scrollbackLimit + rows
+          ) {
+            hasReachedMax = true;
+          }
+          lastYdisp = ydisp;
         });
 
+        let pendingWrites = 0;
+        let exitTrigger: (() => void) | null = null;
+
         const handleOutput = (data: Buffer) => {
-          processingChain = processingChain.then(
-            () =>
-              new Promise<void>((resolve) => {
-                if (!decoder) {
-                  const encoding = getCachedEncodingForBuffer(data);
-                  try {
-                    decoder = new TextDecoder(encoding);
-                  } catch {
-                    decoder = new TextDecoder('utf-8');
-                  }
+          if (!decoder) {
+            const encoding = getCachedEncodingForBuffer(data);
+            try {
+              decoder = new TextDecoder(encoding);
+            } catch {
+              decoder = new TextDecoder('utf-8');
+            }
+          }
+
+          totalBytes += data.length;
+
+          if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
+            sniffChunks.push(data);
+            const sniffBuffer = Buffer.concat(sniffChunks);
+            sniffedBytes = sniffBuffer.length;
+
+            if (isBinary(sniffBuffer)) {
+              isStreamingRawContent = false;
+              const event: ShellOutputEvent = { type: 'binary_detected' };
+              onOutputEvent(event);
+              ShellExecutionService.emitEvent(ptyProcess.pid, event);
+            }
+          }
+
+          if (isStreamingRawContent) {
+            const decodedChunk = decoder.decode(data, { stream: true });
+            if (decodedChunk.length === 0) {
+              return;
+            }
+            isWriting = true;
+            pendingWrites++;
+
+            // Emit raw_data for file streaming before pty render
+            const rawEvent: ShellOutputEvent = {
+              type: 'raw_data',
+              chunk: decodedChunk,
+            };
+            onOutputEvent(rawEvent);
+            ShellExecutionService.emitEvent(ptyProcess.pid, rawEvent);
+
+            headlessTerminal.write(decodedChunk, () => {
+              pendingWrites--;
+              render();
+              if (pendingWrites === 0) {
+                isWriting = false;
+                if (exited && exitTrigger) {
+                  exitTrigger();
                 }
-
-                outputChunks.push(data);
-
-                if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-                  const sniffBuffer = Buffer.concat(outputChunks.slice(0, 20));
-                  sniffedBytes = sniffBuffer.length;
-
-                  if (isBinary(sniffBuffer)) {
-                    isStreamingRawContent = false;
-                    const event: ShellOutputEvent = { type: 'binary_detected' };
-                    onOutputEvent(event);
-                    ShellExecutionService.emitEvent(ptyProcess.pid, event);
-                  }
-                }
-
-                if (isStreamingRawContent) {
-                  const decodedChunk = decoder.decode(data, { stream: true });
-                  if (decodedChunk.length === 0) {
-                    resolve();
-                    return;
-                  }
-                  isWriting = true;
-                  headlessTerminal.write(decodedChunk, () => {
-                    render();
-                    isWriting = false;
-                    resolve();
-                  });
-                } else {
-                  const totalBytes = outputChunks.reduce(
-                    (sum, chunk) => sum + chunk.length,
-                    0,
-                  );
-                  const event: ShellOutputEvent = {
-                    type: 'binary_progress',
-                    bytesReceived: totalBytes,
-                  };
-                  onOutputEvent(event);
-                  ShellExecutionService.emitEvent(ptyProcess.pid, event);
-                  resolve();
-                }
-              }),
-          );
+              }
+            });
+          } else {
+            const event: ShellOutputEvent = {
+              type: 'binary_progress',
+              bytesReceived: totalBytes,
+            };
+            onOutputEvent(event);
+            ShellExecutionService.emitEvent(ptyProcess.pid, event);
+          }
         };
 
         ptyProcess.onData((data: string) => {
@@ -803,6 +921,16 @@ export class ShellExecutionService {
             const finalize = () => {
               render(true);
 
+              const activePty = this.activePtys.get(ptyProcess.pid);
+              if (activePty) {
+                emitPendingLines(
+                  activePty,
+                  ptyProcess.pid,
+                  onOutputEvent,
+                  true,
+                );
+              }
+
               // Store exit info for late subscribers (e.g. backgrounding race condition)
               this.exitedPtyInfo.set(ptyProcess.pid, { exitCode, signal });
               setTimeout(
@@ -824,7 +952,7 @@ export class ShellExecutionService {
               ShellExecutionService.emitEvent(ptyProcess.pid, event);
               this.activeListeners.delete(ptyProcess.pid);
 
-              const finalBuffer = Buffer.concat(outputChunks);
+              const finalBuffer = Buffer.concat(sniffChunks);
 
               resolve({
                 rawOutput: finalBuffer,
@@ -837,6 +965,8 @@ export class ShellExecutionService {
                 pid: ptyProcess.pid,
                 executionMethod: ptyInfo?.name ?? 'node-pty',
               });
+
+              headlessTerminal.dispose();
             };
 
             if (abortSignal.aborted) {
@@ -844,21 +974,26 @@ export class ShellExecutionService {
               return;
             }
 
-            const processingComplete = processingChain.then(() => 'processed');
-            const abortFired = new Promise<'aborted'>((res) => {
-              if (abortSignal.aborted) {
-                res('aborted');
-                return;
+            let abortListener: (() => void) | undefined;
+            const finalizeWhenReady = () => {
+              if (abortListener) {
+                abortSignal.removeEventListener('abort', abortListener);
               }
-              abortSignal.addEventListener('abort', () => res('aborted'), {
+              finalize();
+            };
+
+            if (pendingWrites === 0) {
+              finalizeWhenReady();
+            } else {
+              exitTrigger = finalizeWhenReady;
+              abortListener = () => {
+                exitTrigger = null;
+                finalizeWhenReady();
+              };
+              abortSignal.addEventListener('abort', abortListener, {
                 once: true,
               });
-            });
-
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            Promise.race([processingComplete, abortFired]).then(() => {
-              finalize();
-            });
+            }
           },
         );
 
@@ -1082,13 +1217,18 @@ export class ShellExecutionService {
       const endLine = activePty.headlessTerminal.buffer.active.length;
       const startLine = Math.max(
         0,
-        endLine - (activePty.maxSerializedLines ?? 2000),
+        endLine -
+          (activePty.maxSerializedLines ??
+            activePty.headlessTerminal.rows + 1000),
       );
       const bufferData = serializeTerminalToObject(
         activePty.headlessTerminal,
         startLine,
         endLine,
       );
+
+      activePty.lastSerializedOutput = bufferData;
+
       if (bufferData && bufferData.length > 0) {
         listener({ type: 'data', chunk: bufferData });
       }
@@ -1149,13 +1289,18 @@ export class ShellExecutionService {
       const endLine = activePty.headlessTerminal.buffer.active.length;
       const startLine = Math.max(
         0,
-        endLine - (activePty.maxSerializedLines ?? 2000),
+        endLine -
+          (activePty.maxSerializedLines ??
+            activePty.headlessTerminal.rows + 1000),
       );
       const bufferData = serializeTerminalToObject(
         activePty.headlessTerminal,
         startLine,
         endLine,
       );
+
+      activePty.lastSerializedOutput = bufferData;
+
       const event: ShellOutputEvent = { type: 'data', chunk: bufferData };
       const listeners = ShellExecutionService.activeListeners.get(pid);
       if (listeners) {

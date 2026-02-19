@@ -6,3 +6,5 @@
 
 export const REFERENCE_CONTENT_START = '--- Content from referenced files ---';
 export const REFERENCE_CONTENT_END = '--- End of content ---';
+
+export const DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 40_000;

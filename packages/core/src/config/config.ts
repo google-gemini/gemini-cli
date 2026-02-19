@@ -48,6 +48,7 @@ import {
   DEFAULT_OTLP_ENDPOINT,
   uiTelemetryService,
 } from '../telemetry/index.js';
+import { DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD } from '../utils/constants.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import {
@@ -355,8 +356,6 @@ export {
   DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
 };
-
-export const DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 40_000;
 
 export class MCPServerConfig {
   constructor(

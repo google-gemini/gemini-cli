@@ -130,6 +130,7 @@ describe('ShellTool', () => {
       getShellToolInactivityTimeout: vi.fn().mockReturnValue(1000),
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
+      getTruncateToolOutputThreshold: vi.fn().mockReturnValue(40000),
       sanitizationConfig: {},
     } as unknown as Config;
 

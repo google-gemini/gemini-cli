@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
+import React from 'react';
 import { Box, Text } from 'ink';
 import type { AnsiLine, AnsiOutput, AnsiToken } from '@google/gemini-cli-core';
 
@@ -47,23 +47,26 @@ export const AnsiOutputText: React.FC<AnsiOutputProps> = ({
   );
 };
 
-export const AnsiLineText: React.FC<{ line: AnsiLine }> = ({ line }) => (
-  <Text>
-    {line.length > 0
-      ? line.map((token: AnsiToken, tokenIndex: number) => (
-          <Text
-            key={tokenIndex}
-            color={token.fg}
-            backgroundColor={token.bg}
-            inverse={token.inverse}
-            dimColor={token.dim}
-            bold={token.bold}
-            italic={token.italic}
-            underline={token.underline}
-          >
-            {token.text}
-          </Text>
-        ))
-      : null}
-  </Text>
+export const AnsiLineText = React.memo<{ line: AnsiLine }>(
+  ({ line }: { line: AnsiLine }) => (
+    <Text>
+      {line.length > 0
+        ? line.map((token: AnsiToken, tokenIndex: number) => (
+            <Text
+              key={tokenIndex}
+              color={token.fg}
+              backgroundColor={token.bg}
+              inverse={token.inverse}
+              dimColor={token.dim}
+              bold={token.bold}
+              italic={token.italic}
+              underline={token.underline}
+            >
+              {token.text}
+            </Text>
+          ))
+        : null}
+    </Text>
+  ),
 );
+AnsiLineText.displayName = 'AnsiLineText';

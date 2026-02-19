@@ -9,12 +9,12 @@ import * as fs from 'node:fs';
 import { HookRegistry } from './hookRegistry.js';
 import type { Storage } from '../config/storage.js';
 import {
-  ConfigSource,
   HookEventName,
   HookType,
+  ConfigSource,
   HOOKS_CONFIG_FIELDS,
-  type CommandHookConfig,
   type HookDefinition,
+  type CommandHookConfig,
 } from './types.js';
 import type { Config } from '../config/config.js';
 
