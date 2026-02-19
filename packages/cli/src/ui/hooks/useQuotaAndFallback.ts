@@ -16,6 +16,7 @@ import {
   type UserTierId,
   VALID_GEMINI_MODELS,
   isProModel,
+  getDisplayString,
 } from '@google/gemini-cli-core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -84,7 +85,7 @@ export function useQuotaAndFallback({
         isModelNotFoundError = true;
         if (VALID_GEMINI_MODELS.has(failedModel)) {
           const messageLines = [
-            `It seems like you don't have access to ${failedModel}.`,
+            `It seems like you don't have access to ${getDisplayString(failedModel)}.`,
             `Your admin might have disabled the access. Contact them to enable the Preview Release Channel.`,
           ];
           message = messageLines.join('\n');

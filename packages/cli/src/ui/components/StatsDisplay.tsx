@@ -26,6 +26,7 @@ import {
   isActiveModel,
   getDisplayString,
   isAutoModel,
+  AuthType,
 } from '@google/gemini-cli-core';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
@@ -84,9 +85,12 @@ const buildModelRows = (
   models: Record<string, ModelMetrics>,
   quotas?: RetrieveUserQuotaResponse,
   useGemini3_1 = false,
+  useCustomToolModel = false,
 ) => {
   const getBaseModelName = (name: string) => name.replace('-001', '');
-  const usedModelNames = new Set(Object.keys(models).map(getBaseModelName));
+  const usedModelNames = new Set(
+    Object.keys(models).map(getBaseModelName).map(getDisplayString),
+  );
 
   // 1. Models with active usage
   const activeRows = Object.entries(models).map(([name, metrics]) => {
@@ -95,7 +99,7 @@ const buildModelRows = (
     const inputTokens = metrics.tokens.input;
     return {
       key: name,
-      modelName,
+      modelName: getDisplayString(modelName),
       requests: metrics.api.totalRequests,
       cachedTokens: cachedTokens.toLocaleString(),
       inputTokens: inputTokens.toLocaleString(),
@@ -111,12 +115,12 @@ const buildModelRows = (
       ?.filter(
         (b) =>
           b.modelId &&
-          isActiveModel(b.modelId, useGemini3_1) &&
-          !usedModelNames.has(b.modelId),
+          isActiveModel(b.modelId, useGemini3_1, useCustomToolModel) &&
+          !usedModelNames.has(getDisplayString(b.modelId)),
       )
       .map((bucket) => ({
         key: bucket.modelId!,
-        modelName: bucket.modelId!,
+        modelName: getDisplayString(bucket.modelId!),
         requests: '-',
         cachedTokens: '-',
         inputTokens: '-',
@@ -138,6 +142,7 @@ const ModelUsageTable: React.FC<{
   pooledLimit?: number;
   pooledResetTime?: string;
   useGemini3_1?: boolean;
+  useCustomToolModel?: boolean;
 }> = ({
   models,
   quotas,
@@ -147,9 +152,10 @@ const ModelUsageTable: React.FC<{
   pooledRemaining,
   pooledLimit,
   pooledResetTime,
-  useGemini3_1 = false,
+  useGemini3_1,
+  useCustomToolModel,
 }) => {
-  const rows = buildModelRows(models, quotas, useGemini3_1);
+  const rows = buildModelRows(models, quotas, useGemini3_1, useCustomToolModel);
 
   if (rows.length === 0) {
     return null;
@@ -409,7 +415,9 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   const settings = useSettings();
   const config = useConfig();
   const useGemini3_1 = config.getGemini31LaunchedSync?.() ?? false;
-
+  const useCustomToolModel =
+    useGemini3_1 &&
+    config.getContentGeneratorConfig().authType !== AuthType.USE_VERTEX_AI;
   const pooledRemaining = quotaStats?.remaining;
   const pooledLimit = quotaStats?.limit;
   const pooledResetTime = quotaStats?.resetTime;
@@ -551,6 +559,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
         pooledLimit={pooledLimit}
         pooledResetTime={pooledResetTime}
         useGemini3_1={useGemini3_1}
+        useCustomToolModel={useCustomToolModel}
       />
       {renderFooter()}
     </Box>
