@@ -15,17 +15,13 @@ import {
 import type { EditorType } from '../utils/editor.js';
 import type { Config } from '../config/config.js';
 import { PolicyDecision } from '../policy/types.js';
-import { updatePolicy } from '../scheduler/policy.js';
 import { logToolCall } from '../telemetry/loggers.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { ToolCallEvent } from '../telemetry/types.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { ToolModificationHandler } from '../scheduler/tool-modifier.js';
 import { getToolSuggestion } from '../utils/tool-utils.js';
-import type {
-  ToolConfirmationRequest,
-  SerializableConfirmationDetails,
-} from '../confirmation-bus/types.js';
+import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
@@ -113,7 +109,6 @@ export class CoreToolScheduler {
   private onToolCallsUpdate?: ToolCallsUpdateHandler;
   private getPreferredEditor: () => EditorType | undefined;
   private config: Config;
-  private messageBus: MessageBus;
   private isFinalizingToolCalls = false;
   private isScheduling = false;
   private isCancelling = false;
@@ -134,7 +129,6 @@ export class CoreToolScheduler {
     this.onAllToolCallsComplete = options.onAllToolCallsComplete;
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.getPreferredEditor = options.getPreferredEditor;
-    this.messageBus = this.config.getMessageBus();
     this.toolExecutor = new ToolExecutor(this.config);
     this.toolModifier = new ToolModificationHandler();
 
@@ -142,7 +136,7 @@ export class CoreToolScheduler {
     // Use a static WeakMap to ensure we only subscribe ONCE per MessageBus instance
     // This prevents memory leaks when multiple CoreToolScheduler instances are created
     // (e.g., on every React render, or for each non-interactive tool call)
-    const messageBus = this.messageBus;
+    const messageBus = this.config.getMessageBus();
 
     // Check if we've already subscribed a handler to this message bus
     if (!CoreToolScheduler.subscribedMessageBuses.has(messageBus)) {
@@ -784,19 +778,6 @@ export class CoreToolScheduler {
 
     if (toolCall && toolCall.status === CoreToolCallStatus.AwaitingApproval) {
       await originalOnConfirm(outcome);
-
-      // Centralized policy update
-      if (this.messageBus) {
-        await updatePolicy(
-          toolCall.tool,
-          outcome,
-          toolCall.confirmationDetails as SerializableConfirmationDetails,
-          {
-            config: this.config,
-            messageBus: this.messageBus,
-          },
-        );
-      }
     }
 
     this.setToolCallOutcome(callId, outcome);
