@@ -973,6 +973,10 @@ describe('Scheduler (Orchestrator)', () => {
         CoreToolCallStatus.Cancelled,
         'User denied execution.',
       );
+      expect(mockStateManager.setOutcome).toHaveBeenCalledWith(
+        'call-1',
+        ToolConfirmationOutcome.Cancel,
+      );
       expect(mockStateManager.cancelAllQueued).toHaveBeenCalledWith(
         'User cancelled operation',
       );
