@@ -22,6 +22,9 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
@@ -30,9 +33,6 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -69,6 +69,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
@@ -77,9 +80,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -116,6 +116,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
 │    Enable Prompt Completion                                                              false*  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
@@ -124,9 +127,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -163,6 +163,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
@@ -171,9 +174,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -210,6 +210,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
@@ -218,9 +221,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -257,6 +257,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
@@ -265,9 +268,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -304,6 +304,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
@@ -312,9 +315,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -351,6 +351,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
@@ -359,9 +362,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -398,6 +398,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
 │    Enable Prompt Completion                                                               true*  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
@@ -406,9 +409,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │

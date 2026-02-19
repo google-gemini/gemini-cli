@@ -107,6 +107,16 @@ describe('SettingsSchema', () => {
       ).toBe('boolean');
     });
 
+    it('should have plan nested properties', () => {
+      expect(
+        getSettingsSchema().general?.properties?.plan?.properties?.directory,
+      ).toBeDefined();
+      expect(
+        getSettingsSchema().general?.properties?.plan?.properties?.directory
+          .type,
+      ).toBe('string');
+    });
+
     it('should have fileFiltering nested properties', () => {
       expect(
         getSettingsSchema().context.properties.fileFiltering.properties

@@ -105,6 +105,22 @@
           },
           "additionalProperties": false
         },
+        "plan": {
+          "title": "Plan",
+          "description": "Planning features configuration.",
+          "markdownDescription": "Planning features configuration.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "directory": {
+              "title": "Plan Directory",
+              "description": "The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.",
+              "markdownDescription": "The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.\n\n- Category: `General`\n- Requires restart: `yes`",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
         "enablePromptCompletion": {
           "title": "Enable Prompt Completion",
           "description": "Enable AI-powered prompt completion suggestions while typing.",

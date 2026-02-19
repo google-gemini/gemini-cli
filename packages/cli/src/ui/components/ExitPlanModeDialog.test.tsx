@@ -154,7 +154,7 @@ Implement a comprehensive authentication system with multiple providers.
           getIdeMode: () => false,
           isTrustedFolder: () => true,
           storage: {
-            getProjectTempPlansDir: () => mockPlansDir,
+            getPlansDir: () => mockPlansDir,
           },
           getFileSystemService: (): FileSystemService => ({
             readTextFile: vi.fn(),
@@ -429,7 +429,7 @@ Implement a comprehensive authentication system with multiple providers.
               getIdeMode: () => false,
               isTrustedFolder: () => true,
               storage: {
-                getProjectTempPlansDir: () => mockPlansDir,
+                getPlansDir: () => mockPlansDir,
               },
               getFileSystemService: (): FileSystemService => ({
                 readTextFile: vi.fn(),
