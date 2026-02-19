@@ -240,10 +240,7 @@ export class ChatCompressionService {
     const curatedHistory = chat.getHistory(true);
 
     // Regardless of `force`, don't do anything if the history is empty.
-    if (
-      curatedHistory.length === 0 ||
-      (hasFailedCompressionAttempt && !force)
-    ) {
+    if (curatedHistory.length === 0) {
       return {
         newHistory: null,
         info: {
@@ -284,6 +281,35 @@ export class ChatCompressionService {
       curatedHistory,
       config,
     );
+
+    // If summarization previously failed (and not forced), we only rely on truncation.
+    // We do NOT attempt to invoke the LLM for summarization again to avoid repeated failures/costs.
+    if (hasFailedCompressionAttempt && !force) {
+      const truncatedTokenCount = estimateTokenCountSync(
+        truncatedHistory.flatMap((c) => c.parts || []),
+      );
+
+      // If truncation reduced the size, we consider it a successful "compression" (truncation only).
+      if (truncatedTokenCount < originalTokenCount) {
+        return {
+          newHistory: truncatedHistory,
+          info: {
+            originalTokenCount,
+            newTokenCount: truncatedTokenCount,
+            compressionStatus: CompressionStatus.COMPRESSED,
+          },
+        };
+      }
+
+      return {
+        newHistory: null,
+        info: {
+          originalTokenCount,
+          newTokenCount: originalTokenCount,
+          compressionStatus: CompressionStatus.NOOP,
+        },
+      };
+    }
 
     const splitPoint = findCompressSplitPoint(
       truncatedHistory,
