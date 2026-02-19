@@ -122,7 +122,10 @@ describe('experimentCommand', () => {
     );
 
     it('should unset an experiment', async () => {
-      mockContext.services.settings.merged.experimental = {
+       
+      (
+        mockContext.services.settings.merged as Record<string, unknown>
+      ).experimental = {
         'enable-preview': true,
       };
       await unsetCommand?.action!(mockContext, 'enable-preview');
