@@ -416,7 +416,10 @@ export function BaseSettingsDialog({
 
       return;
     },
-    { isActive: true },
+    {
+      isActive: true,
+      priority: focusSection === 'settings' && !editingKey,
+    },
   );
 
   return (
