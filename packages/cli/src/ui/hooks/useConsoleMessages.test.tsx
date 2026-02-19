@@ -96,7 +96,7 @@ describe('useConsoleMessages', () => {
     });
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(20);
+      await vi.advanceTimersByTimeAsync(60);
     });
 
     expect(result.current.consoleMessages).toEqual([
@@ -114,7 +114,7 @@ describe('useConsoleMessages', () => {
     });
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(20);
+      await vi.advanceTimersByTimeAsync(60);
     });
 
     expect(result.current.consoleMessages).toEqual([
@@ -131,7 +131,7 @@ describe('useConsoleMessages', () => {
     });
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(20);
+      await vi.advanceTimersByTimeAsync(60);
     });
 
     expect(result.current.consoleMessages).toEqual([
@@ -148,7 +148,7 @@ describe('useConsoleMessages', () => {
     });
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(20);
+      await vi.advanceTimersByTimeAsync(60);
     });
 
     expect(result.current.consoleMessages).toHaveLength(1);

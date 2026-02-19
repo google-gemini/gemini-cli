@@ -80,19 +80,23 @@ export function useFocusHint(
   isThisShellFocused: boolean,
   resultDisplay: ToolResultDisplay | undefined,
 ) {
-  const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
   const [userHasFocused, setUserHasFocused] = useState(false);
+
+  // Derive a stable reset key for the inactivity timer. For strings and arrays
+  // (shell output), we use the length to capture updates without referential
+  // identity issues or expensive deep comparisons.
+  const resetKey =
+    typeof resultDisplay === 'string'
+      ? resultDisplay.length
+      : Array.isArray(resultDisplay)
+        ? resultDisplay.length
+        : !!resultDisplay;
+
   const showFocusHint = useInactivityTimer(
     isThisShellFocusable,
-    lastUpdateTime ? lastUpdateTime.getTime() : 0,
+    resetKey,
     SHELL_FOCUS_HINT_DELAY_MS,
   );
-
-  useEffect(() => {
-    if (resultDisplay) {
-      setLastUpdateTime(new Date());
-    }
-  }, [resultDisplay]);
 
   useEffect(() => {
     if (isThisShellFocused) {
