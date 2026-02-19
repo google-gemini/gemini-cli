@@ -39,6 +39,8 @@ export interface SessionInfo {
   yoloMode?: boolean;
   /** When true, an async task is currently processing. */
   asyncProcessing?: boolean;
+  /** When true, session has been cancelled (e.g. by /reset). Signals async processing to stop. */
+  cancelled?: boolean;
 }
 
 /** Serializable subset of SessionInfo for GCS persistence. */
@@ -194,6 +196,11 @@ export class SessionStore {
    * Removes a session (e.g. when bot is removed from space).
    */
   remove(threadName: string): void {
+    const session = this.sessions.get(threadName);
+    if (session) {
+      // Signal any in-flight async processing to stop
+      session.cancelled = true;
+    }
     this.sessions.delete(threadName);
     this.dirty = true;
   }

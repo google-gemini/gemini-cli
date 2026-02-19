@@ -15,12 +15,7 @@
  * server-side rendering to a constrained card format.
  */
 
-import type {
-  ChatResponse,
-  ChatCardV2,
-  ChatCardSection,
-  ChatWidget,
-} from './types.js';
+import type { ChatResponse, ChatCardV2, ChatWidget } from './types.js';
 import type { Part } from '@a2a-js/sdk';
 import {
   type A2AResponse,
@@ -355,61 +350,95 @@ function extractCommandSummary(approval: ToolApprovalInfo): string {
 }
 
 /**
- * Renders a tool approval surface as a Google Chat Card V2.
+ * Renders a tool approval surface as a compact Google Chat Card V2
+ * with clickable Approve/Reject buttons.
  */
 function renderToolApprovalCard(approval: ToolApprovalInfo): ChatCardV2 {
   const widgets: ChatWidget[] = [];
+  const toolLabel = approval.displayName || approval.name;
 
   // Show a concise summary of what the tool will do.
-  // For shell commands, extract just the command string from the args JSON.
   const commandSummary = extractCommandSummary(approval);
   if (commandSummary) {
     widgets.push({
       decoratedText: {
         text: `\`${commandSummary}\``,
-        topLabel: approval.displayName || approval.name,
+        topLabel: toolLabel,
         startIcon: { knownIcon: 'DESCRIPTION' },
         wrapText: true,
       },
     });
   } else if (approval.args && approval.args !== 'No arguments') {
-    // Fallback: show truncated args
     const truncatedArgs =
-      approval.args.length > 300
-        ? approval.args.substring(0, 300) + '...'
+      approval.args.length > 200
+        ? approval.args.substring(0, 200) + '...'
         : approval.args;
     widgets.push({
       decoratedText: {
         text: truncatedArgs,
-        topLabel: approval.displayName || approval.name,
+        topLabel: toolLabel,
         startIcon: { knownIcon: 'DESCRIPTION' },
         wrapText: true,
       },
     });
   }
 
-  // Text-based approval instructions (card click buttons don't work
-  // with the current Add-ons routing configuration)
+  // Clickable buttons for approve/reject
   widgets.push({
-    textParagraph: {
-      text: 'Reply <b>approve</b>, <b>always allow</b>, or <b>reject</b>',
+    buttonList: {
+      buttons: [
+        {
+          text: 'Approve',
+          onClick: {
+            action: {
+              function: 'tool_confirmation',
+              parameters: [
+                { key: 'callId', value: approval.callId },
+                { key: 'outcome', value: 'proceed_once' },
+                { key: 'taskId', value: approval.taskId },
+              ],
+            },
+          },
+        },
+        {
+          text: 'Always Allow',
+          onClick: {
+            action: {
+              function: 'tool_confirmation',
+              parameters: [
+                { key: 'callId', value: approval.callId },
+                { key: 'outcome', value: 'proceed_always_tool' },
+                { key: 'taskId', value: approval.taskId },
+              ],
+            },
+          },
+        },
+        {
+          text: 'Reject',
+          onClick: {
+            action: {
+              function: 'tool_confirmation',
+              parameters: [
+                { key: 'callId', value: approval.callId },
+                { key: 'outcome', value: 'cancel' },
+                { key: 'taskId', value: approval.taskId },
+              ],
+            },
+          },
+          color: { red: 0.8, green: 0.2, blue: 0.2 },
+        },
+      ],
     },
   });
-
-  const sections: ChatCardSection[] = [
-    {
-      widgets,
-    },
-  ];
 
   return {
     cardId: `tool_approval_${approval.callId}`,
     card: {
       header: {
-        title: 'Tool Approval Required',
-        subtitle: approval.displayName || approval.name,
+        title: toolLabel,
+        subtitle: 'Approval Required',
       },
-      sections,
+      sections: [{ widgets }],
     },
   };
 }

@@ -245,7 +245,9 @@ function normalizeEvent(raw: Record<string, unknown>): ChatEvent | null {
  * Add-ons expects: {hostAppDataAction: {chatDataAction: {createMessageAction: {message}}}}
  */
 function wrapAddOnsResponse(response: ChatResponse): Record<string, unknown> {
-  // Build the message object for the Add-ons format
+  // Build the message object for the Add-ons format.
+  // Include thread info so replies appear in the same thread as the user's
+  // message. Without it, createMessageAction creates a top-level message.
   const message: Record<string, unknown> = {};
   if (response.text) {
     message['text'] = response.text;
@@ -253,14 +255,8 @@ function wrapAddOnsResponse(response: ChatResponse): Record<string, unknown> {
   if (response.cardsV2) {
     message['cardsV2'] = response.cardsV2;
   }
-  // Include thread info so the reply goes to the user's thread
-  // instead of appearing as a top-level message
   if (response.thread) {
-    const thread: Record<string, string> = {};
-    if (response.thread.name) thread['name'] = response.thread.name;
-    if (response.thread.threadKey)
-      thread['threadKey'] = response.thread.threadKey;
-    message['thread'] = thread;
+    message['thread'] = response.thread;
   }
 
   // For action responses (like CARD_CLICKED acknowledgments), use updateMessageAction
