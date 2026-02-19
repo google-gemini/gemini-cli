@@ -37,7 +37,15 @@ import type {
 } from '@google/genai';
 import * as readline from 'node:readline';
 import type { ContentGenerator } from '../core/contentGenerator.js';
-import { UserTierId } from './types.js';
+import type { Config } from '../config/config.js';
+import {
+  G1_CREDIT_TYPE,
+  getG1CreditBalance,
+  shouldAutoUseCredits,
+} from '../billing/billing.js';
+import { logBillingEvent } from '../telemetry/loggers.js';
+import { CreditsUsedEvent } from '../telemetry/billingEvents.js';
+import { UserTierId, type GeminiUserTier, type Credits } from './types.js';
 import type {
   CaCountTokenResponse,
   CaGenerateContentResponse,
@@ -71,6 +79,8 @@ export class CodeAssistServer implements ContentGenerator {
     readonly sessionId?: string,
     readonly userTier?: UserTierId,
     readonly userTierName?: string,
+    readonly paidTier?: GeminiUserTier,
+    readonly config?: Config,
   ) {}
 
   async generateContentStream(
@@ -79,6 +89,19 @@ export class CodeAssistServer implements ContentGenerator {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     role: LlmRole,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    const autoUse = this.config
+      ? shouldAutoUseCredits(
+          this.config.getBillingSettings().overageStrategy,
+          getG1CreditBalance(this.paidTier),
+        )
+      : false;
+    const nextReqFlag = this.config?.shouldUseCreditsForNextRequest() ?? false;
+    const shouldEnableCredits = autoUse || nextReqFlag;
+
+    const enabledCreditTypes = shouldEnableCredits
+      ? ([G1_CREDIT_TYPE] as string[])
+      : undefined;
+
     const responses =
       await this.requestStreamingPost<CaGenerateContentResponse>(
         'streamGenerateContent',
@@ -87,6 +110,7 @@ export class CodeAssistServer implements ContentGenerator {
           userPromptId,
           this.projectId,
           this.sessionId,
+          enabledCreditTypes,
         ),
         req.config?.abortSignal,
       );
@@ -98,6 +122,9 @@ export class CodeAssistServer implements ContentGenerator {
     return (async function* (
       server: CodeAssistServer,
     ): AsyncGenerator<GenerateContentResponse> {
+      let totalConsumed = 0;
+      let lastRemaining = 0;
+
       for await (const response of responses) {
         if (isFirst) {
           streamingLatency.firstMessageLatency = formatProtoJsonDuration(
@@ -120,7 +147,35 @@ export class CodeAssistServer implements ContentGenerator {
           req.config?.abortSignal,
         );
 
+        if (response.consumedCredits) {
+          for (const credit of response.consumedCredits) {
+            if (credit.creditType === G1_CREDIT_TYPE && credit.creditAmount) {
+              totalConsumed += parseInt(credit.creditAmount, 10) || 0;
+            }
+          }
+        }
+        if (response.remainingCredits) {
+          for (const credit of response.remainingCredits) {
+            if (credit.creditType === G1_CREDIT_TYPE && credit.creditAmount) {
+              lastRemaining = parseInt(credit.creditAmount, 10) || 0;
+            }
+          }
+          server.updateCredits(response.remainingCredits);
+        }
+
         yield translatedResponse;
+      }
+
+      // Emit credits used telemetry after the stream completes
+      if (totalConsumed > 0 && server.config) {
+        logBillingEvent(
+          server.config,
+          new CreditsUsedEvent(
+            req.model ?? 'unknown',
+            totalConsumed,
+            lastRemaining,
+          ),
+        );
       }
     })(this);
   }
@@ -132,6 +187,18 @@ export class CodeAssistServer implements ContentGenerator {
     role: LlmRole,
   ): Promise<GenerateContentResponse> {
     const start = Date.now();
+    const shouldEnableCredits =
+      this.config &&
+      (shouldAutoUseCredits(
+        this.config.getBillingSettings().overageStrategy,
+        getG1CreditBalance(this.paidTier),
+      ) ||
+        this.config.shouldUseCreditsForNextRequest());
+
+    const enabledCreditTypes = shouldEnableCredits
+      ? ([G1_CREDIT_TYPE] as string[])
+      : undefined;
+
     const response = await this.requestPost<CaGenerateContentResponse>(
       'generateContent',
       toGenerateContentRequest(
@@ -139,6 +206,7 @@ export class CodeAssistServer implements ContentGenerator {
         userPromptId,
         this.projectId,
         this.sessionId,
+        enabledCreditTypes,
       ),
       req.config?.abortSignal,
     );
@@ -158,7 +226,41 @@ export class CodeAssistServer implements ContentGenerator {
       req.config?.abortSignal,
     );
 
+    if (response.remainingCredits) {
+      this.updateCredits(response.remainingCredits);
+    }
+
     return translatedResponse;
+  }
+
+  private updateCredits(remainingCredits: Credits[]): void {
+    if (!this.paidTier) {
+      return;
+    }
+
+    // Initialize availableCredits if it doesn't exist
+    if (!this.paidTier.availableCredits) {
+      this.paidTier.availableCredits = [];
+    }
+
+    for (const credit of remainingCredits) {
+      if (credit.creditType !== G1_CREDIT_TYPE) {
+        continue;
+      }
+
+      const existingCredit = this.paidTier.availableCredits.find(
+        (c) => c.creditType === credit.creditType,
+      );
+
+      if (existingCredit) {
+        existingCredit.creditAmount = credit.creditAmount;
+      } else {
+        this.paidTier.availableCredits.push({
+          creditType: credit.creditType,
+          creditAmount: credit.creditAmount,
+        });
+      }
+    }
   }
 
   async onboardUser(

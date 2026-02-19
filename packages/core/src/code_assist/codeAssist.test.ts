@@ -73,6 +73,8 @@ describe('codeAssist', () => {
         'session-123',
         'free-tier',
         'free-tier-name',
+        undefined,
+        mockConfig,
       );
       expect(generator).toBeInstanceOf(MockedCodeAssistServer);
     });
@@ -103,6 +105,8 @@ describe('codeAssist', () => {
         undefined, // No session ID
         'free-tier',
         'free-tier-name',
+        undefined,
+        mockConfig,
       );
       expect(generator).toBeInstanceOf(MockedCodeAssistServer);
     });

@@ -917,6 +917,8 @@ export class GeminiClient {
           }
         }
       }
+      // Ensure the transient credit usage flag is reset after the request (and any retries/recursions) are done.
+      this.config.setUseCreditsForNextRequest(false);
     }
 
     return turn;
