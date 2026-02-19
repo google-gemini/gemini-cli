@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import { WebFetchTool, parsePrompt } from './web-fetch.js';
+import {
+  WebFetchTool,
+  parsePrompt,
+  convertGithubUrlToRaw,
+} from './web-fetch.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import { ToolConfirmationOutcome } from './tools.js';
@@ -191,6 +195,36 @@ describe('parsePrompt', () => {
     expect(validUrls[0]).toBe('https://google.com,/');
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain('ftp://bad.com');
+  });
+});
+
+describe('convertGithubUrlToRaw', () => {
+  it('should convert valid github blob urls', () => {
+    expect(
+      convertGithubUrlToRaw('https://github.com/user/repo/blob/main/README.md'),
+    ).toBe('https://raw.githubusercontent.com/user/repo/main/README.md');
+  });
+
+  it('should not convert non-blob github urls', () => {
+    expect(convertGithubUrlToRaw('https://github.com/user/repo')).toBe(
+      'https://github.com/user/repo',
+    );
+  });
+
+  it('should not convert urls with similar domain names', () => {
+    expect(
+      convertGithubUrlToRaw('https://mygithub.com/user/repo/blob/main'),
+    ).toBe('https://mygithub.com/user/repo/blob/main');
+  });
+
+  it('should not convert urls if blob is not in path', () => {
+    expect(
+      convertGithubUrlToRaw('https://github.com/user/repo/tree/main'),
+    ).toBe('https://github.com/user/repo/tree/main');
+  });
+
+  it('should handle invalid urls gracefully', () => {
+    expect(convertGithubUrlToRaw('not-a-url')).toBe('not-a-url');
   });
 });
 

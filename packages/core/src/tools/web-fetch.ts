@@ -76,6 +76,23 @@ export function parsePrompt(text: string): {
   return { validUrls, errors };
 }
 
+/**
+ * Safely converts a GitHub blob URL to a raw content URL.
+ */
+export function convertGithubUrlToRaw(urlStr: string): string {
+  try {
+    const url = new URL(urlStr);
+    if (url.hostname === 'github.com' && url.pathname.includes('/blob/')) {
+      url.hostname = 'raw.githubusercontent.com';
+      url.pathname = url.pathname.replace('/blob/', '/');
+      return url.href;
+    }
+  } catch {
+    // Ignore invalid URLs
+  }
+  return urlStr;
+}
+
 // Interfaces for grounding metadata (similar to web-search.ts)
 interface GroundingChunkWeb {
   uri?: string;
@@ -135,11 +152,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     let url = urls[0];
 
     // Convert GitHub blob URL to raw URL
-    if (url.includes('github.com') && url.includes('/blob/')) {
-      url = url
-        .replace('github.com', 'raw.githubusercontent.com')
-        .replace('/blob/', '/');
-    }
+    url = convertGithubUrlToRaw(url);
 
     try {
       const response = await retryWithBackoff(
@@ -252,14 +265,7 @@ ${textContent}
     }
 
     // Perform GitHub URL conversion here
-    urls = urls.map((url) => {
-      if (url.includes('github.com') && url.includes('/blob/')) {
-        return url
-          .replace('github.com', 'raw.githubusercontent.com')
-          .replace('/blob/', '/');
-      }
-      return url;
-    });
+    urls = urls.map((url) => convertGithubUrlToRaw(url));
 
     const confirmationDetails: ToolCallConfirmationDetails = {
       type: 'info',
@@ -332,11 +338,7 @@ ${textContent}
     }
 
     // Convert GitHub blob URL to raw URL
-    if (url.includes('github.com') && url.includes('/blob/')) {
-      url = url
-        .replace('github.com', 'raw.githubusercontent.com')
-        .replace('/blob/', '/');
-    }
+    url = convertGithubUrlToRaw(url);
 
     try {
       const response = await retryWithBackoff(
