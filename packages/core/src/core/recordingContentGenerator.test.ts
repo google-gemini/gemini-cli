@@ -22,6 +22,11 @@ import { LlmRole } from '../telemetry/types.js';
 
 vi.mock('node:fs', () => ({
   appendFileSync: vi.fn(),
+  createWriteStream: vi.fn(() => ({
+    on: vi.fn(),
+    write: vi.fn(),
+    end: vi.fn(),
+  })),
 }));
 
 describe('RecordingContentGenerator', () => {
