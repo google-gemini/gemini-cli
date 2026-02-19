@@ -346,7 +346,7 @@ ${textContent}
           const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
             headers: {
               Accept:
-                'text/markdown, text/plain;q=0.9, application/json;q=0.9, text/html;q=0.8, */*;q=0.5',
+                'text/markdown, text/plain;q=0.9, application/json;q=0.9, text/html;q=0.8, application/pdf;q=0.7, video/*;q=0.7, */*;q=0.5',
             },
           });
           return res;
@@ -427,9 +427,7 @@ Response: ${rawResponseText}`;
         returnDisplay: `Fetched ${contentType || 'unknown'} content from ${url}`,
       };
     } catch (e) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const error = e as Error;
-      const errorMessage = `Error during experimental fetch for ${url}: ${error.message}`;
+      const errorMessage = `Error during experimental fetch for ${url}: ${getErrorMessage(e)}`;
       return {
         llmContent: `Error: ${errorMessage}`,
         returnDisplay: `Error: ${errorMessage}`,
