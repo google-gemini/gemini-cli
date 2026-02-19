@@ -164,30 +164,28 @@ function findCodeRegions(content: string): Array<[number, number]> {
 }
 
 function stripHtmlComments(content: string): string {
-  if (!content.includes('<!--')) return content;
+  const startToken = '<!--';
+  const endToken = '-->';
+  let start = content.indexOf(startToken);
+  if (start === -1) return content;
 
-  let result = '';
+  const parts: string[] = [];
   let cursor = 0;
-  const len = content.length;
 
-  while (cursor < len) {
-    const start = content.indexOf('<!--', cursor);
-    if (start === -1) {
-      result += content.slice(cursor);
-      break;
-    }
+  while (start !== -1) {
+    parts.push(content.slice(cursor, start));
 
-    result += content.slice(cursor, start);
-
-    const end = content.indexOf('-->', start + 4);
+    const end = content.indexOf(endToken, start + startToken.length);
     if (end === -1) {
-      break;
+      return parts.join('');
     }
 
-    cursor = end + 3;
+    cursor = end + endToken.length;
+    start = content.indexOf(startToken, cursor);
   }
 
-  return result;
+  parts.push(content.slice(cursor));
+  return parts.join('');
 }
 
 /**
