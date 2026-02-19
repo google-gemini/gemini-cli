@@ -158,6 +158,11 @@ export interface PromptConfig {
  */
 export interface ToolConfig {
   tools: Array<string | FunctionDeclaration | AnyDeclarativeTool>;
+  /**
+   * Whether to pre-select a subset of tools based on the user request.
+   * This can help reduce context size and improve performance.
+   */
+  preselectTools?: boolean;
 }
 
 /**

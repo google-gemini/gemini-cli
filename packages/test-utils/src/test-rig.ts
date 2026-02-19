@@ -962,6 +962,10 @@ export class TestRig {
     );
   }
 
+  readTelemetryLogs(): any[] {
+    return this._readAndParseTelemetryLog();
+  }
+
   async waitForToolCall(
     toolName: string,
     timeout?: number,

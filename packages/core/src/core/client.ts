@@ -35,6 +35,7 @@ import type {
 import type { ContentGenerator } from './contentGenerator.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
+import { ToolPreselectionService } from '../services/toolPreselectionService.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
   logContentRetryFailure,
@@ -259,18 +260,36 @@ export class GeminiClient {
 
   private lastUsedModelId?: string;
 
-  async setTools(modelId?: string): Promise<void> {
+  async setTools(
+    modelId?: string,
+    query?: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
     if (!this.chat) {
       return;
     }
 
-    if (modelId && modelId === this.lastUsedModelId) {
+    if (modelId && modelId === this.lastUsedModelId && !query) {
       return;
     }
     this.lastUsedModelId = modelId;
 
     const toolRegistry = this.config.getToolRegistry();
-    const toolDeclarations = toolRegistry.getFunctionDeclarations(modelId);
+    let toolDeclarations = toolRegistry.getFunctionDeclarations(modelId);
+
+    if (query && signal && this.config.isToolPreselectionEnabled()) {
+      const preselector = new ToolPreselectionService(this.config);
+      const selectedNames = await preselector.selectTools(
+        query,
+        toolDeclarations,
+        signal,
+      );
+      const selectedSet = new Set(selectedNames);
+      toolDeclarations = toolDeclarations.filter((t) =>
+        selectedSet.has(t.name!),
+      );
+    }
+
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
     this.getChat().setTools(tools);
   }
@@ -674,7 +693,8 @@ export class GeminiClient {
     this.currentSequenceModel = modelToUse;
 
     // Update tools with the final modelId to ensure model-dependent descriptions are used.
-    await this.setTools(modelToUse);
+    // Also perform tool pre-selection if enabled.
+    await this.setTools(modelToUse, partToString(request), signal);
 
     const resultStream = turn.run(
       modelConfigKey,

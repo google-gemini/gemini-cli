@@ -75,6 +75,7 @@ export class GeminiCliAgent {
       fakeResponses: options.fakeResponses,
       skillsSupport: true,
       adminSkillsEnabled: true,
+      toolPreselection: false,
     };
 
     this.config = new Config(configParams);

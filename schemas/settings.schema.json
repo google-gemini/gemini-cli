@@ -119,6 +119,13 @@
           "default": false,
           "type": "boolean"
         },
+        "toolPreselection": {
+          "title": "Tool Preselection",
+          "description": "Exclude unneeded tools from context to save tokens and improve performance.",
+          "markdownDescription": "Exclude unneeded tools from context to save tokens and improve performance.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "debugKeystrokeLogging": {
           "title": "Debug Keystroke Logging",
           "description": "Enable debug logging of keystrokes to the console.",
