@@ -171,6 +171,7 @@ describe('useSlashCommandProcessor', () => {
         displayName: string,
         definition: unknown,
       ) => void;
+      openContentInExternalEditor?: (content: string) => Promise<void>;
     } = {},
   ) => {
     const {
@@ -180,6 +181,7 @@ describe('useSlashCommandProcessor', () => {
       setIsProcessing = vi.fn(),
       refreshStatic = vi.fn(),
       openAgentConfigDialog = vi.fn(),
+      openContentInExternalEditor = vi.fn().mockResolvedValue(undefined),
     } = options;
 
     mockBuiltinLoadCommands.mockResolvedValue(Object.freeze(builtinCommands));
@@ -240,6 +242,7 @@ describe('useSlashCommandProcessor', () => {
             toggleBackgroundShell: vi.fn(),
             toggleShortcutsHelp: vi.fn(),
             setText: vi.fn(),
+            openContentInExternalEditor,
           },
           new Map(), // extensionsUpdateState
           true, // isConfigInitialized
@@ -753,6 +756,37 @@ describe('useSlashCommandProcessor', () => {
         { type: MessageType.USER, text: '/filecmd' },
         expect.any(Number),
       );
+    });
+
+    it('should call openContentInExternalEditor for "open_in_editor" action', async () => {
+      const mockOpenContentInExternalEditor = vi
+        .fn()
+        .mockResolvedValue(undefined);
+      const editorCommand = createTestCommand({
+        name: 'copyeditor',
+        action: vi.fn().mockResolvedValue({
+          type: 'open_in_editor',
+          content: 'User:\nHello\n\n---\n\nModel:\nHi!',
+        }),
+      });
+
+      const result = await setupProcessorHook({
+        builtinCommands: [editorCommand],
+        openContentInExternalEditor: mockOpenContentInExternalEditor,
+      });
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      let actionResult: Awaited<
+        ReturnType<typeof result.current.handleSlashCommand>
+      >;
+      await act(async () => {
+        actionResult = await result.current.handleSlashCommand('/copyeditor');
+      });
+
+      expect(mockOpenContentInExternalEditor).toHaveBeenCalledWith(
+        'User:\nHello\n\n---\n\nModel:\nHi!',
+      );
+      expect(actionResult!).toEqual({ type: 'handled' });
     });
 
     it('should handle "submit_prompt" action returned from a mcp-based command', async () => {

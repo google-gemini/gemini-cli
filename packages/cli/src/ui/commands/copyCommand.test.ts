@@ -295,4 +295,224 @@ describe('copyCommand', () => {
 
     expect(mockCopyToClipboard).not.toHaveBeenCalled();
   });
+
+  describe('editor subcommand', () => {
+    const editorSubCommand = copyCommand.subCommands?.[0];
+
+    it('should return info when no chat object is available', async () => {
+      if (!editorSubCommand?.action)
+        throw new Error('Editor subcommand has no action');
+
+      mockGetChat.mockReturnValue(undefined);
+
+      const result = await editorSubCommand.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'No chat history to open.',
+      });
+    });
+
+    it('should return info when history is empty', async () => {
+      if (!editorSubCommand?.action)
+        throw new Error('Editor subcommand has no action');
+
+      mockGetHistory.mockReturnValue([]);
+
+      const result = await editorSubCommand.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'No chat history to open.',
+      });
+    });
+
+    it('should return info when config is null', async () => {
+      if (!editorSubCommand?.action)
+        throw new Error('Editor subcommand has no action');
+
+      const nullConfigContext = createMockCommandContext({
+        services: { config: null },
+      });
+
+      const result = await editorSubCommand.action(nullConfigContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'No chat history to open.',
+      });
+    });
+
+    it('should format user and model messages with correct labels', async () => {
+      if (!editorSubCommand?.action)
+        throw new Error('Editor subcommand has no action');
+
+      mockGetHistory.mockReturnValue([
+        { role: 'user', parts: [{ text: 'Hello there' }] },
+        { role: 'model', parts: [{ text: 'Hi! How can I help?' }] },
+      ]);
+
+      const result = await editorSubCommand.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'open_in_editor',
+        content: 'User:\nHello there\n\n---\n\nModel:\nHi! How can I help?',
+      });
+    });
+
+    it('should join multiple messages with separator', async () => {
+      if (!editorSubCommand?.action)
+        throw new Error('Editor subcommand has no action');
+
+      mockGetHistory.mockReturnValue([
+        { role: 'user', parts: [{ text: 'First question' }] },
+        { role: 'model', parts: [{ text: 'First answer' }] },
+        { role: 'user', parts: [{ text: 'Second question' }] },
+        { role: 'model', parts: [{ text: 'Second answer' }] },
+      ]);
+
+      const result = await editorSubCommand.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'open_in_editor',
+        content:
+          'User:\nFirst question\n\n---\n\nModel:\nFirst answer\n\n---\n\nUser:\nSecond question\n\n---\n\nModel:\nSecond answer',
+      });
+    });
+
+    it('should exclude thought parts from message content', async () => {
+      if (!editorSubCommand?.action)
+        throw new Error('Editor subcommand has no action');
+
+      mockGetHistory.mockReturnValue([
+        {
+          role: 'model',
+          parts: [
+            { text: 'I am thinking...', thought: true },
+            { text: 'Here is my answer.' },
+          ],
+        },
+      ]);
+
+      const result = await editorSubCommand.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'open_in_editor',
+        content: 'Model:\nHere is my answer.',
+      });
+    });
+
+    it('should filter out messages that only contain thought parts', async () => {
+      if (!editorSubCommand?.action)
+        throw new Error('Editor subcommand has no action');
+
+      mockGetHistory.mockReturnValue([
+        { role: 'model', parts: [{ text: 'Just thinking...', thought: true }] },
+        { role: 'user', parts: [{ text: 'A real question?' }] },
+      ]);
+
+      const result = await editorSubCommand.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'open_in_editor',
+        content: 'User:\nA real question?',
+      });
+    });
+
+    it('should filter out system messages containing <session_context>', async () => {
+      if (!editorSubCommand?.action)
+        throw new Error('Editor subcommand has no action');
+
+      mockGetHistory.mockReturnValue([
+        {
+          role: 'user',
+          parts: [{ text: '<session_context>system stuff</session_context>' }],
+        },
+        { role: 'model', parts: [{ text: 'Real response' }] },
+      ]);
+
+      const result = await editorSubCommand.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'open_in_editor',
+        content: 'Model:\nReal response',
+      });
+    });
+
+    it('should filter out messages containing both <user_input> and "Internal instruction:"', async () => {
+      if (!editorSubCommand?.action)
+        throw new Error('Editor subcommand has no action');
+
+      mockGetHistory.mockReturnValue([
+        {
+          role: 'user',
+          parts: [
+            {
+              text: '<user_input>Internal instruction: follow this rule</user_input>',
+            },
+          ],
+        },
+        { role: 'model', parts: [{ text: 'Acknowledged.' }] },
+      ]);
+
+      const result = await editorSubCommand.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'open_in_editor',
+        content: 'Model:\nAcknowledged.',
+      });
+    });
+
+    it('should NOT filter out messages with <user_input> alone (no "Internal instruction:")', async () => {
+      if (!editorSubCommand?.action)
+        throw new Error('Editor subcommand has no action');
+
+      mockGetHistory.mockReturnValue([
+        {
+          role: 'user',
+          parts: [{ text: '<user_input>Normal user input</user_input>' }],
+        },
+        { role: 'model', parts: [{ text: 'Sure.' }] },
+      ]);
+
+      const result = await editorSubCommand.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'open_in_editor',
+        content:
+          'User:\n<user_input>Normal user input</user_input>\n\n---\n\nModel:\nSure.',
+      });
+    });
+
+    it('should return info when all messages are system messages', async () => {
+      if (!editorSubCommand?.action)
+        throw new Error('Editor subcommand has no action');
+
+      mockGetHistory.mockReturnValue([
+        {
+          role: 'user',
+          parts: [{ text: '<session_context>ctx</session_context>' }],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              text: '<user_input>Internal instruction: do this</user_input>',
+            },
+          ],
+        },
+      ]);
+
+      const result = await editorSubCommand.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'No output in history',
+      });
+    });
+  });
 });

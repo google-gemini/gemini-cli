@@ -42,6 +42,8 @@ import { MessageType, StreamingState } from './types.js';
 import { ToolActionsProvider } from './contexts/ToolActionsContext.js';
 import {
   type EditorType,
+  getEditorCommand,
+  isGuiEditor,
   type Config,
   type IdeInfo,
   type IdeContext,
@@ -99,7 +101,10 @@ import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
 import { calculateMainAreaWidth } from './utils/ui-sizing.js';
 import ansiEscapes from 'ansi-escapes';
-import { basename } from 'node:path';
+import { basename, join as pathJoin } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import { computeTerminalTitle } from '../utils/windowTitle.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
@@ -527,6 +532,65 @@ export const AppContainer = (props: AppContainerProps) => {
     [settings.merged.general.preferredEditor],
   );
 
+  const openContentInExternalEditor = useCallback(
+    async (content: string): Promise<void> => {
+      const tmpDir = fs.mkdtempSync(pathJoin(os.tmpdir(), 'gemini-chat-'));
+      const filePath = pathJoin(tmpDir, 'chat.md');
+      fs.writeFileSync(filePath, content, 'utf8');
+
+      let command: string | undefined;
+      const args = [filePath];
+
+      const preferredEditorType = getPreferredEditor();
+      if (preferredEditorType) {
+        command = getEditorCommand(preferredEditorType);
+        if (isGuiEditor(preferredEditorType)) {
+          args.unshift('--wait');
+        }
+      }
+
+      if (!command) {
+        command =
+          process.env['VISUAL'] ??
+          process.env['EDITOR'] ??
+          (process.platform === 'win32' ? 'notepad' : 'vi');
+      }
+
+      const wasRaw = stdin?.isRaw ?? false;
+      try {
+        setRawMode?.(false);
+        const { status, error } = spawnSync(command, args, {
+          stdio: 'inherit',
+          shell: process.platform === 'win32',
+        });
+        if (error) throw error;
+        if (typeof status === 'number' && status !== 0) {
+          throw new Error(`External editor exited with status ${status}`);
+        }
+      } catch (err) {
+        coreEvents.emitFeedback(
+          'error',
+          '[AppContainer] external editor error',
+          err,
+        );
+      } finally {
+        coreEvents.emit(CoreEvent.ExternalEditorClosed);
+        if (wasRaw) setRawMode?.(true);
+        try {
+          fs.unlinkSync(filePath);
+        } catch {
+          /* ignore */
+        }
+        try {
+          fs.rmdirSync(tmpDir);
+        } catch {
+          /* ignore */
+        }
+      }
+    },
+    [stdin, setRawMode, getPreferredEditor],
+  );
+
   const buffer = useTextBuffer({
     initialText: '',
     viewport: { height: 10, width: inputWidth },
@@ -856,6 +920,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       },
       toggleShortcutsHelp: () => setShortcutsHelpVisible((visible) => !visible),
       setText: stableSetText,
+      openContentInExternalEditor,
     }),
     [
       setAuthState,
@@ -875,6 +940,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleDebugProfiler,
       setShortcutsHelpVisible,
       stableSetText,
+      openContentInExternalEditor,
     ],
   );
 
