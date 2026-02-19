@@ -57,7 +57,7 @@ describe('EmptyWalletDialog', () => {
       unmount();
     });
 
-    it('should display zero credit balance', () => {
+    it('should not display credit balance in empty wallet state', () => {
       const { lastFrame, unmount } = render(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
@@ -66,8 +66,8 @@ describe('EmptyWalletDialog', () => {
       );
 
       const output = lastFrame() ?? '';
-      expect(output).toContain('0');
-      expect(output).toContain('AI Credits available');
+      expect(output).not.toContain('AI Credits available');
+      expect(output).toContain('purchase more AI Credits');
       unmount();
     });
 

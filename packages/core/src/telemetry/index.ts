@@ -140,6 +140,9 @@ export {
   GenAiOperationName,
   GenAiProviderName,
   GenAiTokenType,
+  // Billing metrics functions
+  recordOverageOptionSelected,
+  recordCreditPurchaseClick,
 } from './metrics.js';
 export { runInDevTraceSpan, type SpanMetadata } from './trace.js';
 export { startupProfiler, StartupProfiler } from './startupProfiler.js';

@@ -10,6 +10,7 @@ import {
   buildG1Url,
   getG1CreditBalance,
   G1_CREDIT_TYPE,
+  G1_UTM_CAMPAIGNS,
   shouldAutoUseCredits,
   shouldShowEmptyWalletMenu,
   shouldShowOverageMenu,
@@ -39,7 +40,11 @@ describe('billing', () => {
 
   describe('buildG1Url', () => {
     it('should build activity URL with UTM params wrapped in AccountChooser', () => {
-      const result = buildG1Url('activity', 'user@gmail.com');
+      const result = buildG1Url(
+        'activity',
+        'user@gmail.com',
+        G1_UTM_CAMPAIGNS.MANAGE_ACTIVITY,
+      );
 
       // Should contain AccountChooser prefix
       expect(result).toContain('https://accounts.google.com/AccountChooser');
@@ -48,45 +53,53 @@ describe('billing', () => {
       // The continue URL should contain the G1 activity path and UTM params
       expect(result).toContain('one.google.com%2Fai%2Factivity');
       expect(result).toContain('utm_source%3Dgemini_cli');
-      expect(result).toContain('utm_medium%3Dproduct');
-      expect(result).toContain('utm_campaign%3Doverage');
+      expect(result).toContain(
+        'utm_campaign%3Dhydrogen_cli_settings_ai_credits_activity_page',
+      );
     });
 
     it('should build credits URL with UTM params wrapped in AccountChooser', () => {
-      const result = buildG1Url('credits', 'test@example.com');
+      const result = buildG1Url(
+        'credits',
+        'test@example.com',
+        G1_UTM_CAMPAIGNS.EMPTY_WALLET_ADD_CREDITS,
+      );
 
       expect(result).toContain('https://accounts.google.com/AccountChooser');
       expect(result).toContain('one.google.com%2Fai%2Fcredits');
+      expect(result).toContain(
+        'utm_campaign%3Dhydrogen_cli_insufficient_credits_add_credits',
+      );
     });
   });
 
   describe('getG1CreditBalance', () => {
-    it('should return 0 for null tier', () => {
-      expect(getG1CreditBalance(null)).toBe(0);
+    it('should return null for null tier', () => {
+      expect(getG1CreditBalance(null)).toBeNull();
     });
 
-    it('should return 0 for undefined tier', () => {
-      expect(getG1CreditBalance(undefined)).toBe(0);
+    it('should return null for undefined tier', () => {
+      expect(getG1CreditBalance(undefined)).toBeNull();
     });
 
-    it('should return 0 for tier without availableCredits', () => {
+    it('should return null for tier without availableCredits', () => {
       const tier: GeminiUserTier = { id: 'PERSONAL' };
-      expect(getG1CreditBalance(tier)).toBe(0);
+      expect(getG1CreditBalance(tier)).toBeNull();
     });
 
-    it('should return 0 for empty availableCredits array', () => {
+    it('should return null for empty availableCredits array', () => {
       const tier: GeminiUserTier = { id: 'PERSONAL', availableCredits: [] };
-      expect(getG1CreditBalance(tier)).toBe(0);
+      expect(getG1CreditBalance(tier)).toBeNull();
     });
 
-    it('should return 0 when no G1 credit type found', () => {
+    it('should return null when no G1 credit type found', () => {
       const tier: GeminiUserTier = {
         id: 'PERSONAL',
         availableCredits: [
           { creditType: 'CREDIT_TYPE_UNSPECIFIED', creditAmount: '100' },
         ],
       };
-      expect(getG1CreditBalance(tier)).toBe(0);
+      expect(getG1CreditBalance(tier)).toBeNull();
     });
 
     it('should return G1 credit balance when present', () => {
@@ -145,6 +158,10 @@ describe('billing', () => {
     it('should return false when strategy is never', () => {
       expect(shouldAutoUseCredits('never', 100)).toBe(false);
     });
+
+    it('should return false when creditBalance is null (ineligible)', () => {
+      expect(shouldAutoUseCredits('always', null)).toBe(false);
+    });
   });
 
   describe('shouldShowOverageMenu', () => {
@@ -163,6 +180,10 @@ describe('billing', () => {
     it('should return false when strategy is never', () => {
       expect(shouldShowOverageMenu('never', 100)).toBe(false);
     });
+
+    it('should return false when creditBalance is null (ineligible)', () => {
+      expect(shouldShowOverageMenu('ask', null)).toBe(false);
+    });
   });
 
   describe('shouldShowEmptyWalletMenu', () => {
@@ -180,6 +201,10 @@ describe('billing', () => {
 
     it('should return false when balance > 0', () => {
       expect(shouldShowEmptyWalletMenu('ask', 100)).toBe(false);
+    });
+
+    it('should return false when creditBalance is null (ineligible)', () => {
+      expect(shouldShowEmptyWalletMenu('ask', null)).toBe(false);
     });
   });
 });

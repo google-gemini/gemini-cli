@@ -43,6 +43,8 @@ import {
   getG1CreditBalance,
   shouldAutoUseCredits,
 } from '../billing/billing.js';
+import { logBillingEvent } from '../telemetry/loggers.js';
+import { CreditsUsedEvent } from '../telemetry/billingEvents.js';
 import { UserTierId, type GeminiUserTier, type Credits } from './types.js';
 import type {
   CaCountTokenResponse,
@@ -87,13 +89,14 @@ export class CodeAssistServer implements ContentGenerator {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     role: LlmRole,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    const shouldEnableCredits =
-      this.config &&
-      (shouldAutoUseCredits(
-        this.config.getBillingSettings().overageStrategy,
-        getG1CreditBalance(this.paidTier),
-      ) ||
-        this.config.shouldUseCreditsForNextRequest());
+    const autoUse = this.config
+      ? shouldAutoUseCredits(
+          this.config.getBillingSettings().overageStrategy,
+          getG1CreditBalance(this.paidTier),
+        )
+      : false;
+    const nextReqFlag = this.config?.shouldUseCreditsForNextRequest() ?? false;
+    const shouldEnableCredits = autoUse || nextReqFlag;
 
     const enabledCreditTypes = shouldEnableCredits
       ? ([G1_CREDIT_TYPE] as string[])
@@ -119,6 +122,9 @@ export class CodeAssistServer implements ContentGenerator {
     return (async function* (
       server: CodeAssistServer,
     ): AsyncGenerator<GenerateContentResponse> {
+      let totalConsumed = 0;
+      let lastRemaining = 0;
+
       for await (const response of responses) {
         if (isFirst) {
           streamingLatency.firstMessageLatency = formatProtoJsonDuration(
@@ -142,13 +148,34 @@ export class CodeAssistServer implements ContentGenerator {
         );
 
         if (response.consumedCredits) {
-          // Track consumed credits if needed (e.g. for telemetry)
+          for (const credit of response.consumedCredits) {
+            if (credit.creditType === G1_CREDIT_TYPE && credit.creditAmount) {
+              totalConsumed += parseInt(credit.creditAmount, 10) || 0;
+            }
+          }
         }
         if (response.remainingCredits) {
+          for (const credit of response.remainingCredits) {
+            if (credit.creditType === G1_CREDIT_TYPE && credit.creditAmount) {
+              lastRemaining = parseInt(credit.creditAmount, 10) || 0;
+            }
+          }
           server.updateCredits(response.remainingCredits);
         }
 
         yield translatedResponse;
+      }
+
+      // Emit credits used telemetry after the stream completes
+      if (totalConsumed > 0 && server.config) {
+        logBillingEvent(
+          server.config,
+          new CreditsUsedEvent(
+            req.model ?? 'unknown',
+            totalConsumed,
+            lastRemaining,
+          ),
+        );
       }
     })(this);
   }

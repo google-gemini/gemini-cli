@@ -211,10 +211,45 @@ export class CreditsUsedEvent implements BaseTelemetryEvent {
   }
 }
 
+// ============================================================================
+// Event: API Key Updated (Auth Type Changed)
+// ============================================================================
+
+export const EVENT_API_KEY_UPDATED = 'gemini_cli.api_key_updated';
+
+export class ApiKeyUpdatedEvent implements BaseTelemetryEvent {
+  'event.name': 'api_key_updated';
+  'event.timestamp': string;
+  previous_auth_type: string;
+  new_auth_type: string;
+
+  constructor(previousAuthType: string, newAuthType: string) {
+    this['event.name'] = 'api_key_updated';
+    this['event.timestamp'] = new Date().toISOString();
+    this.previous_auth_type = previousAuthType;
+    this.new_auth_type = newAuthType;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_API_KEY_UPDATED,
+      'event.timestamp': this['event.timestamp'],
+      previous_auth_type: this.previous_auth_type,
+      new_auth_type: this.new_auth_type,
+    };
+  }
+
+  toLogBody(): string {
+    return `Auth type changed from ${this.previous_auth_type} to ${this.new_auth_type}.`;
+  }
+}
+
 /** Union type of all billing-related telemetry events */
 export type BillingTelemetryEvent =
   | OverageMenuShownEvent
   | OverageOptionSelectedEvent
   | EmptyWalletMenuShownEvent
   | CreditPurchaseClickEvent
-  | CreditsUsedEvent;
+  | CreditsUsedEvent
+  | ApiKeyUpdatedEvent;

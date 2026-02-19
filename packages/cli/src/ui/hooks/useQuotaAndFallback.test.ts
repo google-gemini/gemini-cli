@@ -387,6 +387,8 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
             userTier: UserTierId.FREE,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
             onShowAuthSelection: mockOnShowAuthSelection,
+            paidTier: null,
+            settings: mockSettings,
           }),
         );
 

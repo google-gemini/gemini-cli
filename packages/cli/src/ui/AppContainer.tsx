@@ -82,6 +82,8 @@ import {
   CoreToolCallStatus,
   generateSteeringAckMessage,
   buildUserSteeringHintPrompt,
+  logBillingEvent,
+  ApiKeyUpdatedEvent,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -701,6 +703,8 @@ export const AppContainer = (props: AppContainerProps) => {
   const handleAuthSelect = useCallback(
     async (authType: AuthType | undefined, scope: LoadableSettingScope) => {
       if (authType) {
+        const previousAuthType =
+          config.getContentGeneratorConfig()?.authType ?? 'unknown';
         if (authType === AuthType.LOGIN_WITH_GOOGLE) {
           setAuthContext({ requiresRestart: true });
         } else {
@@ -713,6 +717,10 @@ export const AppContainer = (props: AppContainerProps) => {
           config.setRemoteAdminSettings(undefined);
           await config.refreshAuth(authType);
           setAuthState(AuthState.Authenticated);
+          logBillingEvent(
+            config,
+            new ApiKeyUpdatedEvent(previousAuthType, authType),
+          );
         } catch (e) {
           if (e instanceof ChangeAuthRequestedError) {
             return;
@@ -1938,6 +1946,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     showIdeRestartPrompt ||
     !!proQuotaRequest ||
     !!validationRequest ||
+    !!overageMenuRequest ||
+    !!emptyWalletRequest ||
     isSessionBrowserOpen ||
     authState === AuthState.AwaitingApiKeyInput ||
     !!newAgents;
@@ -1965,6 +1975,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     hasLoopDetectionConfirmationRequest ||
     !!proQuotaRequest ||
     !!validationRequest ||
+    !!overageMenuRequest ||
+    !!emptyWalletRequest ||
     !!customDialog;
 
   const allowPlanMode =
@@ -2399,10 +2411,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setActiveBackgroundShellPid,
       setIsBackgroundShellListOpen,
       setAuthContext,
-      onHintInput: () => {},
-      onHintBackspace: () => {},
-      onHintClear: () => {},
-      onHintSubmit: () => {},
+      onHintInput: () => { },
+      onHintBackspace: () => { },
+      onHintClear: () => { },
+      onHintSubmit: () => { },
       handleRestart: async () => {
         if (process.send) {
           const remoteSettings = config.getRemoteAdminSettings();

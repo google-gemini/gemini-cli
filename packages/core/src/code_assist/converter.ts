@@ -34,7 +34,7 @@ export interface CAGenerateContentRequest {
   project?: string;
   user_prompt_id?: string;
   request: VertexGenerateContentRequest;
-  enabledCreditTypes?: string[];
+  enabled_credit_types?: string[];
 }
 
 interface VertexGenerateContentRequest {
@@ -132,7 +132,7 @@ export function toGenerateContentRequest(
     project,
     user_prompt_id: userPromptId,
     request: toVertexGenerateContentRequest(req, sessionId),
-    enabledCreditTypes,
+    enabled_credit_types: enabledCreditTypes,
   };
 }
 

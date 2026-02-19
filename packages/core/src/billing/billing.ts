@@ -28,11 +28,8 @@ const G1_AI_BASE_URL = 'https://one.google.com/ai';
 const ACCOUNT_CHOOSER_URL = 'https://accounts.google.com/AccountChooser';
 
 /** UTM parameters for CLI tracking */
-const UTM_PARAMS = {
-  utm_source: 'gemini_cli',
-  utm_medium: 'product',
-  utm_campaign: 'overage',
-} as const;
+const UTM_SOURCE = 'gemini_cli';
+const UTM_MEDIUM = 'desktop';
 
 /**
  * Wraps a URL in the AccountChooser redirect to maintain user context.
@@ -52,17 +49,35 @@ export function wrapInAccountChooser(
 }
 
 /**
+ * UTM campaign identifiers per the design doc.
+ */
+export const G1_UTM_CAMPAIGNS = {
+  /** From Interception Flow "Manage" link (user has credits) */
+  MANAGE_ACTIVITY: 'hydrogen_cli_settings_ai_credits_activity_page',
+  /** From "Manage" to add more credits */
+  MANAGE_ADD_CREDITS: 'hydrogen_cli_settings_add_credits',
+  /** From Empty Wallet Flow "Get AI Credits" link */
+  EMPTY_WALLET_ADD_CREDITS: 'hydrogen_cli_insufficient_credits_add_credits',
+} as const;
+
+/**
  * Builds a G1 AI URL with UTM tracking parameters.
  * @param path The path segment (e.g., 'activity' or 'credits')
  * @param email User's email for AccountChooser wrapper
+ * @param campaign The UTM campaign identifier
  * @returns The complete URL wrapped in AccountChooser
  */
 export function buildG1Url(
   path: 'activity' | 'credits',
   email: string,
+  campaign: string,
 ): string {
   const baseUrl = `${G1_AI_BASE_URL}/${path}`;
-  const params = new URLSearchParams(UTM_PARAMS);
+  const params = new URLSearchParams({
+    utm_source: UTM_SOURCE,
+    utm_medium: UTM_MEDIUM,
+    utm_campaign: campaign,
+  });
   const urlWithUtm = `${baseUrl}?${params.toString()}`;
   return wrapInAccountChooser(email, urlWithUtm);
 }
@@ -70,20 +85,24 @@ export function buildG1Url(
 /**
  * Extracts the G1 AI credit balance from a tier's available credits.
  * @param tier The user tier to check
- * @returns The credit amount as a number, or 0 if not found
+ * @returns The credit amount as a number, 0 if eligible but empty, or null if not eligible
  */
 export function getG1CreditBalance(
   tier: GeminiUserTier | null | undefined,
-): number {
+): number | null {
   if (!tier?.availableCredits) {
-    return 0;
+    return null;
   }
 
   const g1Credits = tier.availableCredits.find(
     (credit: AvailableCredits) => credit.creditType === G1_CREDIT_TYPE,
   );
 
-  if (!g1Credits?.creditAmount) {
+  if (!g1Credits) {
+    return null;
+  }
+
+  if (!g1Credits.creditAmount) {
     return 0;
   }
 
@@ -100,9 +119,9 @@ export function getG1CreditBalance(
  */
 export function shouldAutoUseCredits(
   strategy: OverageStrategy,
-  creditBalance: number,
+  creditBalance: number | null,
 ): boolean {
-  return strategy === 'always' && creditBalance > 0;
+  return strategy === 'always' && creditBalance != null && creditBalance > 0;
 }
 
 /**
@@ -113,10 +132,10 @@ export function shouldAutoUseCredits(
  */
 export function shouldShowOverageMenu(
   strategy: OverageStrategy,
-  creditBalance: number,
+  creditBalance: number | null,
 ): boolean {
   // Show menu if strategy is 'ask' and there are credits available
-  return strategy === 'ask' && creditBalance > 0;
+  return strategy === 'ask' && creditBalance != null && creditBalance > 0;
 }
 
 /**
@@ -127,8 +146,9 @@ export function shouldShowOverageMenu(
  */
 export function shouldShowEmptyWalletMenu(
   strategy: OverageStrategy,
-  creditBalance: number,
+  creditBalance: number | null,
 ): boolean {
-  // Show empty wallet menu if credits exist but balance is 0, and strategy isn't 'never'
-  return strategy !== 'never' && creditBalance === 0;
+  // Show empty wallet menu only if user is eligible (creditBalance is not null)
+  // and balance is 0, and strategy isn't 'never'
+  return strategy !== 'never' && creditBalance != null && creditBalance === 0;
 }

@@ -28,6 +28,11 @@ import {
   OverageOptionSelectedEvent,
   EmptyWalletMenuShownEvent,
   CreditPurchaseClickEvent,
+  buildG1Url,
+  G1_UTM_CAMPAIGNS,
+  UserAccountManager,
+  recordOverageOptionSelected,
+  recordCreditPurchaseClick,
 } from '@google/gemini-cli-core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -113,184 +118,244 @@ export function useQuotaAndFallback({
         // (paidTier?.availableCredits indicates the user is a G1 subscriber)
         if (paidTier?.availableCredits) {
           const creditBalance = getG1CreditBalance(paidTier);
-          const resetTime = error.retryDelayMs
-            ? getResetTimeMessage(error.retryDelayMs)
-            : undefined;
 
-          // G1 Credits Flow: Check overageStrategy setting
-          if (shouldAutoUseCredits(overageStrategy, creditBalance)) {
-            // Auto-use credits: retry with credits enabled
-            // Note: This will be handled by the caller with 'retry_with_credits' intent
-            historyManager.addItem(
-              {
-                type: MessageType.INFO,
-                text: `Usage limit reached. Automatically using AI Credits (${creditBalance} available).`,
-              },
-              Date.now(),
-            );
-            // Return special intent to retry with credits
-            return 'retry_with_credits';
-          }
+          // creditBalance is null when user is not eligible for G1 credits.
+          // In that case, fall through to the default ProQuotaDialog below.
+          if (creditBalance == null) {
+            // Not eligible for credits — skip G1 flow
+          } else {
+            const resetTime = error.retryDelayMs
+              ? getResetTimeMessage(error.retryDelayMs)
+              : undefined;
 
-          if (shouldShowOverageMenu(overageStrategy, creditBalance)) {
-            // Log overage menu shown
-            logBillingEvent(
-              config,
-              new OverageMenuShownEvent(
-                usageLimitReachedModel,
-                creditBalance,
-                overageStrategy,
-              ),
-            );
-
-            // Show overage menu dialog
-            if (isDialogPending.current) {
-              return 'stop';
+            // G1 Credits Flow: Check overageStrategy setting
+            if (shouldAutoUseCredits(overageStrategy, creditBalance)) {
+              // Auto-use credits: retry with credits enabled
+              // Note: This will be handled by the caller with 'retry_with_credits' intent
+              historyManager.addItem(
+                {
+                  type: MessageType.INFO,
+                  text: `Usage limit reached. Automatically using AI Credits (${creditBalance} available).`,
+                },
+                Date.now(),
+              );
+              // Return special intent to retry with credits
+              return 'retry_with_credits';
             }
-            isDialogPending.current = true;
 
-            setModelSwitchedFromQuotaError(true);
-            config.setQuotaErrorOccurred(true);
-
-            const overageIntent = await new Promise<OverageMenuIntent>(
-              (resolve) => {
-                setOverageMenuRequest({
-                  failedModel: usageLimitReachedModel,
-                  resetTime,
+            const showOverage = shouldShowOverageMenu(
+              overageStrategy,
+              creditBalance,
+            );
+            if (showOverage) {
+              // Log overage menu shown
+              logBillingEvent(
+                config,
+                new OverageMenuShownEvent(
+                  usageLimitReachedModel,
                   creditBalance,
-                  resolve,
-                });
-              },
-            );
+                  overageStrategy,
+                ),
+              );
 
-            // Handle the intent
-            setOverageMenuRequest(null);
-            isDialogPending.current = false;
+              // Show overage menu dialog
+              if (isDialogPending.current) {
+                return 'stop';
+              }
+              isDialogPending.current = true;
 
-            switch (overageIntent) {
-              case 'use_credits':
-                // User chose to use credits
-                logBillingEvent(
-                  config,
-                  new OverageOptionSelectedEvent(
-                    usageLimitReachedModel,
-                    'use_credits',
+              setModelSwitchedFromQuotaError(true);
+              config.setQuotaErrorOccurred(true);
+
+              const overageIntent = await new Promise<OverageMenuIntent>(
+                (resolve) => {
+                  setOverageMenuRequest({
+                    failedModel: usageLimitReachedModel,
+                    resetTime,
                     creditBalance,
-                  ),
-                );
-                historyManager.addItem(
-                  {
-                    type: MessageType.INFO,
-                    text: `Using AI Credits for this request.`,
-                  },
-                  Date.now(),
-                );
-                return 'retry_with_credits';
-              case 'manage':
-                // User wants to manage credits
-                logBillingEvent(
-                  config,
-                  new OverageOptionSelectedEvent(
-                    usageLimitReachedModel,
-                    'manage',
-                    creditBalance,
-                  ),
-                );
-                try {
-                  await openBrowserSecurely(
-                    'https://console.cloud.google.com/gemini/credits',
+                    resolve,
+                  });
+                },
+              );
+
+              // Handle the intent
+              setOverageMenuRequest(null);
+              isDialogPending.current = false;
+
+              switch (overageIntent) {
+                case 'use_credits':
+                  // User chose to use credits
+                  logBillingEvent(
+                    config,
+                    new OverageOptionSelectedEvent(
+                      usageLimitReachedModel,
+                      'use_credits',
+                      creditBalance,
+                    ),
                   );
-                } catch (_e) {
-                  // Ignore browser open errors
-                }
-                return 'stop';
-              case 'switch_auth':
-                logBillingEvent(
-                  config,
-                  new OverageOptionSelectedEvent(
-                    usageLimitReachedModel,
-                    'switch_auth',
-                    creditBalance,
-                  ),
-                );
-                onShowAuthSelection();
-                return 'stop';
-              case 'stop':
-              default:
-                logBillingEvent(
-                  config,
-                  new OverageOptionSelectedEvent(
-                    usageLimitReachedModel,
-                    'stop',
-                    creditBalance,
-                  ),
-                );
-                return 'stop';
-            }
-          }
-
-          if (shouldShowEmptyWalletMenu(overageStrategy, creditBalance)) {
-            // Log empty wallet menu shown
-            logBillingEvent(
-              config,
-              new EmptyWalletMenuShownEvent(usageLimitReachedModel),
-            );
-
-            // Show empty wallet dialog
-            if (isDialogPending.current) {
-              return 'stop';
-            }
-            isDialogPending.current = true;
-
-            setModelSwitchedFromQuotaError(true);
-            config.setQuotaErrorOccurred(true);
-
-            const emptyWalletIntent = await new Promise<EmptyWalletIntent>(
-              (resolve) => {
-                setEmptyWalletRequest({
-                  failedModel: usageLimitReachedModel,
-                  resetTime,
-                  resolve,
-                });
-              },
-            );
-
-            // Handle the intent
-            setEmptyWalletRequest(null);
-            isDialogPending.current = false;
-
-            switch (emptyWalletIntent) {
-              case 'get_credits':
-                // User wants to purchase credits
-                logBillingEvent(
-                  config,
-                  new CreditPurchaseClickEvent(
-                    'empty_wallet_menu',
-                    usageLimitReachedModel,
-                  ),
-                );
-                try {
-                  await openBrowserSecurely(
-                    'https://console.cloud.google.com/gemini/credits',
+                  recordOverageOptionSelected(config, {
+                    selected_option: 'use_credits',
+                    model: usageLimitReachedModel,
+                  });
+                  historyManager.addItem(
+                    {
+                      type: MessageType.INFO,
+                      text: `Using AI Credits for this request.`,
+                    },
+                    Date.now(),
                   );
-                } catch (_e) {
-                  // Ignore browser open errors
-                }
-                return 'stop';
-              case 'switch_auth':
-                onShowAuthSelection();
-                return 'stop';
-              case 'stop':
-              default:
-                return 'stop';
+                  return 'retry_with_credits';
+                case 'manage':
+                  // User wants to manage credits
+                  logBillingEvent(
+                    config,
+                    new OverageOptionSelectedEvent(
+                      usageLimitReachedModel,
+                      'manage',
+                      creditBalance,
+                    ),
+                  );
+                  recordOverageOptionSelected(config, {
+                    selected_option: 'manage',
+                    model: usageLimitReachedModel,
+                  });
+                  logBillingEvent(
+                    config,
+                    new CreditPurchaseClickEvent(
+                      'manage',
+                      usageLimitReachedModel,
+                    ),
+                  );
+                  recordCreditPurchaseClick(config, {
+                    source: 'manage',
+                    model: usageLimitReachedModel,
+                  });
+                  try {
+                    const userEmail =
+                      new UserAccountManager().getCachedGoogleAccount() ?? '';
+                    await openBrowserSecurely(
+                      buildG1Url(
+                        'activity',
+                        userEmail,
+                        G1_UTM_CAMPAIGNS.MANAGE_ACTIVITY,
+                      ),
+                    );
+                  } catch (_e) {
+                    // Ignore browser open errors
+                  }
+                  return 'stop';
+                case 'switch_auth':
+                  logBillingEvent(
+                    config,
+                    new OverageOptionSelectedEvent(
+                      usageLimitReachedModel,
+                      'switch_auth',
+                      creditBalance,
+                    ),
+                  );
+                  recordOverageOptionSelected(config, {
+                    selected_option: 'switch_auth',
+                    model: usageLimitReachedModel,
+                  });
+                  onShowAuthSelection();
+                  return 'stop';
+                case 'stop':
+                default:
+                  logBillingEvent(
+                    config,
+                    new OverageOptionSelectedEvent(
+                      usageLimitReachedModel,
+                      'stop',
+                      creditBalance,
+                    ),
+                  );
+                  recordOverageOptionSelected(config, {
+                    selected_option: 'stop',
+                    model: usageLimitReachedModel,
+                  });
+                  return 'stop';
+              }
             }
-          }
+
+            const showEmptyWallet = shouldShowEmptyWalletMenu(
+              overageStrategy,
+              creditBalance,
+            );
+            if (showEmptyWallet) {
+              // Log empty wallet menu shown
+              logBillingEvent(
+                config,
+                new EmptyWalletMenuShownEvent(usageLimitReachedModel),
+              );
+
+              // Show empty wallet dialog
+              if (isDialogPending.current) {
+                return 'stop';
+              }
+              isDialogPending.current = true;
+
+              setModelSwitchedFromQuotaError(true);
+              config.setQuotaErrorOccurred(true);
+
+              const emptyWalletIntent = await new Promise<EmptyWalletIntent>(
+                (resolve) => {
+                  setEmptyWalletRequest({
+                    failedModel: usageLimitReachedModel,
+                    resetTime,
+                    resolve,
+                  });
+                },
+              );
+
+              // Handle the intent
+              setEmptyWalletRequest(null);
+              isDialogPending.current = false;
+
+              switch (emptyWalletIntent) {
+                case 'get_credits':
+                  // User wants to purchase credits
+                  logBillingEvent(
+                    config,
+                    new CreditPurchaseClickEvent(
+                      'empty_wallet_menu',
+                      usageLimitReachedModel,
+                    ),
+                  );
+                  recordCreditPurchaseClick(config, {
+                    source: 'empty_wallet_menu',
+                    model: usageLimitReachedModel,
+                  });
+                  try {
+                    const userEmail =
+                      new UserAccountManager().getCachedGoogleAccount() ?? '';
+                    await openBrowserSecurely(
+                      buildG1Url(
+                        'credits',
+                        userEmail,
+                        G1_UTM_CAMPAIGNS.EMPTY_WALLET_ADD_CREDITS,
+                      ),
+                    );
+                  } catch (_e) {
+                    // Ignore browser open errors
+                  }
+                  return 'stop';
+                case 'switch_auth':
+                  onShowAuthSelection();
+                  return 'stop';
+                case 'stop':
+                default:
+                  return 'stop';
+              }
+            }
+          } // End of else (creditBalance != null)
         } // End of if (paidTier?.availableCredits)
 
         // Default: Show existing ProQuotaDialog (for overageStrategy: 'never' or non-G1 users)
         const messageLines = [
           `Usage limit reached for ${usageLimitReachedModel}.`,
-          error.retryDelayMs ? getResetTimeMessage(error.retryDelayMs) : null,
+          error.retryDelayMs
+            ? `Access resets at ${getResetTimeMessage(error.retryDelayMs)}.`
+            : null,
           `/stats model for usage details`,
           `/model to switch models.`,
           `/auth to switch to API key.`,
@@ -476,5 +541,5 @@ function getResetTimeMessage(delayMs: number): string {
     timeZoneName: 'short',
   });
 
-  return `Access resets at ${timeFormatter.format(resetDate)}.`;
+  return timeFormatter.format(resetDate);
 }

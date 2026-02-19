@@ -64,14 +64,7 @@ export function EmptyWalletDialog({
           </Text>
         )}
       </Box>
-      <Box marginBottom={1} flexDirection="column">
-        <Text>
-          You have{' '}
-          <Text bold color={theme.status.warning}>
-            0
-          </Text>{' '}
-          AI Credits available.
-        </Text>
+      <Box marginBottom={1}>
         <Text>To continue using this model now, purchase more AI Credits.</Text>
       </Box>
       <Box marginBottom={1}>
