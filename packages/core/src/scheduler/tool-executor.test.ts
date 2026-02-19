@@ -253,7 +253,17 @@ describe('ToolExecutor', () => {
     // 2. Mock executeToolWithHooks to trigger the PID callback
     const testPid = 12345;
     vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockImplementation(
-      async (_inv, _name, _sig, _tool, _liveCb, _shellCfg, setPidCallback) => {
+      async (
+        _inv,
+        _name,
+        _sig,
+        _tool,
+        _liveCb,
+        _shellCfg,
+        setPidCallback,
+        _config,
+        _originalRequestName,
+      ) => {
         // Simulate the shell tool reporting a PID
         if (setPidCallback) {
           setPidCallback(testPid);

@@ -61,6 +61,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   borderColor,
 
   borderDimColor,
+  originalRequestName,
 }) => {
   const { activePtyId: activeShellPtyId, embeddedShellFocused } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
@@ -126,6 +127,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           status={status}
           description={description}
           emphasis={emphasis}
+          originalRequestName={originalRequestName}
         />
 
         <FocusHint

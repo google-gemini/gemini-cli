@@ -107,6 +107,7 @@ export function mapToDisplay(
       progressMessage,
       progressPercent,
       approvalMode: call.approvalMode,
+      originalRequestName: call.request.originalRequestName,
     };
   });
 

@@ -253,6 +253,32 @@ export class DefaultHookOutput implements HookOutput {
   shouldClearContext(): boolean {
     return false;
   }
+
+  /**
+   * Optional request to execute another tool immediately after this one.
+   * The result of this tail call will replace the original tool's response.
+   */
+  getTailToolCallRequest():
+    | {
+        name: string;
+        args: Record<string, unknown>;
+      }
+    | undefined {
+    if (
+      this.hookSpecificOutput &&
+      'tailToolCallRequest' in this.hookSpecificOutput
+    ) {
+      const request = this.hookSpecificOutput['tailToolCallRequest'];
+      if (
+        typeof request === 'object' &&
+        request !== null &&
+        !Array.isArray(request)
+      ) {
+        return request as { name: string; args: Record<string, unknown> };
+      }
+    }
+    return undefined;
+  }
 }
 
 /**
@@ -430,6 +456,7 @@ export interface BeforeToolInput extends HookInput {
   tool_name: string;
   tool_input: Record<string, unknown>;
   mcp_context?: McpToolContext; // Only present for MCP tools
+  original_request_name?: string;
 }
 
 /**
@@ -450,6 +477,7 @@ export interface AfterToolInput extends HookInput {
   tool_input: Record<string, unknown>;
   tool_response: Record<string, unknown>;
   mcp_context?: McpToolContext; // Only present for MCP tools
+  original_request_name?: string;
 }
 
 /**
@@ -459,6 +487,14 @@ export interface AfterToolOutput extends HookOutput {
   hookSpecificOutput?: {
     hookEventName: 'AfterTool';
     additionalContext?: string;
+    /**
+     * Optional request to execute another tool immediately after this one.
+     * The result of this tail call will replace the original tool's response.
+     */
+    tailToolCallRequest?: {
+      name: string;
+      args: Record<string, unknown>;
+    };
   };
 }
 
