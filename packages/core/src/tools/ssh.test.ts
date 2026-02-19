@@ -12,30 +12,30 @@ import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 // Mock ssh2
 vi.mock('ssh2', () => ({
-    Client: vi.fn().mockImplementation(() => {
-      const handlers: Record<string, Array<(...args: unknown[]) => void>> = {};
-      return {
-        on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
-          if (!handlers[event]) {
-            handlers[event] = [];
+  Client: vi.fn().mockImplementation(() => {
+    const handlers: Record<string, Array<(...args: unknown[]) => void>> = {};
+    return {
+      on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+        if (!handlers[event]) {
+          handlers[event] = [];
+        }
+        handlers[event].push(handler);
+        return { on: vi.fn() };
+      }),
+      connect: vi.fn(),
+      exec: vi.fn(),
+      end: vi.fn(),
+      _handlers: handlers,
+      _emit: (event: string, ...args: unknown[]) => {
+        if (handlers[event]) {
+          for (const handler of handlers[event]) {
+            handler(...args);
           }
-          handlers[event].push(handler);
-          return { on: vi.fn() };
-        }),
-        connect: vi.fn(),
-        exec: vi.fn(),
-        end: vi.fn(),
-        _handlers: handlers,
-        _emit: (event: string, ...args: unknown[]) => {
-          if (handlers[event]) {
-            for (const handler of handlers[event]) {
-              handler(...args);
-            }
-          }
-        },
-      };
-    }),
-  }));
+        }
+      },
+    };
+  }),
+}));
 
 vi.mock('../config/config.js');
 
@@ -45,6 +45,8 @@ describe('SSHTool', () => {
   beforeEach(() => {
     const mockConfigInstance = {
       getTargetDir: () => '/tmp/test',
+      getWorkingDir: () => '/tmp/test',
+      isPathAllowed: () => false,
       validatePathAccess: () => null,
     } as unknown as Config;
     tool = new SSHTool(mockConfigInstance, createMockMessageBus());
@@ -171,6 +173,21 @@ describe('SSHTool', () => {
       expect(result.llmContent).toBe(
         'SSH command was cancelled before it could start.',
       );
+    });
+
+    it('should reject private key paths outside allowed directories', async () => {
+      const params: SSHToolParams = {
+        host: 'example.com',
+        username: 'admin',
+        command: 'uptime',
+        private_key_path: '/etc/passwd',
+      };
+      const invocation = tool.build(params);
+      const controller = new AbortController();
+      const result = await invocation.execute(controller.signal);
+      expect(result.llmContent).toContain('outside of the allowed directories');
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe('ssh_connection_error');
     });
   });
 

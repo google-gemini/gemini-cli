@@ -60,11 +60,34 @@ export interface SSHToolParams {
 
 /**
  * Resolves a private key path, supporting ~ expansion.
+ * Validates the path is within allowed directories to prevent arbitrary file reads.
  */
-async function resolvePrivateKey(keyPath: string): Promise<string> {
-  const resolved = keyPath.startsWith('~')
-    ? path.join(os.homedir(), keyPath.slice(1))
-    : path.resolve(keyPath);
+async function resolvePrivateKey(
+  keyPath: string,
+  config: Config,
+): Promise<string> {
+  const homeDir = os.homedir();
+  let resolved: string;
+
+  if (keyPath.startsWith('~')) {
+    resolved = path.join(homeDir, keyPath.slice(1));
+  } else if (path.isAbsolute(keyPath)) {
+    resolved = keyPath;
+  } else {
+    resolved = path.resolve(config.getWorkingDir(), keyPath);
+  }
+
+  // Security: Ensure the path is within the user's home directory or the project workspace.
+  const isInHomeDir = path.resolve(resolved).startsWith(path.resolve(homeDir));
+  const isPathAllowed = config.isPathAllowed(resolved);
+
+  if (!isInHomeDir && !isPathAllowed) {
+    throw new Error(
+      `Path "${keyPath}" resolves outside of the allowed directories. ` +
+        'Private key must be within the user home directory or project workspace.',
+    );
+  }
+
   return fs.readFile(resolved, 'utf-8');
 }
 
@@ -72,14 +95,17 @@ async function resolvePrivateKey(keyPath: string): Promise<string> {
  * Invocation implementation for the SSH tool.
  */
 class SSHToolInvocation extends BaseToolInvocation<SSHToolParams, ToolResult> {
+  private readonly _config: Config;
+
   constructor(
-    _config: Config,
+    config: Config,
     params: SSHToolParams,
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
     super(params, messageBus, _toolName, _toolDisplayName);
+    this._config = config;
   }
 
   getDescription(): string {
@@ -122,7 +148,10 @@ class SSHToolInvocation extends BaseToolInvocation<SSHToolParams, ToolResult> {
       let privateKey: string | undefined;
       if (this.params.private_key_path) {
         try {
-          privateKey = await resolvePrivateKey(this.params.private_key_path);
+          privateKey = await resolvePrivateKey(
+            this.params.private_key_path,
+            this._config,
+          );
         } catch (err) {
           return {
             llmContent: `Error reading private key at "${this.params.private_key_path}": ${err instanceof Error ? err.message : String(err)}`,
