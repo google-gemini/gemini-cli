@@ -16,6 +16,7 @@ import {
 import { GeminiAgent } from './zedIntegration.js';
 import * as acp from '@agentclientprotocol/sdk';
 import {
+  ApprovalMode,
   AuthType,
   type Config,
   CoreToolCallStatus,
@@ -62,6 +63,8 @@ describe('GeminiAgent Session Resume', () => {
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
       },
+      getApprovalMode: vi.fn().mockReturnValue('default'),
+      isPlanEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Config>;
     mockSettings = {
       merged: {
@@ -149,7 +152,28 @@ describe('GeminiAgent Session Resume', () => {
       mcpServers: [],
     });
 
-    expect(response).toEqual({});
+    expect(response).toEqual({
+      modes: {
+        availableModes: [
+          {
+            id: ApprovalMode.DEFAULT,
+            name: 'Default',
+            description: 'Prompts for approval',
+          },
+          {
+            id: ApprovalMode.AUTO_EDIT,
+            name: 'Auto Edit',
+            description: 'Auto-approves edit tools',
+          },
+          {
+            id: ApprovalMode.YOLO,
+            name: 'YOLO',
+            description: 'Auto-approves all tools',
+          },
+        ],
+        currentModeId: ApprovalMode.DEFAULT,
+      },
+    });
 
     // Verify resumeChat received the correct arguments
     expect(mockConfig.getGeminiClient().resumeChat).toHaveBeenCalledWith(
