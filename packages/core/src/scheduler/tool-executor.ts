@@ -86,6 +86,8 @@ export class ToolExecutor {
       async ({ metadata: spanMetadata }) => {
         spanMetadata.input = request;
 
+        let completedToolCall: CompletedToolCall;
+
         try {
           let promise: Promise<ToolResult>;
           if (invocation instanceof ShellToolInvocation) {
@@ -124,21 +126,23 @@ export class ToolExecutor {
           }
 
           const toolResult: ToolResult = await promise;
-          spanMetadata.output = toolResult;
 
           if (signal.aborted) {
-            return this.createCancelledResult(
+            completedToolCall = this.createCancelledResult(
               call,
               'User cancelled tool execution.',
             );
           } else if (toolResult.error === undefined) {
-            return await this.createSuccessResult(call, toolResult);
+            completedToolCall = await this.createSuccessResult(
+              call,
+              toolResult,
+            );
           } else {
             const displayText =
               typeof toolResult.returnDisplay === 'string'
                 ? toolResult.returnDisplay
                 : undefined;
-            return this.createErrorResult(
+            completedToolCall = this.createErrorResult(
               call,
               new Error(toolResult.error.message),
               toolResult.error.type,
@@ -148,21 +152,25 @@ export class ToolExecutor {
         } catch (executionError: unknown) {
           spanMetadata.error = executionError;
           if (signal.aborted) {
-            return this.createCancelledResult(
+            completedToolCall = this.createCancelledResult(
               call,
               'User cancelled tool execution.',
             );
+          } else {
+            const error =
+              executionError instanceof Error
+                ? executionError
+                : new Error(String(executionError));
+            completedToolCall = this.createErrorResult(
+              call,
+              error,
+              ToolErrorType.UNHANDLED_EXCEPTION,
+            );
           }
-          const error =
-            executionError instanceof Error
-              ? executionError
-              : new Error(String(executionError));
-          return this.createErrorResult(
-            call,
-            error,
-            ToolErrorType.UNHANDLED_EXCEPTION,
-          );
         }
+
+        spanMetadata.output = completedToolCall;
+        return completedToolCall;
       },
     );
   }
