@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { INFORMATIVE_TIPS } from '../constants/tips.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
+import type { LoadingPhrasesMode } from '../../config/settings.js';
 
 export const PHRASE_CHANGE_INTERVAL_MS = 15000;
 export const INTERACTIVE_SHELL_WAITING_PHRASE =
@@ -17,23 +18,20 @@ export const INTERACTIVE_SHELL_WAITING_PHRASE =
  * @param isActive Whether the phrase cycling should be active.
  * @param isWaiting Whether to show a specific waiting phrase.
  * @param shouldShowFocusHint Whether to show the shell focus hint.
- * @param customPhrases Optional list of custom phrases to use.
+ * @param loadingPhrasesMode Which phrases to show: tips, witty, all, or off.
+ * @param customPhrases Optional list of custom phrases to use instead of built-in witty phrases.
  * @returns The current loading phrase.
  */
 export const usePhraseCycler = (
   isActive: boolean,
   isWaiting: boolean,
   shouldShowFocusHint: boolean,
+  loadingPhrasesMode: LoadingPhrasesMode = 'tips',
   customPhrases?: string[],
 ) => {
-  const loadingPhrases =
-    customPhrases && customPhrases.length > 0
-      ? customPhrases
-      : WITTY_LOADING_PHRASES;
-
   const [currentLoadingPhrase, setCurrentLoadingPhrase] = useState<
     string | undefined
-  >(isActive ? loadingPhrases[0] : undefined);
+  >(undefined);
 
   const phraseIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownFirstRequestTipRef = useRef(false);
@@ -55,30 +53,43 @@ export const usePhraseCycler = (
       return;
     }
 
-    if (!isActive) {
+    if (!isActive || loadingPhrasesMode === 'off') {
       setCurrentLoadingPhrase(undefined);
       return;
     }
 
+    const wittyPhrases =
+      customPhrases && customPhrases.length > 0
+        ? customPhrases
+        : WITTY_LOADING_PHRASES;
+
     const setRandomPhrase = () => {
-      if (customPhrases && customPhrases.length > 0) {
-        const randomIndex = Math.floor(Math.random() * customPhrases.length);
-        setCurrentLoadingPhrase(customPhrases[randomIndex]);
-      } else {
-        let phraseList;
-        // Show a tip on the first request after startup, then continue with 1/6 chance
-        if (!hasShownFirstRequestTipRef.current) {
-          // Show a tip during the first request
+      let phraseList: readonly string[];
+
+      switch (loadingPhrasesMode) {
+        case 'tips':
           phraseList = INFORMATIVE_TIPS;
-          hasShownFirstRequestTipRef.current = true;
-        } else {
-          // Roughly 1 in 6 chance to show a tip after the first request
-          const showTip = Math.random() < 1 / 6;
-          phraseList = showTip ? INFORMATIVE_TIPS : WITTY_LOADING_PHRASES;
-        }
-        const randomIndex = Math.floor(Math.random() * phraseList.length);
-        setCurrentLoadingPhrase(phraseList[randomIndex]);
+          break;
+        case 'witty':
+          phraseList = wittyPhrases;
+          break;
+        case 'all':
+          // Show a tip on the first request after startup, then continue with 1/6 chance
+          if (!hasShownFirstRequestTipRef.current) {
+            phraseList = INFORMATIVE_TIPS;
+            hasShownFirstRequestTipRef.current = true;
+          } else {
+            const showTip = Math.random() < 1 / 6;
+            phraseList = showTip ? INFORMATIVE_TIPS : wittyPhrases;
+          }
+          break;
+        default:
+          phraseList = INFORMATIVE_TIPS;
+          break;
       }
+
+      const randomIndex = Math.floor(Math.random() * phraseList.length);
+      setCurrentLoadingPhrase(phraseList[randomIndex]);
     };
 
     // Select an initial random phrase
@@ -95,7 +106,13 @@ export const usePhraseCycler = (
         phraseIntervalRef.current = null;
       }
     };
-  }, [isActive, isWaiting, shouldShowFocusHint, customPhrases, loadingPhrases]);
+  }, [
+    isActive,
+    isWaiting,
+    shouldShowFocusHint,
+    loadingPhrasesMode,
+    customPhrases,
+  ]);
 
   return currentLoadingPhrase;
 };

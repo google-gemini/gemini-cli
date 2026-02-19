@@ -211,12 +211,12 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                 thought={
                   uiState.streamingState ===
                     StreamingState.WaitingForConfirmation ||
-                  config.getAccessibility()?.enableLoadingPhrases === false
+                  settings.merged.ui.loadingPhrases === 'off'
                     ? undefined
                     : uiState.thought
                 }
                 currentLoadingPhrase={
-                  config.getAccessibility()?.enableLoadingPhrases === false
+                  settings.merged.ui.loadingPhrases === 'off'
                     ? undefined
                     : uiState.currentLoadingPhrase
                 }
@@ -255,12 +255,12 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                   thought={
                     uiState.streamingState ===
                       StreamingState.WaitingForConfirmation ||
-                    config.getAccessibility()?.enableLoadingPhrases === false
+                    settings.merged.ui.loadingPhrases === 'off'
                       ? undefined
                       : uiState.thought
                   }
                   currentLoadingPhrase={
-                    config.getAccessibility()?.enableLoadingPhrases === false
+                    settings.merged.ui.loadingPhrases === 'off'
                       ? undefined
                       : uiState.currentLoadingPhrase
                   }

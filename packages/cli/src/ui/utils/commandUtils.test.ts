@@ -14,6 +14,7 @@ import {
   copyToClipboard,
   getUrlOpenCommand,
 } from './commandUtils.js';
+import type { Settings } from '../../config/settingsSchema.js';
 
 // Constants used by OSC-52 tests
 const ESC = '\u001B';
@@ -254,6 +255,29 @@ describe('commandUtils', () => {
       expect(tty.write).toHaveBeenCalledTimes(1);
       expect(tty.write.mock.calls[0][0]).toBe(expected);
       expect(tty.end).toHaveBeenCalledTimes(1); // /dev/tty closed after write
+      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+    });
+
+    it('uses OSC-52 when useOSC52Copy setting is enabled', async () => {
+      const testText = 'forced-osc52';
+      const tty = makeWritable({ isTTY: true });
+      mockFs.createWriteStream.mockImplementation(() => {
+        setTimeout(() => tty.emit('open'), 0);
+        return tty;
+      });
+
+      // NO environment signals for SSH/WSL/etc.
+      const settings = {
+        experimental: { useOSC52Copy: true },
+      } as unknown as Settings;
+
+      await copyToClipboard(testText, settings);
+
+      const b64 = Buffer.from(testText, 'utf8').toString('base64');
+      const expected = `${ESC}]52;c;${b64}${BEL}`;
+
+      expect(tty.write).toHaveBeenCalledTimes(1);
+      expect(tty.write.mock.calls[0][0]).toBe(expected);
       expect(mockClipboardyWrite).not.toHaveBeenCalled();
     });
 
