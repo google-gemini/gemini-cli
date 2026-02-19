@@ -1,6 +1,6 @@
-# Preview release: v0.30.0-preview.0
+# Preview release: v0.30.0-preview.1
 
-Released: February 17, 2026
+Released: February 19, 2026
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
@@ -25,6 +25,10 @@ npm install -g @google/gemini-cli@preview
 
 ## What's Changed
 
+- fix(patch): cherry-pick 261788c to release/v0.30.0-preview.0-pr-19453 to patch
+  version v0.30.0-preview.0 and create version 0.30.0-preview.1 by
+  @gemini-cli-robot in
+  [#19490](https://github.com/google-gemini/gemini-cli/pull/19490)
 - feat(ux): added text wrapping capabilities to markdown tables by @devr0306 in
   [#18240](https://github.com/google-gemini/gemini-cli/pull/18240)
 - Revert "fix(mcp): ensure MCP transport is closed to prevent memory leaks" by
@@ -306,5 +310,5 @@ npm install -g @google/gemini-cli@preview
 - feat(core): experimental in-progress steering hints (1 of 3) by @joshualitt in
   [#19008](https://github.com/google-gemini/gemini-cli/pull/19008)
 
-**Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.29.0-preview.5...v0.30.0-preview.0
+**Full changelog**:
+https://github.com/google-gemini/gemini-cli/compare/v0.29.0-preview.5...v0.30.0-preview.1
