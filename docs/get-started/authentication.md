@@ -22,8 +22,8 @@ Select the authentication method that matches your situation in the table below:
 ### What is my Google account type?
 
 - **Individual Google accounts:** Includes all
-  [free tier accounts](../quota-and-pricing/#free-usage) such as Gemini Code
-  Assist for individuals, as well as paid subscriptions for
+  [free tier accounts](../resources/quota-and-pricing.md#free-usage) such as
+  Gemini Code Assist for individuals, as well as paid subscriptions for
   [Google AI Pro and Ultra](https://gemini.google/subscriptions/).
 
 - **Organization accounts:** Accounts using paid licenses through an

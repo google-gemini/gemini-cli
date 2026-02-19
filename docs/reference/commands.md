@@ -293,7 +293,8 @@ Slash commands provide meta-level control over the CLI itself.
   settings that control the behavior and appearance of Gemini CLI. It is
   equivalent to manually editing the `.gemini/settings.json` file, but with
   validation and guidance to prevent errors. See the
-  [settings documentation](./settings.md) for a full list of available settings.
+  [settings documentation](../cli/settings.md) for a full list of available
+  settings.
 - **Usage:** Simply run `/settings` and the editor will open. You can then
   browse or search for specific settings, view their current values, and modify
   them as desired. Changes to some settings are applied immediately, while
@@ -380,7 +381,8 @@ Slash commands provide meta-level control over the CLI itself.
 
 Custom commands allow you to create personalized shortcuts for your most-used
 prompts. For detailed instructions on how to create, manage, and use them,
-please see the dedicated [Custom Commands documentation](./custom-commands.md).
+please see the dedicated
+[Custom Commands documentation](../cli/custom-commands.md).
 
 ## Input prompt shortcuts
 
