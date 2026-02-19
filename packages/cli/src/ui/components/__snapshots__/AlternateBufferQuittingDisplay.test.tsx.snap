@@ -43,10 +43,12 @@ Tips for getting started:
 │ ✓  tool1 Description for tool 1                                          │
 │                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────╯
+
 ╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool2 Description for tool 2                                          │
 │                                                                          │
-╰──────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`AlternateBufferQuittingDisplay > renders with empty history and no pending items > empty 1`] = `
@@ -87,10 +89,12 @@ Tips for getting started:
 │ ✓  tool1 Description for tool 1                                          │
 │                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────╯
+
 ╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool2 Description for tool 2                                          │
 │                                                                          │
-╰──────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`AlternateBufferQuittingDisplay > renders with pending items but no history > with_pending_no_history 1`] = `

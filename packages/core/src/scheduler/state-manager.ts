@@ -517,6 +517,12 @@ export class SchedulerStateManager {
       execData?.liveOutput ??
       ('liveOutput' in call ? call.liveOutput : undefined);
     const pid = execData?.pid ?? ('pid' in call ? call.pid : undefined);
+    const progressMessage =
+      execData?.progressMessage ??
+      ('progressMessage' in call ? call.progressMessage : undefined);
+    const progressPercent =
+      execData?.progressPercent ??
+      ('progressPercent' in call ? call.progressPercent : undefined);
 
     return {
       request: call.request,
@@ -527,6 +533,8 @@ export class SchedulerStateManager {
       invocation: call.invocation,
       liveOutput,
       pid,
+      progressMessage,
+      progressPercent,
       schedulerId: call.schedulerId,
       approvalMode: call.approvalMode,
     };
