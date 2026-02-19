@@ -1,46 +1,36 @@
 ---
 name: experimentation
-description: Manage, view, and override Gemini CLI remote experiments and feature flags locally.
+description: Guide developers through the process of adding new remote experiments (feature flags) to the Gemini CLI codebase.
 ---
 
 # Experimentation Skill
 
-This skill allows you to safely manage, view, and locally override remote Gemini CLI experiments (feature flags).
+This skill assists developers in adding net-new remote experiments (feature flags) to the Gemini CLI codebase. It acts as an interactive guide to ensure all necessary scaffolding, telemetry, command-line overrides, settings, and code placement are considered.
 
-## Core Concepts
+## Workflow: Adding a New Experiment
 
-Remote experimentation is enabled by default. `packages/core/src/code_assist/experiments/flagNames.ts` contains the active `ExperimentFlags` and `ExperimentMetadata` which describe each flag's purpose, type, and default value.
+When a user asks to add a new experiment, follow these steps sequentially:
 
-Currently, Gemini CLI supports local overrides using the `GEMINI_EXP` environment variable pointing to a JSON file.
+### 1. Scaffolding the Config Entry
+- Guide the user to add the new experiment ID to `ExperimentFlags` in `packages/core/src/code_assist/experiments/flagNames.ts`.
+- Ensure a corresponding entry is added to `ExperimentMetadata` in the same file. This must include a clear `description`, the `type` (`boolean`, `number`, `string`), and a sensible `defaultValue`.
 
-## Workflow: Viewing Experiments
+### 2. Command Line and Settings Overrides (Crucial Pattern)
+Every remote flag must be overridable via local settings and command-line arguments.
+- **Settings:** Guide the user to add a corresponding property to the settings schema (e.g., in `schemas/settings.schema.json` and the corresponding TypeScript interfaces).
+- **Command Line:** Guide the user to add a corresponding CLI argument in the appropriate command definitions.
+- **The Config Object:** The source of truth for the rest of the application should be the unified `Config` object. Guide the user to wrap the remote experiment value, the local setting, and the command-line argument into a single property on the `Config` object. The typical priority order is: Command Line > Local Setting > Remote Experiment > Default Value.
 
-When a user asks what experiments are active or available:
-1. Search `packages/core/src/code_assist/experiments/flagNames.ts` for `ExperimentMetadata`.
-2. Extract the descriptions, types, and defaults to answer the user's questions.
-3. Check if there is an active local override file at `.gemini/experiments.json`.
+### 3. Code Placement and Usage
+- Discuss with the user *where* in the codebase this experiment should take effect.
+- Guide them on how to correctly fetch and evaluate the experiment value using the unified `Config` object.
+- Help them write the necessary conditional logic around the experimental feature.
 
-## Workflow: Local Overrides & Opt-Out
+### 4. Telemetry and Metrics (Crucial)
+- Prompt the user to think deeply about what metrics are necessary to evaluate the success or failure of the experiment.
+- Ask questions like: "How will we know if this feature is working as intended?" or "What telemetry events should be fired when this new code path is executed?"
+- Help them add the necessary telemetry calls to the codebase to capture these insights.
 
-When a user wants to override a flag locally (e.g., to turn off a preview feature) or opt-out:
-
-1. Use the `scripts/override_experiment.cjs` script bundled with this skill to safely update or create `.gemini/experiments.json`.
-2. When the user asks to "opt out of experiments", use the script to set `experimentIds` to an empty array and clear flags, ensuring a sensible baseline.
-3. **Important:** After updating the JSON file, instruct the user to run the CLI with `GEMINI_EXP` set, e.g.:
-   `GEMINI_EXP=.gemini/experiments.json gemini <command>`
-
-## Using the Scripts
-
-You have access to `scripts/override_experiment.cjs` to manage the local overrides safely without disrupting the file structure required by the CLI backend.
-
-Example usage:
-```bash
-# Enable an experiment locally
-node .gemini/skills/experimentation/scripts/override_experiment.cjs set 45740196 true
-
-# Remove an override
-node .gemini/skills/experimentation/scripts/override_experiment.cjs unset 45740196
-
-# Opt out of all experiments (clear everything)
-node .gemini/skills/experimentation/scripts/override_experiment.cjs clear
-```
+### 5. Branching and PR Preparation
+- If not already on a dedicated branch, help the user create a new git branch for this experiment (e.g., `git checkout -b exp/feature-name`).
+- Remind them to run local tests and linting (`npm run lint:all`, `npm test` or `npm run preflight`) before preparing a Pull Request.
