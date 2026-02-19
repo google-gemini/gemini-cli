@@ -106,6 +106,7 @@ export * from './utils/secure-browser-launcher.js';
 export * from './utils/apiConversionUtils.js';
 export * from './utils/channel.js';
 export * from './utils/constants.js';
+export * from './utils/sessionUtils.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
@@ -143,6 +144,7 @@ export * from './agents/types.js';
 export * from './agents/agentLoader.js';
 export * from './agents/local-executor.js';
 export * from './agents/agent-scheduler.js';
+export * from './agents/session.js';
 
 // Export specific tool logic
 export * from './tools/read-file.js';

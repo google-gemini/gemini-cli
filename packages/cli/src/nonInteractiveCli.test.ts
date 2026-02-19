@@ -82,6 +82,19 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       stdout: process.stdout,
       stderr: process.stderr,
     })),
+    AgentSession: vi.fn(),
+    AgentTerminateMode: {
+      ERROR: 'ERROR',
+      TIMEOUT: 'TIMEOUT',
+      GOAL: 'GOAL',
+      MAX_TURNS: 'MAX_TURNS',
+      ABORTED: 'ABORTED',
+    },
+    CoreToolCallStatus: {
+      Success: 'success',
+      Error: 'error',
+      Cancelled: 'cancelled',
+    },
   };
 });
 
@@ -190,6 +203,7 @@ describe('runNonInteractive', () => {
       isTrustedFolder: vi.fn().mockReturnValue(false),
       getRawOutput: vi.fn().mockReturnValue(false),
       getAcceptRawOutputRisk: vi.fn().mockReturnValue(false),
+      isAgentsEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     mockSettings = {
@@ -2229,6 +2243,108 @@ describe('runNonInteractive', () => {
       const output = getWrittenOutput();
       expect(output).toContain('"type":"tool_result"');
       expect(output).toContain('"status":"success"');
+    });
+  });
+  describe('runNonInteractive (AgentSession)', () => {
+    let mockAgentSession: { prompt: Mock; resume: Mock };
+
+    beforeEach(async () => {
+      vi.mocked(mockConfig.isAgentsEnabled).mockReturnValue(true);
+
+      // Get the mocked AgentSession class to spy on instances
+      const core = await import('@google/gemini-cli-core');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const MockAgentSessionClass = core.AgentSession as any;
+
+      // Mock the prompt method logic
+      mockAgentSession = {
+        prompt: vi.fn(),
+        resume: vi.fn(),
+      };
+
+      // When new AgentSession() is called, return our mock instance
+      MockAgentSessionClass.mockImplementation(() => mockAgentSession);
+    });
+
+    it('should process input and write text output from agent events', async () => {
+      const events = [
+        { type: GeminiEventType.Content, value: 'Hello' },
+        { type: GeminiEventType.Content, value: ' World' },
+        {
+          type: 'agent_finish',
+          value: {
+            reason: 'GOAL',
+            sessionId: 'test-session-id',
+            totalTurns: 1,
+          },
+        },
+      ];
+
+      async function* eventGenerator() {
+        for (const event of events) {
+          yield event;
+        }
+      }
+
+      mockAgentSession.prompt.mockReturnValue(eventGenerator());
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Test input',
+        prompt_id: 'prompt-id-agent',
+      });
+
+      expect(mockAgentSession.prompt).toHaveBeenCalledWith(
+        [{ text: 'Test input' }],
+        expect.any(AbortSignal),
+      );
+      expect(getWrittenOutput()).toBe('Hello World\n');
+    });
+
+    it('should write JSON output with stats from agent events', async () => {
+      const events = [
+        { type: GeminiEventType.Content, value: 'JSON Response' },
+        {
+          type: 'agent_finish',
+          value: {
+            reason: 'GOAL',
+            sessionId: 'test-session-id',
+            totalTurns: 1,
+          },
+        },
+      ];
+
+      async function* eventGenerator() {
+        for (const event of events) {
+          yield event;
+        }
+      }
+
+      mockAgentSession.prompt.mockReturnValue(eventGenerator());
+      vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+      vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Test input',
+        prompt_id: 'prompt-id-agent-json',
+      });
+
+      expect(processStdoutSpy).toHaveBeenCalledWith(
+        JSON.stringify(
+          {
+            session_id: 'test-session-id',
+            response: 'JSON Response',
+            stats: MOCK_SESSION_METRICS,
+          },
+          null,
+          2,
+        ),
+      );
     });
   });
 });

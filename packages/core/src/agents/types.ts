@@ -1,11 +1,7 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- */
-
-/**
- * @fileoverview Defines the core configuration interfaces and types for the agent architecture.
  */
 
 import type { Content, FunctionDeclaration } from '@google/genai';
@@ -14,6 +10,55 @@ import { type z } from 'zod';
 import type { ModelConfig } from '../services/modelConfigService.js';
 import type { AnySchema } from 'ajv';
 import type { A2AAuthConfig } from './auth-provider/types.js';
+import { type ServerGeminiStreamEvent } from '../core/turn.js';
+import { type ToolCallResponseInfo } from '../scheduler/types.js';
+
+/**
+ * Unified event type for the Agent loop.
+ * This extends the base Gemini stream events with higher-level agent lifecycle events.
+ */
+export type AgentEvent =
+  | ServerGeminiStreamEvent
+  | { type: 'agent_start'; value: { sessionId: string } }
+  | {
+      type: 'agent_finish';
+      value: {
+        sessionId: string;
+        totalTurns: number;
+        reason: AgentTerminateMode;
+        message?: string;
+        error?: unknown;
+      };
+    }
+  | { type: 'tool_suite_start'; value: { count: number } }
+  | { type: 'tool_suite_finish'; value: { responses: ToolCallResponseInfo[] } }
+  | { type: 'thought'; value: string }
+  | { type: 'loop_detected'; value: { sessionId: string } };
+
+/**
+ * Configuration for an Agent.
+ */
+export interface AgentConfig {
+  /** The name of the agent. */
+  name: string;
+  /** The system instruction (personality/rules) for the agent. */
+  systemInstruction?: string;
+  /** Optional override for the model to use. */
+  model?: string;
+  /**
+   * Optional maximum number of conversational turns.
+   * Set to -1 for no limit, defaults to -1 if not specified.
+   */
+  maxTurns?: number;
+  /**
+   * Optional capabilities to enable for this agent.
+   */
+  capabilities?: {
+    compression?: boolean;
+    loopDetection?: boolean;
+    ideContext?: boolean;
+  };
+}
 
 /**
  * Describes the possible termination modes for an agent.

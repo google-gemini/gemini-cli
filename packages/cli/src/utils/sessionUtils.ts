@@ -16,7 +16,6 @@ import {
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { stripUnsafeCharacters } from '../ui/utils/textUtils.js';
-import type { Part } from '@google/genai';
 import { MessageType, type HistoryItemWithoutId } from '../ui/types.js';
 
 /**
@@ -518,13 +517,12 @@ export class SessionSelector {
 }
 
 /**
- * Converts session/conversation data into UI history and Gemini client history formats.
+ * Converts session/conversation data into UI history format.
  */
 export function convertSessionToHistoryFormats(
   messages: ConversationRecord['messages'],
 ): {
   uiHistory: HistoryItemWithoutId[];
-  clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>;
 } {
   const uiHistory: HistoryItemWithoutId[] = [];
 
@@ -591,117 +589,7 @@ export function convertSessionToHistoryFormats(
     }
   }
 
-  // Convert to Gemini client history format
-  const clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }> = [];
-
-  for (const msg of messages) {
-    // Skip system/error messages and user slash commands
-    if (msg.type === 'info' || msg.type === 'error' || msg.type === 'warning') {
-      continue;
-    }
-
-    if (msg.type === 'user') {
-      // Skip user slash commands
-      const contentString = partListUnionToString(msg.content);
-      if (
-        contentString.trim().startsWith('/') ||
-        contentString.trim().startsWith('?')
-      ) {
-        continue;
-      }
-
-      // Add regular user message
-      clientHistory.push({
-        role: 'user',
-        parts: Array.isArray(msg.content)
-          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            (msg.content as Part[])
-          : [{ text: contentString }],
-      });
-    } else if (msg.type === 'gemini') {
-      // Handle Gemini messages with potential tool calls
-      const hasToolCalls = msg.toolCalls && msg.toolCalls.length > 0;
-
-      if (hasToolCalls) {
-        // Create model message with function calls
-        const modelParts: Part[] = [];
-
-        // Add text content if present
-        const contentString = partListUnionToString(msg.content);
-        if (msg.content && contentString.trim()) {
-          modelParts.push({ text: contentString });
-        }
-
-        // Add function calls
-        for (const toolCall of msg.toolCalls!) {
-          modelParts.push({
-            functionCall: {
-              name: toolCall.name,
-              args: toolCall.args,
-              ...(toolCall.id && { id: toolCall.id }),
-            },
-          });
-        }
-
-        clientHistory.push({
-          role: 'model',
-          parts: modelParts,
-        });
-
-        // Create single function response message with all tool call responses
-        const functionResponseParts: Part[] = [];
-        for (const toolCall of msg.toolCalls!) {
-          if (toolCall.result) {
-            // Convert PartListUnion result to function response format
-            let responseData: Part;
-
-            if (typeof toolCall.result === 'string') {
-              responseData = {
-                functionResponse: {
-                  id: toolCall.id,
-                  name: toolCall.name,
-                  response: {
-                    output: toolCall.result,
-                  },
-                },
-              };
-            } else if (Array.isArray(toolCall.result)) {
-              // toolCall.result is an array containing properly formatted
-              // function responses
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-              functionResponseParts.push(...(toolCall.result as Part[]));
-              continue;
-            } else {
-              // Fallback for non-array results
-              responseData = toolCall.result;
-            }
-
-            functionResponseParts.push(responseData);
-          }
-        }
-
-        // Only add user message if we have function responses
-        if (functionResponseParts.length > 0) {
-          clientHistory.push({
-            role: 'user',
-            parts: functionResponseParts,
-          });
-        }
-      } else {
-        // Regular Gemini message without tool calls
-        const contentString = partListUnionToString(msg.content);
-        if (msg.content && contentString.trim()) {
-          clientHistory.push({
-            role: 'model',
-            parts: [{ text: contentString }],
-          });
-        }
-      }
-    }
-  }
-
   return {
     uiHistory,
-    clientHistory,
   };
 }
