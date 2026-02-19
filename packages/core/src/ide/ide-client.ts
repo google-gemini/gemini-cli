@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { detectIde, type IdeInfo } from '../ide/detect-ide.js';
+import { detectIde, type IdeInfo, IDE_DEFINITIONS } from '../ide/detect-ide.js';
 import { ideContextStore } from './ideContext.js';
 import {
   IdeContextNotificationSchema,
@@ -58,6 +58,18 @@ export enum IDEConnectionStatus {
   Connecting = 'connecting',
 }
 
+export type IDEConnectionTransport = 'http' | 'stdio';
+
+const NEOVIM_BETA_ENV_VAR = 'GEMINI_CLI_NEOVIM_BETA_ENABLED';
+
+function isNeovimBetaEnabled(): boolean {
+  const raw = process.env[NEOVIM_BETA_ENV_VAR];
+  if (!raw) {
+    return false;
+  }
+  return ['1', 'true', 'yes'].includes(raw.toLowerCase());
+}
+
 /**
  * Manages the connection to and interaction with the IDE server.
  */
@@ -71,6 +83,7 @@ export class IdeClient {
   };
   private currentIde: IdeInfo | undefined;
   private ideProcessInfo: { pid: number; command: string } | undefined;
+  private connectionTransport: IDEConnectionTransport | undefined;
 
   private diffResponses = new Map<string, (result: DiffUpdateResult) => void>();
   private statusListeners = new Set<(state: IDEConnectionState) => void>();
@@ -124,8 +137,20 @@ export class IdeClient {
     if (!this.currentIde) {
       this.setState(
         IDEConnectionStatus.Disconnected,
-        `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: Antigravity, VS Code, or VS Code forks.`,
+        `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: Antigravity, VS Code, VS Code forks, or Neovim (beta).`,
         false,
+      );
+      return;
+    }
+
+    if (
+      this.currentIde.name === IDE_DEFINITIONS.neovim.name &&
+      !isNeovimBetaEnabled()
+    ) {
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        `Neovim IDE integration is currently in beta. To enable it, set ide.neovimBetaEnabled to true in your settings and restart Gemini CLI.`,
+        logError,
       );
       return;
     }
@@ -411,6 +436,10 @@ export class IdeClient {
     return this.currentIde?.displayName;
   }
 
+  getConnectionTransport(): IDEConnectionTransport | undefined {
+    return this.connectionTransport;
+  }
+
   isDiffingEnabled(): boolean {
     return (
       !!this.client &&
@@ -487,6 +516,7 @@ export class IdeClient {
 
     if (status === IDEConnectionStatus.Disconnected) {
       ideContextStore.clear();
+      this.connectionTransport = undefined;
     }
   }
 
@@ -597,6 +627,7 @@ export class IdeClient {
       this.registerClientHandlers();
       await this.discoverTools();
       this.setState(IDEConnectionStatus.Connected);
+      this.connectionTransport = 'http';
       return true;
     } catch (_error) {
       if (transport) {
@@ -631,6 +662,7 @@ export class IdeClient {
       this.registerClientHandlers();
       await this.discoverTools();
       this.setState(IDEConnectionStatus.Connected);
+      this.connectionTransport = 'stdio';
       return true;
     } catch (_error) {
       if (transport) {

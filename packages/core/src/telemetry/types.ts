@@ -27,6 +27,7 @@ export { ToolCallDecision };
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import type { OutputFormat } from '../output/types.js';
 import type { AgentTerminateMode } from '../agents/types.js';
+import type { IdeInfo } from '../ide/detect-ide.js';
 
 import { getCommonAttributes } from './telemetryAttributes.js';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
@@ -1012,16 +1013,31 @@ export enum IdeConnectionType {
   SESSION = 'session',
 }
 
+export type IdeConnectionTransport = 'http' | 'stdio';
+
 export const EVENT_IDE_CONNECTION = 'gemini_cli.ide_connection';
 export class IdeConnectionEvent {
   'event.name': 'ide_connection';
   'event.timestamp': string;
   connection_type: IdeConnectionType;
+  ide_name?: string;
+  ide_display_name?: string;
+  ide_transport?: IdeConnectionTransport;
 
-  constructor(connection_type: IdeConnectionType) {
+  constructor(
+    connection_type: IdeConnectionType,
+    options?: { ide?: IdeInfo; transport?: IdeConnectionTransport },
+  ) {
     this['event.name'] = 'ide_connection';
     this['event.timestamp'] = new Date().toISOString();
     this.connection_type = connection_type;
+    if (options?.ide) {
+      this.ide_name = options.ide.name;
+      this.ide_display_name = options.ide.displayName;
+    }
+    if (options?.transport) {
+      this.ide_transport = options.transport;
+    }
   }
 
   toOpenTelemetryAttributes(config: Config): LogAttributes {
@@ -1030,11 +1046,20 @@ export class IdeConnectionEvent {
       'event.name': EVENT_IDE_CONNECTION,
       'event.timestamp': this['event.timestamp'],
       connection_type: this.connection_type,
+      ide_name: this.ide_name,
+      ide_display_name: this.ide_display_name,
+      ide_transport: this.ide_transport,
     };
   }
 
   toLogBody(): string {
-    return `Ide connection. Type: ${this.connection_type}.`;
+    const ideInfo = this.ide_display_name
+      ? ` IDE: ${this.ide_display_name}.`
+      : '';
+    const transport = this.ide_transport
+      ? ` Transport: ${this.ide_transport}.`
+      : '';
+    return `Ide connection. Type: ${this.connection_type}.${ideInfo}${transport}`;
   }
 }
 

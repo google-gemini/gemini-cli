@@ -1,0 +1,21 @@
+{
+  "name": "gemini-cli-neovim-ide-companion",
+  "version": "0.30.0-nightly.20260210.a2174751d",
+  "description": "Neovim companion for Gemini CLI IDE integration (beta)",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/google-gemini/gemini-cli.git",
+    "directory": "packages/neovim-ide-companion"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "node ../../scripts/build_package.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "files": [
+    "dist",
+    "lua"
+  ]
+}

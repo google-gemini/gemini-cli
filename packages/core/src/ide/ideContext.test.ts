@@ -7,11 +7,15 @@
 import {
   IDE_MAX_OPEN_FILES,
   IDE_MAX_SELECTED_TEXT_LENGTH,
+  IDE_MAX_DIAGNOSTIC_FILES,
+  IDE_MAX_DIAGNOSTICS_PER_FILE,
+  IDE_MAX_DIAGNOSTIC_MESSAGE_LENGTH,
 } from './constants.js';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { IdeContextStore } from './ideContext.js';
 import {
   type IdeContext,
+  type DiagnosticFile,
   FileSchema,
   IdeContextSchema,
   type File,
@@ -352,6 +356,105 @@ describe('ideContext', () => {
       const openFiles = ideContextStore.get()?.workspaceState?.openFiles;
       expect(openFiles).toHaveLength(IDE_MAX_OPEN_FILES);
     });
+
+    it('should normalize diagnostics ordering and truncation', () => {
+      const longMessage = 'a'.repeat(IDE_MAX_DIAGNOSTIC_MESSAGE_LENGTH + 10);
+      const diagnostics: DiagnosticFile[] = [
+        {
+          path: 'b.ts',
+          timestamp: 100,
+          items: [
+            {
+              range: {
+                start: { line: 10, character: 1 },
+                end: { line: 10, character: 5 },
+              },
+              severity: 'warning',
+              message: longMessage,
+            },
+            {
+              range: {
+                start: { line: 5, character: 1 },
+                end: { line: 5, character: 2 },
+              },
+              severity: 'error',
+              message: 'short',
+            },
+          ],
+        },
+        {
+          path: 'a.ts',
+          timestamp: 100,
+          items: Array.from(
+            { length: IDE_MAX_DIAGNOSTICS_PER_FILE + 1 },
+            (_, i) => ({
+              range: {
+                start: { line: i + 1, character: 1 },
+                end: { line: i + 1, character: 2 },
+              },
+              severity: 'info',
+              message: `item-${i}`,
+            }),
+          ),
+        },
+        {
+          path: 'c.ts',
+          timestamp: 200,
+          items: [
+            {
+              range: {
+                start: { line: 1, character: 1 },
+                end: { line: 1, character: 2 },
+              },
+              severity: 'hint',
+              message: 'hint',
+            },
+          ],
+        },
+      ];
+
+      const context: IdeContext = {
+        workspaceState: {
+          diagnostics,
+        },
+      };
+      ideContextStore.set(context);
+
+      const normalized = ideContextStore.get()?.workspaceState?.diagnostics;
+      expect(normalized?.[0]?.path).toBe('c.ts');
+      expect(normalized?.[1]?.path).toBe('a.ts');
+      expect(normalized?.[2]?.path).toBe('b.ts');
+
+      const bItems = normalized?.[2]?.items;
+      expect(bItems?.[0]?.severity).toBe('error');
+      expect(bItems?.[1]?.severity).toBe('warning');
+      expect(bItems?.[1]?.message).toHaveLength(
+        IDE_MAX_DIAGNOSTIC_MESSAGE_LENGTH + '... [TRUNCATED]'.length,
+      );
+      expect(bItems?.[1]?.message.endsWith('... [TRUNCATED]')).toBe(true);
+
+      const aItems = normalized?.[1]?.items;
+      expect(aItems).toHaveLength(IDE_MAX_DIAGNOSTICS_PER_FILE);
+    });
+
+    it('should truncate diagnostics file list if it exceeds the max length', () => {
+      const diagnostics = Array.from(
+        { length: IDE_MAX_DIAGNOSTIC_FILES + 3 },
+        (_, i) => ({
+          path: `file${i}.ts`,
+          timestamp: i,
+          items: [],
+        }),
+      );
+      const context: IdeContext = {
+        workspaceState: {
+          diagnostics,
+        },
+      };
+      ideContextStore.set(context);
+      const normalized = ideContextStore.get()?.workspaceState?.diagnostics;
+      expect(normalized).toHaveLength(IDE_MAX_DIAGNOSTIC_FILES);
+    });
   });
 
   describe('FileSchema', () => {
@@ -442,6 +545,52 @@ describe('ideContext', () => {
           openFiles: [
             {
               timestamp: 12345, // path is missing
+            },
+          ],
+        },
+      };
+      const result = IdeContextSchema.safeParse(context);
+      expect(result.success).toBe(false);
+    });
+
+    it('should validate a context with diagnostics', () => {
+      const context = {
+        workspaceState: {
+          diagnostics: [
+            {
+              path: '/path/to/file.ts',
+              timestamp: 12345,
+              items: [
+                {
+                  range: {
+                    start: { line: 1, character: 1 },
+                    end: { line: 1, character: 2 },
+                  },
+                  severity: 'error',
+                  message: 'oops',
+                },
+              ],
+            },
+          ],
+        },
+      };
+      const result = IdeContextSchema.safeParse(context);
+      expect(result.success).toBe(true);
+    });
+
+    it('should fail validation with invalid diagnostics', () => {
+      const context = {
+        workspaceState: {
+          diagnostics: [
+            {
+              path: '/path/to/file.ts',
+              timestamp: 12345,
+              items: [
+                {
+                  severity: 'error',
+                  message: 'oops',
+                },
+              ],
             },
           ],
         },

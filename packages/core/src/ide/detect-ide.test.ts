@@ -31,6 +31,8 @@ describe('detectIde', () => {
     vi.stubEnv('POSITRON', '');
     vi.stubEnv('__COG_BASHRC_SOURCED', '');
     vi.stubEnv('TERMINAL_EMULATOR', '');
+    vi.stubEnv('NVIM', '');
+    vi.stubEnv('NVIM_LISTEN_ADDRESS', '');
   });
 
   afterEach(() => {
@@ -60,6 +62,11 @@ describe('detectIde', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('CURSOR_TRACE_ID', 'some-id');
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.cursor);
+  });
+
+  it('should detect Neovim when NVIM is set', () => {
+    vi.stubEnv('NVIM', '/tmp/nvim');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.neovim);
   });
 
   it('should detect Codespaces', () => {
@@ -211,6 +218,8 @@ describe('detectIde with ideInfoFromFile', () => {
     vi.stubEnv('POSITRON', '');
     vi.stubEnv('__COG_BASHRC_SOURCED', '');
     vi.stubEnv('TERMINAL_EMULATOR', '');
+    vi.stubEnv('NVIM', '');
+    vi.stubEnv('NVIM_LISTEN_ADDRESS', '');
   });
 
   it('should use the name and displayName from the file', () => {

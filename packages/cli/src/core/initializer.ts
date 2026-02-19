@@ -55,7 +55,13 @@ export async function initializeApp(
   if (config.getIdeMode()) {
     const ideClient = await IdeClient.getInstance();
     await ideClient.connect();
-    logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.START));
+    logIdeConnection(
+      config,
+      new IdeConnectionEvent(IdeConnectionType.START, {
+        ide: ideClient.getCurrentIde(),
+        transport: ideClient.getConnectionTransport(),
+      }),
+    );
   }
 
   return {

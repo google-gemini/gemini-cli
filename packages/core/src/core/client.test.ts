@@ -15,6 +15,7 @@ import {
 } from 'vitest';
 
 import type { Content, GenerateContentResponse, Part } from '@google/genai';
+import type { DiagnosticFile } from '../ide/types.js';
 import { GeminiClient } from './client.js';
 import {
   AuthType,
@@ -843,6 +844,96 @@ ${JSON.stringify(
       selectedText: 'hello',
     },
     otherOpenFiles: ['/path/to/recent/file1.ts', '/path/to/recent/file2.ts'],
+  },
+  null,
+  2,
+)}
+\`\`\`
+      `.trim();
+      const expectedRequest = [{ text: expectedContext }];
+      expect(mockChat.addHistory).toHaveBeenCalledWith({
+        role: 'user',
+        parts: expectedRequest,
+      });
+    });
+
+    it('should include diagnostics in editor context', async () => {
+      vi.mocked(ideContextStore.get).mockReturnValue({
+        workspaceState: {
+          openFiles: [],
+          diagnostics: [
+            {
+              path: '/path/to/file.ts',
+              timestamp: 12345,
+              items: [
+                {
+                  range: {
+                    start: { line: 1, character: 1 },
+                    end: { line: 1, character: 2 },
+                  },
+                  severity: 'error',
+                  message: 'oops',
+                },
+              ],
+            },
+          ],
+        },
+      });
+
+      vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
+
+      vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
+        originalTokenCount: 0,
+        newTokenCount: 0,
+        compressionStatus: CompressionStatus.COMPRESSED,
+      });
+
+      mockTurnRunFn.mockReturnValue(
+        (async function* () {
+          yield { type: 'content', value: 'Hello' };
+        })(),
+      );
+
+      const mockChat = {
+        addHistory: vi.fn(),
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
+      } as unknown as GeminiChat;
+      client['chat'] = mockChat;
+
+      const initialRequest: Part[] = [{ text: 'Hi' }];
+
+      const stream = client.sendMessageStream(
+        initialRequest,
+        new AbortController().signal,
+        'prompt-id-ide-diagnostics',
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      const expectedContext = `
+Here is the user's editor context as a JSON object. This is for your information only.
+\`\`\`json
+${JSON.stringify(
+  {
+    diagnostics: [
+      {
+        path: '/path/to/file.ts',
+        timestamp: 12345,
+        items: [
+          {
+            range: {
+              start: { line: 1, character: 1 },
+              end: { line: 1, character: 2 },
+            },
+            severity: 'error',
+            message: 'oops',
+          },
+        ],
+      },
+    ],
   },
   null,
   2,
@@ -2293,6 +2384,76 @@ ${JSON.stringify(
         );
         expect(contextJson).toHaveProperty('activeFile');
         expect(contextJson.activeFile.path).toBe('/path/to/active/file.ts');
+      });
+
+      it('sends delta when diagnostics change', async () => {
+        const lastDiagnostics: DiagnosticFile[] = [
+          {
+            path: '/path/to/file.ts',
+            timestamp: 100,
+            items: [
+              {
+                range: {
+                  start: { line: 1, character: 1 },
+                  end: { line: 1, character: 2 },
+                },
+                severity: 'warning',
+                message: 'old',
+              },
+            ],
+          },
+        ];
+        const currentDiagnostics: DiagnosticFile[] = [
+          {
+            path: '/path/to/file.ts',
+            timestamp: 200,
+            items: [
+              {
+                range: {
+                  start: { line: 1, character: 1 },
+                  end: { line: 1, character: 2 },
+                },
+                severity: 'error',
+                message: 'new',
+              },
+            ],
+          },
+        ];
+
+        client['lastSentIdeContext'] = {
+          workspaceState: {
+            openFiles: [],
+            diagnostics: lastDiagnostics,
+          },
+        };
+
+        vi.mocked(ideContextStore.get).mockReturnValue({
+          workspaceState: {
+            openFiles: [],
+            diagnostics: currentDiagnostics,
+          },
+        });
+
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-id-diagnostics-delta',
+        );
+        for await (const _ of stream) {
+          // consume stream
+        }
+
+        const mockChat = client['chat'] as unknown as {
+          addHistory: ReturnType<(typeof vi)['fn']>;
+        };
+        const call = mockChat.addHistory.mock.calls[0][0];
+        const contextText = call.parts[0].text;
+        const contextJson = JSON.parse(
+          contextText.match(/```json\n(.*)\n```/s)![1],
+        );
+        expect(contextJson.changes.diagnosticsChanged).toEqual(
+          currentDiagnostics,
+        );
       });
     });
 

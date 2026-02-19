@@ -19,6 +19,11 @@ export interface IdeInstaller {
 export interface InstallResult {
   success: boolean;
   message: string;
+  /**
+   * Whether the CLI should automatically enable IDE mode after install.
+   * Defaults to true when omitted.
+   */
+  shouldEnableIdeMode?: boolean;
 }
 
 async function findCommand(
@@ -298,6 +303,39 @@ class AntigravityInstaller implements IdeInstaller {
   }
 }
 
+class NeovimInstaller implements IdeInstaller {
+  constructor(readonly ideInfo: IdeInfo) {}
+
+  async install(): Promise<InstallResult> {
+    const message = [
+      'Neovim IDE integration is in beta. Setup steps:',
+      '',
+      '1) Install the companion plugin from this repo:',
+      '   - Clone https://github.com/google-gemini/gemini-cli',
+      '   - Add the plugin path to Neovim',
+      '',
+      '   lazy.nvim:',
+      "     { dir = '/absolute/path/to/gemini-cli/packages/neovim-ide-companion' }",
+      '   packer.nvim:',
+      "     use { '/absolute/path/to/gemini-cli/packages/neovim-ide-companion' }",
+      '   vim-plug:',
+      "     Plug '/absolute/path/to/gemini-cli/packages/neovim-ide-companion'",
+      '',
+      '2) In your init.lua:',
+      "     require('gemini_ide').setup({})",
+      '',
+      '3) Enable beta in settings: ide.neovimBetaEnabled = true',
+      '4) Restart Gemini CLI and run /ide enable',
+    ].join('\n');
+
+    return {
+      success: true,
+      message,
+      shouldEnableIdeMode: false,
+    };
+  }
+}
+
 export function getIdeInstaller(
   ide: IdeInfo,
   platform = process.platform,
@@ -310,6 +348,8 @@ export function getIdeInstaller(
       return new PositronInstaller(ide, platform);
     case IDE_DEFINITIONS.antigravity.name:
       return new AntigravityInstaller(ide, platform);
+    case IDE_DEFINITIONS.neovim.name:
+      return new NeovimInstaller(ide);
     default:
       return null;
   }

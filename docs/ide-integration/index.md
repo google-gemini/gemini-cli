@@ -5,8 +5,9 @@ context-aware experience. This integration allows the CLI to understand your
 workspace better and enables powerful features like native in-editor diffing.
 
 Currently, the supported IDEs are [Antigravity](https://antigravity.google),
-[Visual Studio Code](https://code.visualstudio.com/), and other editors that
-support VS Code extensions. To build support for other editors, see the
+[Visual Studio Code](https://code.visualstudio.com/), VS Code forks, and
+**Neovim (beta)**. Neovim support is behind the `ide.neovimBetaEnabled` feature
+flag and requires manual setup. To build support for other editors, see the
 [IDE Companion Extension Spec](./ide-companion-spec.md).
 
 ## Features
@@ -17,6 +18,8 @@ support VS Code extensions. To build support for other editors, see the
   - Your active cursor position.
   - Any text you have selected (up to a 16KB limit; longer selections will be
     truncated).
+  - Diagnostics reported by the IDE (errors, warnings, etc.), with truncation
+    limits to keep prompts small.
 
 - **Native diffing:** When Gemini suggests code modifications, you can view the
   changes directly within your IDE's native diff viewer. This allows you to
@@ -34,7 +37,8 @@ support VS Code extensions. To build support for other editors, see the
 
 ## Installation and setup
 
-There are three ways to set up the IDE integration:
+There are three ways to set up the IDE integration for VS Code–compatible
+editors, plus a manual setup flow for Neovim:
 
 ### 1. Automatic nudge (recommended)
 
@@ -72,6 +76,22 @@ You can also install the extension directly from a marketplace.
 >
 > After manually installing the extension, you must run `/ide enable` in the CLI
 > to activate the integration.
+
+### 4. Neovim (beta) setup
+
+Neovim integration is a beta feature and is disabled by default.
+
+1. Enable the beta flag in your settings:
+   ```
+   ide.neovimBetaEnabled = true
+   ```
+2. Run `/ide install` inside the CLI to print setup snippets (no files are
+   modified).
+3. Add the Neovim companion plugin from `packages/neovim-ide-companion` and run:
+   ```
+   :lua require('gemini_ide').setup({})
+   ```
+4. Restart Gemini CLI and run `/ide enable`.
 
 ## Usage
 
@@ -127,6 +147,12 @@ editor.
 
 You can also **modify the suggested changes** directly in the diff view before
 accepting them.
+
+**Neovim commands (beta):**
+
+- `:GeminiDiffAccept` to accept the current diff.
+- `:GeminiDiffReject` to reject the current diff.
+- Saving a diff buffer will accept it.
 
 If you select ‘Allow for this session’ in the CLI, changes will no longer show
 up in the IDE as they will be auto-accepted.
@@ -192,6 +218,24 @@ messages and how to resolve them.
     not a supported IDE.
   - **Solution:** Run Gemini CLI from the integrated terminal of a supported
     IDE, like Antigravity or VS Code.
+
+### Neovim (beta) troubleshooting
+
+- **Message:**
+  `Neovim IDE integration is currently in beta. To enable it, set ide.neovimBetaEnabled to true in your settings and restart Gemini CLI.`
+  - **Cause:** The beta flag is not enabled.
+  - **Solution:** Set `ide.neovimBetaEnabled = true`, restart the CLI, then run
+    `/ide enable`.
+
+- **Symptoms:** CLI cannot connect while Neovim is running.
+  - **Checks:**
+    - Confirm the Neovim companion plugin is loaded.
+    - Verify `GEMINI_CLI_IDE_WORKSPACE_PATH` and either
+      `GEMINI_CLI_IDE_SERVER_PORT` (HTTP) or
+      `GEMINI_CLI_IDE_SERVER_STDIO_COMMAND` (stdio) are present in the Neovim
+      integrated terminal environment.
+    - Ensure the Neovim sidecar discovery file exists in your temp directory
+      (`os.tmpdir()/gemini/ide/`).
 
 - **Message:**
   `No installer is available for IDE. Please install the Gemini CLI Companion extension manually from the marketplace.`

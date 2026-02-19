@@ -736,6 +736,15 @@ const SETTINGS_SCHEMA = {
         description: 'Enable IDE integration mode.',
         showInDialog: true,
       },
+      neovimBetaEnabled: {
+        type: 'boolean',
+        label: 'Enable Neovim IDE (Beta)',
+        category: 'IDE',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable Neovim IDE integration (beta).',
+        showInDialog: false,
+      },
       hasSeenNudge: {
         type: 'boolean',
         label: 'Has Seen IDE Integration Nudge',

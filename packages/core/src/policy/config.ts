@@ -5,6 +5,7 @@
  */
 
 import * as fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -34,7 +35,25 @@ import { isDirectorySecure } from '../utils/security.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-export const DEFAULT_CORE_POLICIES_DIR = path.join(__dirname, 'policies');
+export const DEFAULT_CORE_POLICIES_DIR = (() => {
+  const packagedDir = path.join(__dirname, 'policies');
+  if (existsSync(packagedDir)) {
+    return packagedDir;
+  }
+  const sourceDir = path.resolve(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    'src',
+    'policy',
+    'policies',
+  );
+  if (existsSync(sourceDir)) {
+    return sourceDir;
+  }
+  return packagedDir;
+})();
 
 // Policy tier constants for priority calculation
 export const DEFAULT_POLICY_TIER = 1;

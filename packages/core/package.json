@@ -9,6 +9,18 @@
   },
   "type": "module",
   "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "test": "./index.ts",
+      "default": "./dist/index.js"
+    },
+    "./src/*.js": {
+      "types": "./dist/src/*.d.ts",
+      "test": "./src/*.ts",
+      "default": "./dist/src/*.js"
+    }
+  },
   "scripts": {
     "build": "node ../../scripts/build_package.js",
     "lint": "eslint . --ext .ts,.tsx",

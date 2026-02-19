@@ -44,6 +44,55 @@ export const FileSchema = z.object({
 });
 export type File = z.infer<typeof FileSchema>;
 
+export const DiagnosticSeveritySchema = z.enum([
+  'error',
+  'warning',
+  'info',
+  'hint',
+]);
+export type DiagnosticSeverity = z.infer<typeof DiagnosticSeveritySchema>;
+
+const DiagnosticPositionSchema = z.object({
+  /**
+   * The 1-based line number.
+   */
+  line: z.number(),
+  /**
+   * The 1-based character offset.
+   */
+  character: z.number(),
+});
+
+const DiagnosticRangeSchema = z.object({
+  start: DiagnosticPositionSchema,
+  end: DiagnosticPositionSchema,
+});
+
+export const DiagnosticItemSchema = z.object({
+  range: DiagnosticRangeSchema,
+  severity: DiagnosticSeveritySchema,
+  message: z.string(),
+  source: z.string().optional(),
+  code: z.union([z.string(), z.number()]).optional(),
+});
+export type DiagnosticItem = z.infer<typeof DiagnosticItemSchema>;
+
+export const DiagnosticFileSchema = z.object({
+  /**
+   * The absolute path to the file.
+   */
+  path: z.string(),
+  /**
+   * The unix timestamp of when diagnostics were last updated.
+   */
+  timestamp: z.number(),
+  /**
+   * Diagnostic entries for this file.
+   */
+  items: z.array(DiagnosticItemSchema),
+});
+export type DiagnosticFile = z.infer<typeof DiagnosticFileSchema>;
+
 /**
  * The context of the IDE.
  */
@@ -58,6 +107,10 @@ export const IdeContextSchema = z.object({
        * Whether the workspace is trusted.
        */
       isTrusted: z.boolean().optional(),
+      /**
+       * The list of diagnostics grouped by file.
+       */
+      diagnostics: z.array(DiagnosticFileSchema).optional(),
     })
     .optional(),
 });
