@@ -362,6 +362,36 @@ export const useSlashCommandProcessor = (
         return false;
       }
 
+      const {
+        commandToExecute,
+        args,
+        canonicalPath: resolvedCommandPath,
+      } = parseSlashCommand(trimmed, commands);
+
+      // If the input doesn't match any known command, check if MCP servers
+      // are still loading (the command might come from an MCP server).
+      // Otherwise, treat it as regular text input (e.g. file paths like
+      // /home/user/file.txt) and let it be sent to the model.
+      if (!commandToExecute) {
+        const isMcpLoading =
+          config?.getMcpClientManager()?.getDiscoveryState() ===
+          MCPDiscoveryState.IN_PROGRESS;
+        if (isMcpLoading) {
+          setIsProcessing(true);
+          if (addToHistory) {
+            addItem({ type: MessageType.USER, text: trimmed }, Date.now());
+          }
+          addMessage({
+            type: MessageType.ERROR,
+            content: `Unknown command: ${trimmed}. Command might have been from an MCP server but MCP servers are not done loading.`,
+            timestamp: new Date(),
+          });
+          setIsProcessing(false);
+          return { type: 'handled' };
+        }
+        return false;
+      }
+
       setIsProcessing(true);
 
       if (addToHistory) {
@@ -373,11 +403,6 @@ export const useSlashCommandProcessor = (
       }
 
       let hasError = false;
-      const {
-        commandToExecute,
-        args,
-        canonicalPath: resolvedCommandPath,
-      } = parseSlashCommand(trimmed, commands);
 
       const subcommand =
         resolvedCommandPath.length > 1
@@ -653,19 +678,6 @@ export const useSlashCommandProcessor = (
             return { type: 'handled' };
           }
         }
-
-        const isMcpLoading =
-          config?.getMcpClientManager()?.getDiscoveryState() ===
-          MCPDiscoveryState.IN_PROGRESS;
-        const errorMessage = isMcpLoading
-          ? `Unknown command: ${trimmed}. Command might have been from an MCP server but MCP servers are not done loading.`
-          : `Unknown command: ${trimmed}`;
-
-        addMessage({
-          type: MessageType.ERROR,
-          content: errorMessage,
-          timestamp: new Date(),
-        });
 
         return { type: 'handled' };
       } catch (e: unknown) {
