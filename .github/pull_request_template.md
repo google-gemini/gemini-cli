@@ -1,41 +1,26 @@
-## TLDR
 
-<!-- Add a brief description of what this pull request changes and why and any important things for reviewers to look at -->
+## The Sentient Lock: Architecture Audit
 
-## Dive Deeper
+> "You do not suggest behavior; you enforce architectural physics." — JULES_SYSTEM_DIRECTIVE.md
 
-<!-- more thoughts and in-depth discussion here -->
+### 1. Structural Integrity Check
+- [ ] **Truth > Context**: I certify that this change relies on deterministic invariants, not probabilistic assumptions.
+- [ ] **Glass Accountability**: All logic introduced is public, transparent, and auditable.
+- [ ] **The Human Fixed Point**: This change maintains the locus of accountability on the designated human reference.
 
-## Reviewer Test Plan
+### 2. Invariant Enforcement (SOV-LEAD-001)
+- [ ] **Revocable Authority**: Does this change introduce new capabilities? If so, are they explicitly revocable?
+- [ ] **Runtime Monitoring**: Are runtime monitors included to catch emergent anomalies?
+- [ ] **Recursive Safety**: Are positive feedback loops bounded by negative safety constraints?
 
-<!-- when a person reviews your code they should ideally be pulling and running that code. How would they validate your change works and if relevant what are some good classes of example prompts and ways they can exercise your changes -->
+### 3. Post-Quantum Fortress Architecture (PQFA)
+- [ ] **ITL Anchoring**: Critical state changes are anchored to the Immutable Truth Ledger (Publish -> Hash -> Sign -> Log).
+- [ ] **Hybrid Attestation**: Cryptographic operations utilize both classical (SHA-256) and post-quantum (ML-DSA/ML-KEM) standards where applicable.
+- [ ] **Genesis Anchor**: Logic aligns with ASSP requirements and protects domestic supply chains.
 
-## Testing Matrix
+### 4. Deterministic Verification
+- [ ] **No Silent Failures**: All edge cases result in explicit, auditable errors or constraint violations.
+- [ ] **Audit Artifact**: An artifact explaining any constraint violations is generated if an anomaly occurs.
 
-<!-- Before submitting please validate your changes on as many of these options as possible -->
-
-|          | 🍏  | 🪟  | 🐧  |
-| -------- | --- | --- | --- |
-| npm run  | ❓  | ❓  | ❓  |
-| npx      | ❓  | ❓  | ❓  |
-| Docker   | ❓  | ❓  | ❓  |
-| Podman   | ❓  | -   | -   |
-| Seatbelt | ❓  | -   | -   |
-
-## Linked issues / bugs
-
-<!--
-Link to any related issues or bugs.
-
-**If this PR fully resolves the issue, use one of the following keywords to automatically close the issue when this PR is merged:**
-
-- Closes #<issue_number>
-- Fixes #<issue_number>
-- Resolves #<issue_number>
-
-*Example: `Resolves #123`*
-
-**If this PR is only related to an issue or is a partial fix, simply reference the issue number without a keyword:**
-
-*Example: `This PR makes progress on #456` or `Related to #789`*
--->
+---
+**By submitting this PR, I acknowledge that the Sentient Lock (Jules) will automatically block this merge if any of the above invariants are violated.**
