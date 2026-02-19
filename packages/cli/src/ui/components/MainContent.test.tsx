@@ -427,6 +427,65 @@ describe('MainContent', () => {
     unmount();
   });
 
+  it('renders a split tool group without a gap between static and pending areas', async () => {
+    const toolCalls = [
+      {
+        callId: 'tool-1',
+        name: 'test-tool',
+        description: 'A tool for testing',
+        resultDisplay: 'Part 1',
+        status: CoreToolCallStatus.Success,
+      } as IndividualToolCallDisplay,
+    ];
+
+    const pendingToolCalls = [
+      {
+        callId: 'tool-2',
+        name: 'test-tool',
+        description: 'A tool for testing',
+        resultDisplay: 'Part 2',
+        status: CoreToolCallStatus.Success,
+      } as IndividualToolCallDisplay,
+    ];
+
+    const uiState = {
+      ...defaultMockUiState,
+      history: [
+        {
+          id: 1,
+          type: 'tool_group' as const,
+          tools: toolCalls,
+          borderBottom: false,
+        },
+      ],
+      pendingHistoryItems: [
+        {
+          type: 'tool_group' as const,
+          tools: pendingToolCalls,
+          borderTop: false,
+          borderBottom: true,
+        },
+      ],
+    };
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <MainContent />,
+      {
+        uiState: uiState as Partial<UIState>,
+      },
+    );
+    await waitUntilReady();
+
+    const output = lastFrame();
+    // Verify Part 1 and Part 2 are rendered.
+    expect(output).toContain('Part 1');
+    expect(output).toContain('Part 2');
+
+    // The snapshot will be the best way to verify there is no gap (empty line) between them.
+    expect(output).toMatchSnapshot();
+    unmount();
+  });
+
   describe('MainContent Tool Output Height Logic', () => {
     const testCases = [
       {
