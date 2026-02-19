@@ -293,8 +293,7 @@ The user has the ability to modify \`content\`. If modified, this will be stated
     description: `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting.
 The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
 
-CRITICAL for \`old_string\`: Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. For single replacements (default), this string must uniquely identify the single instance to change; if it matches multiple locations, the tool will fail unless \`expected_replacements\` is specified.
-**Multiple replacements:** Set \`expected_replacements\` to the number of occurrences you want to replace. The tool will replace ALL occurrences that match \`old_string\` exactly. Ensure the number of replacements matches your expectation.`,
+CRITICAL for \`old_string\`: Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. For single replacements (default), this string must uniquely identify the single instance to change; if it matches multiple locations, the tool will fail unless \`expected_replacements\` is specified.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
