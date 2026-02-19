@@ -37,9 +37,9 @@ async function main() {
   try {
     // Also fetch to ensure we have the latest commit dates
     console.log(
-      'Running git fetch to ensure we have up-to-date commit dates...',
+      'Running git fetch to ensure we have up-to-date commit dates and prune stale branches...',
     );
-    runCmd('git fetch origin');
+    runCmd('git fetch origin --prune');
 
     // Get all branches with their commit dates
     allBranchesOutput = runCmd(
@@ -142,7 +142,23 @@ async function main() {
           stdio: 'inherit',
         });
       } catch {
-        console.error('Failed to delete some remote branches in this batch.');
+        console.warn('Batch failed, trying to delete branches individually...');
+        for (const branch of batch) {
+          try {
+            execSync(`git push origin --delete ${branch}`, {
+              stdio: 'pipe',
+            });
+          } catch (err: unknown) {
+            const error = err as { stderr?: Buffer; message?: string };
+            const stderr = error.stderr?.toString() || '';
+            if (!stderr.includes('remote ref does not exist')) {
+              console.error(
+                `Failed to delete branch "${branch}":`,
+                stderr.trim() || error.message,
+              );
+            }
+          }
+        }
       }
     }
 
