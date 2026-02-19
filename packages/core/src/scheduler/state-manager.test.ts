@@ -16,6 +16,7 @@ import type {
   ToolCallRequestInfo,
   ToolCallResponseInfo,
 } from './types.js';
+import { CoreToolCallStatus, ROOT_SCHEDULER_ID } from './types.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
@@ -23,7 +24,7 @@ import {
 } from '../tools/tools.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { ROOT_SCHEDULER_ID } from './types.js';
+import { ApprovalMode } from '../policy/types.js';
 
 describe('SchedulerStateManager', () => {
   const mockRequest: ToolCallRequestInfo = {
@@ -43,12 +44,16 @@ describe('SchedulerStateManager', () => {
     shouldConfirmExecute: vi.fn(),
   } as unknown as AnyToolInvocation;
 
-  const createValidatingCall = (id = 'call-1'): ValidatingToolCall => ({
-    status: 'validating',
+  const createValidatingCall = (
+    id = 'call-1',
+    mode: ApprovalMode = ApprovalMode.DEFAULT,
+  ): ValidatingToolCall => ({
+    status: CoreToolCallStatus.Validating,
     request: { ...mockRequest, callId: id },
     tool: mockTool,
     invocation: mockInvocation,
     startTime: Date.now(),
+    approvalMode: mode,
   });
 
   const createMockResponse = (id: string): ToolCallResponseInfo => ({
@@ -97,7 +102,7 @@ describe('SchedulerStateManager', () => {
       manager.dequeue();
       manager.updateStatus(
         call.request.callId,
-        'success',
+        CoreToolCallStatus.Success,
         createMockResponse(call.request.callId),
       );
       manager.finalizeCall(call.request.callId);
@@ -105,7 +110,7 @@ describe('SchedulerStateManager', () => {
       expect(onTerminalCall).toHaveBeenCalledTimes(1);
       expect(onTerminalCall).toHaveBeenCalledWith(
         expect.objectContaining({
-          status: 'success',
+          status: CoreToolCallStatus.Success,
           request: expect.objectContaining({ callId: call.request.callId }),
         }),
       );
@@ -125,13 +130,13 @@ describe('SchedulerStateManager', () => {
       expect(onTerminalCall).toHaveBeenCalledTimes(2);
       expect(onTerminalCall).toHaveBeenCalledWith(
         expect.objectContaining({
-          status: 'cancelled',
+          status: CoreToolCallStatus.Cancelled,
           request: expect.objectContaining({ callId: '1' }),
         }),
       );
       expect(onTerminalCall).toHaveBeenCalledWith(
         expect.objectContaining({
-          status: 'cancelled',
+          status: CoreToolCallStatus.Cancelled,
           request: expect.objectContaining({ callId: '2' }),
         }),
       );
@@ -167,7 +172,7 @@ describe('SchedulerStateManager', () => {
       stateManager.dequeue();
       stateManager.updateStatus(
         'completed-1',
-        'success',
+        CoreToolCallStatus.Success,
         createMockResponse('completed-1'),
       );
       stateManager.finalizeCall('completed-1');
@@ -208,30 +213,42 @@ describe('SchedulerStateManager', () => {
 
   describe('Status Transitions', () => {
     it('should transition validating to scheduled', () => {
-      const call = createValidatingCall();
+      const call = createValidatingCall('call-1', ApprovalMode.PLAN);
       stateManager.enqueue([call]);
       stateManager.dequeue();
 
-      stateManager.updateStatus(call.request.callId, 'scheduled');
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Scheduled,
+      );
 
       const snapshot = stateManager.getSnapshot();
-      expect(snapshot[0].status).toBe('scheduled');
+      expect(snapshot[0].status).toBe(CoreToolCallStatus.Scheduled);
       expect(snapshot[0].request.callId).toBe(call.request.callId);
+      expect(snapshot[0].approvalMode).toBe(ApprovalMode.PLAN);
     });
 
     it('should transition scheduled to executing', () => {
       const call = createValidatingCall();
       stateManager.enqueue([call]);
       stateManager.dequeue();
-      stateManager.updateStatus(call.request.callId, 'scheduled');
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Scheduled,
+      );
 
-      stateManager.updateStatus(call.request.callId, 'executing');
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Executing,
+      );
 
-      expect(stateManager.firstActiveCall?.status).toBe('executing');
+      expect(stateManager.firstActiveCall?.status).toBe(
+        CoreToolCallStatus.Executing,
+      );
     });
 
     it('should transition to success and move to completed batch', () => {
-      const call = createValidatingCall();
+      const call = createValidatingCall('call-1', ApprovalMode.PLAN);
       stateManager.enqueue([call]);
       stateManager.dequeue();
 
@@ -244,7 +261,11 @@ describe('SchedulerStateManager', () => {
       };
 
       vi.mocked(onUpdate).mockClear();
-      stateManager.updateStatus(call.request.callId, 'success', response);
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Success,
+        response,
+      );
       expect(onUpdate).toHaveBeenCalledTimes(1);
 
       vi.mocked(onUpdate).mockClear();
@@ -254,9 +275,10 @@ describe('SchedulerStateManager', () => {
       expect(stateManager.isActive).toBe(false);
       expect(stateManager.completedBatch).toHaveLength(1);
       const completed = stateManager.completedBatch[0] as SuccessfulToolCall;
-      expect(completed.status).toBe('success');
+      expect(completed.status).toBe(CoreToolCallStatus.Success);
       expect(completed.response).toEqual(response);
       expect(completed.durationMs).toBeDefined();
+      expect(completed.approvalMode).toBe(ApprovalMode.PLAN);
     });
 
     it('should transition to error and move to completed batch', () => {
@@ -272,13 +294,17 @@ describe('SchedulerStateManager', () => {
         errorType: undefined,
       };
 
-      stateManager.updateStatus(call.request.callId, 'error', response);
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Error,
+        response,
+      );
       stateManager.finalizeCall(call.request.callId);
 
       expect(stateManager.isActive).toBe(false);
       expect(stateManager.completedBatch).toHaveLength(1);
       const completed = stateManager.completedBatch[0] as ErroredToolCall;
-      expect(completed.status).toBe('error');
+      expect(completed.status).toBe(CoreToolCallStatus.Error);
       expect(completed.response).toEqual(response);
     });
 
@@ -296,12 +322,12 @@ describe('SchedulerStateManager', () => {
 
       stateManager.updateStatus(
         call.request.callId,
-        'awaiting_approval',
+        CoreToolCallStatus.AwaitingApproval,
         details,
       );
 
       const active = stateManager.firstActiveCall as WaitingToolCall;
-      expect(active.status).toBe('awaiting_approval');
+      expect(active.status).toBe(CoreToolCallStatus.AwaitingApproval);
       expect(active.confirmationDetails).toEqual(details);
     });
 
@@ -322,12 +348,12 @@ describe('SchedulerStateManager', () => {
 
       stateManager.updateStatus(
         call.request.callId,
-        'awaiting_approval',
+        CoreToolCallStatus.AwaitingApproval,
         eventDrivenData,
       );
 
       const active = stateManager.firstActiveCall as WaitingToolCall;
-      expect(active.status).toBe('awaiting_approval');
+      expect(active.status).toBe(CoreToolCallStatus.AwaitingApproval);
       expect(active.correlationId).toBe('corr-123');
       expect(active.confirmationDetails).toEqual(details);
     });
@@ -350,18 +376,18 @@ describe('SchedulerStateManager', () => {
 
       stateManager.updateStatus(
         call.request.callId,
-        'awaiting_approval',
+        CoreToolCallStatus.AwaitingApproval,
         details,
       );
       stateManager.updateStatus(
         call.request.callId,
-        'cancelled',
+        CoreToolCallStatus.Cancelled,
         'User said no',
       );
       stateManager.finalizeCall(call.request.callId);
 
       const completed = stateManager.completedBatch[0] as CancelledToolCall;
-      expect(completed.status).toBe('cancelled');
+      expect(completed.status).toBe(CoreToolCallStatus.Cancelled);
       expect(completed.response.resultDisplay).toEqual({
         fileDiff: 'diff',
         fileName: 'test.txt',
@@ -372,7 +398,7 @@ describe('SchedulerStateManager', () => {
     });
 
     it('should ignore status updates for non-existent callIds', () => {
-      stateManager.updateStatus('unknown', 'scheduled');
+      stateManager.updateStatus('unknown', CoreToolCallStatus.Scheduled);
       expect(onUpdate).not.toHaveBeenCalled();
     });
 
@@ -382,13 +408,16 @@ describe('SchedulerStateManager', () => {
       stateManager.dequeue();
       stateManager.updateStatus(
         call.request.callId,
-        'success',
+        CoreToolCallStatus.Success,
         createMockResponse(call.request.callId),
       );
       stateManager.finalizeCall(call.request.callId);
 
       vi.mocked(onUpdate).mockClear();
-      stateManager.updateStatus(call.request.callId, 'scheduled');
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Scheduled,
+      );
       expect(onUpdate).not.toHaveBeenCalled();
     });
 
@@ -397,7 +426,10 @@ describe('SchedulerStateManager', () => {
       stateManager.enqueue([call]);
       stateManager.dequeue();
 
-      stateManager.updateStatus(call.request.callId, 'executing');
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Executing,
+      );
       stateManager.finalizeCall(call.request.callId);
 
       expect(stateManager.isActive).toBe(true);
@@ -405,7 +437,7 @@ describe('SchedulerStateManager', () => {
 
       stateManager.updateStatus(
         call.request.callId,
-        'success',
+        CoreToolCallStatus.Success,
         createMockResponse(call.request.callId),
       );
       stateManager.finalizeCall(call.request.callId);
@@ -420,33 +452,80 @@ describe('SchedulerStateManager', () => {
       stateManager.dequeue();
 
       // Start executing
-      stateManager.updateStatus(call.request.callId, 'executing');
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Executing,
+      );
       let active = stateManager.firstActiveCall as ExecutingToolCall;
-      expect(active.status).toBe('executing');
+      expect(active.status).toBe(CoreToolCallStatus.Executing);
       expect(active.liveOutput).toBeUndefined();
 
       // Update with live output
-      stateManager.updateStatus(call.request.callId, 'executing', {
-        liveOutput: 'chunk 1',
-      });
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Executing,
+        {
+          liveOutput: 'chunk 1',
+        },
+      );
       active = stateManager.firstActiveCall as ExecutingToolCall;
       expect(active.liveOutput).toBe('chunk 1');
 
       // Update with pid (should preserve liveOutput)
-      stateManager.updateStatus(call.request.callId, 'executing', {
-        pid: 1234,
-      });
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Executing,
+        {
+          pid: 1234,
+        },
+      );
       active = stateManager.firstActiveCall as ExecutingToolCall;
       expect(active.liveOutput).toBe('chunk 1');
       expect(active.pid).toBe(1234);
 
       // Update live output again (should preserve pid)
-      stateManager.updateStatus(call.request.callId, 'executing', {
-        liveOutput: 'chunk 2',
-      });
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Executing,
+        {
+          liveOutput: 'chunk 2',
+        },
+      );
       active = stateManager.firstActiveCall as ExecutingToolCall;
       expect(active.liveOutput).toBe('chunk 2');
       expect(active.pid).toBe(1234);
+    });
+
+    it('should update progressMessage and progressPercent during executing updates', () => {
+      const call = createValidatingCall();
+      stateManager.enqueue([call]);
+      stateManager.dequeue();
+
+      // Update with progress
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Executing,
+        {
+          progressMessage: 'Starting...',
+          progressPercent: 10,
+        },
+      );
+      let active = stateManager.firstActiveCall as ExecutingToolCall;
+      expect(active.progressMessage).toBe('Starting...');
+      expect(active.progressPercent).toBe(10);
+
+      // Update progress further
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Executing,
+        {
+          progressMessage: 'Halfway!',
+          progressPercent: 50,
+        },
+      );
+      active = stateManager.firstActiveCall as ExecutingToolCall;
+      expect(active.progressMessage).toBe('Halfway!');
+      expect(active.progressPercent).toBe(50);
     });
   });
 
@@ -475,7 +554,7 @@ describe('SchedulerStateManager', () => {
       stateManager.dequeue();
       stateManager.updateStatus(
         call.request.callId,
-        'error',
+        CoreToolCallStatus.Error,
         createMockResponse(call.request.callId),
       );
       stateManager.finalizeCall(call.request.callId);
@@ -521,7 +600,9 @@ describe('SchedulerStateManager', () => {
       expect(stateManager.queueLength).toBe(0);
       expect(stateManager.completedBatch).toHaveLength(2);
       expect(
-        stateManager.completedBatch.every((c) => c.status === 'cancelled'),
+        stateManager.completedBatch.every(
+          (c) => c.status === CoreToolCallStatus.Cancelled,
+        ),
       ).toBe(true);
       expect(onUpdate).toHaveBeenCalledTimes(1);
     });
@@ -538,7 +619,7 @@ describe('SchedulerStateManager', () => {
       stateManager.dequeue();
       stateManager.updateStatus(
         call.request.callId,
-        'success',
+        CoreToolCallStatus.Success,
         createMockResponse(call.request.callId),
       );
       stateManager.finalizeCall(call.request.callId);
@@ -555,7 +636,7 @@ describe('SchedulerStateManager', () => {
       stateManager.dequeue();
       stateManager.updateStatus(
         call.request.callId,
-        'success',
+        CoreToolCallStatus.Success,
         createMockResponse(call.request.callId),
       );
       stateManager.finalizeCall(call.request.callId);
@@ -578,7 +659,11 @@ describe('SchedulerStateManager', () => {
       const call1 = createValidatingCall('1');
       stateManager.enqueue([call1]);
       stateManager.dequeue();
-      stateManager.updateStatus('1', 'success', createMockResponse('1'));
+      stateManager.updateStatus(
+        '1',
+        CoreToolCallStatus.Success,
+        createMockResponse('1'),
+      );
       stateManager.finalizeCall('1');
 
       // 2. Active

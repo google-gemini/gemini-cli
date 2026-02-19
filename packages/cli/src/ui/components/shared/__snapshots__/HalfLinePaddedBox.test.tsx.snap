@@ -3,15 +3,23 @@
 exports[`<HalfLinePaddedBox /> > renders iTerm2-specific blocks when iTerm2 is detected 1`] = `
 "▄▄▄▄▄▄▄▄▄▄
 Content
-▀▀▀▀▀▀▀▀▀▀"
+▀▀▀▀▀▀▀▀▀▀
+"
 `;
 
-exports[`<HalfLinePaddedBox /> > renders nothing when screen reader is enabled 1`] = `"Content"`;
+exports[`<HalfLinePaddedBox /> > renders nothing when screen reader is enabled 1`] = `
+"Content
+"
+`;
 
-exports[`<HalfLinePaddedBox /> > renders nothing when useBackgroundColor is false 1`] = `"Content"`;
+exports[`<HalfLinePaddedBox /> > renders nothing when useBackgroundColor is false 1`] = `
+"Content
+"
+`;
 
 exports[`<HalfLinePaddedBox /> > renders standard background and blocks when not iTerm2 1`] = `
 "▀▀▀▀▀▀▀▀▀▀
 Content
-▄▄▄▄▄▄▄▄▄▄"
+▄▄▄▄▄▄▄▄▄▄
+"
 `;

@@ -17,21 +17,29 @@ describe('RawMarkdownIndicator', () => {
     });
   });
 
-  it('renders correct key binding for darwin', () => {
+  it('renders correct key binding for darwin', async () => {
     Object.defineProperty(process, 'platform', {
       value: 'darwin',
     });
-    const { lastFrame } = render(<RawMarkdownIndicator />);
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <RawMarkdownIndicator />,
+    );
+    await waitUntilReady();
     expect(lastFrame()).toContain('raw markdown mode');
     expect(lastFrame()).toContain('option+m to toggle');
+    unmount();
   });
 
-  it('renders correct key binding for other platforms', () => {
+  it('renders correct key binding for other platforms', async () => {
     Object.defineProperty(process, 'platform', {
       value: 'linux',
     });
-    const { lastFrame } = render(<RawMarkdownIndicator />);
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <RawMarkdownIndicator />,
+    );
+    await waitUntilReady();
     expect(lastFrame()).toContain('raw markdown mode');
     expect(lastFrame()).toContain('alt+m to toggle');
+    unmount();
   });
 });

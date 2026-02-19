@@ -29,6 +29,8 @@ import {
   DEFAULT_TOTAL_MAX_MATCHES,
   DEFAULT_SEARCH_TIMEOUT_MS,
 } from './constants.js';
+import { RIP_GREP_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 function getRgCandidateFilenames(): readonly string[] {
   return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
@@ -385,10 +387,9 @@ class GrepToolInvocation extends BaseToolInvocation<
 
     if (fixed_strings) {
       rgArgs.push('--fixed-strings');
-      rgArgs.push(pattern);
-    } else {
-      rgArgs.push('--regexp', pattern);
     }
+
+    rgArgs.push('--regexp', pattern);
 
     if (context) {
       rgArgs.push('--context', context.toString());
@@ -559,83 +560,9 @@ export class RipGrepTool extends BaseDeclarativeTool<
     super(
       RipGrepTool.Name,
       'SearchText',
-      'Searches for a regular expression pattern within file contents.',
+      RIP_GREP_DEFINITION.base.description!,
       Kind.Search,
-      {
-        properties: {
-          pattern: {
-            description:
-              "The pattern to search for. By default, treated as a Rust-flavored regular expression. Use '\\b' for precise symbol matching (e.g., '\\bMatchMe\\b').",
-            type: 'string',
-          },
-          dir_path: {
-            description:
-              "Directory or file to search. Directories are searched recursively. Relative paths are resolved against current working directory. Defaults to current working directory ('.') if omitted.",
-            type: 'string',
-          },
-          include: {
-            description:
-              "Glob pattern to filter files (e.g., '*.ts', 'src/**'). Recommended for large repositories to reduce noise. Defaults to all files if omitted.",
-            type: 'string',
-          },
-          exclude_pattern: {
-            description:
-              'Optional: A regular expression pattern to exclude from the search results. If a line matches both the pattern and the exclude_pattern, it will be omitted.',
-            type: 'string',
-          },
-          names_only: {
-            description:
-              'Optional: If true, only the file paths of the matches will be returned, without the line content or line numbers. This is useful for gathering a list of files.',
-            type: 'boolean',
-          },
-          case_sensitive: {
-            description:
-              'If true, search is case-sensitive. Defaults to false (ignore case) if omitted.',
-            type: 'boolean',
-          },
-          fixed_strings: {
-            description:
-              'If true, treats the `pattern` as a literal string instead of a regular expression. Defaults to false (basic regex) if omitted.',
-            type: 'boolean',
-          },
-          context: {
-            description:
-              'Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.',
-            type: 'integer',
-          },
-          after: {
-            description:
-              'Show this many lines after each match (equivalent to grep -A). Defaults to 0 if omitted.',
-            type: 'integer',
-            minimum: 0,
-          },
-          before: {
-            description:
-              'Show this many lines before each match (equivalent to grep -B). Defaults to 0 if omitted.',
-            type: 'integer',
-            minimum: 0,
-          },
-          no_ignore: {
-            description:
-              'If true, searches all files including those usually ignored (like in .gitignore, build/, dist/, etc). Defaults to false if omitted.',
-            type: 'boolean',
-          },
-          max_matches_per_file: {
-            description:
-              'Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.',
-            type: 'integer',
-            minimum: 1,
-          },
-          total_max_matches: {
-            description:
-              'Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.',
-            type: 'integer',
-            minimum: 1,
-          },
-        },
-        required: ['pattern'],
-        type: 'object',
-      },
+      RIP_GREP_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
@@ -729,5 +656,9 @@ export class RipGrepTool extends BaseDeclarativeTool<
       _toolName,
       _toolDisplayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(RIP_GREP_DEFINITION, modelId);
   }
 }

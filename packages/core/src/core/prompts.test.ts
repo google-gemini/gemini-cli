@@ -218,6 +218,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).not.toContain('No sub-agents are currently available.');
     expect(prompt).toContain('# Core Mandates');
     expect(prompt).toContain('- **Conventions:**');
+    expect(prompt).toContain('- **User Hints:**');
     expect(prompt).toContain('# Outside of Sandbox');
     expect(prompt).toContain('# Final Reminder');
     expect(prompt).toMatchSnapshot();
@@ -227,6 +228,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
     const prompt = getCoreSystemPrompt(mockConfig);
     expect(prompt).toContain('You are Gemini CLI, an interactive CLI agent'); // Check for core content
+    expect(prompt).toContain('- **User Hints:**');
     expect(prompt).toContain('No Chitchat:');
     expect(prompt).toMatchSnapshot();
   });
@@ -238,6 +240,18 @@ describe('Core System Prompt (prompts.ts)', () => {
     const prompt = getCoreSystemPrompt(mockConfig);
     expect(prompt).toContain('You are Gemini CLI, an interactive CLI agent'); // Check for core content
     expect(prompt).toContain('No Chitchat:');
+    expect(prompt).toMatchSnapshot();
+  });
+
+  it('should include mandate to distinguish between Directives and Inquiries', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('Distinguish between **Directives**');
+    expect(prompt).toContain('and **Inquiries**');
+    expect(prompt).toContain(
+      'Assume all requests are Inquiries unless they contain an explicit instruction to perform a task.',
+    );
     expect(prompt).toMatchSnapshot();
   });
 
@@ -612,7 +626,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     const prompt = getCoreSystemPrompt(mockConfig);
 
     expect(prompt).toContain(
-      'For complex tasks, consider using the `enter_plan_mode` tool to enter a dedicated planning phase before starting implementation.',
+      'If the request is ambiguous, broad in scope, or involves creating a new feature/application, you MUST use the `enter_plan_mode` tool to design your approach before making changes. Do NOT use Plan Mode for straightforward bug fixes, answering questions, or simple inquiries.',
     );
     expect(prompt).toMatchSnapshot();
   });

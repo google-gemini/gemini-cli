@@ -14,9 +14,8 @@ import {
   type Mock,
   type MockedObject,
 } from 'vitest';
-import { render } from '../test-utils/render.js';
+import { render, cleanup, persistentStateMock } from '../test-utils/render.js';
 import { waitFor } from '../test-utils/async.js';
-import { cleanup } from 'ink-testing-library';
 import { act, useContext, type ReactElement } from 'react';
 import { AppContainer } from './AppContainer.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
@@ -29,6 +28,7 @@ import {
   type ResumedSessionData,
   AuthType,
   type AgentDefinition,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 
 // Mock coreEvents
@@ -47,6 +47,15 @@ const mockIdeClient = vi.hoisted(() => ({
 // Mock stdout
 const mocks = vi.hoisted(() => ({
   mockStdout: { write: vi.fn() },
+}));
+const terminalNotificationsMocks = vi.hoisted(() => ({
+  notifyViaTerminal: vi.fn().mockResolvedValue(true),
+  isNotificationsEnabled: vi.fn(() => true),
+  buildRunEventNotificationContent: vi.fn((event) => ({
+    title: 'Mock Notification',
+    subtitle: 'Mock Subtitle',
+    body: JSON.stringify(event),
+  })),
 }));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -87,6 +96,7 @@ import ansiEscapes from 'ansi-escapes';
 import { mergeSettings, type LoadedSettings } from '../config/settings.js';
 import type { InitializationResult } from '../core/initializer.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
+import { StreamingState } from './types.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
 import {
   UIActionsContext,
@@ -135,6 +145,7 @@ vi.mock('./hooks/vim.js');
 vi.mock('./hooks/useFocus.js');
 vi.mock('./hooks/useBracketedPaste.js');
 vi.mock('./hooks/useLoadingIndicator.js');
+vi.mock('./hooks/useSuspend.js');
 vi.mock('./hooks/useFolderTrust.js');
 vi.mock('./hooks/useIdeTrustListener.js');
 vi.mock('./hooks/useMessageQueue.js');
@@ -162,6 +173,12 @@ vi.mock('./hooks/useShellInactivityStatus.js', () => ({
     inactivityStatus: 'none',
   })),
 }));
+vi.mock('../utils/terminalNotifications.js', () => ({
+  notifyViaTerminal: terminalNotificationsMocks.notifyViaTerminal,
+  isNotificationsEnabled: terminalNotificationsMocks.isNotificationsEnabled,
+  buildRunEventNotificationContent:
+    terminalNotificationsMocks.buildRunEventNotificationContent,
+}));
 vi.mock('./hooks/useTerminalTheme.js', () => ({
   useTerminalTheme: vi.fn(),
 }));
@@ -169,6 +186,7 @@ vi.mock('./hooks/useTerminalTheme.js', () => ({
 import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
+import { useFocus } from './hooks/useFocus.js';
 
 // Mock external utilities
 vi.mock('../utils/events.js');
@@ -199,6 +217,7 @@ import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import * as useKeypressModule from './hooks/useKeypress.js';
+import { useSuspend } from './hooks/useSuspend.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import {
@@ -271,10 +290,12 @@ describe('AppContainer State Management', () => {
   const mockedUseTextBuffer = useTextBuffer as Mock;
   const mockedUseLogger = useLogger as Mock;
   const mockedUseLoadingIndicator = useLoadingIndicator as Mock;
+  const mockedUseSuspend = useSuspend as Mock;
   const mockedUseInputHistoryStore = useInputHistoryStore as Mock;
   const mockedUseHookDisplayState = useHookDisplayState as Mock;
   const mockedUseTerminalTheme = useTerminalTheme as Mock;
   const mockedUseShellInactivityStatus = useShellInactivityStatus as Mock;
+  const mockedUseFocusState = useFocus as Mock;
 
   const DEFAULT_GEMINI_STREAM_MOCK = {
     streamingState: 'idle',
@@ -296,6 +317,7 @@ describe('AppContainer State Management', () => {
   };
 
   beforeEach(() => {
+    persistentStateMock.reset();
     vi.clearAllMocks();
 
     mockIdeClient.getInstance.mockReturnValue(new Promise(() => {}));
@@ -402,11 +424,18 @@ describe('AppContainer State Management', () => {
       elapsedTime: '0.0s',
       currentLoadingPhrase: '',
     });
+    mockedUseSuspend.mockReturnValue({
+      handleSuspend: vi.fn(),
+    });
     mockedUseHookDisplayState.mockReturnValue([]);
     mockedUseTerminalTheme.mockReturnValue(undefined);
     mockedUseShellInactivityStatus.mockReturnValue({
       shouldShowFocusHint: false,
       inactivityStatus: 'none',
+    });
+    mockedUseFocusState.mockReturnValue({
+      isFocused: true,
+      hasReceivedFocusEvent: true,
     });
 
     // Mock Config
@@ -441,8 +470,8 @@ describe('AppContainer State Management', () => {
           ...defaultMergedSettings.ui,
           showStatusInTitle: false,
           hideWindowTitle: false,
+          useAlternateBuffer: false,
         },
-        useAlternateBuffer: false,
       },
     } as unknown as LoadedSettings;
 
@@ -482,9 +511,392 @@ describe('AppContainer State Management', () => {
       await waitFor(() => expect(capturedUIState).toBeTruthy());
       unmount!();
     });
+
+    it('shows full UI details by default', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.cleanUiDetailsVisible).toBe(true);
+      });
+      unmount!();
+    });
+
+    it('starts in minimal UI mode when Focus UI preference is persisted', async () => {
+      persistentStateMock.get.mockReturnValueOnce(true);
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({
+          settings: mockSettings,
+        });
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.cleanUiDetailsVisible).toBe(false);
+      });
+      expect(persistentStateMock.get).toHaveBeenCalledWith('focusUiEnabled');
+      unmount!();
+    });
   });
 
   describe('State Initialization', () => {
+    it('sends a macOS notification when confirmation is pending and terminal is unfocused', async () => {
+      mockedUseFocusState.mockReturnValue({
+        isFocused: false,
+        hasReceivedFocusEvent: true,
+      });
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        pendingHistoryItems: [
+          {
+            type: 'tool_group',
+            tools: [
+              {
+                callId: 'call-1',
+                name: 'run_shell_command',
+                description: 'Run command',
+                resultDisplay: undefined,
+                status: CoreToolCallStatus.AwaitingApproval,
+                confirmationDetails: {
+                  type: 'exec',
+                  title: 'Run shell command',
+                  command: 'ls',
+                  rootCommand: 'ls',
+                  rootCommands: ['ls'],
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      let unmount: (() => void) | undefined;
+      await act(async () => {
+        const rendered = renderAppContainer();
+        unmount = rendered.unmount;
+      });
+
+      await waitFor(() =>
+        expect(terminalNotificationsMocks.notifyViaTerminal).toHaveBeenCalled(),
+      );
+      expect(
+        terminalNotificationsMocks.buildRunEventNotificationContent,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'attention',
+        }),
+      );
+
+      await act(async () => {
+        unmount?.();
+      });
+    });
+
+    it('does not send attention notification when terminal is focused', async () => {
+      mockedUseFocusState.mockReturnValue({
+        isFocused: true,
+        hasReceivedFocusEvent: true,
+      });
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        pendingHistoryItems: [
+          {
+            type: 'tool_group',
+            tools: [
+              {
+                callId: 'call-2',
+                name: 'run_shell_command',
+                description: 'Run command',
+                resultDisplay: undefined,
+                status: CoreToolCallStatus.AwaitingApproval,
+                confirmationDetails: {
+                  type: 'exec',
+                  title: 'Run shell command',
+                  command: 'ls',
+                  rootCommand: 'ls',
+                  rootCommands: ['ls'],
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      let unmount: (() => void) | undefined;
+      await act(async () => {
+        const rendered = renderAppContainer();
+        unmount = rendered.unmount;
+      });
+
+      expect(
+        terminalNotificationsMocks.notifyViaTerminal,
+      ).not.toHaveBeenCalled();
+
+      await act(async () => {
+        unmount?.();
+      });
+    });
+
+    it('sends attention notification when focus reporting is unavailable', async () => {
+      mockedUseFocusState.mockReturnValue({
+        isFocused: true,
+        hasReceivedFocusEvent: false,
+      });
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        pendingHistoryItems: [
+          {
+            type: 'tool_group',
+            tools: [
+              {
+                callId: 'call-focus-unknown',
+                name: 'run_shell_command',
+                description: 'Run command',
+                resultDisplay: undefined,
+                status: CoreToolCallStatus.AwaitingApproval,
+                confirmationDetails: {
+                  type: 'exec',
+                  title: 'Run shell command',
+                  command: 'ls',
+                  rootCommand: 'ls',
+                  rootCommands: ['ls'],
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      let unmount: (() => void) | undefined;
+      await act(async () => {
+        const rendered = renderAppContainer();
+        unmount = rendered.unmount;
+      });
+
+      await waitFor(() =>
+        expect(terminalNotificationsMocks.notifyViaTerminal).toHaveBeenCalled(),
+      );
+
+      await act(async () => {
+        unmount?.();
+      });
+    });
+
+    it('sends a macOS notification when a response completes while unfocused', async () => {
+      mockedUseFocusState.mockReturnValue({
+        isFocused: false,
+        hasReceivedFocusEvent: true,
+      });
+      let currentStreamingState: 'idle' | 'responding' = 'responding';
+      mockedUseGeminiStream.mockImplementation(() => ({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: currentStreamingState,
+      }));
+
+      let unmount: (() => void) | undefined;
+      let rerender: ((tree: ReactElement) => void) | undefined;
+
+      await act(async () => {
+        const rendered = renderAppContainer();
+        unmount = rendered.unmount;
+        rerender = rendered.rerender;
+      });
+
+      currentStreamingState = 'idle';
+      await act(async () => {
+        rerender?.(getAppContainer());
+      });
+
+      await waitFor(() =>
+        expect(
+          terminalNotificationsMocks.buildRunEventNotificationContent,
+        ).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'session_complete',
+            detail: 'Gemini CLI finished responding.',
+          }),
+        ),
+      );
+      expect(terminalNotificationsMocks.notifyViaTerminal).toHaveBeenCalled();
+
+      await act(async () => {
+        unmount?.();
+      });
+    });
+
+    it('sends completion notification when focus reporting is unavailable', async () => {
+      mockedUseFocusState.mockReturnValue({
+        isFocused: true,
+        hasReceivedFocusEvent: false,
+      });
+      let currentStreamingState: 'idle' | 'responding' = 'responding';
+      mockedUseGeminiStream.mockImplementation(() => ({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: currentStreamingState,
+      }));
+
+      let unmount: (() => void) | undefined;
+      let rerender: ((tree: ReactElement) => void) | undefined;
+
+      await act(async () => {
+        const rendered = renderAppContainer();
+        unmount = rendered.unmount;
+        rerender = rendered.rerender;
+      });
+
+      currentStreamingState = 'idle';
+      await act(async () => {
+        rerender?.(getAppContainer());
+      });
+
+      await waitFor(() =>
+        expect(
+          terminalNotificationsMocks.buildRunEventNotificationContent,
+        ).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'session_complete',
+            detail: 'Gemini CLI finished responding.',
+          }),
+        ),
+      );
+
+      await act(async () => {
+        unmount?.();
+      });
+    });
+
+    it('does not send completion notification when another action-required dialog is pending', async () => {
+      mockedUseFocusState.mockReturnValue({
+        isFocused: false,
+        hasReceivedFocusEvent: true,
+      });
+      mockedUseQuotaAndFallback.mockReturnValue({
+        proQuotaRequest: { kind: 'upgrade' },
+        handleProQuotaChoice: vi.fn(),
+      });
+      let currentStreamingState: 'idle' | 'responding' = 'responding';
+      mockedUseGeminiStream.mockImplementation(() => ({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: currentStreamingState,
+      }));
+
+      let unmount: (() => void) | undefined;
+      let rerender: ((tree: ReactElement) => void) | undefined;
+
+      await act(async () => {
+        const rendered = renderAppContainer();
+        unmount = rendered.unmount;
+        rerender = rendered.rerender;
+      });
+
+      currentStreamingState = 'idle';
+      await act(async () => {
+        rerender?.(getAppContainer());
+      });
+
+      expect(
+        terminalNotificationsMocks.notifyViaTerminal,
+      ).not.toHaveBeenCalled();
+
+      await act(async () => {
+        unmount?.();
+      });
+    });
+
+    it('can send repeated attention notifications for the same key after pending state clears', async () => {
+      mockedUseFocusState.mockReturnValue({
+        isFocused: false,
+        hasReceivedFocusEvent: true,
+      });
+
+      let pendingHistoryItems = [
+        {
+          type: 'tool_group',
+          tools: [
+            {
+              callId: 'repeat-key-call',
+              name: 'run_shell_command',
+              description: 'Run command',
+              resultDisplay: undefined,
+              status: CoreToolCallStatus.AwaitingApproval,
+              confirmationDetails: {
+                type: 'exec',
+                title: 'Run shell command',
+                command: 'ls',
+                rootCommand: 'ls',
+                rootCommands: ['ls'],
+              },
+            },
+          ],
+        },
+      ];
+
+      mockedUseGeminiStream.mockImplementation(() => ({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        pendingHistoryItems,
+      }));
+
+      let unmount: (() => void) | undefined;
+      let rerender: ((tree: ReactElement) => void) | undefined;
+
+      await act(async () => {
+        const rendered = renderAppContainer();
+        unmount = rendered.unmount;
+        rerender = rendered.rerender;
+      });
+
+      await waitFor(() =>
+        expect(
+          terminalNotificationsMocks.notifyViaTerminal,
+        ).toHaveBeenCalledTimes(1),
+      );
+
+      pendingHistoryItems = [];
+      await act(async () => {
+        rerender?.(getAppContainer());
+      });
+
+      pendingHistoryItems = [
+        {
+          type: 'tool_group',
+          tools: [
+            {
+              callId: 'repeat-key-call',
+              name: 'run_shell_command',
+              description: 'Run command',
+              resultDisplay: undefined,
+              status: CoreToolCallStatus.AwaitingApproval,
+              confirmationDetails: {
+                type: 'exec',
+                title: 'Run shell command',
+                command: 'ls',
+                rootCommand: 'ls',
+                rootCommands: ['ls'],
+              },
+            },
+          ],
+        },
+      ];
+      await act(async () => {
+        rerender?.(getAppContainer());
+      });
+
+      await waitFor(() =>
+        expect(
+          terminalNotificationsMocks.notifyViaTerminal,
+        ).toHaveBeenCalledTimes(2),
+      );
+
+      await act(async () => {
+        unmount?.();
+      });
+    });
+
     it('initializes with theme error from initialization result', async () => {
       const initResultWithError = {
         ...mockInitResult,
@@ -728,10 +1140,10 @@ describe('AppContainer State Management', () => {
         getChatRecordingService: vi.fn(() => mockChatRecordingService),
       };
 
-      const configWithRecording = {
-        ...mockConfig,
-        getGeminiClient: vi.fn(() => mockGeminiClient),
-      } as unknown as Config;
+      const configWithRecording = makeFakeConfig();
+      vi.spyOn(configWithRecording, 'getGeminiClient').mockReturnValue(
+        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
+      );
 
       expect(() => {
         renderAppContainer({
@@ -762,11 +1174,13 @@ describe('AppContainer State Management', () => {
         setHistory: vi.fn(),
       };
 
-      const configWithRecording = {
-        ...mockConfig,
-        getGeminiClient: vi.fn(() => mockGeminiClient),
-        getSessionId: vi.fn(() => 'test-session-123'),
-      } as unknown as Config;
+      const configWithRecording = makeFakeConfig();
+      vi.spyOn(configWithRecording, 'getGeminiClient').mockReturnValue(
+        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
+      );
+      vi.spyOn(configWithRecording, 'getSessionId').mockReturnValue(
+        'test-session-123',
+      );
 
       expect(() => {
         renderAppContainer({
@@ -802,10 +1216,10 @@ describe('AppContainer State Management', () => {
         getUserTier: vi.fn(),
       };
 
-      const configWithRecording = {
-        ...mockConfig,
-        getGeminiClient: vi.fn(() => mockGeminiClient),
-      } as unknown as Config;
+      const configWithRecording = makeFakeConfig();
+      vi.spyOn(configWithRecording, 'getGeminiClient').mockReturnValue(
+        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
+      );
 
       renderAppContainer({
         config: configWithRecording,
@@ -836,10 +1250,10 @@ describe('AppContainer State Management', () => {
         })),
       };
 
-      const configWithClient = {
-        ...mockConfig,
-        getGeminiClient: vi.fn(() => mockGeminiClient),
-      } as unknown as Config;
+      const configWithClient = makeFakeConfig();
+      vi.spyOn(configWithClient, 'getGeminiClient').mockReturnValue(
+        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
+      );
 
       const resumedData = {
         conversation: {
@@ -892,10 +1306,10 @@ describe('AppContainer State Management', () => {
         getChatRecordingService: vi.fn(),
       };
 
-      const configWithClient = {
-        ...mockConfig,
-        getGeminiClient: vi.fn(() => mockGeminiClient),
-      } as unknown as Config;
+      const configWithClient = makeFakeConfig();
+      vi.spyOn(configWithClient, 'getGeminiClient').mockReturnValue(
+        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
+      );
 
       const resumedData = {
         conversation: {
@@ -945,10 +1359,10 @@ describe('AppContainer State Management', () => {
         getUserTier: vi.fn(),
       };
 
-      const configWithRecording = {
-        ...mockConfig,
-        getGeminiClient: vi.fn(() => mockGeminiClient),
-      } as unknown as Config;
+      const configWithRecording = makeFakeConfig();
+      vi.spyOn(configWithRecording, 'getGeminiClient').mockReturnValue(
+        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
+      );
 
       renderAppContainer({
         config: configWithRecording,
@@ -1372,7 +1786,7 @@ describe('AppContainer State Management', () => {
                 name: 'run_shell_command',
                 args: { command: 'ls > out' },
               },
-              status: 'executing',
+              status: CoreToolCallStatus.Executing,
             } as unknown as TrackedToolCall,
           ],
           activePtyId: 'pty-1',
@@ -1939,6 +2353,19 @@ describe('AppContainer State Management', () => {
 
         pressKey('\x04'); // Ctrl+D
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+        unmount();
+      });
+    });
+
+    describe('CTRL+Z', () => {
+      it('should call handleSuspend', async () => {
+        const handleSuspend = vi.fn();
+        mockedUseSuspend.mockReturnValue({ handleSuspend });
+        await setupKeypressTest();
+
+        pressKey('\x1A'); // Ctrl+Z
+
+        expect(handleSuspend).toHaveBeenCalledTimes(1);
         unmount();
       });
     });
@@ -2924,5 +3351,99 @@ describe('AppContainer State Management', () => {
         await act(async () => unmount!());
       },
     );
+  });
+
+  describe('Plan Mode Availability', () => {
+    it('should allow plan mode when enabled and idle', async () => {
+      vi.spyOn(mockConfig, 'isPlanEnabled').mockReturnValue(true);
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        pendingHistoryItems: [],
+      });
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState).toBeTruthy();
+        expect(capturedUIState.allowPlanMode).toBe(true);
+      });
+      unmount!();
+    });
+
+    it('should NOT allow plan mode when disabled in config', async () => {
+      vi.spyOn(mockConfig, 'isPlanEnabled').mockReturnValue(false);
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        pendingHistoryItems: [],
+      });
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState).toBeTruthy();
+        expect(capturedUIState.allowPlanMode).toBe(false);
+      });
+      unmount!();
+    });
+
+    it('should NOT allow plan mode when streaming', async () => {
+      vi.spyOn(mockConfig, 'isPlanEnabled').mockReturnValue(true);
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: StreamingState.Responding,
+        pendingHistoryItems: [],
+      });
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState).toBeTruthy();
+        expect(capturedUIState.allowPlanMode).toBe(false);
+      });
+      unmount!();
+    });
+
+    it('should NOT allow plan mode when a tool is awaiting confirmation', async () => {
+      vi.spyOn(mockConfig, 'isPlanEnabled').mockReturnValue(true);
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: StreamingState.Idle,
+        pendingHistoryItems: [
+          {
+            type: 'tool_group',
+            tools: [
+              {
+                name: 'test_tool',
+                status: CoreToolCallStatus.AwaitingApproval,
+              },
+            ],
+          },
+        ],
+      });
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState).toBeTruthy();
+        expect(capturedUIState.allowPlanMode).toBe(false);
+      });
+      unmount!();
+    });
   });
 });

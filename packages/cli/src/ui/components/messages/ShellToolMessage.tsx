@@ -22,17 +22,16 @@ import {
   FocusHint,
 } from './ToolShared.js';
 import type { ToolMessageProps } from './ToolMessage.js';
-import { ToolCallStatus } from '../../types.js';
 import {
   ACTIVE_SHELL_MAX_LINES,
   COMPLETED_SHELL_MAX_LINES,
 } from '../../constants.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
-import type { Config } from '@google/gemini-cli-core';
+import { type Config, CoreToolCallStatus } from '@google/gemini-cli-core';
+
+import { useUIState } from '../../contexts/UIStateContext.js';
 
 export interface ShellToolMessageProps extends ToolMessageProps {
-  activeShellPtyId?: number | null;
-  embeddedShellFocused?: boolean;
   config?: Config;
 }
 
@@ -53,10 +52,6 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
 
   renderOutputAsMarkdown = true,
 
-  activeShellPtyId,
-
-  embeddedShellFocused,
-
   ptyId,
 
   config,
@@ -67,6 +62,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
 
   borderDimColor,
 }) => {
+  const { activePtyId: activeShellPtyId, embeddedShellFocused } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
   const isThisShellFocused = checkIsShellFocused(
     name,
@@ -190,15 +186,15 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
  * This function ensures a finite number of lines is always returned to prevent performance issues.
  */
 function getShellMaxLines(
-  status: ToolCallStatus,
+  status: CoreToolCallStatus,
   isAlternateBuffer: boolean,
   isThisShellFocused: boolean,
   availableTerminalHeight: number | undefined,
 ): number {
   if (
-    status === ToolCallStatus.Success ||
-    status === ToolCallStatus.Error ||
-    status === ToolCallStatus.Canceled
+    status === CoreToolCallStatus.Success ||
+    status === CoreToolCallStatus.Error ||
+    status === CoreToolCallStatus.Cancelled
   ) {
     return COMPLETED_SHELL_MAX_LINES;
   }

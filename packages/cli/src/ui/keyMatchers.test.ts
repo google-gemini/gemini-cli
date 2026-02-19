@@ -130,6 +130,7 @@ describe('keyMatchers', () => {
       positive: [
         createKey('delete', { ctrl: true }),
         createKey('delete', { alt: true }),
+        createKey('d', { alt: true }),
       ],
       negative: [createKey('delete'), createKey('backspace', { ctrl: true })],
     },
@@ -331,12 +332,25 @@ describe('keyMatchers', () => {
       negative: [createKey('d'), createKey('c', { ctrl: true })],
     },
     {
-      command: Command.SHOW_MORE_LINES,
+      command: Command.SUSPEND_APP,
       positive: [
-        createKey('s', { ctrl: true }),
-        createKey('o', { ctrl: true }),
+        createKey('z', { ctrl: true }),
+        createKey('z', { ctrl: true, shift: true }),
       ],
-      negative: [createKey('s'), createKey('l', { ctrl: true })],
+      negative: [
+        createKey('z'),
+        createKey('y', { ctrl: true }),
+        createKey('z', { alt: true }),
+      ],
+    },
+    {
+      command: Command.SHOW_MORE_LINES,
+      positive: [createKey('o', { ctrl: true })],
+      negative: [
+        createKey('s', { ctrl: true }),
+        createKey('s'),
+        createKey('l', { ctrl: true }),
+      ],
     },
 
     // Shell commands
@@ -358,7 +372,7 @@ describe('keyMatchers', () => {
     {
       command: Command.FOCUS_SHELL_INPUT,
       positive: [createKey('tab')],
-      negative: [createKey('f', { ctrl: true }), createKey('f')],
+      negative: [createKey('f6'), createKey('f', { ctrl: true })],
     },
     {
       command: Command.TOGGLE_YOLO,
