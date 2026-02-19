@@ -3198,7 +3198,6 @@ describe('Policy Engine Integration in loadCliConfig', () => {
         }),
       }),
       expect.anything(),
-      undefined,
     );
   });
 
@@ -3220,7 +3219,6 @@ describe('Policy Engine Integration in loadCliConfig', () => {
         }),
       }),
       expect.anything(),
-      undefined,
     );
   });
 
@@ -3241,7 +3239,6 @@ describe('Policy Engine Integration in loadCliConfig', () => {
         policyPaths: ['/path/to/policy1.toml', '/path/to/policy2.toml'],
       }),
       expect.anything(),
-      undefined,
     );
   });
 });
