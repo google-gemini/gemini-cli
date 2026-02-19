@@ -65,7 +65,7 @@ describe('<ShellToolMessage />', () => {
       ['SHELL_COMMAND_NAME', SHELL_COMMAND_NAME],
       ['SHELL_TOOL_NAME', SHELL_TOOL_NAME],
     ])('clicks inside the shell area sets focus for %s', async (_, name) => {
-      const { stdin, lastFrame, simulateClick } = renderShell(
+      const { lastFrame, simulateClick } = renderShell(
         { name },
         { mouseEventsEnabled: true },
       );
@@ -74,7 +74,7 @@ describe('<ShellToolMessage />', () => {
         expect(lastFrame()).toContain('A shell command');
       });
 
-      await simulateClick(stdin, 2, 2);
+      await simulateClick(2, 2);
 
       await waitFor(() => {
         expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(true);
@@ -164,10 +164,9 @@ describe('<ShellToolMessage />', () => {
         },
       ],
     ])('%s', async (_, props, options) => {
-      const { lastFrame } = renderShell(props, options);
-      await waitFor(() => {
-        expect(lastFrame()).toMatchSnapshot();
-      });
+      const { lastFrame, waitUntilReady } = renderShell(props, options);
+      await waitUntilReady();
+      expect(lastFrame()).toMatchSnapshot();
     });
   });
 
@@ -198,7 +197,7 @@ describe('<ShellToolMessage />', () => {
         false,
       ],
     ])('%s', async (_, availableTerminalHeight, expectedMaxLines, focused) => {
-      const { lastFrame } = renderShell(
+      const { lastFrame, waitUntilReady } = renderShell(
         {
           resultDisplay: LONG_OUTPUT,
           renderOutputAsMarkdown: false,
@@ -215,11 +214,10 @@ describe('<ShellToolMessage />', () => {
         },
       );
 
-      await waitFor(() => {
-        const frame = lastFrame();
-        expect(frame!.match(/Line \d+/g)?.length).toBe(expectedMaxLines);
-        expect(frame).toMatchSnapshot();
-      });
+      await waitUntilReady();
+      const frame = lastFrame();
+      expect(frame.match(/Line \d+/g)?.length).toBe(expectedMaxLines);
+      expect(frame).toMatchSnapshot();
     });
   });
 });

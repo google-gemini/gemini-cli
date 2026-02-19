@@ -1430,11 +1430,15 @@ describe('RipGrepTool', () => {
       });
       const result = await invocation.execute(abortSignal);
 
-      expect(mockSpawn).toHaveBeenLastCalledWith(
-        expect.anything(),
-        expect.arrayContaining(['--fixed-strings']),
-        expect.anything(),
-      );
+      const spawnArgs = mockSpawn.mock.calls[0][1];
+      expect(spawnArgs).toContain('--fixed-strings');
+      expect(spawnArgs).toContain('--regexp');
+      expect(spawnArgs).toContain('hello.world');
+
+      // Verify --fixed-strings doesn't have the pattern as its next argument
+      const fixedStringsIdx = spawnArgs.indexOf('--fixed-strings');
+      expect(spawnArgs[fixedStringsIdx + 1]).not.toBe('hello.world');
+
       expect(result.llmContent).toContain(
         'Found 1 match for pattern "hello.world"',
       );

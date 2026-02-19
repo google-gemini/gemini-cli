@@ -100,10 +100,11 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           displayStatus !== ToolCallStatus.Confirming
         );
       }),
+
     [toolCalls],
   );
 
-  const staticHeight = /* border */ 2 + /* marginBottom */ 1;
+  const staticHeight = /* border */ 2;
 
   // If all tools are filtered out (e.g., in-progress AskUser tools, confirming tools),
   // only render if we need to close a border from previous
@@ -147,6 +148,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       */
       width={terminalWidth}
       paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
+      marginBottom={borderBottomOverride === false ? 0 : 1}
     >
       {visibleToolCalls.map((tool, index) => {
         const isFirst = index === 0;
