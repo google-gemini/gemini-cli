@@ -27,6 +27,11 @@ import { GREP_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { GREP_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import {
+  type GrepMatch,
+  groupMatchesByFile,
+  readFileLines,
+} from './grep-utils.js';
 
 // --- Interfaces ---
 
@@ -68,16 +73,6 @@ export interface GrepToolParams {
    * Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.
    */
   total_max_matches?: number;
-}
-
-/**
- * Result object for a single grep match
- */
-interface GrepMatch {
-  filePath: string;
-  absolutePath: string;
-  lineNumber: number;
-  line: string;
 }
 
 class GrepToolInvocation extends BaseToolInvocation<
@@ -277,18 +272,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       const wasTruncated = allMatches.length >= totalMaxMatches;
 
       // Group matches by file
-      const matchesByFile = allMatches.reduce(
-        (acc, match) => {
-          const fileKey = match.filePath;
-          if (!acc[fileKey]) {
-            acc[fileKey] = [];
-          }
-          acc[fileKey].push(match);
-          acc[fileKey].sort((a, b) => a.lineNumber - b.lineNumber);
-          return acc;
-        },
-        {} as Record<string, GrepMatch[]>,
-      );
+      const matchesByFile = groupMatchesByFile(allMatches);
 
       const matchCount = allMatches.length;
       const matchTerm = matchCount === 1 ? 'match' : 'matches';
@@ -315,25 +299,16 @@ class GrepToolInvocation extends BaseToolInvocation<
         const contextBudget = matchCount === 1 ? 50 : 15;
         for (const filePath in matchesByFile) {
           const fileMatches = matchesByFile[filePath];
-          let fileLines: string[] | null = null;
-          try {
-            const content = await fsPromises.readFile(
-              fileMatches[0].absolutePath,
-              'utf8',
-            );
-            fileLines = content.split(/\r?\n/);
-          } catch (err) {
-            debugLogger.warn(
-              `Failed to read file for context: ${fileMatches[0].absolutePath}`,
-              err,
-            );
-          }
+          const fileLines = await readFileLines(fileMatches[0].absolutePath);
 
           llmContent += `File: ${filePath}\n`;
 
           for (const match of fileMatches) {
             if (fileLines) {
-              const startLine = Math.max(0, match.lineNumber - 1 - contextBudget);
+              const startLine = Math.max(
+                0,
+                match.lineNumber - 1 - contextBudget,
+              );
               const endLine = Math.min(
                 fileLines.length,
                 match.lineNumber - 1 + contextBudget + 1,
