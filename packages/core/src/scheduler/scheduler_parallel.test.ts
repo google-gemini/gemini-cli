@@ -333,4 +333,65 @@ describe('Scheduler Parallel Execution', () => {
       'end-call-1',
     ]);
   });
+
+  it('should execute [WRITE, READ, READ] as [sequential, parallel]', async () => {
+    const executionLog: string[] = [];
+    mockExecutor.execute.mockImplementation(async ({ call }) => {
+      const id = call.request.callId;
+      executionLog.push(`start-${id}`);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      executionLog.push(`end-${id}`);
+      return {
+        status: 'success',
+        response: { callId: id, responseParts: [] },
+      } as unknown as SuccessfulToolCall;
+    });
+
+    // req3 (WRITE), req1 (READ), req2 (READ)
+    await scheduler.schedule([req3, req1, req2], signal);
+
+    // Order should be:
+    // 1. write starts and ends
+    // 2. read1 and read2 start together (parallel)
+    expect(executionLog[0]).toBe('start-call-3');
+    expect(executionLog[1]).toBe('end-call-3');
+    expect(executionLog.slice(2, 4)).toContain('start-call-1');
+    expect(executionLog.slice(2, 4)).toContain('start-call-2');
+  });
+
+  it('should execute [READ, READ, WRITE, READ, READ] in three waves', async () => {
+    const executionLog: string[] = [];
+    mockExecutor.execute.mockImplementation(async ({ call }) => {
+      const id = call.request.callId;
+      executionLog.push(`start-${id}`);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      executionLog.push(`end-${id}`);
+      return {
+        status: 'success',
+        response: { callId: id, responseParts: [] },
+      } as unknown as SuccessfulToolCall;
+    });
+
+    const req4: ToolCallRequestInfo = { ...req1, callId: 'call-4' };
+    const req5: ToolCallRequestInfo = { ...req2, callId: 'call-5' };
+
+    await scheduler.schedule([req1, req2, req3, req4, req5], signal);
+
+    // Wave 1: call-1, call-2 (parallel)
+    expect(executionLog.slice(0, 2)).toContain('start-call-1');
+    expect(executionLog.slice(0, 2)).toContain('start-call-2');
+
+    // Wave 2: call-3 (sequential)
+    // Must start after both call-1 and call-2 end
+    const start3 = executionLog.indexOf('start-call-3');
+    expect(start3).toBeGreaterThan(executionLog.indexOf('end-call-1'));
+    expect(start3).toBeGreaterThan(executionLog.indexOf('end-call-2'));
+    const end3 = executionLog.indexOf('end-call-3');
+    expect(end3).toBeGreaterThan(start3);
+
+    // Wave 3: call-4, call-5 (parallel)
+    // Must start after call-3 ends
+    expect(executionLog.indexOf('start-call-4')).toBeGreaterThan(end3);
+    expect(executionLog.indexOf('start-call-5')).toBeGreaterThan(end3);
+  });
 });

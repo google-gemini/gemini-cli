@@ -293,9 +293,6 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
       messageBus,
       true,
       false,
-      undefined,
-      undefined,
-      true,
     );
   }
 

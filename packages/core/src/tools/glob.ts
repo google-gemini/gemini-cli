@@ -278,9 +278,6 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
       messageBus,
       true,
       false,
-      undefined,
-      undefined,
-      true,
     );
   }
 

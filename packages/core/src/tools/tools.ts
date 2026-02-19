@@ -366,15 +366,10 @@ export abstract class DeclarativeTool<
     readonly canUpdateOutput: boolean = false,
     readonly extensionName?: string,
     readonly extensionId?: string,
-    isReadOnly: boolean = false,
-  ) {
-    this._isReadOnly = isReadOnly;
-  }
-
-  private _isReadOnly: boolean;
+  ) {}
 
   get isReadOnly(): boolean {
-    return this._isReadOnly;
+    return READ_ONLY_KINDS.includes(this.kind);
   }
 
   getSchema(_modelId?: string): FunctionDeclaration {
@@ -551,7 +546,6 @@ export function isTool(obj: unknown): obj is AnyDeclarativeTool {
     obj !== null &&
     'name' in obj &&
     'build' in obj &&
-    'isReadOnly' in obj &&
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     typeof (obj as AnyDeclarativeTool).build === 'function'
   );
@@ -832,6 +826,13 @@ export const MUTATOR_KINDS: Kind[] = [
   Kind.Delete,
   Kind.Move,
   Kind.Execute,
+] as const;
+
+// Function kinds that are safe to run in parallel
+export const READ_ONLY_KINDS: Kind[] = [
+  Kind.Read,
+  Kind.Search,
+  Kind.Fetch,
 ] as const;
 
 export interface ToolLocation {

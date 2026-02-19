@@ -264,8 +264,17 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       false, // canUpdateOutput,
       extensionName,
       extensionId,
-      isReadOnly,
     );
+    this._isReadOnly = isReadOnly;
+  }
+
+  private readonly _isReadOnly?: boolean;
+
+  override get isReadOnly(): boolean {
+    if (this._isReadOnly !== undefined) {
+      return this._isReadOnly;
+    }
+    return super.isReadOnly;
   }
 
   getFullyQualifiedPrefix(): string {

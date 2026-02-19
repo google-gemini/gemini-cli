@@ -66,11 +66,6 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
       Kind.Plan,
       definition.base.parametersJsonSchema,
       messageBus,
-      true,
-      false,
-      undefined,
-      undefined,
-      true,
     );
   }
 

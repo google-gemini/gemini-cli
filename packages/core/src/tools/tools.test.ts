@@ -249,49 +249,21 @@ describe('Tools Read-Only property', () => {
     expect(tool.isReadOnly).toBe(true);
   });
 
-  it('should respect isReadOnly value for generic tools', () => {
-    class MutatorTool extends DeclarativeTool<object, ToolResult> {
-      override build(_params: object): ToolInvocation<object, ToolResult> {
-        throw new Error('Method not implemented.');
-      }
-      protected createInvocation(): unknown {
-        return null;
+  it('should derive isReadOnly from Kind', () => {
+    const bus = createMockMessageBus();
+    class MyTool extends DeclarativeTool<object, ToolResult> {
+      build(_params: object): ToolInvocation<object, ToolResult> {
+        throw new Error('Not implemented');
       }
     }
-    const bus = createMockMessageBus();
-    const mutator = new MutatorTool(
-      'mutator',
-      'Mutator',
-      '...',
-      Kind.Edit,
-      {},
-      bus,
-      true,
-      true,
-    );
+
+    const mutator = new MyTool('m', 'M', 'd', Kind.Edit, {}, bus);
     expect(mutator.isReadOnly).toBe(false);
 
-    class ReadOnlyTool extends DeclarativeTool<object, ToolResult> {
-      override build(_params: object): ToolInvocation<object, ToolResult> {
-        throw new Error('Method not implemented.');
-      }
-      protected createInvocation(): unknown {
-        return null;
-      }
-    }
-    const readOnly = new ReadOnlyTool(
-      'read',
-      'Read',
-      '...',
-      Kind.Read,
-      {},
-      bus,
-      true,
-      false,
-      undefined,
-      undefined,
-      true,
-    );
-    expect(readOnly.isReadOnly).toBe(true);
+    const reader = new MyTool('r', 'R', 'd', Kind.Read, {}, bus);
+    expect(reader.isReadOnly).toBe(true);
+
+    const searcher = new MyTool('s', 'S', 'd', Kind.Search, {}, bus);
+    expect(searcher.isReadOnly).toBe(true);
   });
 });

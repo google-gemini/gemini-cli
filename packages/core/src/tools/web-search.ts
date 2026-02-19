@@ -208,9 +208,6 @@ export class WebSearchTool extends BaseDeclarativeTool<
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
-      undefined,
-      undefined,
-      true,
     );
   }
 
