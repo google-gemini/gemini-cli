@@ -14,24 +14,27 @@ import {
 } from './usePhraseCycler.js';
 import { INFORMATIVE_TIPS } from '../constants/tips.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
+import type { LoadingPhrasesMode } from '../../config/settings.js';
 
 // Test component to consume the hook
 const TestComponent = ({
   isActive,
   isWaiting,
   isInteractiveShellWaiting = false,
+  loadingPhrasesMode = 'all',
   customPhrases,
 }: {
   isActive: boolean;
   isWaiting: boolean;
   isInteractiveShellWaiting?: boolean;
+  loadingPhrasesMode?: LoadingPhrasesMode;
   customPhrases?: string[];
 }) => {
   const phrase = usePhraseCycler(
     isActive,
     isWaiting,
     isInteractiveShellWaiting,
-    'all',
+    loadingPhrasesMode,
     customPhrases,
   );
   return <Text>{phrase}</Text>;
@@ -290,6 +293,7 @@ describe('usePhraseCycler', () => {
         <TestComponent
           isActive={config.isActive}
           isWaiting={false}
+          loadingPhrasesMode="witty"
           customPhrases={config.customPhrases}
         />
       );
