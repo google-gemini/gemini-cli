@@ -680,7 +680,7 @@ export class Session {
         if (confirmationDetails.type === 'edit') {
           content.push({
             type: 'diff',
-            path: confirmationDetails.fileName,
+            path: confirmationDetails.filePath,
             oldText: confirmationDetails.originalContent,
             newText: confirmationDetails.newContent,
           });
@@ -1200,7 +1200,9 @@ function toToolCallContent(toolResult: ToolResult): acp.ToolCallContent | null {
       if ('fileName' in toolResult.returnDisplay) {
         return {
           type: 'diff',
-          path: toolResult.returnDisplay.fileName,
+          path:
+            toolResult.returnDisplay.filePath ??
+            toolResult.returnDisplay.fileName,
           oldText: toolResult.returnDisplay.originalContent,
           newText: toolResult.returnDisplay.newContent,
         };
