@@ -58,15 +58,18 @@ describe('IdeClient', () => {
 
   beforeEach(async () => {
     // Reset singleton instance for test isolation
-    (IdeClient as unknown as { instance: IdeClient | undefined }).instance =
-      undefined;
+    (
+      IdeClient as unknown as {
+        instancePromise: Promise<IdeClient> | null;
+      }
+    ).instancePromise = null;
 
     // Mock environment variables
-    process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/test/workspace';
-    delete process.env['GEMINI_CLI_IDE_SERVER_PORT'];
-    delete process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'];
-    delete process.env['GEMINI_CLI_IDE_SERVER_STDIO_ARGS'];
-    delete process.env['GEMINI_CLI_IDE_AUTH_TOKEN'];
+    vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '/test/workspace');
+    vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '');
+    vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_COMMAND', '');
+    vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_ARGS', '');
+    vi.stubEnv('GEMINI_CLI_IDE_AUTH_TOKEN', '');
 
     // Mock dependencies
     vi.spyOn(process, 'cwd').mockReturnValue('/test/workspace/sub-dir');
@@ -101,6 +104,7 @@ describe('IdeClient', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -586,7 +590,7 @@ describe('IdeClient', () => {
       vi.mocked(getConnectionConfigFromFile).mockResolvedValue(undefined);
       vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
       vi.mocked(getPortFromEnv).mockReturnValue('9090');
-      process.env['GEMINI_CLI_IDE_AUTH_TOKEN'] = 'env-auth-token';
+      vi.stubEnv('GEMINI_CLI_IDE_AUTH_TOKEN', 'env-auth-token');
 
       const ideClient = await IdeClient.getInstance();
       await ideClient.connect();
