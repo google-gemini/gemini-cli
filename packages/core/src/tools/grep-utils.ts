@@ -24,18 +24,17 @@ export interface GrepMatch {
 export function groupMatchesByFile(
   allMatches: GrepMatch[],
 ): Record<string, GrepMatch[]> {
-  return allMatches.reduce(
-    (acc, match) => {
-      const fileKey = match.filePath;
-      if (!acc[fileKey]) {
-        acc[fileKey] = [];
-      }
-      acc[fileKey].push(match);
-      acc[fileKey].sort((a, b) => a.lineNumber - b.lineNumber);
-      return acc;
-    },
-    {} as Record<string, GrepMatch[]>,
-  );
+  const groups: Record<string, GrepMatch[]> = {};
+  for (const match of allMatches) {
+    if (!groups[match.filePath]) {
+      groups[match.filePath] = [];
+    }
+    groups[match.filePath].push(match);
+  }
+  for (const filePath in groups) {
+    groups[filePath].sort((a, b) => a.lineNumber - b.lineNumber);
+  }
+  return groups;
 }
 
 /**
