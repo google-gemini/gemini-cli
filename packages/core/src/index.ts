@@ -155,6 +155,7 @@ export * from './tools/write-file.js';
 export * from './tools/web-fetch.js';
 export * from './tools/memoryTool.js';
 export * from './tools/shell.js';
+export * from './tools/ssh.js';
 export * from './tools/web-search.js';
 export * from './tools/read-many-files.js';
 export * from './tools/mcp-client.js';

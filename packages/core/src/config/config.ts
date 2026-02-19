@@ -36,6 +36,7 @@ import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
+import { SSHTool } from '../tools/ssh.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
@@ -2454,6 +2455,9 @@ export class Config {
     );
     maybeRegister(ShellTool, () =>
       registry.registerTool(new ShellTool(this, this.messageBus)),
+    );
+    maybeRegister(SSHTool, () =>
+      registry.registerTool(new SSHTool(this, this.messageBus)),
     );
     maybeRegister(MemoryTool, () =>
       registry.registerTool(new MemoryTool(this.messageBus)),

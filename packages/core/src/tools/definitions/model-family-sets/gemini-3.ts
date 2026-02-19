@@ -25,6 +25,7 @@ import {
   GET_INTERNAL_DOCS_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  SSH_TOOL_NAME,
 } from '../base-declarations.js';
 import {
   getShellDeclaration,
@@ -678,4 +679,49 @@ The agent did not use the todo list because this task could be completed by a ti
 
   exit_plan_mode: (plansDir) => getExitPlanModeDeclaration(plansDir),
   activate_skill: (skillNames) => getActivateSkillDeclaration(skillNames),
+
+  ssh_command: {
+    name: SSH_TOOL_NAME,
+    description:
+      'Executes a command on a remote device via SSH. Use this tool to initiate SSH sessions, run commands on remote servers or network devices, and capture their output for analysis. Supports password and key-based authentication. The output of the remote command is returned for immediate analysis by the model.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        host: {
+          description:
+            'The hostname or IP address of the remote device to connect to (e.g., "device1.example.com" or "192.168.1.1").',
+          type: 'string',
+        },
+        port: {
+          description: 'The SSH port number. Defaults to 22 if not specified.',
+          type: 'number',
+        },
+        username: {
+          description: 'The username for SSH authentication.',
+          type: 'string',
+        },
+        password: {
+          description:
+            'The password for SSH authentication. Optional if using key-based authentication.',
+          type: 'string',
+        },
+        private_key_path: {
+          description:
+            'Path to the private key file for SSH authentication (e.g., "~/.ssh/id_rsa"). Optional if using password authentication. If neither password nor key is provided, the default SSH keys (~/.ssh/id_rsa, ~/.ssh/id_ed25519) and SSH agent will be tried.',
+          type: 'string',
+        },
+        command: {
+          description:
+            'The command to execute on the remote device (e.g., "show ip bgp summary", "uptime", "cat /var/log/syslog | tail -50").',
+          type: 'string',
+        },
+        description: {
+          description:
+            'Optional brief description of what the command does, for display purposes.',
+          type: 'string',
+        },
+      },
+      required: ['host', 'username', 'command'],
+    },
+  },
 };

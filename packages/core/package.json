@@ -71,6 +71,7 @@
     "read-package-up": "^11.0.0",
     "shell-quote": "^1.8.3",
     "simple-git": "^3.28.0",
+    "ssh2": "^1.17.0",
     "strip-ansi": "^7.1.0",
     "systeminformation": "^5.25.11",
     "tree-sitter-bash": "^0.25.0",
@@ -95,6 +96,7 @@
     "@types/fast-levenshtein": "^0.0.4",
     "@types/js-yaml": "^4.0.9",
     "@types/picomatch": "^4.0.1",
+    "@types/ssh2": "^1.15.5",
     "msw": "^2.3.4",
     "typescript": "^5.3.3",
     "vitest": "^3.1.1"
