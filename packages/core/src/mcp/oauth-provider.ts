@@ -17,8 +17,6 @@ import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getConsentForOauth } from '../utils/authConsent.js';
 
-export const OAUTH_DISPLAY_MESSAGE_EVENT = 'oauth-display-message' as const;
-
 /**
  * OAuth configuration for an MCP server.
  */

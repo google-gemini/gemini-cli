@@ -1,8 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`Composer > Snapshots > matches snapshot in idle state 1`] = `
-"
-                                                                                       ShortcutsHint
+"                                                                                       ShortcutsHint
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  ApprovalModeIndicator                                                                 StatusDisplay
 InputPrompt:   Type your message or @path/to/file
@@ -11,22 +10,19 @@ Footer
 `;
 
 exports[`Composer > Snapshots > matches snapshot in minimal UI mode 1`] = `
-"
-                                                                                       ShortcutsHint
+"                                                                                       ShortcutsHint
 InputPrompt:   Type your message or @path/to/file
 "
 `;
 
 exports[`Composer > Snapshots > matches snapshot in minimal UI mode while loading 1`] = `
-"
- LoadingIndicator
+" LoadingIndicator
 InputPrompt:   Type your message or @path/to/file
 "
 `;
 
 exports[`Composer > Snapshots > matches snapshot in narrow view 1`] = `
 "
-
 ShortcutsHint
 ────────────────────────────────────────
  ApprovalModeIndicator
@@ -39,8 +35,7 @@ Footer
 `;
 
 exports[`Composer > Snapshots > matches snapshot while streaming 1`] = `
-"
- LoadingIndicator: Thinking                                                            ShortcutsHint
+" LoadingIndicator: Thinking                                                            ShortcutsHint
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  ApprovalModeIndicator
 InputPrompt:   Type your message or @path/to/file
