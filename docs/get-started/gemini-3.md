@@ -2,6 +2,21 @@
 
 Gemini 3 Pro and Gemini 3 Flash are available on Gemini CLI for all users!
 
+> **Note:** Gemini 3.1 Pro Preview is rolling out. To determine whether you have
+> access to Gemini 3.1, use the `/model` command and select **Manual**. You will
+> see gemini-3.1-pro-preview listed as an available model.
+>
+> If you have access to Gemini 3.1, it will be included in model routing when
+> you select **Auto (Gemini 3)**. You can also launch the Gemini 3.1 model
+> directly using the `-m` flag:
+>
+> ```
+> gemini -m gemini-3.1-pro-preview
+> ```
+>
+> Learn more about [models](../cli/model.md) and
+> [model routing](../cli/model-routing.md).
+
 ## How to get started with Gemini 3 on Gemini CLI
 
 Get started by upgrading Gemini CLI to the latest version:
