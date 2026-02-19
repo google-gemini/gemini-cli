@@ -272,9 +272,9 @@ describe('isActiveModel', () => {
     expect(isActiveModel(DEFAULT_GEMINI_FLASH_MODEL)).toBe(true);
   });
 
-  it('should return true for unknown models and aliases (to support test models)', () => {
-    expect(isActiveModel('invalid-model')).toBe(true);
-    expect(isActiveModel(GEMINI_MODEL_ALIAS_AUTO)).toBe(true);
+  it('should return true for unknown models and aliases', () => {
+    expect(isActiveModel('invalid-model')).toBe(false);
+    expect(isActiveModel(GEMINI_MODEL_ALIAS_AUTO)).toBe(false);
   });
 
   it('should return false for PREVIEW_GEMINI_MODEL when useGemini3_1 is true', () => {

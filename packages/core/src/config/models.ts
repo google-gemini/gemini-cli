@@ -208,7 +208,7 @@ export function isActiveModel(
   useCustomToolModel: boolean = false,
 ): boolean {
   if (!VALID_GEMINI_MODELS.has(model)) {
-    return true;
+    return false;
   }
   if (useGemini3_1) {
     if (model === PREVIEW_GEMINI_MODEL) {
