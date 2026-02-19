@@ -204,7 +204,7 @@ class MemoryToolInvocation extends BaseToolInvocation<
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           MemoryToolInvocation.allowlist.add(allowlistKey);
         }
-        await this.publishPolicyUpdate(outcome);
+        // Policy updates are now handled centrally by the scheduler
       },
     };
     return confirmationDetails;

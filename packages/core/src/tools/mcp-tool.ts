@@ -130,7 +130,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
           DiscoveredMCPToolInvocation.allowlist.add(toolAllowListKey);
         } else if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
           DiscoveredMCPToolInvocation.allowlist.add(toolAllowListKey);
-          await this.publishPolicyUpdate(outcome);
+          // Persistent policy updates are now handled centrally by the scheduler
         }
       },
     };
