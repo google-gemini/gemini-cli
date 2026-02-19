@@ -23,7 +23,8 @@ import { InstallationManager } from '../utils/installationManager.js';
 import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { parseCustomHeaders } from '../utils/customHeaderUtils.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
-import { getVersion, resolveModel } from '../../index.js';
+import { resolveModel } from '../config/models.js';
+import { getVersion } from '../utils/version.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
 
 /**
