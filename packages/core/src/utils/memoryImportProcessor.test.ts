@@ -378,6 +378,32 @@ describe('memoryImportProcessor', () => {
       );
     });
 
+    it('should strip HTML comments and ignore imports inside them', async () => {
+      const content = [
+        'Header',
+        '<!-- user comment that should be removed -->',
+        'Real import @./real.md',
+        'Inline comment <!-- @./fake.md --> after text',
+      ].join('\n');
+      const basePath = testPath('test', 'path');
+      const importedContent = 'Real imported content';
+
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile.mockResolvedValue(importedContent);
+
+      const result = await processImports(content, basePath, true);
+
+      expect(result.content).toContain(importedContent);
+      expect(result.content).not.toContain('user comment that should be removed');
+      expect(result.content).not.toContain('fake.md');
+
+      expect(mockedFs.readFile).toHaveBeenCalledTimes(1);
+      expect(mockedFs.readFile).toHaveBeenCalledWith(
+        path.resolve(basePath, './real.md'),
+        'utf-8',
+      );
+    });
+
     it('should handle nested tokens and non-unique content correctly', async () => {
       // This test verifies the robust findCodeRegions implementation
       // that recursively walks the token tree and handles non-unique content
