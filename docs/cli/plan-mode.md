@@ -69,8 +69,7 @@ You can enter Plan Mode in three ways:
 2.  **Command:** Type `/plan` in the input box.
 3.  **Natural Language:** Ask the agent to "start a plan for...". The agent will
     then call the [`enter_plan_mode`] tool to switch modes.
-
-> **Note:** Plan Mode is not available when the CLI is in YOLO mode.
+    - **Note:** This tool is not available when the CLI is in YOLO mode.
 
 ### The Planning Workflow
 
