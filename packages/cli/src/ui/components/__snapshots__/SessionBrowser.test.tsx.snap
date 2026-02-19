@@ -7,7 +7,8 @@ exports[`SessionBrowser component > enters search mode, filters sessions, and re
 
    Index │ Msgs │ Age  │ Match
  ❯ #1    │ 1    │ 10mo │ You:    Query is here a… (+1 more)
- ▼"
+ ▼
+"
 `;
 
 exports[`SessionBrowser component > renders a list of sessions and marks current session as disabled 1`] = `
@@ -18,15 +19,18 @@ exports[`SessionBrowser component > renders a list of sessions and marks current
    Index │ Msgs │ Age  │ Name
  ❯ #1    │ 5    │ 10mo │ Second conversation about dogs (current)
    #2    │ 2    │ 10mo │ First conversation about cats
- ▼"
+ ▼
+"
 `;
 
 exports[`SessionBrowser component > shows an error state when loading sessions fails 1`] = `
 " Error: storage failure
- Press q to exit"
+ Press q to exit
+"
 `;
 
 exports[`SessionBrowser component > shows empty state when no sessions exist 1`] = `
 " No auto-saved conversations found.
- Press q to exit"
+ Press q to exit
+"
 `;

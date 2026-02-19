@@ -32,7 +32,6 @@ import type {
   ConversationFinishedEvent,
   ChatCompressionEvent,
   MalformedJsonResponseEvent,
-  InvalidChunkEvent,
   ContentRetryEvent,
   ContentRetryFailureEvent,
   RipgrepFallbackEvent,
@@ -57,13 +56,14 @@ import type {
   LlmLoopCheckEvent,
   PlanExecutionEvent,
   ToolOutputMaskingEvent,
+  KeychainAvailabilityEvent,
+  TokenStorageInitializationEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
   recordToolCallMetrics,
   recordChatCompressionMetrics,
   recordFileOperationMetric,
-  recordInvalidChunk,
   recordContentRetry,
   recordContentRetryFailure,
   recordModelRoutingMetrics,
@@ -76,6 +76,8 @@ import {
   recordLinesChanged,
   recordHookCallMetrics,
   recordPlanExecution,
+  recordKeychainAvailability,
+  recordTokenStorageInitialization,
 } from './metrics.js';
 import { bufferTelemetryEvent } from './sdk.js';
 import type { UiEvent } from './uiTelemetry.js';
@@ -466,22 +468,6 @@ export function logMalformedJsonResponse(
   });
 }
 
-export function logInvalidChunk(
-  config: Config,
-  event: InvalidChunkEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logInvalidChunkEvent(event);
-  bufferTelemetryEvent(() => {
-    const logger = logs.getLogger(SERVICE_NAME);
-    const logRecord: LogRecord = {
-      body: event.toLogBody(),
-      attributes: event.toOpenTelemetryAttributes(config),
-    };
-    logger.emit(logRecord);
-    recordInvalidChunk(config);
-  });
-}
-
 export function logContentRetry(
   config: Config,
   event: ContentRetryEvent,
@@ -803,5 +789,39 @@ export function logStartupStats(
       .catch((e: unknown) => {
         debugLogger.error('Failed to log telemetry event', e);
       });
+  });
+}
+
+export function logKeychainAvailability(
+  config: Config,
+  event: KeychainAvailabilityEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logKeychainAvailabilityEvent(event);
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
+
+    recordKeychainAvailability(config, event);
+  });
+}
+
+export function logTokenStorageInitialization(
+  config: Config,
+  event: TokenStorageInitializationEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logTokenStorageInitializationEvent(event);
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
+
+    recordTokenStorageInitialization(config, event);
   });
 }

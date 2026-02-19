@@ -13,6 +13,8 @@ import type {
   ModelSlashCommandEvent,
   AgentFinishEvent,
   RecoveryAttemptEvent,
+  KeychainAvailabilityEvent,
+  TokenStorageInitializationEvent,
 } from './types.js';
 import { AuthType } from '../core/contentGenerator.js';
 import { getCommonAttributes } from './telemetryAttributes.js';
@@ -37,6 +39,8 @@ const MODEL_SLASH_COMMAND_CALL_COUNT =
   'gemini_cli.slash_command.model.call_count';
 const EVENT_HOOK_CALL_COUNT = 'gemini_cli.hook_call.count';
 const EVENT_HOOK_CALL_LATENCY = 'gemini_cli.hook_call.latency';
+const KEYCHAIN_AVAILABILITY_COUNT = 'gemini_cli.keychain.availability.count';
+const TOKEN_STORAGE_TYPE_COUNT = 'gemini_cli.token_storage.type.count';
 
 // Agent Metrics
 const AGENT_RUN_COUNT = 'gemini_cli.agent.run.count';
@@ -234,6 +238,25 @@ const COUNTER_DEFINITIONS = {
       hook_event_name: string;
       hook_name: string;
       success: boolean;
+    },
+  },
+  [KEYCHAIN_AVAILABILITY_COUNT]: {
+    description: 'Counts keychain availability checks.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (keychainAvailabilityCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      available: boolean;
+    },
+  },
+  [TOKEN_STORAGE_TYPE_COUNT]: {
+    description: 'Counts token storage type initializations.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (tokenStorageTypeCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      type: string;
+      forced: boolean;
     },
   },
 } as const;
@@ -572,6 +595,8 @@ let planExecutionCounter: Counter | undefined;
 let slowRenderHistogram: Histogram | undefined;
 let hookCallCounter: Counter | undefined;
 let hookCallLatencyHistogram: Histogram | undefined;
+let keychainAvailabilityCounter: Counter | undefined;
+let tokenStorageTypeCounter: Counter | undefined;
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 let genAiClientTokenUsageHistogram: Histogram | undefined;
@@ -592,7 +617,7 @@ let baselineComparisonHistogram: Histogram | undefined;
 let isMetricsInitialized = false;
 let isPerformanceMonitoringEnabled = false;
 
-export function getMeter(): Meter | undefined {
+function getMeter(): Meter | undefined {
   if (!cliMeter) {
     cliMeter = metrics.getMeter(SERVICE_NAME);
   }
@@ -994,7 +1019,7 @@ function getGenAiOperationName(): GenAiOperationName {
 
 // Performance Monitoring Functions
 
-export function initializePerformanceMonitoring(config: Config): void {
+function initializePerformanceMonitoring(config: Config): void {
   const meter = getMeter();
   if (!meter) return;
 
@@ -1278,4 +1303,33 @@ export function recordHookCallMetrics(
 
   hookCallCounter.add(1, metricAttributes);
   hookCallLatencyHistogram.record(durationMs, metricAttributes);
+}
+
+/**
+ * Records a metric for keychain availability.
+ */
+export function recordKeychainAvailability(
+  config: Config,
+  event: KeychainAvailabilityEvent,
+): void {
+  if (!keychainAvailabilityCounter || !isMetricsInitialized) return;
+  keychainAvailabilityCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    available: event.available,
+  });
+}
+
+/**
+ * Records a metric for token storage type initialization.
+ */
+export function recordTokenStorageInitialization(
+  config: Config,
+  event: TokenStorageInitializationEvent,
+): void {
+  if (!tokenStorageTypeCounter || !isMetricsInitialized) return;
+  tokenStorageTypeCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    type: event.type,
+    forced: event.forced,
+  });
 }

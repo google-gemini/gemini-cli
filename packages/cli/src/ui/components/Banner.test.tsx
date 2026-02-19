@@ -12,18 +12,22 @@ describe('Banner', () => {
   it.each([
     ['warning mode', true, 'Warning Message'],
     ['info mode', false, 'Info Message'],
-  ])('renders in %s', (_, isWarning, text) => {
-    const { lastFrame } = render(
+  ])('renders in %s', async (_, isWarning, text) => {
+    const { lastFrame, waitUntilReady, unmount } = render(
       <Banner bannerText={text} isWarning={isWarning} width={80} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('handles newlines in text', () => {
+  it('handles newlines in text', async () => {
     const text = 'Line 1\\nLine 2';
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <Banner bannerText={text} isWarning={false} width={80} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 });

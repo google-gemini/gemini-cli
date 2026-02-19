@@ -226,8 +226,10 @@ describe('ChatCompressionService', () => {
       false,
       mockModel,
       mockConfig,
-      true,
+      false,
     );
+    // It should now attempt compression even if previously failed (logic removed)
+    // But since history is small, it will be NOOP due to threshold
     expect(result.info.compressionStatus).toBe(CompressionStatus.NOOP);
     expect(result.newHistory).toBeNull();
   });

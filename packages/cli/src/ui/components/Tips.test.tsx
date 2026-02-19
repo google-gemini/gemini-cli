@@ -13,13 +13,20 @@ describe('Tips', () => {
   it.each([
     [0, '3. Create GEMINI.md files'],
     [5, '3. /help for more information'],
-  ])('renders correct tips when file count is %i', (count, expectedText) => {
-    const config = {
-      getGeminiMdFileCount: vi.fn().mockReturnValue(count),
-    } as unknown as Config;
+  ])(
+    'renders correct tips when file count is %i',
+    async (count, expectedText) => {
+      const config = {
+        getGeminiMdFileCount: vi.fn().mockReturnValue(count),
+      } as unknown as Config;
 
-    const { lastFrame } = render(<Tips config={config} />);
-    const output = lastFrame();
-    expect(output).toContain(expectedText);
-  });
+      const { lastFrame, waitUntilReady, unmount } = render(
+        <Tips config={config} />,
+      );
+      await waitUntilReady();
+      const output = lastFrame();
+      expect(output).toContain(expectedText);
+      unmount();
+    },
+  );
 });

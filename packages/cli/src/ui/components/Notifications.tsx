@@ -88,17 +88,16 @@ export const Notifications = () => {
       )}
       {updateInfo && <UpdateNotification message={updateInfo.message} />}
       {showStartupWarnings && (
-        <Box
-          borderStyle="round"
-          borderColor={theme.status.warning}
-          paddingX={1}
-          marginY={1}
-          flexDirection="column"
-        >
+        <Box marginY={1} flexDirection="column">
           {startupWarnings.map((warning, index) => (
-            <Text key={index} color={theme.status.warning}>
-              {warning}
-            </Text>
+            <Box key={index} flexDirection="row">
+              <Box width={3}>
+                <Text color={theme.status.warning}>⚠ </Text>
+              </Box>
+              <Box flexGrow={1}>
+                <Text color={theme.status.warning}>{warning}</Text>
+              </Box>
+            </Box>
           ))}
         </Box>
       )}

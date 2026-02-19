@@ -223,6 +223,13 @@ Slash commands provide meta-level control over the CLI itself.
 
 - **Description:** Opens a dialog to choose your Gemini model.
 
+### `/plan`
+
+- **Description:** Switch to Plan Mode (read-only) and view the current plan if
+  one has been generated.
+  - **Note:** This feature requires the `experimental.plan` setting to be
+    enabled in your configuration.
+
 ### `/policies`
 
 - **Description:** Manage policies.

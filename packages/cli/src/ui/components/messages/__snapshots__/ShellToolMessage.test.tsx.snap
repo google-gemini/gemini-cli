@@ -18,7 +18,8 @@ exports[`<ShellToolMessage /> > Height Constraints > defaults to ACTIVE_SHELL_MA
 │ Line 97                                                                      │
 │ Line 98                                                                    ▄ │
 │ Line 99                                                                    █ │
-│ Line 100                                                                   █ │"
+│ Line 100                                                                   █ │
+"
 `;
 
 exports[`<ShellToolMessage /> > Height Constraints > respects availableTerminalHeight when it is smaller than ACTIVE_SHELL_MAX_LINES 1`] = `
@@ -32,7 +33,8 @@ exports[`<ShellToolMessage /> > Height Constraints > respects availableTerminalH
 │ Line 97                                                                      │
 │ Line 98                                                                      │
 │ Line 99                                                                      │
-│ Line 100                                                                   █ │"
+│ Line 100                                                                   █ │
+"
 `;
 
 exports[`<ShellToolMessage /> > Height Constraints > uses ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is large 1`] = `
@@ -53,7 +55,8 @@ exports[`<ShellToolMessage /> > Height Constraints > uses ACTIVE_SHELL_MAX_LINES
 │ Line 97                                                                      │
 │ Line 98                                                                    ▄ │
 │ Line 99                                                                    █ │
-│ Line 100                                                                   █ │"
+│ Line 100                                                                   █ │
+"
 `;
 
 exports[`<ShellToolMessage /> > Height Constraints > uses full availableTerminalHeight when focused in alternate buffer mode 1`] = `
@@ -158,7 +161,8 @@ exports[`<ShellToolMessage /> > Height Constraints > uses full availableTerminal
 │ Line 98                                                                    █ │
 │ Line 99                                                                    █ │
 │ Line 100                                                                   █ │
-│                                                                              │"
+│                                                                              │
+"
 `;
 
 exports[`<ShellToolMessage /> > Snapshots > renders in Alternate Buffer mode while focused 1`] = `
@@ -166,33 +170,38 @@ exports[`<ShellToolMessage /> > Snapshots > renders in Alternate Buffer mode whi
 │ ⊷  Shell Command A shell command                      (Shift+Tab to unfocus) │
 │                                                                              │
 │ Test result                                                                  │
-│                                                                              │"
+│                                                                              │
+"
 `;
 
 exports[`<ShellToolMessage /> > Snapshots > renders in Alternate Buffer mode while unfocused 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ⊷  Shell Command A shell command                                             │
 │                                                                              │
-│ Test result                                                                  │"
+│ Test result                                                                  │
+"
 `;
 
 exports[`<ShellToolMessage /> > Snapshots > renders in Error state 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ x  Shell Command A shell command                                             │
 │                                                                              │
-│ Error output                                                                 │"
+│ Error output                                                                 │
+"
 `;
 
 exports[`<ShellToolMessage /> > Snapshots > renders in Executing state 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ⊷  Shell Command A shell command                                             │
 │                                                                              │
-│ Test result                                                                  │"
+│ Test result                                                                  │
+"
 `;
 
 exports[`<ShellToolMessage /> > Snapshots > renders in Success state (history mode) 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  Shell Command A shell command                                             │
 │                                                                              │
-│ Test result                                                                  │"
+│ Test result                                                                  │
+"
 `;

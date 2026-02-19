@@ -16,8 +16,8 @@ describe('SuggestionsDisplay', () => {
     { label: 'Command 3', value: 'command3', description: 'Description 3' },
   ];
 
-  it('renders loading state', () => {
-    const { lastFrame } = render(
+  it('renders loading state', async () => {
+    const { lastFrame, waitUntilReady } = render(
       <SuggestionsDisplay
         suggestions={[]}
         activeIndex={0}
@@ -28,11 +28,12 @@ describe('SuggestionsDisplay', () => {
         mode="reverse"
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders nothing when empty and not loading', () => {
-    const { lastFrame } = render(
+  it('renders nothing when empty and not loading', async () => {
+    const { lastFrame, waitUntilReady } = render(
       <SuggestionsDisplay
         suggestions={[]}
         activeIndex={0}
@@ -43,11 +44,12 @@ describe('SuggestionsDisplay', () => {
         mode="reverse"
       />,
     );
-    expect(lastFrame()).toBe('');
+    await waitUntilReady();
+    expect(lastFrame({ allowEmpty: true })).toBe('');
   });
 
-  it('renders suggestions list', () => {
-    const { lastFrame } = render(
+  it('renders suggestions list', async () => {
+    const { lastFrame, waitUntilReady } = render(
       <SuggestionsDisplay
         suggestions={mockSuggestions}
         activeIndex={0}
@@ -58,13 +60,14 @@ describe('SuggestionsDisplay', () => {
         mode="reverse"
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('highlights active item', () => {
+  it('highlights active item', async () => {
     // This test relies on visual inspection or implementation details (colors)
     // For now, we just ensure it renders without error and contains the item
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady } = render(
       <SuggestionsDisplay
         suggestions={mockSuggestions}
         activeIndex={1}
@@ -75,17 +78,18 @@ describe('SuggestionsDisplay', () => {
         mode="reverse"
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('handles scrolling', () => {
+  it('handles scrolling', async () => {
     const manySuggestions = Array.from({ length: 20 }, (_, i) => ({
       label: `Cmd ${i}`,
       value: `Cmd ${i}`,
       description: `Description ${i}`,
     }));
 
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady } = render(
       <SuggestionsDisplay
         suggestions={manySuggestions}
         activeIndex={10}
@@ -96,10 +100,11 @@ describe('SuggestionsDisplay', () => {
         mode="reverse"
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders MCP tag for MCP prompts', () => {
+  it('renders MCP tag for MCP prompts', async () => {
     const mcpSuggestions = [
       {
         label: 'MCP Tool',
@@ -108,7 +113,7 @@ describe('SuggestionsDisplay', () => {
       },
     ];
 
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady } = render(
       <SuggestionsDisplay
         suggestions={mcpSuggestions}
         activeIndex={0}
@@ -119,6 +124,7 @@ describe('SuggestionsDisplay', () => {
         mode="reverse"
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 });

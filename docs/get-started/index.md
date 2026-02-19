@@ -70,4 +70,3 @@ To explore the power of Gemini CLI, see [Gemini CLI examples](./examples.md).
   start working with your codebase.
 - See [Shell commands](../cli/tutorials/shell-commands.md) to learn about
   terminal integration.
-- Explore the full range of [User guides](../cli/index.md#user-guides).

@@ -38,7 +38,7 @@ describe('ToolConfirmationMessage', () => {
     getIdeMode: () => false,
   } as unknown as Config;
 
-  it('should not display urls if prompt and url are the same', () => {
+  it('should not display urls if prompt and url are the same', async () => {
     const confirmationDetails: SerializableConfirmationDetails = {
       type: 'info',
       title: 'Confirm Web Fetch',
@@ -46,7 +46,7 @@ describe('ToolConfirmationMessage', () => {
       urls: ['https://example.com'],
     };
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
@@ -55,11 +55,13 @@ describe('ToolConfirmationMessage', () => {
         terminalWidth={80}
       />,
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('should display urls if prompt and url are different', () => {
+  it('should display urls if prompt and url are different', async () => {
     const confirmationDetails: SerializableConfirmationDetails = {
       type: 'info',
       title: 'Confirm Web Fetch',
@@ -70,7 +72,7 @@ describe('ToolConfirmationMessage', () => {
       ],
     };
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
@@ -79,11 +81,13 @@ describe('ToolConfirmationMessage', () => {
         terminalWidth={80}
       />,
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('should display multiple commands for exec type when provided', () => {
+  it('should display multiple commands for exec type when provided', async () => {
     const confirmationDetails: SerializableConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Multiple Commands',
@@ -93,7 +97,7 @@ describe('ToolConfirmationMessage', () => {
       commands: ['echo "hello"', 'ls -la', 'whoami'], // Multi-command list
     };
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
@@ -102,12 +106,14 @@ describe('ToolConfirmationMessage', () => {
         terminalWidth={80}
       />,
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('echo "hello"');
     expect(output).toContain('ls -la');
     expect(output).toContain('whoami');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
   describe('with folder trust', () => {
@@ -166,13 +172,13 @@ describe('ToolConfirmationMessage', () => {
         alwaysAllowText: 'always allow',
       },
     ])('$description', ({ details }) => {
-      it('should show "allow always" when folder is trusted', () => {
+      it('should show "allow always" when folder is trusted', async () => {
         const mockConfig = {
           isTrustedFolder: () => true,
           getIdeMode: () => false,
         } as unknown as Config;
 
-        const { lastFrame } = renderWithProviders(
+        const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
           <ToolConfirmationMessage
             callId="test-call-id"
             confirmationDetails={details}
@@ -181,17 +187,19 @@ describe('ToolConfirmationMessage', () => {
             terminalWidth={80}
           />,
         );
+        await waitUntilReady();
 
         expect(lastFrame()).toMatchSnapshot();
+        unmount();
       });
 
-      it('should NOT show "allow always" when folder is untrusted', () => {
+      it('should NOT show "allow always" when folder is untrusted', async () => {
         const mockConfig = {
           isTrustedFolder: () => false,
           getIdeMode: () => false,
         } as unknown as Config;
 
-        const { lastFrame } = renderWithProviders(
+        const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
           <ToolConfirmationMessage
             callId="test-call-id"
             confirmationDetails={details}
@@ -200,8 +208,10 @@ describe('ToolConfirmationMessage', () => {
             terminalWidth={80}
           />,
         );
+        await waitUntilReady();
 
         expect(lastFrame()).toMatchSnapshot();
+        unmount();
       });
     });
   });
@@ -217,13 +227,13 @@ describe('ToolConfirmationMessage', () => {
       newContent: 'b',
     };
 
-    it('should NOT show "Allow for all future sessions" when setting is false (default)', () => {
+    it('should NOT show "Allow for all future sessions" when setting is false (default)', async () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
       } as unknown as Config;
 
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <ToolConfirmationMessage
           callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
@@ -237,17 +247,19 @@ describe('ToolConfirmationMessage', () => {
           }),
         },
       );
+      await waitUntilReady();
 
       expect(lastFrame()).not.toContain('Allow for all future sessions');
+      unmount();
     });
 
-    it('should show "Allow for all future sessions" when setting is true', () => {
+    it('should show "Allow for all future sessions" when setting is true', async () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
       } as unknown as Config;
 
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <ToolConfirmationMessage
           callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
@@ -261,8 +273,10 @@ describe('ToolConfirmationMessage', () => {
           }),
         },
       );
+      await waitUntilReady();
 
       expect(lastFrame()).toContain('Allow for all future sessions');
+      unmount();
     });
   });
 
@@ -277,7 +291,7 @@ describe('ToolConfirmationMessage', () => {
       newContent: 'b',
     };
 
-    it('should show "Modify with external editor" when NOT in IDE mode', () => {
+    it('should show "Modify with external editor" when NOT in IDE mode', async () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
@@ -289,7 +303,7 @@ describe('ToolConfirmationMessage', () => {
         isDiffingEnabled: false,
       });
 
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <ToolConfirmationMessage
           callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
@@ -298,11 +312,13 @@ describe('ToolConfirmationMessage', () => {
           terminalWidth={80}
         />,
       );
+      await waitUntilReady();
 
       expect(lastFrame()).toContain('Modify with external editor');
+      unmount();
     });
 
-    it('should show "Modify with external editor" when in IDE mode but diffing is NOT enabled', () => {
+    it('should show "Modify with external editor" when in IDE mode but diffing is NOT enabled', async () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => true,
@@ -314,7 +330,7 @@ describe('ToolConfirmationMessage', () => {
         isDiffingEnabled: false,
       });
 
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <ToolConfirmationMessage
           callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
@@ -323,11 +339,13 @@ describe('ToolConfirmationMessage', () => {
           terminalWidth={80}
         />,
       );
+      await waitUntilReady();
 
       expect(lastFrame()).toContain('Modify with external editor');
+      unmount();
     });
 
-    it('should NOT show "Modify with external editor" when in IDE mode AND diffing is enabled', () => {
+    it('should NOT show "Modify with external editor" when in IDE mode AND diffing is enabled', async () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => true,
@@ -339,7 +357,7 @@ describe('ToolConfirmationMessage', () => {
         isDiffingEnabled: true,
       });
 
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <ToolConfirmationMessage
           callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
@@ -348,8 +366,10 @@ describe('ToolConfirmationMessage', () => {
           terminalWidth={80}
         />,
       );
+      await waitUntilReady();
 
       expect(lastFrame()).not.toContain('Modify with external editor');
+      unmount();
     });
   });
 });
