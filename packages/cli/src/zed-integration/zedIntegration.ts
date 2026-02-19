@@ -376,6 +376,16 @@ export class GeminiAgent {
     }
     return session.prompt(params);
   }
+
+  async unstable_setSessionModel(
+    params: acp.SetSessionModelRequest,
+  ): Promise<acp.SetSessionModelResponse> {
+    const session = this.sessions.get(params.sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${params.sessionId}`);
+    }
+    return session.setModel(params.modelId);
+  }
 }
 
 export class Session {
@@ -395,6 +405,11 @@ export class Session {
 
     this.pendingPrompt.abort();
     this.pendingPrompt = null;
+  }
+
+  setModel(model: acp.ModelId): acp.SetSessionModelResponse {
+    this.config.setModel(model);
+    return {};
   }
 
   async streamHistory(messages: ConversationRecord['messages']): Promise<void> {
