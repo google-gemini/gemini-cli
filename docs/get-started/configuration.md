@@ -941,8 +941,15 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`experimental.useOSC52Paste`** (boolean):
-  - **Description:** Use OSC 52 sequence for pasting instead of clipboardy
-    (useful for remote sessions).
+  - **Description:** Use OSC 52 for pasting. This may be more robust than the
+    default system when using remote terminal sessions (if your terminal is
+    configured to allow it).
+  - **Default:** `false`
+
+- **`experimental.useOSC52Copy`** (boolean):
+  - **Description:** Use OSC 52 for copying. This may be more robust than the
+    default system when using remote terminal sessions (if your terminal is
+    configured to allow it).
   - **Default:** `false`
 
 - **`experimental.plan`** (boolean):
