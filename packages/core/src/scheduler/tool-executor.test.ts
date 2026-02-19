@@ -239,6 +239,61 @@ describe('ToolExecutor', () => {
     }
   });
 
+  it('should use rawOutput for saving truncated tool output when available', async () => {
+    vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(10);
+    vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue('/tmp');
+
+    const mockTool = new MockTool({ name: SHELL_TOOL_NAME });
+    const invocation = mockTool.build({});
+    const longOutput = 'This is a very long output that should be truncated.';
+    const rawOutputContent =
+      'This is the raw output, perhaps with ANSI codes or other formatting not present in llmContent.';
+
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+      llmContent: longOutput,
+      returnDisplay: longOutput,
+      data: {
+        rawOutput: rawOutputContent,
+      },
+    });
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-trunc-raw',
+        name: SHELL_TOOL_NAME,
+        args: { command: 'echo long' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-trunc-raw',
+      },
+      tool: mockTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    const result = await executor.execute({
+      call: scheduledCall,
+      signal: new AbortController().signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    expect(fileUtils.saveTruncatedToolOutput).toHaveBeenCalledWith(
+      rawOutputContent, // Expect rawOutput to be used here
+      SHELL_TOOL_NAME,
+      'call-trunc-raw',
+      expect.any(String),
+      'test-session-id',
+    );
+
+    expect(fileUtils.formatTruncatedToolOutput).toHaveBeenCalledWith(
+      longOutput, // But format uses the llmContent
+      '/tmp/truncated_output.txt',
+      10,
+    );
+
+    expect(result.status).toBe(CoreToolCallStatus.Success);
+  });
+
   it('should report PID updates for shell tools', async () => {
     // 1. Setup ShellToolInvocation
     const messageBus = createMockMessageBus();

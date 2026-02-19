@@ -1,14 +1,19 @@
 /**
  * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import crypto from 'node:crypto';
+
+/**
+ * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import fsPromises from 'node:fs/promises';
-import fs from 'node:fs';
 import path from 'node:path';
 import os, { EOL } from 'node:os';
-import crypto from 'node:crypto';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../index.js';
 import { ToolErrorType } from './tool-error.js';
@@ -178,10 +183,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
     const onAbort = () => combinedController.abort();
 
-    const outputFileName = `gemini_shell_output_${crypto.randomBytes(6).toString('hex')}.log`;
-    const outputFilePath = path.join(os.tmpdir(), outputFileName);
-    const outputStream = fs.createWriteStream(outputFilePath);
-
     try {
       // pgrep is not available on Windows, so we can't get background PIDs
       const commandToExecute = isWindows
@@ -238,11 +239,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
             resetTimeout(); // Reset timeout on any event
 
             switch (event.type) {
-              case 'raw_data':
-                if (!isBinaryStream) {
-                  outputStream.write(event.chunk);
-                }
-                break;
               case 'data':
                 if (isBinaryStream) break;
                 cumulativeOutput = event.chunk;
@@ -305,7 +301,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
 
       const result = await resultPromise;
-      outputStream.end();
 
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {
@@ -392,8 +387,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
         llmContent = llmContentParts.join('\n');
       }
 
-      if (outputStream.bytesWritten > 0) {
-        const fileMsg = `[Full command output saved to: ${outputFilePath}]`;
+      const stat = result.outputFile
+        ? await fsPromises.stat(result.outputFile).catch(() => null)
+        : null;
+      if (stat && stat.size > 0) {
+        const fileMsg = `[Full command output saved to: ${result.outputFile}]`;
         if (llmContent.includes('[GEMINI_CLI_WARNING: Output truncated.')) {
           llmContent = llmContent.replace(
             /\[GEMINI_CLI_WARNING: Output truncated\..*?\]/,
@@ -433,8 +431,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
         }
       }
 
-      if (outputStream.bytesWritten > 0) {
-        const fileMsg = `[Full command output saved to: ${outputFilePath}]`;
+      const stat2 = result.outputFile
+        ? await fsPromises.stat(result.outputFile).catch(() => null)
+        : null;
+      if (stat2 && stat2.size > 0) {
+        const fileMsg = `[Full command output saved to: ${result.outputFile}]`;
         if (
           returnDisplayMessage.includes(
             '[GEMINI_CLI_WARNING: Output truncated.',
@@ -483,9 +484,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
       };
     } finally {
       if (timeoutTimer) clearTimeout(timeoutTimer);
-      if (!outputStream.closed) {
-        outputStream.destroy();
-      }
       signal.removeEventListener('abort', onAbort);
       timeoutController.signal.removeEventListener('abort', onAbort);
       try {

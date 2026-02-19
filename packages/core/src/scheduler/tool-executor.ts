@@ -210,8 +210,12 @@ export class ToolExecutor {
 
       if (threshold > 0 && content.length > threshold) {
         const originalContentLength = content.length;
+        const fileContent =
+          typeof toolResult.data?.rawOutput === 'string'
+            ? toolResult.data.rawOutput
+            : content;
         const { outputFile: savedPath } = await saveTruncatedToolOutput(
-          content,
+          fileContent,
           toolName,
           callId,
           this.config.storage.getProjectTempDir(),

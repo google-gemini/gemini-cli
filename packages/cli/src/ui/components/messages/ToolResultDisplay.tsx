@@ -87,7 +87,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     if (typeof resultDisplay === 'string') {
       let text = resultDisplay;
       if (text.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
-        text = '...' + text.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
+        text = text.slice(0, MAXIMUM_RESULT_DISPLAY_CHARACTERS) + '...';
       }
       if (maxLines) {
         const hasTrailingNewline = text.endsWith('\n');

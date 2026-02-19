@@ -1,5 +1,14 @@
 /**
  * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as crypto from 'node:crypto';
+
+/**
+ * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -85,6 +94,8 @@ export interface ShellExecutionResult {
   executionMethod: 'lydell-node-pty' | 'node-pty' | 'child_process' | 'none';
   /** Whether the command was moved to the background. */
   backgrounded?: boolean;
+  /** The path to the temporary file containing the full raw output. */
+  outputFile?: string;
 }
 
 /** A handle for an ongoing shell execution. */
@@ -353,7 +364,10 @@ export class ShellExecutionService {
         let isStreamingRawContent = true;
         const MAX_SNIFF_SIZE = 4096;
         let sniffedBytes = 0;
-        const sniffChunks: Buffer[] = [];
+        const outputFileName = `gemini_shell_output_${crypto.randomBytes(6).toString('hex')}.log`;
+        const outputFilePath = path.join(os.tmpdir(), outputFileName);
+        const outputStream = fs.createWriteStream(outputFilePath);
+        const outputChunks: Buffer[] = [];
         let totalBytes = 0;
 
         const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
@@ -369,10 +383,13 @@ export class ShellExecutionService {
           }
 
           totalBytes += data.length;
+          outputStream.write(data);
 
+          if (totalBytes <= 100 * 1024 * 1024) {
+            outputChunks.push(data);
+          }
           if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-            sniffChunks.push(data);
-            const sniffBuffer = Buffer.concat(sniffChunks);
+            const sniffBuffer = Buffer.concat(outputChunks);
             sniffedBytes = sniffBuffer.length;
 
             if (isBinary(sniffBuffer)) {
@@ -458,6 +475,7 @@ export class ShellExecutionService {
 
           resolve({
             rawOutput: finalBuffer,
+            outputFile: outputFilePath,
             output: finalStrippedOutput,
             exitCode,
             signal: exitSignal,
@@ -527,9 +545,10 @@ export class ShellExecutionService {
             }
           }
 
-          const finalBuffer = Buffer.concat(sniffChunks);
+          const finalBuffer = Buffer.concat(outputChunks);
+          outputStream.end();
 
-          return { finalBuffer };
+          return { finalBuffer, outputFile: outputFilePath };
         }
       });
 
@@ -617,7 +636,10 @@ export class ShellExecutionService {
 
         let decoder: TextDecoder | null = null;
         let output: string | AnsiOutput | null = null;
-        const sniffChunks: Buffer[] = [];
+        const outputFileName = `gemini_shell_output_${crypto.randomBytes(6).toString('hex')}.log`;
+        const outputFilePath = path.join(os.tmpdir(), outputFileName);
+        const outputStream = fs.createWriteStream(outputFilePath);
+        const outputChunks: Buffer[] = [];
         let totalBytes = 0;
         const error: Error | null = null;
         let exited = false;
@@ -755,10 +777,13 @@ export class ShellExecutionService {
           }
 
           totalBytes += data.length;
+          outputStream.write(data);
 
+          if (totalBytes <= 100 * 1024 * 1024) {
+            outputChunks.push(data);
+          }
           if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-            sniffChunks.push(data);
-            const sniffBuffer = Buffer.concat(sniffChunks);
+            const sniffBuffer = Buffer.concat(outputChunks);
             sniffedBytes = sniffBuffer.length;
 
             if (isBinary(sniffBuffer)) {
@@ -847,10 +872,12 @@ export class ShellExecutionService {
               ShellExecutionService.emitEvent(ptyProcess.pid, event);
               this.activeListeners.delete(ptyProcess.pid);
 
-              const finalBuffer = Buffer.concat(sniffChunks);
+              const finalBuffer = Buffer.concat(outputChunks);
+              outputStream.end();
 
               resolve({
                 rawOutput: finalBuffer,
+                outputFile: outputFilePath,
                 output: getFullBufferText(headlessTerminal),
                 exitCode,
                 signal: signal ?? null,
