@@ -156,11 +156,6 @@ function validateHistory(history: Content[]) {
  * filters or recitation). Extracting valid turns from the history
  * ensures that subsequent requests could be accepted by the model.
  */
-
-/**
- * Prunes the history to remove large tool outputs (like Greedy Grep context)
- * after they have been seen by the model for one turn.
- */
 function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
   if (comprehensiveHistory === undefined || comprehensiveHistory.length === 0) {
     return [];
@@ -689,8 +684,9 @@ export class GeminiChat {
    * chat session.
    */
   getHistory(curated: boolean = false): Content[] {
-    const history = curated ? extractCuratedHistory(this.history) : this.history;
-
+    const history = curated
+      ? extractCuratedHistory(this.history)
+      : this.history;
     // Deep copy the history to avoid mutating the history outside of the
     // chat session.
     return structuredClone(history);
