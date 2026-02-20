@@ -764,7 +764,7 @@ export async function loadCliConfig(
     }
   }
 
-  const experimentalCliArgs: Record<string, unknown> = {};
+  const experimentalCliArgs: Record<string, unknown> = Object.create(null);
   if (argv['experiment'] && Array.isArray(argv['experiment'])) {
     for (const entry of argv['experiment']) {
       const [key, ...valueParts] = entry.split('=');

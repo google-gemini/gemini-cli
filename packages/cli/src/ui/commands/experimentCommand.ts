@@ -70,7 +70,7 @@ const setExperimentCommand: SlashCommand = {
     }
 
     const name = parts[0];
-    const rawValue = parts[1];
+    const rawValue = args.trim().substring(name.length).trim();
     const id = getExperimentFlagIdFromName(name);
 
     if (id === undefined) {
@@ -110,13 +110,23 @@ const setExperimentCommand: SlashCommand = {
     const { settings, config } = context.services;
     if (!config) return;
 
-    const currentExperimental = {
-      ...((settings.merged.experimental as Record<string, unknown>) || {}),
+    // SECURITY: Only persist user-scoped settings to prevent untrusted workspace settings
+    // from being promoted to the global user configuration.
+    const userExperimental = {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      ...((settings.user.settings['experimental'] as Record<string, unknown>) ||
+        {}),
     };
-    currentExperimental[name] = value;
+    userExperimental[name] = value;
 
-    settings.setValue(SettingScope.User, 'experimental', currentExperimental);
-    config.updateExperimentalSettings(currentExperimental);
+    settings.setValue(SettingScope.User, 'experimental', userExperimental);
+
+    // Update the live config with the merged state so it takes effect immediately
+    const mergedExperimental = {
+      ...((settings.merged.experimental as Record<string, unknown>) || {}),
+      ...userExperimental,
+    };
+    config.updateExperimentalSettings(mergedExperimental);
 
     context.ui.addItem({
       type: MessageType.INFO,
@@ -144,25 +154,33 @@ const unsetExperimentCommand: SlashCommand = {
     const { settings, config } = context.services;
     if (!config) return;
 
-    const currentExperimental = {
-      ...((settings.merged.experimental as Record<string, unknown>) || {}),
+    const userExperimental = {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      ...((settings.user.settings['experimental'] as Record<string, unknown>) ||
+        {}),
     };
 
-    if (!(name in currentExperimental)) {
+    if (!(name in userExperimental)) {
       context.ui.addItem({
         type: MessageType.ERROR,
-        text: `No local override found for experiment: ${name}`,
+        text: `No local user override found for experiment: ${name}`,
       });
       return;
     }
 
-    delete currentExperimental[name];
-    settings.setValue(SettingScope.User, 'experimental', currentExperimental);
-    config.updateExperimentalSettings(currentExperimental);
+    delete userExperimental[name];
+    settings.setValue(SettingScope.User, 'experimental', userExperimental);
+
+    // Update the live config with the new merged state
+    const mergedExperimental = {
+      ...((settings.merged.experimental as Record<string, unknown>) || {}),
+    };
+    delete mergedExperimental[name];
+    config.updateExperimentalSettings(mergedExperimental);
 
     context.ui.addItem({
       type: MessageType.INFO,
-      text: `Local override for experiment ${name} removed.`,
+      text: `Local user override for experiment ${name} removed.`,
     });
   },
 };
