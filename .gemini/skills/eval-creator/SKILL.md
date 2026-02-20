@@ -64,7 +64,7 @@ describe('chat-to-eval-generated', () => {
 5.  **Verify and Refine (Loop):**
     *   **MANDATORY:** After generating the test file, run it using `npx vitest run evals/<descriptive-name>.eval.ts`.
     *   Analyze the results:
-        *   **If the test passes:** The reproduction failed. Refine the `messages`, `files`, or `prompt` to more accurately capture the state that triggered the bug.
+        *   **If the test passes:** The reproduction failed. Refine the `messages`, `files`, or `prompt` to more accurately capture the state that triggered the bug. It may help to add messages to the history to make the scenario more realistic and true to the repro in chat.json.
         *   **If the test fails for the WRONG reason:** (e.g., a crash in the test setup, or a different bug), fix the test code or setup.
         *   **If the test fails for the EXPECTED reason:** The bug is successfully reproduced.
     *   **Iterate** until you have a valid, stable failure that clearly demonstrates the bug.
