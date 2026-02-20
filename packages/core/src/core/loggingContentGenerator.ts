@@ -16,7 +16,7 @@ import type {
   GenerateContentResponseUsageMetadata,
   GenerateContentResponse,
 } from '@google/genai';
-import type { ServerDetails , ContextBreakdown } from '../telemetry/types.js';
+import type { ServerDetails, ContextBreakdown } from '../telemetry/types.js';
 import {
   ApiRequestEvent,
   ApiResponseEvent,
