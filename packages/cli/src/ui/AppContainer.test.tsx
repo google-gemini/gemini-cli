@@ -3540,8 +3540,8 @@ describe('AppContainer State Management', () => {
       await renderAndCall();
 
       expect(spawnSync).toHaveBeenCalledWith(
-        'code.cmd',
-        expect.arrayContaining([expect.stringContaining('chat.md')]),
+        expect.stringContaining('code.cmd'),
+        [],
         expect.objectContaining({ shell: true }),
       );
     });
@@ -3555,12 +3555,8 @@ describe('AppContainer State Management', () => {
       await renderAndCall();
 
       expect(spawnSync).toHaveBeenCalledWith(
-        'notepad',
-        expect.arrayContaining([
-          '&',
-          'calc',
-          expect.stringContaining('chat.md'),
-        ]),
+        expect.stringContaining('notepad & calc'),
+        [],
         expect.objectContaining({ shell: true }),
       );
     });

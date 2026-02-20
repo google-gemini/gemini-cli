@@ -556,15 +556,24 @@ export const AppContainer = (props: AppContainerProps) => {
           (process.platform === 'win32' ? 'notepad' : 'vi');
       }
 
-      // Tokenize the command string respecting quoted segments so paths with
-      // spaces are preserved (e.g. $EDITOR='"C:\Program Files\ed.exe" --flag').
-      const tokens = [...command.matchAll(/[^\s"']+|"([^"]*)"|'([^']*)'/g)].map(
-        ([full, dq, sq]) => dq ?? sq ?? full,
-      );
-      const [exe = '', ...embeddedArgs] = tokens;
-      const allArgs = [...embeddedArgs, ...args];
-
-      const [spawnCmd, spawnArgs] = [exe, allArgs];
+      let spawnCmd: string;
+      let spawnArgs: string[];
+      if (process.platform === 'win32') {
+        const quoteForCmd = (value: string) => `"${value.replace(/"/g, '""')}"`;
+        const fullCommand = [command, ...args.map(quoteForCmd)].join(' ');
+        spawnCmd = fullCommand;
+        spawnArgs = [];
+      } else {
+        // Tokenize the command string respecting quoted segments so paths with
+        // spaces are preserved (e.g. $EDITOR='"C:\Program Files\ed.exe" --flag').
+        const tokens = [
+          ...command.matchAll(/[^\s"']+|"([^"]*)"|'([^']*)'/g),
+        ].map(([full, dq, sq]) => dq ?? sq ?? full);
+        const [exe = '', ...embeddedArgs] = tokens;
+        const allArgs = [...embeddedArgs, ...args];
+        spawnCmd = exe;
+        spawnArgs = allArgs;
+      }
 
       const wasRaw = stdin?.isRaw ?? false;
       try {
