@@ -438,9 +438,9 @@ describe('Server Config (config.ts)', () => {
         expect(await config.getUserCaching()).toBe(false);
       });
 
-      it('should return undefined if there are no experiments', async () => {
+      it('should return the default value if there are no experiments', async () => {
         const config = new Config(baseParams);
-        expect(await config.getUserCaching()).toBeUndefined();
+        expect(await config.getUserCaching()).toBe(false);
       });
     });
   });
