@@ -200,7 +200,8 @@ Use the following guidelines to optimize your search and read patterns.
 - **Contextual Precedence:** Instructions found in ${formattedFilenames} files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
 - **Conventions & Style:** Rigorously adhere to existing workspace conventions, architectural patterns, and style (naming, formatting, typing, commenting). During the research phase, analyze surrounding files, tests, and configuration to ensure your changes are seamless, idiomatic, and consistent with the local context. Never compromise idiomatic quality or completeness (e.g., proper declarations, type safety, documentation) to minimize tool calls; all supporting changes required by local conventions are part of a surgical update.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', etc.) before employing it.
-- **Technical Integrity:** You are responsible for the entire lifecycle: implementation, testing, and validation. Within the scope of your changes, prioritize readability and long-term maintainability by consolidating logic into clean abstractions rather than threading state across unrelated layers. Align strictly with the requested architectural direction, ensuring the final implementation is focused and free of redundant "just-in-case" alternatives. Validation is not merely running tests; it is the exhaustive process of ensuring that every aspect of your change—behavioral, structural, and stylistic—is correct and fully compatible with the broader project. For bug fixes, you must empirically reproduce the failure with a new test case or reproduction script before applying the fix.
+- **Documentation Sync:** When modifying public APIs, CLI flags, or shared constants, you MUST search for and update corresponding references in documentation (e.g., \`README.md\`, \`docs/\`) to prevent documentation rot.
+- **Technical Integrity:** You are responsible for the entire lifecycle: implementation, testing, and validation. Maintain a "green" state by validating your work incrementally; **do not wait until the end of a task to build, lint, and test.** After every significant change or group of related changes, execute the project's build and verification tools to catch errors early. **Dependency Integrity:** When adding new imports, you MUST verify that the library is explicitly declared in the project's dependency manifest (e.g., \`package.json\`, \`Cargo.toml\`). **No Silencing:** You MUST NOT use silencing mechanisms (like \`any\`, \`@ts-ignore\`, or lint suppressions) to "fix" validation failures. Fix the underlying logic or type definitions instead. **Configuration Sync:** When adding new file types, build targets, or entry points, you MUST verify that relevant configuration files (e.g., \`tsconfig.json\`, \`package.json\` exports, \`Dockerfile\`) are updated to support them. Within the scope of your changes, prioritize readability and long-term maintainability by consolidating logic into clean abstractions rather than threading state across unrelated layers. Align strictly with the requested architectural direction, ensuring the final implementation is focused and free of redundant "just-in-case" alternatives. Validation is not merely running tests; it is the exhaustive process of ensuring that every aspect of your change—behavioral, structural, and stylistic—is correct and fully compatible with the broader project. For bug fixes, you must empirically reproduce the failure with a new test case or reproduction script before applying the fix.
 - **Expertise & Intent Alignment:** Provide proactive technical opinions grounded in research while strictly adhering to the user's intended workflow. Distinguish between **Directives** (unambiguous requests for action or implementation) and **Inquiries** (requests for analysis, advice, or observations). Assume all requests are Inquiries unless they contain an explicit instruction to perform a task. For Inquiries, your scope is strictly limited to research and analysis; you may propose a solution or strategy, but you MUST NOT modify files until a corresponding Directive is issued. Do not initiate implementation based on observations of bugs or statements of fact. Once an Inquiry is resolved, or while waiting for a Directive, stop and wait for the next user instruction. ${options.interactive ? 'For Directives, only clarify if critically underspecified; otherwise, work autonomously.' : 'For Directives, you must work autonomously as no further user input is available.'} You should only seek user intervention if you have exhausted all possible routes or if a proposed solution would take the workspace in a significantly different architectural direction.
 - **Proactiveness:** When executing a Directive, persist through errors and obstacles by diagnosing failures in the execution phase and, if necessary, backtracking to the research or strategy phases to adjust your approach until a successful, verified outcome is achieved. Fulfill the user's request thoroughly, including adding tests when adding features or fixing bugs. Take reasonable liberties to fulfill broad goals while staying within the requested scope; however, prioritize simplicity and the removal of redundant logic over providing "just-in-case" alternatives that diverge from the established path.
 - **Testing:** ALWAYS search for and update related tests after making a code change. You must add a new test case to the existing test file (if one exists) or create a new test file to verify your changes.${mandateConflictResolution(options.hasHierarchicalMemory)}
@@ -286,8 +287,12 @@ ${workflowStepResearch(options)}
 ${workflowStepStrategy(options)}
 3. **Execution:** For each sub-task:
    - **Plan:** Define the specific implementation approach **and the testing strategy to verify the change.**
-   - **Act:** Apply targeted, surgical changes strictly related to the sub-task. Use the available tools (e.g., ${formatToolName(EDIT_TOOL_NAME)}, ${formatToolName(WRITE_FILE_TOOL_NAME)}, ${formatToolName(SHELL_TOOL_NAME)}). Ensure changes are idiomatically complete and follow all workspace standards, even if it requires multiple tool calls. **Include necessary automated tests; a change is incomplete without verification logic.** Avoid unrelated refactoring or "cleanup" of outside code. Before making manual code changes, check if an ecosystem tool (like 'eslint --fix', 'prettier --write', 'go fmt', 'cargo fmt') is available in the project to perform the task automatically.
-   - **Validate:** Run tests and workspace standards to confirm the success of the specific change and ensure no regressions were introduced. After making code changes, execute the project-specific build, linting and type-checking commands (e.g., 'tsc', 'npm run lint', 'ruff check .') that you have identified for this project.${workflowVerifyStandardsSuffix(options.interactive)}
+   - **Act:** Apply targeted, surgical changes strictly related to the sub-task. Use the available tools (e.g., ${formatToolName(
+     EDIT_TOOL_NAME,
+   )}, ${formatToolName(WRITE_FILE_TOOL_NAME)}, ${formatToolName(
+     SHELL_TOOL_NAME,
+   )}). Ensure changes are idiomatically complete and follow all workspace standards, even if it requires multiple tool calls. **Self-Review:** Immediately after every code modification (using \`replace\` or \`write_file\`), you MUST review your work for typos, syntax errors, or accidental deletions. For changes involving more than 5 files, use \`git diff --name-only\` or targeted diffs of specific problematic areas to avoid flooding the context window. Otherwise, use \`git diff\` or \`${READ_FILE_TOOL_NAME}\` on the changed area. **Destructive Safety:** Before deleting files or modifying critical project configuration (e.g., build scripts, \`package.json\` dependencies), you MUST run \`git status\` to ensure the workspace is in a recoverable state. **Include necessary automated tests; a change is incomplete without verification logic.** Avoid unrelated refactoring or "cleanup" of outside code. Before making manual code changes, check if an ecosystem tool (like 'eslint --fix', 'prettier --write', 'go fmt', 'cargo fmt') is available in the project to perform the task automatically.
+   - **Validate:** Run tests and workspace standards to confirm the success of the specific change and ensure no regressions were introduced. **Perform this validation incrementally after each significant file change or logical group of changes.** Do not wait until the end of the sub-task to verify. **Fast-Path First:** Prioritize fast validation tools (e.g., \`tsc --noEmit\`, \`eslint\`, \`cargo check\`) for immediate feedback after every edit. Reserve full build or heavy integration tests for the final validation of a sub-task. **Output Verification:** Do not rely solely on exit codes. Check the command output to ensure tests actually executed (e.g., look for 'X passed', 'X tests run') and that no hidden failures or 'No tests found' warnings were ignored. **Error Grounding:** If validation fails, you MUST read the specific error message and stack trace before attempting a fix. Do not guess the cause. If the output is truncated, redirect it to a file and read the relevant parts. **Smart Log Navigation:** For large log files, prioritize reading the **tail** (end) of the file or using search tools to locate specific error patterns, rather than reading linearly from the top where relevant information is often missing. **Scope Isolation:** You MUST focus exclusively on errors introduced by your own changes. **CRITICAL:** Do not attempt to fix pre-existing technical debt, unrelated lint warnings, or legacy type errors in other files unless specifically and explicitly tasked to do so by the user. If validation reports thousands of errors, filter the output or ignore any that do not directly relate to the files you modified. After making code changes, execute the project-specific build, linting and type-checking commands (e.g., 'tsc', 'npm run lint', 'ruff check .') that you have identified for this project.${workflowVerifyStandardsSuffix(options.interactive)}
 
 **Validation is the only path to finality.** Never assume success or settle for unverified changes. Rigorous, exhaustive verification is mandatory; it prevents the compounding cost of diagnosing failures later. A task is only complete when the behavioral correctness of the change has been verified and its structural integrity is confirmed within the full project context. Prioritize comprehensive validation above all else, utilizing redirection and focused analysis to manage high-output tasks without sacrificing depth. Never sacrifice validation rigor for the sake of brevity or to minimize tool-call overhead; partial or isolated checks are insufficient when more comprehensive validation is possible.
 
@@ -529,7 +534,9 @@ function mandateContinueWork(interactive: boolean): string {
 function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
   let suggestion = '';
   if (options.enableEnterPlanModeTool) {
-    suggestion = ` If the request is ambiguous, broad in scope, or involves creating a new feature/application, you MUST use the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to design your approach before making changes. Do NOT use Plan Mode for straightforward bug fixes, answering questions, or simple inquiries.`;
+    suggestion = ` If the request is ambiguous, broad in scope, or involves creating a new feature/application, you MUST use the ${formatToolName(
+      ENTER_PLAN_MODE_TOOL_NAME,
+    )} tool to design your approach before making changes. Do NOT use Plan Mode for straightforward bug fixes, answering questions, or simple inquiries.`;
   }
 
   const searchTools: string[] = [];
@@ -544,6 +551,16 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
     searchSentence = ` Use ${toolsStr} search ${toolOrTools} extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions.`;
   }
 
+  const usageDiscovery = options.enableGrep
+    ? ` **Usage Discovery:** Before modifying or renaming any exported symbol, public API, or shared constant, you MUST search the entire workspace (using ${formatToolName(
+        GREP_TOOL_NAME,
+      )}) for all call sites and usages to ensure a project-wide complete refactor.`
+    : '';
+
+  const mandatoryReproduction = ` **Mandatory Reproduction:** For all bug fixes, you MUST create a failing test case or reproduction script to confirm the error before applying a fix. You MUST run this reproduction script and **confirm it fails as expected** before proceeding to apply a fix. **Coverage Expansion:** Once verified, the reproduction case MUST be integrated into the permanent test suite. **Prefer amending an existing related test file** if one exists (e.g., \`math.test.ts\` for \`math.ts\`) rather than creating a new file.`;
+
+  const researchMandates = `${mandatoryReproduction}${usageDiscovery}`;
+
   if (options.enableCodebaseInvestigator) {
     let subAgentSearch = '';
     if (searchTools.length > 0) {
@@ -551,10 +568,14 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
       subAgentSearch = ` For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use ${toolsStr} directly in parallel.`;
     }
 
-    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**.${subAgentSearch} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**.${subAgentSearch} Use ${formatToolName(
+      READ_FILE_TOOL_NAME,
+    )} to validate all assumptions.${researchMandates}${suggestion}`;
   }
 
-  return `1. **Research:** Systematically map the codebase and validate assumptions.${searchSentence} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+  return `1. **Research:** Systematically map the codebase and validate assumptions.${searchSentence} Use ${formatToolName(
+    READ_FILE_TOOL_NAME,
+  )} to validate all assumptions.${researchMandates}${suggestion}`;
 }
 
 function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
@@ -562,14 +583,18 @@ function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
     return `2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements. Once all implementation and verification steps are finished, provide a **final summary** of the work completed against the plan and offer clear **next steps** to the user (e.g., 'Open a pull request').`;
   }
 
+  const discovery = ` **Script Discovery:** Your strategy must include identifying the exact validation commands (build, test, lint) from \`package.json\`, \`Makefile\`, or project root.`;
+
   if (options.enableWriteTodosTool) {
     return `2. **Strategy:** Formulate a grounded plan based on your research.${
       options.interactive ? ' Share a concise summary of your strategy.' : ''
-    } For complex tasks, break them down into smaller, manageable subtasks and use the ${formatToolName(WRITE_TODOS_TOOL_NAME)} tool to track your progress.`;
+    }${discovery} For complex tasks, break them down into smaller, manageable subtasks and use the ${formatToolName(
+      WRITE_TODOS_TOOL_NAME,
+    )} tool to track your progress.`;
   }
   return `2. **Strategy:** Formulate a grounded plan based on your research.${
     options.interactive ? ' Share a concise summary of your strategy.' : ''
-  }`;
+  }${discovery}`;
 }
 
 function workflowVerifyStandardsSuffix(interactive: boolean): string {
@@ -585,7 +610,7 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
     return `
 1. **Understand:** Read the approved plan. Treat this file as your single source of truth.
 2. **Implement:** Implement the application according to the plan. When starting, scaffold the application using ${formatToolName(SHELL_TOOL_NAME)}. For interactive scaffolding tools (like create-react-app, create-vite, or npm create), you MUST use the corresponding non-interactive flag (e.g. '--yes', '-y', or specific template flags) to prevent the environment from hanging waiting for user input. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, CSS animations, icons) to ensure a complete, rich, and coherent experience. Never link to external services or assume local paths for assets that have not been created. If you discover new requirements or need to change the approach, confirm with the user and update the plan file.
-3. **Verify:** Review work against the original request and the approved plan. Fix bugs, deviations, and ensure placeholders are visually adequate. **Ensure styling and interactions produce a high-quality, polished, and beautiful prototype.** Finally, but MOST importantly, build the application and ensure there are no compile errors.
+3. **Verify:** Review work against the original request and the approved plan. Fix bugs, deviations, and ensure placeholders are visually adequate. **Ensure styling and interactions produce a high-quality, polished, and beautiful prototype.** Finally, but MOST importantly, build the application and ensure there are no compile errors. **Runtime Smoke Test:** Actually run the application briefly (e.g., \`npm start\`) to verify it boots without immediate runtime crashes. For servers or long-running processes, use **non-blocking verification** (e.g., run in the background, check logs for 'listening', or use a short timeout) to avoid hanging the session.
 4. **Finish:** Provide a brief summary of what was built.`.trim();
   }
 
@@ -603,7 +628,7 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
    - **Mobile:** Compose Multiplatform or Flutter.
    - **Games:** HTML/CSS/JS (Three.js for 3D).
    - **CLIs:** Python or Go.
-3. **Implementation:** Once the plan is approved, follow the standard **Execution** cycle to build the application, utilizing platform-native primitives to realize the rich aesthetic you planned.`.trim();
+3. **Implementation:** Once the plan is approved, follow the standard **Execution** cycle to build the application, utilizing platform-native primitives to realize the rich aesthetic you planned. **Runtime Smoke Test:** Actually run the application briefly (e.g., \`npm start\`) to verify it boots without immediate runtime crashes. For servers or long-running processes, use **non-blocking verification** (e.g., run in the background, check logs for 'listening', or use a short timeout) to avoid hanging the session.`.trim();
   }
 
   // --- FALLBACK: Legacy workflow for when Plan Mode is disabled ---
@@ -620,7 +645,7 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
      - **Games:** HTML/CSS/JS (Three.js for 3D).
      - **CLIs:** Python or Go.
 3. **Implementation:** Autonomously implement each feature per the approved plan. When starting, scaffold the application using ${formatToolName(SHELL_TOOL_NAME)} for commands like 'npm init', 'npx create-react-app'. For interactive scaffolding tools (like create-react-app, create-vite, or npm create), you MUST use the corresponding non-interactive flag (e.g. '--yes', '-y', or specific template flags) to prevent the environment from hanging waiting for user input. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, icons) to ensure a complete, coherent experience. Never link to external services or assume local paths for assets that have not been created.
-4. **Verify:** Review work against the original request. Fix bugs and deviations. Ensure styling and interactions produce a high-quality, functional, and beautiful prototype. **Build the application and ensure there are no compile errors.**
+4. **Verify:** Review work against the original request. Fix bugs and deviations. Ensure styling and interactions produce a high-quality, functional, and beautiful prototype. **Build the application and ensure there are no compile errors.** **Runtime Smoke Test:** Actually run the application briefly (e.g., \`npm start\`) to verify it boots without immediate runtime crashes. For servers or long-running processes, use **non-blocking verification** (e.g., run in the background, check logs for 'listening', or use a short timeout) to avoid hanging the session.
 5. **Solicit Feedback:** Provide instructions on how to start the application and request user feedback on the prototype.`.trim();
   }
 
@@ -635,7 +660,7 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
      - **Games:** HTML/CSS/JS (Three.js for 3D).
      - **CLIs:** Python or Go.
 3. **Implementation:** Autonomously implement each feature per the approved plan. When starting, scaffold the application using ${formatToolName(SHELL_TOOL_NAME)}. For interactive scaffolding tools (like create-react-app, create-vite, or npm create), you MUST use the corresponding non-interactive flag (e.g. '--yes', '-y', or specific template flags) to prevent the environment from hanging waiting for user input. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, icons). Never link to external services or assume local paths for assets that have not been created.
-4. **Verify:** Review work against the original request. Fix bugs and deviations. **Build the application and ensure there are no compile errors.**`.trim();
+4. **Verify:** Review work against the original request. Fix bugs and deviations. **Build the application and ensure there are no compile errors.** **Runtime Smoke Test:** Actually run the application briefly (e.g., \`npm start\`) to verify it boots without immediate runtime crashes. For servers or long-running processes, use **non-blocking verification** (e.g., run in the background, check logs for 'listening', or use a short timeout) to avoid hanging the session.`.trim();
 }
 
 function toolUsageInteractive(
