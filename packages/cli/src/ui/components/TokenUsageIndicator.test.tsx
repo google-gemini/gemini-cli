@@ -99,10 +99,10 @@ describe('<TokenUsageIndicator />', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    // gemini-2.5-flash -> 2.5F: 500K (sorted by total descending)
-    // gemini-3-pro-preview -> 3P: 1.5K
-    expect(output).toContain('2.5F:500K');
-    expect(output).toContain('3P:1.5K');
+    // gemini-2.5-flash -> F25: 500K (sorted by total descending)
+    // gemini-3-pro-preview -> PP30: 1.5K
+    expect(output).toContain('F25:500K');
+    expect(output).toContain('PP30:1.5K');
     unmount();
   });
 
@@ -123,8 +123,8 @@ describe('<TokenUsageIndicator />', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    const posFlash = output.indexOf('2.5F');
-    const posPro = output.indexOf('3P');
+    const posFlash = output.indexOf('F25');
+    const posPro = output.indexOf('PP30');
     expect(posFlash).toBeLessThan(posPro);
     unmount();
   });

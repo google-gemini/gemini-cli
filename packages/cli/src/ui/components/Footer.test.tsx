@@ -515,7 +515,7 @@ describe('<Footer />', () => {
         },
       );
       await waitUntilReady();
-      expect(lastFrame()).toContain('3P:1.5K');
+      expect(lastFrame()).toContain('PP30:1.5K');
       unmount();
     });
 

@@ -110,34 +110,42 @@ export function getDisplayString(model: string) {
  * Returns a short, compact abbreviation for a model name.
  *
  * @param model The model name to abbreviate.
- * @returns A short abbreviation (e.g., '3P', '2.5F').
+ * @returns A short abbreviation (e.g., 'PP30', 'P25', 'FL25').
  */
 export function getShortDisplayString(model: string): string {
   switch (model) {
     case PREVIEW_GEMINI_MODEL:
-      return '3P';
+      return 'PP30';
     case PREVIEW_GEMINI_FLASH_MODEL:
-      return '3F';
+      return 'FP30';
     case DEFAULT_GEMINI_MODEL:
-      return '2.5P';
+      return 'P25';
     case DEFAULT_GEMINI_FLASH_MODEL:
-      return '2.5F';
+      return 'F25';
     case DEFAULT_GEMINI_FLASH_LITE_MODEL:
-      return '2.5L';
+      return 'FL25';
     case PREVIEW_GEMINI_MODEL_AUTO:
     case DEFAULT_GEMINI_MODEL_AUTO:
       return 'Auto';
     default: {
-      // For custom models, try to extract a short name
+      // For other models, try to construct a descriptive abbreviation
       if (model.startsWith('gemini-')) {
         const parts = model.split('-');
-        if (parts.length >= 2) {
-          const version = parts[1];
-          const type = parts[2]?.[0]?.toUpperCase() || '';
-          return `${version}${type}`;
+        // gemini-1.5-flash -> F15
+        // gemini-1.5-pro -> P15
+        const version = parts[1]?.replace('.', '') || '';
+        const typePart = parts.slice(2).join('-').toLowerCase();
+        let type = '';
+        if (typePart.includes('flash')) {
+          type = typePart.includes('lite') ? 'FL' : 'F';
+        } else if (typePart.includes('pro')) {
+          type = 'P';
         }
+        const isPreview =
+          model.includes('preview') || model.includes('experimental');
+        return `${type}${isPreview ? 'P' : ''}${version}`.replace(/\s+/g, '');
       }
-      return model.slice(0, 4);
+      return model.slice(0, 4).toUpperCase();
     }
   }
 }
