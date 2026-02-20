@@ -37,11 +37,16 @@ import {
   partListUnionToString,
   LlmRole,
   ApprovalMode,
+  getVersion,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
 import { getAcpErrorMessage } from './acpErrors.js';
 import { Readable, Writable } from 'node:stream';
+
+function hasMeta(obj: unknown): obj is { _meta?: Record<string, unknown> } {
+  return typeof obj === 'object' && obj !== null && '_meta' in obj;
+}
 import type { Content, Part, FunctionCall } from '@google/genai';
 import type { LoadedSettings } from '../config/settings.js';
 import { SettingScope, loadSettings } from '../config/settings.js';
@@ -99,25 +104,43 @@ export class GeminiAgent {
       {
         id: AuthType.LOGIN_WITH_GOOGLE,
         name: 'Log in with Google',
-        description: null,
+        description: 'Log in with your Google account',
       },
       {
         id: AuthType.USE_GEMINI,
-        name: 'Use Gemini API key',
-        description:
-          'Requires setting the `GEMINI_API_KEY` environment variable',
+        name: 'Gemini API key',
+        description: 'Use an API key with Gemini Developer API',
       },
       {
         id: AuthType.USE_VERTEX_AI,
         name: 'Vertex AI',
-        description: null,
+        description: 'Use an API key with Vertex AI GenAI API',
       },
     ];
 
+    ];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const meta = hasMeta(args) ? args._meta : undefined;
+    const apiKey =
+      typeof meta?.['apiKey'] === 'string' ? meta['apiKey'] : undefined;
+
+    if (apiKey) {
+      // If we have an API key from the client, we can try to use it to refresh auth
+      // This is useful if the client wants to provide the key during initialization
+      await this.config.refreshAuth(AuthType.USE_GEMINI, apiKey);
+    }
+
     await this.config.initialize();
+    const version = await getVersion();
     return {
       protocolVersion: acp.PROTOCOL_VERSION,
       authMethods,
+      agentInfo: {
+        name: 'gemini-cli',
+        title: 'Gemini CLI',
+        version,
+      },
       agentCapabilities: {
         loadSession: true,
         promptCapabilities: {
@@ -133,7 +156,8 @@ export class GeminiAgent {
     };
   }
 
-  async authenticate({ methodId }: acp.AuthenticateRequest): Promise<void> {
+  async authenticate(req: acp.AuthenticateRequest): Promise<void> {
+    const { methodId } = req;
     const method = z.nativeEnum(AuthType).parse(methodId);
     const selectedAuthType = this.settings.merged.security.auth.selectedType;
 
@@ -141,17 +165,18 @@ export class GeminiAgent {
     if (selectedAuthType && selectedAuthType !== method) {
       await clearCachedCredentialFile();
     }
+    // Check for apiKey in _meta
+    const meta = hasMeta(req) ? req._meta : undefined;
+    const apiKey =
+      typeof meta?.['apiKey'] === 'string' ? meta['apiKey'] : undefined;
 
     // Refresh auth with the requested method
     // This will reuse existing credentials if they're valid,
     // or perform new authentication if needed
     try {
-      await this.config.refreshAuth(method);
+      await this.config.refreshAuth(method, apiKey);
     } catch (e) {
-      throw new acp.RequestError(
-        getErrorStatus(e) || 401,
-        getAcpErrorMessage(e),
-      );
+      throw new acp.RequestError(-32000, getAcpErrorMessage(e));
     }
     this.settings.setValue(
       SettingScope.User,
@@ -201,7 +226,7 @@ export class GeminiAgent {
 
     if (!isAuthenticated) {
       throw new acp.RequestError(
-        401,
+        -32000,
         authErrorMessage || 'Authentication required.',
       );
     }
