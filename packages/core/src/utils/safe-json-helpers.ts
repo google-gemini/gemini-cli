@@ -68,3 +68,13 @@ export function safeJsonStringifyBooleanValuesOnly(obj: any): string {
     return '';
   });
 }
+
+/**
+ * Safely parses a JSON string, typed as unknown to force explicit type assertions or validations by the caller.
+ *
+ * @param text - The JSON string to parse
+ * @returns The parsed JSON object of type unknown
+ */
+export function safeParseJson(text: string): unknown {
+  return JSON.parse(text);
+}

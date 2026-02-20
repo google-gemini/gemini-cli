@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { safeJsonStringify } from './safeJsonStringify.js';
+import { safeJsonStringify } from './safe-json-helpers.js';
 
 describe('safeJsonStringify', () => {
   it('should stringify normal objects without issues', () => {
