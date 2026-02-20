@@ -51,6 +51,7 @@ import {
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
   CoreToolCallStatus,
+  HookType,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
@@ -736,8 +737,10 @@ Would you like to attempt to install via "git clone" instead?`,
             if (eventHooks) {
               for (const definition of eventHooks) {
                 for (const hook of definition.hooks) {
-                  // Merge existing env with new env vars, giving extension settings precedence.
-                  hook.env = { ...hook.env, ...hookEnv };
+                  if (hook.type === HookType.Command) {
+                    // Merge existing env with new env vars, giving extension settings precedence.
+                    hook.env = { ...hook.env, ...hookEnv };
+                  }
                 }
               }
             }
