@@ -55,9 +55,9 @@ describe('NumericalClassifierStrategy', () => {
       },
       getModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO),
       getSessionId: vi.fn().mockReturnValue('control-group-id'), // Default to Control Group (Hash 71 >= 50)
-      getNumericalRoutingEnabled: vi.fn().mockResolvedValue(true),
-      getResolvedClassifierThreshold: vi.fn().mockResolvedValue(90),
-      getClassifierThreshold: vi.fn().mockResolvedValue(undefined),
+      isNumericalRoutingEnabled: vi.fn().mockReturnValue(true),
+      getResolvedClassifierThreshold: vi.fn().mockReturnValue(90),
+      getClassifierThreshold: vi.fn().mockReturnValue(undefined),
       getGemini31Launched: vi.fn().mockResolvedValue(false),
       getGemini31FlashLiteLaunched: vi.fn().mockResolvedValue(false),
       getUseCustomToolModel: vi.fn().mockImplementation(async () => {
@@ -82,7 +82,7 @@ describe('NumericalClassifierStrategy', () => {
   });
 
   it('should return null if numerical routing is disabled', async () => {
-    vi.mocked(mockConfig.getNumericalRoutingEnabled).mockResolvedValue(false);
+    vi.mocked(mockConfig.isNumericalRoutingEnabled).mockReturnValue(false);
 
     const decision = await strategy.route(
       mockContext,

@@ -76,10 +76,8 @@ export class ModelRouterService {
     const startTime = Date.now();
     let decision: RoutingDecision;
 
-    const [enableNumericalRouting, thresholdValue] = await Promise.all([
-      this.config.getNumericalRoutingEnabled(),
-      this.config.getResolvedClassifierThreshold(),
-    ]);
+    const enableNumericalRouting = this.config.isNumericalRoutingEnabled();
+    const thresholdValue = this.config.getResolvedClassifierThreshold();
     const classifierThreshold = String(thresholdValue);
 
     let failed = false;

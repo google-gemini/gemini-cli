@@ -57,7 +57,7 @@ describe('ClassifierStrategy', () => {
         getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
       },
       getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
-      getNumericalRoutingEnabled: vi.fn().mockResolvedValue(false),
+      isNumericalRoutingEnabled: vi.fn().mockReturnValue(false),
       getGemini31Launched: vi.fn().mockResolvedValue(false),
       getGemini31FlashLiteLaunched: vi.fn().mockResolvedValue(false),
       getUseCustomToolModel: vi.fn().mockImplementation(async () => {
@@ -78,7 +78,7 @@ describe('ClassifierStrategy', () => {
   });
 
   it('should return null if numerical routing is enabled and model is Gemini 3', async () => {
-    vi.mocked(mockConfig.getNumericalRoutingEnabled).mockResolvedValue(true);
+    vi.mocked(mockConfig.isNumericalRoutingEnabled).mockReturnValue(true);
     vi.mocked(mockConfig.getModel).mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO);
 
     const decision = await strategy.route(
@@ -93,7 +93,7 @@ describe('ClassifierStrategy', () => {
   });
 
   it('should NOT return null if numerical routing is enabled but model is NOT Gemini 3', async () => {
-    vi.mocked(mockConfig.getNumericalRoutingEnabled).mockResolvedValue(true);
+    vi.mocked(mockConfig.isNumericalRoutingEnabled).mockReturnValue(true);
     vi.mocked(mockConfig.getModel).mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO);
     vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
       reasoning: 'test',

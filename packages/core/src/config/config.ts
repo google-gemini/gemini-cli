@@ -942,7 +942,7 @@ export class Config implements McpContext, AgentLoopContext {
 
   private readonly enableAgents: boolean;
   private agents: AgentSettings;
-  private readonly experimentalSettings: Record<string, unknown>;
+  private experimentalSettings: Record<string, unknown>;
   private readonly experimentalCliArgs: Record<string, unknown>;
   private readonly enableEventDrivenScheduler: boolean;
   private readonly skillsSupport: boolean;
@@ -3020,15 +3020,15 @@ export class Config implements McpContext, AgentLoopContext {
     return remoteThreshold;
   }
 
-  async getUserCaching(): Promise<boolean | undefined> {
+  getUserCaching(): boolean | undefined {
     return this.getExperimentValue<boolean>(ExperimentFlags.USER_CACHING);
   }
 
-  async getPlanModeRoutingEnabled(): Promise<boolean> {
+  getPlanModeRoutingEnabled(): boolean {
     return this.planModeRoutingEnabled;
   }
 
-  async getNumericalRoutingEnabled(): Promise<boolean> {
+  isNumericalRoutingEnabled(): boolean {
     return (
       this.getExperimentValue<boolean>(
         ExperimentFlags.ENABLE_NUMERICAL_ROUTING,
@@ -3041,8 +3041,8 @@ export class Config implements McpContext, AgentLoopContext {
    * If a remote threshold is provided and within range (0-100), it is returned.
    * Otherwise, the default threshold (90) is returned.
    */
-  async getResolvedClassifierThreshold(): Promise<number> {
-    const remoteValue = await this.getClassifierThreshold();
+  getResolvedClassifierThreshold(): number {
+    const remoteValue = this.getClassifierThreshold();
     const defaultValue = 90;
 
     if (
@@ -3057,13 +3057,13 @@ export class Config implements McpContext, AgentLoopContext {
     return defaultValue;
   }
 
-  async getClassifierThreshold(): Promise<number | undefined> {
+  getClassifierThreshold(): number | undefined {
     return this.getExperimentValue<number>(
       ExperimentFlags.CLASSIFIER_THRESHOLD,
     );
   }
 
-  async getBannerTextNoCapacityIssues(): Promise<string> {
+  getBannerTextNoCapacityIssues(): string {
     return (
       this.getExperimentValue<string>(
         ExperimentFlags.BANNER_TEXT_NO_CAPACITY_ISSUES,
@@ -3071,7 +3071,7 @@ export class Config implements McpContext, AgentLoopContext {
     );
   }
 
-  async getBannerTextCapacityIssues(): Promise<string> {
+  getBannerTextCapacityIssues(): string {
     return (
       this.getExperimentValue<string>(
         ExperimentFlags.BANNER_TEXT_CAPACITY_ISSUES,
@@ -3736,6 +3736,18 @@ export class Config implements McpContext, AgentLoopContext {
     // 4. Default value from metadata
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return ExperimentMetadata[flagId]?.defaultValue as unknown as T;
+  }
+
+  /**
+   * Updates experimental settings.
+   */
+  updateExperimentalSettings(settings: Record<string, unknown>): void {
+    // Only update if settings have actually changed to avoid unnecessary re-initialization logic
+    // if we add any in the future.
+    this.experimentalSettings = {
+      ...this.experimentalSettings,
+      ...settings,
+    };
   }
 
   /**
