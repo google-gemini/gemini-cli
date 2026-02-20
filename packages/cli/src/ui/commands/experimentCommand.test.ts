@@ -21,6 +21,11 @@ describe('experimentCommand', () => {
           updateExperimentalSettings: vi.fn(),
         },
         settings: {
+          user: {
+            settings: {
+              experimental: {},
+            },
+          },
           merged: {
             experimental: {},
           },
@@ -123,7 +128,7 @@ describe('experimentCommand', () => {
     );
 
     it('should unset an experiment', async () => {
-      (mockContext.services.settings.merged as Record<string, unknown>)[
+      (mockContext.services.settings.user.settings as Record<string, unknown>)[
         'experimental'
       ] = {
         'enable-preview': true,
@@ -139,7 +144,7 @@ describe('experimentCommand', () => {
         expect.objectContaining({
           type: MessageType.INFO,
           text: expect.stringContaining(
-            'Local override for experiment enable-preview removed',
+            'Local user override for experiment enable-preview removed',
           ),
         }),
       );
@@ -152,7 +157,7 @@ describe('experimentCommand', () => {
         expect.objectContaining({
           type: MessageType.ERROR,
           text: expect.stringContaining(
-            'No local override found for experiment: enable-preview',
+            'No local user override found for experiment: enable-preview',
           ),
         }),
       );
