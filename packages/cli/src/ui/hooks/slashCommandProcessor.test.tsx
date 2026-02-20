@@ -763,7 +763,7 @@ describe('useSlashCommandProcessor', () => {
         .fn()
         .mockResolvedValue(undefined);
       const editorCommand = createTestCommand({
-        name: 'copyeditor',
+        name: 'editorcmd',
         action: vi.fn().mockResolvedValue({
           type: 'open_in_editor',
           content: 'User:\nHello\n\n---\n\nModel:\nHi!',
@@ -780,7 +780,7 @@ describe('useSlashCommandProcessor', () => {
         ReturnType<typeof result.current.handleSlashCommand>
       >;
       await act(async () => {
-        actionResult = await result.current.handleSlashCommand('/copyeditor');
+        actionResult = await result.current.handleSlashCommand('/editorcmd');
       });
 
       expect(mockOpenContentInExternalEditor).toHaveBeenCalledWith(
