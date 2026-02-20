@@ -33,6 +33,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { WEB_FETCH_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { LRUCache } from 'mnemonist';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
@@ -40,7 +41,7 @@ const MAX_CONTENT_LENGTH = 100000;
 // Rate limiting configuration
 const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 10;
-const hostRequestHistory = new LRUCache<string, number[]>({ max: 1000 });
+const hostRequestHistory = new LRUCache<string, number[]>(1000);
 
 function checkRateLimit(url: string): {
   allowed: boolean;

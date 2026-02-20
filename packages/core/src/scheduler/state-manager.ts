@@ -78,13 +78,6 @@ export class SchedulerStateManager {
     return next;
   }
 
-  /**
-   * Returns the first tool call in the queue without removing it.
-   */
-  peek(): ToolCall | undefined {
-    return this.queue[0];
-  }
-
   get isActive(): boolean {
     return this.activeCalls.size > 0;
   }
