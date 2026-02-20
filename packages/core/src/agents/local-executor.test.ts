@@ -48,7 +48,8 @@ import {
   logAgentFinish,
   logRecoveryAttempt,
 } from '../telemetry/loggers.js';
-import { LlmRole ,
+import {
+  LlmRole,
   AgentStartEvent,
   AgentFinishEvent,
   RecoveryAttemptEvent,
