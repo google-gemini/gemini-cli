@@ -88,9 +88,7 @@ const buildModelRows = (
   useCustomToolModel = false,
 ) => {
   const getBaseModelName = (name: string) => name.replace('-001', '');
-  const usedModelNames = new Set(
-    Object.keys(models).map(getBaseModelName).map(getDisplayString),
-  );
+  const usedModelNames = new Set(Object.keys(models).map(getBaseModelName));
 
   // 1. Models with active usage
   const activeRows = Object.entries(models).map(([name, metrics]) => {
@@ -116,7 +114,7 @@ const buildModelRows = (
         (b) =>
           b.modelId &&
           isActiveModel(b.modelId, useGemini3_1, useCustomToolModel) &&
-          !usedModelNames.has(getDisplayString(b.modelId)),
+          !usedModelNames.has(b.modelId),
       )
       .map((bucket) => ({
         key: bucket.modelId!,
@@ -164,34 +162,22 @@ const ModelUsageTable: React.FC<{
 
   const showQuotaColumn = !!quotas;
 
-  const nameWidth = 22;
-  const requestsWidth = 7;
-  const uncachedWidth = 15;
-  const cachedWidth = 14;
-  const outputTokensWidth = 15;
-  const usageLimitWidth = showQuotaColumn ? 40 : 0;
+  const modelColumnWidth = 30;
+  const requestsColumnWidth = 8;
+  const tokenColumnWidth = 15;
 
   const cacheEfficiencyColor = getStatusColor(cacheEfficiency, {
     green: CACHE_EFFICIENCY_HIGH,
     yellow: CACHE_EFFICIENCY_MEDIUM,
   });
 
-  const totalWidth =
-    nameWidth +
-    requestsWidth +
-    (showQuotaColumn
-      ? usageLimitWidth
-      : uncachedWidth + cachedWidth + outputTokensWidth);
-
   return (
     <Box flexDirection="column" marginBottom={1}>
       {/* Header */}
-      <Box alignItems="flex-end">
-        <Box width={nameWidth}>
-          <Text bold color={theme.text.primary} wrap="truncate-end">
-            {modelUsageTitle}
-          </Text>
-        </Box>
+      <Box>
+        <Text bold color={theme.text.primary} wrap="truncate-end">
+          {modelUsageTitle}
+        </Text>
       </Box>
 
       <Box flexDirection="column" marginTop={0} marginBottom={1}>
@@ -200,6 +186,9 @@ const ModelUsageTable: React.FC<{
           limit={pooledLimit}
           resetTime={pooledResetTime}
           showDetails={true}
+          quotas={quotas}
+          useGemini3_1={useGemini3_1}
+          useCustomToolModel={useCustomToolModel}
         />
         {isAuto && (
           <Text color={theme.text.primary}>
@@ -208,18 +197,13 @@ const ModelUsageTable: React.FC<{
         )}
       </Box>
 
-      <Box alignItems="flex-end">
-        <Box width={nameWidth}>
+      <Box>
+        <Box width={modelColumnWidth}>
           <Text bold color={theme.text.primary}>
             Model
           </Text>
         </Box>
-        <Box
-          width={requestsWidth}
-          flexDirection="column"
-          alignItems="flex-end"
-          flexShrink={0}
-        >
+        <Box width={requestsColumnWidth} justifyContent="flex-end">
           <Text bold color={theme.text.primary}>
             Reqs
           </Text>
@@ -227,32 +211,17 @@ const ModelUsageTable: React.FC<{
 
         {!showQuotaColumn && (
           <>
-            <Box
-              width={uncachedWidth}
-              flexDirection="column"
-              alignItems="flex-end"
-              flexShrink={0}
-            >
+            <Box width={tokenColumnWidth} justifyContent="flex-end">
               <Text bold color={theme.text.primary}>
                 Input Tokens
               </Text>
             </Box>
-            <Box
-              width={cachedWidth}
-              flexDirection="column"
-              alignItems="flex-end"
-              flexShrink={0}
-            >
+            <Box width={tokenColumnWidth} justifyContent="flex-end">
               <Text bold color={theme.text.primary}>
                 Cache Reads
               </Text>
             </Box>
-            <Box
-              width={outputTokensWidth}
-              flexDirection="column"
-              alignItems="flex-end"
-              flexShrink={0}
-            >
+            <Box width={tokenColumnWidth} justifyContent="flex-end">
               <Text bold color={theme.text.primary}>
                 Output Tokens
               </Text>
@@ -260,7 +229,7 @@ const ModelUsageTable: React.FC<{
           </>
         )}
         {showQuotaColumn && (
-          <Box width={usageLimitWidth} justifyContent="flex-end">
+          <Box flexGrow={1} justifyContent="flex-end">
             <Text bold color={theme.text.primary}>
               Usage left
             </Text>
@@ -270,19 +239,19 @@ const ModelUsageTable: React.FC<{
 
       {/* Divider */}
       <Box
-        borderStyle="round"
+        borderStyle="single"
         borderBottom={true}
         borderTop={false}
         borderLeft={false}
         borderRight={false}
         borderColor={theme.border.default}
-        width={totalWidth}
-      ></Box>
+        marginBottom={0}
+      />
 
       {rows.length > 0 ? (
         rows.map((row) => (
           <Box key={row.key}>
-            <Box width={nameWidth}>
+            <Box width={modelColumnWidth}>
               <Text
                 color={row.isActive ? theme.text.primary : theme.text.secondary}
                 wrap="truncate-end"
@@ -290,12 +259,7 @@ const ModelUsageTable: React.FC<{
                 {row.modelName}
               </Text>
             </Box>
-            <Box
-              width={requestsWidth}
-              flexDirection="column"
-              alignItems="flex-end"
-              flexShrink={0}
-            >
+            <Box width={requestsColumnWidth} justifyContent="flex-end">
               <Text
                 color={row.isActive ? theme.text.primary : theme.text.secondary}
               >
@@ -304,12 +268,7 @@ const ModelUsageTable: React.FC<{
             </Box>
             {!showQuotaColumn && (
               <>
-                <Box
-                  width={uncachedWidth}
-                  flexDirection="column"
-                  alignItems="flex-end"
-                  flexShrink={0}
-                >
+                <Box width={tokenColumnWidth} justifyContent="flex-end">
                   <Text
                     color={
                       row.isActive ? theme.text.primary : theme.text.secondary
@@ -318,20 +277,10 @@ const ModelUsageTable: React.FC<{
                     {row.inputTokens}
                   </Text>
                 </Box>
-                <Box
-                  width={cachedWidth}
-                  flexDirection="column"
-                  alignItems="flex-end"
-                  flexShrink={0}
-                >
+                <Box width={tokenColumnWidth} justifyContent="flex-end">
                   <Text color={theme.text.secondary}>{row.cachedTokens}</Text>
                 </Box>
-                <Box
-                  width={outputTokensWidth}
-                  flexDirection="column"
-                  alignItems="flex-end"
-                  flexShrink={0}
-                >
+                <Box width={tokenColumnWidth} justifyContent="flex-end">
                   <Text
                     color={
                       row.isActive ? theme.text.primary : theme.text.secondary
@@ -342,27 +291,29 @@ const ModelUsageTable: React.FC<{
                 </Box>
               </>
             )}
-            <Box width={usageLimitWidth} justifyContent="flex-end">
-              {row.bucket && row.bucket.remainingFraction != null && (
-                <Text color={theme.text.secondary}>
-                  {(row.bucket.remainingFraction * 100).toFixed(1)}%
-                  {row.bucket.resetTime && (
-                    <Text color={theme.text.secondary}>
-                      {' '}
-                      (
-                      {(function (t) {
-                        const formatted = formatResetTime(t);
-                        return formatted === 'Resetting...' ||
-                          formatted === '< 1m'
-                          ? formatted
-                          : `Resets in ${formatted}`;
-                      })(row.bucket.resetTime)}
-                      )
-                    </Text>
-                  )}
-                </Text>
-              )}
-            </Box>
+            {showQuotaColumn && (
+              <Box flexGrow={1} justifyContent="flex-end">
+                {row.bucket && row.bucket.remainingFraction != null && (
+                  <Text color={theme.text.secondary}>
+                    {(row.bucket.remainingFraction * 100).toFixed(1)}%
+                    {row.bucket.resetTime && (
+                      <Text color={theme.text.secondary}>
+                        {' '}
+                        (
+                        {(function (t) {
+                          const formatted = formatResetTime(t);
+                          return formatted === 'Resetting...' ||
+                            formatted === '< 1m'
+                            ? formatted
+                            : `Resets in ${formatted}`;
+                        })(row.bucket.resetTime)}
+                        )
+                      </Text>
+                    )}
+                  </Text>
+                )}
+              </Box>
+            )}
           </Box>
         ))
       ) : (

@@ -4,12 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { ModelStatsDisplay } from './ModelStatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
-import * as SettingsContext from '../contexts/SettingsContext.js';
-import type { LoadedSettings } from '../../config/settings.js';
 import type { SessionMetrics } from '../contexts/SessionContext.js';
 import { ToolCallDecision, LlmRole } from '@google/gemini-cli-core';
 
@@ -22,16 +20,7 @@ vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../contexts/SettingsContext.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof SettingsContext>();
-  return {
-    ...actual,
-    useSettings: vi.fn(),
-  };
-});
-
 const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
-const useSettingsMock = vi.mocked(SettingsContext.useSettings);
 
 const renderWithMockedStats = async (
   metrics: SessionMetrics,
@@ -51,17 +40,9 @@ const renderWithMockedStats = async (
     startNewPrompt: vi.fn(),
   });
 
-  useSettingsMock.mockReturnValue({
-    merged: {
-      ui: {
-        showUserIdentity: true,
-      },
-    },
-  } as unknown as LoadedSettings);
-
-  const result = render(
+  const result = renderWithProviders(
     <ModelStatsDisplay currentModel={currentModel} />,
-    width,
+    { width },
   );
   await result.waitUntilReady();
   return result;
@@ -474,14 +455,6 @@ describe('<ModelStatsDisplay />', () => {
   });
 
   it('should render user identity information when provided', async () => {
-    useSettingsMock.mockReturnValue({
-      merged: {
-        ui: {
-          showUserIdentity: true,
-        },
-      },
-    } as unknown as LoadedSettings);
-
     useSessionStatsMock.mockReturnValue({
       stats: {
         sessionId: 'test-session',
@@ -528,7 +501,7 @@ describe('<ModelStatsDisplay />', () => {
       startNewPrompt: vi.fn(),
     });
 
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ModelStatsDisplay
         selectedAuthType="oauth"
         userEmail="test@example.com"

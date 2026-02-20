@@ -23,9 +23,12 @@ import {
   getDisplayString,
   isAutoModel,
   LlmRole,
+  AuthType,
+  type RetrieveUserQuotaResponse,
 } from '@google/gemini-cli-core';
 import type { QuotaStats } from '../types.js';
 import { QuotaStatsInfo } from './QuotaStatsInfo.js';
+import { useConfig } from '../contexts/ConfigContext.js';
 
 interface StatRowData {
   metric: string;
@@ -43,6 +46,7 @@ interface ModelStatsDisplayProps {
   tier?: string;
   currentModel?: string;
   quotaStats?: QuotaStats;
+  quotas?: RetrieveUserQuotaResponse;
 }
 
 export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
@@ -51,8 +55,14 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
   tier,
   currentModel,
   quotaStats,
+  quotas,
 }) => {
   const { stats } = useSessionStats();
+  const config = useConfig();
+  const useGemini3_1 = config.getGemini31LaunchedSync?.() ?? false;
+  const useCustomToolModel =
+    useGemini3_1 &&
+    config.getContentGeneratorConfig().authType === AuthType.USE_GEMINI;
 
   const pooledRemaining = quotaStats?.remaining;
   const pooledLimit = quotaStats?.limit;
@@ -343,6 +353,9 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
         remaining={pooledRemaining}
         limit={pooledLimit}
         resetTime={pooledResetTime}
+        quotas={quotas}
+        useGemini3_1={useGemini3_1}
+        useCustomToolModel={useCustomToolModel}
       />
       {(showUserIdentity || isAuto) && <Box height={1} />}
 
