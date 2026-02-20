@@ -49,6 +49,7 @@ export { getExperiments } from './src/code_assist/experiments/experiments.js';
 export {
   ExperimentFlags,
   ExperimentMetadata,
+  type ExperimentMetadataEntry,
   getExperimentFlagName,
   getExperimentFlagIdFromName,
 } from './src/code_assist/experiments/flagNames.js';

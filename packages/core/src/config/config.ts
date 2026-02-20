@@ -128,6 +128,7 @@ import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import { MemoryContextManager } from '../context/memoryContextManager.js';
 import { TrackerService } from '../services/trackerService.js';
 import type { GenerateContentParameters } from '@google/genai';
+import { ExperimentManager } from './experimentManager.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig, AnyToolInvocation, AnyDeclarativeTool };
@@ -155,10 +156,6 @@ import type {
 } from '../code_assist/types.js';
 import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
-import {
-  getExperiments,
-  type Experiments,
-} from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { AcknowledgedAgentsService } from '../agents/acknowledgedAgents.js';
 import { setGlobalProxy, updateGlobalFetchTimeouts } from '../utils/fetch.js';
@@ -168,6 +165,10 @@ import {
   ExperimentMetadata,
   getExperimentFlagName,
 } from '../code_assist/experiments/flagNames.js';
+import {
+  getExperiments,
+  type Experiments,
+} from '../code_assist/experiments/experiments.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
@@ -447,7 +448,6 @@ import {
   DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD,
   DEFAULT_PROTECT_LATEST_TURN,
 } from '../context/toolOutputMaskingService.js';
-
 import {
   type ExtensionLoader,
   SimpleExtensionLoader,
@@ -824,7 +824,6 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly listExtensions: boolean;
   private readonly _extensionLoader: ExtensionLoader;
   private readonly _enabledExtensions: string[];
-  private readonly enableExtensionReloading: boolean;
   fallbackModelHandler?: FallbackModelHandler;
   validationHandler?: ValidationHandler;
   private quotaErrorOccurred: boolean = false;
@@ -882,6 +881,7 @@ export class Config implements McpContext, AgentLoopContext {
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
   private readonly extensionRegistryURI: string | undefined;
+  private readonly enablePromptCompletion: boolean = false;
   private readonly truncateToolOutputThreshold: number;
   private compressionTruncationCounter = 0;
   private initialized = false;
@@ -894,6 +894,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly workspacePoliciesDir: string | undefined;
   private readonly _messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
+  private readonly experimentManager: ExperimentManager;
   private policyUpdateConfirmationRequest:
     | PolicyUpdateConfirmationRequest
     | undefined;
@@ -918,14 +919,7 @@ export class Config implements McpContext, AgentLoopContext {
   private pendingIncludeDirectories: string[];
   private readonly enableHooksUI: boolean;
   private readonly enableHooks: boolean;
-
-  private hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
-  private projectHooks:
-    | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
-    | undefined;
-  private disabledHooks: string[];
-  private experiments: Experiments | undefined;
-  private experimentsPromise: Promise<Experiments | undefined> | undefined;
+  private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
   private readonly onModelChange: ((model: string) => void) | undefined;
   private readonly onReload:
@@ -942,8 +936,6 @@ export class Config implements McpContext, AgentLoopContext {
 
   private readonly enableAgents: boolean;
   private agents: AgentSettings;
-  private experimentalSettings: Record<string, unknown>;
-  private readonly experimentalCliArgs: Record<string, unknown>;
   private readonly enableEventDrivenScheduler: boolean;
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
@@ -959,6 +951,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly modelSteering: boolean;
   private memoryContextManager?: MemoryContextManager;
   private readonly contextManagement: ContextManagementConfig;
+  private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
@@ -1107,11 +1100,45 @@ export class Config implements McpContext, AgentLoopContext {
     this.planEnabled = params.plan ?? true;
     this.trackerEnabled = params.tracker ?? false;
     this.planModeRoutingEnabled = params.planSettings?.modelRouting ?? true;
+
+    // Merge legacy experimental parameters into a single object for the manager
+    const experimentalSettings = {
+      ...(params.experimentalSettings ?? {}),
+    };
+    if (params.plan !== undefined) experimentalSettings['plan'] = params.plan;
+    if (params.experimentalJitContext !== undefined)
+      experimentalSettings['jitContext'] = params.experimentalJitContext;
+    if (params.enableAgents !== undefined)
+      experimentalSettings['enableAgents'] = params.enableAgents;
+    if (params.modelSteering !== undefined)
+      experimentalSettings['modelSteering'] = params.modelSteering;
+    if (params.enableExtensionReloading !== undefined)
+      experimentalSettings['extensionReloading'] =
+        params.enableExtensionReloading;
+    if (params.extensionManagement !== undefined)
+      experimentalSettings['extensionManagement'] = params.extensionManagement;
+    if (params.disableLLMCorrection !== undefined)
+      experimentalSettings['disableLLMCorrection'] =
+        params.disableLLMCorrection;
+    if (params.toolOutputMasking?.enabled !== undefined) {
+      experimentalSettings['toolOutputMasking'] = {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        ...((experimentalSettings['toolOutputMasking'] as object) ?? {}),
+        enabled: params.toolOutputMasking.enabled,
+      };
+    }
+
+    this.experimentManager = new ExperimentManager({
+      experimentalSettings,
+      experimentalCliArgs: params.experimentalCliArgs,
+      experiments: params.experiments,
+    });
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
     this.modelAvailabilityService = new ModelAvailabilityService();
+<<<<<<< HEAD
     this.dynamicModelConfiguration = params.dynamicModelConfiguration ?? false;
 
     // HACK: The settings loading logic doesn't currently merge the default
@@ -1355,7 +1382,6 @@ export class Config implements McpContext, AgentLoopContext {
       this.projectHooks = params.projectHooks;
     }
 
-    this.experiments = params.experiments;
     this.onModelChange = params.onModelChange;
     this.onReload = params.onReload;
 
@@ -1420,7 +1446,7 @@ export class Config implements McpContext, AgentLoopContext {
     }
 
     // Add plans directory to workspace context for plan file storage
-    if (this.planEnabled) {
+    if (this.isPlanEnabled()) {
       const plansDir = this.storage.getPlansDir();
       try {
         await fs.promises.access(plansDir);
@@ -1502,9 +1528,15 @@ export class Config implements McpContext, AgentLoopContext {
       await this.hookSystem.initialize();
     }
 
+<<<<<<< HEAD
     if (this.experimentalJitContext) {
       this.memoryContextManager = new MemoryContextManager(this);
       await this.memoryContextManager.refresh();
+=======
+    if (this.isJitContextEnabled()) {
+      this.contextManager = new ContextManager(this);
+      await this.contextManager.refresh();
+>>>>>>> 49ab62d87 (refactor: move experiment logic to ExperimentManager with Zod validation)
     }
 
     await this._geminiClient.initialize();
@@ -1603,9 +1635,11 @@ export class Config implements McpContext, AgentLoopContext {
       this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
     }
 
-    const adminControlsEnabled =
-      experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]?.boolValue ??
-      false;
+    // Fetch admin controls
+    await this.ensureExperimentsLoaded();
+    const adminControlsEnabled = !!this.getExperimentValue<boolean>(
+      ExperimentFlags.ENABLE_ADMIN_CONTROLS,
+    );
     const adminControls = await fetchAdminControls(
       codeAssistServer,
       this.getRemoteAdminSettings(),
@@ -1623,8 +1657,8 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   async getExperimentsAsync(): Promise<Experiments | undefined> {
-    if (this.experiments) {
-      return this.experiments;
+    if (this.experimentManager.getExperiments()) {
+      return this.experimentManager.getExperiments();
     }
     const codeAssistServer = getCodeAssistServer(this);
     return getExperiments(codeAssistServer);
@@ -2331,12 +2365,12 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getUserMemory(): string | HierarchicalMemory {
-    if (this.experimentalJitContext && this.memoryContextManager) {
+    if (this.isJitContextEnabled() && this.contextManager) {
       return {
-        global: this.memoryContextManager.getGlobalMemory(),
-        extension: this.memoryContextManager.getExtensionMemory(),
-        project: this.memoryContextManager.getEnvironmentMemory(),
-        userProjectMemory: this.memoryContextManager.getUserProjectMemory(),
+        global: this.contextManager.getGlobalMemory(),
+        extension: this.contextManager.getExtensionMemory(),
+        project: this.contextManager.getEnvironmentMemory(),
+        userProjectMemory: this.contextManager.getUserProjectMemory(),
       };
     }
     return this.userMemory;
@@ -2346,8 +2380,8 @@ export class Config implements McpContext, AgentLoopContext {
    * Refreshes the MCP context, including memory, tools, and system instructions.
    */
   async refreshMcpContext(): Promise<void> {
-    if (this.experimentalJitContext && this.memoryContextManager) {
-      await this.memoryContextManager.refresh();
+    if (this.isJitContextEnabled() && this.contextManager) {
+      await this.contextManager.refresh();
     } else {
       const { refreshServerHierarchicalMemory } = await import(
         '../utils/memoryDiscovery.js'
@@ -2422,7 +2456,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   isJitContextEnabled(): boolean {
-    return this.experimentalJitContext;
+    return this.experimentManager.isJitContextEnabled();
   }
 
   isContextManagementEnabled(): boolean {
@@ -2458,49 +2492,37 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   isModelSteeringEnabled(): boolean {
-    return this.modelSteering;
+    return this.experimentManager.isModelSteeringEnabled();
+  }
+
+  getToolOutputMaskingEnabled(): boolean {
+    return this.getExperimentValue<boolean>(
+      ExperimentFlags.ENABLE_TOOL_OUTPUT_MASKING,
+    )!;
   }
 
   async getToolOutputMaskingConfig(): Promise<ToolOutputMaskingConfig> {
     await this.ensureExperimentsLoaded();
 
-    const remoteProtection =
-      this.experiments?.flags[ExperimentFlags.MASKING_PROTECTION_THRESHOLD]
-        ?.intValue;
-    const remotePrunable =
-      this.experiments?.flags[ExperimentFlags.MASKING_PRUNABLE_THRESHOLD]
-        ?.intValue;
-    const remoteProtectLatest =
-      this.experiments?.flags[ExperimentFlags.MASKING_PROTECT_LATEST_TURN]
-        ?.boolValue;
-
-    const parsedProtection = remoteProtection
-      ? parseInt(remoteProtection, 10)
-      : undefined;
-    const parsedPrunable = remotePrunable
-      ? parseInt(remotePrunable, 10)
-      : undefined;
-
     return {
-      protectionThresholdTokens:
-        parsedProtection !== undefined && !isNaN(parsedProtection)
-          ? parsedProtection
-          : this.contextManagement.tools.outputMasking
-              .protectionThresholdTokens,
-      minPrunableThresholdTokens:
-        parsedPrunable !== undefined && !isNaN(parsedPrunable)
-          ? parsedPrunable
-          : this.contextManagement.tools.outputMasking
-              .minPrunableThresholdTokens,
-      protectLatestTurn:
-        remoteProtectLatest ??
-        this.contextManagement.tools.outputMasking.protectLatestTurn,
+      enabled: this.getExperimentValue<boolean>(
+        ExperimentFlags.ENABLE_TOOL_OUTPUT_MASKING,
+      )!,
+      toolProtectionThreshold: this.getExperimentValue<number>(
+        ExperimentFlags.MASKING_PROTECTION_THRESHOLD,
+      )!,
+      minPrunableTokensThreshold: this.getExperimentValue<number>(
+        ExperimentFlags.MASKING_PRUNABLE_THRESHOLD,
+      )!,
+      protectLatestTurn: this.getExperimentValue<boolean>(
+        ExperimentFlags.MASKING_PROTECT_LATEST_TURN,
+      )!,
     };
   }
 
   getGeminiMdFileCount(): number {
-    if (this.experimentalJitContext && this.memoryContextManager) {
-      return this.memoryContextManager.getLoadedPaths().size;
+    if (this.isJitContextEnabled() && this.contextManager) {
+      return this.contextManager.getLoadedPaths().size;
     }
     return this.geminiMdFileCount;
   }
@@ -2510,8 +2532,8 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getGeminiMdFilePaths(): string[] {
-    if (this.experimentalJitContext && this.memoryContextManager) {
-      return Array.from(this.memoryContextManager.getLoadedPaths());
+    if (this.isJitContextEnabled() && this.contextManager) {
+      return Array.from(this.contextManager.getLoadedPaths());
     }
     return this.geminiMdFilePaths;
   }
@@ -2609,6 +2631,45 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
+   * Synchronizes enter/exit plan mode tools based on current mode.
+   */
+  syncPlanModeTools(): void {
+    const registry = this.getToolRegistry();
+    if (!registry) {
+      return;
+    }
+    const approvalMode = this.getApprovalMode();
+    const isPlanMode = approvalMode === ApprovalMode.PLAN;
+    const isYoloMode = approvalMode === ApprovalMode.YOLO;
+
+    if (isPlanMode) {
+      if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
+        registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
+      }
+      if (!registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
+        registry.registerTool(new ExitPlanModeTool(this, this.messageBus));
+      }
+    } else {
+      if (registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
+        registry.unregisterTool(EXIT_PLAN_MODE_TOOL_NAME);
+      }
+      if (this.isPlanEnabled() && !isYoloMode) {
+        if (!registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
+          registry.registerTool(new EnterPlanModeTool(this, this.messageBus));
+        }
+      } else {
+        if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
+          registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
+        }
+      }
+    }
+
+    if (this.geminiClient?.isInitialized()) {
+      this.geminiClient.setTools().catch((err) => {
+        debugLogger.error('Failed to update tools', err);
+      });
+    }
+  }
    * Logs the duration of the current approval mode.
    */
   logCurrentModeDuration(mode: ApprovalMode): void {
@@ -2840,7 +2901,9 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getExtensionManagement(): boolean {
-    return this.extensionManagement;
+    return this.experimentManager.getExperimentValue<boolean>(
+      ExperimentFlags.EXTENSION_MANAGEMENT,
+    );
   }
 
   getExtensions(): GeminiCLIExtension[] {
@@ -2858,15 +2921,15 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getEnableExtensionReloading(): boolean {
-    return this.enableExtensionReloading;
+    return this.experimentManager.getEnableExtensionReloading();
   }
 
   getDisableLLMCorrection(): boolean {
-    return this.disableLLMCorrection;
+    return this.experimentManager.getDisableLLMCorrection();
   }
 
   isPlanEnabled(): boolean {
-    return this.planEnabled;
+    return this.experimentManager.isPlanEnabled();
   }
 
   isTrackerEnabled(): boolean {
@@ -2886,7 +2949,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   isAgentsEnabled(): boolean {
-    return this.enableAgents;
+    return this.experimentManager.isAgentsEnabled();
   }
 
   isEventDrivenSchedulerEnabled(): boolean {
@@ -3011,9 +3074,9 @@ export class Config implements McpContext, AgentLoopContext {
 
     await this.ensureExperimentsLoaded();
 
-    const remoteThreshold =
-      this.experiments?.flags[ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]
-        ?.floatValue;
+    const remoteThreshold = this.getExperimentValue<number>(
+      ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD,
+    );
     if (remoteThreshold === 0) {
       return undefined;
     }
@@ -3021,7 +3084,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   async getUserCaching(): Promise<boolean | undefined> {
-    return this.getExperimentValue<boolean>(ExperimentFlags.USER_CACHING);
+    return this.experimentManager.getUserCaching();
   }
 
   async getPlanModeRoutingEnabled(): Promise<boolean> {
@@ -3029,11 +3092,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   async getNumericalRoutingEnabled(): Promise<boolean> {
-    return (
-      this.getExperimentValue<boolean>(
-        ExperimentFlags.ENABLE_NUMERICAL_ROUTING,
-      ) ?? false
-    );
+    return this.experimentManager.isNumericalRoutingEnabled();
   }
 
   /**
@@ -3058,25 +3117,15 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   async getClassifierThreshold(): Promise<number | undefined> {
-    return this.getExperimentValue<number>(
-      ExperimentFlags.CLASSIFIER_THRESHOLD,
-    );
+    return this.experimentManager.getClassifierThreshold();
   }
 
   async getBannerTextNoCapacityIssues(): Promise<string> {
-    return (
-      this.getExperimentValue<string>(
-        ExperimentFlags.BANNER_TEXT_NO_CAPACITY_ISSUES,
-      ) ?? ''
-    );
+    return this.experimentManager.getBannerTextNoCapacityIssues();
   }
 
   async getBannerTextCapacityIssues(): Promise<string> {
-    return (
-      this.getExperimentValue<string>(
-        ExperimentFlags.BANNER_TEXT_CAPACITY_ISSUES,
-      ) ?? ''
-    );
+    return this.experimentManager.getBannerTextCapacityIssues();
   }
 
   /**
@@ -3685,7 +3734,7 @@ export class Config implements McpContext, AgentLoopContext {
    * Get experiments configuration
    */
   getExperiments(): Experiments | undefined {
-    return this.experiments;
+    return this.experimentManager.getExperiments();
   }
 
   /**
@@ -3698,69 +3747,21 @@ export class Config implements McpContext, AgentLoopContext {
   getExperimentValue<T extends boolean | number | string>(
     flagId: number,
   ): T | undefined {
-    const flagName = getExperimentFlagName(flagId);
-    if (!flagName) {
-      return undefined;
-    }
-
-    // 1. Command-line argument
-    const cliValue = this.experimentalCliArgs[flagName];
-    if (cliValue !== undefined) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return cliValue as T;
-    }
-
-    // 2. Local setting
-    const settingValue = this.experimentalSettings[flagName];
-    if (settingValue !== undefined) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return settingValue as T;
-    }
-
-    // 3. Remote experiment
-    const remoteFlag = this.experiments?.flags[flagId];
-    if (remoteFlag) {
-      const val =
-        remoteFlag.boolValue ??
-        remoteFlag.floatValue ??
-        remoteFlag.intValue ??
-        remoteFlag.stringValue;
-      if (val !== undefined) {
-        // Handle string representation of numbers if necessary
-        if (typeof val === 'string' && !isNaN(Number(val))) {
-          const metadata = ExperimentMetadata[flagId];
-          if (metadata?.type === 'number') {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            return Number(val) as unknown as T;
-          }
-        }
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        return val as unknown as T;
-      }
-    }
-
-    // 4. Default value from metadata
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return ExperimentMetadata[flagId]?.defaultValue as unknown as T;
+    return this.experimentManager.getExperimentValue<T>(flagId);
   }
 
   /**
    * Updates experimental settings.
    */
   updateExperimentalSettings(settings: Record<string, unknown>): void {
-    // Only update if settings have actually changed to avoid unnecessary re-initialization logic
-    // if we add any in the future.
-    this.experimentalSettings = {
-      ...this.experimentalSettings,
-      ...settings,
-    };
+    this.experimentManager.updateExperimentalSettings(settings);
   }
 
   /**
    * Set experiments configuration
    */
   setExperiments(experiments: Experiments): void {
-    this.experiments = experiments;
+    this.experimentManager.setExperiments(experiments);
     const flagSummaries = Object.entries(experiments.flags ?? {})
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([flagId, flag]) => {

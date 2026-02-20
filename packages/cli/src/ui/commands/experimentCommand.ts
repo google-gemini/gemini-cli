@@ -9,6 +9,7 @@ import {
   getExperimentFlagIdFromName,
   getExperimentFlagName,
 } from '@google/gemini-cli-core';
+import { z } from 'zod';
 import {
   type CommandContext,
   CommandKind,
@@ -26,7 +27,9 @@ const listExperimentsCommand: SlashCommand = {
     const { config } = context.services;
     if (!config) return;
 
-    const entries = Object.entries(ExperimentMetadata);
+    const entries = Object.entries(ExperimentMetadata).filter(
+      ([, metadata]) => !metadata.hidden,
+    );
     if (entries.length === 0) {
       context.ui.addItem({
         type: MessageType.INFO,
@@ -40,7 +43,7 @@ const listExperimentsCommand: SlashCommand = {
       const id = parseInt(idStr, 10);
       const name = getExperimentFlagName(id) || `ID: ${id}`;
       const value = config.getExperimentValue(id);
-      output += `${name} (${metadata.type})\n`;
+      output += `${name}\n`;
       output += `  Value: ${value}\n`;
       output += `  Description: ${metadata.description}\n`;
       output += `  Default: ${metadata.defaultValue}\n\n`;
@@ -82,30 +85,33 @@ const setExperimentCommand: SlashCommand = {
     }
 
     const metadata = ExperimentMetadata[id];
-    let value: boolean | number | string;
+    let value: unknown;
 
-    if (metadata.type === 'boolean') {
-      if (rawValue === 'true' || rawValue === 'on') value = true;
-      else if (rawValue === 'false' || rawValue === 'off') value = false;
-      else {
-        context.ui.addItem({
-          type: MessageType.ERROR,
-          text: `Invalid boolean value: ${rawValue}. Use true/false or on/off.`,
-        });
-        return;
+    // Helper to parse strings based on Zod schema type
+    const parseValue = (raw: string, schema: z.ZodTypeAny): unknown => {
+      if (schema instanceof z.ZodBoolean) {
+        if (raw === 'true' || raw === 'on') return true;
+        if (raw === 'false' || raw === 'off') return false;
+        return raw;
       }
-    } else if (metadata.type === 'number') {
-      value = Number(rawValue);
-      if (isNaN(value)) {
-        context.ui.addItem({
-          type: MessageType.ERROR,
-          text: `Invalid number value: ${rawValue}`,
-        });
-        return;
+      if (schema instanceof z.ZodNumber) {
+        return Number(raw);
       }
-    } else {
-      value = rawValue;
+      return raw;
+    };
+
+    value = parseValue(rawValue, metadata.schema);
+    const result = metadata.schema.safeParse(value);
+
+    if (!result.success) {
+      context.ui.addItem({
+        type: MessageType.ERROR,
+        text: `Invalid value for ${name}: ${rawValue}. Error: ${result.error.errors[0].message}`,
+      });
+      return;
     }
+
+    value = result.data;
 
     const { settings, config } = context.services;
     if (!config) return;
@@ -188,6 +194,7 @@ const unsetExperimentCommand: SlashCommand = {
 export const experimentCommand: SlashCommand = {
   name: 'experiment',
   description: 'Manage experimental features',
+  hidden: true,
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   subCommands: [
