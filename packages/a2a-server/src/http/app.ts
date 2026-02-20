@@ -7,12 +7,12 @@
 import express from 'express';
 
 import type { AgentCard, Message } from '@a2a-js/sdk';
-import type { TaskStore } from '@a2a-js/sdk/server';
 import {
   DefaultRequestHandler,
   InMemoryTaskStore,
   DefaultExecutionEventBus,
   type AgentExecutionEvent,
+  type TaskStore,
 } from '@a2a-js/sdk/server';
 import { A2AExpressApp } from '@a2a-js/sdk/server/express'; // Import server components
 import { v4 as uuidv4 } from 'uuid';
@@ -25,9 +25,12 @@ import { loadConfig, loadEnvironment, setTargetDir } from '../config/config.js';
 import { loadSettings } from '../config/settings.js';
 import { loadExtensions } from '../config/extension.js';
 import { commandRegistry } from '../commands/command-registry.js';
-import { debugLogger, SimpleExtensionLoader } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  SimpleExtensionLoader,
+  GitService,
+} from '@google/gemini-cli-core';
 import type { Command, CommandArgument } from '../commands/types.js';
-import { GitService } from '@google/gemini-cli-core';
 
 type CommandResponse = {
   name: string;

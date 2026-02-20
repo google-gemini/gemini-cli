@@ -5,8 +5,11 @@
  */
 
 import type { HookRegistry, HookRegistryEntry } from './hookRegistry.js';
-import type { HookExecutionPlan } from './types.js';
-import { getHookKey, type HookEventName } from './types.js';
+import {
+  getHookKey,
+  type HookEventName,
+  type HookExecutionPlan,
+} from './types.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 /**

@@ -11,11 +11,12 @@ import {
 } from './a2a-client-manager.js';
 import type { AgentCard, Task } from '@a2a-js/sdk';
 import type { AuthenticationHandler, Client } from '@a2a-js/sdk/client';
-import { ClientFactory, DefaultAgentCardResolver } from '@a2a-js/sdk/client';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
   createAuthenticatingFetchWithRetry,
   ClientFactoryOptions,
+  ClientFactory,
+  DefaultAgentCardResolver,
 } from '@a2a-js/sdk/client';
 
 vi.mock('../utils/debugLogger.js', () => ({

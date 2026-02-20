@@ -8,11 +8,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
 
-import type { TelemetryTarget } from '@google/gemini-cli-core';
 import {
   AuthType,
   Config,
   type ConfigParameters,
+  type TelemetryTarget,
   FileDiscoveryService,
   ApprovalMode,
   loadServerHierarchicalMemory,
