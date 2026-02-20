@@ -36,6 +36,7 @@ import type {
   GenerateContentResponse,
 } from '@google/genai';
 import * as readline from 'node:readline';
+import { Readable } from 'node:stream';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import { UserTierId } from './types.js';
 import type {
@@ -341,7 +342,7 @@ export class CodeAssistServer implements ContentGenerator {
     req: object,
     signal?: AbortSignal,
   ): Promise<AsyncGenerator<T>> {
-    const res = await this.client.request({
+    const res = await this.client.request<AsyncIterable<unknown>>({
       url: this.getMethodUrl(method),
       method: 'POST',
       params: {
@@ -358,8 +359,7 @@ export class CodeAssistServer implements ContentGenerator {
 
     return (async function* (): AsyncGenerator<T> {
       const rl = readline.createInterface({
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        input: res.data as NodeJS.ReadableStream,
+        input: Readable.from(res.data),
         crlfDelay: Infinity, // Recognizes '\r\n' and '\n' as line breaks
       });
 
