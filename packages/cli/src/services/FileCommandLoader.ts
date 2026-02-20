@@ -37,7 +37,6 @@ import { sanitizeForDisplay } from '../ui/utils/textUtils.js';
 
 interface CommandDirectory {
   path: string;
-  namespace: string;
   extensionName?: string;
   extensionId?: string;
 }
@@ -112,7 +111,6 @@ export class FileCommandLoader implements ICommandLoader {
           this.parseAndAdaptFile(
             path.join(dirInfo.path, file),
             dirInfo.path,
-            dirInfo.namespace,
             dirInfo.extensionName,
             dirInfo.extensionId,
           ),
@@ -153,16 +151,10 @@ export class FileCommandLoader implements ICommandLoader {
     const storage = this.config?.storage ?? new Storage(this.projectRoot);
 
     // 1. User commands
-    dirs.push({
-      path: Storage.getUserCommandsDir(),
-      namespace: 'user',
-    });
+    dirs.push({ path: Storage.getUserCommandsDir() });
 
     // 2. Project commands (override user commands)
-    dirs.push({
-      path: storage.getProjectCommandsDir(),
-      namespace: 'workspace',
-    });
+    dirs.push({ path: storage.getProjectCommandsDir() });
 
     // 3. Extension commands (processed last to detect all conflicts)
     if (this.config) {
@@ -173,7 +165,6 @@ export class FileCommandLoader implements ICommandLoader {
 
       const extensionCommandDirs = activeExtensions.map((ext) => ({
         path: path.join(ext.path, 'commands'),
-        namespace: ext.name,
         extensionName: ext.name,
         extensionId: ext.id,
       }));
@@ -188,16 +179,14 @@ export class FileCommandLoader implements ICommandLoader {
    * Parses a single .toml file and transforms it into a SlashCommand object.
    * @param filePath The absolute path to the .toml file.
    * @param baseDir The root command directory for name calculation.
-   * @param namespace The namespace of the command.
    * @param extensionName Optional extension name to prefix commands with.
    * @returns A promise resolving to a SlashCommand, or null if the file is invalid.
    */
   private async parseAndAdaptFile(
     filePath: string,
     baseDir: string,
-    namespace: string,
-    extensionName: string | undefined,
-    extensionId: string | undefined,
+    extensionName?: string,
+    extensionId?: string,
   ): Promise<SlashCommand | null> {
     let fileContent: string;
     try {
@@ -256,10 +245,15 @@ export class FileCommandLoader implements ICommandLoader {
       })
       .join(':');
 
+    // Add extension name tag for extension commands
     const defaultDescription = `Custom command from ${path.basename(filePath)}`;
     let description = validDef.description || defaultDescription;
 
     description = sanitizeForDisplay(description, 100);
+
+    if (extensionName) {
+      description = `[${extensionName}] ${description}`;
+    }
 
     const processors: IPromptProcessor[] = [];
     const usesArgs = validDef.prompt.includes(SHORTHAND_ARGS_PLACEHOLDER);
@@ -291,7 +285,6 @@ export class FileCommandLoader implements ICommandLoader {
 
     return {
       name: baseCommandName,
-      namespace,
       description,
       kind: CommandKind.FILE,
       extensionName,
