@@ -75,7 +75,8 @@ describe('createPolicyUpdater', () => {
       expect.objectContaining({
         toolName: 'run_shell_command',
         priority: ALWAYS_ALLOW_PRIORITY,
-        argsPattern: new RegExp('"command":"echo(?:[\\s"]|\\\\")'),
+        argsPattern: new RegExp('^echo(?:\\s|$)'),
+        argName: 'command',
       }),
     );
     expect(policyEngine.addRule).toHaveBeenNthCalledWith(
@@ -83,7 +84,8 @@ describe('createPolicyUpdater', () => {
       expect.objectContaining({
         toolName: 'run_shell_command',
         priority: ALWAYS_ALLOW_PRIORITY,
-        argsPattern: new RegExp('"command":"ls(?:[\\s"]|\\\\")'),
+        argsPattern: new RegExp('^ls(?:\\s|$)'),
+        argName: 'command',
       }),
     );
   });
@@ -103,7 +105,8 @@ describe('createPolicyUpdater', () => {
       expect.objectContaining({
         toolName: 'run_shell_command',
         priority: ALWAYS_ALLOW_PRIORITY,
-        argsPattern: new RegExp('"command":"git(?:[\\s"]|\\\\")'),
+        argsPattern: new RegExp('^git(?:\\s|$)'),
+        argName: 'command',
       }),
     );
   });

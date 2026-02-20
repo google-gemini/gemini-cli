@@ -1169,17 +1169,13 @@ modes = ["plan"]
         r.argsPattern,
     );
     expect(shellRules).toHaveLength(2);
-    expect(
-      shellRules?.some((r) => r.argsPattern?.test('{"command":"git status"}')),
-    ).toBe(true);
-    expect(
-      shellRules?.some((r) => r.argsPattern?.test('{"command":"git diff"}')),
-    ).toBe(true);
-    expect(
-      shellRules?.every(
-        (r) => !r.argsPattern?.test('{"command":"git commit"}'),
-      ),
-    ).toBe(true);
+    expect(shellRules?.some((r) => r.argsPattern?.test('git status'))).toBe(
+      true,
+    );
+    expect(shellRules?.some((r) => r.argsPattern?.test('git diff'))).toBe(true);
+    expect(shellRules?.every((r) => !r.argsPattern?.test('git commit'))).toBe(
+      true,
+    );
 
     const subagentRule = config.rules?.find(
       (r) =>
