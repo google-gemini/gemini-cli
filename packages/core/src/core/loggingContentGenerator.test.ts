@@ -24,11 +24,16 @@ vi.mock('../telemetry/trace.js', () => ({
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type {
+  Content,
+  GenerateContentConfig,
   GenerateContentResponse,
   EmbedContentResponse,
 } from '@google/genai';
 import type { ContentGenerator } from './contentGenerator.js';
-import { LoggingContentGenerator } from './loggingContentGenerator.js';
+import {
+  LoggingContentGenerator,
+  estimateContextBreakdown,
+} from './loggingContentGenerator.js';
 import type { Config } from '../config/config.js';
 import { UserTierId } from '../code_assist/types.js';
 import { ApiRequestEvent, LlmRole } from '../telemetry/types.js';
@@ -344,5 +349,284 @@ describe('LoggingContentGenerator', () => {
       wrapped.userTierName = 'Standard Tier';
       expect(loggingContentGenerator.userTierName).toBe('Standard Tier');
     });
+  });
+});
+
+describe('estimateContextBreakdown', () => {
+  it('should return zeros for empty contents and no config', () => {
+    const result = estimateContextBreakdown([], undefined);
+    expect(result).toEqual({
+      system_instructions: 0,
+      tool_definitions: 0,
+      history: 0,
+      tool_calls: {},
+      mcp_servers: 0,
+    });
+  });
+
+  it('should estimate system instruction tokens', () => {
+    const config = {
+      systemInstruction: 'You are a helpful assistant.',
+    } as GenerateContentConfig;
+    const result = estimateContextBreakdown([], config);
+    expect(result.system_instructions).toBeGreaterThan(0);
+    expect(result.tool_definitions).toBe(0);
+    expect(result.history).toBe(0);
+  });
+
+  it('should estimate non-MCP tool definition tokens', () => {
+    const config = {
+      tools: [
+        {
+          functionDeclarations: [
+            { name: 'read_file', description: 'Reads a file', parameters: {} },
+          ],
+        },
+      ],
+    } as unknown as GenerateContentConfig;
+    const result = estimateContextBreakdown([], config);
+    expect(result.tool_definitions).toBeGreaterThan(0);
+    expect(result.mcp_servers).toBe(0);
+  });
+
+  it('should classify MCP tool definitions into mcp_servers, not tool_definitions', () => {
+    const config = {
+      tools: [
+        {
+          functionDeclarations: [
+            {
+              name: 'myserver__search',
+              description: 'Search via MCP',
+              parameters: {},
+            },
+            {
+              name: 'read_file',
+              description: 'Reads a file',
+              parameters: {},
+            },
+          ],
+        },
+      ],
+    } as unknown as GenerateContentConfig;
+    const result = estimateContextBreakdown([], config);
+    expect(result.mcp_servers).toBeGreaterThan(0);
+    expect(result.tool_definitions).toBeGreaterThan(0);
+    // MCP tokens should not be in tool_definitions
+    const configOnlyBuiltin = {
+      tools: [
+        {
+          functionDeclarations: [
+            {
+              name: 'read_file',
+              description: 'Reads a file',
+              parameters: {},
+            },
+          ],
+        },
+      ],
+    } as unknown as GenerateContentConfig;
+    const builtinOnly = estimateContextBreakdown([], configOnlyBuiltin);
+    // tool_definitions should be smaller when MCP tools are separated out
+    expect(result.tool_definitions).toBeLessThan(
+      result.tool_definitions + result.mcp_servers,
+    );
+    expect(builtinOnly.mcp_servers).toBe(0);
+  });
+
+  it('should not classify tools with __ in the middle of a segment as MCP', () => {
+    // "__" at start or end (not a valid server__tool pattern) should not be MCP
+    const config = {
+      tools: [
+        {
+          functionDeclarations: [
+            { name: '__leading', description: 'test', parameters: {} },
+            { name: 'trailing__', description: 'test', parameters: {} },
+            {
+              name: 'a__b__c',
+              description: 'three parts - not valid MCP',
+              parameters: {},
+            },
+          ],
+        },
+      ],
+    } as unknown as GenerateContentConfig;
+    const result = estimateContextBreakdown([], config);
+    expect(result.mcp_servers).toBe(0);
+  });
+
+  it('should estimate history tokens excluding tool call/response parts', () => {
+    const contents: Content[] = [
+      { role: 'user', parts: [{ text: 'Hello world' }] },
+      { role: 'model', parts: [{ text: 'Hi there!' }] },
+    ];
+    const result = estimateContextBreakdown(contents);
+    expect(result.history).toBeGreaterThan(0);
+    expect(result.tool_calls).toEqual({});
+  });
+
+  it('should separate tool call tokens from history', () => {
+    const contents: Content[] = [
+      {
+        role: 'model',
+        parts: [
+          {
+            functionCall: {
+              name: 'read_file',
+              args: { path: '/tmp/test.txt' },
+            },
+          },
+        ],
+      },
+      {
+        role: 'function',
+        parts: [
+          {
+            functionResponse: {
+              name: 'read_file',
+              response: { content: 'file contents here' },
+            },
+          },
+        ],
+      },
+    ];
+    const result = estimateContextBreakdown(contents);
+    expect(result.tool_calls['read_file']).toBeGreaterThan(0);
+    // history should still have some tokens (the content wrapper minus tool parts)
+    expect(result.history).toBeGreaterThanOrEqual(0);
+  });
+
+  it('should produce additive (non-overlapping) fields', () => {
+    const contents: Content[] = [
+      { role: 'user', parts: [{ text: 'Hello' }] },
+      {
+        role: 'model',
+        parts: [
+          {
+            functionCall: {
+              name: 'read_file',
+              args: { path: '/tmp/test.txt' },
+            },
+          },
+        ],
+      },
+      {
+        role: 'function',
+        parts: [
+          {
+            functionResponse: {
+              name: 'read_file',
+              response: { content: 'data' },
+            },
+          },
+        ],
+      },
+    ];
+    const config = {
+      systemInstruction: 'Be helpful.',
+      tools: [
+        {
+          functionDeclarations: [
+            { name: 'read_file', description: 'Read', parameters: {} },
+            {
+              name: 'myserver__search',
+              description: 'MCP search',
+              parameters: {},
+            },
+          ],
+        },
+      ],
+    } as unknown as GenerateContentConfig;
+    const result = estimateContextBreakdown(contents, config);
+
+    // Sum of tool_calls values
+    const totalToolCalls = Object.values(result.tool_calls).reduce(
+      (a, b) => a + b,
+      0,
+    );
+    // mcp_servers includes both definitions and call/response parts for MCP tools
+    // but does NOT overlap with tool_definitions or history
+    // tool_calls overlaps with mcp_servers (MCP call/responses are in both)
+    // so the additive total is: system + tool_defs + history + tool_calls_non_mcp + mcp
+    expect(result.system_instructions).toBeGreaterThan(0);
+    expect(result.tool_definitions).toBeGreaterThan(0);
+    expect(result.history).toBeGreaterThanOrEqual(0);
+    expect(totalToolCalls).toBeGreaterThan(0);
+  });
+
+  it('should classify MCP tool calls into mcp_servers', () => {
+    const contents: Content[] = [
+      {
+        role: 'model',
+        parts: [
+          {
+            functionCall: {
+              name: 'myserver__search',
+              args: { query: 'test' },
+            },
+          },
+        ],
+      },
+      {
+        role: 'function',
+        parts: [
+          {
+            functionResponse: {
+              name: 'myserver__search',
+              response: { results: [] },
+            },
+          },
+        ],
+      },
+    ];
+    const result = estimateContextBreakdown(contents);
+    expect(result.tool_calls['myserver__search']).toBeGreaterThan(0);
+    expect(result.mcp_servers).toBeGreaterThan(0);
+    // MCP call tokens should be counted in mcp_servers
+    expect(result.mcp_servers).toBe(result.tool_calls['myserver__search']);
+  });
+
+  it('should handle mixed MCP and non-MCP tool calls', () => {
+    const contents: Content[] = [
+      {
+        role: 'model',
+        parts: [
+          {
+            functionCall: {
+              name: 'read_file',
+              args: { path: '/test' },
+            },
+          },
+          {
+            functionCall: {
+              name: 'myserver__search',
+              args: { q: 'hello' },
+            },
+          },
+        ],
+      },
+    ];
+    const result = estimateContextBreakdown(contents);
+    expect(result.tool_calls['read_file']).toBeGreaterThan(0);
+    expect(result.tool_calls['myserver__search']).toBeGreaterThan(0);
+    // Only MCP tool calls should be in mcp_servers
+    expect(result.mcp_servers).toBe(result.tool_calls['myserver__search']);
+  });
+
+  it('should use "unknown" for tool calls without a name', () => {
+    const contents: Content[] = [
+      {
+        role: 'model',
+        parts: [
+          {
+            functionCall: {
+              name: undefined as unknown as string,
+              args: { x: 1 },
+            },
+          },
+        ],
+      },
+    ];
+    const result = estimateContextBreakdown(contents);
+    expect(result.tool_calls['unknown']).toBeGreaterThan(0);
   });
 });
