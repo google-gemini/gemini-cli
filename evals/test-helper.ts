@@ -141,7 +141,6 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         // We need to set the GEMINI_CLI_HOME env var so Storage.getGlobalGeminiDir() points to our fake home
         const originalGeminiHome = process.env['GEMINI_CLI_HOME'];
         try {
-          process.env['GEMINI_CLI_HOME'] = rig.homeDir!;
           await storage.initialize();
           const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
           fs.mkdirSync(chatsDir, { recursive: true });
@@ -154,7 +153,11 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
             messages: evalCase.messages,
           };
 
-          const filename = `${SESSION_FILE_PREFIX}${new Date().toISOString().slice(0, 10)}-${sessionId.slice(0, 8)}.json`;
+          const timestamp = new Date()
+            .toISOString()
+            .slice(0, 16)
+            .replace(/:/g, '-');
+          const filename = `${SESSION_FILE_PREFIX}${timestamp}-${sessionId.slice(0, 8)}.json`;
           fs.writeFileSync(
             path.join(chatsDir, filename),
             JSON.stringify(conversation, null, 2),

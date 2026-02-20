@@ -23,7 +23,7 @@ When the user asks you to create an eval from a `chat.json` file, follow these s
 2.  **Minimize and Anonymize:**
     *   Identify the "Repro Turn": the specific user prompt where the agent failed.
     *   Discard all preceding conversation turns that are not strictly necessary to set up the environment or trigger the behavior.
-    *   For the remaining preceding turns, anonymize and keep them in a `messages` array.
+    *   **MANDATORY:** Use the `messages` array to include essential preceding context (user prompts, tool calls, and tool outputs). This "narrows the test trajectory" by replaying the specific logic, assumptions, or tool results that led to the failure. This makes reproduction significantly more reliable, makes the test faster to run, and ensures the agent starts with the exact context required.
     *   **CRITICAL:** Anonymize all data. Replace absolute file paths (e.g., `/Users/username/code/...`) with generic relative paths (e.g., `src/app.ts`). Remove any sensitive tokens, API keys, or personal information. Replace user-specific code with generic, simplified code snippets that still reproduce the issue.
 
 3.  **Reconstruct Initial State:**
@@ -61,18 +61,19 @@ describe('chat-to-eval-generated', () => {
 });
 ```
 
-5.  **Validate and Finalize:**
-    *   **CRITICAL:** An evaluation is only valid to add if it is **initially failing** (demonstrating the bug or missing behavior). Skip this requirement only if you have clear evidence that the user has already applied a fix and is using the test for regression verification.
-    *   Inform the user that the file has been created.
-    *   Include instructions on how to run the test to verify failure/success:
+5.  **Verify and Refine (Loop):**
+    *   **MANDATORY:** After generating the test file, run it using `npx vitest run evals/<descriptive-name>.eval.ts`.
+    *   Analyze the results:
+        *   **If the test passes:** The reproduction failed. Refine the `messages`, `files`, or `prompt` to more accurately capture the state that triggered the bug.
+        *   **If the test fails for the WRONG reason:** (e.g., a crash in the test setup, or a different bug), fix the test code or setup.
+        *   **If the test fails for the EXPECTED reason:** The bug is successfully reproduced.
+    *   **Iterate** until you have a valid, stable failure that clearly demonstrates the bug.
+
+6.  **Finalize:**
+    *   Inform the user that the file has been created and verified as a failing repro.
+    *   Include instructions on how to run the test:
         ```bash
         # Run only the new eval test
         RUN_EVALS=1 npx vitest run --config evals/vitest.config.ts evals/<descriptive-name>.eval.ts
-
-        # Run all evals (including 'USUALLY_PASSES')
-        npm run test:all_evals
-
-        # Run only 'ALWAYS_PASSES' evals
-        npm run test:always_passing_evals
         ```
     *   Remind them to manually review the assertions and ensure complete anonymization before committing.
