@@ -156,8 +156,6 @@ export class GeminiAgent {
     const meta = hasMeta(req) ? req._meta : undefined;
     const apiKey =
       typeof meta?.['apiKey'] === 'string' ? meta['apiKey'] : undefined;
-    const apiKey =
-      typeof meta?.['apiKey'] === 'string' ? meta['apiKey'] : undefined;
 
     // Refresh auth with the requested method
     // This will reuse existing credentials if they're valid,
