@@ -284,8 +284,21 @@ jobs:
                   return;
                 }
               } else {
-                core.setFailed(`Output is not valid JSON and does not contain a JSON markdown block.\nRaw output: ${rawOutput}`);
-                return;
+                // If no markdown block, try to find a raw JSON object in the output.
+                // The CLI may include debug/log lines (e.g. telemetry init, YOLO mode)
+                // before the actual JSON response.
+                const jsonObjectMatch = rawOutput.match(/(\{[\s\S]*"labels_to_set"[\s\S]*\})/);
+                if (jsonObjectMatch) {
+                  try {
+                    parsedLabels = JSON.parse(jsonObjectMatch[0]);
+                  } catch (extractError) {
+                    core.setFailed(`Found JSON-like content but failed to parse: ${extractError.message}\nRaw output: ${rawOutput}`);
+                    return;
+                  }
+                } else {
+                  core.setFailed(`Output is not valid JSON and does not contain extractable JSON.\nRaw output: ${rawOutput}`);
+                  return;
+                }
               }
             }
 
