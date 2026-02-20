@@ -73,4 +73,26 @@ if (existsSync(builtinSkillsSrc)) {
   console.log('Copied built-in skills to bundle/builtin/');
 }
 
+// 5. Copy DevTools package so the external dynamic import resolves at runtime
+const devtoolsSrc = join(root, 'packages/devtools');
+const devtoolsDest = join(
+  bundleDir,
+  'node_modules',
+  '@google',
+  'gemini-cli-devtools',
+);
+const devtoolsDistSrc = join(devtoolsSrc, 'dist');
+if (existsSync(devtoolsDistSrc)) {
+  mkdirSync(devtoolsDest, { recursive: true });
+  cpSync(devtoolsDistSrc, join(devtoolsDest, 'dist'), {
+    recursive: true,
+    dereference: true,
+  });
+  copyFileSync(
+    join(devtoolsSrc, 'package.json'),
+    join(devtoolsDest, 'package.json'),
+  );
+  console.log('Copied devtools package to bundle/node_modules/');
+}
+
 console.log('Assets copied to bundle/');
