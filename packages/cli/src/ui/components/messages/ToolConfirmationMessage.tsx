@@ -115,7 +115,7 @@ export const ToolConfirmationMessage: React.FC<
           ? confirmationDetails.commands
           : [confirmationDetails.command];
       for (const cmd of commands) {
-        const matches = cmd.match(/https?:\/\/[^\s"'`<>]+/g);
+        const matches = cmd.match(/https?:\/\/[^\s"'`<>;&|()]+/g);
         if (matches) urls.push(...matches);
       }
     }

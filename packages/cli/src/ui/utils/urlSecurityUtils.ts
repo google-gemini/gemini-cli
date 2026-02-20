@@ -88,21 +88,3 @@ export function getDeceptiveUrlDetails(
     return null;
   }
 }
-
-/**
- * Checks if a URL hostname contains potential deceptive characters.
- *
- * @param urlString The URL string to check.
- * @returns true if the URL is a potential deceptive URL, false otherwise.
- */
-export function isDeceptiveUrl(urlString: string): boolean {
-  try {
-    if (!urlString.includes('://')) {
-      return false;
-    }
-    const { hostname } = new URL(urlString);
-    return containsDeceptiveMarkers(hostname);
-  } catch {
-    return false;
-  }
-}
