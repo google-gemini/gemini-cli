@@ -295,6 +295,63 @@ export class Storage {
     return path.join(this.getProjectTempDir(), 'tasks');
   }
 
+  async listProjectChatFiles(): Promise<
+    Array<{ filePath: string; lastUpdated: string }>
+  > {
+    const chatsDir = path.join(this.getProjectTempDir(), 'chats');
+    try {
+      const files = await fs.promises.readdir(chatsDir);
+      const jsonFiles = files.filter((f) => f.endsWith('.json'));
+
+      const sessions = await Promise.all(
+        jsonFiles.map(async (file) => {
+          const absolutePath = path.join(chatsDir, file);
+          const stats = await fs.promises.stat(absolutePath);
+          return {
+            filePath: path.join('chats', file),
+            lastUpdated: stats.mtime.toISOString(),
+            mtimeMs: stats.mtimeMs,
+          };
+        }),
+      );
+
+      return sessions
+        .sort((a, b) => b.mtimeMs - a.mtimeMs)
+        .map(({ filePath, lastUpdated }) => ({ filePath, lastUpdated }));
+    } catch (e) {
+      // If directory doesn't exist, return empty
+      if (
+        e instanceof Error &&
+        'code' in e &&
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (e as NodeJS.ErrnoException).code === 'ENOENT'
+      ) {
+        return [];
+      }
+      throw e;
+    }
+  }
+
+  async loadProjectTempFile<T>(filePath: string): Promise<T | null> {
+    const absolutePath = path.join(this.getProjectTempDir(), filePath);
+    try {
+      const content = await fs.promises.readFile(absolutePath, 'utf8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return JSON.parse(content) as T;
+    } catch (e) {
+      // If file doesn't exist, return null
+      if (
+        e instanceof Error &&
+        'code' in e &&
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (e as NodeJS.ErrnoException).code === 'ENOENT'
+      ) {
+        return null;
+      }
+      throw e;
+    }
+  }
+
   getExtensionsDir(): string {
     return path.join(this.getGeminiDir(), 'extensions');
   }

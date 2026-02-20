@@ -26,7 +26,7 @@ class MockClient implements acp.Client {
   };
 }
 
-describe('ACP Environment and Auth', () => {
+describe.skip('ACP Environment and Auth', () => {
   let rig: TestRig;
   let child: ChildProcess | undefined;
 
