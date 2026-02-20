@@ -78,8 +78,16 @@ export class SchedulerStateManager {
     return next;
   }
 
+  peekQueue(): ToolCall | undefined {
+    return this.queue[0];
+  }
+
   get isActive(): boolean {
     return this.activeCalls.size > 0;
+  }
+
+  get allActiveCalls(): ToolCall[] {
+    return Array.from(this.activeCalls.values());
   }
 
   get activeCallCount(): number {
