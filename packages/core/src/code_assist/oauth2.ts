@@ -491,6 +491,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
               'OAuth callback not received. Unexpected request: ' + req.url,
             ),
           );
+          return;
         }
         // acquire the code from the querystring, and close the web server.
         const qs = new url.URL(req.url!, 'http://127.0.0.1:3000').searchParams;
