@@ -183,8 +183,9 @@ function maybeToContent(content?: ContentUnion): Content | undefined {
 
 function isPart(c: ContentUnion): c is PartUnion {
   return (
+    typeof c === 'object' &&
+    c !== null &&
     !Array.isArray(c) &&
-    typeof c !== 'string' &&
     !('parts' in c) &&
     !('role' in c)
   );
