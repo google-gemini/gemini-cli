@@ -76,13 +76,6 @@ export async function cleanupExpiredSessions(
       return { ...result, disabled: true };
     }
 
-    // Also clean up old entries from deleted-corrupted tracking file
-    try {
-      await cleanupOldDeletedTracking(config.storage.getProjectTempDir());
-    } catch {
-      // Ignore errors in cleanup of tracking file
-    }
-
     // Get all session files (including corrupted ones) for this project
     const allFiles = await getAllSessionFiles(chatsDir, config.getSessionId());
     result.scanned = allFiles.length;
@@ -114,11 +107,12 @@ export async function cleanupExpiredSessions(
               corruptedSessionIds.push(idMatch[1]);
             }
           } catch {
-            const uuidMatch = sessionToDelete.fileName.match(
-              /([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/i,
+            // If we can't read the file, try to extract short ID from filename
+            const match = sessionToDelete.fileName.match(
+              /-([a-f0-9]{8,})\.json$/i,
             );
-            if (uuidMatch) {
-              corruptedSessionIds.push(uuidMatch[1]);
+            if (match) {
+              corruptedSessionIds.push(match[1]);
             }
           }
         }
@@ -613,12 +607,11 @@ export async function wasSessionDeletedAsCorrupted(
     const content = await fs.readFile(trackingPath, 'utf8');
     const data = JSON.parse(content);
     if (Array.isArray(data)) {
-      const shortId = sessionId.slice(0, 8);
       return data.some(
         (id) =>
           id === sessionId ||
-          id.startsWith(shortId) ||
-          sessionId.startsWith(id),
+          (sessionId.length >= 8 && id.startsWith(sessionId)) ||
+          (id.length >= 8 && sessionId.startsWith(id)),
       );
     }
   } catch {
@@ -626,29 +619,4 @@ export async function wasSessionDeletedAsCorrupted(
   }
 
   return false;
-}
-
-/**
- * Cleans up old entries from the deleted tracking file.
- * Called during cleanup to prevent unbounded growth.
- */
-async function cleanupOldDeletedTracking(
-  projectTempDir: string,
-): Promise<void> {
-  const trackingPath = path.join(projectTempDir, DELETED_CORRUPTED_FILE);
-
-  try {
-    const content = await fs.readFile(trackingPath, 'utf8');
-    const data = JSON.parse(content);
-    if (Array.isArray(data) && data.length > MAX_DELETED_TRACKING) {
-      const trimmed = data.slice(0, MAX_DELETED_TRACKING);
-      await fs.writeFile(
-        trackingPath,
-        JSON.stringify(trimmed, null, 2),
-        'utf8',
-      );
-    }
-  } catch {
-    // Ignore errors during cleanup of tracking file
-  }
 }
