@@ -58,7 +58,9 @@ const DEFAULT_CHAIN: ModelPolicyChain = [
 
 const PREVIEW_CHAIN: ModelPolicyChain = [
   definePolicy({ model: PREVIEW_GEMINI_MODEL }),
-  definePolicy({ model: PREVIEW_GEMINI_FLASH_MODEL, isLastResort: true }),
+  definePolicy({ model: PREVIEW_GEMINI_FLASH_MODEL }),
+  definePolicy({ model: DEFAULT_GEMINI_MODEL }),
+  definePolicy({ model: DEFAULT_GEMINI_FLASH_MODEL, isLastResort: true }),
 ];
 
 const FLASH_LITE_CHAIN: ModelPolicyChain = [
