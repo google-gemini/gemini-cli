@@ -88,6 +88,7 @@ export function createWorkingStdio() {
       if (prop === 'write') {
         return writeToStdout;
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const value = Reflect.get(target, prop, receiver);
       if (typeof value === 'function') {
         return value.bind(target);
@@ -101,6 +102,7 @@ export function createWorkingStdio() {
       if (prop === 'write') {
         return writeToStderr;
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const value = Reflect.get(target, prop, receiver);
       if (typeof value === 'function') {
         return value.bind(target);
