@@ -13,7 +13,6 @@ import {
 import type { ExtensionConfig } from '../../config/extension.js';
 import prompts from 'prompts';
 import {
-  promptForSetting,
   updateSetting,
   type ExtensionSetting,
   getScopedEnvContents,
@@ -49,6 +48,24 @@ const defaultRequestConfirmation: RequestConfirmationCallback = async (
   });
   return response.confirm;
 };
+
+export async function promptForSetting(
+  setting: ExtensionSetting,
+): Promise<string> {
+  let description = setting.description;
+  if (setting.defaultValue !== undefined) {
+    const displayValue = setting.sensitive ? '******' : setting.defaultValue;
+    description += ` [default: ${displayValue}]`;
+  }
+
+  const response = await prompts({
+    type: setting.sensitive ? 'password' : 'text',
+    name: 'value',
+    message: `${setting.name}\n${description}`,
+    initial: setting.defaultValue,
+  });
+  return response.value;
+}
 
 export async function getExtensionManager() {
   const workspaceDir = process.cwd();
