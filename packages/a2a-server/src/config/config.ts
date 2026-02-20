@@ -8,8 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
 
-import type { TelemetryTarget } from '@google/gemini-cli-core';
-import {
+import type { TelemetryTarget ,
   AuthType,
   Config,
   type ConfigParameters,
@@ -66,8 +65,9 @@ export async function loadConfig(
     debugMode: process.env['DEBUG'] === 'true' || false,
     question: '', // Not used in server mode directly like CLI
 
-    coreTools: settings.coreTools || undefined,
-    excludeTools: settings.excludeTools || undefined,
+    coreTools: settings.coreTools || settings.tools?.core || undefined,
+    excludeTools: settings.excludeTools || settings.tools?.exclude || undefined,
+    allowedTools: settings.allowedTools || settings.tools?.allowed || undefined,
     showMemoryUsage: settings.showMemoryUsage || false,
     approvalMode:
       process.env['GEMINI_YOLO_MODE'] === 'true'
