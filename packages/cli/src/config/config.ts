@@ -769,20 +769,21 @@ export async function loadCliConfig(
       const [key, ...valueParts] = entry.split('=');
       const value = valueParts.join('=');
       if (key && value !== undefined) {
-        // Normalize key to kebab-case (e.g., enableNumericalRouting -> enable-numerical-routing)
-        const normalizedKey = key
-          .replace(/([a-z])([A-Z])/g, '$1-$2')
-          .toLowerCase()
-          .replace(/_/g, '-');
-
+  const experimentalCliArgs: Record<string, unknown> = Object.create(null);
+  if (argv['experiment'] && Array.isArray(argv['experiment'])) {
+    for (const entry of argv['experiment']) {
+      const [key, ...valueParts] = entry.split('=');
+      const value = valueParts.join('=');
+      if (key && value !== undefined) {
         // Simple type inference for CLI args
-        if (value === 'true') experimentalCliArgs[normalizedKey] = true;
-        else if (value === 'false') experimentalCliArgs[normalizedKey] = false;
+        if (value === 'true') experimentalCliArgs[key] = true;
+        else if (value === 'false') experimentalCliArgs[key] = false;
         else if (!isNaN(Number(value)))
-          experimentalCliArgs[normalizedKey] = Number(value);
-        else experimentalCliArgs[normalizedKey] = value;
+          experimentalCliArgs[key] = Number(value);
+        else experimentalCliArgs[key] = value;
       }
     }
+  }
   }
 
   if (debugMode && Object.keys(experimentalCliArgs).length > 0) {
