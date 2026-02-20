@@ -115,6 +115,7 @@ export function SettingsDialog({
     }
 
     const doSearch = async () => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const results = await fzfInstance.find(searchQuery);
 
       if (!active) return;

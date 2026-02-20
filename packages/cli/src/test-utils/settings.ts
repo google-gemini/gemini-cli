@@ -46,6 +46,7 @@ export const createMockSettings = (
     workspace,
     isTrusted,
     errors,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     merged: mergedOverride,
     ...settingsOverrides
   } = overrides;
@@ -75,7 +76,7 @@ export const createMockSettings = (
   // Assign any function overrides (e.g., vi.fn() for methods)
   for (const key in overrides) {
     if (typeof overrides[key] === 'function') {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
       (loaded as any)[key] = overrides[key];
     }
   }

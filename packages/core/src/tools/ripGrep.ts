@@ -481,8 +481,10 @@ class GrepToolInvocation extends BaseToolInvocation<
     basePath: string,
   ): GrepMatch | null {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const json = JSON.parse(line);
       if (json.type === 'match' || json.type === 'context') {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const data = json.data;
         // Defensive check: ensure text properties exist (skips binary/invalid encoding)
         if (data.path?.text && data.lines?.text) {
@@ -500,7 +502,9 @@ class GrepToolInvocation extends BaseToolInvocation<
 
           return {
             filePath: relativeFilePath || path.basename(absoluteFilePath),
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             lineNumber: data.line_number,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             line: data.lines.text.trimEnd(),
             isContext: json.type === 'context',
           };

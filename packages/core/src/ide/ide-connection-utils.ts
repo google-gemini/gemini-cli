@@ -89,8 +89,10 @@ export function getStdioConfigFromEnv(): StdioConfig | undefined {
   let args: string[] = [];
   if (argsStr) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const parsedArgs = JSON.parse(argsStr);
       if (Array.isArray(parsedArgs)) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         args = parsedArgs;
       } else {
         logger.error(
@@ -188,6 +190,7 @@ export async function getConnectionConfigFromFile(
   }
 
   if (validWorkspaces.length === 1) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const selected = validWorkspaces[0];
     const fileIndex = parsedContents.indexOf(selected);
     if (fileIndex !== -1) {
@@ -202,6 +205,7 @@ export async function getConnectionConfigFromFile(
       (content) => String(content.port) === portFromEnv,
     );
     if (matchingPortIndex !== -1) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const selected = validWorkspaces[matchingPortIndex];
       const fileIndex = parsedContents.indexOf(selected);
       if (fileIndex !== -1) {
@@ -213,6 +217,7 @@ export async function getConnectionConfigFromFile(
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const selected = validWorkspaces[0];
   const fileIndex = parsedContents.indexOf(selected);
   if (fileIndex !== -1) {

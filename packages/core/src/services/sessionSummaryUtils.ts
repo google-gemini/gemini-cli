@@ -26,6 +26,7 @@ async function generateAndSaveSummary(
 ): Promise<void> {
   // Read session file
   const content = await fs.readFile(sessionPath, 'utf-8');
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const conversation: ConversationRecord = JSON.parse(content);
 
   // Skip if summary already exists
@@ -69,6 +70,7 @@ async function generateAndSaveSummary(
 
   // Re-read the file before writing to handle race conditions
   const freshContent = await fs.readFile(sessionPath, 'utf-8');
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const freshConversation: ConversationRecord = JSON.parse(freshContent);
 
   // Check if summary was added by another process
@@ -127,6 +129,7 @@ export async function getPreviousSession(
 
     try {
       const content = await fs.readFile(filePath, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const conversation: ConversationRecord = JSON.parse(content);
 
       if (conversation.summary) {

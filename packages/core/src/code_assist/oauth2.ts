@@ -695,6 +695,7 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
       return;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const userInfo = await response.json();
     await userAccountManager.cacheGoogleAccount(userInfo.email);
   } catch (error) {
