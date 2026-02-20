@@ -8,6 +8,7 @@ import type {
   HistoryItemStats,
   HistoryItemModelStats,
   HistoryItemToolStats,
+  HistoryItemStartupStats,
 } from '../types.js';
 import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
@@ -71,7 +72,8 @@ async function defaultSessionView(context: CommandContext) {
 export const statsCommand: SlashCommand = {
   name: 'stats',
   altNames: ['usage'],
-  description: 'Check session stats. Usage: /stats [session|model|tools]',
+  description:
+    'Check session stats. Usage: /stats [session|model|tools|startup]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: async (context: CommandContext) => {
@@ -119,6 +121,17 @@ export const statsCommand: SlashCommand = {
         context.ui.addItem({
           type: MessageType.TOOL_STATS,
         } as HistoryItemToolStats);
+      },
+    },
+    {
+      name: 'startup',
+      description: 'Show startup time breakdown',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      action: (context: CommandContext) => {
+        context.ui.addItem({
+          type: MessageType.STARTUP_STATS,
+        } as HistoryItemStartupStats);
       },
     },
   ],
