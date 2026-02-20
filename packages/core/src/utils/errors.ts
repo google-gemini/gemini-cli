@@ -26,6 +26,15 @@ export function getErrorMessage(error: unknown): string {
   }
 }
 
+export function getErrorType(error: unknown): string {
+  if (!(error instanceof Error)) return 'unknown';
+
+  // Return constructor name if the generic 'Error' name is used (for custom errors)
+  return error.name === 'Error'
+    ? (error.constructor?.name ?? 'Error')
+    : error.name;
+}
+
 export class FatalError extends Error {
   constructor(
     message: string,
@@ -98,6 +107,7 @@ interface ResponseData {
 
 export function toFriendlyError(error: unknown): unknown {
   if (error && typeof error === 'object' && 'response' in error) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const gaxiosError = error as GaxiosError;
     const data = parseResponseData(gaxiosError);
     if (data && data.error && data.error.message && data.error.code) {
@@ -122,11 +132,13 @@ function parseResponseData(error: GaxiosError): ResponseData | undefined {
   // Inexplicably, Gaxios sometimes doesn't JSONify the response data.
   if (typeof error.response?.data === 'string') {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(error.response?.data) as ResponseData;
     } catch {
       return undefined;
     }
   }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return error.response?.data as ResponseData | undefined;
 }
 

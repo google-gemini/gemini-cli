@@ -79,8 +79,21 @@ export class MessageBus extends EventEmitter {
             });
             break;
           case PolicyDecision.ASK_USER:
-            // Pass through to UI for user confirmation
-            this.emitMessage(message);
+            // Pass through to UI for user confirmation if any listeners exist.
+            // If no listeners are registered (e.g., headless/ACP flows),
+            // immediately request user confirmation to avoid long timeouts.
+            if (
+              this.listenerCount(MessageBusType.TOOL_CONFIRMATION_REQUEST) > 0
+            ) {
+              this.emitMessage(message);
+            } else {
+              this.emitMessage({
+                type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+                correlationId: message.correlationId,
+                confirmed: false,
+                requiresUserConfirmation: true,
+              });
+            }
             break;
           default:
             throw new Error(`Unknown policy decision: ${decision}`);
@@ -146,7 +159,7 @@ export class MessageBus extends EventEmitter {
       this.subscribe<TResponse>(responseType, responseHandler);
 
       // Publish the request with correlation ID
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises, @typescript-eslint/no-unsafe-type-assertion
       this.publish({ ...request, correlationId } as TRequest);
     });
   }

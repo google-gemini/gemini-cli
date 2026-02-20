@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-a2a-server",
-  "version": "0.28.0-nightly.20260128.adc8e11bb",
+  "version": "0.30.0-nightly.20260210.a2174751d",
   "description": "Gemini CLI A2A Server",
   "repository": {
     "type": "git",
@@ -30,11 +30,13 @@
     "@google/gemini-cli-core": "file:../core",
     "express": "^5.1.0",
     "fs-extra": "^11.3.0",
-    "tar": "^7.5.2",
+    "strip-json-comments": "^3.1.1",
+    "tar": "^7.5.8",
     "uuid": "^13.0.0",
     "winston": "^3.17.0"
   },
   "devDependencies": {
+    "@google/genai": "^1.30.0",
     "@types/express": "^5.0.3",
     "@types/fs-extra": "^11.0.4",
     "@types/supertest": "^6.0.3",

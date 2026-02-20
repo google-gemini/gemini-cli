@@ -148,13 +148,13 @@ describe('Policy Engine Integration Tests', () => {
       );
       const engine = new PolicyEngine(config);
 
-      // MCP server allowed (priority 2.1) provides general allow for server
-      // MCP server allowed (priority 2.1) provides general allow for server
+      // MCP server allowed (priority 3.1) provides general allow for server
+      // MCP server allowed (priority 3.1) provides general allow for server
       expect(
         (await engine.check({ name: 'my-server__safe-tool' }, undefined))
           .decision,
       ).toBe(PolicyDecision.ALLOW);
-      // But specific tool exclude (priority 2.4) wins over server allow
+      // But specific tool exclude (priority 3.4) wins over server allow
       expect(
         (await engine.check({ name: 'my-server__dangerous-tool' }, undefined))
           .decision,
@@ -323,116 +323,64 @@ describe('Policy Engine Integration Tests', () => {
       ).toBe(PolicyDecision.DENY);
     });
 
-    it('should allow write_file to plans directory in Plan mode', async () => {
-      const settings: Settings = {};
+    describe.each(['write_file', 'replace'])(
+      'Plan Mode policy for %s',
+      (toolName) => {
+        it(`should allow ${toolName} to plans directory`, async () => {
+          const settings: Settings = {};
+          const config = await createPolicyEngineConfig(
+            settings,
+            ApprovalMode.PLAN,
+          );
+          const engine = new PolicyEngine(config);
 
-      const config = await createPolicyEngineConfig(
-        settings,
-        ApprovalMode.PLAN,
-      );
-      const engine = new PolicyEngine(config);
+          // Valid plan file paths
+          const validPaths = [
+            '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/session-1/plans/my-plan.md',
+            '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/session-1/plans/feature_auth.md',
+            '/home/user/.gemini/tmp/new-temp_dir_123/session-1/plans/plan.md', // new style of temp directory
+          ];
 
-      // Valid plan file path (64-char hex hash, .md extension, safe filename)
-      const validPlanPath =
-        '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/my-plan.md';
-      expect(
-        (
-          await engine.check(
-            { name: 'write_file', args: { file_path: validPlanPath } },
-            undefined,
-          )
-        ).decision,
-      ).toBe(PolicyDecision.ALLOW);
+          for (const file_path of validPaths) {
+            expect(
+              (
+                await engine.check(
+                  { name: toolName, args: { file_path } },
+                  undefined,
+                )
+              ).decision,
+            ).toBe(PolicyDecision.ALLOW);
+          }
+        });
 
-      // Valid plan with underscore in filename
-      const validPlanPath2 =
-        '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/feature_auth.md';
-      expect(
-        (
-          await engine.check(
-            { name: 'write_file', args: { file_path: validPlanPath2 } },
-            undefined,
-          )
-        ).decision,
-      ).toBe(PolicyDecision.ALLOW);
-    });
+        it(`should deny ${toolName} outside plans directory`, async () => {
+          const settings: Settings = {};
+          const config = await createPolicyEngineConfig(
+            settings,
+            ApprovalMode.PLAN,
+          );
+          const engine = new PolicyEngine(config);
 
-    it('should deny write_file outside plans directory in Plan mode', async () => {
-      const settings: Settings = {};
+          const invalidPaths = [
+            '/project/src/file.ts', // Workspace
+            '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/script.js', // Wrong extension
+            '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/../../../etc/passwd.md', // Path traversal
+            '/home/user/.gemini/non-tmp/new-temp_dir_123/plans/plan.md', // outside of temp dir
+          ];
 
-      const config = await createPolicyEngineConfig(
-        settings,
-        ApprovalMode.PLAN,
-      );
-      const engine = new PolicyEngine(config);
-
-      // Write to workspace (not plans dir) should be denied
-      expect(
-        (
-          await engine.check(
-            { name: 'write_file', args: { file_path: '/project/src/file.ts' } },
-            undefined,
-          )
-        ).decision,
-      ).toBe(PolicyDecision.DENY);
-
-      // Write to plans dir but wrong extension should be denied
-      const wrongExtPath =
-        '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/script.js';
-      expect(
-        (
-          await engine.check(
-            { name: 'write_file', args: { file_path: wrongExtPath } },
-            undefined,
-          )
-        ).decision,
-      ).toBe(PolicyDecision.DENY);
-
-      // Path traversal attempt should be denied (filename contains /)
-      const traversalPath =
-        '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/../../../etc/passwd.md';
-      expect(
-        (
-          await engine.check(
-            { name: 'write_file', args: { file_path: traversalPath } },
-            undefined,
-          )
-        ).decision,
-      ).toBe(PolicyDecision.DENY);
-
-      // Invalid hash length should be denied
-      const shortHashPath = '/home/user/.gemini/tmp/abc123/plans/plan.md';
-      expect(
-        (
-          await engine.check(
-            { name: 'write_file', args: { file_path: shortHashPath } },
-            undefined,
-          )
-        ).decision,
-      ).toBe(PolicyDecision.DENY);
-    });
-
-    it('should deny write_file to subdirectories in Plan mode', async () => {
-      const settings: Settings = {};
-
-      const config = await createPolicyEngineConfig(
-        settings,
-        ApprovalMode.PLAN,
-      );
-      const engine = new PolicyEngine(config);
-
-      // Write to subdirectory should be denied
-      const subdirPath =
-        '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/subdir/plan.md';
-      expect(
-        (
-          await engine.check(
-            { name: 'write_file', args: { file_path: subdirPath } },
-            undefined,
-          )
-        ).decision,
-      ).toBe(PolicyDecision.DENY);
-    });
+          for (const file_path of invalidPaths) {
+            expect(
+              (
+                await engine.check(
+                  { name: toolName, args: { file_path } },
+                  undefined,
+                )
+              ).decision,
+            ).toBe(PolicyDecision.DENY);
+          }
+        });
+      },
+    );
 
     it('should verify priority ordering works correctly in practice', async () => {
       const settings: Settings = {
@@ -464,29 +412,29 @@ describe('Policy Engine Integration Tests', () => {
 
       // Find rules and verify their priorities
       const blockedToolRule = rules.find((r) => r.toolName === 'blocked-tool');
-      expect(blockedToolRule?.priority).toBe(2.4); // Command line exclude
+      expect(blockedToolRule?.priority).toBe(3.4); // Command line exclude
 
       const blockedServerRule = rules.find(
         (r) => r.toolName === 'blocked-server__*',
       );
-      expect(blockedServerRule?.priority).toBe(2.9); // MCP server exclude
+      expect(blockedServerRule?.priority).toBe(3.9); // MCP server exclude
 
       const specificToolRule = rules.find(
         (r) => r.toolName === 'specific-tool',
       );
-      expect(specificToolRule?.priority).toBe(2.3); // Command line allow
+      expect(specificToolRule?.priority).toBe(3.3); // Command line allow
 
       const trustedServerRule = rules.find(
         (r) => r.toolName === 'trusted-server__*',
       );
-      expect(trustedServerRule?.priority).toBe(2.2); // MCP trusted server
+      expect(trustedServerRule?.priority).toBe(3.2); // MCP trusted server
 
       const mcpServerRule = rules.find((r) => r.toolName === 'mcp-server__*');
-      expect(mcpServerRule?.priority).toBe(2.1); // MCP allowed server
+      expect(mcpServerRule?.priority).toBe(3.1); // MCP allowed server
 
       const readOnlyToolRule = rules.find((r) => r.toolName === 'glob');
-      // Priority 50 in default tier → 1.05
-      expect(readOnlyToolRule?.priority).toBeCloseTo(1.05, 5);
+      // Priority 70 in default tier → 1.07 (Overriding Plan Mode Deny)
+      expect(readOnlyToolRule?.priority).toBeCloseTo(1.07, 5);
 
       // Verify the engine applies these priorities correctly
       expect(
@@ -629,20 +577,20 @@ describe('Policy Engine Integration Tests', () => {
 
       // Verify each rule has the expected priority
       const tool3Rule = rules.find((r) => r.toolName === 'tool3');
-      expect(tool3Rule?.priority).toBe(2.4); // Excluded tools (user tier)
+      expect(tool3Rule?.priority).toBe(3.4); // Excluded tools (user tier)
 
       const server2Rule = rules.find((r) => r.toolName === 'server2__*');
-      expect(server2Rule?.priority).toBe(2.9); // Excluded servers (user tier)
+      expect(server2Rule?.priority).toBe(3.9); // Excluded servers (user tier)
 
       const tool1Rule = rules.find((r) => r.toolName === 'tool1');
-      expect(tool1Rule?.priority).toBe(2.3); // Allowed tools (user tier)
+      expect(tool1Rule?.priority).toBe(3.3); // Allowed tools (user tier)
 
       const server1Rule = rules.find((r) => r.toolName === 'server1__*');
-      expect(server1Rule?.priority).toBe(2.1); // Allowed servers (user tier)
+      expect(server1Rule?.priority).toBe(3.1); // Allowed servers (user tier)
 
       const globRule = rules.find((r) => r.toolName === 'glob');
-      // Priority 50 in default tier → 1.05
-      expect(globRule?.priority).toBeCloseTo(1.05, 5); // Auto-accept read-only
+      // Priority 70 in default tier → 1.07
+      expect(globRule?.priority).toBeCloseTo(1.07, 5); // Auto-accept read-only
 
       // The PolicyEngine will sort these by priority when it's created
       const engine = new PolicyEngine(config);

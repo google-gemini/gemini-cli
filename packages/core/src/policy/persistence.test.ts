@@ -15,11 +15,11 @@ import {
 } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { createPolicyUpdater } from './config.js';
+import { createPolicyUpdater, ALWAYS_ALLOW_PRIORITY } from './config.js';
 import { PolicyEngine } from './policy-engine.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
-import { Storage } from '../config/storage.js';
+import { Storage, AUTO_SAVED_POLICY_FILENAME } from '../config/storage.js';
 import { ApprovalMode } from './types.js';
 
 vi.mock('node:fs/promises');
@@ -28,6 +28,7 @@ vi.mock('../config/storage.js');
 describe('createPolicyUpdater', () => {
   let policyEngine: PolicyEngine;
   let messageBus: MessageBus;
+  let mockStorage: Storage;
 
   beforeEach(() => {
     policyEngine = new PolicyEngine({
@@ -36,6 +37,7 @@ describe('createPolicyUpdater', () => {
       approvalMode: ApprovalMode.DEFAULT,
     });
     messageBus = new MessageBus(policyEngine);
+    mockStorage = new Storage('/mock/project');
     vi.clearAllMocks();
   });
 
@@ -44,15 +46,27 @@ describe('createPolicyUpdater', () => {
   });
 
   it('should persist policy when persist flag is true', async () => {
-    createPolicyUpdater(policyEngine, messageBus);
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
-    const userPoliciesDir = '/mock/user/policies';
-    vi.spyOn(Storage, 'getUserPoliciesDir').mockReturnValue(userPoliciesDir);
+    const workspacePoliciesDir = '/mock/project/.gemini/policies';
+    const policyFile = path.join(
+      workspacePoliciesDir,
+      AUTO_SAVED_POLICY_FILENAME,
+    );
+    vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
+      workspacePoliciesDir,
+    );
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
     (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
     (fs.readFile as unknown as Mock).mockRejectedValue(
       new Error('File not found'),
     ); // Simulate new file
-    (fs.writeFile as unknown as Mock).mockResolvedValue(undefined);
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    (fs.open as unknown as Mock).mockResolvedValue(mockFileHandle);
     (fs.rename as unknown as Mock).mockResolvedValue(undefined);
 
     const toolName = 'test_tool';
@@ -65,26 +79,27 @@ describe('createPolicyUpdater', () => {
     // Wait for async operations (microtasks)
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(Storage.getUserPoliciesDir).toHaveBeenCalled();
-    expect(fs.mkdir).toHaveBeenCalledWith(userPoliciesDir, {
+    expect(mockStorage.getWorkspacePoliciesDir).toHaveBeenCalled();
+    expect(fs.mkdir).toHaveBeenCalledWith(workspacePoliciesDir, {
       recursive: true,
     });
 
+    expect(fs.open).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/), 'wx');
+
     // Check written content
     const expectedContent = expect.stringContaining(`toolName = "test_tool"`);
-    expect(fs.writeFile).toHaveBeenCalledWith(
-      expect.stringMatching(/\.tmp$/),
+    expect(mockFileHandle.writeFile).toHaveBeenCalledWith(
       expectedContent,
       'utf-8',
     );
     expect(fs.rename).toHaveBeenCalledWith(
       expect.stringMatching(/\.tmp$/),
-      path.join(userPoliciesDir, 'auto-saved.toml'),
+      policyFile,
     );
   });
 
   it('should not persist policy when persist flag is false or undefined', async () => {
-    createPolicyUpdater(policyEngine, messageBus);
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
     await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
@@ -98,15 +113,27 @@ describe('createPolicyUpdater', () => {
   });
 
   it('should persist policy with commandPrefix when provided', async () => {
-    createPolicyUpdater(policyEngine, messageBus);
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
-    const userPoliciesDir = '/mock/user/policies';
-    vi.spyOn(Storage, 'getUserPoliciesDir').mockReturnValue(userPoliciesDir);
+    const workspacePoliciesDir = '/mock/project/.gemini/policies';
+    const policyFile = path.join(
+      workspacePoliciesDir,
+      AUTO_SAVED_POLICY_FILENAME,
+    );
+    vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
+      workspacePoliciesDir,
+    );
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
     (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
     (fs.readFile as unknown as Mock).mockRejectedValue(
       new Error('File not found'),
     );
-    (fs.writeFile as unknown as Mock).mockResolvedValue(undefined);
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    (fs.open as unknown as Mock).mockResolvedValue(mockFileHandle);
     (fs.rename as unknown as Mock).mockResolvedValue(undefined);
 
     const toolName = 'run_shell_command';
@@ -125,29 +152,41 @@ describe('createPolicyUpdater', () => {
     const rules = policyEngine.getRules();
     const addedRule = rules.find((r) => r.toolName === toolName);
     expect(addedRule).toBeDefined();
-    expect(addedRule?.priority).toBe(2.95);
+    expect(addedRule?.priority).toBe(ALWAYS_ALLOW_PRIORITY);
     expect(addedRule?.argsPattern).toEqual(
       new RegExp(`"command":"git\\ status(?:[\\s"]|\\\\")`),
     );
 
     // Verify file written
-    expect(fs.writeFile).toHaveBeenCalledWith(
-      expect.stringMatching(/\.tmp$/),
+    expect(fs.open).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/), 'wx');
+    expect(mockFileHandle.writeFile).toHaveBeenCalledWith(
       expect.stringContaining(`commandPrefix = "git status"`),
       'utf-8',
     );
   });
 
   it('should persist policy with mcpName and toolName when provided', async () => {
-    createPolicyUpdater(policyEngine, messageBus);
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
-    const userPoliciesDir = '/mock/user/policies';
-    vi.spyOn(Storage, 'getUserPoliciesDir').mockReturnValue(userPoliciesDir);
+    const workspacePoliciesDir = '/mock/project/.gemini/policies';
+    const policyFile = path.join(
+      workspacePoliciesDir,
+      AUTO_SAVED_POLICY_FILENAME,
+    );
+    vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
+      workspacePoliciesDir,
+    );
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
     (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
     (fs.readFile as unknown as Mock).mockRejectedValue(
       new Error('File not found'),
     );
-    (fs.writeFile as unknown as Mock).mockResolvedValue(undefined);
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    (fs.open as unknown as Mock).mockResolvedValue(mockFileHandle);
     (fs.rename as unknown as Mock).mockResolvedValue(undefined);
 
     const mcpName = 'my-jira-server';
@@ -164,23 +203,36 @@ describe('createPolicyUpdater', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     // Verify file written
-    const writeCall = (fs.writeFile as unknown as Mock).mock.calls[0];
-    const writtenContent = writeCall[1] as string;
+    expect(fs.open).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/), 'wx');
+    const writeCall = mockFileHandle.writeFile.mock.calls[0];
+    const writtenContent = writeCall[0] as string;
     expect(writtenContent).toContain(`mcpName = "${mcpName}"`);
     expect(writtenContent).toContain(`toolName = "${simpleToolName}"`);
     expect(writtenContent).toContain('priority = 200');
   });
 
   it('should escape special characters in toolName and mcpName', async () => {
-    createPolicyUpdater(policyEngine, messageBus);
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
-    const userPoliciesDir = '/mock/user/policies';
-    vi.spyOn(Storage, 'getUserPoliciesDir').mockReturnValue(userPoliciesDir);
+    const workspacePoliciesDir = '/mock/project/.gemini/policies';
+    const policyFile = path.join(
+      workspacePoliciesDir,
+      AUTO_SAVED_POLICY_FILENAME,
+    );
+    vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
+      workspacePoliciesDir,
+    );
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
     (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
     (fs.readFile as unknown as Mock).mockRejectedValue(
       new Error('File not found'),
     );
-    (fs.writeFile as unknown as Mock).mockResolvedValue(undefined);
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    (fs.open as unknown as Mock).mockResolvedValue(mockFileHandle);
     (fs.rename as unknown as Mock).mockResolvedValue(undefined);
 
     const mcpName = 'my"jira"server';
@@ -195,8 +247,9 @@ describe('createPolicyUpdater', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    const writeCall = (fs.writeFile as unknown as Mock).mock.calls[0];
-    const writtenContent = writeCall[1] as string;
+    expect(fs.open).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/), 'wx');
+    const writeCall = mockFileHandle.writeFile.mock.calls[0];
+    const writtenContent = writeCall[0] as string;
 
     // Verify escaping - should be valid TOML
     // Note: @iarna/toml optimizes for shortest representation, so it may use single quotes 'foo"bar'

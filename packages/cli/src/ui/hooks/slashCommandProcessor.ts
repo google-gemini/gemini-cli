@@ -34,6 +34,7 @@ import {
   addMCPStatusChangeListener,
   removeMCPStatusChangeListener,
   MCPDiscoveryState,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type {
@@ -44,7 +45,7 @@ import type {
   ConfirmationRequest,
   IndividualToolCallDisplay,
 } from '../types.js';
-import { MessageType, ToolCallStatus } from '../types.js';
+import { MessageType } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { type CommandContext, type SlashCommand } from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
@@ -83,6 +84,7 @@ interface SlashCommandProcessorActions {
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
   toggleBackgroundShell: () => void;
+  toggleShortcutsHelp: () => void;
   setText: (text: string) => void;
 }
 
@@ -237,8 +239,10 @@ export const useSlashCommandProcessor = (
         dispatchExtensionStateUpdate: actions.dispatchExtensionStateUpdate,
         addConfirmUpdateExtensionRequest:
           actions.addConfirmUpdateExtensionRequest,
+        setConfirmationRequest,
         removeComponent: () => setCustomDialog(null),
         toggleBackgroundShell: actions.toggleBackgroundShell,
+        toggleShortcutsHelp: actions.toggleShortcutsHelp,
       },
       session: {
         stats: session.stats,
@@ -258,6 +262,7 @@ export const useSlashCommandProcessor = (
       actions,
       pendingItem,
       setPendingItem,
+      setConfirmationRequest,
       toggleVimEnabled,
       sessionShellAllowlist,
       reloadCommands,
@@ -325,6 +330,11 @@ export const useSlashCommandProcessor = (
         ],
         controller.signal,
       );
+
+      if (controller.signal.aborted) {
+        return;
+      }
+
       setCommands(commandService.getCommands());
     })();
 
@@ -352,6 +362,36 @@ export const useSlashCommandProcessor = (
         return false;
       }
 
+      const {
+        commandToExecute,
+        args,
+        canonicalPath: resolvedCommandPath,
+      } = parseSlashCommand(trimmed, commands);
+
+      // If the input doesn't match any known command, check if MCP servers
+      // are still loading (the command might come from an MCP server).
+      // Otherwise, treat it as regular text input (e.g. file paths like
+      // /home/user/file.txt) and let it be sent to the model.
+      if (!commandToExecute) {
+        const isMcpLoading =
+          config?.getMcpClientManager()?.getDiscoveryState() ===
+          MCPDiscoveryState.IN_PROGRESS;
+        if (isMcpLoading) {
+          setIsProcessing(true);
+          if (addToHistory) {
+            addItem({ type: MessageType.USER, text: trimmed }, Date.now());
+          }
+          addMessage({
+            type: MessageType.ERROR,
+            content: `Unknown command: ${trimmed}. Command might have been from an MCP server but MCP servers are not done loading.`,
+            timestamp: new Date(),
+          });
+          setIsProcessing(false);
+          return { type: 'handled' };
+        }
+        return false;
+      }
+
       setIsProcessing(true);
 
       if (addToHistory) {
@@ -363,11 +403,6 @@ export const useSlashCommandProcessor = (
       }
 
       let hasError = false;
-      const {
-        commandToExecute,
-        args,
-        canonicalPath: resolvedCommandPath,
-      } = parseSlashCommand(trimmed, commands);
 
       const subcommand =
         resolvedCommandPath.length > 1
@@ -463,6 +498,7 @@ export const useSlashCommandProcessor = (
                       actions.openModelDialog();
                       return { type: 'handled' };
                     case 'agentConfig': {
+                      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                       const props = result.props as Record<string, unknown>;
                       if (
                         !props ||
@@ -478,12 +514,14 @@ export const useSlashCommandProcessor = (
                       actions.openAgentConfigDialog(
                         props['name'],
                         props['displayName'],
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                         props['definition'] as AgentDefinition,
                       );
                       return { type: 'handled' };
                     }
                     case 'permissions':
                       actions.openPermissionsDialog(
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                         result.props as { targetDirectory?: string },
                       );
                       return { type: 'handled' };
@@ -542,7 +580,7 @@ export const useSlashCommandProcessor = (
                       callId,
                       name: 'Expansion',
                       description: 'Command expansion needs shell access',
-                      status: ToolCallStatus.Confirming,
+                      status: CoreToolCallStatus.AwaitingApproval,
                       resultDisplay: undefined,
                       confirmationDetails,
                     };
@@ -640,19 +678,6 @@ export const useSlashCommandProcessor = (
             return { type: 'handled' };
           }
         }
-
-        const isMcpLoading =
-          config?.getMcpClientManager()?.getDiscoveryState() ===
-          MCPDiscoveryState.IN_PROGRESS;
-        const errorMessage = isMcpLoading
-          ? `Unknown command: ${trimmed}. Command might have been from an MCP server but MCP servers are not done loading.`
-          : `Unknown command: ${trimmed}`;
-
-        addMessage({
-          type: MessageType.ERROR,
-          content: errorMessage,
-          timestamp: new Date(),
-        });
 
         return { type: 'handled' };
       } catch (e: unknown) {

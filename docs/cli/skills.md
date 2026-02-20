@@ -35,15 +35,21 @@ the full instructions and resources required to complete the task using the
 
 Gemini CLI discovers skills from three primary locations:
 
-1.  **Workspace Skills** (`.gemini/skills/`): Workspace-specific skills that are
-    typically committed to version control and shared with the team.
-2.  **User Skills** (`~/.gemini/skills/`): Personal skills available across all
-    your workspaces.
+1.  **Workspace Skills**: Located in `.gemini/skills/` or the `.agents/skills/`
+    alias. Workspace skills are typically committed to version control and
+    shared with the team.
+2.  **User Skills**: Located in `~/.gemini/skills/` or the `~/.agents/skills/`
+    alias. These are personal skills available across all your workspaces.
 3.  **Extension Skills**: Skills bundled within installed
     [extensions](../extensions/index.md).
 
 **Precedence:** If multiple skills share the same name, higher-precedence
 locations override lower ones: **Workspace > User > Extension**.
+
+Within the same tier (user or workspace), the `.agents/skills/` alias takes
+precedence over the `.gemini/skills/` directory. This generic alias provides an
+intuitive path for managing agent-specific expertise that remains compatible
+across different AI agent tools.
 
 ## Managing Skills
 
@@ -52,6 +58,7 @@ locations override lower ones: **Workspace > User > Extension**.
 Use the `/skills` slash command to view and manage available expertise:
 
 - `/skills list` (default): Shows all discovered skills and their status.
+- `/skills link <path>`: Links agent skills from a local directory via symlink.
 - `/skills disable <name>`: Prevents a specific skill from being used.
 - `/skills enable <name>`: Re-enables a disabled skill.
 - `/skills reload`: Refreshes the list of discovered skills from all tiers.
@@ -67,8 +74,16 @@ The `gemini skills` command provides management utilities:
 # List all discovered skills
 gemini skills list
 
+# Link agent skills from a local directory via symlink
+# Discovers skills (SKILL.md or */SKILL.md) and creates symlinks in ~/.gemini/skills
+# (or ~/.agents/skills)
+gemini skills link /path/to/my-skills-repo
+
+# Link to the workspace scope (.gemini/skills or .agents/skills)
+gemini skills link /path/to/my-skills-repo --scope workspace
+
 # Install a skill from a Git repository, local directory, or zipped skill file (.skill)
-# Uses the user scope by default (~/.gemini/skills)
+# Uses the user scope by default (~/.gemini/skills or ~/.agents/skills)
 gemini skills install https://github.com/user/repo.git
 gemini skills install /path/to/local/skill
 gemini skills install /path/to/local/my-expertise.skill
@@ -76,7 +91,7 @@ gemini skills install /path/to/local/my-expertise.skill
 # Install a specific skill from a monorepo or subdirectory using --path
 gemini skills install https://github.com/my-org/my-skills.git --path skills/frontend-design
 
-# Install to the workspace scope (.gemini/skills)
+# Install to the workspace scope (.gemini/skills or .agents/skills)
 gemini skills install /path/to/skill --scope workspace
 
 # Uninstall a skill by name
@@ -89,7 +104,7 @@ gemini skills enable my-expertise
 gemini skills disable my-expertise --scope workspace
 ```
 
-## How it Works (Security & Privacy)
+## How it Works
 
 1.  **Discovery**: At the start of a session, Gemini CLI scans the discovery
     tiers and injects the name and description of all enabled skills into the
@@ -105,6 +120,13 @@ gemini skills disable my-expertise --scope workspace
       it permission to read any bundled assets.
 5.  **Execution**: The model proceeds with the specialized expertise active. It
     is instructed to prioritize the skill's procedural guidance within reason.
+
+### Skill activation
+
+Once a skill is activated (typically by Gemini identifying a task that matches
+the skill's description and your approval), its specialized instructions and
+resources are loaded into the agent's context. A skill remains active and its
+guidance is prioritized for the duration of the session.
 
 ## Creating your own skills
 

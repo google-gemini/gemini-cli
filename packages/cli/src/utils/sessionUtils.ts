@@ -8,6 +8,7 @@ import {
   checkExhaustive,
   partListUnionToString,
   SESSION_FILE_PREFIX,
+  CoreToolCallStatus,
   type Config,
   type ConversationRecord,
   type MessageRecord,
@@ -16,11 +17,7 @@ import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { stripUnsafeCharacters } from '../ui/utils/textUtils.js';
 import type { Part } from '@google/genai';
-import {
-  MessageType,
-  ToolCallStatus,
-  type HistoryItemWithoutId,
-} from '../ui/types.js';
+import { MessageType, type HistoryItemWithoutId } from '../ui/types.js';
 
 /**
  * Constant for the resume "latest" identifier.
@@ -257,6 +254,7 @@ export const getAllSessionFiles = async (
       async (file): Promise<SessionFileEntry> => {
         const filePath = path.join(chatsDir, file);
         try {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const content: ConversationRecord = JSON.parse(
             await fs.readFile(filePath, 'utf8'),
           );
@@ -501,6 +499,7 @@ export class SessionSelector {
     const sessionPath = path.join(chatsDir, sessionInfo.fileName);
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const sessionData: ConversationRecord = JSON.parse(
         await fs.readFile(sessionPath, 'utf8'),
       );
@@ -585,8 +584,8 @@ export function convertSessionToHistoryFormats(
           renderOutputAsMarkdown: tool.renderOutputAsMarkdown ?? true,
           status:
             tool.status === 'success'
-              ? ToolCallStatus.Success
-              : ToolCallStatus.Error,
+              ? CoreToolCallStatus.Success
+              : CoreToolCallStatus.Error,
           resultDisplay: tool.resultDisplay,
           confirmationDetails: undefined,
         })),
@@ -617,7 +616,8 @@ export function convertSessionToHistoryFormats(
       clientHistory.push({
         role: 'user',
         parts: Array.isArray(msg.content)
-          ? (msg.content as Part[])
+          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            (msg.content as Part[])
           : [{ text: contentString }],
       });
     } else if (msg.type === 'gemini') {
@@ -670,6 +670,7 @@ export function convertSessionToHistoryFormats(
             } else if (Array.isArray(toolCall.result)) {
               // toolCall.result is an array containing properly formatted
               // function responses
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               functionResponseParts.push(...(toolCall.result as Part[]));
               continue;
             } else {

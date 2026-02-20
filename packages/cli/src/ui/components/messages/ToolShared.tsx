@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
-import { ToolCallStatus } from '../../types.js';
+import { ToolCallStatus, mapCoreStatusToDisplayStatus } from '../../types.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import {
   SHELL_COMMAND_NAME,
@@ -18,10 +18,13 @@ import { theme } from '../../semantic-colors.js';
 import {
   type Config,
   SHELL_TOOL_NAME,
-  ASK_USER_DISPLAY_NAME,
+  isCompletedAskUserTool,
   type ToolResultDisplay,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { useInactivityTimer } from '../../hooks/useInactivityTimer.js';
+import { formatCommand } from '../../utils/keybindingUtils.js';
+import { Command } from '../../../config/keyBindings.js';
 
 export const STATUS_INDICATOR_WIDTH = 3;
 
@@ -41,12 +44,12 @@ export function isShellTool(name: string): boolean {
  */
 export function isThisShellFocusable(
   name: string,
-  status: ToolCallStatus,
+  status: CoreToolCallStatus,
   config?: Config,
 ): boolean {
   return !!(
     isShellTool(name) &&
-    status === ToolCallStatus.Executing &&
+    status === CoreToolCallStatus.Executing &&
     config?.getEnableInteractiveShell()
   );
 }
@@ -56,14 +59,14 @@ export function isThisShellFocusable(
  */
 export function isThisShellFocused(
   name: string,
-  status: ToolCallStatus,
+  status: CoreToolCallStatus,
   ptyId?: number,
   activeShellPtyId?: number | null,
   embeddedShellFocused?: boolean,
 ): boolean {
   return !!(
     isShellTool(name) &&
-    status === ToolCallStatus.Executing &&
+    status === CoreToolCallStatus.Executing &&
     ptyId === activeShellPtyId &&
     embeddedShellFocused
   );
@@ -77,19 +80,23 @@ export function useFocusHint(
   isThisShellFocused: boolean,
   resultDisplay: ToolResultDisplay | undefined,
 ) {
-  const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
   const [userHasFocused, setUserHasFocused] = useState(false);
+
+  // Derive a stable reset key for the inactivity timer. For strings and arrays
+  // (shell output), we use the length to capture updates without referential
+  // identity issues or expensive deep comparisons.
+  const resetKey =
+    typeof resultDisplay === 'string'
+      ? resultDisplay.length
+      : Array.isArray(resultDisplay)
+        ? resultDisplay.length
+        : !!resultDisplay;
+
   const showFocusHint = useInactivityTimer(
     isThisShellFocusable,
-    lastUpdateTime ? lastUpdateTime.getTime() : 0,
+    resetKey,
     SHELL_FOCUS_HINT_DELAY_MS,
   );
-
-  useEffect(() => {
-    if (resultDisplay) {
-      setLastUpdateTime(new Date());
-    }
-  }, [resultDisplay]);
 
   useEffect(() => {
     if (isThisShellFocused) {
@@ -117,7 +124,9 @@ export const FocusHint: React.FC<{
   return (
     <Box marginLeft={1} flexShrink={0}>
       <Text color={theme.text.accent}>
-        {isThisShellFocused ? '(Focused)' : '(tab to focus)'}
+        {isThisShellFocused
+          ? `(${formatCommand(Command.UNFOCUS_SHELL_INPUT)} to unfocus)`
+          : `(${formatCommand(Command.FOCUS_SHELL_INPUT)} to focus)`}
       </Text>
     </Box>
   );
@@ -126,14 +135,15 @@ export const FocusHint: React.FC<{
 export type TextEmphasis = 'high' | 'medium' | 'low';
 
 type ToolStatusIndicatorProps = {
-  status: ToolCallStatus;
+  status: CoreToolCallStatus;
   name: string;
 };
 
 export const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
-  status,
+  status: coreStatus,
   name,
 }) => {
+  const status = mapCoreStatusToDisplayStatus(coreStatus);
   const isShell = isShellTool(name);
   const statusColor = isShell ? theme.ui.symbol : theme.status.warning;
 
@@ -175,16 +185,21 @@ export const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
 type ToolInfoProps = {
   name: string;
   description: string;
-  status: ToolCallStatus;
+  status: CoreToolCallStatus;
   emphasis: TextEmphasis;
+  progressMessage?: string;
+  progressPercent?: number;
 };
 
 export const ToolInfo: React.FC<ToolInfoProps> = ({
   name,
   description,
-  status,
+  status: coreStatus,
   emphasis,
+  progressMessage,
+  progressPercent,
 }) => {
+  const status = mapCoreStatusToDisplayStatus(coreStatus);
   const nameColor = React.useMemo<string>(() => {
     switch (emphasis) {
       case 'high':
@@ -201,13 +216,25 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
   }, [emphasis]);
 
   // Hide description for completed Ask User tools (the result display speaks for itself)
-  const isCompletedAskUser =
-    name === ASK_USER_DISPLAY_NAME &&
-    [
-      ToolCallStatus.Success,
-      ToolCallStatus.Error,
-      ToolCallStatus.Canceled,
-    ].includes(status);
+  const isCompletedAskUser = isCompletedAskUserTool(name, status);
+
+  let displayDescription = description;
+  if (status === ToolCallStatus.Executing) {
+    const parts: string[] = [];
+    if (progressMessage) {
+      parts.push(progressMessage);
+    }
+    if (progressPercent !== undefined) {
+      parts.push(`${Math.round(progressPercent)}%`);
+    }
+
+    if (parts.length > 0) {
+      const progressInfo = parts.join(' - ');
+      displayDescription = description
+        ? `${description} (${progressInfo})`
+        : progressInfo;
+    }
+  }
 
   return (
     <Box overflow="hidden" height={1} flexGrow={1} flexShrink={1}>
@@ -218,7 +245,7 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
         {!isCompletedAskUser && (
           <>
             {' '}
-            <Text color={theme.text.secondary}>{description}</Text>
+            <Text color={theme.text.secondary}>{displayDescription}</Text>
           </>
         )}
       </Text>

@@ -22,6 +22,10 @@ import { validatePlanPath, validatePlanContent } from '../utils/planUtils.js';
 import { ApprovalMode } from '../policy/types.js';
 import { checkExhaustive } from '../utils/checks.js';
 import { resolveToRealPath, isSubpath } from '../utils/paths.js';
+import { logPlanExecution } from '../telemetry/loggers.js';
+import { PlanExecutionEvent } from '../telemetry/types.js';
+import { getExitPlanModeDefinition } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 /**
  * Returns a human-readable description for an approval mode.
@@ -53,22 +57,14 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
     private config: Config,
     messageBus: MessageBus,
   ) {
-    const plansDir = config.storage.getProjectTempPlansDir();
+    const plansDir = config.storage.getPlansDir();
+    const definition = getExitPlanModeDefinition(plansDir);
     super(
       EXIT_PLAN_MODE_TOOL_NAME,
       'Exit Plan Mode',
-      'Signals that the planning phase is complete and requests user approval to start implementation.',
+      definition.base.description!,
       Kind.Plan,
-      {
-        type: 'object',
-        required: ['plan_path'],
-        properties: {
-          plan_path: {
-            type: 'string',
-            description: `The file path to the finalized plan (e.g., "${plansDir}/feature-x.md"). This path MUST be within the designated plans directory: ${plansDir}/`,
-          },
-        },
-      },
+      definition.base.parametersJsonSchema,
       messageBus,
     );
   }
@@ -82,9 +78,7 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
 
     // Since validateToolParamValues is synchronous, we use a basic synchronous check
     // for path traversal safety. High-level async validation is deferred to shouldConfirmExecute.
-    const plansDir = resolveToRealPath(
-      this.config.storage.getProjectTempPlansDir(),
-    );
+    const plansDir = resolveToRealPath(this.config.storage.getPlansDir());
     const resolvedPath = path.resolve(
       this.config.getTargetDir(),
       params.plan_path,
@@ -113,6 +107,11 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
       this.config,
     );
   }
+
+  override getSchema(modelId?: string) {
+    const plansDir = this.config.storage.getPlansDir();
+    return resolveToolDeclaration(getExitPlanModeDefinition(plansDir), modelId);
+  }
 }
 
 export class ExitPlanModeInvocation extends BaseToolInvocation<
@@ -140,7 +139,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
 
     const pathError = await validatePlanPath(
       this.params.plan_path,
-      this.config.storage.getProjectTempPlansDir(),
+      this.config.storage.getPlansDir(),
       this.config.getTargetDir(),
     );
     if (pathError) {
@@ -224,6 +223,9 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
     if (payload?.approved) {
       const newMode = payload.approvalMode ?? ApprovalMode.DEFAULT;
       this.config.setApprovalMode(newMode);
+      this.config.setApprovedPlanPath(resolvedPlanPath);
+
+      logPlanExecution(this.config, new PlanExecutionEvent(newMode));
 
       const description = getApprovalModeDescription(newMode);
 

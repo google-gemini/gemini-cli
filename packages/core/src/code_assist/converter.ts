@@ -133,14 +133,18 @@ export function toGenerateContentRequest(
 export function fromGenerateContentResponse(
   res: CaGenerateContentResponse,
 ): GenerateContentResponse {
-  const inres = res.response;
   const out = new GenerateContentResponse();
-  out.candidates = inres.candidates;
+  out.responseId = res.traceId;
+  const inres = res.response;
+  if (!inres) {
+    out.candidates = [];
+    return out;
+  }
+  out.candidates = inres.candidates ?? [];
   out.automaticFunctionCallingHistory = inres.automaticFunctionCallingHistory;
   out.promptFeedback = inres.promptFeedback;
   out.usageMetadata = inres.usageMetadata;
   out.modelVersion = inres.modelVersion;
-  out.responseId = res.traceId;
   return out;
 }
 
@@ -177,6 +181,16 @@ function maybeToContent(content?: ContentUnion): Content | undefined {
   return toContent(content);
 }
 
+function isPart(c: ContentUnion): c is PartUnion {
+  return (
+    typeof c === 'object' &&
+    c !== null &&
+    !Array.isArray(c) &&
+    !('parts' in c) &&
+    !('role' in c)
+  );
+}
+
 function toContent(content: ContentUnion): Content {
   if (Array.isArray(content)) {
     // it's a PartsUnion[]
@@ -192,7 +206,7 @@ function toContent(content: ContentUnion): Content {
       parts: [{ text: content }],
     };
   }
-  if ('parts' in content) {
+  if (!isPart(content)) {
     // it's a Content - process parts to handle thought filtering
     return {
       ...content,
@@ -204,7 +218,7 @@ function toContent(content: ContentUnion): Content {
   // it's a Part
   return {
     role: 'user',
-    parts: [toPart(content as Part)],
+    parts: [toPart(content)],
   };
 }
 

@@ -35,8 +35,10 @@ export function getHookSource(input: Record<string, unknown>): HookSource {
   const source = input['hook_source'];
   if (
     typeof source === 'string' &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     VALID_HOOK_SOURCES.includes(source as HookSource)
   ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return source as HookSource;
   }
   return 'project';
@@ -180,6 +182,12 @@ export interface SafetyCheckerRule {
    * If undefined or empty, it applies to all modes.
    */
   modes?: ApprovalMode[];
+
+  /**
+   * Source of the rule.
+   * e.g. "my-policies.toml", "Workspace: project.toml", etc.
+   */
+  source?: string;
 }
 
 export interface HookExecutionContext {
@@ -270,9 +278,18 @@ export interface PolicySettings {
     allowed?: string[];
   };
   mcpServers?: Record<string, { trust?: boolean }>;
+  // User provided policies that will replace the USER level policies in ~/.gemini/policies
+  policyPaths?: string[];
+  workspacePoliciesDir?: string;
 }
 
 export interface CheckResult {
   decision: PolicyDecision;
   rule?: PolicyRule;
 }
+
+/**
+ * Priority for subagent tools (registered dynamically).
+ * Effective priority matching Tier 1 (Default) read-only tools.
+ */
+export const PRIORITY_SUBAGENT_TOOL = 1.05;

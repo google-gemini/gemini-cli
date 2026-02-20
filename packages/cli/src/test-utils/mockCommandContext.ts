@@ -38,12 +38,14 @@ export const createMockCommandContext = (
     },
     services: {
       config: null,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       settings: {
         merged: defaultMergedSettings,
         setValue: vi.fn(),
         forScope: vi.fn().mockReturnValue({ settings: {} }),
       } as unknown as LoadedSettings,
       git: undefined as GitService | undefined,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
       logger: {
         log: vi.fn(),
         logMessage: vi.fn(),
@@ -52,6 +54,7 @@ export const createMockCommandContext = (
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any, // Cast because Logger is a class.
     },
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
     ui: {
       addItem: vi.fn(),
       clear: vi.fn(),
@@ -60,6 +63,7 @@ export const createMockCommandContext = (
       setPendingItem: vi.fn(),
       loadHistory: vi.fn(),
       toggleCorgiMode: vi.fn(),
+      toggleShortcutsHelp: vi.fn(),
       toggleVimEnabled: vi.fn(),
       openAgentConfigDialog: vi.fn(),
       closeAgentConfigDialog: vi.fn(),
@@ -69,6 +73,7 @@ export const createMockCommandContext = (
     } as any,
     session: {
       sessionShellAllowlist: new Set<string>(),
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       stats: {
         sessionStartTime: new Date(),
         lastPromptTokenCount: 0,
@@ -89,11 +94,14 @@ export const createMockCommandContext = (
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const merge = (target: any, source: any): any => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const output = { ...target };
 
     for (const key in source) {
       if (Object.prototype.hasOwnProperty.call(source, key)) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const sourceValue = source[key];
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const targetValue = output[key];
 
         if (
@@ -101,9 +109,11 @@ export const createMockCommandContext = (
           Object.prototype.toString.call(sourceValue) === '[object Object]' &&
           Object.prototype.toString.call(targetValue) === '[object Object]'
         ) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           output[key] = merge(targetValue, sourceValue);
         } else {
           // If not, we do a direct assignment. This preserves Date objects and others.
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           output[key] = sourceValue;
         }
       }

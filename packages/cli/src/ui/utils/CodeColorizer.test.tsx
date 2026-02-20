@@ -10,7 +10,7 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { LoadedSettings } from '../../config/settings.js';
 
 describe('colorizeCode', () => {
-  it('renders empty lines correctly when useAlternateBuffer is true', () => {
+  it('renders empty lines correctly when useAlternateBuffer is true', async () => {
     const code = 'line 1\n\nline 3';
     const settings = new LoadedSettings(
       { path: '', settings: {}, originalSettings: {} },
@@ -35,7 +35,10 @@ describe('colorizeCode', () => {
       hideLineNumbers: true,
     });
 
-    const { lastFrame } = renderWithProviders(<>{result}</>);
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <>{result}</>,
+    );
+    await waitUntilReady();
     // We expect the output to preserve the empty line.
     // If the bug exists, it might look like "line 1\nline 3"
     // If fixed, it should look like "line 1\n \nline 3" (if we use space) or just have the newline.
@@ -45,5 +48,6 @@ describe('colorizeCode', () => {
     // But ink-testing-library usually returns the visual representation.
 
     expect(lastFrame()).toMatch(/line 1\s*\n\s*\n\s*line 3/);
+    unmount();
   });
 });

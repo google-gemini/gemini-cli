@@ -105,51 +105,91 @@ export function printDebugInfo(
   return allTools;
 }
 
-// Helper to validate model output and warn about unexpected content
-export function validateModelOutput(
-  result: string,
-  expectedContent: string | (string | RegExp)[] | null = null,
-  testName = '',
-) {
-  // First, check if there's any output at all (this should fail the test if missing)
+// Helper to assert that the model returned some output
+export function assertModelHasOutput(result: string) {
   if (!result || result.trim().length === 0) {
     throw new Error('Expected LLM to return some output');
   }
+}
+
+function contentExists(result: string, content: string | RegExp): boolean {
+  if (typeof content === 'string') {
+    return result.toLowerCase().includes(content.toLowerCase());
+  } else if (content instanceof RegExp) {
+    return content.test(result);
+  }
+  return false;
+}
+
+function findMismatchedContent(
+  result: string,
+  content: string | (string | RegExp)[],
+  shouldExist: boolean,
+): (string | RegExp)[] {
+  const contents = Array.isArray(content) ? content : [content];
+  return contents.filter((c) => contentExists(result, c) !== shouldExist);
+}
+
+function logContentWarning(
+  problematicContent: (string | RegExp)[],
+  isMissing: boolean,
+  originalContent: string | (string | RegExp)[] | null | undefined,
+  result: string,
+) {
+  const message = isMissing
+    ? 'LLM did not include expected content in response'
+    : 'LLM included forbidden content in response';
+
+  console.warn(
+    `Warning: ${message}: ${problematicContent.join(', ')}.`,
+    'This is not ideal but not a test failure.',
+  );
+
+  const label = isMissing ? 'Expected content' : 'Forbidden content';
+  console.warn(`${label}:`, originalContent);
+  console.warn('Actual output:', result);
+}
+
+// Helper to check model output and warn about unexpected content
+export function checkModelOutputContent(
+  result: string,
+  {
+    expectedContent = null,
+    testName = '',
+    forbiddenContent = null,
+  }: {
+    expectedContent?: string | (string | RegExp)[] | null;
+    testName?: string;
+    forbiddenContent?: string | (string | RegExp)[] | null;
+  } = {},
+): boolean {
+  let isValid = true;
 
   // If expectedContent is provided, check for it and warn if missing
   if (expectedContent) {
-    const contents = Array.isArray(expectedContent)
-      ? expectedContent
-      : [expectedContent];
-    const missingContent = contents.filter((content) => {
-      if (typeof content === 'string') {
-        return !result.toLowerCase().includes(content.toLowerCase());
-      } else if (content instanceof RegExp) {
-        return !content.test(result);
-      }
-      return false;
-    });
+    const missingContent = findMismatchedContent(result, expectedContent, true);
 
     if (missingContent.length > 0) {
-      console.warn(
-        `Warning: LLM did not include expected content in response: ${missingContent.join(
-          ', ',
-        )}.`,
-        'This is not ideal but not a test failure.',
-      );
-      console.warn(
-        'The tool was called successfully, which is the main requirement.',
-      );
-      console.warn('Expected content:', expectedContent);
-      console.warn('Actual output:', result);
-      return false;
-    } else if (env['VERBOSE'] === 'true') {
-      console.log(`${testName}: Model output validated successfully.`);
+      logContentWarning(missingContent, true, expectedContent, result);
+      isValid = false;
     }
-    return true;
   }
 
-  return true;
+  // If forbiddenContent is provided, check for it and warn if present
+  if (forbiddenContent) {
+    const foundContent = findMismatchedContent(result, forbiddenContent, false);
+
+    if (foundContent.length > 0) {
+      logContentWarning(foundContent, false, forbiddenContent, result);
+      isValid = false;
+    }
+  }
+
+  if (isValid && env['VERBOSE'] === 'true') {
+    console.log(`${testName}: Model output content checked successfully.`);
+  }
+
+  return isValid;
 }
 
 export interface ParsedLog {
@@ -168,6 +208,8 @@ export interface ParsedLog {
     stdout?: string;
     stderr?: string;
     error?: string;
+    error_type?: string;
+    prompt_id?: string;
   };
   scopeMetrics?: {
     metrics: {
@@ -305,6 +347,7 @@ export class TestRig {
   originalFakeResponsesPath?: string;
   private _interactiveRuns: InteractiveRun[] = [];
   private _spawnedProcesses: ChildProcess[] = [];
+  private _initialized = false;
 
   setup(
     testName: string,
@@ -319,6 +362,14 @@ export class TestRig {
       env['INTEGRATION_TEST_FILE_DIR'] || join(os.tmpdir(), 'gemini-cli-tests');
     this.testDir = join(testFileDir, sanitizedName);
     this.homeDir = join(testFileDir, sanitizedName + '-home');
+
+    if (!this._initialized) {
+      // Clean up existing directories from previous runs (e.g. retries)
+      this._cleanDir(this.testDir);
+      this._cleanDir(this.homeDir);
+      this._initialized = true;
+    }
+
     mkdirSync(this.testDir, { recursive: true });
     mkdirSync(this.homeDir, { recursive: true });
     if (options.fakeResponsesPath) {
@@ -331,6 +382,36 @@ export class TestRig {
 
     // Create a settings file to point the CLI to the local collector
     this._createSettingsFile(options.settings);
+  }
+
+  private _cleanDir(dir: string) {
+    if (fs.existsSync(dir)) {
+      for (let i = 0; i < 10; i++) {
+        try {
+          fs.rmSync(dir, { recursive: true, force: true });
+          return;
+        } catch (err) {
+          if (i === 9) {
+            console.error(
+              `Failed to clean directory ${dir} after 10 attempts:`,
+              err,
+            );
+            throw err;
+          }
+          const delay = Math.min(Math.pow(2, i) * 1000, 10000); // Max 10s delay
+          try {
+            const sharedBuffer = new Int32Array(new SharedArrayBuffer(4));
+            Atomics.wait(sharedBuffer, 0, 0, delay);
+          } catch {
+            // Fallback for environments where SharedArrayBuffer might be restricted
+            const start = Date.now();
+            while (Date.now() - start < delay) {
+              /* busy wait */
+            }
+          }
+        }
+      }
+    }
   }
 
   private _createSettingsFile(overrideSettings?: Record<string, unknown>) {
@@ -350,7 +431,6 @@ export class TestRig {
           // Nightly releases sometimes becomes out of sync with local code and
           // triggers auto-update, which causes tests to fail.
           disableAutoUpdate: true,
-          previewFeatures: false,
         },
         telemetry: {
           enabled: true,
@@ -369,9 +449,13 @@ export class TestRig {
         ui: {
           useAlternateBuffer: true,
         },
-        model: {
-          name: DEFAULT_GEMINI_MODEL,
-        },
+        ...(env['GEMINI_TEST_TYPE'] === 'integration'
+          ? {
+              model: {
+                name: DEFAULT_GEMINI_MODEL,
+              },
+            }
+          : {}),
         sandbox:
           env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
         // Don't show the IDE connection dialog when running from VsCode
@@ -416,7 +500,8 @@ export class TestRig {
   } {
     const isNpmReleaseTest =
       env['INTEGRATION_TEST_USE_INSTALLED_GEMINI'] === 'true';
-    const command = isNpmReleaseTest ? 'gemini' : 'node';
+    const geminiCommand = os.platform() === 'win32' ? 'gemini.cmd' : 'gemini';
+    const command = isNpmReleaseTest ? geminiCommand : 'node';
     const initialArgs = isNpmReleaseTest
       ? extraInitialArgs
       : [BUNDLE_PATH, ...extraInitialArgs];
@@ -428,6 +513,17 @@ export class TestRig {
       }
     }
     return { command, initialArgs };
+  }
+
+  createScript(fileName: string, content: string) {
+    if (!this.testDir) {
+      throw new Error(
+        'TestRig.setup must be called before creating files or scripts',
+      );
+    }
+    const scriptPath = join(this.testDir, fileName);
+    writeFileSync(scriptPath, content);
+    return normalizePath(scriptPath);
   }
 
   private _getCleanEnv(
@@ -445,6 +541,7 @@ export class TestRig {
         key !== 'GEMINI_MODEL' &&
         key !== 'GEMINI_DEBUG' &&
         key !== 'GEMINI_CLI_TEST_VAR' &&
+        key !== 'GEMINI_CLI_INTEGRATION_TEST' &&
         !key.startsWith('GEMINI_CLI_ACTIVITY_LOG')
       ) {
         delete cleanEnv[key];
@@ -454,6 +551,7 @@ export class TestRig {
     return {
       ...cleanEnv,
       GEMINI_CLI_HOME: this.homeDir!,
+      GEMINI_PTY_INFO: 'child_process',
       ...extraEnv,
     };
   }
@@ -756,6 +854,13 @@ export class TestRig {
     // Kill any interactive runs that are still active
     for (const run of this._interactiveRuns) {
       try {
+        if (process.platform === 'win32') {
+          // @ts-ignore - access private ptyProcess
+          const pid = run.ptyProcess?.pid;
+          if (pid) {
+            execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore' });
+          }
+        }
         await run.kill();
       } catch (error) {
         if (env['VERBOSE'] === 'true') {
@@ -769,6 +874,9 @@ export class TestRig {
     for (const child of this._spawnedProcesses) {
       if (child.exitCode === null && child.signalCode === null) {
         try {
+          if (process.platform === 'win32' && child.pid) {
+            execSync(`taskkill /F /T /PID ${child.pid}`, { stdio: 'ignore' });
+          }
           child.kill('SIGKILL');
         } catch (error) {
           if (env['VERBOSE'] === 'true') {
@@ -791,21 +899,21 @@ export class TestRig {
     // Clean up test directory and home directory
     if (this.testDir && !env['KEEP_OUTPUT']) {
       try {
-        fs.rmSync(this.testDir, { recursive: true, force: true });
+        this._cleanDir(this.testDir);
       } catch (error) {
         // Ignore cleanup errors
-        if (env['VERBOSE'] === 'true') {
-          console.warn('Cleanup warning:', (error as Error).message);
+        if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+          console.warn('Cleanup warning (testDir):', (error as Error).message);
         }
       }
     }
     if (this.homeDir && !env['KEEP_OUTPUT']) {
       try {
-        fs.rmSync(this.homeDir, { recursive: true, force: true });
+        this._cleanDir(this.homeDir);
       } catch (error) {
         // Ignore cleanup errors
-        if (env['VERBOSE'] === 'true') {
-          console.warn('Cleanup warning:', (error as Error).message);
+        if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+          console.warn('Cleanup warning (homeDir):', (error as Error).message);
         }
       }
     }
@@ -945,6 +1053,7 @@ export class TestRig {
         args: string;
         success: boolean;
         duration_ms: number;
+        prompt_id?: string;
       };
     }[] = [];
 
@@ -973,6 +1082,13 @@ export class TestRig {
         args = argsMatch[1];
       }
 
+      // Look for prompt_id in the context
+      let promptId = undefined;
+      const promptIdMatch = context.match(/prompt_id:\s*'([^']+)'/);
+      if (promptIdMatch) {
+        promptId = promptIdMatch[1];
+      }
+
       // Also try to find function_name to double-check
       // Updated regex to handle tool names with hyphens and underscores
       const nameMatch = context.match(/function_name:\s*'([\w-]+)'/);
@@ -985,6 +1101,7 @@ export class TestRig {
           args: args,
           success: success,
           duration_ms: duration,
+          prompt_id: promptId,
         },
       });
     }
@@ -1032,6 +1149,7 @@ export class TestRig {
                       args: obj.attributes.function_args || '{}',
                       success: obj.attributes.success !== false,
                       duration_ms: obj.attributes.duration_ms || 0,
+                      prompt_id: obj.attributes.prompt_id,
                     },
                   });
                 }
@@ -1046,6 +1164,7 @@ export class TestRig {
                     args: obj.attributes.function_args,
                     success: obj.attributes.success,
                     duration_ms: obj.attributes.duration_ms,
+                    prompt_id: obj.attributes.prompt_id,
                   },
                 });
               }
@@ -1136,6 +1255,9 @@ export class TestRig {
         args: string;
         success: boolean;
         duration_ms: number;
+        prompt_id?: string;
+        error?: string;
+        error_type?: string;
       };
     }[] = [];
 
@@ -1152,6 +1274,9 @@ export class TestRig {
             args: logData.attributes.function_args ?? '{}',
             success: logData.attributes.success ?? false,
             duration_ms: logData.attributes.duration_ms ?? 0,
+            prompt_id: logData.attributes.prompt_id,
+            error: logData.attributes.error,
+            error_type: logData.attributes.error_type,
           },
         });
       }
@@ -1237,6 +1362,23 @@ export class TestRig {
 
     const envVars = this._getCleanEnv(options?.env);
 
+    // node-pty on windows often needs these to spawn correctly
+    if (process.platform === 'win32') {
+      const windowsCriticalVars = [
+        'SystemRoot',
+        'COMSPEC',
+        'windir',
+        'PATHEXT',
+        'TEMP',
+        'TMP',
+      ];
+      for (const v of windowsCriticalVars) {
+        if (process.env[v] && !envVars[v]) {
+          envVars[v] = process.env[v]!;
+        }
+      }
+    }
+
     const ptyOptions: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
@@ -1318,4 +1460,12 @@ export class TestRig {
     }
     throw new Error(`pollCommand timed out after ${timeout}ms`);
   }
+}
+
+/**
+ * Normalizes a path for cross-platform matching (replaces backslashes with forward slashes).
+ */
+export function normalizePath(p: string | undefined): string | undefined {
+  if (!p) return p;
+  return p.replace(/\\/g, '/');
 }

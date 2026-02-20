@@ -20,7 +20,12 @@ import {
   ApiRequestPhase,
 } from './metrics.js';
 import { makeFakeConfig } from '../test-utils/config.js';
-import { ModelRoutingEvent, AgentFinishEvent } from './types.js';
+import {
+  ModelRoutingEvent,
+  AgentFinishEvent,
+  KeychainAvailabilityEvent,
+  TokenStorageInitializationEvent,
+} from './types.js';
 import { AgentTerminateMode } from '../agents/types.js';
 
 const mockCounterAddFn: Mock<
@@ -96,6 +101,9 @@ describe('Telemetry Metrics', () => {
   let recordAgentRunMetricsModule: typeof import('./metrics.js').recordAgentRunMetrics;
   let recordLinesChangedModule: typeof import('./metrics.js').recordLinesChanged;
   let recordSlowRenderModule: typeof import('./metrics.js').recordSlowRender;
+  let recordPlanExecutionModule: typeof import('./metrics.js').recordPlanExecution;
+  let recordKeychainAvailabilityModule: typeof import('./metrics.js').recordKeychainAvailability;
+  let recordTokenStorageInitializationModule: typeof import('./metrics.js').recordTokenStorageInitialization;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -140,6 +148,11 @@ describe('Telemetry Metrics', () => {
     recordAgentRunMetricsModule = metricsJsModule.recordAgentRunMetrics;
     recordLinesChangedModule = metricsJsModule.recordLinesChanged;
     recordSlowRenderModule = metricsJsModule.recordSlowRender;
+    recordPlanExecutionModule = metricsJsModule.recordPlanExecution;
+    recordKeychainAvailabilityModule =
+      metricsJsModule.recordKeychainAvailability;
+    recordTokenStorageInitializationModule =
+      metricsJsModule.recordTokenStorageInitialization;
 
     const otelApiModule = await import('@opentelemetry/api');
 
@@ -214,6 +227,29 @@ describe('Telemetry Metrics', () => {
         'session.id': 'test-session-id',
         'installation.id': 'test-installation-id',
         'user.email': 'test@example.com',
+      });
+    });
+  });
+
+  describe('recordPlanExecution', () => {
+    it('does not record metrics if not initialized', () => {
+      const config = makeFakeConfig({});
+      recordPlanExecutionModule(config, { approval_mode: 'default' });
+      expect(mockCounterAddFn).not.toHaveBeenCalled();
+    });
+
+    it('records a plan execution event when initialized', () => {
+      const config = makeFakeConfig({});
+      initializeMetricsModule(config);
+      recordPlanExecutionModule(config, { approval_mode: 'autoEdit' });
+
+      // Called for session, then for plan execution
+      expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
+      expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 1, {
+        'session.id': 'test-session-id',
+        'installation.id': 'test-installation-id',
+        'user.email': 'test@example.com',
+        approval_mode: 'autoEdit',
       });
     });
   });
@@ -1457,6 +1493,59 @@ describe('Telemetry Metrics', () => {
             success: false,
           }),
         );
+      });
+    });
+  });
+
+  describe('Keychain and Token Storage Metrics', () => {
+    describe('recordKeychainAvailability', () => {
+      it('should not record metrics if not initialized', () => {
+        const config = makeFakeConfig({});
+        const event = new KeychainAvailabilityEvent(true);
+        recordKeychainAvailabilityModule(config, event);
+        expect(mockCounterAddFn).not.toHaveBeenCalled();
+      });
+
+      it('should record keychain availability when initialized', () => {
+        const config = makeFakeConfig({});
+        initializeMetricsModule(config);
+        mockCounterAddFn.mockClear();
+
+        const event = new KeychainAvailabilityEvent(true);
+        recordKeychainAvailabilityModule(config, event);
+
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          available: true,
+        });
+      });
+    });
+
+    describe('recordTokenStorageInitialization', () => {
+      it('should not record metrics if not initialized', () => {
+        const config = makeFakeConfig({});
+        const event = new TokenStorageInitializationEvent('hybrid', false);
+        recordTokenStorageInitializationModule(config, event);
+        expect(mockCounterAddFn).not.toHaveBeenCalled();
+      });
+
+      it('should record token storage initialization when initialized', () => {
+        const config = makeFakeConfig({});
+        initializeMetricsModule(config);
+        mockCounterAddFn.mockClear();
+
+        const event = new TokenStorageInitializationEvent('keychain', true);
+        recordTokenStorageInitializationModule(config, event);
+
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          type: 'keychain',
+          forced: true,
+        });
       });
     });
   });

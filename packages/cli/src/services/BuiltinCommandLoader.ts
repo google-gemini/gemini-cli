@@ -23,6 +23,7 @@ import { authCommand } from '../ui/commands/authCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
 import { chatCommand, debugCommand } from '../ui/commands/chatCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
+import { commandsCommand } from '../ui/commands/commandsCommand.js';
 import { compressCommand } from '../ui/commands/compressCommand.js';
 import { copyCommand } from '../ui/commands/copyCommand.js';
 import { corgiCommand } from '../ui/commands/corgiCommand.js';
@@ -31,6 +32,7 @@ import { directoryCommand } from '../ui/commands/directoryCommand.js';
 import { editorCommand } from '../ui/commands/editorCommand.js';
 import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
+import { shortcutsCommand } from '../ui/commands/shortcutsCommand.js';
 import { rewindCommand } from '../ui/commands/rewindCommand.js';
 import { hooksCommand } from '../ui/commands/hooksCommand.js';
 import { ideCommand } from '../ui/commands/ideCommand.js';
@@ -40,8 +42,9 @@ import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { modelCommand } from '../ui/commands/modelCommand.js';
 import { oncallCommand } from '../ui/commands/oncallCommand.js';
 import { permissionsCommand } from '../ui/commands/permissionsCommand.js';
-import { privacyCommand } from '../ui/commands/privacyCommand.js';
+import { planCommand } from '../ui/commands/planCommand.js';
 import { policiesCommand } from '../ui/commands/policiesCommand.js';
+import { privacyCommand } from '../ui/commands/privacyCommand.js';
 import { profileCommand } from '../ui/commands/profileCommand.js';
 import { quitCommand } from '../ui/commands/quitCommand.js';
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
@@ -87,6 +90,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
           : chatCommand.subCommands,
       },
       clearCommand,
+      commandsCommand,
       compressCommand,
       copyCommand,
       corgiCommand,
@@ -115,6 +119,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
           ]
         : [extensionsCommand(this.config?.getEnableExtensionReloading())]),
       helpCommand,
+      shortcutsCommand,
       ...(this.config?.getEnableHooksUI() ? [hooksCommand] : []),
       rewindCommand,
       await ideCommand(),
@@ -142,8 +147,9 @@ export class BuiltinCommandLoader implements ICommandLoader {
       memoryCommand,
       modelCommand,
       ...(this.config?.getFolderTrust() ? [permissionsCommand] : []),
-      privacyCommand,
+      ...(this.config?.isPlanEnabled() ? [planCommand] : []),
       policiesCommand,
+      privacyCommand,
       ...(isDevelopment ? [profileCommand] : []),
       quitCommand,
       restoreCommand(this.config),

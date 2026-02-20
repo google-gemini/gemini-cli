@@ -15,13 +15,21 @@ import { Holiday } from './holiday.js';
 import { DefaultLight } from './default-light.js';
 import { DefaultDark } from './default.js';
 import { ShadesOfPurple } from './shades-of-purple.js';
+import { SolarizedDark } from './solarized-dark.js';
+import { SolarizedLight } from './solarized-light.js';
 import { XCode } from './xcode.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { Theme, ThemeType } from './theme.js';
+import type { Theme, ThemeType, ColorsTheme } from './theme.js';
 import type { CustomTheme } from '@google/gemini-cli-core';
 import { createCustomTheme, validateCustomTheme } from './theme.js';
 import type { SemanticColors } from './semantic-tokens.js';
+import {
+  interpolateColor,
+  getThemeTypeFromBackgroundColor,
+  resolveColor,
+} from './color-utils.js';
+import { DEFAULT_BORDER_OPACITY } from '../constants.js';
 import { ANSI } from './ansi.js';
 import { ANSILight } from './ansi-light.js';
 import { NoColorTheme } from './no-color.js';
@@ -42,6 +50,12 @@ class ThemeManager {
   private settingsThemes: Map<string, Theme> = new Map();
   private extensionThemes: Map<string, Theme> = new Map();
   private fileThemes: Map<string, Theme> = new Map();
+  private terminalBackground: string | undefined;
+
+  // Cache for dynamic colors
+  private cachedColors: ColorsTheme | undefined;
+  private cachedSemanticColors: SemanticColors | undefined;
+  private lastCacheKey: string | undefined;
 
   constructor() {
     this.availableThemes = [
@@ -56,11 +70,30 @@ class ThemeManager {
       GoogleCode,
       Holiday,
       ShadesOfPurple,
+      SolarizedDark,
+      SolarizedLight,
       XCode,
       ANSI,
       ANSILight,
     ];
     this.activeTheme = DEFAULT_THEME;
+  }
+
+  setTerminalBackground(color: string | undefined): void {
+    if (this.terminalBackground !== color) {
+      this.terminalBackground = color;
+      this.clearCache();
+    }
+  }
+
+  getTerminalBackground(): string | undefined {
+    return this.terminalBackground;
+  }
+
+  private clearCache(): void {
+    this.cachedColors = undefined;
+    this.cachedSemanticColors = undefined;
+    this.lastCacheKey = undefined;
   }
 
   isDefaultTheme(themeName: string | undefined): boolean {
@@ -214,7 +247,10 @@ class ThemeManager {
     if (!theme) {
       return false;
     }
-    this.activeTheme = theme;
+    if (this.activeTheme !== theme) {
+      this.activeTheme = theme;
+      this.clearCache();
+    }
     return true;
   }
 
@@ -256,11 +292,103 @@ class ThemeManager {
   }
 
   /**
+   * Gets the colors for the active theme, respecting the terminal background.
+   * @returns The theme colors.
+   */
+  getColors(): ColorsTheme {
+    const activeTheme = this.getActiveTheme();
+    const cacheKey = `${activeTheme.name}:${this.terminalBackground}`;
+    if (this.cachedColors && this.lastCacheKey === cacheKey) {
+      return this.cachedColors;
+    }
+
+    const colors = activeTheme.colors;
+    if (
+      this.terminalBackground &&
+      this.isThemeCompatible(activeTheme, this.terminalBackground)
+    ) {
+      this.cachedColors = {
+        ...colors,
+        Background: this.terminalBackground,
+        DarkGray: interpolateColor(colors.Gray, this.terminalBackground, 0.5),
+      };
+    } else {
+      this.cachedColors = colors;
+    }
+
+    this.lastCacheKey = cacheKey;
+    return this.cachedColors;
+  }
+
+  /**
    * Gets the semantic colors for the active theme.
    * @returns The semantic colors.
    */
   getSemanticColors(): SemanticColors {
-    return this.getActiveTheme().semanticColors;
+    const activeTheme = this.getActiveTheme();
+    const cacheKey = `${activeTheme.name}:${this.terminalBackground}`;
+    if (this.cachedSemanticColors && this.lastCacheKey === cacheKey) {
+      return this.cachedSemanticColors;
+    }
+
+    const semanticColors = activeTheme.semanticColors;
+    if (
+      this.terminalBackground &&
+      this.isThemeCompatible(activeTheme, this.terminalBackground)
+    ) {
+      this.cachedSemanticColors = {
+        ...semanticColors,
+        background: {
+          ...semanticColors.background,
+          primary: this.terminalBackground,
+        },
+        border: {
+          ...semanticColors.border,
+          default: interpolateColor(
+            this.terminalBackground,
+            activeTheme.colors.Gray,
+            DEFAULT_BORDER_OPACITY,
+          ),
+        },
+        ui: {
+          ...semanticColors.ui,
+          dark: interpolateColor(
+            activeTheme.colors.Gray,
+            this.terminalBackground,
+            0.5,
+          ),
+        },
+      };
+    } else {
+      this.cachedSemanticColors = semanticColors;
+    }
+
+    this.lastCacheKey = cacheKey;
+    return this.cachedSemanticColors;
+  }
+
+  isThemeCompatible(
+    activeTheme: Theme,
+    terminalBackground: string | undefined,
+  ): boolean {
+    if (activeTheme.type === 'ansi') {
+      return true;
+    }
+
+    const backgroundType = getThemeTypeFromBackgroundColor(terminalBackground);
+    if (!backgroundType) {
+      return true;
+    }
+
+    const themeType =
+      activeTheme.type === 'custom'
+        ? getThemeTypeFromBackgroundColor(
+            resolveColor(activeTheme.colors.Background) ||
+              activeTheme.colors.Background,
+          )
+        : activeTheme.type;
+
+    return themeType === backgroundType;
   }
 
   private _getAllCustomThemes(): Theme[] {
@@ -383,6 +511,7 @@ class ThemeManager {
 
       // 3. Read, parse, and validate the theme file.
       const themeContent = fs.readFileSync(canonicalPath, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const customThemeConfig = JSON.parse(themeContent) as CustomTheme;
 
       const validation = validateCustomTheme(customThemeConfig);

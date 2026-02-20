@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -155,9 +155,10 @@ describe('useQuotaAndFallback', () => {
         expect(request?.isTerminalQuotaError).toBe(true);
 
         const message = request!.message;
-        expect(message).toContain('Usage limit reached for gemini-pro.');
+        expect(message).toContain('Usage limit reached for all Pro models.');
         expect(message).toContain('Access resets at'); // From getResetTimeMessage
-        expect(message).toContain('/stats for usage details');
+        expect(message).toContain('/stats model for usage details');
+        expect(message).toContain('/model to switch models.');
         expect(message).toContain('/auth to switch to API key.');
 
         expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
@@ -174,6 +175,77 @@ describe('useQuotaAndFallback', () => {
         // The pending request should be cleared from the state
         expect(result.current.proQuotaRequest).toBeNull();
         expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);
+      });
+
+      it('should show the model name for a terminal quota error on a non-pro model', async () => {
+        const { result } = renderHook(() =>
+          useQuotaAndFallback({
+            config: mockConfig,
+            historyManager: mockHistoryManager,
+            userTier: UserTierId.FREE,
+            setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+            onShowAuthSelection: mockOnShowAuthSelection,
+          }),
+        );
+
+        const handler = setFallbackHandlerSpy.mock
+          .calls[0][0] as FallbackModelHandler;
+
+        let promise: Promise<FallbackIntent | null>;
+        const error = new TerminalQuotaError(
+          'flash quota',
+          mockGoogleApiError,
+          1000 * 60 * 5,
+        );
+        act(() => {
+          promise = handler('gemini-flash', 'gemini-pro', error);
+        });
+
+        const request = result.current.proQuotaRequest;
+        expect(request).not.toBeNull();
+        expect(request?.failedModel).toBe('gemini-flash');
+
+        const message = request!.message;
+        expect(message).toContain('Usage limit reached for gemini-flash.');
+        expect(message).not.toContain('all Pro models');
+
+        act(() => {
+          result.current.handleProQuotaChoice('retry_later');
+        });
+
+        await promise!;
+      });
+
+      it('should handle terminal quota error without retry delay', async () => {
+        const { result } = renderHook(() =>
+          useQuotaAndFallback({
+            config: mockConfig,
+            historyManager: mockHistoryManager,
+            userTier: UserTierId.FREE,
+            setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+            onShowAuthSelection: mockOnShowAuthSelection,
+          }),
+        );
+
+        const handler = setFallbackHandlerSpy.mock
+          .calls[0][0] as FallbackModelHandler;
+
+        let promise: Promise<FallbackIntent | null>;
+        const error = new TerminalQuotaError('no delay', mockGoogleApiError);
+        act(() => {
+          promise = handler('gemini-pro', 'gemini-flash', error);
+        });
+
+        const request = result.current.proQuotaRequest;
+        const message = request!.message;
+        expect(message).not.toContain('Access resets at');
+        expect(message).toContain('Usage limit reached for all Pro models.');
+
+        act(() => {
+          result.current.handleProQuotaChoice('retry_later');
+        });
+
+        await promise!;
       });
 
       it('should handle race conditions by stopping subsequent requests', async () => {
@@ -328,8 +400,7 @@ describe('useQuotaAndFallback', () => {
         const message = request!.message;
         expect(message).toBe(
           `It seems like you don't have access to gemini-3-pro-preview.
-Learn more at https://goo.gle/enable-preview-features
-To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
+Your admin might have disabled the access. Contact them to enable the Preview Release Channel.`,
         );
 
         // Simulate the user choosing to switch
@@ -341,6 +412,46 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
         expect(intent).toBe('retry_always');
 
         expect(result.current.proQuotaRequest).toBeNull();
+      });
+
+      it('should handle ModelNotFoundError with invalid model correctly', async () => {
+        const { result } = renderHook(() =>
+          useQuotaAndFallback({
+            config: mockConfig,
+            historyManager: mockHistoryManager,
+            userTier: UserTierId.FREE,
+            setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+            onShowAuthSelection: mockOnShowAuthSelection,
+          }),
+        );
+
+        const handler = setFallbackHandlerSpy.mock
+          .calls[0][0] as FallbackModelHandler;
+
+        let promise: Promise<FallbackIntent | null>;
+        const error = new ModelNotFoundError('model not found', 404);
+
+        act(() => {
+          promise = handler('invalid-model', 'gemini-2.5-pro', error);
+        });
+
+        const request = result.current.proQuotaRequest;
+        expect(request).not.toBeNull();
+        expect(request?.failedModel).toBe('invalid-model');
+        expect(request?.isModelNotFoundError).toBe(true);
+
+        const message = request!.message;
+        expect(message).toBe(
+          `Model "invalid-model" was not found or is invalid.
+/model to switch models.`,
+        );
+
+        act(() => {
+          result.current.handleProQuotaChoice('retry_always');
+        });
+
+        const intent = await promise!;
+        expect(intent).toBe('retry_always');
       });
     });
   });

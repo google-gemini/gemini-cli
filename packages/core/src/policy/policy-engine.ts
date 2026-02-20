@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -26,6 +26,22 @@ import {
 } from '../utils/shell-utils.js';
 import { getToolAliases } from '../tools/tool-names.js';
 
+function isWildcardPattern(name: string): boolean {
+  return name.endsWith('__*');
+}
+
+function getWildcardPrefix(pattern: string): string {
+  return pattern.slice(0, -3);
+}
+
+function matchesWildcard(pattern: string, toolName: string): boolean {
+  if (!isWildcardPattern(pattern)) {
+    return false;
+  }
+  const prefix = getWildcardPrefix(pattern);
+  return toolName.startsWith(prefix + '__');
+}
+
 function ruleMatches(
   rule: PolicyRule | SafetyCheckerRule,
   toolCall: FunctionCall,
@@ -43,8 +59,8 @@ function ruleMatches(
   // Check tool name if specified
   if (rule.toolName) {
     // Support wildcard patterns: "serverName__*" matches "serverName__anyTool"
-    if (rule.toolName.endsWith('__*')) {
-      const prefix = rule.toolName.slice(0, -3); // Remove "__*"
+    if (isWildcardPattern(rule.toolName)) {
+      const prefix = getWildcardPrefix(rule.toolName);
       if (serverName !== undefined) {
         // Robust check: if serverName is provided, it MUST match the prefix exactly.
         // This prevents "malicious-server" from spoofing "trusted-server" by naming itself "trusted-server__malicious".
@@ -53,7 +69,7 @@ function ruleMatches(
         }
       }
       // Always verify the prefix, even if serverName matched
-      if (!toolCall.name || !toolCall.name.startsWith(prefix + '__')) {
+      if (!toolCall.name || !matchesWildcard(rule.toolName, toolCall.name)) {
         return false;
       }
     } else if (toolCall.name !== rule.toolName) {
@@ -312,6 +328,7 @@ export class PolicyEngine {
 
     if (toolName && SHELL_TOOL_NAMES.includes(toolName)) {
       isShellCommand = true;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const args = toolCall.args as { command?: string; dir_path?: string };
       command = args?.command;
       shellDirPath = args?.dir_path;
@@ -459,6 +476,24 @@ export class PolicyEngine {
   }
 
   /**
+   * Remove rules matching a specific tier (priority band).
+   */
+  removeRulesByTier(tier: number): void {
+    this.rules = this.rules.filter(
+      (rule) => Math.floor(rule.priority ?? 0) !== tier,
+    );
+  }
+
+  /**
+   * Remove checkers matching a specific tier (priority band).
+   */
+  removeCheckersByTier(tier: number): void {
+    this.checkers = this.checkers.filter(
+      (checker) => Math.floor(checker.priority ?? 0) !== tier,
+    );
+  }
+
+  /**
    * Remove rules for a specific tool.
    * If source is provided, only rules matching that source are removed.
    */
@@ -506,6 +541,92 @@ export class PolicyEngine {
    */
   getHookCheckers(): readonly HookCheckerRule[] {
     return this.hookCheckers;
+  }
+
+  /**
+   * Get tools that are effectively denied by the current rules.
+   * This takes into account:
+   * 1. Global rules (no argsPattern)
+   * 2. Priority order (higher priority wins)
+   * 3. Non-interactive mode (ASK_USER becomes DENY)
+   */
+  getExcludedTools(): Set<string> {
+    const excludedTools = new Set<string>();
+    const processedTools = new Set<string>();
+    let globalVerdict: PolicyDecision | undefined;
+
+    for (const rule of this.rules) {
+      if (rule.argsPattern) {
+        if (rule.toolName && rule.decision !== PolicyDecision.DENY) {
+          processedTools.add(rule.toolName);
+        }
+        continue;
+      }
+
+      // Check if rule applies to current approval mode
+      if (rule.modes && rule.modes.length > 0) {
+        if (!rule.modes.includes(this.approvalMode)) {
+          continue;
+        }
+      }
+
+      // Handle Global Rules
+      if (!rule.toolName) {
+        if (globalVerdict === undefined) {
+          globalVerdict = rule.decision;
+          if (globalVerdict !== PolicyDecision.DENY) {
+            // Global ALLOW/ASK found.
+            // Since rules are sorted by priority, this overrides any lower-priority rules.
+            // We can stop processing because nothing else will be excluded.
+            break;
+          }
+          // If Global DENY, we continue to find specific tools to add to excluded set
+        }
+        continue;
+      }
+
+      const toolName = rule.toolName;
+
+      // Check if already processed (exact match)
+      if (processedTools.has(toolName)) {
+        continue;
+      }
+
+      // Check if covered by a processed wildcard
+      let coveredByWildcard = false;
+      for (const processed of processedTools) {
+        if (
+          isWildcardPattern(processed) &&
+          matchesWildcard(processed, toolName)
+        ) {
+          // It's covered by a higher-priority wildcard rule.
+          // If that wildcard rule resulted in exclusion, this tool should also be excluded.
+          if (excludedTools.has(processed)) {
+            excludedTools.add(toolName);
+          }
+          coveredByWildcard = true;
+          break;
+        }
+      }
+      if (coveredByWildcard) {
+        continue;
+      }
+
+      processedTools.add(toolName);
+
+      // Determine decision
+      let decision: PolicyDecision;
+      if (globalVerdict !== undefined) {
+        decision = globalVerdict;
+      } else {
+        decision = rule.decision;
+      }
+
+      if (decision === PolicyDecision.DENY) {
+        excludedTools.add(toolName);
+      }
+    }
+    return excludedTools;
   }
 
   private applyNonInteractiveMode(decision: PolicyDecision): PolicyDecision {

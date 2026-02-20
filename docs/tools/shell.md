@@ -1,70 +1,33 @@
 # Shell tool (`run_shell_command`)
 
-This document describes the `run_shell_command` tool for the Gemini CLI.
+The `run_shell_command` tool allows the Gemini model to execute commands
+directly on your system's shell. It is the primary mechanism for the agent to
+interact with your environment beyond simple file edits.
 
-## Description
+## Technical reference
 
-Use `run_shell_command` to interact with the underlying system, run scripts, or
-perform command-line operations. `run_shell_command` executes a given shell
-command, including interactive commands that require user input (e.g., `vim`,
-`git rebase -i`) if the `tools.shell.enableInteractiveShell` setting is set to
-`true`.
-
-On Windows, commands are executed with `powershell.exe -NoProfile -Command`
-(unless you explicitly point `ComSpec` at another shell). On other platforms,
-they are executed with `bash -c`.
+On Windows, commands execute with `powershell.exe -NoProfile -Command`. On other
+platforms, they execute with `bash -c`.
 
 ### Arguments
 
-`run_shell_command` takes the following arguments:
-
 - `command` (string, required): The exact shell command to execute.
-- `description` (string, optional): A brief description of the command's
-  purpose, which will be shown to the user.
-- `directory` (string, optional): The directory (relative to the project root)
-  in which to execute the command. If not provided, the command runs in the
-  project root.
+- `description` (string, optional): A brief description shown to the user for
+  confirmation.
+- `dir_path` (string, optional): The absolute path or relative path from
+  workspace root where the command runs.
+- `is_background` (boolean, optional): Whether to move the process to the
+  background immediately after starting.
 
-## How to use `run_shell_command` with the Gemini CLI
+### Return values
 
-When using `run_shell_command`, the command is executed as a subprocess.
-`run_shell_command` can start background processes using `&`. The tool returns
-detailed information about the execution, including:
+The tool returns a JSON object containing:
 
-- `Command`: The command that was executed.
-- `Directory`: The directory where the command was run.
-- `Stdout`: Output from the standard output stream.
-- `Stderr`: Output from the standard error stream.
-- `Error`: Any error message reported by the subprocess.
-- `Exit Code`: The exit code of the command.
-- `Signal`: The signal number if the command was terminated by a signal.
-- `Background PIDs`: A list of PIDs for any background processes started.
-
-Usage:
-
-```
-run_shell_command(command="Your commands.", description="Your description of the command.", directory="Your execution directory.")
-```
-
-## `run_shell_command` examples
-
-List files in the current directory:
-
-```
-run_shell_command(command="ls -la")
-```
-
-Run a script in a specific directory:
-
-```
-run_shell_command(command="./my_script.sh", directory="scripts", description="Run my custom script")
-```
-
-Start a background server:
-
-```
-run_shell_command(command="npm run dev &", description="Start development server in background")
-```
+- `Command`: The executed string.
+- `Directory`: The execution path.
+- `Stdout` / `Stderr`: The output streams.
+- `Exit Code`: The process return code.
+- `Background PIDs`: PIDs of any started background processes.
 
 ## Configuration
 
@@ -167,10 +130,11 @@ configuration file.
   `"tools": {"core": ["run_shell_command(git)"]}` will only allow `git`
   commands. Including the generic `run_shell_command` acts as a wildcard,
   allowing any command not explicitly blocked.
-- `tools.exclude`: To block specific commands, add entries to the `exclude` list
-  under the `tools` category in the format `run_shell_command(<command>)`. For
-  example, `"tools": {"exclude": ["run_shell_command(rm)"]}` will block `rm`
-  commands.
+- `tools.exclude` [DEPRECATED]: To block specific commands, use the
+  [Policy Engine](../reference/policy-engine.md). Historically, this setting
+  allowed adding entries to the `exclude` list under the `tools` category in the
+  format `run_shell_command(<command>)`. For example,
+  `"tools": {"exclude": ["run_shell_command(rm)"]}` will block `rm` commands.
 
 The validation logic is designed to be secure and flexible:
 
@@ -223,38 +187,30 @@ To block `rm` and allow all other commands:
 If a command prefix is in both `tools.core` and `tools.exclude`, it will be
 blocked.
 
-```json
-{
-  "tools": {
-    "core": ["run_shell_command(git)"],
-    "exclude": ["run_shell_command(git push)"]
-  }
-}
-```
+- **`tools.shell.enableInteractiveShell`**: (boolean) Uses `node-pty` for
+  real-time interaction.
+- **`tools.shell.showColor`**: (boolean) Preserves ANSI colors in output.
+- **`tools.shell.inactivityTimeout`**: (number) Seconds to wait for output
+  before killing the process.
 
-- `git push origin main`: Blocked
-- `git status`: Allowed
+### Command restrictions
 
-**Block all shell commands**
+You can limit which commands the agent is allowed to request using these
+settings:
 
-To block all shell commands, add the `run_shell_command` wildcard to
-`tools.exclude`:
+- **`tools.core`**: An allowlist of command prefixes (for example,
+  `["git", "npm test"]`).
+- **`tools.exclude`**: A blocklist of command prefixes.
 
-```json
-{
-  "tools": {
-    "exclude": ["run_shell_command"]
-  }
-}
-```
+## Use cases
 
-- `ls -l`: Blocked
-- `any other command`: Blocked
+- Running build scripts and test suites.
+- Initializing or managing version control systems.
+- Installing project dependencies.
+- Starting development servers or background watchers.
 
-## Security note for `excludeTools`
+## Next steps
 
-Command-specific restrictions in `excludeTools` for `run_shell_command` are
-based on simple string matching and can be easily bypassed. This feature is
-**not a security mechanism** and should not be relied upon to safely execute
-untrusted code. It is recommended to use `coreTools` to explicitly select
-commands that can be executed.
+- Follow the [Shell commands tutorial](../cli/tutorials/shell-commands.md) for
+  practical examples.
+- Learn about [Sandboxing](../cli/sandbox.md) to isolate command execution.

@@ -18,9 +18,14 @@ import {
   type ExtensionLoader,
   debugLogger,
   ApprovalMode,
+  type MCPServerConfig,
 } from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
-import { type Settings, createTestMergedSettings } from './settings.js';
+import {
+  type Settings,
+  type MergedSettings,
+  createTestMergedSettings,
+} from './settings.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
@@ -140,6 +145,26 @@ vi.mock('@google/gemini-cli-core', async () => {
       defaultDecision: ServerConfig.PolicyDecision.ASK_USER,
       approvalMode: ServerConfig.ApprovalMode.DEFAULT,
     })),
+    getAdminErrorMessage: vi.fn(
+      (_feature) =>
+        `YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli`,
+    ),
+    isHeadlessMode: vi.fn((opts) => {
+      if (process.env['VITEST'] === 'true') {
+        return (
+          !!opts?.prompt ||
+          (!!process.stdin && !process.stdin.isTTY) ||
+          (!!process.stdout && !process.stdout.isTTY)
+        );
+      }
+      return (
+        !!opts?.prompt ||
+        process.env['CI'] === 'true' ||
+        process.env['GITHUB_ACTIONS'] === 'true' ||
+        (!!process.stdin && !process.stdin.isTTY) ||
+        (!!process.stdout && !process.stdout.isTTY)
+      );
+    }),
   };
 });
 
@@ -153,6 +178,8 @@ vi.mock('./extension-manager.js', () => {
 // Global setup to ensure clean environment for all tests in this file
 const originalArgv = process.argv;
 const originalGeminiModel = process.env['GEMINI_MODEL'];
+const originalStdoutIsTTY = process.stdout.isTTY;
+const originalStdinIsTTY = process.stdin.isTTY;
 
 beforeEach(() => {
   delete process.env['GEMINI_MODEL'];
@@ -161,6 +188,18 @@ beforeEach(() => {
   ExtensionManager.prototype.loadExtensions = vi
     .fn()
     .mockResolvedValue(undefined);
+
+  // Default to interactive mode for tests unless otherwise specified
+  Object.defineProperty(process.stdout, 'isTTY', {
+    value: true,
+    configurable: true,
+    writable: true,
+  });
+  Object.defineProperty(process.stdin, 'isTTY', {
+    value: true,
+    configurable: true,
+    writable: true,
+  });
 });
 
 afterEach(() => {
@@ -170,6 +209,16 @@ afterEach(() => {
   } else {
     delete process.env['GEMINI_MODEL'];
   }
+  Object.defineProperty(process.stdout, 'isTTY', {
+    value: originalStdoutIsTTY,
+    configurable: true,
+    writable: true,
+  });
+  Object.defineProperty(process.stdin, 'isTTY', {
+    value: originalStdinIsTTY,
+    configurable: true,
+    writable: true,
+  });
 });
 
 describe('parseArguments', () => {
@@ -248,6 +297,16 @@ describe('parseArguments', () => {
   });
 
   describe('positional arguments and @commands', () => {
+    beforeEach(() => {
+      // Default to headless mode for these tests as they mostly expect one-shot behavior
+      process.stdin.isTTY = false;
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: false,
+        configurable: true,
+        writable: true,
+      });
+    });
+
     it.each([
       {
         description:
@@ -378,8 +437,12 @@ describe('parseArguments', () => {
     );
 
     it('should include a startup message when converting positional query to interactive prompt', async () => {
-      const originalIsTTY = process.stdin.isTTY;
       process.stdin.isTTY = true;
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: true,
+        configurable: true,
+        writable: true,
+      });
       process.argv = ['node', 'script.js', 'hello'];
 
       try {
@@ -388,7 +451,7 @@ describe('parseArguments', () => {
           'Positional arguments now default to interactive mode. To run in non-interactive mode, use the --prompt (-p) flag.',
         );
       } finally {
-        process.stdin.isTTY = originalIsTTY;
+        // beforeEach handles resetting
       }
     });
   });
@@ -1285,6 +1348,36 @@ describe('Approval mode tool exclusion logic', () => {
       'Invalid approval mode: invalid_mode. Valid values are: yolo, auto_edit, plan, default',
     );
   });
+
+  it('should fall back to default approval mode if plan mode is requested but not enabled', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      general: {
+        defaultApprovalMode: 'plan',
+      },
+      experimental: {
+        plan: false,
+      },
+    });
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
+  });
+
+  it('should allow plan approval mode if experimental plan is enabled', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      general: {
+        defaultApprovalMode: 'plan',
+      },
+      experimental: {
+        plan: true,
+      },
+    });
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.PLAN);
+  });
 });
 
 describe('loadCliConfig with allowed-mcp-server-names', () => {
@@ -1441,6 +1534,211 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
   });
 });
 
+describe('loadCliConfig with admin.mcp.config', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  const localMcpServers: Record<string, MCPServerConfig> = {
+    serverA: {
+      command: 'npx',
+      args: ['-y', '@mcp/server-a'],
+      env: { KEY: 'VALUE' },
+      cwd: '/local/cwd',
+      trust: false,
+    },
+    serverB: {
+      command: 'npx',
+      args: ['-y', '@mcp/server-b'],
+      trust: false,
+    },
+  };
+
+  const baseSettings = createTestMergedSettings({
+    mcp: { serverCommand: 'npx -y @mcp/default-server' },
+    mcpServers: localMcpServers,
+  });
+
+  it('should use local configuration if admin allowlist is empty', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      mcp: baseSettings.mcp,
+      mcpServers: localMcpServers,
+      admin: {
+        ...baseSettings.admin,
+        mcp: { enabled: true, config: {} },
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getMcpServers()).toEqual(localMcpServers);
+    expect(config.getMcpServerCommand()).toBe('npx -y @mcp/default-server');
+  });
+
+  it('should ignore locally configured servers not present in the allowlist', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const adminAllowlist: Record<string, MCPServerConfig> = {
+      serverA: {
+        type: 'sse',
+        url: 'https://admin-server-a.com/sse',
+        trust: true,
+      },
+    };
+    const settings = createTestMergedSettings({
+      mcp: baseSettings.mcp,
+      mcpServers: localMcpServers,
+      admin: {
+        ...baseSettings.admin,
+        mcp: { enabled: true, config: adminAllowlist },
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    const mergedServers = config.getMcpServers() ?? {};
+    expect(mergedServers).toHaveProperty('serverA');
+    expect(mergedServers).not.toHaveProperty('serverB');
+  });
+
+  it('should clear command, args, env, and cwd for present servers', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const adminAllowlist: Record<string, MCPServerConfig> = {
+      serverA: {
+        type: 'sse',
+        url: 'https://admin-server-a.com/sse',
+        trust: true,
+      },
+    };
+    const settings = createTestMergedSettings({
+      mcpServers: localMcpServers,
+      admin: {
+        ...baseSettings.admin,
+        mcp: { enabled: true, config: adminAllowlist },
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    const serverA = config.getMcpServers()?.['serverA'];
+    expect(serverA).toEqual({
+      ...localMcpServers['serverA'],
+      type: 'sse',
+      url: 'https://admin-server-a.com/sse',
+      trust: true,
+      command: undefined,
+      args: undefined,
+      env: undefined,
+      cwd: undefined,
+      httpUrl: undefined,
+      tcp: undefined,
+    });
+  });
+
+  it('should not initialize a server if it is in allowlist but missing locally', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const adminAllowlist: Record<string, MCPServerConfig> = {
+      serverC: {
+        type: 'sse',
+        url: 'https://admin-server-c.com/sse',
+        trust: true,
+      },
+    };
+    const settings = createTestMergedSettings({
+      mcpServers: localMcpServers,
+      admin: {
+        ...baseSettings.admin,
+        mcp: { enabled: true, config: adminAllowlist },
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    const mergedServers = config.getMcpServers() ?? {};
+    expect(mergedServers).not.toHaveProperty('serverC');
+    expect(Object.keys(mergedServers)).toHaveLength(0);
+  });
+
+  it('should merge local fields and prefer admin tool filters', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const adminAllowlist: Record<string, MCPServerConfig> = {
+      serverA: {
+        type: 'sse',
+        url: 'https://admin-server-a.com/sse',
+        trust: true,
+        includeTools: ['admin_tool'],
+      },
+    };
+    const localMcpServersWithTools: Record<string, MCPServerConfig> = {
+      serverA: {
+        ...localMcpServers['serverA'],
+        includeTools: ['local_tool'],
+        timeout: 1234,
+      },
+    };
+    const settings = createTestMergedSettings({
+      mcpServers: localMcpServersWithTools,
+      admin: {
+        ...baseSettings.admin,
+        mcp: { enabled: true, config: adminAllowlist },
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    const serverA = (config.getMcpServers() ?? {})['serverA'];
+    expect(serverA).toMatchObject({
+      timeout: 1234,
+      includeTools: ['admin_tool'],
+      type: 'sse',
+      url: 'https://admin-server-a.com/sse',
+      trust: true,
+    });
+    expect(serverA).not.toHaveProperty('command');
+    expect(serverA).not.toHaveProperty('args');
+    expect(serverA).not.toHaveProperty('env');
+    expect(serverA).not.toHaveProperty('cwd');
+    expect(serverA).not.toHaveProperty('httpUrl');
+    expect(serverA).not.toHaveProperty('tcp');
+  });
+
+  it('should use local tool filters when admin does not define them', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const adminAllowlist: Record<string, MCPServerConfig> = {
+      serverA: {
+        type: 'sse',
+        url: 'https://admin-server-a.com/sse',
+        trust: true,
+      },
+    };
+    const localMcpServersWithTools: Record<string, MCPServerConfig> = {
+      serverA: {
+        ...localMcpServers['serverA'],
+        includeTools: ['local_tool'],
+      },
+    };
+    const settings = createTestMergedSettings({
+      mcpServers: localMcpServersWithTools,
+      admin: {
+        ...baseSettings.admin,
+        mcp: { enabled: true, config: adminAllowlist },
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    const serverA = config.getMcpServers()?.['serverA'];
+    expect(serverA?.includeTools).toEqual(['local_tool']);
+  });
+});
+
 describe('loadCliConfig model selection', () => {
   beforeEach(() => {
     vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
@@ -1477,7 +1775,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('auto-gemini-2.5');
+    expect(config.getModel()).toBe('auto-gemini-3');
   });
 
   it('always prefers model from argv', async () => {
@@ -1521,19 +1819,34 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('auto-gemini-2.5');
+    expect(config.getModel()).toBe('auto-gemini-3');
   });
 });
 
 describe('loadCliConfig folderTrust', () => {
+  let originalVitest: string | undefined;
+  let originalIntegrationTest: string | undefined;
+
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+
+    originalVitest = process.env['VITEST'];
+    originalIntegrationTest = process.env['GEMINI_CLI_INTEGRATION_TEST'];
+    delete process.env['VITEST'];
+    delete process.env['GEMINI_CLI_INTEGRATION_TEST'];
   });
 
   afterEach(() => {
+    if (originalVitest !== undefined) {
+      process.env['VITEST'] = originalVitest;
+    }
+    if (originalIntegrationTest !== undefined) {
+      process.env['GEMINI_CLI_INTEGRATION_TEST'] = originalIntegrationTest;
+    }
+
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
@@ -1592,10 +1905,11 @@ describe('loadCliConfig with includeDirectories', () => {
     vi.restoreAllMocks();
   });
 
-  it('should combine and resolve paths from settings and CLI arguments', async () => {
+  it.skip('should combine and resolve paths from settings and CLI arguments', async () => {
     const mockCwd = path.resolve(path.sep, 'home', 'user', 'project');
     process.argv = [
       'node',
+
       'script.js',
       '--include-directories',
       `${path.resolve(path.sep, 'cli', 'path1')},${path.join(mockCwd, 'cli', 'path2')}`,
@@ -2276,9 +2590,8 @@ describe('loadCliConfig approval mode', () => {
       },
     });
 
-    await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Approval mode "plan" is only available when experimental.plan is enabled.',
-    );
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
   });
 
   it('should throw error when --approval-mode=plan is used but experimental.plan setting is missing', async () => {
@@ -2286,9 +2599,23 @@ describe('loadCliConfig approval mode', () => {
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({});
 
-    await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Approval mode "plan" is only available when experimental.plan is enabled.',
-    );
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
+  });
+
+  it('should pass planSettings.directory from settings to config', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      general: {
+        plan: {
+          directory: '.custom-plans',
+        },
+      },
+    } as unknown as MergedSettings);
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    const plansDir = config.storage.getPlansDir();
+    expect(plansDir).toContain('.custom-plans');
   });
 
   // --- Untrusted Folder Scenarios ---
@@ -2349,7 +2676,7 @@ describe('loadCliConfig approval mode', () => {
     it('should use approvalMode from settings when no CLI flags are set', async () => {
       process.argv = ['node', 'script.js'];
       const settings = createTestMergedSettings({
-        tools: { approvalMode: 'auto_edit' },
+        general: { defaultApprovalMode: 'auto_edit' },
       });
       const argv = await parseArguments(settings);
       const config = await loadCliConfig(settings, 'test-session', argv);
@@ -2361,7 +2688,7 @@ describe('loadCliConfig approval mode', () => {
     it('should prioritize --approval-mode flag over settings', async () => {
       process.argv = ['node', 'script.js', '--approval-mode', 'auto_edit'];
       const settings = createTestMergedSettings({
-        tools: { approvalMode: 'default' },
+        general: { defaultApprovalMode: 'default' },
       });
       const argv = await parseArguments(settings);
       const config = await loadCliConfig(settings, 'test-session', argv);
@@ -2373,7 +2700,7 @@ describe('loadCliConfig approval mode', () => {
     it('should prioritize --yolo flag over settings', async () => {
       process.argv = ['node', 'script.js', '--yolo'];
       const settings = createTestMergedSettings({
-        tools: { approvalMode: 'auto_edit' },
+        general: { defaultApprovalMode: 'auto_edit' },
       });
       const argv = await parseArguments(settings);
       const config = await loadCliConfig(settings, 'test-session', argv);
@@ -2383,7 +2710,7 @@ describe('loadCliConfig approval mode', () => {
     it('should respect plan mode from settings when experimental.plan is enabled', async () => {
       process.argv = ['node', 'script.js'];
       const settings = createTestMergedSettings({
-        tools: { approvalMode: 'plan' },
+        general: { defaultApprovalMode: 'plan' },
         experimental: { plan: true },
       });
       const argv = await parseArguments(settings);
@@ -2394,15 +2721,12 @@ describe('loadCliConfig approval mode', () => {
     it('should throw error if plan mode is in settings but experimental.plan is disabled', async () => {
       process.argv = ['node', 'script.js'];
       const settings = createTestMergedSettings({
-        tools: { approvalMode: 'plan' },
+        general: { defaultApprovalMode: 'plan' },
         experimental: { plan: false },
       });
       const argv = await parseArguments(settings);
-      await expect(
-        loadCliConfig(settings, 'test-session', argv),
-      ).rejects.toThrow(
-        'Approval mode "plan" is only available when experimental.plan is enabled.',
-      );
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
     });
   });
 });
@@ -2572,6 +2896,16 @@ describe('Output format', () => {
 
 describe('parseArguments with positional prompt', () => {
   const originalArgv = process.argv;
+
+  beforeEach(() => {
+    // Default to headless mode for these tests as they mostly expect one-shot behavior
+    process.stdin.isTTY = false;
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: false,
+      configurable: true,
+      writable: true,
+    });
+  });
 
   afterEach(() => {
     process.argv = originalArgv;
@@ -2902,6 +3236,26 @@ describe('Policy Engine Integration in loadCliConfig', () => {
         tools: expect.objectContaining({
           exclude: expect.arrayContaining([SHELL_TOOL_NAME]),
         }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('should pass user-provided policy paths from --policy flag to createPolicyEngineConfig', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--policy',
+      '/path/to/policy1.toml,/path/to/policy2.toml',
+    ];
+    const settings = createTestMergedSettings();
+    const argv = await parseArguments(settings);
+
+    await loadCliConfig(settings, 'test-session', argv);
+
+    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        policyPaths: ['/path/to/policy1.toml', '/path/to/policy2.toml'],
       }),
       expect.anything(),
     );

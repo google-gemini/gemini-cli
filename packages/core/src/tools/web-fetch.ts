@@ -13,7 +13,7 @@ import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
-  ToolConfirmationOutcome,
+  type ToolConfirmationOutcome,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
@@ -27,12 +27,51 @@ import {
   logWebFetchFallbackAttempt,
   WebFetchFallbackAttemptEvent,
 } from '../telemetry/index.js';
+import { LlmRole } from '../telemetry/llmRole.js';
 import { WEB_FETCH_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { retryWithBackoff } from '../utils/retry.js';
+import { WEB_FETCH_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
+import { LRUCache } from 'mnemonist';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
+
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 10;
+const hostRequestHistory = new LRUCache<string, number[]>(1000);
+
+function checkRateLimit(url: string): {
+  allowed: boolean;
+  waitTimeMs?: number;
+} {
+  try {
+    const hostname = new URL(url).hostname;
+    const now = Date.now();
+    const windowStart = now - RATE_LIMIT_WINDOW_MS;
+
+    let history = hostRequestHistory.get(hostname) || [];
+    // Clean up old timestamps
+    history = history.filter((timestamp) => timestamp > windowStart);
+
+    if (history.length >= MAX_REQUESTS_PER_WINDOW) {
+      // Calculate wait time based on the oldest timestamp in the current window
+      const oldestTimestamp = history[0];
+      const waitTimeMs = oldestTimestamp + RATE_LIMIT_WINDOW_MS - now;
+      hostRequestHistory.set(hostname, history); // Update cleaned history
+      return { allowed: false, waitTimeMs: Math.max(0, waitTimeMs) };
+    }
+
+    history.push(now);
+    hostRequestHistory.set(hostname, history);
+    return { allowed: true };
+  } catch (_e) {
+    // If URL parsing fails, we fallback to allowed (should be caught by parsePrompt anyway)
+    return { allowed: true };
+  }
+}
 
 /**
  * Parses a prompt to extract valid URLs and identify malformed ones.
@@ -187,6 +226,7 @@ ${textContent}
         { model: 'web-fetch-fallback' },
         [{ role: 'user', parts: [{ text: fallbackPrompt }] }],
         signal,
+        LlmRole.UTILITY_TOOL,
       );
       const resultText = getResponseText(result) || '';
       return {
@@ -194,6 +234,7 @@ ${textContent}
         returnDisplay: `Content for ${url} processed using fallback fetch.`,
       };
     } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as Error;
       const errorMessage = `Error during fallback fetch for ${url}: ${error.message}`;
       return {
@@ -241,14 +282,9 @@ ${textContent}
       title: `Confirm Web Fetch`,
       prompt: this.params.prompt,
       urls,
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          // No need to publish a policy update as the default policy for
-          // AUTO_EDIT already reflects always approving web-fetch.
-          this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
-        } else {
-          await this.publishPolicyUpdate(outcome);
-        }
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // Mode transitions (e.g. AUTO_EDIT) and policy updates are now
+        // handled centrally by the scheduler.
       },
     };
     return confirmationDetails;
@@ -258,6 +294,23 @@ ${textContent}
     const userPrompt = this.params.prompt;
     const { validUrls: urls } = parsePrompt(userPrompt);
     const url = urls[0];
+
+    // Enforce rate limiting
+    const rateLimitResult = checkRateLimit(url);
+    if (!rateLimitResult.allowed) {
+      const waitTimeSecs = Math.ceil((rateLimitResult.waitTimeMs || 0) / 1000);
+      const errorMessage = `Rate limit exceeded for host. Please wait ${waitTimeSecs} seconds before trying again.`;
+      debugLogger.warn(`[WebFetchTool] Rate limit exceeded for ${url}`);
+      return {
+        llmContent: `Error: ${errorMessage}`,
+        returnDisplay: `Error: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.WEB_FETCH_PROCESSING_ERROR,
+        },
+      };
+    }
+
     const isPrivate = isPrivateIp(url);
 
     if (isPrivate) {
@@ -275,6 +328,7 @@ ${textContent}
         { model: 'web-fetch' },
         [{ role: 'user', parts: [{ text: userPrompt }] }],
         signal, // Pass signal
+        LlmRole.UTILITY_TOOL,
       );
 
       debugLogger.debug(
@@ -291,6 +345,7 @@ ${textContent}
       const sources = groundingMetadata?.groundingChunks as
         | GroundingChunkItem[]
         | undefined;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const groundingSupports = groundingMetadata?.groundingSupports as
         | GroundingSupportItem[]
         | undefined;
@@ -412,19 +467,9 @@ export class WebFetchTool extends BaseDeclarativeTool<
     super(
       WebFetchTool.Name,
       'WebFetch',
-      "Processes content from URL(s), including local and private network addresses (e.g., localhost), embedded in a prompt. Include up to 20 URLs and instructions (e.g., summarize, extract specific data) directly in the 'prompt' parameter.",
+      WEB_FETCH_DEFINITION.base.description!,
       Kind.Fetch,
-      {
-        properties: {
-          prompt: {
-            description:
-              'A comprehensive prompt that includes the URL(s) (up to 20) to fetch and specific instructions on how to process their content (e.g., "Summarize https://example.com/article and extract key points from https://another.com/data"). All URLs to be fetched must be valid and complete, starting with "http://" or "https://", and be fully-formed with a valid hostname (e.g., a domain name like "example.com" or an IP address). For example, "https://example.com" is valid, but "example.com" is not.',
-            type: 'string',
-          },
-        },
-        required: ['prompt'],
-        type: 'object',
-      },
+      WEB_FETCH_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
@@ -464,5 +509,9 @@ export class WebFetchTool extends BaseDeclarativeTool<
       _toolName,
       _toolDisplayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(WEB_FETCH_DEFINITION, modelId);
   }
 }

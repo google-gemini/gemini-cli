@@ -4,28 +4,56 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Centralized constants for tool names.
-// This prevents circular dependencies that can occur when other modules (like agents)
-// need to reference a tool's name without importing the tool's implementation.
+import {
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
+  LS_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  EDIT_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
+  WRITE_TODOS_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
+  READ_MANY_FILES_TOOL_NAME,
+  MEMORY_TOOL_NAME,
+  GET_INTERNAL_DOCS_TOOL_NAME,
+  ACTIVATE_SKILL_TOOL_NAME,
+  ASK_USER_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+} from './definitions/coreTools.js';
 
-export const GLOB_TOOL_NAME = 'glob';
-export const WRITE_TODOS_TOOL_NAME = 'write_todos';
-export const WRITE_FILE_TOOL_NAME = 'write_file';
-export const WEB_SEARCH_TOOL_NAME = 'google_web_search';
-export const WEB_FETCH_TOOL_NAME = 'web_fetch';
-export const EDIT_TOOL_NAME = 'replace';
-export const SHELL_TOOL_NAME = 'run_shell_command';
-export const GREP_TOOL_NAME = 'grep_search';
-export const READ_MANY_FILES_TOOL_NAME = 'read_many_files';
-export const READ_FILE_TOOL_NAME = 'read_file';
-export const LS_TOOL_NAME = 'list_directory';
-export const MEMORY_TOOL_NAME = 'save_memory';
-export const GET_INTERNAL_DOCS_TOOL_NAME = 'get_internal_docs';
-export const ACTIVATE_SKILL_TOOL_NAME = 'activate_skill';
+export {
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
+  LS_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  EDIT_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
+  WRITE_TODOS_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
+  READ_MANY_FILES_TOOL_NAME,
+  MEMORY_TOOL_NAME,
+  GET_INTERNAL_DOCS_TOOL_NAME,
+  ACTIVATE_SKILL_TOOL_NAME,
+  ASK_USER_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+};
+
+export const LS_TOOL_NAME_LEGACY = 'list_directory'; // Just to be safe if anything used the old exported name directly
+
 export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
-export const ASK_USER_TOOL_NAME = 'ask_user';
+
+// Tool Display Names
+export const WRITE_FILE_DISPLAY_NAME = 'WriteFile';
+export const EDIT_DISPLAY_NAME = 'Edit';
 export const ASK_USER_DISPLAY_NAME = 'Ask User';
-export const EXIT_PLAN_MODE_TOOL_NAME = 'exit_plan_mode';
+export const READ_FILE_DISPLAY_NAME = 'ReadFile';
+export const GLOB_DISPLAY_NAME = 'FindFiles';
 
 /**
  * Mapping of legacy tool names to their current names.
@@ -79,6 +107,9 @@ export const ALL_BUILTIN_TOOL_NAMES = [
   MEMORY_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
+  GET_INTERNAL_DOCS_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
 ] as const;
 
 /**
@@ -93,6 +124,7 @@ export const PLAN_MODE_TOOLS = [
   LS_TOOL_NAME,
   WEB_SEARCH_TOOL_NAME,
   ASK_USER_TOOL_NAME,
+  ACTIVATE_SKILL_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
 ] as const;
 

@@ -1,98 +1,102 @@
 # Gemini CLI tools
 
-The Gemini CLI includes built-in tools that the Gemini model uses to interact
-with your local environment, access information, and perform actions. These
-tools enhance the CLI's capabilities, enabling it to go beyond text generation
-and assist with a wide range of tasks.
+Gemini CLI uses tools to interact with your local environment, access
+information, and perform actions on your behalf. These tools extend the model's
+capabilities beyond text generation, letting it read files, execute commands,
+and search the web.
 
-## Overview of Gemini CLI tools
+## User-triggered tools
 
-In the context of the Gemini CLI, tools are specific functions or modules that
-the Gemini model can request to be executed. For example, if you ask Gemini to
-"Summarize the contents of `my_document.txt`," the model will likely identify
-the need to read that file and will request the execution of the `read_file`
-tool.
+You can directly trigger these tools using special syntax in your prompts.
 
-The core component (`packages/core`) manages these tools, presents their
-definitions (schemas) to the Gemini model, executes them when requested, and
-returns the results to the model for further processing into a user-facing
-response.
+- **[File access](./file-system.md#read_many_files) (`@`):** Use the `@` symbol
+  followed by a file or directory path to include its content in your prompt.
+  This triggers the `read_many_files` tool.
+- **[Shell commands](./shell.md) (`!`):** Use the `!` symbol followed by a
+  system command to execute it directly. This triggers the `run_shell_command`
+  tool.
 
-These tools provide the following capabilities:
+## Model-triggered tools
 
-- **Access local information:** Tools allow Gemini to access your local file
-  system, read file contents, list directories, etc.
-- **Execute commands:** With tools like `run_shell_command`, Gemini can run
-  shell commands (with appropriate safety measures and user confirmation).
-- **Interact with the web:** Tools can fetch content from URLs.
-- **Take actions:** Tools can modify files, write new files, or perform other
-  actions on your system (again, typically with safeguards).
-- **Ground responses:** By using tools to fetch real-time or specific local
-  data, Gemini's responses can be more accurate, relevant, and grounded in your
-  actual context.
+The Gemini model automatically requests these tools when it needs to perform
+specific actions or gather information to fulfill your requests. You do not call
+these tools manually.
 
-## How to use Gemini CLI tools
+### File management
 
-To use Gemini CLI tools, provide a prompt to the Gemini CLI. The process works
-as follows:
+These tools let the model explore and modify your local codebase.
 
-1.  You provide a prompt to the Gemini CLI.
-2.  The CLI sends the prompt to the core.
-3.  The core, along with your prompt and conversation history, sends a list of
-    available tools and their descriptions/schemas to the Gemini API.
-4.  The Gemini model analyzes your request. If it determines that a tool is
-    needed, its response will include a request to execute a specific tool with
-    certain parameters.
-5.  The core receives this tool request, validates it, and (often after user
-    confirmation for sensitive operations) executes the tool.
-6.  The output from the tool is sent back to the Gemini model.
-7.  The Gemini model uses the tool's output to formulate its final answer, which
-    is then sent back through the core to the CLI and displayed to you.
+- **[Directory listing](./file-system.md#list_directory) (`list_directory`):**
+  Lists files and subdirectories.
+- **[File reading](./file-system.md#read_file) (`read_file`):** Reads the
+  content of a specific file.
+- **[File writing](./file-system.md#write_file) (`write_file`):** Creates or
+  overwrites a file with new content.
+- **[File search](./file-system.md#glob) (`glob`):** Finds files matching a glob
+  pattern.
+- **[Text search](./file-system.md#search_file_content)
+  (`search_file_content`):** Searches for text within files using grep or
+  ripgrep.
+- **[Text replacement](./file-system.md#replace) (`replace`):** Performs precise
+  edits within a file.
 
-You will typically see messages in the CLI indicating when a tool is being
-called and whether it succeeded or failed.
+### Agent coordination
+
+These tools help the model manage its plan and interact with you.
+
+- **Ask user (`ask_user`):** Requests clarification or missing information from
+  you via an interactive dialog.
+- **[Memory](./memory.md) (`save_memory`):** Saves important facts to your
+  long-term memory (`GEMINI.md`).
+- **[Todos](./todos.md) (`write_todos`):** Manages a list of subtasks for
+  complex plans.
+- **[Agent Skills](../cli/skills.md) (`activate_skill`):** Loads specialized
+  procedural expertise when needed.
+- **Internal docs (`get_internal_docs`):** Accesses Gemini CLI's own
+  documentation to help answer your questions.
+
+### Information gathering
+
+These tools provide the model with access to external data.
+
+- **[Web fetch](./web-fetch.md) (`web_fetch`):** Retrieves and processes content
+  from specific URLs.
+- **[Web search](./web-search.md) (`google_web_search`):** Performs a Google
+  Search to find up-to-date information.
+
+## How to use tools
+
+You use tools indirectly by providing natural language prompts to Gemini CLI.
+
+1.  **Prompt:** You enter a request or use syntax like `@` or `!`.
+2.  **Request:** The model analyzes your request and identifies if a tool is
+    required.
+3.  **Validation:** If a tool is needed, the CLI validates the parameters and
+    checks your security settings.
+4.  **Confirmation:** For sensitive operations (like writing files), the CLI
+    prompts you for approval.
+5.  **Execution:** The tool runs, and its output is sent back to the model.
+6.  **Response:** The model uses the results to generate a final, grounded
+    answer.
 
 ## Security and confirmation
 
-Many tools, especially those that can modify your file system or execute
-commands (`write_file`, `edit`, `run_shell_command`), are designed with safety
-in mind. The Gemini CLI will typically:
+Safety is a core part of the tool system. To protect your system, Gemini CLI
+implements several safeguards.
 
-- **Require confirmation:** Prompt you before executing potentially sensitive
-  operations, showing you what action is about to be taken.
-- **Utilize sandboxing:** All tools are subject to restrictions enforced by
-  sandboxing (see [Sandboxing in the Gemini CLI](../cli/sandbox.md)). This means
-  that when operating in a sandbox, any tools (including MCP servers) you wish
-  to use must be available _inside_ the sandbox environment. For example, to run
-  an MCP server through `npx`, the `npx` executable must be installed within the
-  sandbox's Docker image or be available in the `sandbox-exec` environment.
+- **User confirmation:** You must manually approve tools that modify files or
+  execute shell commands. The CLI shows you a diff or the exact command before
+  you confirm.
+- **Sandboxing:** You can run tool executions in secure, containerized
+  environments to isolate changes from your host system. For more details, see
+  the [Sandboxing](../cli/sandbox.md) guide.
+- **Trusted folders:** You can configure which directories allow the model to
+  use system tools.
 
-It's important to always review confirmation prompts carefully before allowing a
-tool to proceed.
+Always review confirmation prompts carefully before allowing a tool to execute.
 
-## Learn more about Gemini CLI's tools
+## Next steps
 
-Gemini CLI's built-in tools can be broadly categorized as follows:
-
-- **[File System Tools](./file-system.md):** For interacting with files and
-  directories (reading, writing, listing, searching, etc.).
-- **[Shell Tool](./shell.md) (`run_shell_command`):** For executing shell
-  commands.
-- **[Web Fetch Tool](./web-fetch.md) (`web_fetch`):** For retrieving content
-  from URLs.
-- **[Web Search Tool](./web-search.md) (`google_web_search`):** For searching
-  the web.
-- **[Memory Tool](./memory.md) (`save_memory`):** For saving and recalling
-  information across sessions.
-- **[Todo Tool](./todos.md) (`write_todos`):** For managing subtasks of complex
-  requests.
-
-Additionally, these tools incorporate:
-
-- **[MCP servers](./mcp-server.md)**: MCP servers act as a bridge between the
-  Gemini model and your local environment or other services like APIs.
-- **[Agent Skills](../cli/skills.md)**: On-demand expertise packages that are
-  activated via the `activate_skill` tool to provide specialized guidance and
-  resources.
-- **[Sandboxing](../cli/sandbox.md)**: Sandboxing isolates the model and its
-  changes from your environment to reduce potential risk.
+- Learn how to [Provide context](../cli/gemini-md.md) to guide tool use.
+- Explore the [Command reference](../reference/commands.md) for tool-related
+  slash commands.

@@ -28,7 +28,7 @@ import type { Config } from '../config/config.js';
 import {
   resolveModel,
   isGemini2Model,
-  isPreviewModel,
+  supportsModernFeatures,
 } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
@@ -55,6 +55,7 @@ import {
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
 import { coreEvents } from '../utils/events.js';
+import type { LlmRole } from '../telemetry/types.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -247,6 +248,7 @@ export class GeminiChat {
     private tools: Tool[] = [],
     private history: Content[] = [],
     resumedSessionData?: ResumedSessionData,
+    private readonly onModelChanged?: (modelId: string) => Promise<Tool[]>,
   ) {
     validateHistory(history);
     this.chatRecordingService = new ChatRecordingService(config);
@@ -291,6 +293,7 @@ export class GeminiChat {
     message: PartListUnion,
     prompt_id: string,
     signal: AbortSignal,
+    role: LlmRole,
     displayContent?: PartListUnion,
   ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
@@ -361,6 +364,7 @@ export class GeminiChat {
               requestContents,
               prompt_id,
               signal,
+              role,
             );
             isConnectionPhase = false;
             for await (const chunk of stream) {
@@ -394,15 +398,22 @@ export class GeminiChat {
               return; // Stop the generator
             }
 
-            if (isConnectionPhase) {
-              throw error;
-            }
-            lastError = error;
-            const isContentError = error instanceof InvalidStreamError;
+            // Check if the error is retryable (e.g., transient SSL errors
+            // like ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC)
             const isRetryable = isRetryableError(
               error,
               this.config.getRetryFetchErrors(),
             );
+
+            // For connection phase errors, only retryable errors should continue
+            if (isConnectionPhase) {
+              if (!isRetryable || signal.aborted) {
+                throw error;
+              }
+              // Fall through to retry logic for retryable connection errors
+            }
+            lastError = error;
+            const isContentError = error instanceof InvalidStreamError;
 
             if (
               (isContentError && isGemini2Model(model)) ||
@@ -459,6 +470,7 @@ export class GeminiChat {
     requestContents: Content[],
     prompt_id: string,
     abortSignal: AbortSignal,
+    role: LlmRole,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const contentsForPreviewModel =
       this.ensureActiveLoopHasThoughtSignatures(requestContents);
@@ -484,19 +496,14 @@ export class GeminiChat {
     const initialActiveModel = this.config.getActiveModel();
 
     const apiCall = async () => {
+      const useGemini3_1 = (await this.config.getGemini31Launched?.()) ?? false;
       // Default to the last used model (which respects arguments/availability selection)
-      let modelToUse = resolveModel(
-        lastModelToUse,
-        this.config.getPreviewFeatures(),
-      );
+      let modelToUse = resolveModel(lastModelToUse, useGemini3_1);
 
       // If the active model has changed (e.g. due to a fallback updating the config),
       // we switch to the new active model.
       if (this.config.getActiveModel() !== initialActiveModel) {
-        modelToUse = resolveModel(
-          this.config.getActiveModel(),
-          this.config.getPreviewFeatures(),
-        );
+        modelToUse = resolveModel(this.config.getActiveModel(), useGemini3_1);
       }
 
       if (modelToUse !== lastModelToUse) {
@@ -518,7 +525,7 @@ export class GeminiChat {
         abortSignal,
       };
 
-      let contentsToUse = isPreviewModel(modelToUse)
+      let contentsToUse = supportsModernFeatures(modelToUse)
         ? contentsForPreviewModel
         : requestContents;
 
@@ -558,6 +565,7 @@ export class GeminiChat {
           beforeModelResult.modifiedContents &&
           Array.isArray(beforeModelResult.modifiedContents)
         ) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           contentsToUse = beforeModelResult.modifiedContents as Content[];
         }
 
@@ -575,8 +583,13 @@ export class GeminiChat {
           toolSelectionResult.tools &&
           Array.isArray(toolSelectionResult.tools)
         ) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           config.tools = toolSelectionResult.tools as Tool[];
         }
+      }
+
+      if (this.onModelChanged) {
+        this.tools = await this.onModelChanged(modelToUse);
       }
 
       // Track final request parameters for AfterModel hooks
@@ -591,6 +604,7 @@ export class GeminiChat {
           config,
         },
         prompt_id,
+        role,
       );
     };
 
@@ -698,6 +712,7 @@ export class GeminiChat {
     this.lastPromptTokenCount = estimateTokenCountSync(
       this.history.flatMap((c) => c.parts || []),
     );
+    this.chatRecordingService.updateMessagesFromHistory(history);
   }
 
   stripThoughtsFromHistory(): void {
@@ -813,6 +828,7 @@ export class GeminiChat {
         (candidate) => candidate.finishReason,
       );
       if (candidateWithReason) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         finishReason = candidateWithReason.finishReason as FinishReason;
       }
 

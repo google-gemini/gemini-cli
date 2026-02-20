@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 // Mock dependencies AT THE TOP
 const mockOpenBrowserSecurely = vi.hoisted(() => vi.fn());
@@ -36,8 +36,24 @@ vi.mock('../utils/events.js', () => ({
 vi.mock('../utils/authConsent.js', () => ({
   getConsentForOauth: vi.fn(() => Promise.resolve(true)),
 }));
+vi.mock('../utils/headless.js', () => ({
+  isHeadlessMode: vi.fn(() => false),
+}));
+vi.mock('node:readline', () => ({
+  default: {
+    createInterface: vi.fn(() => ({
+      question: vi.fn((_query, callback) => callback('')),
+      close: vi.fn(),
+      on: vi.fn(),
+    })),
+  },
+  createInterface: vi.fn(() => ({
+    question: vi.fn((_query, callback) => callback('')),
+    close: vi.fn(),
+    on: vi.fn(),
+  })),
+}));
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as http from 'node:http';
 import * as crypto from 'node:crypto';
 import type {
@@ -127,6 +143,7 @@ describe('MCPOAuthProvider', () => {
     clientId: 'test-client-id',
     clientSecret: 'test-client-secret',
     authorizationUrl: 'https://auth.example.com/authorize',
+    issuer: 'https://auth.example.com',
     tokenUrl: 'https://auth.example.com/token',
     scopes: ['read', 'write'],
     redirectUri: 'http://localhost:7777/oauth/callback',
@@ -620,6 +637,27 @@ describe('MCPOAuthProvider', () => {
           headers: { 'Content-Type': 'application/json' },
         }),
       );
+    });
+
+    it('should throw error when issuer is missing and dynamic registration is needed', async () => {
+      const configWithoutIssuer: MCPOAuthConfig = {
+        enabled: mockConfig.enabled,
+        authorizationUrl: mockConfig.authorizationUrl,
+        tokenUrl: mockConfig.tokenUrl,
+        scopes: mockConfig.scopes,
+        redirectUri: mockConfig.redirectUri,
+        audiences: mockConfig.audiences,
+      };
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+      });
+
+      const authProvider = new MCPOAuthProvider();
+
+      await expect(
+        authProvider.authenticate('test-server', configWithoutIssuer),
+      ).rejects.toThrow('Cannot perform dynamic registration without issuer');
     });
 
     it('should handle OAuth callback errors', async () => {

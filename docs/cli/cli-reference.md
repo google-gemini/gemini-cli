@@ -1,4 +1,4 @@
-# CLI cheatsheet
+# Gemini CLI cheatsheet
 
 This page provides a reference for commonly used Gemini CLI commands, options,
 and parameters.
@@ -9,8 +9,7 @@ and parameters.
 | ---------------------------------- | ---------------------------------- | --------------------------------------------------- |
 | `gemini`                           | Start interactive REPL             | `gemini`                                            |
 | `gemini "query"`                   | Query non-interactively, then exit | `gemini "explain this project"`                     |
-| `gemini -p "query"`                | Query via SDK, then exit           | `gemini -p "explain this function"`                 |
-| `cat file \| gemini -p "query"`    | Process piped content              | `cat logs.txt \| gemini -p "explain"`               |
+| `cat file \| gemini`               | Process piped content              | `cat logs.txt \| gemini`                            |
 | `gemini -i "query"`                | Execute and continue interactively | `gemini -i "What is the purpose of this project?"`  |
 | `gemini -r "latest"`               | Continue most recent session       | `gemini -r "latest"`                                |
 | `gemini -r "latest" "query"`       | Continue session with a new prompt | `gemini -r "latest" "Check for type errors"`        |
@@ -27,34 +26,34 @@ and parameters.
 
 ## CLI Options
 
-| Option                           | Alias | Type    | Default   | Description                                                                                                |
-| -------------------------------- | ----- | ------- | --------- | ---------------------------------------------------------------------------------------------------------- |
-| `--debug`                        | `-d`  | boolean | `false`   | Run in debug mode with verbose logging                                                                     |
-| `--version`                      | `-v`  | -       | -         | Show CLI version number and exit                                                                           |
-| `--help`                         | `-h`  | -       | -         | Show help information                                                                                      |
-| `--model`                        | `-m`  | string  | `auto`    | Model to use. See [Model Selection](#model-selection) for available values.                                |
-| `--prompt`                       | `-p`  | string  | -         | Prompt text. Appended to stdin input if provided. **Deprecated:** Use positional arguments instead.        |
-| `--prompt-interactive`           | `-i`  | string  | -         | Execute prompt and continue in interactive mode                                                            |
-| `--sandbox`                      | `-s`  | boolean | `false`   | Run in a sandboxed environment for safer execution                                                         |
-| `--approval-mode`                | -     | string  | `default` | Approval mode for tool execution. Choices: `default`, `auto_edit`, `yolo`                                  |
-| `--yolo`                         | `-y`  | boolean | `false`   | **Deprecated.** Auto-approve all actions. Use `--approval-mode=yolo` instead.                              |
-| `--experimental-acp`             | -     | boolean | -         | Start in ACP (Agent Code Pilot) mode. **Experimental feature.**                                            |
-| `--experimental-zed-integration` | -     | boolean | -         | Run in Zed editor integration mode. **Experimental feature.**                                              |
-| `--allowed-mcp-server-names`     | -     | array   | -         | Allowed MCP server names (comma-separated or multiple flags)                                               |
-| `--allowed-tools`                | -     | array   | -         | Tools that are allowed to run without confirmation (comma-separated or multiple flags)                     |
-| `--extensions`                   | `-e`  | array   | -         | List of extensions to use. If not provided, all extensions are enabled (comma-separated or multiple flags) |
-| `--list-extensions`              | `-l`  | boolean | -         | List all available extensions and exit                                                                     |
-| `--resume`                       | `-r`  | string  | -         | Resume a previous session. Use `"latest"` for most recent or index number (e.g. `--resume 5`)              |
-| `--list-sessions`                | -     | boolean | -         | List available sessions for the current project and exit                                                   |
-| `--delete-session`               | -     | string  | -         | Delete a session by index number (use `--list-sessions` to see available sessions)                         |
-| `--include-directories`          | -     | array   | -         | Additional directories to include in the workspace (comma-separated or multiple flags)                     |
-| `--screen-reader`                | -     | boolean | -         | Enable screen reader mode for accessibility                                                                |
-| `--output-format`                | `-o`  | string  | `text`    | The format of the CLI output. Choices: `text`, `json`, `stream-json`                                       |
+| Option                           | Alias | Type    | Default   | Description                                                                                                                                                            |
+| -------------------------------- | ----- | ------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--debug`                        | `-d`  | boolean | `false`   | Run in debug mode with verbose logging                                                                                                                                 |
+| `--version`                      | `-v`  | -       | -         | Show CLI version number and exit                                                                                                                                       |
+| `--help`                         | `-h`  | -       | -         | Show help information                                                                                                                                                  |
+| `--model`                        | `-m`  | string  | `auto`    | Model to use. See [Model Selection](#model-selection) for available values.                                                                                            |
+| `--prompt`                       | `-p`  | string  | -         | Prompt text. Appended to stdin input if provided. **Deprecated:** Use positional arguments instead.                                                                    |
+| `--prompt-interactive`           | `-i`  | string  | -         | Execute prompt and continue in interactive mode                                                                                                                        |
+| `--sandbox`                      | `-s`  | boolean | `false`   | Run in a sandboxed environment for safer execution                                                                                                                     |
+| `--approval-mode`                | -     | string  | `default` | Approval mode for tool execution. Choices: `default`, `auto_edit`, `yolo`                                                                                              |
+| `--yolo`                         | `-y`  | boolean | `false`   | **Deprecated.** Auto-approve all actions. Use `--approval-mode=yolo` instead.                                                                                          |
+| `--experimental-acp`             | -     | boolean | -         | Start in ACP (Agent Code Pilot) mode. **Experimental feature.**                                                                                                        |
+| `--experimental-zed-integration` | -     | boolean | -         | Run in Zed editor integration mode. **Experimental feature.**                                                                                                          |
+| `--allowed-mcp-server-names`     | -     | array   | -         | Allowed MCP server names (comma-separated or multiple flags)                                                                                                           |
+| `--allowed-tools`                | -     | array   | -         | **Deprecated.** Use the [Policy Engine](../reference/policy-engine.md) instead. Tools that are allowed to run without confirmation (comma-separated or multiple flags) |
+| `--extensions`                   | `-e`  | array   | -         | List of extensions to use. If not provided, all extensions are enabled (comma-separated or multiple flags)                                                             |
+| `--list-extensions`              | `-l`  | boolean | -         | List all available extensions and exit                                                                                                                                 |
+| `--resume`                       | `-r`  | string  | -         | Resume a previous session. Use `"latest"` for most recent or index number (e.g. `--resume 5`)                                                                          |
+| `--list-sessions`                | -     | boolean | -         | List available sessions for the current project and exit                                                                                                               |
+| `--delete-session`               | -     | string  | -         | Delete a session by index number (use `--list-sessions` to see available sessions)                                                                                     |
+| `--include-directories`          | -     | array   | -         | Additional directories to include in the workspace (comma-separated or multiple flags)                                                                                 |
+| `--screen-reader`                | -     | boolean | -         | Enable screen reader mode for accessibility                                                                                                                            |
+| `--output-format`                | `-o`  | string  | `text`    | The format of the CLI output. Choices: `text`, `json`, `stream-json`                                                                                                   |
 
 ## Model selection
 
-The `--model` (or `-m`) flag allows you to specify which Gemini model to use.
-You can use either model aliases (user-friendly names) or concrete model names.
+The `--model` (or `-m`) flag lets you specify which Gemini model to use. You can
+use either model aliases (user-friendly names) or concrete model names.
 
 ### Model aliases
 
@@ -99,3 +98,18 @@ See [Extensions Documentation](../extensions/index.md) for more details.
 | `gemini mcp list`                                             | List all configured MCP servers | `gemini mcp list`                                                                                    |
 
 See [MCP Server Integration](../tools/mcp-server.md) for more details.
+
+## Skills management
+
+| Command                          | Description                           | Example                                           |
+| -------------------------------- | ------------------------------------- | ------------------------------------------------- |
+| `gemini skills list`             | List all discovered agent skills      | `gemini skills list`                              |
+| `gemini skills install <source>` | Install skill from Git, path, or file | `gemini skills install https://github.com/u/repo` |
+| `gemini skills link <path>`      | Link local agent skills via symlink   | `gemini skills link /path/to/my-skills`           |
+| `gemini skills uninstall <name>` | Uninstall an agent skill              | `gemini skills uninstall my-skill`                |
+| `gemini skills enable <name>`    | Enable an agent skill                 | `gemini skills enable my-skill`                   |
+| `gemini skills disable <name>`   | Disable an agent skill                | `gemini skills disable my-skill`                  |
+| `gemini skills enable --all`     | Enable all skills                     | `gemini skills enable --all`                      |
+| `gemini skills disable --all`    | Disable all skills                    | `gemini skills disable --all`                     |
+
+See [Agent Skills Documentation](./skills.md) for more details.

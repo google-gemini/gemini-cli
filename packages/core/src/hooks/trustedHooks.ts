@@ -34,6 +34,7 @@ export class TrustedHooksManager {
     try {
       if (fs.existsSync(this.configPath)) {
         const content = fs.readFileSync(this.configPath, 'utf-8');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         this.trustedHooks = JSON.parse(content);
       }
     } catch (error) {
@@ -71,6 +72,7 @@ export class TrustedHooksManager {
     const untrusted: string[] = [];
 
     for (const eventName of Object.keys(hooks)) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const definitions = hooks[eventName as HookEventName];
       if (!Array.isArray(definitions)) continue;
 
@@ -99,6 +101,7 @@ export class TrustedHooksManager {
     const currentTrusted = new Set(this.trustedHooks[projectPath] || []);
 
     for (const eventName of Object.keys(hooks)) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const definitions = hooks[eventName as HookEventName];
       if (!Array.isArray(definitions)) continue;
 

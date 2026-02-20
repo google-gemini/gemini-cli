@@ -54,7 +54,7 @@ Gemini CLI offers several ways to configure its behavior, including environment
 variables, command-line arguments, and settings files.
 
 To explore your configuration options, see
-[Gemini CLI Configuration](./configuration.md).
+[Gemini CLI Configuration](../reference/configuration.md).
 
 ## Use
 
@@ -64,8 +64,9 @@ and more.
 
 To explore the power of Gemini CLI, see [Gemini CLI examples](./examples.md).
 
-## What's next?
+## Next steps
 
-- Find out more about [Gemini CLI's tools](../tools/index.md).
-- Review [Gemini CLI's commands](../cli/commands.md).
-- Learn how to [get started with Gemini 3](./gemini-3.md).
+- Follow the [File management](../cli/tutorials/file-management.md) guide to
+  start working with your codebase.
+- See [Shell commands](../cli/tutorials/shell-commands.md) to learn about
+  terminal integration.

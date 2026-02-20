@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -30,8 +30,9 @@ import type {
 import type { ContentGenerator } from './contentGenerator.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
 import type { Config } from '../config/config.js';
-import { ApiRequestEvent } from '../telemetry/types.js';
 import { UserTierId } from '../code_assist/types.js';
+import { ApiRequestEvent, LlmRole } from '../telemetry/types.js';
+import { FatalAuthenticationError } from '../utils/errors.js';
 
 describe('LoggingContentGenerator', () => {
   let wrapped: ContentGenerator;
@@ -51,6 +52,7 @@ describe('LoggingContentGenerator', () => {
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: 'API_KEY',
       }),
+      refreshUserQuotaIfStale: vi.fn().mockResolvedValue(undefined),
     } as unknown as Config;
     loggingContentGenerator = new LoggingContentGenerator(wrapped, config);
     vi.useFakeTimers();
@@ -88,13 +90,18 @@ describe('LoggingContentGenerator', () => {
       const promise = loggingContentGenerator.generateContent(
         req,
         userPromptId,
+        LlmRole.MAIN,
       );
 
       vi.advanceTimersByTime(1000);
 
       await promise;
 
-      expect(wrapped.generateContent).toHaveBeenCalledWith(req, userPromptId);
+      expect(wrapped.generateContent).toHaveBeenCalledWith(
+        req,
+        userPromptId,
+        LlmRole.MAIN,
+      );
       expect(logApiRequest).toHaveBeenCalledWith(
         config,
         expect.any(ApiRequestEvent),
@@ -117,6 +124,7 @@ describe('LoggingContentGenerator', () => {
       const promise = loggingContentGenerator.generateContent(
         req,
         userPromptId,
+        LlmRole.MAIN,
       );
 
       vi.advanceTimersByTime(1000);
@@ -129,6 +137,19 @@ describe('LoggingContentGenerator', () => {
       );
       const errorEvent = vi.mocked(logApiError).mock.calls[0][1];
       expect(errorEvent.duration_ms).toBe(1000);
+    });
+
+    describe('error type extraction', () => {
+      it('should extract error type correctly', async () => {
+        const req = { contents: [], model: 'm' };
+        const error = new FatalAuthenticationError('test');
+        vi.mocked(wrapped.generateContent).mockRejectedValue(error);
+        await expect(
+          loggingContentGenerator.generateContent(req, 'id', LlmRole.MAIN),
+        ).rejects.toThrow();
+        const errorEvent = vi.mocked(logApiError).mock.calls[0][1];
+        expect(errorEvent.error_type).toBe('FatalAuthenticationError');
+      });
     });
   });
 
@@ -155,12 +176,17 @@ describe('LoggingContentGenerator', () => {
       vi.mocked(wrapped.generateContentStream).mockResolvedValue(
         createAsyncGenerator(),
       );
+
       const startTime = new Date('2025-01-01T00:00:00.000Z');
+
       vi.setSystemTime(startTime);
 
       const stream = await loggingContentGenerator.generateContentStream(
         req,
+
         userPromptId,
+
+        LlmRole.MAIN,
       );
 
       vi.advanceTimersByTime(1000);
@@ -172,6 +198,7 @@ describe('LoggingContentGenerator', () => {
       expect(wrapped.generateContentStream).toHaveBeenCalledWith(
         req,
         userPromptId,
+        LlmRole.MAIN,
       );
       expect(logApiRequest).toHaveBeenCalledWith(
         config,
@@ -202,6 +229,7 @@ describe('LoggingContentGenerator', () => {
       const stream = await loggingContentGenerator.generateContentStream(
         req,
         userPromptId,
+        LlmRole.MAIN,
       );
 
       vi.advanceTimersByTime(1000);
@@ -239,6 +267,7 @@ describe('LoggingContentGenerator', () => {
       await loggingContentGenerator.generateContentStream(
         req,
         mainAgentPromptId,
+        LlmRole.MAIN,
       );
 
       expect(config.setLatestApiRequest).toHaveBeenCalledWith(req);
@@ -263,6 +292,7 @@ describe('LoggingContentGenerator', () => {
       await loggingContentGenerator.generateContentStream(
         req,
         subAgentPromptId,
+        LlmRole.SUBAGENT,
       );
 
       expect(config.setLatestApiRequest).not.toHaveBeenCalled();

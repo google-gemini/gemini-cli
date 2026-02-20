@@ -15,6 +15,7 @@ import {
   DEFAULT_MAX_TURNS,
   DEFAULT_MAX_TIME_MINUTES,
 } from './types.js';
+import type { A2AAuthConfig } from './auth-provider/types.js';
 import { isValidToolName } from '../tools/tool-names.js';
 import { FRONTMATTER_REGEX } from '../skills/skillLoader.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -39,11 +40,28 @@ interface FrontmatterLocalAgentDefinition
   timeout_mins?: number;
 }
 
+/**
+ * Authentication configuration for remote agents in frontmatter format.
+ */
+interface FrontmatterAuthConfig {
+  type: 'apiKey' | 'http';
+  agent_card_requires_auth?: boolean;
+  // API Key
+  key?: string;
+  name?: string;
+  // HTTP
+  scheme?: 'Bearer' | 'Basic';
+  token?: string;
+  username?: string;
+  password?: string;
+}
+
 interface FrontmatterRemoteAgentDefinition
   extends FrontmatterBaseAgentDefinition {
   kind: 'remote';
   description?: string;
   agent_card_url: string;
+  auth?: FrontmatterAuthConfig;
 }
 
 type FrontmatterAgentDefinition =
@@ -95,6 +113,68 @@ const localAgentSchema = z
   })
   .strict();
 
+/**
+ * Base fields shared by all auth configs.
+ */
+const baseAuthFields = {
+  agent_card_requires_auth: z.boolean().optional(),
+};
+
+/**
+ * API Key auth schema.
+ * Supports sending key in header, query parameter, or cookie.
+ */
+const apiKeyAuthSchema = z.object({
+  ...baseAuthFields,
+  type: z.literal('apiKey'),
+  key: z.string().min(1, 'API key is required'),
+  name: z.string().optional(),
+});
+
+/**
+ * HTTP auth schema (Bearer or Basic).
+ * Note: Validation for scheme-specific fields is applied in authConfigSchema
+ * since discriminatedUnion doesn't support refined schemas directly.
+ */
+const httpAuthSchema = z.object({
+  ...baseAuthFields,
+  type: z.literal('http'),
+  scheme: z.enum(['Bearer', 'Basic']),
+  token: z.string().min(1).optional(),
+  username: z.string().min(1).optional(),
+  password: z.string().min(1).optional(),
+});
+
+const authConfigSchema = z
+  .discriminatedUnion('type', [apiKeyAuthSchema, httpAuthSchema])
+  .superRefine((data, ctx) => {
+    if (data.type === 'http') {
+      if (data.scheme === 'Bearer' && !data.token) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Bearer scheme requires "token"',
+          path: ['token'],
+        });
+      }
+      if (data.scheme === 'Basic') {
+        if (!data.username) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Basic authentication requires "username"',
+            path: ['username'],
+          });
+        }
+        if (!data.password) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Basic authentication requires "password"',
+            path: ['password'],
+          });
+        }
+      }
+    }
+  });
+
 const remoteAgentSchema = z
   .object({
     kind: z.literal('remote').optional().default('remote'),
@@ -102,6 +182,7 @@ const remoteAgentSchema = z
     description: z.string().optional(),
     display_name: z.string().optional(),
     agent_card_url: z.string().url(),
+    auth: authConfigSchema.optional(),
   })
   .strict();
 
@@ -185,6 +266,7 @@ export async function parseAgentMarkdown(
   } catch (error) {
     throw new AgentLoadError(
       filePath,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       `YAML frontmatter parsing failed: ${(error as Error).message}`,
     );
   }
@@ -238,6 +320,75 @@ export async function parseAgentMarkdown(
 }
 
 /**
+ * Converts frontmatter auth config to the internal A2AAuthConfig type.
+ * This handles the mapping from snake_case YAML to the internal type structure.
+ */
+function convertFrontmatterAuthToConfig(
+  frontmatter: FrontmatterAuthConfig,
+): A2AAuthConfig {
+  const base = {
+    agent_card_requires_auth: frontmatter.agent_card_requires_auth,
+  };
+
+  switch (frontmatter.type) {
+    case 'apiKey':
+      if (!frontmatter.key) {
+        throw new Error('Internal error: API key missing after validation.');
+      }
+      return {
+        ...base,
+        type: 'apiKey',
+        key: frontmatter.key,
+        name: frontmatter.name,
+      };
+
+    case 'http': {
+      if (!frontmatter.scheme) {
+        throw new Error(
+          'Internal error: HTTP scheme missing after validation.',
+        );
+      }
+      switch (frontmatter.scheme) {
+        case 'Bearer':
+          if (!frontmatter.token) {
+            throw new Error(
+              'Internal error: Bearer token missing after validation.',
+            );
+          }
+          return {
+            ...base,
+            type: 'http',
+            scheme: 'Bearer',
+            token: frontmatter.token,
+          };
+        case 'Basic':
+          if (!frontmatter.username || !frontmatter.password) {
+            throw new Error(
+              'Internal error: Basic auth credentials missing after validation.',
+            );
+          }
+          return {
+            ...base,
+            type: 'http',
+            scheme: 'Basic',
+            username: frontmatter.username,
+            password: frontmatter.password,
+          };
+        default: {
+          const exhaustive: never = frontmatter.scheme;
+          throw new Error(`Unknown HTTP scheme: ${exhaustive}`);
+        }
+      }
+    }
+
+    default: {
+      const exhaustive: never = frontmatter.type;
+      throw new Error(`Unknown auth type: ${exhaustive}`);
+    }
+  }
+}
+
+/**
  * Converts a FrontmatterAgentDefinition DTO to the internal AgentDefinition structure.
  *
  * @param markdown The parsed Markdown/Frontmatter definition.
@@ -269,6 +420,9 @@ export function markdownToAgentDefinition(
       description: markdown.description || '(Loading description...)',
       displayName: markdown.display_name,
       agentCardUrl: markdown.agent_card_url,
+      auth: markdown.auth
+        ? convertFrontmatterAuthToConfig(markdown.auth)
+        : undefined,
       inputConfig,
       metadata,
     };
@@ -328,12 +482,14 @@ export async function loadAgentsFromDirectory(
     dirEntries = await fs.readdir(dir, { withFileTypes: true });
   } catch (error) {
     // If directory doesn't exist, just return empty
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return result;
     }
     result.errors.push(
       new AgentLoadError(
         dir,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         `Could not list directory: ${(error as Error).message}`,
       ),
     );
@@ -364,6 +520,7 @@ export async function loadAgentsFromDirectory(
         result.errors.push(
           new AgentLoadError(
             filePath,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             `Unexpected error: ${(error as Error).message}`,
           ),
         );

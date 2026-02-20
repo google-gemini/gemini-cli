@@ -22,6 +22,16 @@
         "$ref": "#/$defs/MCPServerConfig"
       }
     },
+    "policyPaths": {
+      "title": "Policy Paths",
+      "description": "Additional policy files or directories to load.",
+      "markdownDescription": "Additional policy files or directories to load.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `[]`",
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "general": {
       "title": "General",
       "description": "General application settings.",
@@ -29,13 +39,6 @@
       "default": {},
       "type": "object",
       "properties": {
-        "previewFeatures": {
-          "title": "Preview Features (e.g., models)",
-          "description": "Enable preview features (e.g., preview models).",
-          "markdownDescription": "Enable preview features (e.g., preview models).\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
-        },
         "preferredEditor": {
           "title": "Preferred Editor",
           "description": "The preferred editor to open files in.",
@@ -46,6 +49,21 @@
           "title": "Vim Mode",
           "description": "Enable Vim keybindings",
           "markdownDescription": "Enable Vim keybindings\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "defaultApprovalMode": {
+          "title": "Default Approval Mode",
+          "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.",
+          "markdownDescription": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `default`",
+          "default": "default",
+          "type": "string",
+          "enum": ["default", "auto_edit", "plan"]
+        },
+        "devtools": {
+          "title": "DevTools",
+          "description": "Enable DevTools inspector on launch.",
+          "markdownDescription": "Enable DevTools inspector on launch.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -63,6 +81,13 @@
           "default": true,
           "type": "boolean"
         },
+        "enableNotifications": {
+          "title": "Enable Notifications",
+          "description": "Enable run-event notifications for action-required prompts and session completion. Currently macOS only.",
+          "markdownDescription": "Enable run-event notifications for action-required prompts and session completion. Currently macOS only.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "checkpointing": {
           "title": "Checkpointing",
           "description": "Session checkpointing settings.",
@@ -76,6 +101,22 @@
               "markdownDescription": "Enable session checkpointing for recovery\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `false`",
               "default": false,
               "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "plan": {
+          "title": "Plan",
+          "description": "Planning features configuration.",
+          "markdownDescription": "Planning features configuration.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "directory": {
+              "title": "Plan Directory",
+              "description": "The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.",
+              "markdownDescription": "The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.\n\n- Category: `General`\n- Requires restart: `yes`",
+              "type": "string"
             }
           },
           "additionalProperties": false
@@ -115,9 +156,9 @@
               "type": "boolean"
             },
             "maxAge": {
-              "title": "Max Session Age",
-              "description": "Maximum age of sessions to keep (e.g., \"30d\", \"7d\", \"24h\", \"1w\")",
-              "markdownDescription": "Maximum age of sessions to keep (e.g., \"30d\", \"7d\", \"24h\", \"1w\")\n\n- Category: `General`\n- Requires restart: `no`",
+              "title": "Keep chat history",
+              "description": "Automatically delete chats older than this time period (e.g., \"30d\", \"7d\", \"24h\", \"1w\")",
+              "markdownDescription": "Automatically delete chats older than this time period (e.g., \"30d\", \"7d\", \"24h\", \"1w\")\n\n- Category: `General`\n- Requires restart: `no`",
               "type": "string"
             },
             "maxCount": {
@@ -132,6 +173,13 @@
               "markdownDescription": "Minimum retention period (safety limit, defaults to \"1d\")\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `1d`",
               "default": "1d",
               "type": "string"
+            },
+            "warningAcknowledged": {
+              "title": "Warning Acknowledged",
+              "description": "INTERNAL: Whether the user has acknowledged the session retention warning",
+              "markdownDescription": "INTERNAL: Whether the user has acknowledged the session retention warning\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
             }
           },
           "additionalProperties": false
@@ -201,6 +249,14 @@
           "default": false,
           "type": "boolean"
         },
+        "inlineThinkingMode": {
+          "title": "Inline Thinking",
+          "description": "Display model thinking inline: off or full.",
+          "markdownDescription": "Display model thinking inline: off or full.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `off`",
+          "default": "off",
+          "type": "string",
+          "enum": ["off", "full"]
+        },
         "showStatusInTitle": {
           "title": "Show Thoughts in Title",
           "description": "Show Gemini CLI model thoughts in the terminal window title during the working phase",
@@ -222,11 +278,25 @@
           "default": true,
           "type": "boolean"
         },
+        "showCompatibilityWarnings": {
+          "title": "Show Compatibility Warnings",
+          "description": "Show warnings about terminal or OS compatibility issues.",
+          "markdownDescription": "Show warnings about terminal or OS compatibility issues.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "hideTips": {
           "title": "Hide Tips",
           "description": "Hide helpful tips in the UI",
           "markdownDescription": "Hide helpful tips in the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
+          "type": "boolean"
+        },
+        "showShortcutsHint": {
+          "title": "Show Shortcuts Hint",
+          "description": "Show the \"? for shortcuts\" hint above the input.",
+          "markdownDescription": "Show the \"? for shortcuts\" hint above the input.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "hideBanner": {
@@ -351,6 +421,14 @@
           "default": true,
           "type": "boolean"
         },
+        "loadingPhrases": {
+          "title": "Loading Phrases",
+          "description": "What to show while the model is working: tips, witty comments, both, or nothing.",
+          "markdownDescription": "What to show while the model is working: tips, witty comments, both, or nothing.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `tips`",
+          "default": "tips",
+          "type": "string",
+          "enum": ["tips", "witty", "all", "off"]
+        },
         "customWittyPhrases": {
           "title": "Custom Witty Phrases",
           "description": "Custom witty phrases to display during loading. When provided, the CLI cycles through these instead of the defaults.",
@@ -370,8 +448,8 @@
           "properties": {
             "enableLoadingPhrases": {
               "title": "Enable Loading Phrases",
-              "description": "Enable loading phrases during operations.",
-              "markdownDescription": "Enable loading phrases during operations.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+              "description": "@deprecated Use ui.loadingPhrases instead. Enable loading phrases during operations.",
+              "markdownDescription": "@deprecated Use ui.loadingPhrases instead. Enable loading phrases during operations.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
@@ -491,7 +569,7 @@
     "modelConfigs": {
       "title": "Model Configs",
       "description": "Model configurations.",
-      "markdownDescription": "Model configurations.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{\n  \"aliases\": {\n    \"base\": {\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"temperature\": 0,\n          \"topP\": 1\n        }\n      }\n    },\n    \"chat-base\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"includeThoughts\": true\n          },\n          \"temperature\": 1,\n          \"topP\": 0.95,\n          \"topK\": 64\n        }\n      }\n    },\n    \"chat-base-2.5\": {\n      \"extends\": \"chat-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 8192\n          }\n        }\n      }\n    },\n    \"chat-base-3\": {\n      \"extends\": \"chat-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"thinkingLevel\": \"HIGH\"\n          }\n        }\n      }\n    },\n    \"gemini-3-pro-preview\": {\n      \"extends\": \"chat-base-3\",\n      \"modelConfig\": {\n        \"model\": \"gemini-3-pro-preview\"\n      }\n    },\n    \"gemini-3-flash-preview\": {\n      \"extends\": \"chat-base-3\",\n      \"modelConfig\": {\n        \"model\": \"gemini-3-flash-preview\"\n      }\n    },\n    \"gemini-2.5-pro\": {\n      \"extends\": \"chat-base-2.5\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-pro\"\n      }\n    },\n    \"gemini-2.5-flash\": {\n      \"extends\": \"chat-base-2.5\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash\"\n      }\n    },\n    \"gemini-2.5-flash-lite\": {\n      \"extends\": \"chat-base-2.5\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\"\n      }\n    },\n    \"gemini-2.5-flash-base\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash\"\n      }\n    },\n    \"classifier\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"maxOutputTokens\": 1024,\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 512\n          }\n        }\n      }\n    },\n    \"prompt-completion\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"temperature\": 0.3,\n          \"maxOutputTokens\": 16000,\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 0\n          }\n        }\n      }\n    },\n    \"edit-corrector\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 0\n          }\n        }\n      }\n    },\n    \"summarizer-default\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"maxOutputTokens\": 2000\n        }\n      }\n    },\n    \"summarizer-shell\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"maxOutputTokens\": 2000\n        }\n      }\n    },\n    \"web-search\": {\n      \"extends\": \"gemini-2.5-flash-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"tools\": [\n            {\n              \"googleSearch\": {}\n            }\n          ]\n        }\n      }\n    },\n    \"web-fetch\": {\n      \"extends\": \"gemini-2.5-flash-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"tools\": [\n            {\n              \"urlContext\": {}\n            }\n          ]\n        }\n      }\n    },\n    \"web-fetch-fallback\": {\n      \"extends\": \"gemini-2.5-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"loop-detection\": {\n      \"extends\": \"gemini-2.5-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"loop-detection-double-check\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-pro\"\n      }\n    },\n    \"llm-edit-fixer\": {\n      \"extends\": \"gemini-2.5-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"next-speaker-checker\": {\n      \"extends\": \"gemini-2.5-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"chat-compression-3-pro\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3-pro-preview\"\n      }\n    },\n    \"chat-compression-3-flash\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3-flash-preview\"\n      }\n    },\n    \"chat-compression-2.5-pro\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-pro\"\n      }\n    },\n    \"chat-compression-2.5-flash\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash\"\n      }\n    },\n    \"chat-compression-2.5-flash-lite\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\"\n      }\n    },\n    \"chat-compression-default\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-pro\"\n      }\n    }\n  },\n  \"overrides\": [\n    {\n      \"match\": {\n        \"model\": \"chat-base\",\n        \"isRetry\": true\n      },\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"temperature\": 1\n        }\n      }\n    }\n  ]\n}`",
+      "markdownDescription": "Model configurations.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{\n  \"aliases\": {\n    \"base\": {\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"temperature\": 0,\n          \"topP\": 1\n        }\n      }\n    },\n    \"chat-base\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"includeThoughts\": true\n          },\n          \"temperature\": 1,\n          \"topP\": 0.95,\n          \"topK\": 64\n        }\n      }\n    },\n    \"chat-base-2.5\": {\n      \"extends\": \"chat-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 8192\n          }\n        }\n      }\n    },\n    \"chat-base-3\": {\n      \"extends\": \"chat-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"thinkingLevel\": \"HIGH\"\n          }\n        }\n      }\n    },\n    \"gemini-3-pro-preview\": {\n      \"extends\": \"chat-base-3\",\n      \"modelConfig\": {\n        \"model\": \"gemini-3-pro-preview\"\n      }\n    },\n    \"gemini-3-flash-preview\": {\n      \"extends\": \"chat-base-3\",\n      \"modelConfig\": {\n        \"model\": \"gemini-3-flash-preview\"\n      }\n    },\n    \"gemini-2.5-pro\": {\n      \"extends\": \"chat-base-2.5\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-pro\"\n      }\n    },\n    \"gemini-2.5-flash\": {\n      \"extends\": \"chat-base-2.5\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash\"\n      }\n    },\n    \"gemini-2.5-flash-lite\": {\n      \"extends\": \"chat-base-2.5\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\"\n      }\n    },\n    \"gemini-2.5-flash-base\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash\"\n      }\n    },\n    \"gemini-3-flash-base\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-3-flash-preview\"\n      }\n    },\n    \"classifier\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"maxOutputTokens\": 1024,\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 512\n          }\n        }\n      }\n    },\n    \"prompt-completion\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"temperature\": 0.3,\n          \"maxOutputTokens\": 16000,\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 0\n          }\n        }\n      }\n    },\n    \"fast-ack-helper\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"temperature\": 0.2,\n          \"maxOutputTokens\": 120,\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 0\n          }\n        }\n      }\n    },\n    \"edit-corrector\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 0\n          }\n        }\n      }\n    },\n    \"summarizer-default\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"maxOutputTokens\": 2000\n        }\n      }\n    },\n    \"summarizer-shell\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"maxOutputTokens\": 2000\n        }\n      }\n    },\n    \"web-search\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"tools\": [\n            {\n              \"googleSearch\": {}\n            }\n          ]\n        }\n      }\n    },\n    \"web-fetch\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"tools\": [\n            {\n              \"urlContext\": {}\n            }\n          ]\n        }\n      }\n    },\n    \"web-fetch-fallback\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"loop-detection\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"loop-detection-double-check\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-3-pro-preview\"\n      }\n    },\n    \"llm-edit-fixer\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"next-speaker-checker\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"chat-compression-3-pro\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3-pro-preview\"\n      }\n    },\n    \"chat-compression-3-flash\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3-flash-preview\"\n      }\n    },\n    \"chat-compression-2.5-pro\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-pro\"\n      }\n    },\n    \"chat-compression-2.5-flash\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash\"\n      }\n    },\n    \"chat-compression-2.5-flash-lite\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\"\n      }\n    },\n    \"chat-compression-default\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3-pro-preview\"\n      }\n    }\n  },\n  \"overrides\": [\n    {\n      \"match\": {\n        \"model\": \"chat-base\",\n        \"isRetry\": true\n      },\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"temperature\": 1\n        }\n      }\n    }\n  ]\n}`",
       "default": {
         "aliases": {
           "base": {
@@ -571,6 +649,12 @@
               "model": "gemini-2.5-flash"
             }
           },
+          "gemini-3-flash-base": {
+            "extends": "base",
+            "modelConfig": {
+              "model": "gemini-3-flash-preview"
+            }
+          },
           "classifier": {
             "extends": "base",
             "modelConfig": {
@@ -590,6 +674,19 @@
               "generateContentConfig": {
                 "temperature": 0.3,
                 "maxOutputTokens": 16000,
+                "thinkingConfig": {
+                  "thinkingBudget": 0
+                }
+              }
+            }
+          },
+          "fast-ack-helper": {
+            "extends": "base",
+            "modelConfig": {
+              "model": "gemini-2.5-flash-lite",
+              "generateContentConfig": {
+                "temperature": 0.2,
+                "maxOutputTokens": 120,
                 "thinkingConfig": {
                   "thinkingBudget": 0
                 }
@@ -626,7 +723,7 @@
             }
           },
           "web-search": {
-            "extends": "gemini-2.5-flash-base",
+            "extends": "gemini-3-flash-base",
             "modelConfig": {
               "generateContentConfig": {
                 "tools": [
@@ -638,7 +735,7 @@
             }
           },
           "web-fetch": {
-            "extends": "gemini-2.5-flash-base",
+            "extends": "gemini-3-flash-base",
             "modelConfig": {
               "generateContentConfig": {
                 "tools": [
@@ -650,25 +747,25 @@
             }
           },
           "web-fetch-fallback": {
-            "extends": "gemini-2.5-flash-base",
+            "extends": "gemini-3-flash-base",
             "modelConfig": {}
           },
           "loop-detection": {
-            "extends": "gemini-2.5-flash-base",
+            "extends": "gemini-3-flash-base",
             "modelConfig": {}
           },
           "loop-detection-double-check": {
             "extends": "base",
             "modelConfig": {
-              "model": "gemini-2.5-pro"
+              "model": "gemini-3-pro-preview"
             }
           },
           "llm-edit-fixer": {
-            "extends": "gemini-2.5-flash-base",
+            "extends": "gemini-3-flash-base",
             "modelConfig": {}
           },
           "next-speaker-checker": {
-            "extends": "gemini-2.5-flash-base",
+            "extends": "gemini-3-flash-base",
             "modelConfig": {}
           },
           "chat-compression-3-pro": {
@@ -698,7 +795,7 @@
           },
           "chat-compression-default": {
             "modelConfig": {
-              "model": "gemini-2.5-pro"
+              "model": "gemini-3-pro-preview"
             }
           }
         },
@@ -721,7 +818,7 @@
         "aliases": {
           "title": "Model Config Aliases",
           "description": "Named presets for model configs. Can be used in place of a model name and can inherit from other aliases using an `extends` property.",
-          "markdownDescription": "Named presets for model configs. Can be used in place of a model name and can inherit from other aliases using an `extends` property.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{\n  \"base\": {\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"temperature\": 0,\n        \"topP\": 1\n      }\n    }\n  },\n  \"chat-base\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"includeThoughts\": true\n        },\n        \"temperature\": 1,\n        \"topP\": 0.95,\n        \"topK\": 64\n      }\n    }\n  },\n  \"chat-base-2.5\": {\n    \"extends\": \"chat-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 8192\n        }\n      }\n    }\n  },\n  \"chat-base-3\": {\n    \"extends\": \"chat-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"thinkingLevel\": \"HIGH\"\n        }\n      }\n    }\n  },\n  \"gemini-3-pro-preview\": {\n    \"extends\": \"chat-base-3\",\n    \"modelConfig\": {\n      \"model\": \"gemini-3-pro-preview\"\n    }\n  },\n  \"gemini-3-flash-preview\": {\n    \"extends\": \"chat-base-3\",\n    \"modelConfig\": {\n      \"model\": \"gemini-3-flash-preview\"\n    }\n  },\n  \"gemini-2.5-pro\": {\n    \"extends\": \"chat-base-2.5\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-pro\"\n    }\n  },\n  \"gemini-2.5-flash\": {\n    \"extends\": \"chat-base-2.5\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash\"\n    }\n  },\n  \"gemini-2.5-flash-lite\": {\n    \"extends\": \"chat-base-2.5\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\"\n    }\n  },\n  \"gemini-2.5-flash-base\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash\"\n    }\n  },\n  \"classifier\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"maxOutputTokens\": 1024,\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 512\n        }\n      }\n    }\n  },\n  \"prompt-completion\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"temperature\": 0.3,\n        \"maxOutputTokens\": 16000,\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 0\n        }\n      }\n    }\n  },\n  \"edit-corrector\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 0\n        }\n      }\n    }\n  },\n  \"summarizer-default\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"maxOutputTokens\": 2000\n      }\n    }\n  },\n  \"summarizer-shell\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"maxOutputTokens\": 2000\n      }\n    }\n  },\n  \"web-search\": {\n    \"extends\": \"gemini-2.5-flash-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"tools\": [\n          {\n            \"googleSearch\": {}\n          }\n        ]\n      }\n    }\n  },\n  \"web-fetch\": {\n    \"extends\": \"gemini-2.5-flash-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"tools\": [\n          {\n            \"urlContext\": {}\n          }\n        ]\n      }\n    }\n  },\n  \"web-fetch-fallback\": {\n    \"extends\": \"gemini-2.5-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"loop-detection\": {\n    \"extends\": \"gemini-2.5-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"loop-detection-double-check\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-pro\"\n    }\n  },\n  \"llm-edit-fixer\": {\n    \"extends\": \"gemini-2.5-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"next-speaker-checker\": {\n    \"extends\": \"gemini-2.5-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"chat-compression-3-pro\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3-pro-preview\"\n    }\n  },\n  \"chat-compression-3-flash\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3-flash-preview\"\n    }\n  },\n  \"chat-compression-2.5-pro\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-pro\"\n    }\n  },\n  \"chat-compression-2.5-flash\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash\"\n    }\n  },\n  \"chat-compression-2.5-flash-lite\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\"\n    }\n  },\n  \"chat-compression-default\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-pro\"\n    }\n  }\n}`",
+          "markdownDescription": "Named presets for model configs. Can be used in place of a model name and can inherit from other aliases using an `extends` property.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{\n  \"base\": {\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"temperature\": 0,\n        \"topP\": 1\n      }\n    }\n  },\n  \"chat-base\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"includeThoughts\": true\n        },\n        \"temperature\": 1,\n        \"topP\": 0.95,\n        \"topK\": 64\n      }\n    }\n  },\n  \"chat-base-2.5\": {\n    \"extends\": \"chat-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 8192\n        }\n      }\n    }\n  },\n  \"chat-base-3\": {\n    \"extends\": \"chat-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"thinkingLevel\": \"HIGH\"\n        }\n      }\n    }\n  },\n  \"gemini-3-pro-preview\": {\n    \"extends\": \"chat-base-3\",\n    \"modelConfig\": {\n      \"model\": \"gemini-3-pro-preview\"\n    }\n  },\n  \"gemini-3-flash-preview\": {\n    \"extends\": \"chat-base-3\",\n    \"modelConfig\": {\n      \"model\": \"gemini-3-flash-preview\"\n    }\n  },\n  \"gemini-2.5-pro\": {\n    \"extends\": \"chat-base-2.5\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-pro\"\n    }\n  },\n  \"gemini-2.5-flash\": {\n    \"extends\": \"chat-base-2.5\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash\"\n    }\n  },\n  \"gemini-2.5-flash-lite\": {\n    \"extends\": \"chat-base-2.5\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\"\n    }\n  },\n  \"gemini-2.5-flash-base\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash\"\n    }\n  },\n  \"gemini-3-flash-base\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-3-flash-preview\"\n    }\n  },\n  \"classifier\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"maxOutputTokens\": 1024,\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 512\n        }\n      }\n    }\n  },\n  \"prompt-completion\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"temperature\": 0.3,\n        \"maxOutputTokens\": 16000,\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 0\n        }\n      }\n    }\n  },\n  \"fast-ack-helper\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"temperature\": 0.2,\n        \"maxOutputTokens\": 120,\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 0\n        }\n      }\n    }\n  },\n  \"edit-corrector\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 0\n        }\n      }\n    }\n  },\n  \"summarizer-default\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"maxOutputTokens\": 2000\n      }\n    }\n  },\n  \"summarizer-shell\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"maxOutputTokens\": 2000\n      }\n    }\n  },\n  \"web-search\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"tools\": [\n          {\n            \"googleSearch\": {}\n          }\n        ]\n      }\n    }\n  },\n  \"web-fetch\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"tools\": [\n          {\n            \"urlContext\": {}\n          }\n        ]\n      }\n    }\n  },\n  \"web-fetch-fallback\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"loop-detection\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"loop-detection-double-check\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-3-pro-preview\"\n    }\n  },\n  \"llm-edit-fixer\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"next-speaker-checker\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"chat-compression-3-pro\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3-pro-preview\"\n    }\n  },\n  \"chat-compression-3-flash\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3-flash-preview\"\n    }\n  },\n  \"chat-compression-2.5-pro\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-pro\"\n    }\n  },\n  \"chat-compression-2.5-flash\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash\"\n    }\n  },\n  \"chat-compression-2.5-flash-lite\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\"\n    }\n  },\n  \"chat-compression-default\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3-pro-preview\"\n    }\n  }\n}`",
           "default": {
             "base": {
               "modelConfig": {
@@ -800,6 +897,12 @@
                 "model": "gemini-2.5-flash"
               }
             },
+            "gemini-3-flash-base": {
+              "extends": "base",
+              "modelConfig": {
+                "model": "gemini-3-flash-preview"
+              }
+            },
             "classifier": {
               "extends": "base",
               "modelConfig": {
@@ -819,6 +922,19 @@
                 "generateContentConfig": {
                   "temperature": 0.3,
                   "maxOutputTokens": 16000,
+                  "thinkingConfig": {
+                    "thinkingBudget": 0
+                  }
+                }
+              }
+            },
+            "fast-ack-helper": {
+              "extends": "base",
+              "modelConfig": {
+                "model": "gemini-2.5-flash-lite",
+                "generateContentConfig": {
+                  "temperature": 0.2,
+                  "maxOutputTokens": 120,
                   "thinkingConfig": {
                     "thinkingBudget": 0
                   }
@@ -855,7 +971,7 @@
               }
             },
             "web-search": {
-              "extends": "gemini-2.5-flash-base",
+              "extends": "gemini-3-flash-base",
               "modelConfig": {
                 "generateContentConfig": {
                   "tools": [
@@ -867,7 +983,7 @@
               }
             },
             "web-fetch": {
-              "extends": "gemini-2.5-flash-base",
+              "extends": "gemini-3-flash-base",
               "modelConfig": {
                 "generateContentConfig": {
                   "tools": [
@@ -879,25 +995,25 @@
               }
             },
             "web-fetch-fallback": {
-              "extends": "gemini-2.5-flash-base",
+              "extends": "gemini-3-flash-base",
               "modelConfig": {}
             },
             "loop-detection": {
-              "extends": "gemini-2.5-flash-base",
+              "extends": "gemini-3-flash-base",
               "modelConfig": {}
             },
             "loop-detection-double-check": {
               "extends": "base",
               "modelConfig": {
-                "model": "gemini-2.5-pro"
+                "model": "gemini-3-pro-preview"
               }
             },
             "llm-edit-fixer": {
-              "extends": "gemini-2.5-flash-base",
+              "extends": "gemini-3-flash-base",
               "modelConfig": {}
             },
             "next-speaker-checker": {
-              "extends": "gemini-2.5-flash-base",
+              "extends": "gemini-3-flash-base",
               "modelConfig": {}
             },
             "chat-compression-3-pro": {
@@ -927,7 +1043,7 @@
             },
             "chat-compression-default": {
               "modelConfig": {
-                "model": "gemini-2.5-pro"
+                "model": "gemini-3-pro-preview"
               }
             }
           },
@@ -999,6 +1115,13 @@
           "description": "The format to use when importing memory.",
           "markdownDescription": "The format to use when importing memory.\n\n- Category: `Context`\n- Requires restart: `no`",
           "type": "string"
+        },
+        "includeDirectoryTree": {
+          "title": "Include Directory Tree",
+          "description": "Whether to include the directory tree of the current working directory in the initial request to the model.",
+          "markdownDescription": "Whether to include the directory tree of the current working directory in the initial request to the model.\n\n- Category: `Context`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
         },
         "discoveryMaxDirs": {
           "title": "Memory Discovery Max Dirs",
@@ -1133,14 +1256,6 @@
           },
           "additionalProperties": false
         },
-        "approvalMode": {
-          "title": "Approval Mode",
-          "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.",
-          "markdownDescription": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `default`",
-          "default": "default",
-          "type": "string",
-          "enum": ["default", "auto_edit", "plan"]
-        },
         "core": {
           "title": "Core Tools",
           "description": "Restrict the set of built-in tools with an allowlist. Match semantics mirror tools.allowed; see the built-in tools documentation for available names.",
@@ -1187,25 +1302,11 @@
           "default": true,
           "type": "boolean"
         },
-        "enableToolOutputTruncation": {
-          "title": "Enable Tool Output Truncation",
-          "description": "Enable truncation of large tool outputs.",
-          "markdownDescription": "Enable truncation of large tool outputs.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `true`",
-          "default": true,
-          "type": "boolean"
-        },
         "truncateToolOutputThreshold": {
           "title": "Tool Output Truncation Threshold",
-          "description": "Truncate tool output if it is larger than this many characters. Set to -1 to disable.",
-          "markdownDescription": "Truncate tool output if it is larger than this many characters. Set to -1 to disable.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `4000000`",
-          "default": 4000000,
-          "type": "number"
-        },
-        "truncateToolOutputLines": {
-          "title": "Tool Output Truncation Lines",
-          "description": "The number of lines to keep when truncating tool output.",
-          "markdownDescription": "The number of lines to keep when truncating tool output.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `1000`",
-          "default": 1000,
+          "description": "Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.",
+          "markdownDescription": "Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `40000`",
+          "default": 40000,
           "type": "number"
         },
         "disableLLMCorrection": {
@@ -1428,6 +1529,44 @@
       "default": {},
       "type": "object",
       "properties": {
+        "toolOutputMasking": {
+          "title": "Tool Output Masking",
+          "description": "Advanced settings for tool output masking to manage context window efficiency.",
+          "markdownDescription": "Advanced settings for tool output masking to manage context window efficiency.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Tool Output Masking",
+              "description": "Enables tool output masking to save tokens.",
+              "markdownDescription": "Enables tool output masking to save tokens.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
+            "toolProtectionThreshold": {
+              "title": "Tool Protection Threshold",
+              "description": "Minimum number of tokens to protect from masking (most recent tool outputs).",
+              "markdownDescription": "Minimum number of tokens to protect from masking (most recent tool outputs).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `50000`",
+              "default": 50000,
+              "type": "number"
+            },
+            "minPrunableTokensThreshold": {
+              "title": "Min Prunable Tokens Threshold",
+              "description": "Minimum prunable tokens required to trigger a masking pass.",
+              "markdownDescription": "Minimum prunable tokens required to trigger a masking pass.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `30000`",
+              "default": 30000,
+              "type": "number"
+            },
+            "protectLatestTurn": {
+              "title": "Protect Latest Turn",
+              "description": "Ensures the absolute latest turn is never masked, regardless of token count.",
+              "markdownDescription": "Ensures the absolute latest turn is never masked, regardless of token count.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "enableAgents": {
           "title": "Enable Agents",
           "description": "Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents",
@@ -1445,15 +1584,15 @@
         "extensionConfig": {
           "title": "Extension Configuration",
           "description": "Enable requesting and fetching of extension settings.",
-          "markdownDescription": "Enable requesting and fetching of extension settings.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Enable requesting and fetching of extension settings.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
-        "enableEventDrivenScheduler": {
-          "title": "Event Driven Scheduler",
-          "description": "Enables event-driven scheduler within the CLI session.",
-          "markdownDescription": "Enables event-driven scheduler within the CLI session.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
-          "default": true,
+        "extensionRegistry": {
+          "title": "Extension Registry Explore UI",
+          "description": "Enable extension registry explore UI.",
+          "markdownDescription": "Enable extension registry explore UI.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
           "type": "boolean"
         },
         "extensionReloading": {
@@ -1472,8 +1611,15 @@
         },
         "useOSC52Paste": {
           "title": "Use OSC 52 Paste",
-          "description": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).",
-          "markdownDescription": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "description": "Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).",
+          "markdownDescription": "Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "useOSC52Copy": {
+          "title": "Use OSC 52 Copy",
+          "description": "Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).",
+          "markdownDescription": "Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -1481,6 +1627,13 @@
           "title": "Plan",
           "description": "Enable planning features (Plan Mode and tools).",
           "markdownDescription": "Enable planning features (Plan Mode and tools).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "modelSteering": {
+          "title": "Model Steering",
+          "description": "Enable model steering (user hints) to guide the model during tool execution.",
+          "markdownDescription": "Enable model steering (user hints) to guide the model during tool execution.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         }
@@ -1712,6 +1865,16 @@
               "markdownDescription": "If false, disallows MCP servers from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
               "type": "boolean"
+            },
+            "config": {
+              "title": "MCP Config",
+              "description": "Admin-configured MCP servers.",
+              "markdownDescription": "Admin-configured MCP servers.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/MCPServerConfig"
+              }
             }
           },
           "additionalProperties": false

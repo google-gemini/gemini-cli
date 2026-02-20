@@ -76,7 +76,11 @@ import {
   LoadedSettings,
   sanitizeEnvVar,
 } from './settings.js';
-import { FatalConfigError, GEMINI_DIR } from '@google/gemini-cli-core';
+import {
+  FatalConfigError,
+  GEMINI_DIR,
+  type MCPServerConfig,
+} from '@google/gemini-cli-core';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 import {
   getSettingsSchema,
@@ -1932,6 +1936,40 @@ describe('Settings Loading and Merging', () => {
       );
     });
 
+    it('should migrate tools.approvalMode to general.defaultApprovalMode', () => {
+      const userSettingsContent = {
+        tools: {
+          approvalMode: 'plan',
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      migrateDeprecatedSettings(loadedSettings, true);
+
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'general',
+        expect.objectContaining({ defaultApprovalMode: 'plan' }),
+      );
+
+      // Verify removal
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'tools',
+        expect.not.objectContaining({ approvalMode: 'plan' }),
+      );
+    });
+
     it('should migrate all 4 inverted boolean settings', () => {
       const userSettingsContent = {
         general: {
@@ -1994,6 +2032,85 @@ describe('Settings Loading and Merging', () => {
           }),
         }),
       );
+
+      // Check that enableLoadingPhrases: false was further migrated to loadingPhrases: 'off'
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'ui',
+        expect.objectContaining({
+          loadingPhrases: 'off',
+        }),
+      );
+    });
+
+    it('should migrate enableLoadingPhrases: false to loadingPhrases: off', () => {
+      const userSettingsContent = {
+        ui: {
+          accessibility: {
+            enableLoadingPhrases: false,
+          },
+        },
+      };
+
+      const loadedSettings = createMockSettings(userSettingsContent);
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+
+      migrateDeprecatedSettings(loadedSettings);
+
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'ui',
+        expect.objectContaining({
+          loadingPhrases: 'off',
+        }),
+      );
+    });
+
+    it('should not migrate enableLoadingPhrases: true to loadingPhrases', () => {
+      const userSettingsContent = {
+        ui: {
+          accessibility: {
+            enableLoadingPhrases: true,
+          },
+        },
+      };
+
+      const loadedSettings = createMockSettings(userSettingsContent);
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+
+      migrateDeprecatedSettings(loadedSettings);
+
+      // Should not set loadingPhrases when enableLoadingPhrases is true
+      const uiCalls = setValueSpy.mock.calls.filter((call) => call[1] === 'ui');
+      for (const call of uiCalls) {
+        const uiValue = call[2] as Record<string, unknown>;
+        expect(uiValue).not.toHaveProperty('loadingPhrases');
+      }
+    });
+
+    it('should not overwrite existing loadingPhrases during migration', () => {
+      const userSettingsContent = {
+        ui: {
+          loadingPhrases: 'witty',
+          accessibility: {
+            enableLoadingPhrases: false,
+          },
+        },
+      };
+
+      const loadedSettings = createMockSettings(userSettingsContent);
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+
+      migrateDeprecatedSettings(loadedSettings);
+
+      // Should not overwrite existing loadingPhrases
+      const uiCalls = setValueSpy.mock.calls.filter((call) => call[1] === 'ui');
+      for (const call of uiCalls) {
+        const uiValue = call[2] as Record<string, unknown>;
+        if (uiValue['loadingPhrases'] !== undefined) {
+          expect(uiValue['loadingPhrases']).toBe('witty');
+        }
+      }
     });
 
     it('should prioritize new settings over deprecated ones and respect removeDeprecated flag', () => {
@@ -2074,7 +2191,7 @@ describe('Settings Loading and Merging', () => {
       );
     });
 
-    it('should migrate disableUpdateNag to enableAutoUpdateNotification in system and system defaults settings', () => {
+    it('should migrate disableUpdateNag to enableAutoUpdateNotification in memory but not save for system and system defaults settings', () => {
       const systemSettingsContent = {
         general: {
           disableUpdateNag: true,
@@ -2099,9 +2216,10 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
+      const feedbackSpy = mockCoreEvents.emitFeedback;
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
-      // Verify system settings were migrated
+      // Verify system settings were migrated in memory
       expect(settings.system.settings.general).toHaveProperty(
         'enableAutoUpdateNotification',
       );
@@ -2111,7 +2229,7 @@ describe('Settings Loading and Merging', () => {
         ],
       ).toBe(false);
 
-      // Verify system defaults settings were migrated
+      // Verify system defaults settings were migrated in memory
       expect(settings.systemDefaults.settings.general).toHaveProperty(
         'enableAutoUpdateNotification',
       );
@@ -2123,6 +2241,74 @@ describe('Settings Loading and Merging', () => {
 
       // Merged should also reflect it (system overrides defaults, but both are migrated)
       expect(settings.merged.general?.enableAutoUpdateNotification).toBe(false);
+
+      // Verify it was NOT saved back to disk
+      expect(updateSettingsFilePreservingFormat).not.toHaveBeenCalledWith(
+        getSystemSettingsPath(),
+        expect.anything(),
+      );
+      expect(updateSettingsFilePreservingFormat).not.toHaveBeenCalledWith(
+        getSystemDefaultsPath(),
+        expect.anything(),
+      );
+
+      // Verify warnings were shown
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining(
+          'The system configuration contains deprecated settings',
+        ),
+      );
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining(
+          'The system default configuration contains deprecated settings',
+        ),
+      );
+    });
+
+    it('should migrate experimental agent settings in system scope in memory but not save', () => {
+      const systemSettingsContent = {
+        experimental: {
+          codebaseInvestigatorSettings: {
+            enabled: true,
+          },
+        },
+      };
+
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath()) {
+            return JSON.stringify(systemSettingsContent);
+          }
+          return '{}';
+        },
+      );
+
+      const feedbackSpy = mockCoreEvents.emitFeedback;
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Verify it was migrated in memory
+      expect(settings.system.settings.agents?.overrides).toMatchObject({
+        codebase_investigator: {
+          enabled: true,
+        },
+      });
+
+      // Verify it was NOT saved back to disk
+      expect(updateSettingsFilePreservingFormat).not.toHaveBeenCalledWith(
+        getSystemSettingsPath(),
+        expect.anything(),
+      );
+
+      // Verify warnings were shown
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining(
+          'The system configuration contains deprecated settings: [experimental.codebaseInvestigatorSettings]',
+        ),
+      );
     });
 
     it('should migrate experimental agent settings to agents overrides', () => {
@@ -2350,6 +2536,28 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
     });
 
+    it('should un-nest MCP configuration from remote settings', () => {
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      const mcpServers: Record<string, MCPServerConfig> = {
+        'admin-server': {
+          url: 'http://admin-mcp.com',
+          type: 'sse',
+          trust: true,
+        },
+      };
+
+      loadedSettings.setRemoteAdminSettings({
+        mcpSetting: {
+          mcpEnabled: true,
+          mcpConfig: {
+            mcpServers,
+          },
+        },
+      });
+
+      expect(loadedSettings.merged.admin?.mcp?.config).toEqual(mcpServers);
+    });
+
     it('should set skills based on unmanagedCapabilitiesEnabled', () => {
       const loadedSettings = loadSettings();
       loadedSettings.setRemoteAdminSettings({
@@ -2414,6 +2622,50 @@ describe('Settings Loading and Merging', () => {
           prop2: 42,
         },
       });
+    });
+  });
+
+  describe('Reactivity & Snapshots', () => {
+    let loadedSettings: LoadedSettings;
+
+    beforeEach(() => {
+      const emptySettingsFile: SettingsFile = {
+        path: '/mock/path',
+        settings: {},
+        originalSettings: {},
+      };
+
+      loadedSettings = new LoadedSettings(
+        { ...emptySettingsFile, path: getSystemSettingsPath() },
+        { ...emptySettingsFile, path: getSystemDefaultsPath() },
+        { ...emptySettingsFile, path: USER_SETTINGS_PATH },
+        { ...emptySettingsFile, path: MOCK_WORKSPACE_SETTINGS_PATH },
+        true, // isTrusted
+        [],
+      );
+    });
+
+    it('getSnapshot() should return stable reference if no changes occur', () => {
+      const snap1 = loadedSettings.getSnapshot();
+      const snap2 = loadedSettings.getSnapshot();
+      expect(snap1).toBe(snap2);
+    });
+
+    it('setValue() should create a new snapshot reference and emit event', () => {
+      const oldSnapshot = loadedSettings.getSnapshot();
+      const oldUserRef = oldSnapshot.user.settings;
+
+      loadedSettings.setValue(SettingScope.User, 'ui.theme', 'high-contrast');
+
+      const newSnapshot = loadedSettings.getSnapshot();
+
+      expect(newSnapshot).not.toBe(oldSnapshot);
+      expect(newSnapshot.user.settings).not.toBe(oldUserRef);
+      expect(newSnapshot.user.settings.ui?.theme).toBe('high-contrast');
+
+      expect(newSnapshot.system.settings).not.toBe(oldSnapshot.system.settings);
+
+      expect(mockCoreEvents.emitSettingsChanged).toHaveBeenCalled();
     });
   });
 

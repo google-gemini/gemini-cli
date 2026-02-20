@@ -60,6 +60,12 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
       ? Math.max(uiAvailableHeight - 1, 4)
       : Math.floor(terminalHeight * 0.5);
 
+  const isRoutine =
+    tool.confirmationDetails?.type === 'ask_user' ||
+    tool.confirmationDetails?.type === 'exit_plan_mode';
+  const borderColor = isRoutine ? theme.status.success : theme.status.warning;
+  const hideToolIdentity = isRoutine;
+
   // ToolConfirmationMessage needs to know the height available for its OWN content.
   // We subtract the lines used by the Queue wrapper:
   // - 2 lines for the rounded border
@@ -67,13 +73,8 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
   // - 2 lines for Tool Identity (text + margin)
   const availableContentHeight =
     constrainHeight && !isAlternateBuffer
-      ? Math.max(maxHeight - 6, 4)
+      ? Math.max(maxHeight - (hideToolIdentity ? 4 : 6), 4)
       : undefined;
-
-  const borderColor = theme.status.warning;
-  const hideToolIdentity =
-    tool.confirmationDetails?.type === 'ask_user' ||
-    tool.confirmationDetails?.type === 'exit_plan_mode';
 
   return (
     <OverflowProvider>
@@ -90,7 +91,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
               marginBottom={hideToolIdentity ? 0 : 1}
               justifyContent="space-between"
             >
-              <Text color={theme.status.warning} bold>
+              <Text color={borderColor} bold>
                 {getConfirmationHeader(tool.confirmationDetails)}
               </Text>
               {total > 1 && (
@@ -140,7 +141,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           />
         </Box>
         <Box
-          height={0}
+          height={1}
           width={mainAreaWidth}
           borderLeft={true}
           borderRight={true}
@@ -150,9 +151,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           borderStyle="round"
         />
       </Box>
-      <Box paddingX={2} marginBottom={1}>
-        <ShowMoreLines constrainHeight={constrainHeight} />
-      </Box>
+      <ShowMoreLines constrainHeight={constrainHeight} />
     </OverflowProvider>
   );
 };

@@ -10,39 +10,57 @@ import { describe, it, expect } from 'vitest';
 import { ApprovalMode } from '@google/gemini-cli-core';
 
 describe('ApprovalModeIndicator', () => {
-  it('renders correctly for AUTO_EDIT mode', () => {
-    const { lastFrame } = render(
+  it('renders correctly for AUTO_EDIT mode', async () => {
+    const { lastFrame, waitUntilReady } = render(
       <ApprovalModeIndicator approvalMode={ApprovalMode.AUTO_EDIT} />,
     );
-    const output = lastFrame();
-    expect(output).toContain('accepting edits');
-    expect(output).toContain('(shift + tab to cycle)');
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders correctly for PLAN mode', () => {
-    const { lastFrame } = render(
+  it('renders correctly for AUTO_EDIT mode with plan enabled', async () => {
+    const { lastFrame, waitUntilReady } = render(
+      <ApprovalModeIndicator
+        approvalMode={ApprovalMode.AUTO_EDIT}
+        allowPlanMode={true}
+      />,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('renders correctly for PLAN mode', async () => {
+    const { lastFrame, waitUntilReady } = render(
       <ApprovalModeIndicator approvalMode={ApprovalMode.PLAN} />,
     );
-    const output = lastFrame();
-    expect(output).toContain('plan mode');
-    expect(output).toContain('(shift + tab to cycle)');
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders correctly for YOLO mode', () => {
-    const { lastFrame } = render(
+  it('renders correctly for YOLO mode', async () => {
+    const { lastFrame, waitUntilReady } = render(
       <ApprovalModeIndicator approvalMode={ApprovalMode.YOLO} />,
     );
-    const output = lastFrame();
-    expect(output).toContain('YOLO mode');
-    expect(output).toContain('(ctrl + y to toggle)');
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders nothing for DEFAULT mode', () => {
-    const { lastFrame } = render(
+  it('renders correctly for DEFAULT mode', async () => {
+    const { lastFrame, waitUntilReady } = render(
       <ApprovalModeIndicator approvalMode={ApprovalMode.DEFAULT} />,
     );
-    const output = lastFrame();
-    expect(output).not.toContain('accepting edits');
-    expect(output).not.toContain('YOLO mode');
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('renders correctly for DEFAULT mode with plan enabled', async () => {
+    const { lastFrame, waitUntilReady } = render(
+      <ApprovalModeIndicator
+        approvalMode={ApprovalMode.DEFAULT}
+        allowPlanMode={true}
+      />,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
   });
 });

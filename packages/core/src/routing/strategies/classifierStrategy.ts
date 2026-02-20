@@ -12,7 +12,7 @@ import type {
   RoutingDecision,
   RoutingStrategy,
 } from '../routingStrategy.js';
-import { resolveClassifierModel } from '../../config/models.js';
+import { resolveClassifierModel, isGemini3Model } from '../../config/models.js';
 import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
 import {
@@ -20,6 +20,8 @@ import {
   isFunctionResponse,
 } from '../../utils/messageInspectors.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { LlmRole } from '../../telemetry/types.js';
+import { AuthType } from '../../core/contentGenerator.js';
 
 // The number of recent history turns to provide to the router for context.
 const HISTORY_TURNS_FOR_CONTEXT = 4;
@@ -133,7 +135,11 @@ export class ClassifierStrategy implements RoutingStrategy {
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
     try {
-      if (await config.getNumericalRoutingEnabled()) {
+      const model = context.requestedModel ?? config.getModel();
+      if (
+        (await config.getNumericalRoutingEnabled()) &&
+        isGemini3Model(model)
+      ) {
         return null;
       }
 
@@ -157,16 +163,22 @@ export class ClassifierStrategy implements RoutingStrategy {
         systemInstruction: CLASSIFIER_SYSTEM_PROMPT,
         abortSignal: context.signal,
         promptId,
+        role: LlmRole.UTILITY_ROUTER,
       });
 
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
 
       const reasoning = routerResponse.reasoning;
       const latencyMs = Date.now() - startTime;
+      const useGemini3_1 = (await config.getGemini31Launched?.()) ?? false;
+      const useCustomToolModel =
+        useGemini3_1 &&
+        config.getContentGeneratorConfig().authType === AuthType.USE_GEMINI;
       const selectedModel = resolveClassifierModel(
-        context.requestedModel ?? config.getModel(),
+        model,
         routerResponse.model_choice,
-        config.getPreviewFeatures(),
+        useGemini3_1,
+        useCustomToolModel,
       );
 
       return {

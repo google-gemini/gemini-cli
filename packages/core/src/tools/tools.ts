@@ -173,8 +173,8 @@ export abstract class BaseToolInvocation<
       type: 'info',
       title: `Confirm: ${this._toolDisplayName || this._toolName}`,
       prompt: this.getDescription(),
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        await this.publishPolicyUpdate(outcome);
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // Policy updates are now handled centrally by the scheduler
       },
     };
     return confirmationDetails;
@@ -195,6 +195,7 @@ export abstract class BaseToolInvocation<
       correlationId,
       toolCall: {
         name: this._toolName,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         args: this.params as Record<string, unknown>,
       },
       serverName: this._serverName,
@@ -312,8 +313,15 @@ export interface ToolBuilder<
 
   /**
    * Function declaration schema from @google/genai.
+   * @param modelId Optional model identifier to get a model-specific schema.
    */
-  schema: FunctionDeclaration;
+  getSchema(modelId?: string): FunctionDeclaration;
+
+  /**
+   * Function declaration schema for the default model.
+   * @deprecated Use getSchema(modelId) for model-specific schemas.
+   */
+  readonly schema: FunctionDeclaration;
 
   /**
    * Whether the tool's output should be rendered as markdown.
@@ -324,6 +332,11 @@ export interface ToolBuilder<
    * Whether the tool supports live (streaming) output.
    */
   canUpdateOutput: boolean;
+
+  /**
+   * Whether the tool is read-only (has no side effects).
+   */
+  isReadOnly: boolean;
 
   /**
    * Validates raw parameters and builds a ready-to-execute invocation.
@@ -355,12 +368,20 @@ export abstract class DeclarativeTool<
     readonly extensionId?: string,
   ) {}
 
-  get schema(): FunctionDeclaration {
+  get isReadOnly(): boolean {
+    return READ_ONLY_KINDS.includes(this.kind);
+  }
+
+  getSchema(_modelId?: string): FunctionDeclaration {
     return {
       name: this.name,
       description: this.description,
       parametersJsonSchema: this.parameterSchema,
     };
+  }
+
+  get schema(): FunctionDeclaration {
+    return this.getSchema();
   }
 
   /**
@@ -525,6 +546,7 @@ export function isTool(obj: unknown): obj is AnyDeclarativeTool {
     obj !== null &&
     'name' in obj &&
     'build' in obj &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     typeof (obj as AnyDeclarativeTool).build === 'function'
   );
 }
@@ -579,8 +601,10 @@ export function hasCycleInSchema(schema: object): boolean {
       ) {
         return null;
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       current = (current as Record<string, unknown>)[segment];
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return current as object;
   }
 
@@ -628,6 +652,7 @@ export function hasCycleInSchema(schema: object): boolean {
       if (Object.prototype.hasOwnProperty.call(node, key)) {
         if (
           traverse(
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             (node as Record<string, unknown>)[key],
             visitedRefs,
             pathRefs,
@@ -801,6 +826,13 @@ export const MUTATOR_KINDS: Kind[] = [
   Kind.Delete,
   Kind.Move,
   Kind.Execute,
+] as const;
+
+// Function kinds that are safe to run in parallel
+export const READ_ONLY_KINDS: Kind[] = [
+  Kind.Read,
+  Kind.Search,
+  Kind.Fetch,
 ] as const;
 
 export interface ToolLocation {

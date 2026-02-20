@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.28.0-nightly.20260128.adc8e11bb",
+  "version": "0.30.0-nightly.20260210.a2174751d",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,7 +14,7 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.28.0-nightly.20260128.adc8e11bb"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.30.0-nightly.20260210.a2174751d"
   },
   "scripts": {
     "start": "cross-env NODE_ENV=development node scripts/start.js",
@@ -32,12 +32,12 @@
     "docs:settings": "tsx ./scripts/generate-settings-doc.ts",
     "docs:keybindings": "tsx ./scripts/generate-keybindings-doc.ts",
     "build": "node scripts/build.js",
-    "build-and-start": "npm run build && npm run start",
+    "build-and-start": "npm run build && npm run start --",
     "build:vscode": "node scripts/build_vscode_companion.js",
     "build:all": "npm run build && npm run build:sandbox && npm run build:vscode",
     "build:packages": "npm run build --workspaces",
     "build:sandbox": "node scripts/build_sandbox.js",
-    "bundle": "npm run generate && node esbuild.config.js && node scripts/copy_bundle_assets.js",
+    "bundle": "npm run generate && npm run build --workspace=@google/gemini-cli-devtools && node esbuild.config.js && node scripts/copy_bundle_assets.js",
     "test": "npm run test --workspaces --if-present",
     "test:ci": "npm run test:ci --workspaces --if-present && npm run test:scripts",
     "test:scripts": "vitest run --config ./scripts/tests/vitest.config.ts",
@@ -64,11 +64,13 @@
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {
-    "ink": "npm:@jrichman/ink@6.4.8",
+    "ink": "npm:@jrichman/ink@6.4.11",
     "wrap-ansi": "9.0.2",
     "cliui": {
       "wrap-ansi": "7.0.0"
-    }
+    },
+    "glob": "^12.0.0",
+    "node-domexception": "^1.0.0"
   },
   "bin": {
     "gemini": "bundle/gemini.js"
@@ -86,9 +88,11 @@
     "@types/minimatch": "^5.1.2",
     "@types/mock-fs": "^4.13.4",
     "@types/prompts": "^2.4.9",
+    "@types/proper-lockfile": "^4.1.4",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@types/shell-quote": "^1.7.5",
+    "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "^3.1.1",
     "@vitest/eslint-plugin": "^1.3.4",
     "cross-env": "^7.0.3",
@@ -105,7 +109,6 @@
     "globals": "^16.0.0",
     "google-artifactregistry-auth": "^3.4.0",
     "husky": "^9.1.7",
-    "ink-testing-library": "^4.0.0",
     "json": "^11.0.0",
     "lint-staged": "^16.1.6",
     "memfs": "^4.42.0",
@@ -115,6 +118,7 @@
     "npm-run-all": "^4.1.5",
     "prettier": "^3.5.3",
     "react-devtools-core": "^6.1.2",
+    "react-dom": "^19.2.0",
     "semver": "^7.7.2",
     "strip-ansi": "^7.1.2",
     "ts-prune": "^0.10.3",
@@ -124,8 +128,10 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
-    "ink": "npm:@jrichman/ink@6.4.8",
+    "ink": "npm:@jrichman/ink@6.4.11",
     "latest-version": "^9.0.0",
+    "proper-lockfile": "^4.1.2",
+    "punycode": "^2.3.1",
     "simple-git": "^3.28.0"
   },
   "optionalDependencies": {

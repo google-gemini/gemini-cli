@@ -33,7 +33,10 @@ export class OverrideStrategy implements RoutingStrategy {
 
     // Return the overridden model name.
     return {
-      model: resolveModel(overrideModel, config.getPreviewFeatures()),
+      model: resolveModel(
+        overrideModel,
+        config.getGemini31LaunchedSync?.() ?? false,
+      ),
       metadata: {
         source: this.name,
         latencyMs: 0,

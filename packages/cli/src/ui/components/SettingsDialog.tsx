@@ -39,8 +39,8 @@ import {
 } from '../../config/settingsSchema.js';
 import { coreEvents, debugLogger } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
-import { useUIState } from '../contexts/UIStateContext.js';
-import { useTextBuffer } from './shared/text-buffer.js';
+
+import { useSearchBuffer } from '../hooks/useSearchBuffer.js';
 import {
   BaseSettingsDialog,
   type SettingsDialogItem,
@@ -115,6 +115,7 @@ export function SettingsDialog({
     }
 
     const doSearch = async () => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const results = await fzfInstance.find(searchQuery);
 
       if (!active) return;
@@ -207,21 +208,10 @@ export function SettingsDialog({
     return max;
   }, [selectedScope, settings]);
 
-  // Get mainAreaWidth for search buffer viewport
-  const { mainAreaWidth } = useUIState();
-  const viewportWidth = mainAreaWidth - 8;
-
   // Search input buffer
-  const searchBuffer = useTextBuffer({
+  const searchBuffer = useSearchBuffer({
     initialText: '',
-    initialCursorOffset: 0,
-    viewport: {
-      width: viewportWidth,
-      height: 1,
-    },
-    isValidPath: () => false,
-    singleLine: true,
-    onChange: (text) => setSearchQuery(text),
+    onChange: setSearchQuery,
   });
 
   // Generate items for BaseSettingsDialog
@@ -260,10 +250,12 @@ export function SettingsDialog({
         key,
         label: definition?.label || key,
         description: definition?.description,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         type: type as 'boolean' | 'number' | 'string' | 'enum',
         displayValue,
         isGreyedOut,
         scopeMessage,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         rawValue: rawValue as string | number | boolean | undefined,
       };
     });
@@ -284,8 +276,10 @@ export function SettingsDialog({
       const currentValue = getEffectiveValue(key, pendingSettings, {});
       let newValue: SettingsValue;
       if (definition?.type === 'boolean') {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         newValue = !(currentValue as boolean);
         setPendingSettings((prev) =>
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           setPendingSettingValue(key, newValue as boolean, prev),
         );
       } else if (definition?.type === 'enum' && definition.options) {
@@ -355,10 +349,6 @@ export function SettingsDialog({
           next.delete(key);
           return next;
         });
-
-        if (key === 'general.previewFeatures') {
-          config?.setPreviewFeatures(newValue as boolean);
-        }
       } else {
         // For restart-required settings, track as modified
         setModifiedSettings((prev) => {
@@ -382,19 +372,13 @@ export function SettingsDialog({
         // Record pending change globally
         setGlobalPendingChanges((prev) => {
           const next = new Map(prev);
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           next.set(key, newValue as PendingValue);
           return next;
         });
       }
     },
-    [
-      pendingSettings,
-      settings,
-      selectedScope,
-      vimEnabled,
-      toggleVimEnabled,
-      config,
-    ],
+    [pendingSettings, settings, selectedScope, vimEnabled, toggleVimEnabled],
   );
 
   // Edit commit handler
@@ -521,12 +505,6 @@ export function SettingsDialog({
               );
             });
           }
-        }
-
-        if (key === 'general.previewFeatures') {
-          const booleanDefaultValue =
-            typeof defaultValue === 'boolean' ? defaultValue : false;
-          config?.setPreviewFeatures(booleanDefaultValue);
         }
       }
 

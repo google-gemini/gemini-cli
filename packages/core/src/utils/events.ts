@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,6 +8,11 @@ import { EventEmitter } from 'node:events';
 import type { AgentDefinition } from '../agents/types.js';
 import type { McpClient } from '../tools/mcp-client.js';
 import type { ExtensionEvents } from './extensionLoader.js';
+import type { EditorType } from './editor.js';
+import type {
+  TokenStorageInitializationEvent,
+  KeychainAvailabilityEvent,
+} from '../telemetry/types.js';
 
 /**
  * Defines the severity level for user-facing feedback.
@@ -120,10 +125,42 @@ export interface ConsentRequestPayload {
 }
 
 /**
+ * Payload for the 'mcp-progress' event.
+ */
+export interface McpProgressPayload {
+  serverName: string;
+  callId: string;
+  progressToken: string | number;
+  progress: number;
+  total?: number;
+  message?: string;
+}
+
+/**
  * Payload for the 'agents-discovered' event.
  */
 export interface AgentsDiscoveredPayload {
   agents: AgentDefinition[];
+}
+
+export interface SlashCommandConflict {
+  name: string;
+  renamedTo: string;
+  loserExtensionName?: string;
+  winnerExtensionName?: string;
+}
+
+export interface SlashCommandConflictsPayload {
+  conflicts: SlashCommandConflict[];
+}
+
+/**
+ * Payload for the 'quota-changed' event.
+ */
+export interface QuotaChangedPayload {
+  remaining: number | undefined;
+  limit: number | undefined;
+  resetTime?: string;
 }
 
 export enum CoreEvent {
@@ -142,7 +179,21 @@ export enum CoreEvent {
   AdminSettingsChanged = 'admin-settings-changed',
   RetryAttempt = 'retry-attempt',
   ConsentRequest = 'consent-request',
+  McpProgress = 'mcp-progress',
   AgentsDiscovered = 'agents-discovered',
+  RequestEditorSelection = 'request-editor-selection',
+  EditorSelected = 'editor-selected',
+  SlashCommandConflicts = 'slash-command-conflicts',
+  QuotaChanged = 'quota-changed',
+  TelemetryKeychainAvailability = 'telemetry-keychain-availability',
+  TelemetryTokenStorageType = 'telemetry-token-storage-type',
+}
+
+/**
+ * Payload for the 'editor-selected' event.
+ */
+export interface EditorSelectedPayload {
+  editor?: EditorType;
 }
 
 export interface CoreEvents extends ExtensionEvents {
@@ -151,6 +202,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
   [CoreEvent.Output]: [OutputPayload];
   [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
+  [CoreEvent.QuotaChanged]: [QuotaChangedPayload];
   [CoreEvent.ExternalEditorClosed]: never[];
   [CoreEvent.McpClientUpdate]: Array<Map<string, McpClient> | never>;
   [CoreEvent.OauthDisplayMessage]: string[];
@@ -161,7 +213,13 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.AdminSettingsChanged]: never[];
   [CoreEvent.RetryAttempt]: [RetryAttemptPayload];
   [CoreEvent.ConsentRequest]: [ConsentRequestPayload];
+  [CoreEvent.McpProgress]: [McpProgressPayload];
   [CoreEvent.AgentsDiscovered]: [AgentsDiscoveredPayload];
+  [CoreEvent.RequestEditorSelection]: never[];
+  [CoreEvent.EditorSelected]: [EditorSelectedPayload];
+  [CoreEvent.SlashCommandConflicts]: [SlashCommandConflictsPayload];
+  [CoreEvent.TelemetryKeychainAvailability]: [KeychainAvailabilityEvent];
+  [CoreEvent.TelemetryTokenStorageType]: [TokenStorageInitializationEvent];
 }
 
 type EventBacklogItem = {
@@ -187,14 +245,14 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
       if (this._eventBacklog.length >= CoreEventEmitter.MAX_BACKLOG_SIZE) {
         this._eventBacklog.shift();
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       this._eventBacklog.push({ event, args } as EventBacklogItem);
     } else {
-      (
-        this.emit as <K extends keyof CoreEvents>(
-          event: K,
-          ...args: CoreEvents[K]
-        ) => boolean
-      )(event, ...args);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      (this.emit as (event: K, ...args: CoreEvents[K]) => boolean)(
+        event,
+        ...args,
+      );
     }
   }
 
@@ -292,11 +350,35 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   }
 
   /**
+   * Notifies subscribers that progress has been made on an MCP tool call.
+   */
+  emitMcpProgress(payload: McpProgressPayload): void {
+    this.emit(CoreEvent.McpProgress, payload);
+  }
+
+  /**
    * Notifies subscribers that new unacknowledged agents have been discovered.
    */
   emitAgentsDiscovered(agents: AgentDefinition[]): void {
     const payload: AgentsDiscoveredPayload = { agents };
     this._emitOrQueue(CoreEvent.AgentsDiscovered, payload);
+  }
+
+  emitSlashCommandConflicts(conflicts: SlashCommandConflict[]): void {
+    const payload: SlashCommandConflictsPayload = { conflicts };
+    this._emitOrQueue(CoreEvent.SlashCommandConflicts, payload);
+  }
+
+  /**
+   * Notifies subscribers that the quota has changed.
+   */
+  emitQuotaChanged(
+    remaining: number | undefined,
+    limit: number | undefined,
+    resetTime?: string,
+  ): void {
+    const payload: QuotaChangedPayload = { remaining, limit, resetTime };
+    this.emit(CoreEvent.QuotaChanged, payload);
   }
 
   /**
@@ -307,13 +389,20 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
     const backlog = [...this._eventBacklog];
     this._eventBacklog.length = 0; // Clear in-place
     for (const item of backlog) {
-      (
-        this.emit as <K extends keyof CoreEvents>(
-          event: K,
-          ...args: CoreEvents[K]
-        ) => boolean
-      )(item.event, ...item.args);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      (this.emit as (event: keyof CoreEvents, ...args: unknown[]) => boolean)(
+        item.event,
+        ...item.args,
+      );
     }
+  }
+
+  emitTelemetryKeychainAvailability(event: KeychainAvailabilityEvent): void {
+    this._emitOrQueue(CoreEvent.TelemetryKeychainAvailability, event);
+  }
+
+  emitTelemetryTokenStorageType(event: TokenStorageInitializationEvent): void {
+    this._emitOrQueue(CoreEvent.TelemetryTokenStorageType, event);
   }
 }
 
