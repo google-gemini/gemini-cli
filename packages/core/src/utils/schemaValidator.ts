@@ -8,14 +8,55 @@ import AjvPkg, { type AnySchema, type Ajv } from 'ajv';
 // Ajv2020 is the documented way to use draft-2020-12: https://ajv.js.org/json-schema.html#draft-2020-12
 // eslint-disable-next-line import/no-internal-modules
 import Ajv2020Pkg from 'ajv/dist/2020.js';
-import * as addFormats from 'ajv-formats';
+import addFormatsPkg from 'ajv-formats';
 import { debugLogger } from './debugLogger.js';
 
-// Ajv's ESM/CJS interop: use 'any' for compatibility as recommended by Ajv docs
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
-const AjvClass = (AjvPkg as any).default || AjvPkg;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
-const Ajv2020Class = (Ajv2020Pkg as any).default || Ajv2020Pkg;
+// At runtime, default imports from CJS modules may be double-wrapped as
+// { default: ActualExport } depending on the bundler/runtime. These helpers
+// resolve the actual export using type guards for runtime type safety.
+
+/** Constructor type compatible with Ajv classes. */
+type AjvCtorLike = new (opts?: Record<string, unknown>) => Ajv;
+
+/** Type guard that validates a value is an Ajv-compatible constructor. */
+function isAjvCtor(val: unknown): val is AjvCtorLike {
+  return typeof val === 'function';
+}
+
+/**
+ * Creates an Ajv instance from a module import, handling ESM/CJS interop
+ * where the module may be double-wrapped as { default: Constructor }.
+ */
+function createAjvFromModule(mod: unknown, opts: Record<string, unknown>): Ajv {
+  if (typeof mod === 'object' && mod !== null && 'default' in mod && isAjvCtor(mod.default)) {
+    return new mod.default(opts);
+  }
+  if (isAjvCtor(mod)) {
+    return new mod(opts);
+  }
+  throw new Error('Failed to resolve Ajv constructor from module');
+}
+
+/** Function type compatible with the ajv-formats plugin. */
+type FormatsPluginFn = (ajv: Ajv, ...args: unknown[]) => unknown;
+
+/** Type guard that validates a value is a formats plugin function. */
+function isFormatsPlugin(val: unknown): val is FormatsPluginFn {
+  return typeof val === 'function';
+}
+
+/**
+ * Resolves the ajv-formats plugin function from a potentially wrapped module.
+ */
+function resolveFormatsPlugin(mod: unknown): FormatsPluginFn {
+  if (typeof mod === 'object' && mod !== null && 'default' in mod && isFormatsPlugin(mod.default)) {
+    return mod.default;
+  }
+  if (isFormatsPlugin(mod)) {
+    return mod;
+  }
+  throw new Error('Failed to resolve ajv-formats plugin from module');
+}
 
 const ajvOptions = {
   // See: https://ajv.js.org/options.html#strict-mode-options
@@ -29,20 +70,25 @@ const ajvOptions = {
 };
 
 // Draft-07 validator (default)
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-const ajvDefault: Ajv = new AjvClass(ajvOptions);
+const ajvDefault: Ajv = createAjvFromModule(AjvPkg, ajvOptions);
 
 // Draft-2020-12 validator for MCP servers using rmcp
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-const ajv2020: Ajv = new Ajv2020Class(ajvOptions);
+const ajv2020: Ajv = createAjvFromModule(Ajv2020Pkg, ajvOptions);
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
-const addFormatsFunc = (addFormats as any).default || addFormats;
+const addFormatsFunc = resolveFormatsPlugin(addFormatsPkg);
 addFormatsFunc(ajvDefault);
 addFormatsFunc(ajv2020);
 
 // Canonical draft-2020-12 meta-schema URI (used by rmcp MCP servers)
 const DRAFT_2020_12_SCHEMA = 'https://json-schema.org/draft/2020-12/schema';
+
+/** Safely extracts the $schema URI from a schema object for logging. */
+function getSchemaUri(schema: unknown): string {
+  if (typeof schema === 'object' && schema !== null && '$schema' in schema) {
+    return String(schema.$schema);
+  }
+  return '<no $schema>';
+}
 
 /**
  * Returns the appropriate validator based on schema's $schema field.
@@ -92,8 +138,7 @@ export class SchemaValidator {
       // This matches LenientJsonSchemaValidator behavior in mcp-client.ts.
       debugLogger.warn(
         `Failed to compile schema (${
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          (schema as Record<string, unknown>)?.['$schema'] ?? '<no $schema>'
+          getSchemaUri(schema)
         }): ${error instanceof Error ? error.message : String(error)}. ` +
           'Skipping parameter validation.',
       );
@@ -124,8 +169,7 @@ export class SchemaValidator {
       // Skip validation rather than blocking tool usage.
       debugLogger.warn(
         `Failed to validate schema (${
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          (schema as Record<string, unknown>)?.['$schema'] ?? '<no $schema>'
+          getSchemaUri(schema)
         }): ${error instanceof Error ? error.message : String(error)}. ` +
           'Skipping schema validation.',
       );
