@@ -561,7 +561,10 @@ export class GeminiClient {
 
     // Availability logic: The configured model is the source of truth,
     // including any permanent fallbacks (config.setModel) or manual overrides.
-    return resolveModel(this.config.getActiveModel());
+    return resolveModel(
+      this.config.getActiveModel(),
+      this.config.getGemini31LaunchedSync?.() ?? false,
+    );
   }
 
   private async *processTurn(

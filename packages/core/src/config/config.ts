@@ -1075,6 +1075,12 @@ export class Config {
     // Reset availability status when switching auth (e.g. from limited key to OAuth)
     this.modelAvailabilityService.reset();
 
+    // Clear stale authType to ensure getGemini31LaunchedSync doesn't return stale results
+    // during the transition.
+    if (this.contentGeneratorConfig) {
+      this.contentGeneratorConfig.authType = undefined;
+    }
+
     const newContentGeneratorConfig = await createContentGeneratorConfig(
       this,
       authMethod,
@@ -1354,7 +1360,10 @@ export class Config {
     if (pooled.remaining !== undefined) {
       return pooled.remaining;
     }
-    const primaryModel = resolveModel(this.getModel());
+    const primaryModel = resolveModel(
+      this.getModel(),
+      this.getGemini31LaunchedSync(),
+    );
     return this.modelQuotas.get(primaryModel)?.remaining;
   }
 
@@ -1363,7 +1372,10 @@ export class Config {
     if (pooled.limit !== undefined) {
       return pooled.limit;
     }
-    const primaryModel = resolveModel(this.getModel());
+    const primaryModel = resolveModel(
+      this.getModel(),
+      this.getGemini31LaunchedSync(),
+    );
     return this.modelQuotas.get(primaryModel)?.limit;
   }
 
@@ -1372,7 +1384,10 @@ export class Config {
     if (pooled.resetTime !== undefined) {
       return pooled.resetTime;
     }
-    const primaryModel = resolveModel(this.getModel());
+    const primaryModel = resolveModel(
+      this.getModel(),
+      this.getGemini31LaunchedSync(),
+    );
     return this.modelQuotas.get(primaryModel)?.resetTime;
   }
 
@@ -2254,6 +2269,36 @@ export class Config {
     return (
       this.experiments?.flags[ExperimentFlags.BANNER_TEXT_CAPACITY_ISSUES]
         ?.stringValue ?? ''
+    );
+  }
+
+  /**
+   * Returns whether Gemini 3.1 has been launched.
+   * This method is async and ensures that experiments are loaded before returning the result.
+   */
+  async getGemini31Launched(): Promise<boolean> {
+    await this.ensureExperimentsLoaded();
+    return this.getGemini31LaunchedSync();
+  }
+
+  /**
+   * Returns whether Gemini 3.1 has been launched.
+   *
+   * Note: This method should only be called after startup, once experiments have been loaded.
+   * If you need to call this during startup or from an async context, use
+   * getGemini31Launched instead.
+   */
+  getGemini31LaunchedSync(): boolean {
+    const authType = this.contentGeneratorConfig?.authType;
+    if (
+      authType === AuthType.USE_GEMINI ||
+      authType === AuthType.USE_VERTEX_AI
+    ) {
+      return true;
+    }
+    return (
+      this.experiments?.flags[ExperimentFlags.GEMINI_3_1_PRO_LAUNCHED]
+        ?.boolValue ?? false
     );
   }
 
