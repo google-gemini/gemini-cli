@@ -4,21 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  BaseToolInvocation,
-  type ToolConfirmationOutcome,
-  type ToolResult,
-  type ToolCallConfirmationDetails,
-  type ExecuteOptions,
+import { BaseToolInvocation } from '../tools/tools.js';
+import type {
+  ToolResult,
+  ToolCallConfirmationDetails,
+  ToolConfirmationOutcome,
+  ExecuteOptions,
 } from '../tools/tools.js';
 import {
   DEFAULT_QUERY_STRING,
-  type RemoteAgentInputs,
-  type RemoteAgentDefinition,
-  type AgentInputs,
-  type SubagentProgress,
   getAgentCardLoadOptions,
   getRemoteAgentTargetUrl,
+} from './types.js';
+import type {
+  RemoteAgentInputs,
+  RemoteAgentDefinition,
+  AgentInputs,
+  SubagentProgress,
 } from './types.js';
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
