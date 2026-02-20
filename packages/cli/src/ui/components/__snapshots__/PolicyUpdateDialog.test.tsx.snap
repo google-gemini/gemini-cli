@@ -1,0 +1,15 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`PolicyUpdateDialog > renders correctly and matches snapshot 1`] = `
+" ╭────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │                                                                                                │
+ │ New or changed workspace policies detected                                                     │
+ │ Location: /test/workspace/.gemini/policies                                                     │
+ │ Do you want to accept and load these policies?                                                 │
+ │                                                                                                │
+ │ ● 1. Accept and Load                                                                           │
+ │   2. Ignore (Use Default Policies)                                                             │
+ │                                                                                                │
+ ╰────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
