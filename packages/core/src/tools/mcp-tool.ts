@@ -247,7 +247,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     override readonly parameterSchema: unknown,
     messageBus: MessageBus,
     readonly trust?: boolean,
-    readonly isReadOnly?: boolean,
+    isReadOnly?: boolean,
     nameOverride?: string,
     private readonly cliConfig?: Config,
     override readonly extensionName?: string,
@@ -265,6 +265,16 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       extensionName,
       extensionId,
     );
+    this._isReadOnly = isReadOnly;
+  }
+
+  private readonly _isReadOnly?: boolean;
+
+  override get isReadOnly(): boolean {
+    if (this._isReadOnly !== undefined) {
+      return this._isReadOnly;
+    }
+    return super.isReadOnly;
   }
 
   getFullyQualifiedPrefix(): string {
