@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -31,8 +31,7 @@ import {
 describe('isCustomModel', () => {
   it('should return true for models not starting with gemini-', () => {
     expect(isCustomModel('testing')).toBe(true);
-    expect(isCustomModel('gpt-4')).toBe(true);
-    expect(isCustomModel('claude-3')).toBe(true);
+    expect(isCustomModel('some-other-model')).toBe(true);
   });
 
   it('should return false for Gemini models', () => {
@@ -91,7 +90,7 @@ describe('isGemini3Model', () => {
   });
 
   it('should return false for arbitrary strings', () => {
-    expect(isGemini3Model('gpt-4')).toBe(false);
+    expect(isGemini3Model('some-model')).toBe(false);
   });
 });
 
@@ -192,7 +191,7 @@ describe('isGemini2Model', () => {
   });
 
   it('should return false for arbitrary strings', () => {
-    expect(isGemini2Model('gpt-4')).toBe(false);
+    expect(isGemini2Model('some-model')).toBe(false);
   });
 });
 
@@ -217,7 +216,7 @@ describe('isAutoModel', () => {
 });
 
 describe('getShortDisplayString', () => {
-  it('should return short abbreviations for known Gemini models', () => {
+  it('should return short abbreviations for internal Gemini models', () => {
     expect(getShortDisplayString(PREVIEW_GEMINI_MODEL)).toBe('PP30');
     expect(getShortDisplayString(PREVIEW_GEMINI_FLASH_MODEL)).toBe('FP30');
     expect(getShortDisplayString(DEFAULT_GEMINI_MODEL)).toBe('P25');
@@ -228,19 +227,24 @@ describe('getShortDisplayString', () => {
   it('should return Auto for auto models', () => {
     expect(getShortDisplayString(PREVIEW_GEMINI_MODEL_AUTO)).toBe('Auto');
     expect(getShortDisplayString(DEFAULT_GEMINI_MODEL_AUTO)).toBe('Auto');
+    expect(getShortDisplayString(GEMINI_MODEL_ALIAS_AUTO)).toBe('Auto');
   });
 
-  it('should handle custom gemini models', () => {
-    expect(getShortDisplayString('gemini-1.5-flash')).toBe('F15');
+  it('should handle generic gemini model strings robustly', () => {
     expect(getShortDisplayString('gemini-1.5-pro')).toBe('P15');
+    expect(getShortDisplayString('gemini-1.5-flash')).toBe('F15');
+    expect(getShortDisplayString('gemini-1.5-flash-lite')).toBe('FL15');
+    expect(getShortDisplayString('gemini-1.5-pro-preview')).toBe('PP15');
+    expect(getShortDisplayString('gemini-2.0-flash-experimental')).toBe('FP20');
     expect(getShortDisplayString('gemini-2.0-flash-lite-preview')).toBe(
       'FLP20',
     );
+    expect(getShortDisplayString('gemini-2.0-pro-exp')).toBe('P20');
   });
 
-  it('should handle non-gemini models', () => {
-    expect(getShortDisplayString('gpt-4')).toBe('GPT-');
-    expect(getShortDisplayString('claude-3-opus')).toBe('CLAU');
+  it('should handle missing version numbers', () => {
+    expect(getShortDisplayString('gemini-pro')).toBe('P');
+    expect(getShortDisplayString('gemini-flash-preview')).toBe('FP');
   });
 });
 

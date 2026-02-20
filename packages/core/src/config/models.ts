@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -107,12 +107,13 @@ export function getDisplayString(model: string) {
 }
 
 /**
- * Returns a short, compact abbreviation for a model name.
+ * Returns a short, compact abbreviation for a Gemini model name.
  *
  * @param model The model name to abbreviate.
  * @returns A short abbreviation (e.g., 'PP30', 'P25', 'FL25').
  */
 export function getShortDisplayString(model: string): string {
+  // Direct matches for internal constants
   switch (model) {
     case PREVIEW_GEMINI_MODEL:
       return 'PP30';
@@ -126,28 +127,41 @@ export function getShortDisplayString(model: string): string {
       return 'FL25';
     case PREVIEW_GEMINI_MODEL_AUTO:
     case DEFAULT_GEMINI_MODEL_AUTO:
+    case GEMINI_MODEL_ALIAS_AUTO:
       return 'Auto';
-    default: {
-      // For other models, try to construct a descriptive abbreviation
-      if (model.startsWith('gemini-')) {
-        const parts = model.split('-');
-        // gemini-1.5-flash -> F15
-        // gemini-1.5-pro -> P15
-        const version = parts[1]?.replace('.', '') || '';
-        const typePart = parts.slice(2).join('-').toLowerCase();
-        let type = '';
-        if (typePart.includes('flash')) {
-          type = typePart.includes('lite') ? 'FL' : 'F';
-        } else if (typePart.includes('pro')) {
-          type = 'P';
-        }
-        const isPreview =
-          model.includes('preview') || model.includes('experimental');
-        return `${type}${isPreview ? 'P' : ''}${version}`.replace(/\s+/g, '');
-      }
-      return model.slice(0, 4).toUpperCase();
+    default:
+      break;
+  }
+
+  // Handle generic gemini-X.Y-TYPE[-preview] pattern
+  if (model.startsWith('gemini-')) {
+    const parts = model.split('-');
+    // [gemini, 1.5, flash, lite, preview]
+
+    // Extract version: find first part that looks like a version number
+    const versionPart = parts.find((p) => /^\d+(\.\d+)*$/.test(p));
+    const version = versionPart ? versionPart.replace(/\./g, '') : '';
+
+    // Extract type and preview status
+    const typePart = model.toLowerCase();
+    let type = '';
+    if (typePart.includes('flash')) {
+      type = typePart.includes('lite') ? 'FL' : 'F';
+    } else if (typePart.includes('pro')) {
+      type = 'P';
+    }
+
+    const isPreview =
+      typePart.includes('preview') || typePart.includes('experimental');
+
+    const result = `${type}${isPreview ? 'P' : ''}${version}`.trim();
+    if (result) {
+      return result;
     }
   }
+
+  // Fallback for anything else (should be rare if strictly Gemini)
+  return model.replace(/-/g, '').slice(0, 4).toUpperCase() || 'GEMI';
 }
 
 /**
