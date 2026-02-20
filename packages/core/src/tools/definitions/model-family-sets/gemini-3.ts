@@ -212,18 +212,18 @@ export const GEMINI_3_SET: CoreToolSet = {
   glob: {
     name: GLOB_TOOL_NAME,
     description:
-      "Finds files matching specific glob patterns (e.g., 'src/**/*.ts'), sorted by recency (newest first). Efficiently maps project structure or verifies file existence before using 'read_file' or 'replace'. If 'dir_path' is omitted, it searches all workspace directories. Includes hidden 'dot' files (e.g., .env) and respects ignore patterns by default.",
+      'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.',
     parametersJsonSchema: {
       type: 'object',
       properties: {
         pattern: {
           description:
-            "The glob pattern to match (e.g., '**/*.js'). Use '**' to search recursively across directories.",
+            "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
           type: 'string',
         },
         dir_path: {
           description:
-            'Optional: The absolute path to the directory to search within. If omitted, searches all workspace directories recursively.',
+            'Optional: The absolute path to the directory to search within. If omitted, searches the root directory.',
           type: 'string',
         },
         case_sensitive: {
@@ -233,12 +233,12 @@ export const GEMINI_3_SET: CoreToolSet = {
         },
         respect_git_ignore: {
           description:
-            'Optional: Whether to respect .gitignore patterns. Defaults to true.',
+            'Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.',
           type: 'boolean',
         },
         respect_gemini_ignore: {
           description:
-            'Optional: Whether to respect .geminiignore patterns. Defaults to true.',
+            'Optional: Whether to respect .geminiignore patterns when finding files. Defaults to true.',
           type: 'boolean',
         },
       },

@@ -41,32 +41,6 @@ describe('Tool Optimizations (Gemini 3)', () => {
   });
 
   /**
-   * glob: Verify the agent is aware of recursive search capabilities.
-   */
-  evalTest('USUALLY_PASSES', {
-    name: 'glob should be used recursively to find files in subdirectories',
-    prompt: 'Find the helper.ts file in this project.',
-    files: {
-      'src/utils/helpers/helper.ts': 'export const help = () => {};',
-    },
-    assert: async (rig) => {
-      const toolCalls = rig.readToolLogs();
-      const globCall = toolCalls.find(
-        (call) => call.toolRequest.name === 'glob',
-      );
-
-      expect(globCall, 'Agent should have called glob').toBeDefined();
-
-      const args = globCall!.toolRequest.args as any;
-      const pattern =
-        typeof args === 'string' ? JSON.parse(args).pattern : args.pattern;
-
-      // The agent should use a recursive pattern since the file is deep
-      expect(pattern).toContain('**');
-    },
-  });
-
-  /**
    * save_memory: Verify the agent doesn't save project-specific data to global memory.
    */
   evalTest('USUALLY_PASSES', {
