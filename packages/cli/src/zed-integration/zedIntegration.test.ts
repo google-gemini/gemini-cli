@@ -73,7 +73,7 @@ vi.mock(
       ...actual,
       ReadManyFilesTool: vi.fn().mockImplementation(() => ({
         name: 'read_many_files',
-        kind: 'native',
+        kind: 'read',
         build: vi.fn().mockReturnValue({
           getDescription: () => 'Read files',
           toolLocations: () => [],
@@ -84,6 +84,28 @@ vi.mock(
       })),
       logToolCall: vi.fn(),
       isWithinRoot: vi.fn().mockReturnValue(true),
+      LlmRole: {
+        MAIN: 'main',
+        SUBAGENT: 'subagent',
+        UTILITY_TOOL: 'utility_tool',
+        UTILITY_COMPRESSOR: 'utility_compressor',
+        UTILITY_SUMMARIZER: 'utility_summarizer',
+        UTILITY_ROUTER: 'utility_router',
+        UTILITY_LOOP_DETECTOR: 'utility_loop_detector',
+        UTILITY_NEXT_SPEAKER: 'utility_next_speaker',
+        UTILITY_EDIT_CORRECTOR: 'utility_edit_corrector',
+        UTILITY_AUTOCOMPLETE: 'utility_autocomplete',
+        UTILITY_FAST_ACK_HELPER: 'utility_fast_ack_helper',
+      },
+      CoreToolCallStatus: {
+        Validating: 'validating',
+        Scheduled: 'scheduled',
+        Error: 'error',
+        Success: 'success',
+        Executing: 'executing',
+        Cancelled: 'cancelled',
+        AwaitingApproval: 'awaiting_approval',
+      },
     };
   },
 );
@@ -406,7 +428,7 @@ describe('Session', () => {
       recordCompletedToolCalls: vi.fn(),
     } as unknown as Mocked<GeminiChat>;
     mockTool = {
-      kind: 'native',
+      kind: 'read',
       build: vi.fn().mockReturnValue({
         getDescription: () => 'Test Tool',
         toolLocations: () => [],
@@ -511,6 +533,7 @@ describe('Session', () => {
         update: expect.objectContaining({
           sessionUpdate: 'tool_call',
           status: 'in_progress',
+          kind: 'read',
         }),
       }),
     );
@@ -630,6 +653,92 @@ describe('Session', () => {
         }),
       ]),
     );
+  });
+
+  it('should include _meta.kind in diff tool calls', async () => {
+    // Test 'add' (no original content)
+    const addConfirmation = {
+      type: 'edit',
+      fileName: 'new.txt',
+      originalContent: null,
+      newContent: 'New content',
+      onConfirm: vi.fn(),
+    };
+
+    // Test 'modify' (original and new content)
+    const modifyConfirmation = {
+      type: 'edit',
+      fileName: 'existing.txt',
+      originalContent: 'Old content',
+      newContent: 'New content',
+      onConfirm: vi.fn(),
+    };
+
+    // Test 'delete' (original content, no new content)
+    const deleteConfirmation = {
+      type: 'edit',
+      fileName: 'deleted.txt',
+      originalContent: 'Old content',
+      newContent: '',
+      onConfirm: vi.fn(),
+    };
+
+    const mockBuild = vi.fn();
+    mockTool.build = mockBuild;
+
+    // Helper to simulate tool call and check permission request
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const checkDiffKind = async (confirmation: any, expectedKind: string) => {
+      mockBuild.mockReturnValueOnce({
+        getDescription: () => 'Test Tool',
+        toolLocations: () => [],
+        shouldConfirmExecute: vi.fn().mockResolvedValue(confirmation),
+        execute: vi.fn().mockResolvedValue({ llmContent: 'Result' }),
+      });
+
+      mockConnection.requestPermission.mockResolvedValueOnce({
+        outcome: {
+          outcome: 'selected',
+          optionId: ToolConfirmationOutcome.ProceedOnce,
+        },
+      });
+
+      const stream = createMockStream([
+        {
+          type: StreamEventType.CHUNK,
+          value: {
+            functionCalls: [{ name: 'test_tool', args: {} }],
+          },
+        },
+      ]);
+      const emptyStream = createMockStream([]);
+
+      mockChat.sendMessageStream
+        .mockResolvedValueOnce(stream)
+        .mockResolvedValueOnce(emptyStream);
+
+      await session.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Call tool' }],
+      });
+
+      expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolCall: expect.objectContaining({
+            content: expect.arrayContaining([
+              expect.objectContaining({
+                type: 'diff',
+                _meta: { kind: expectedKind },
+              }),
+            ]),
+          }),
+        }),
+      );
+    };
+
+    await checkDiffKind(addConfirmation, 'add');
+    await checkDiffKind(modifyConfirmation, 'modify');
+    await checkDiffKind(deleteConfirmation, 'delete');
   });
 
   it('should handle @path resolution', async () => {

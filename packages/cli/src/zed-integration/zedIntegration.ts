@@ -686,6 +686,13 @@ export class Session {
             path: confirmationDetails.fileName,
             oldText: confirmationDetails.originalContent,
             newText: confirmationDetails.newContent,
+            _meta: {
+              kind: !confirmationDetails.originalContent
+                ? 'add'
+                : confirmationDetails.newContent === ''
+                  ? 'delete'
+                  : 'modify',
+            },
           });
         }
 
@@ -1207,6 +1214,13 @@ function toToolCallContent(toolResult: ToolResult): acp.ToolCallContent | null {
           path: toolResult.returnDisplay.fileName,
           oldText: toolResult.returnDisplay.originalContent,
           newText: toolResult.returnDisplay.newContent,
+          _meta: {
+            kind: !toolResult.returnDisplay.originalContent
+              ? 'add'
+              : toolResult.returnDisplay.newContent === ''
+                ? 'delete'
+                : 'modify',
+          },
         };
       }
       return null;
@@ -1295,14 +1309,16 @@ function toAcpToolKind(kind: Kind): acp.ToolKind {
   switch (kind) {
     case Kind.Read:
     case Kind.Edit:
+    case Kind.Execute:
+    case Kind.Search:
     case Kind.Delete:
     case Kind.Move:
-    case Kind.Search:
-    case Kind.Execute:
     case Kind.Think:
     case Kind.Fetch:
+    case Kind.SwitchMode:
     case Kind.Other:
       return kind as acp.ToolKind;
+    case Kind.Plan:
     case Kind.Communicate:
     default:
       return 'other';
