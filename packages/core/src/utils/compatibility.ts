@@ -103,15 +103,12 @@ export function getCompatibilityWarnings(): StartupWarning[] {
 
   if (isJetBrainsTerminal()) {
     const platform = os.platform();
-    let terminalRecommendation = '';
-
-    if (platform === 'win32') {
-      terminalRecommendation = 'Windows Terminal';
-    } else if (platform === 'darwin') {
-      terminalRecommendation = 'iTerm2 or Terminal.app';
-    } else {
-      terminalRecommendation = 'a native terminal emulator';
-    }
+    const recommendations: Record<string, string> = {
+      win32: 'Windows Terminal',
+      darwin: 'iTerm2 or Terminal.app',
+    };
+    const terminalRecommendation =
+      recommendations[platform] ?? 'a native terminal emulator';
 
     warnings.push({
       id: 'jetbrains-terminal',
