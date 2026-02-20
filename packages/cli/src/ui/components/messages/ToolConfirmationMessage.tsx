@@ -11,7 +11,6 @@ import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 import {
   type SerializableConfirmationDetails,
-  type ToolCallConfirmationDetails,
   type Config,
   type ToolConfirmationPayload,
   ToolConfirmationOutcome,
@@ -41,9 +40,7 @@ import { ExitPlanModeDialog } from '../ExitPlanModeDialog.js';
 
 export interface ToolConfirmationMessageProps {
   callId: string;
-  confirmationDetails:
-    | ToolCallConfirmationDetails
-    | SerializableConfirmationDetails;
+  confirmationDetails: SerializableConfirmationDetails;
   config: Config;
   isFocused?: boolean;
   availableTerminalHeight?: number;
@@ -241,6 +238,10 @@ export const ToolConfirmationMessage: React.FC<
       return undefined;
     }
 
+    if (handlesOwnUI) {
+      return availableTerminalHeight;
+    }
+
     // Calculate the vertical space (in lines) consumed by UI elements
     // surrounding the main body content.
     const PADDING_OUTER_Y = 2; // Main container has `padding={1}` (top & bottom).
@@ -259,7 +260,7 @@ export const ToolConfirmationMessage: React.FC<
       1; // Reserve one line for 'ShowMoreLines' hint
 
     return Math.max(availableTerminalHeight - surroundingElementsHeight, 1);
-  }, [availableTerminalHeight, getOptions]);
+  }, [availableTerminalHeight, getOptions, handlesOwnUI]);
 
   const { question, bodyContent, options } = useMemo(() => {
     let bodyContent: React.ReactNode | null = null;

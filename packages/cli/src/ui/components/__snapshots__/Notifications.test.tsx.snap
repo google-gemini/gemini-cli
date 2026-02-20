@@ -10,7 +10,8 @@ exports[`Notifications > renders init error 1`] = `
 exports[`Notifications > renders screen reader nudge when enabled and not seen (no legacy file) 1`] = `
 "You are currently in screen reader-friendly view. To switch out, open
 /mock/home/.gemini/settings.json and remove the entry for "screenReader". This will disappear on
-next run."
+next run.
+"
 `;
 
 exports[`Notifications > renders update notification 1`] = `

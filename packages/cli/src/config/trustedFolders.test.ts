@@ -449,6 +449,14 @@ describe('Trusted Folders', () => {
         false,
       );
     });
+
+    it('should return true for isPathTrusted when isHeadlessMode is true', async () => {
+      const geminiCore = await import('@google/gemini-cli-core');
+      vi.spyOn(geminiCore, 'isHeadlessMode').mockReturnValue(true);
+
+      const folders = loadTrustedFolders();
+      expect(folders.isPathTrusted('/any-untrusted-path')).toBe(true);
+    });
   });
 
   describe('Trusted Folders Caching', () => {
@@ -483,25 +491,33 @@ describe('Trusted Folders', () => {
     });
   });
 
+  const itif = (condition: boolean) => (condition ? it : it.skip);
+
   describe('Symlinks Support', () => {
     const mockSettings: Settings = {
       security: { folderTrust: { enabled: true } },
     };
 
-    it('should trust a folder if the rule matches the realpath', () => {
-      // Create a real directory and a symlink
-      const realDir = path.join(tempDir, 'real');
-      const symlinkDir = path.join(tempDir, 'symlink');
-      fs.mkdirSync(realDir);
-      fs.symlinkSync(realDir, symlinkDir);
+    // TODO: issue 19387 - Enable symlink tests on Windows
+    itif(process.platform !== 'win32')(
+      'should trust a folder if the rule matches the realpath',
+      () => {
+        // Create a real directory and a symlink
+        const realDir = path.join(tempDir, 'real');
+        const symlinkDir = path.join(tempDir, 'symlink');
+        fs.mkdirSync(realDir);
+        fs.symlinkSync(realDir, symlinkDir);
 
-      // Rule uses realpath
-      const config = { [realDir]: TrustLevel.TRUST_FOLDER };
-      fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
+        // Rule uses realpath
+        const config = { [realDir]: TrustLevel.TRUST_FOLDER };
+        fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
-      // Check against symlink path
-      expect(isWorkspaceTrusted(mockSettings, symlinkDir).isTrusted).toBe(true);
-    });
+        // Check against symlink path
+        expect(isWorkspaceTrusted(mockSettings, symlinkDir).isTrusted).toBe(
+          true,
+        );
+      },
+    );
   });
 
   describe('Verification: Auth and Trust Interaction', () => {

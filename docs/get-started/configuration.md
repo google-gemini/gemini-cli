@@ -1,16 +1,5 @@
 # Gemini CLI configuration
 
-> **Note on configuration format, 9/17/25:** The format of the `settings.json`
-> file has been updated to a new, more organized structure.
->
-> - The new format will be supported in the stable release starting
->   **[09/10/25]**.
-> - Automatic migration from the old format to the new format will begin on
->   **[09/17/25]**.
->
-> For details on the previous format, please see the
-> [v1 Configuration documentation](./configuration-v1.md).
-
 Gemini CLI offers several ways to configure its behavior, including environment
 variables, command-line arguments, and settings files. This document outlines
 the different configuration methods and available settings.
@@ -96,6 +85,13 @@ their corresponding top-level category object in your `settings.json` file.
 
 <!-- SETTINGS-AUTOGEN:START -->
 
+#### `policyPaths`
+
+- **`policyPaths`** (array):
+  - **Description:** Additional policy files or directories to load.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
 #### `general`
 
 - **`general.preferredEditor`** (string):
@@ -125,6 +121,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable update notification prompts.
   - **Default:** `true`
 
+- **`general.enableNotifications`** (boolean):
+  - **Description:** Enable run-event notifications for action-required prompts
+    and session completion. Currently macOS only.
+  - **Default:** `false`
+
 - **`general.checkpointing.enabled`** (boolean):
   - **Description:** Enable session checkpointing for recovery
   - **Default:** `false`
@@ -150,8 +151,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`general.sessionRetention.maxAge`** (string):
-  - **Description:** Maximum age of sessions to keep (e.g., "30d", "7d", "24h",
-    "1w")
+  - **Description:** Automatically delete chats older than this time period
+    (e.g., "30d", "7d", "24h", "1w")
   - **Default:** `undefined`
 
 - **`general.sessionRetention.maxCount`** (number):
@@ -162,6 +163,11 @@ their corresponding top-level category object in your `settings.json` file.
 - **`general.sessionRetention.minRetention`** (string):
   - **Description:** Minimum retention period (safety limit, defaults to "1d")
   - **Default:** `"1d"`
+
+- **`general.sessionRetention.warningAcknowledged`** (boolean):
+  - **Description:** INTERNAL: Whether the user has acknowledged the session
+    retention warning
+  - **Default:** `false`
 
 #### `output`
 
@@ -216,9 +222,18 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`ui.showCompatibilityWarnings`** (boolean):
+  - **Description:** Show warnings about terminal or OS compatibility issues.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
 - **`ui.hideTips`** (boolean):
   - **Description:** Hide helpful tips in the UI
   - **Default:** `false`
+
+- **`ui.showShortcutsHint`** (boolean):
+  - **Description:** Show the "? for shortcuts" hint above the input.
+  - **Default:** `true`
 
 - **`ui.hideBanner`** (boolean):
   - **Description:** Hide the application banner
@@ -443,6 +458,12 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-2.5-flash"
         }
       },
+      "gemini-3-flash-base": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-3-flash-preview"
+        }
+      },
       "classifier": {
         "extends": "base",
         "modelConfig": {
@@ -462,6 +483,19 @@ their corresponding top-level category object in your `settings.json` file.
           "generateContentConfig": {
             "temperature": 0.3,
             "maxOutputTokens": 16000,
+            "thinkingConfig": {
+              "thinkingBudget": 0
+            }
+          }
+        }
+      },
+      "fast-ack-helper": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-2.5-flash-lite",
+          "generateContentConfig": {
+            "temperature": 0.2,
+            "maxOutputTokens": 120,
             "thinkingConfig": {
               "thinkingBudget": 0
             }
@@ -498,7 +532,7 @@ their corresponding top-level category object in your `settings.json` file.
         }
       },
       "web-search": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {
           "generateContentConfig": {
             "tools": [
@@ -510,7 +544,7 @@ their corresponding top-level category object in your `settings.json` file.
         }
       },
       "web-fetch": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {
           "generateContentConfig": {
             "tools": [
@@ -522,25 +556,25 @@ their corresponding top-level category object in your `settings.json` file.
         }
       },
       "web-fetch-fallback": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {}
       },
       "loop-detection": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {}
       },
       "loop-detection-double-check": {
         "extends": "base",
         "modelConfig": {
-          "model": "gemini-2.5-pro"
+          "model": "gemini-3-pro-preview"
         }
       },
       "llm-edit-fixer": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {}
       },
       "next-speaker-checker": {
-        "extends": "gemini-2.5-flash-base",
+        "extends": "gemini-3-flash-base",
         "modelConfig": {}
       },
       "chat-compression-3-pro": {
@@ -570,7 +604,7 @@ their corresponding top-level category object in your `settings.json` file.
       },
       "chat-compression-default": {
         "modelConfig": {
-          "model": "gemini-2.5-pro"
+          "model": "gemini-3-pro-preview"
         }
       }
     }
@@ -610,6 +644,11 @@ their corresponding top-level category object in your `settings.json` file.
 - **`context.importFormat`** (string):
   - **Description:** The format to use when importing memory.
   - **Default:** `undefined`
+
+- **`context.includeDirectoryTree`** (boolean):
+  - **Description:** Whether to include the directory tree of the current
+    working directory in the initial request to the model.
+  - **Default:** `true`
 
 - **`context.discoveryMaxDirs`** (number):
   - **Description:** Maximum number of directories to search for memory.
@@ -848,6 +887,28 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `experimental`
 
+- **`experimental.toolOutputMasking.enabled`** (boolean):
+  - **Description:** Enables tool output masking to save tokens.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`experimental.toolOutputMasking.toolProtectionThreshold`** (number):
+  - **Description:** Minimum number of tokens to protect from masking (most
+    recent tool outputs).
+  - **Default:** `50000`
+  - **Requires restart:** Yes
+
+- **`experimental.toolOutputMasking.minPrunableTokensThreshold`** (number):
+  - **Description:** Minimum prunable tokens required to trigger a masking pass.
+  - **Default:** `30000`
+  - **Requires restart:** Yes
+
+- **`experimental.toolOutputMasking.protectLatestTurn`** (boolean):
+  - **Description:** Ensures the absolute latest turn is never masked,
+    regardless of token count.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
 - **`experimental.enableAgents`** (boolean):
   - **Description:** Enable local and remote subagents. Warning: Experimental
     feature, uses YOLO mode for subagents
@@ -888,6 +949,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable planning features (Plan Mode and tools).
   - **Default:** `false`
   - **Requires restart:** Yes
+
+- **`experimental.modelSteering`** (boolean):
+  - **Description:** Enable model steering (user hints) to guide the model
+    during tool execution.
+  - **Default:** `false`
 
 #### `skills`
 
@@ -1258,7 +1324,10 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
     few other folders, see
     `packages/cli/src/utils/sandbox-macos-permissive-open.sb`) but allows other
     operations.
-  - `strict`: Uses a strict profile that declines operations by default.
+  - `restrictive-open`: Declines operations by default, allows network.
+  - `strict-open`: Restricts both reads and writes to the working directory,
+    allows network.
+  - `strict-proxied`: Same as `strict-open` but routes network through proxy.
   - `<profile_name>`: Uses a custom profile. To define a custom profile, create
     a file named `sandbox-macos-<profile_name>.sb` in your project's `.gemini/`
     directory (e.g., `my-project/.gemini/sandbox-macos-custom.sb`).
@@ -1332,10 +1401,9 @@ for that specific session.
   - Specifies the Gemini model to use for this session.
   - Example: `npm start -- --model gemini-3-pro-preview`
 - **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
+  - **Deprecated:** Use positional arguments instead.
   - Used to pass a prompt directly to the command. This invokes Gemini CLI in a
     non-interactive mode.
-  - For scripting examples, use the `--output-format json` flag to get
-    structured output.
 - **`--prompt-interactive <your_prompt>`** (**`-i <your_prompt>`**):
   - Starts an interactive session with the provided prompt as the initial input.
   - The prompt is processed within the interactive session, not before it.

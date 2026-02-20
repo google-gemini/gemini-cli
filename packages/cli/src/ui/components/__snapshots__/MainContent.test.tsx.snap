@@ -2,7 +2,7 @@
 
 exports[`MainContent > MainContent Tool Output Height Logic > 'ASB mode - Focused shell should expand' 1`] = `
 "ScrollableList
-AppHeader
+AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊷  Shell Command Running a long command...                                                   │
 │                                                                                              │
@@ -28,12 +28,13 @@ AppHeader
 │ Line 20                                                                                      │
 │                                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
-ShowMoreLines"
+ShowMoreLines
+"
 `;
 
 exports[`MainContent > MainContent Tool Output Height Logic > 'ASB mode - Unfocused shell' 1`] = `
 "ScrollableList
-AppHeader
+AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊷  Shell Command Running a long command...                                                   │
 │                                                                                              │
@@ -53,11 +54,12 @@ AppHeader
 │ Line 19                                                                                    █ │
 │ Line 20                                                                                    █ │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
-ShowMoreLines"
+ShowMoreLines
+"
 `;
 
 exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Constrained height' 1`] = `
-"AppHeader
+"AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊷  Shell Command Running a long command...                                                   │
 │                                                                                              │
@@ -77,11 +79,12 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Con
 │ Line 19                                                                                      │
 │ Line 20                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
-ShowMoreLines"
+ShowMoreLines
+"
 `;
 
 exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Unconstrained height' 1`] = `
-"AppHeader
+"AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊷  Shell Command Running a long command...                                                   │
 │                                                                                              │
@@ -101,16 +104,21 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Unc
 │ Line 19                                                                                      │
 │ Line 20                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
-ShowMoreLines"
+ShowMoreLines
+"
 `;
 
-exports[`MainContent > does not constrain height in alternate buffer mode 1`] = `
-"ScrollableList
-AppHeader
-▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > Hello
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-✦ Hi there
-  ShowMoreLines
+exports[`MainContent > renders a split tool group without a gap between static and pending areas 1`] = `
+"AppHeader(full)
+╭──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool A tool for testing                                                              │
+│                                                                                              │
+│ Part 1                                                                                       │
+│                                                                                              │
+│ ✓  test-tool A tool for testing                                                              │
+│                                                                                              │
+│ Part 2                                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+ShowMoreLines
 "
 `;

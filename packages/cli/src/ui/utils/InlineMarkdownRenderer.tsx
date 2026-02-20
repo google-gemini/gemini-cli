@@ -7,7 +7,6 @@
 import React from 'react';
 import { Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import stringWidth from 'string-width';
 import { debugLogger } from '@google/gemini-cli-core';
 import { stripUnsafeCharacters } from './textUtils.js';
 
@@ -173,20 +172,3 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
 };
 
 export const RenderInline = React.memo(RenderInlineInternal);
-
-/**
- * Utility function to get the plain text length of a string with markdown formatting
- * This is useful for calculating column widths in tables
- */
-export const getPlainTextLength = (text: string): number => {
-  const strippedText = stripUnsafeCharacters(text);
-  const cleanText = strippedText
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.+?)\*/g, '$1')
-    .replace(/_(.*?)_/g, '$1')
-    .replace(/~~(.*?)~~/g, '$1')
-    .replace(/`(.*?)`/g, '$1')
-    .replace(/<u>(.*?)<\/u>/g, '$1')
-    .replace(/.*\[(.*?)\]\(.*\)/g, '$1');
-  return stringWidth(cleanText);
-};

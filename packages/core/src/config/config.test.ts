@@ -41,6 +41,7 @@ import type { SkillDefinition } from '../skills/skillLoader.js';
 import type { McpClientManager } from '../tools/mcp-client-manager.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import { DEFAULT_GEMINI_MODEL } from './models.js';
+import { Storage } from './storage.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -279,16 +280,21 @@ describe('Server Config (config.ts)', () => {
       await expect(config.initialize()).resolves.toBeUndefined();
     });
 
-    it('should throw an error if initialized more than once', async () => {
+    it('should deduplicate multiple calls to initialize', async () => {
       const config = new Config({
         ...baseParams,
         checkpointing: false,
       });
 
-      await expect(config.initialize()).resolves.toBeUndefined();
-      await expect(config.initialize()).rejects.toThrow(
-        'Config was already initialized',
-      );
+      const storageSpy = vi.spyOn(Storage.prototype, 'initialize');
+
+      await Promise.all([
+        config.initialize(),
+        config.initialize(),
+        config.initialize(),
+      ]);
+
+      expect(storageSpy).toHaveBeenCalledTimes(1);
     });
 
     it('should await MCP initialization in non-interactive mode', async () => {
@@ -1034,6 +1040,44 @@ describe('Server Config (config.ts)', () => {
         (call) => call[0] instanceof SubAgentToolMock,
       );
       expect(registeredWrappers).toHaveLength(1);
+    });
+
+    it('should register subagents as tools even when they are not in allowedTools', async () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        allowedTools: ['read_file'], // codebase-investigator is NOT here
+        agents: {
+          overrides: {
+            codebase_investigator: { enabled: true },
+          },
+        },
+      };
+      const config = new Config(params);
+
+      const mockAgentDefinition = {
+        name: 'codebase-investigator',
+        description: 'Agent 1',
+        instructions: 'Inst 1',
+      };
+
+      const AgentRegistryMock = (
+        (await vi.importMock('../agents/registry.js')) as {
+          AgentRegistry: Mock;
+        }
+      ).AgentRegistry;
+      AgentRegistryMock.prototype.getAllDefinitions.mockReturnValue([
+        mockAgentDefinition,
+      ]);
+
+      const SubAgentToolMock = (
+        (await vi.importMock('../agents/subagent-tool.js')) as {
+          SubagentTool: Mock;
+        }
+      ).SubagentTool;
+
+      await config.initialize();
+
+      expect(SubAgentToolMock).toHaveBeenCalled();
     });
 
     it('should not register subagents as tools when agents are disabled', async () => {

@@ -101,8 +101,8 @@ execution.
 
 #### Global MCP settings (`mcp`)
 
-The `mcp` object in your `settings.json` allows you to define global rules for
-all MCP servers.
+The `mcp` object in your `settings.json` lets you define global rules for all
+MCP servers.
 
 - **`mcp.serverCommand`** (string): A global command to start an MCP server.
 - **`mcp.allowed`** (array of strings): A list of MCP server names to allow. If
@@ -739,21 +739,10 @@ The MCP integration tracks several states:
   cautiously and only for servers you completely control
 - **Access tokens:** Be security-aware when configuring environment variables
   containing API keys or tokens
-- **Environment variable redaction:** By default, the Gemini CLI redacts
-  sensitive environment variables (such as `GEMINI_API_KEY`, `GOOGLE_API_KEY`,
-  and variables matching patterns like `*TOKEN*`, `*SECRET*`, `*PASSWORD*`) when
-  spawning MCP servers using the `stdio` transport. This prevents unintended
-  exposure of your credentials to third-party servers.
-- **Explicit environment variables:** If you need to pass a specific environment
-  variable to an MCP server, you should define it explicitly in the `env`
-  property of the server configuration in `settings.json`.
 - **Sandbox compatibility:** When using sandboxing, ensure MCP servers are
-  available within the sandbox environment.
+  available within the sandbox environment
 - **Private data:** Using broadly scoped personal access tokens can lead to
   information leakage between repositories.
-- **Untrusted servers:** Be extremely cautious when adding MCP servers from
-  untrusted or third-party sources. Malicious servers could attempt to
-  exfiltrate data or perform unauthorized actions through the tools they expose.
 
 ### Performance and resource management
 

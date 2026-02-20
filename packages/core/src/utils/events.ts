@@ -9,6 +9,10 @@ import type { AgentDefinition } from '../agents/types.js';
 import type { McpClient } from '../tools/mcp-client.js';
 import type { ExtensionEvents } from './extensionLoader.js';
 import type { EditorType } from './editor.js';
+import type {
+  TokenStorageInitializationEvent,
+  KeychainAvailabilityEvent,
+} from '../telemetry/types.js';
 
 /**
  * Defines the severity level for user-facing feedback.
@@ -121,10 +125,33 @@ export interface ConsentRequestPayload {
 }
 
 /**
+ * Payload for the 'mcp-progress' event.
+ */
+export interface McpProgressPayload {
+  serverName: string;
+  callId: string;
+  progressToken: string | number;
+  progress: number;
+  total?: number;
+  message?: string;
+}
+
+/**
  * Payload for the 'agents-discovered' event.
  */
 export interface AgentsDiscoveredPayload {
   agents: AgentDefinition[];
+}
+
+export interface SlashCommandConflict {
+  name: string;
+  renamedTo: string;
+  loserExtensionName?: string;
+  winnerExtensionName?: string;
+}
+
+export interface SlashCommandConflictsPayload {
+  conflicts: SlashCommandConflict[];
 }
 
 /**
@@ -152,10 +179,14 @@ export enum CoreEvent {
   AdminSettingsChanged = 'admin-settings-changed',
   RetryAttempt = 'retry-attempt',
   ConsentRequest = 'consent-request',
+  McpProgress = 'mcp-progress',
   AgentsDiscovered = 'agents-discovered',
   RequestEditorSelection = 'request-editor-selection',
   EditorSelected = 'editor-selected',
+  SlashCommandConflicts = 'slash-command-conflicts',
   QuotaChanged = 'quota-changed',
+  TelemetryKeychainAvailability = 'telemetry-keychain-availability',
+  TelemetryTokenStorageType = 'telemetry-token-storage-type',
 }
 
 /**
@@ -182,9 +213,13 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.AdminSettingsChanged]: never[];
   [CoreEvent.RetryAttempt]: [RetryAttemptPayload];
   [CoreEvent.ConsentRequest]: [ConsentRequestPayload];
+  [CoreEvent.McpProgress]: [McpProgressPayload];
   [CoreEvent.AgentsDiscovered]: [AgentsDiscoveredPayload];
   [CoreEvent.RequestEditorSelection]: never[];
   [CoreEvent.EditorSelected]: [EditorSelectedPayload];
+  [CoreEvent.SlashCommandConflicts]: [SlashCommandConflictsPayload];
+  [CoreEvent.TelemetryKeychainAvailability]: [KeychainAvailabilityEvent];
+  [CoreEvent.TelemetryTokenStorageType]: [TokenStorageInitializationEvent];
 }
 
 type EventBacklogItem = {
@@ -315,11 +350,23 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   }
 
   /**
+   * Notifies subscribers that progress has been made on an MCP tool call.
+   */
+  emitMcpProgress(payload: McpProgressPayload): void {
+    this.emit(CoreEvent.McpProgress, payload);
+  }
+
+  /**
    * Notifies subscribers that new unacknowledged agents have been discovered.
    */
   emitAgentsDiscovered(agents: AgentDefinition[]): void {
     const payload: AgentsDiscoveredPayload = { agents };
     this._emitOrQueue(CoreEvent.AgentsDiscovered, payload);
+  }
+
+  emitSlashCommandConflicts(conflicts: SlashCommandConflict[]): void {
+    const payload: SlashCommandConflictsPayload = { conflicts };
+    this._emitOrQueue(CoreEvent.SlashCommandConflicts, payload);
   }
 
   /**
@@ -348,6 +395,14 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
         ...item.args,
       );
     }
+  }
+
+  emitTelemetryKeychainAvailability(event: KeychainAvailabilityEvent): void {
+    this._emitOrQueue(CoreEvent.TelemetryKeychainAvailability, event);
+  }
+
+  emitTelemetryTokenStorageType(event: TokenStorageInitializationEvent): void {
+    this._emitOrQueue(CoreEvent.TelemetryTokenStorageType, event);
   }
 }
 

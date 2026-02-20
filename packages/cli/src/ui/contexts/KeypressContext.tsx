@@ -6,6 +6,7 @@
 
 import { debugLogger, type Config } from '@google/gemini-cli-core';
 import { useStdin } from 'ink';
+import { MultiMap } from 'mnemonist';
 import type React from 'react';
 import {
   createContext,
@@ -25,6 +26,13 @@ export const BACKSLASH_ENTER_TIMEOUT = 5;
 export const ESC_TIMEOUT = 50;
 export const PASTE_TIMEOUT = 30_000;
 export const FAST_RETURN_TIMEOUT = 30;
+
+export enum KeypressPriority {
+  Low = -100,
+  Normal = 0,
+  High = 100,
+  Critical = 200,
+}
 
 // Parse the key itself
 const KEY_INFO_MAP: Record<
@@ -133,6 +141,7 @@ const MAC_ALT_KEY_CHARACTER_MAP: Record<string, string> = {
   '\u00B5': 'm', // "µ" toggle markup view
   '\u03A9': 'z', // "Ω" Option+z
   '\u00B8': 'Z', // "¸" Option+Shift+z
+  '\u2202': 'd', // "∂" delete word forward
 };
 
 function nonKeyboardEventFilter(
@@ -645,7 +654,10 @@ export interface Key {
 export type KeypressHandler = (key: Key) => boolean | void;
 
 interface KeypressContextValue {
-  subscribe: (handler: KeypressHandler, priority?: boolean) => void;
+  subscribe: (
+    handler: KeypressHandler,
+    priority?: KeypressPriority | boolean,
+  ) => void;
   unsubscribe: (handler: KeypressHandler) => void;
 }
 
@@ -674,44 +686,75 @@ export function KeypressProvider({
 }) {
   const { stdin, setRawMode } = useStdin();
 
-  const prioritySubscribers = useRef<Set<KeypressHandler>>(new Set()).current;
-  const normalSubscribers = useRef<Set<KeypressHandler>>(new Set()).current;
+  const subscribersToPriority = useRef<Map<KeypressHandler, number>>(
+    new Map(),
+  ).current;
+  const subscribers = useRef(
+    new MultiMap<number, KeypressHandler>(Set),
+  ).current;
+  const sortedPriorities = useRef<number[]>([]);
 
   const subscribe = useCallback(
-    (handler: KeypressHandler, priority = false) => {
-      const set = priority ? prioritySubscribers : normalSubscribers;
-      set.add(handler);
+    (
+      handler: KeypressHandler,
+      priority: KeypressPriority | boolean = KeypressPriority.Normal,
+    ) => {
+      const p =
+        typeof priority === 'boolean'
+          ? priority
+            ? KeypressPriority.High
+            : KeypressPriority.Normal
+          : priority;
+
+      subscribersToPriority.set(handler, p);
+      const hadPriority = subscribers.has(p);
+      subscribers.set(p, handler);
+
+      if (!hadPriority) {
+        // Cache sorted priorities only when a new priority level is added
+        sortedPriorities.current = Array.from(subscribers.keys()).sort(
+          (a, b) => b - a,
+        );
+      }
     },
-    [prioritySubscribers, normalSubscribers],
+    [subscribers, subscribersToPriority],
   );
 
   const unsubscribe = useCallback(
     (handler: KeypressHandler) => {
-      prioritySubscribers.delete(handler);
-      normalSubscribers.delete(handler);
+      const p = subscribersToPriority.get(handler);
+      if (p !== undefined) {
+        subscribers.remove(p, handler);
+        subscribersToPriority.delete(handler);
+
+        if (!subscribers.has(p)) {
+          // Cache sorted priorities only when a priority level is completely removed
+          sortedPriorities.current = Array.from(subscribers.keys()).sort(
+            (a, b) => b - a,
+          );
+        }
+      }
     },
-    [prioritySubscribers, normalSubscribers],
+    [subscribers, subscribersToPriority],
   );
 
   const broadcast = useCallback(
     (key: Key) => {
-      // Process priority subscribers first, in reverse order (stack behavior: last subscribed is first to handle)
-      const priorityHandlers = Array.from(prioritySubscribers).reverse();
-      for (const handler of priorityHandlers) {
-        if (handler(key) === true) {
-          return;
-        }
-      }
+      // Use cached sorted priorities to avoid sorting on every keypress
+      for (const p of sortedPriorities.current) {
+        const set = subscribers.get(p);
+        if (!set) continue;
 
-      // Then process normal subscribers, also in reverse order
-      const normalHandlers = Array.from(normalSubscribers).reverse();
-      for (const handler of normalHandlers) {
-        if (handler(key) === true) {
-          return;
+        // Within a priority level, use stack behavior (last subscribed is first to handle)
+        const handlers = Array.from(set).reverse();
+        for (const handler of handlers) {
+          if (handler(key) === true) {
+            return;
+          }
         }
       }
     },
-    [prioritySubscribers, normalSubscribers],
+    [subscribers],
   );
 
   useEffect(() => {
