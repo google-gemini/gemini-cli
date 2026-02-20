@@ -55,6 +55,8 @@ import { MemoryStore, MemoryRetriever } from '../memory/vector-store.js';
 import { MCPManager } from '../mcp/client.js';
 import type { MCPServerConfig } from '../mcp/client.js';
 import { SelfHealer } from './self-healer.js';
+import { dryRunWriteFile, dryRunShellRun } from '../tools/dry-run.js';
+import type { DashboardServer } from '../dashboard/server.js';
 import {
   ReadFileInputSchema,
   ScreenshotAnalyzeInputSchema,
@@ -103,6 +105,16 @@ export interface CoworkerOptions {
    * tools become available via the `mcp_call` tool.
    */
   mcpServers?: MCPServerConfig[];
+  /**
+   * When `true`, write_file and shell_run calls are intercepted and shown as
+   * diffs / command previews without being applied to disk.
+   */
+  dryRun?: boolean;
+  /**
+   * An already-started `DashboardServer` instance.  When provided, every
+   * Think / Act / Observe event is streamed to the web dashboard in real time.
+   */
+  dashboard?: DashboardServer;
 }
 
 /** A single step recorded in the agent's history. */
@@ -218,6 +230,9 @@ export class Coworker {
   private readonly memoryRetriever: MemoryRetriever | null;
   private readonly mcp: MCPManager | null;
   private readonly mcpServers: MCPServerConfig[];
+  // Phase 4 — dry-run + dashboard
+  private readonly dryRun: boolean;
+  private readonly dashboard: DashboardServer | null;
 
   /** Backwards-compatible overload: `new Coworker(root?, maxIterations?)`. */
   constructor(projectRoot?: string, maxIterations?: number);
@@ -232,6 +247,8 @@ export class Coworker {
     let trace = false;
     let useMemory = false;
     let mcpServers: MCPServerConfig[] = [];
+    let dryRun = false;
+    let dashboard: DashboardServer | null = null;
 
     if (typeof rootOrOpts === 'string' || rootOrOpts === undefined) {
       projectRoot = rootOrOpts ?? process.cwd();
@@ -242,6 +259,8 @@ export class Coworker {
       trace = rootOrOpts.trace ?? false;
       useMemory = rootOrOpts.memory ?? false;
       mcpServers = rootOrOpts.mcpServers ?? [];
+      dryRun = rootOrOpts.dryRun ?? false;
+      dashboard = rootOrOpts.dashboard ?? null;
     }
 
     this.maxIterations = maxIterations;
@@ -271,6 +290,10 @@ export class Coworker {
     // Servers are connected in runLoop (async) because addServer() is async.
     this.mcp = mcpServers.length > 0 ? new MCPManager() : null;
     this.mcpServers = mcpServers;
+
+    // ── Phase 4 ──────────────────────────────────────────────────────────────
+    this.dryRun = dryRun;
+    this.dashboard = dashboard;
   }
 
   // -------------------------------------------------------------------------
@@ -437,6 +460,7 @@ export class Coworker {
 
     this.record('think', thinkContent);
     this.tracer?.record({ phase: 'think', iteration, content: thinkContent });
+    this.dashboard?.emit({ type: 'think', iteration, content: thinkContent });
 
     // ── Dynamic tool switching — classify goal on first iteration ──────────
 
@@ -594,10 +618,16 @@ export class Coworker {
           result = await executeReadFile(toolCall.input);
           break;
         case 'write_file':
-          result = await executeWriteFile(toolCall.input);
+          // Dry-run: show diff instead of writing.
+          result = this.dryRun
+            ? await dryRunWriteFile(toolCall.input.path, toolCall.input.content)
+            : await executeWriteFile(toolCall.input);
           break;
         case 'shell_run':
-          result = await executeShellRun(toolCall.input);
+          // Dry-run: show command preview instead of running.
+          result = this.dryRun
+            ? dryRunShellRun(toolCall.input.command, toolCall.input.cwd)
+            : await executeShellRun(toolCall.input);
           break;
         case 'screenshot_and_analyze':
           result = await executeScreenshotAndAnalyze(toolCall.input);
@@ -671,6 +701,11 @@ export class Coworker {
         output: result.output.slice(0, 1000),
         durationMs,
       });
+      this.dashboard?.emit({
+        type: 'act',
+        tool: toolCall.tool,
+        content: actContent,
+      });
 
       return result;
     } catch (err) {
@@ -707,6 +742,7 @@ export class Coworker {
 
     this.record('observe', observation);
     this.tracer?.record({ phase: 'observe', content: observation, output: preview });
+    this.dashboard?.emit({ type: 'observe', content: observation });
   }
 
   // -------------------------------------------------------------------------
@@ -731,9 +767,10 @@ export class Coworker {
     console.log(`\n${BANNER}\n`);
     console.log(chalk.white(`Goal: ${chalk.bold(goal)}\n`));
 
-    // ── Phase 3: start trace session ─────────────────────────────────────────
+    // ── Phase 3 + 4: start trace / dashboard session ──────────────────────────
     this.tracer?.startSession(goal);
     this.tracer?.record({ phase: 'session_start', content: `Goal: ${goal}` });
+    this.dashboard?.emit({ type: 'session_start', content: `Goal: ${goal}` });
 
     // ── Phase 3: connect MCP servers ─────────────────────────────────────────
     if (this.mcp && this.mcpServers.length > 0) {
@@ -794,6 +831,9 @@ export class Coworker {
           // non-fatal
         }
       }
+
+      // ── Phase 4: dashboard session end ────────────────────────────────────
+      this.dashboard?.emit({ type: 'session_end', content: `Outcome: ${outcome}` });
 
       // ── Phase 3: disconnect MCP servers ──────────────────────────────────
       await this.mcp?.dispose().catch(() => undefined);
