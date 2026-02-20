@@ -187,12 +187,18 @@ import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
 import { useFocus } from './hooks/useFocus.js';
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
 
 // Mock external utilities
 vi.mock('../utils/events.js');
 vi.mock('../utils/handleAutoUpdate.js');
 vi.mock('./utils/ConsolePatcher.js');
 vi.mock('../utils/cleanup.js');
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return { ...actual, spawnSync: vi.fn(() => ({ status: 0 })) };
+});
 
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
@@ -3444,6 +3450,123 @@ describe('AppContainer State Management', () => {
         expect(capturedUIState.allowPlanMode).toBe(false);
       });
       unmount!();
+    });
+  });
+
+  describe('openContentInExternalEditor', () => {
+    let capturedSlashActions: {
+      openContentInExternalEditor: (content: string) => Promise<void>;
+    };
+    let savedVisual: string | undefined;
+    let originalPlatform: NodeJS.Platform;
+
+    beforeEach(() => {
+      originalPlatform = process.platform;
+      savedVisual = process.env['VISUAL'];
+      delete process.env['VISUAL'];
+
+      vi.spyOn(fs, 'mkdtempSync').mockReturnValue('/tmp/gemini-chat-test');
+      vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+      vi.spyOn(fs, 'unlinkSync').mockImplementation(() => {});
+      vi.spyOn(fs, 'rmdirSync').mockImplementation(() => {});
+
+      // Capture slashCommandActions by shape, not by arg index, so the test
+      // stays valid if the hook signature changes.
+      mockedUseSlashCommandProcessor.mockImplementation(
+        (...args: unknown[]) => {
+          const actions = args.find(
+            (a) =>
+              typeof a === 'object' &&
+              a !== null &&
+              'openContentInExternalEditor' in a,
+          ) as typeof capturedSlashActions | undefined;
+          if (actions) capturedSlashActions = actions;
+          return {
+            handleSlashCommand: vi.fn(),
+            slashCommands: [],
+            pendingHistoryItems: [],
+            commandContext: {},
+            shellConfirmationRequest: null,
+            confirmationRequest: null,
+          };
+        },
+      );
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform,
+        configurable: true,
+      });
+      if (savedVisual !== undefined) {
+        process.env['VISUAL'] = savedVisual;
+      }
+    });
+
+    const renderAndCall = async () => {
+      let unmount: (() => void) | undefined;
+      await act(async () => {
+        ({ unmount } = renderAppContainer());
+      });
+      await waitFor(() => expect(capturedSlashActions).toBeDefined());
+      await act(async () => {
+        await capturedSlashActions.openContentInExternalEditor('test content');
+      });
+      unmount!();
+    };
+
+    it('always uses shell: false and splits $EDITOR into exe and embedded args', async () => {
+      vi.stubEnv('EDITOR', 'vim -u NONE');
+      await renderAndCall();
+
+      expect(spawnSync).toHaveBeenCalledWith(
+        'vim',
+        expect.arrayContaining([
+          '-u',
+          'NONE',
+          expect.stringContaining('chat.md'),
+        ]),
+        expect.objectContaining({ shell: false }),
+      );
+    });
+
+    it('wraps .cmd editors with cmd.exe on Windows, passing args as array', async () => {
+      vi.stubEnv('EDITOR', 'code.cmd');
+      Object.defineProperty(process, 'platform', {
+        value: 'win32',
+        configurable: true,
+      });
+      await renderAndCall();
+
+      expect(spawnSync).toHaveBeenCalledWith(
+        'cmd.exe',
+        expect.arrayContaining([
+          '/c',
+          'code.cmd',
+          expect.stringContaining('chat.md'),
+        ]),
+        expect.objectContaining({ shell: false }),
+      );
+    });
+
+    it('passes shell metacharacters in $EDITOR as literal argv, not shell-expanded', async () => {
+      vi.stubEnv('EDITOR', 'notepad & calc');
+      Object.defineProperty(process, 'platform', {
+        value: 'win32',
+        configurable: true,
+      });
+      await renderAndCall();
+
+      expect(spawnSync).toHaveBeenCalledWith(
+        'notepad',
+        expect.arrayContaining([
+          '&',
+          'calc',
+          expect.stringContaining('chat.md'),
+        ]),
+        expect.objectContaining({ shell: false }),
+      );
     });
   });
 });

@@ -556,12 +556,24 @@ export const AppContainer = (props: AppContainerProps) => {
           (process.platform === 'win32' ? 'notepad' : 'vi');
       }
 
+      // Split command into exe + any embedded args (e.g. $EDITOR="vim -u NONE")
+      // and always use shell: false to prevent injection via $EDITOR / $VISUAL.
+      const [exe = '', ...embeddedArgs] = command.trim().split(/\s+/);
+      const allArgs = [...embeddedArgs, ...args];
+
+      // .cmd/.bat files on Windows cannot be executed directly; they need
+      // cmd.exe. Pass all args as an array so cmd.exe never shell-expands them.
+      const [spawnCmd, spawnArgs]: [string, string[]] =
+        process.platform === 'win32' && /\.(cmd|bat)$/i.test(exe)
+          ? ['cmd.exe', ['/c', exe, ...allArgs]]
+          : [exe, allArgs];
+
       const wasRaw = stdin?.isRaw ?? false;
       try {
         setRawMode?.(false);
-        const { status, error } = spawnSync(command, args, {
+        const { status, error } = spawnSync(spawnCmd, spawnArgs, {
           stdio: 'inherit',
-          shell: process.platform === 'win32',
+          shell: false,
         });
         if (error) throw error;
         if (typeof status === 'number' && status !== 0) {
