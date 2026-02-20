@@ -2078,8 +2078,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
     const fetchBannerTexts = async () => {
       const [defaultBanner, warningBanner] = await Promise.all([
-        // TODO: temporarily disabling the banner, it will be re-added.
-        '',
+        config.getBannerTextNoCapacityIssues(),
         config.getBannerTextCapacityIssues(),
       ]);
 
