@@ -20,7 +20,8 @@ async function run(cmd) {
       stdio: ['pipe', 'pipe', 'ignore'],
     });
     return stdout.trim();
-  } catch (_e) { // eslint-disable-line @typescript-eslint/no-unused-vars
+  } catch (_e) {
+    // eslint-disable-line @typescript-eslint/no-unused-vars
     return null;
   }
 }
