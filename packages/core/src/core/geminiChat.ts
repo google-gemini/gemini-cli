@@ -528,6 +528,8 @@ export class GeminiChat {
         ? contentsForPreviewModel
         : requestContents;
 
+      // console.log("!! in chat");
+      // console.log(JSON.stringify(requestContents));
       const hookSystem = this.config.getHookSystem();
       if (hookSystem) {
         const beforeModelResult = await hookSystem.fireBeforeModelEvent({

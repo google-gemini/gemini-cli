@@ -47,6 +47,7 @@ function makeMockedConfig(params?: Partial<ConfigParameters>): Config {
   } as unknown as ToolRegistry);
   vi.spyOn(config, 'getAgentRegistry').mockReturnValue({
     getDirectoryContext: () => 'mock directory context',
+    getAllDefinitions: () => [],
   } as unknown as AgentRegistry);
   return config;
 }
@@ -259,6 +260,7 @@ describe('AgentRegistry', () => {
           overrides: {
             codebase_investigator: { enabled: false },
             cli_help: { enabled: false },
+            generalist: { enabled: false },
           },
         },
       });
@@ -296,13 +298,13 @@ describe('AgentRegistry', () => {
       expect(registry.getDefinition('cli_help')).toBeUndefined();
     });
 
-    it('should NOT register generalist agent by default (because it is experimental)', async () => {
+    it('should register generalist agent by default', async () => {
       const config = makeMockedConfig();
       const registry = new TestableAgentRegistry(config);
 
       await registry.initialize();
 
-      expect(registry.getDefinition('generalist')).toBeUndefined();
+      expect(registry.getDefinition('generalist')).toBeDefined();
     });
 
     it('should register generalist agent if explicitly enabled via override', async () => {
