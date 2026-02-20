@@ -1681,15 +1681,6 @@ const SETTINGS_SCHEMA = {
           'Enable model steering (user hints) to guide the model during tool execution.',
         showInDialog: true,
       },
-      'enable-awesome': {
-        type: 'boolean',
-        label: 'Enable Awesome',
-        category: 'Experimental',
-        requiresRestart: false,
-        default: false,
-        description: "When enabled, the ASCII art says 'matt'.",
-        showInDialog: true,
-      },
     },
   },
 

@@ -2193,12 +2193,6 @@ export class Config {
     );
   }
 
-  isAwesomeEnabled(): boolean {
-    return (
-      this.getExperimentValue<boolean>(ExperimentFlags.ENABLE_AWESOME) ?? false
-    );
-  }
-
   private async ensureExperimentsLoaded(): Promise<void> {
     if (!this.experimentsPromise) {
       return;
