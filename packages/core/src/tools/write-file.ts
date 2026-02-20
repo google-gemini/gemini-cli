@@ -20,8 +20,6 @@ import type {
   ToolInvocation,
   ToolLocation,
   ToolResult,
-} from './tools.js';
-import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,

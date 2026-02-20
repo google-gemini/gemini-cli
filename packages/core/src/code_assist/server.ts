@@ -355,6 +355,17 @@ export class CodeAssistServer implements ContentGenerator {
     });
 
     return (async function* (): AsyncGenerator<T> {
+      // gaxios v7 with node-fetch v3 returns a Web ReadableStream from res.data
+      // when responseType is 'stream'. Node's readline.createInterface requires
+      // a Node.js Readable (which has .on()), not a Web ReadableStream. Convert
+      // if necessary; fall back to treating it as a Node.js stream otherwise.
+      const rawData = res.data;
+      const inputStream: NodeJS.ReadableStream =
+        rawData instanceof Readable
+          ? (rawData as NodeJS.ReadableStream)
+          : // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
+            Readable.fromWeb(rawData as any);
+
       const rl = readline.createInterface({
         input: Readable.from(res.data),
         crlfDelay: Infinity, // Recognizes '\r\n' and '\n' as line breaks

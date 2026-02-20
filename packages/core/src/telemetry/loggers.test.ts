@@ -10,8 +10,6 @@ import type {
   CompletedToolCall,
   ContentGeneratorConfig,
   ErroredToolCall,
-} from '../index.js';
-import {
   CoreToolCallStatus,
   AuthType,
   EditTool,
@@ -23,7 +21,7 @@ import {
 } from '../index.js';
 import { OutputFormat } from '../output/types.js';
 import { logs } from '@opentelemetry/api-logs';
-import type { Config } from '../config/config.js';
+import type { Config, type GeminiCLIExtension } from '../config/config.js';
 import {
   logApiError,
   logApiRequest,
@@ -100,7 +98,6 @@ import { FileOperation } from './metrics.js';
 import * as sdk from './sdk.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { vi, describe, beforeEach, it, expect, afterEach } from 'vitest';
-import { type GeminiCLIExtension } from '../config/config.js';
 import {
   FinishReason,
   type CallableTool,

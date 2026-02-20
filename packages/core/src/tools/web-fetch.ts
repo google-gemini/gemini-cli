@@ -8,8 +8,6 @@ import type {
   ToolCallConfirmationDetails,
   ToolInvocation,
   ToolResult,
-} from './tools.js';
-import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,

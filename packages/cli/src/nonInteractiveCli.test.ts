@@ -190,6 +190,7 @@ describe('runNonInteractive', () => {
       isTrustedFolder: vi.fn().mockReturnValue(false),
       getRawOutput: vi.fn().mockReturnValue(false),
       getAcceptRawOutputRisk: vi.fn().mockReturnValue(false),
+      getQuestion: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     mockSettings = {

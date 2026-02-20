@@ -1,0 +1,4 @@
+description="This is a simple command"
+prompt = """
+Tell me about the climate in {{}}
+"""

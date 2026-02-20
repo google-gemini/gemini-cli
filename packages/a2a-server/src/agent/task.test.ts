@@ -14,7 +14,8 @@ import {
   type Mock,
 } from 'vitest';
 import { Task } from './task.js';
-import {
+import type {
+  ToolCall,
   GeminiEventType,
   type Config,
   type ToolCallRequestInfo,
@@ -26,7 +27,6 @@ import {
 import { createMockConfig } from '../utils/testing_utils.js';
 import type { ExecutionEventBus, RequestContext } from '@a2a-js/sdk/server';
 import { CoderAgentEvent } from '../types.js';
-import type { ToolCall } from '@google/gemini-cli-core';
 
 const mockProcessRestorableToolCalls = vi.hoisted(() => vi.fn());
 

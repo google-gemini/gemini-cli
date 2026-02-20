@@ -239,9 +239,18 @@ export async function runNonInteractive({
 
       let query: Part[] | undefined;
 
-      if (isSlashCommand(input)) {
+      // The `input` parameter may have hook context or piped stdin data
+      // prepended (in gemini.tsx), which strips the leading '/' and prevents
+      // isSlashCommand from recognising the prompt. Retrieve the original
+      // CLI prompt (the raw -p value) for slash-command detection so it is
+      // evaluated before any agent/tool pipeline.
+      const rawPrompt = config.getQuestion()?.trim();
+      const slashCandidate =
+        rawPrompt && isSlashCommand(rawPrompt) ? rawPrompt : input;
+
+      if (isSlashCommand(slashCandidate)) {
         const slashCommandResult = await handleSlashCommand(
-          input,
+          slashCandidate,
           abortController,
           config,
           settings,

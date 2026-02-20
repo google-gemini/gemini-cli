@@ -30,8 +30,10 @@ import {
   EDIT_TOOL_NAMES,
   processRestorableToolCalls,
 } from '@google/gemini-cli-core';
-import type { RequestContext } from '@a2a-js/sdk/server';
-import { type ExecutionEventBus } from '@a2a-js/sdk/server';
+import type {
+  RequestContext,
+  type ExecutionEventBus,
+} from '@a2a-js/sdk/server';
 import type {
   TaskStatusUpdateEvent,
   TaskArtifactUpdateEvent,
