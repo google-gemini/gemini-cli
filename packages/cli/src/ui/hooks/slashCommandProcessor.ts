@@ -550,6 +550,8 @@ export const useSlashCommandProcessor = (
                   return {
                     type: 'submit_prompt',
                     content: result.content,
+                    commandName: commandToExecute.name,
+                    commandArgs: args ? { args } : undefined,
                   };
                 case 'confirm_shell_commands': {
                   const callId = `expansion-${Date.now()}`;

@@ -114,10 +114,16 @@ export class HookEventHandler {
    * Fire a BeforeAgent event
    * Called by handleHookExecutionRequest - executes hooks directly
    */
-  async fireBeforeAgentEvent(prompt: string): Promise<AggregatedHookResult> {
+  async fireBeforeAgentEvent(
+    prompt: string,
+    commandName?: string,
+    commandArgs?: Record<string, unknown>,
+  ): Promise<AggregatedHookResult> {
     const input: BeforeAgentInput = {
       ...this.createBaseInput(HookEventName.BeforeAgent),
       prompt,
+      command_name: commandName,
+      command_args: commandArgs,
     };
 
     return this.executeHooks(HookEventName.BeforeAgent, input);
@@ -149,12 +155,16 @@ export class HookEventHandler {
     prompt: string,
     promptResponse: string,
     stopHookActive: boolean = false,
+    commandName?: string,
+    commandArgs?: Record<string, unknown>,
   ): Promise<AggregatedHookResult> {
     const input: AfterAgentInput = {
       ...this.createBaseInput(HookEventName.AfterAgent),
       prompt,
       prompt_response: promptResponse,
       stop_hook_active: stopHookActive,
+      command_name: commandName,
+      command_args: commandArgs,
     };
 
     return this.executeHooks(HookEventName.AfterAgent, input);
