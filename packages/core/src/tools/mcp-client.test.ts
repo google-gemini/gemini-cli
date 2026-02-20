@@ -1976,21 +1976,13 @@ describe('connectToMcpServer with OAuth', () => {
       ),
     );
 
-    vi.mocked(OAuthUtils.discoverOAuthConfig).mockResolvedValue({
+    vi.mocked(OAuthUtils.discoverOAuthFromWWWAuthenticate).mockResolvedValue({
       authorizationUrl: authUrl,
       tokenUrl,
       scopes: ['test-scope'],
     });
 
-    // We need this to be an any type because we dig into its private state.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let capturedTransport: any;
-    vi.mocked(mockedClient.connect).mockImplementationOnce(
-      async (transport) => {
-        capturedTransport = transport;
-        return Promise.resolve();
-      },
-    );
+    vi.mocked(mockedClient.connect).mockResolvedValueOnce(undefined);
 
     const client = await connectToMcpServer(
       '0.0.1',
@@ -2004,10 +1996,10 @@ describe('connectToMcpServer with OAuth', () => {
     expect(client).toBe(mockedClient);
     expect(mockedClient.connect).toHaveBeenCalledTimes(2);
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
-
-    const authHeader =
-      capturedTransport._requestInit?.headers?.['Authorization'];
-    expect(authHeader).toBe('Bearer test-access-token');
+    expect(OAuthUtils.discoverOAuthFromWWWAuthenticate).toHaveBeenCalledWith(
+      wwwAuthHeader,
+      serverUrl,
+    );
   });
 
   it('should discover oauth config if not in www-authenticate header', async () => {
@@ -2019,6 +2011,10 @@ describe('connectToMcpServer with OAuth', () => {
       new StreamableHTTPError(401, 'Unauthorized'),
     );
 
+    // discoverOAuthFromWWWAuthenticate returns null when no resource_metadata in header
+    vi.mocked(OAuthUtils.discoverOAuthFromWWWAuthenticate).mockResolvedValue(
+      null,
+    );
     vi.mocked(OAuthUtils.discoverOAuthConfig).mockResolvedValue({
       authorizationUrl: authUrl,
       tokenUrl,
@@ -2240,7 +2236,7 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
     } as unknown as MCPOAuthProvider;
     vi.mocked(MCPOAuthProvider).mockReturnValue(mockAuthProvider);
 
-    vi.mocked(OAuthUtils.discoverOAuthConfig).mockResolvedValue({
+    vi.mocked(OAuthUtils.discoverOAuthFromWWWAuthenticate).mockResolvedValue({
       authorizationUrl: 'http://auth.example.com/auth',
       tokenUrl: 'http://auth.example.com/token',
       scopes: ['test-scope'],
