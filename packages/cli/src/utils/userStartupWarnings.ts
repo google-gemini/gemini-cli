@@ -105,7 +105,11 @@ export async function getUserStartupWarnings(
   const warnings = results.filter((w): w is StartupWarning => w !== null);
 
   if (settings.ui?.showCompatibilityWarnings !== false) {
-    warnings.push(...getCompatibilityWarnings());
+    warnings.push(
+      ...getCompatibilityWarnings({
+        useAlternateBuffer: settings.ui?.useAlternateBuffer !== false,
+      }),
+    );
   }
 
   return warnings;

@@ -89,7 +89,13 @@ export interface StartupWarning {
   priority: WarningPriority;
 }
 
-export function getCompatibilityWarnings(): StartupWarning[] {
+export interface CompatibilityOptions {
+  useAlternateBuffer?: boolean;
+}
+
+export function getCompatibilityWarnings(
+  options: CompatibilityOptions = {},
+): StartupWarning[] {
   const warnings: StartupWarning[] = [];
 
   if (isWindows10()) {
@@ -101,11 +107,20 @@ export function getCompatibilityWarnings(): StartupWarning[] {
     });
   }
 
-  if (isJetBrainsTerminal()) {
+  if (isJetBrainsTerminal() && options.useAlternateBuffer) {
+    let suggestedTerminals = '';
+    const platform = os.platform();
+    if (platform === 'win32') {
+      suggestedTerminals = 'Windows Terminal';
+    } else if (platform === 'darwin') {
+      suggestedTerminals = 'iTerm2, Ghostty';
+    } else {
+      suggestedTerminals = 'Ghostty';
+    }
+
     warnings.push({
       id: 'jetbrains-terminal',
-      message:
-        'Warning: JetBrains terminal detected. You may experience rendering or scrolling issues. Using an external terminal (e.g., Windows Terminal, iTerm2) is recommended.',
+      message: `Warning: JetBrains terminal detected. Jetbrains mouse scrolling physics has strange bouncing behavior. Using an external terminal (e.g., ${suggestedTerminals}) is recommended.`,
       priority: WarningPriority.High,
     });
   }

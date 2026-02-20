@@ -131,17 +131,27 @@ describe('compatibility', () => {
       );
     });
 
-    it('should return JetBrains warning when detected', () => {
+    it('should return JetBrains warning when detected and useAlternateBuffer is true', () => {
       vi.mocked(os.platform).mockReturnValue('darwin');
       vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
 
-      const warnings = getCompatibilityWarnings();
+      const warnings = getCompatibilityWarnings({ useAlternateBuffer: true });
       expect(warnings).toContainEqual(
         expect.objectContaining({
           id: 'jetbrains-terminal',
           message: expect.stringContaining('JetBrains terminal detected'),
         }),
       );
+    });
+
+    it('should NOT return JetBrains warning when detected but useAlternateBuffer is false', () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
+
+      const warnings = getCompatibilityWarnings({ useAlternateBuffer: false });
+      expect(
+        warnings.find((w) => w.id === 'jetbrains-terminal'),
+      ).toBeUndefined();
     });
 
     it('should return 256-color warning when 256 colors are not supported', () => {
@@ -201,7 +211,7 @@ describe('compatibility', () => {
       vi.stubEnv('TERM_PROGRAM', 'xterm');
       process.stdout.getColorDepth = vi.fn().mockReturnValue(8);
 
-      const warnings = getCompatibilityWarnings();
+      const warnings = getCompatibilityWarnings({ useAlternateBuffer: true });
       expect(warnings).toHaveLength(3);
       expect(warnings[0].message).toContain('Windows 10 detected');
       expect(warnings[1].message).toContain('JetBrains terminal detected');
