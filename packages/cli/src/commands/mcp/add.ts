@@ -211,40 +211,56 @@ export const addCommand: CommandModule = {
       })
       .middleware((argv) => {
         // Handle -- separator args as server args if present
-        if (argv['--']) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const existingArgs = (argv['args'] as Array<string | number>) || [];
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          argv['args'] = [...existingArgs, ...(argv['--'] as string[])];
+        if (argv['--'] && Array.isArray(argv['--'])) {
+          const args = argv['args'];
+          const existingArgs = Array.isArray(args) ? args : [];
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          argv['args'] = [...existingArgs, ...argv['--']];
         }
       }),
   handler: async (argv) => {
+    const name = argv['name'];
+    const commandOrUrl = argv['commandOrUrl'];
+    const args = argv['args'];
+    const scope = argv['scope'];
+    const transport = argv['transport'];
+    const env = argv['env'];
+    const header = argv['header'];
+    const timeout = argv['timeout'];
+    const trust = argv['trust'];
+    const description = argv['description'];
+    const includeTools = argv['includeTools'];
+    const excludeTools = argv['excludeTools'];
+
+    const argsVal = Array.isArray(args)
+      ? args.filter(
+          (a): a is string | number =>
+            typeof a === 'string' || typeof a === 'number',
+        )
+      : undefined;
+
     await addMcpServer(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      argv['name'] as string,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      argv['commandOrUrl'] as string,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      argv['args'] as Array<string | number>,
+      typeof name === 'string' ? name : '',
+      typeof commandOrUrl === 'string' ? commandOrUrl : '',
+      argsVal,
       {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        scope: argv['scope'] as string,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        transport: argv['transport'] as string,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        env: argv['env'] as string[],
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        header: argv['header'] as string[],
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        timeout: argv['timeout'] as number | undefined,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        trust: argv['trust'] as boolean | undefined,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        description: argv['description'] as string | undefined,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        includeTools: argv['includeTools'] as string[] | undefined,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        excludeTools: argv['excludeTools'] as string[] | undefined,
+        scope: typeof scope === 'string' ? scope : 'project',
+        transport: typeof transport === 'string' ? transport : 'stdio',
+        env: Array.isArray(env)
+          ? env.filter((e): e is string => typeof e === 'string')
+          : undefined,
+        header: Array.isArray(header)
+          ? header.filter((h): h is string => typeof h === 'string')
+          : undefined,
+        timeout: typeof timeout === 'number' ? timeout : undefined,
+        trust: typeof trust === 'boolean' ? trust : undefined,
+        description: typeof description === 'string' ? description : undefined,
+        includeTools: Array.isArray(includeTools)
+          ? includeTools.filter((t): t is string => typeof t === 'string')
+          : undefined,
+        excludeTools: Array.isArray(excludeTools)
+          ? excludeTools.filter((t): t is string => typeof t === 'string')
+          : undefined,
       },
     );
     await exitCli();

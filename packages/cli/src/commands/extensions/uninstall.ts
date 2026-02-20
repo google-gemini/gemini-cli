@@ -91,11 +91,14 @@ export const uninstallCommand: CommandModule = {
         return true;
       }),
   handler: async (argv) => {
+    const names = argv['names'];
+    let namesArray: string[] = [];
+    if (Array.isArray(names)) {
+      namesArray = names.filter((n): n is string => typeof n === 'string');
+    }
     await handleUninstall({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      names: argv['names'] as string[] | undefined,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      all: argv['all'] as boolean,
+      names: namesArray,
+      all: typeof argv['all'] === 'boolean' ? argv['all'] : false,
     });
     await exitCli();
   },

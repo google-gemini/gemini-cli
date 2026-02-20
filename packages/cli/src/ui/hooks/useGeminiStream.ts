@@ -92,7 +92,6 @@ import {
   type TrackedCompletedToolCall,
   type TrackedCancelledToolCall,
   type TrackedWaitingToolCall,
-  type TrackedExecutingToolCall,
 } from './useToolScheduler.js';
 import { theme } from '../semantic-colors.js';
 import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
@@ -101,6 +100,10 @@ import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
+
+function isRecord(obj: unknown): obj is Record<string, unknown> {
+  return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
+}
 
 type ToolResponseWithParts = ToolCallResponseInfo & {
   llmContent?: PartListUnion;
@@ -842,9 +845,11 @@ export const useGeminiStream = (
 
       // If it is a shell command, we update the status to Canceled and clear the output
       // to avoid artifacts, then add it to history immediately.
-      if (isShellCommand) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const toolGroup = pendingHistoryItemRef.current as HistoryItemToolGroup;
+      if (
+        isShellCommand &&
+        pendingHistoryItemRef.current.type === 'tool_group'
+      ) {
+        const toolGroup = pendingHistoryItemRef.current;
         const updatedTools = toolGroup.tools.map((tool) => {
           if (tool.name === SHELL_COMMAND_NAME) {
             return {
@@ -855,7 +860,7 @@ export const useGeminiStream = (
           }
           return tool;
         });
-        addItem({ ...toolGroup, tools: updatedTools } as HistoryItemWithoutId);
+        addItem({ ...toolGroup, tools: updatedTools });
       } else {
         addItem(pendingHistoryItemRef.current);
       }
@@ -1069,11 +1074,15 @@ export const useGeminiStream = (
       const splitPoint = findLastSafeSplitPoint(newGeminiMessageBuffer);
       if (splitPoint === newGeminiMessageBuffer.length) {
         // Update the existing message with accumulated content
-        setPendingHistoryItem((item) => ({
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          type: item?.type as 'gemini' | 'gemini_content',
-          text: newGeminiMessageBuffer,
-        }));
+        setPendingHistoryItem((item) => {
+          if (item?.type === 'gemini' || item?.type === 'gemini_content') {
+            return {
+              type: item.type,
+              text: newGeminiMessageBuffer,
+            };
+          }
+          return item;
+        });
       } else {
         // This indicates that we need to split up this Gemini Message.
         // Splitting a message is primarily a performance consideration. There is a
@@ -1086,16 +1095,16 @@ export const useGeminiStream = (
         const beforeText = newGeminiMessageBuffer.substring(0, splitPoint);
         const afterText = newGeminiMessageBuffer.substring(splitPoint);
         if (beforeText.length > 0) {
-          addItem(
-            {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-              type: pendingHistoryItemRef.current?.type as
-                | 'gemini'
-                | 'gemini_content',
-              text: beforeText,
-            },
-            userMessageTimestamp,
-          );
+          const type = pendingHistoryItemRef.current?.type;
+          if (type === 'gemini' || type === 'gemini_content') {
+            addItem(
+              {
+                type,
+                text: beforeText,
+              },
+              userMessageTimestamp,
+            );
+          }
         }
         setPendingHistoryItem({ type: 'gemini_content', text: afterText });
         newGeminiMessageBuffer = afterText;
