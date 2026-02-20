@@ -23,6 +23,7 @@ export class AcpFileSystemService implements FileSystemService {
       return this.fallback.readTextFile(filePath);
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const response = await this.connection.readTextFile({
       path: filePath,
       sessionId: this.sessionId,

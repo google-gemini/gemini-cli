@@ -22,8 +22,7 @@ import type {
   Prompt,
   ReadResourceResult,
   Resource,
-} from '@modelcontextprotocol/sdk/types.js';
-import {
+
   ListResourcesResultSchema,
   ListRootsRequestSchema,
   ReadResourceResultSchema,
@@ -31,8 +30,7 @@ import {
   ToolListChangedNotificationSchema,
   PromptListChangedNotificationSchema,
   ProgressNotificationSchema,
-  type Tool as McpTool,
-} from '@modelcontextprotocol/sdk/types.js';
+  type Tool as McpTool} from '@modelcontextprotocol/sdk/types.js';
 import { ApprovalMode, PolicyDecision } from '../policy/types.js';
 import { parse } from 'shell-quote';
 import type { Config, MCPServerConfig } from '../config/config.js';
@@ -1996,6 +1994,7 @@ export async function createTransport(
       // The `XcodeMcpBridgeFixTransport` wrapper hides the underlying `StdioClientTransport`,
       // which exposes `stderr` for debug logging. We need to unwrap it to attach the listener.
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const underlyingTransport =
         transport instanceof XcodeMcpBridgeFixTransport
           ? // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
@@ -2007,6 +2006,7 @@ export async function createTransport(
         underlyingTransport.stderr
       ) {
         underlyingTransport.stderr.on('data', (data) => {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const stderrStr = data.toString().trim();
           debugLogger.debug(
             `[DEBUG] [MCP STDERR (${mcpServerName})]: `,

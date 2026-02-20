@@ -7,8 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import type { MCPServerConfig } from '@google/gemini-cli-core';
-import {
+import type { MCPServerConfig ,
   debugLogger,
   GEMINI_DIR,
   getErrorMessage,
@@ -122,6 +121,7 @@ export function loadSettings(workspaceDir: string): Settings {
 function resolveEnvVarsInString(value: string): string {
   const envVarRegex = /\$(?:(\w+)|{([^}]+)})/g; // Find $VAR_NAME or ${VAR_NAME}
   return value.replace(envVarRegex, (match, varName1, varName2) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const varName = varName1 || varName2;
     if (process && process.env && typeof process.env[varName] === 'string') {
       return process.env[varName];
