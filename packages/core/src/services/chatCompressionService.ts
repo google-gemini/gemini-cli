@@ -12,7 +12,7 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import { getCompressionPrompt } from '../core/prompts.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { logChatCompression } from '../telemetry/loggers.js';
-import { makeChatCompressionEvent, LlmRole } from '../telemetry/types.js';
+import { makeChatCompressionEvent , LlmRole } from '../telemetry/types.js';
 import {
   saveTruncatedToolOutput,
   formatTruncatedToolOutput,

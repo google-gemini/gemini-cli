@@ -11,19 +11,17 @@ import crypto from 'node:crypto';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../index.js';
 import { ToolErrorType } from './tool-error.js';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
-  ToolConfirmationOutcome,
-  Kind,
-} from './tools.js';
 import type {
   ToolInvocation,
   ToolResult,
   ToolCallConfirmationDetails,
   ToolExecuteConfirmationDetails,
-  PolicyUpdateOptions,
-} from './tools.js';
+
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  ToolConfirmationOutcome,
+  Kind,
+  type PolicyUpdateOptions} from './tools.js';
 
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
