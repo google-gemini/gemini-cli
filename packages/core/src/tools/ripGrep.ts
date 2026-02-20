@@ -160,6 +160,7 @@ export interface RipGrepToolParams {
  */
 interface GrepMatch {
   filePath: string;
+  absolutePath: string;
   lineNumber: number;
   line: string;
   isContext?: boolean;
@@ -309,6 +310,68 @@ class GrepToolInvocation extends BaseToolInvocation<
       const matchesOnly = allMatches.filter((m) => !m.isContext);
       const matchCount = matchesOnly.length;
       const matchTerm = matchCount === 1 ? 'match' : 'matches';
+
+      // Greedy Grep: If match count is low and no context was requested, automatically return context.
+      if (
+        matchCount >= 1 &&
+        matchCount <= 3 &&
+        !this.params.names_only &&
+        !this.params.context &&
+        !this.params.before &&
+        !this.params.after
+      ) {
+        const contextLines = matchCount === 1 ? 50 : 15;
+        for (const filePath in matchesByFile) {
+          const fileMatches = matchesByFile[filePath];
+          let fileLines: string[] | null = null;
+          try {
+            const content = await fsPromises.readFile(
+              fileMatches[0].absolutePath,
+              'utf8',
+            );
+            fileLines = content.split(/\r?\n/);
+          } catch (err) {
+            debugLogger.warn(
+              `Failed to read file for context: ${fileMatches[0].absolutePath}`,
+              err,
+            );
+          }
+
+          if (fileLines) {
+            const newFileMatches: GrepMatch[] = [];
+            const seenLines = new Set<number>();
+            for (const match of fileMatches) {
+              const startLine = Math.max(0, match.lineNumber - 1 - contextLines);
+              const endLine = Math.min(
+                fileLines.length,
+                match.lineNumber - 1 + contextLines + 1,
+              );
+              for (let i = startLine; i < endLine; i++) {
+                if (!seenLines.has(i + 1)) {
+                  newFileMatches.push({
+                    absolutePath: match.absolutePath,
+                    filePath: match.filePath,
+                    lineNumber: i + 1,
+                    line: fileLines[i],
+                    isContext: i + 1 !== match.lineNumber,
+                  });
+                  seenLines.add(i + 1);
+                } else if (i + 1 === match.lineNumber) {
+                  const index = newFileMatches.findIndex(
+                    (m) => m.lineNumber === i + 1,
+                  );
+                  if (index !== -1) {
+                    newFileMatches[index].isContext = false;
+                  }
+                }
+              }
+            }
+            matchesByFile[filePath] = newFileMatches.sort(
+              (a, b) => a.lineNumber - b.lineNumber,
+            );
+          }
+        }
+      }
 
       const wasTruncated = matchCount >= totalMaxMatches;
 
@@ -499,6 +562,7 @@ class GrepToolInvocation extends BaseToolInvocation<
           const relativeFilePath = path.relative(basePath, absoluteFilePath);
 
           return {
+            absolutePath: absoluteFilePath,
             filePath: relativeFilePath || path.basename(absoluteFilePath),
             lineNumber: data.line_number,
             line: data.lines.text.trimEnd(),

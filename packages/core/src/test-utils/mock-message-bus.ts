@@ -5,19 +5,20 @@
  */
 
 import { vi } from 'vitest';
+import { EventEmitter } from 'node:events';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { MessageBusType, type Message } from '../confirmation-bus/types.js';
 
 /**
  * Mock MessageBus for testing hook execution through MessageBus
  */
-export class MockMessageBus {
-  private subscriptions = new Map<
-    MessageBusType,
-    Set<(message: Message) => void>
-  >();
+export class MockMessageBus extends EventEmitter {
   publishedMessages: Message[] = [];
   defaultToolDecision: 'allow' | 'deny' | 'ask_user' = 'allow';
+
+  constructor() {
+    super();
+  }
 
   /**
    * Mock publish method that captures messages and simulates responses
@@ -52,6 +53,7 @@ export class MockMessageBus {
 
     // Emit the message to subscribers (mimicking real MessageBus behavior)
     this.emit(message.type, message);
+    return Promise.resolve();
   });
 
   /**
@@ -59,11 +61,7 @@ export class MockMessageBus {
    */
   subscribe = vi.fn(
     <T extends Message>(type: T['type'], listener: (message: T) => void) => {
-      if (!this.subscriptions.has(type)) {
-        this.subscriptions.set(type, new Set());
-      }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      this.subscriptions.get(type)!.add(listener as (message: Message) => void);
+      this.on(type, listener);
     },
   );
 
@@ -72,30 +70,16 @@ export class MockMessageBus {
    */
   unsubscribe = vi.fn(
     <T extends Message>(type: T['type'], listener: (message: T) => void) => {
-      const listeners = this.subscriptions.get(type);
-      if (listeners) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        listeners.delete(listener as (message: Message) => void);
-      }
+      this.off(type, listener);
     },
   );
-
-  /**
-   * Emit a message to subscribers (for testing)
-   */
-  private emit(type: MessageBusType, message: Message) {
-    const listeners = this.subscriptions.get(type);
-    if (listeners) {
-      listeners.forEach((listener) => listener(message));
-    }
-  }
 
   /**
    * Clear all captured messages (for test isolation)
    */
   clear() {
     this.publishedMessages = [];
-    this.subscriptions.clear();
+    this.removeAllListeners();
   }
 }
 
