@@ -607,7 +607,8 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(patterns[0]!),
+          argsPattern: new RegExp(patterns[0].pattern!),
+          argName: patterns[0].argName,
           decision: PolicyDecision.ALLOW,
         },
       ];
@@ -1489,13 +1490,14 @@ describe('PolicyEngine', () => {
         undefined,
         'tmux send-keys -t [a-z0-9:]+ (C-c|Up|Enter|Up Enter)$',
       );
-      const regex = new RegExp(patterns[0]!);
+      const regex = new RegExp(patterns[0].pattern!);
 
       engine.addRule({
         toolName: 'run_shell_command',
         decision: PolicyDecision.ALLOW,
         priority: 100,
         argsPattern: regex,
+        argName: patterns[0].argName,
       });
 
       const toolCall = {
@@ -1512,13 +1514,14 @@ describe('PolicyEngine', () => {
 
     it('should ALLOW git status with ^ anchor', async () => {
       const patterns = buildArgsPatterns(undefined, undefined, '^git status');
-      const regex = new RegExp(patterns[0]!);
+      const regex = new RegExp(patterns[0].pattern!);
 
       engine.addRule({
         toolName: 'run_shell_command',
         decision: PolicyDecision.ALLOW,
         priority: 100,
         argsPattern: regex,
+        argName: patterns[0].argName,
       });
 
       const toolCall = {
@@ -1531,6 +1534,36 @@ describe('PolicyEngine', () => {
       const result = await engine.check(toolCall, undefined);
 
       expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should NOT match nested command property (security bypass check)', async () => {
+      // Rule allowing only 'git status'
+      const patterns = buildArgsPatterns(undefined, undefined, '^git status$');
+      const regex = new RegExp(patterns[0].pattern!);
+
+      engine.addRule({
+        toolName: 'run_shell_command',
+        decision: PolicyDecision.ALLOW,
+        priority: 100,
+        argsPattern: regex,
+        argName: patterns[0].argName,
+      });
+
+      // Malicious tool call attempting to bypass using nested property
+      const toolCall = {
+        name: 'run_shell_command',
+        args: {
+          command: 'rm -rf /',
+          dummy: {
+            command: 'git status',
+          },
+        },
+      };
+
+      const result = await engine.check(toolCall, undefined);
+
+      // Should be ASK_USER because 'rm -rf /' doesn't match '^git status$'
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
     });
   });
 

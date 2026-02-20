@@ -83,12 +83,23 @@ function ruleMatches(
     if (!toolCall.args) {
       return false;
     }
-    // Use stable JSON stringification with sorted keys to ensure consistent matching
-    if (
-      stringifiedArgs === undefined ||
-      !rule.argsPattern.test(stringifiedArgs)
-    ) {
-      return false;
+
+    if (rule.argName) {
+      // Match against a specific named argument (e.g., 'command' for shell)
+      const val = toolCall.args[rule.argName];
+      // We only support matching string arguments for now
+      if (typeof val !== 'string' || !rule.argsPattern.test(val)) {
+        return false;
+      }
+    } else {
+      // Use stable JSON stringification with sorted keys to ensure consistent matching
+      // against the entire arguments object.
+      if (
+        stringifiedArgs === undefined ||
+        !rule.argsPattern.test(stringifiedArgs)
+      ) {
+        return false;
+      }
     }
   }
 

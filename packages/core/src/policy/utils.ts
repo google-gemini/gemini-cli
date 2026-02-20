@@ -43,6 +43,22 @@ export function isSafeRegExp(pattern: string): boolean {
 }
 
 /**
+ * Metadata about an arguments pattern for policy matching.
+ */
+export interface ArgsPatternInfo {
+  /**
+   * The regular expression pattern string.
+   */
+  pattern?: string;
+
+  /**
+   * Optional name of a specific argument to match the pattern against.
+   * If undefined, the pattern matches against the full JSON arguments string.
+   */
+  argName?: string;
+}
+
+/**
  * Builds a list of args patterns for policy matching.
  *
  * This function handles the transformation of command prefixes and regexes into
@@ -51,64 +67,42 @@ export function isSafeRegExp(pattern: string): boolean {
  * @param argsPattern An optional raw regex string for arguments.
  * @param commandPrefix An optional command prefix (or list of prefixes) to allow.
  * @param commandRegex An optional command regex string to allow.
- * @returns An array of string patterns (or undefined) for the PolicyEngine.
+ * @returns An array of pattern info objects for the PolicyEngine.
  */
 export function buildArgsPatterns(
   argsPattern?: string,
   commandPrefix?: string | string[],
   commandRegex?: string,
-): Array<string | undefined> {
+): ArgsPatternInfo[] {
   if (commandPrefix) {
     const prefixes = Array.isArray(commandPrefix)
       ? commandPrefix
       : [commandPrefix];
 
     // Expand command prefixes to multiple patterns.
-    // We append [\\s"] to ensure we match whole words only (e.g., "git" but not
-    // "github"). Since we match against JSON stringified args, the value is
-    // always followed by a space or a closing quote.
+    // We now match against the 'command' argument directly.
     return prefixes.map((prefix) => {
-      const jsonPrefix = JSON.stringify(prefix).slice(1, -1);
-      // We allow [\s], ["], or the specific sequence [\"] (for escaped quotes
-      // in JSON). We do NOT allow generic [\\], which would match "git\status"
-      // -> "gitstatus".
-      return `"command":"${escapeRegex(jsonPrefix)}(?:[\\s"]|\\\\")`;
+      // For prefixes, we match the string followed by whitespace or end-of-string.
+      // We trim the prefix and then ensure it's followed by a separator to
+      // match whole words (e.g. 'git' matches 'git status' but not 'github').
+      const trimmedPrefix = prefix.trim();
+      return {
+        pattern: `^${escapeRegex(trimmedPrefix)}(?:\\s|$)`,
+        argName: 'command',
+      };
     });
   }
 
   if (commandRegex) {
-    let pattern = commandRegex;
-
-    // 1. Handle ^ (Start Anchor)
-    // If the regex starts with ^, we remove it because the pattern is already
-    // implicitly anchored to the start of the command value by the prepended
-    // "command":" prefix. We only do this if it's not escaped.
-    if (pattern.startsWith('^')) {
-      pattern = pattern.slice(1);
-    }
-
-    // 2. Handle $ (End Anchor)
-    // If the regex ends with $, we replace it with "(?:,|\\}) to match the
-    // closing quote of the command value in the JSON-stringified arguments.
-    // We only do this if the $ is not escaped by an odd number of backslashes.
-    if (pattern.endsWith('$')) {
-      let backslashCount = 0;
-      for (let i = pattern.length - 2; i >= 0; i--) {
-        if (pattern[i] === '\\') {
-          backslashCount++;
-        } else {
-          break;
-        }
-      }
-
-      if (backslashCount % 2 === 0) {
-        // Anchor to the end of the JSON string value: " followed by , or }
-        pattern = pattern.slice(0, -1) + '"(?:,|\\})';
-      }
-    }
-
-    return [`"command":"${pattern}`];
+    // For commandRegex, we match against the 'command' argument directly.
+    // Standard anchors (^, $) work as expected relative to the command string.
+    return [
+      {
+        pattern: commandRegex,
+        argName: 'command',
+      },
+    ];
   }
 
-  return [argsPattern];
+  return [{ pattern: argsPattern }];
 }
