@@ -22,6 +22,7 @@ import type { CallableTool, FunctionCall, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { sanitizeMcpContent } from '../utils/mcp-sanitization.js';
 
 /**
  * The separator used to qualify MCP tool names with their server prefix.
@@ -322,7 +323,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
 }
 
 function transformTextBlock(block: McpTextBlock): Part {
-  return { text: block.text };
+  return { text: sanitizeMcpContent(block.text) };
 }
 
 function transformImageAudioBlock(
@@ -331,9 +332,9 @@ function transformImageAudioBlock(
 ): Part[] {
   return [
     {
-      text: `[Tool '${toolName}' provided the following ${
-        block.type
-      } data with mime-type: ${block.mimeType}]`,
+      text: sanitizeMcpContent(
+        `[Tool '${toolName}' provided the following ${block.type} data with mime-type: ${block.mimeType}]`,
+      ),
     },
     {
       inlineData: {
@@ -350,13 +351,15 @@ function transformResourceBlock(
 ): Part | Part[] | null {
   const resource = block.resource;
   if (resource?.text) {
-    return { text: resource.text };
+    return { text: sanitizeMcpContent(resource.text) };
   }
   if (resource?.blob) {
     const mimeType = resource.mimeType || 'application/octet-stream';
     return [
       {
-        text: `[Tool '${toolName}' provided the following embedded resource with mime-type: ${mimeType}]`,
+        text: sanitizeMcpContent(
+          `[Tool '${toolName}' provided the following embedded resource with mime-type: ${mimeType}]`,
+        ),
       },
       {
         inlineData: {
@@ -371,7 +374,9 @@ function transformResourceBlock(
 
 function transformResourceLinkBlock(block: McpResourceLinkBlock): Part {
   return {
-    text: `Resource Link: ${block.title || block.name} at ${block.uri}`,
+    text: sanitizeMcpContent(
+      `Resource Link: ${block.title || block.name} at ${block.uri}`,
+    ),
   };
 }
 
@@ -409,7 +414,19 @@ function transformMcpContentToParts(sdkResponse: Part[]): Part[] {
     },
   );
 
-  return transformed.filter((part): part is Part => part !== null);
+  const finalParts = transformed.filter((part): part is Part => part !== null);
+
+  if (finalParts.length === 0) {
+    return [
+      {
+        text: sanitizeMcpContent(
+          `[Tool '${toolName}' returned no supported content types]`,
+        ),
+      },
+    ];
+  }
+
+  return finalParts;
 }
 
 /**
