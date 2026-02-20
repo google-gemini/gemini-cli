@@ -18,7 +18,7 @@ import { StringDecoder } from 'node:string_decoder';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import { parse } from 'shell-quote';
 import { ToolErrorType } from './tool-error.js';
-import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import { safeJsonStringify } from '../utils/safe-json-helpers.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';

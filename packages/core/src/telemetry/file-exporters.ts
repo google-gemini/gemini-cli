@@ -17,7 +17,7 @@ import type {
   PushMetricExporter,
 } from '@opentelemetry/sdk-metrics';
 import { AggregationTemporality } from '@opentelemetry/sdk-metrics';
-import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import { safeJsonStringify } from '../utils/safe-json-helpers.js';
 
 class FileExporter {
   protected writeStream: fs.WriteStream;

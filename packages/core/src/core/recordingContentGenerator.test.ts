@@ -15,7 +15,7 @@ import type {
 } from '@google/genai';
 import { appendFileSync } from 'node:fs';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import { safeJsonStringify } from '../utils/safe-json-helpers.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { LlmRole } from '../telemetry/types.js';

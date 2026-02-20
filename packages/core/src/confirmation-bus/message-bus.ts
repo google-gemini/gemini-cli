@@ -9,7 +9,7 @@ import { EventEmitter } from 'node:events';
 import type { PolicyEngine } from '../policy/policy-engine.js';
 import { PolicyDecision } from '../policy/types.js';
 import { MessageBusType, type Message } from './types.js';
-import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import { safeJsonStringify } from '../utils/safe-json-helpers.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 export class MessageBus extends EventEmitter {

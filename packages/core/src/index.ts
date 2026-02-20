@@ -58,6 +58,7 @@ export * from './code_assist/admin/mcpUtils.js';
 export * from './core/apiKeyCredentialStorage.js';
 
 // Export utilities
+export * from './utils/safe-json-helpers.js';
 export * from './utils/fetch.js';
 export { homedir, tmpdir } from './utils/paths.js';
 export * from './utils/paths.js';

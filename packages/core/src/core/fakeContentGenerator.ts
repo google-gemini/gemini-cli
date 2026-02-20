@@ -15,7 +15,7 @@ import {
 import { promises } from 'node:fs';
 import type { ContentGenerator } from './contentGenerator.js';
 import type { UserTierId } from '../code_assist/types.js';
-import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import { safeJsonStringify } from '../utils/safe-json-helpers.js';
 import type { LlmRole } from '../telemetry/types.js';
 
 export type FakeResponse =

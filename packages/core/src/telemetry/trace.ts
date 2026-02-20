@@ -11,7 +11,7 @@ import {
   type AttributeValue,
   type SpanOptions,
 } from '@opentelemetry/api';
-import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import { safeJsonStringify } from '../utils/safe-json-helpers.js';
 
 const TRACER_NAME = 'gemini-cli';
 const TRACER_VERSION = 'v1';

@@ -57,7 +57,7 @@ import { UserAccountManager } from '../../utils/userAccountManager.js';
 import {
   safeJsonStringify,
   safeJsonStringifyBooleanValuesOnly,
-} from '../../utils/safeJsonStringify.js';
+} from '../../utils/safe-json-helpers.js';
 import { ASK_USER_TOOL_NAME } from '../../tools/tool-names.js';
 import { FixedDeque } from 'mnemonist';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
