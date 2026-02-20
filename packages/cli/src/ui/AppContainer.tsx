@@ -41,6 +41,7 @@ import { checkPermissions } from './hooks/atCommandProcessor.js';
 import { MessageType, StreamingState } from './types.js';
 import { ToolActionsProvider } from './contexts/ToolActionsContext.js';
 import {
+  type StartupWarning,
   type EditorType,
   type Config,
   type IdeInfo,
@@ -186,7 +187,7 @@ function isToolAwaitingConfirmation(
 
 interface AppContainerProps {
   config: Config;
-  startupWarnings?: string[];
+  startupWarnings?: StartupWarning[];
   version: string;
   initializationResult: InitializationResult;
   resumedSessionData?: ResumedSessionData;
