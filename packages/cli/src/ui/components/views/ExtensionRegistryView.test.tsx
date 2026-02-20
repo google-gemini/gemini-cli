@@ -126,6 +126,8 @@ describe('ExtensionRegistryView', () => {
 
     vi.mocked(useUIState).mockReturnValue({
       mainAreaWidth: 100,
+      terminalHeight: 40,
+      staticExtraHeight: 5,
     } as unknown as ReturnType<typeof useUIState>);
 
     vi.mocked(useConfig).mockReturnValue({
