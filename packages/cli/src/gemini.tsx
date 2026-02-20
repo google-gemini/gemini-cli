@@ -431,9 +431,14 @@ export async function main() {
     }
   }
 
-  const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
-    projectHooks: settings.workspace.settings.hooks,
-  });
+  const partialConfig = await loadCliConfig(
+    settings.merged,
+    argv.sessionId ?? sessionId,
+    argv,
+    {
+      projectHooks: settings.workspace.settings.hooks,
+    },
+  );
   adminControlsListner.setConfig(partialConfig);
 
   // Refresh auth to fetch remote admin settings from CCPA and before entering
@@ -555,9 +560,14 @@ export async function main() {
   // may have side effects.
   {
     const loadConfigHandle = startupProfiler.start('load_cli_config');
-    const config = await loadCliConfig(settings.merged, sessionId, argv, {
-      projectHooks: settings.workspace.settings.hooks,
-    });
+    const config = await loadCliConfig(
+      settings.merged,
+      argv.sessionId ?? sessionId,
+      argv,
+      {
+        projectHooks: settings.workspace.settings.hooks,
+      },
+    );
     loadConfigHandle?.end();
 
     // Initialize storage immediately after loading config to ensure that
