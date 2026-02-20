@@ -24,7 +24,7 @@ Gemini CLI uses a unified `Config` object as the source of truth. Every experime
 
 ### 1. List Current Experiments
 - **File:** `packages/core/src/code_assist/experiments/flagNames.ts`
-- Read this file and list all existing experiments to the user. This ensures you pick a unique ID and avoid duplicate names.
+- **MANDATORY:** Read this file and explicitly list EVERY existing experiment name and its numeric ID to the user in your response. This is a critical step to ensure a unique ID and name are chosen. Do NOT just read the file silently.
 - **Analyze Usage:** Search for `getExperimentValue` in `packages/core/src/config/config.ts` to see how similar experiments are wrapped and used.
 
 ### 2. Ask for Details (Behavior & Intent)
