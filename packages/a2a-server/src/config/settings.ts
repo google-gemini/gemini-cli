@@ -7,8 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import type { MCPServerConfig } from '@google/gemini-cli-core';
-import {
+import type { MCPServerConfig ,
   debugLogger,
   GEMINI_DIR,
   getErrorMessage,
@@ -27,6 +26,13 @@ export interface Settings {
   mcpServers?: Record<string, MCPServerConfig>;
   coreTools?: string[];
   excludeTools?: string[];
+  allowedTools?: string[];
+  tools?: {
+    allowed?: string[];
+    exclude?: string[];
+    core?: string[];
+    sandbox?: boolean;
+  };
   telemetry?: TelemetrySettings;
   showMemoryUsage?: boolean;
   checkpointing?: CheckpointingSettings;
