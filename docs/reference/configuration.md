@@ -148,6 +148,11 @@ their corresponding top-level category object in your `settings.json` file.
     request" errors.
   - **Default:** `false`
 
+- **`general.toolPreselection`** (boolean):
+  - **Description:** Exclude unneeded tools from context to save tokens and
+    improve performance.
+  - **Default:** `true`
+
 - **`general.debugKeystrokeLogging`** (boolean):
   - **Description:** Enable debug logging of keystrokes to the console.
   - **Default:** `false`

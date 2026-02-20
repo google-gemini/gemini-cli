@@ -28,11 +28,11 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
+│    Tool Preselection                                                                       true  │
+│    Exclude unneeded tools from context to save tokens and improve performance.                   │
+│                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -75,11 +75,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
+│    Tool Preselection                                                                       true  │
+│    Exclude unneeded tools from context to save tokens and improve performance.                   │
+│                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -122,11 +122,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Enable Prompt Completion                                                              false*  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
+│    Tool Preselection                                                                       true  │
+│    Exclude unneeded tools from context to save tokens and improve performance.                   │
+│                                                                                                  │
 │    Debug Keystroke Logging                                                               false*  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -169,11 +169,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
+│    Tool Preselection                                                                       true  │
+│    Exclude unneeded tools from context to save tokens and improve performance.                   │
+│                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -216,11 +216,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
+│    Tool Preselection                                                                       true  │
+│    Exclude unneeded tools from context to save tokens and improve performance.                   │
+│                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -263,11 +263,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
+│    Tool Preselection                                                                       true  │
+│    Exclude unneeded tools from context to save tokens and improve performance.                   │
+│                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -310,11 +310,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
+│    Tool Preselection                                                                       true  │
+│    Exclude unneeded tools from context to save tokens and improve performance.                   │
+│                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -357,11 +357,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
+│    Tool Preselection                                                                       true  │
+│    Exclude unneeded tools from context to save tokens and improve performance.                   │
+│                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -404,11 +404,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Enable Prompt Completion                                                               true*  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
+│    Tool Preselection                                                                       true  │
+│    Exclude unneeded tools from context to save tokens and improve performance.                   │
+│                                                                                                  │
 │    Debug Keystroke Logging                                                                true*  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
