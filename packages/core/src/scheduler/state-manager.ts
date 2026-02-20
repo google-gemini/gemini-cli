@@ -78,8 +78,16 @@ export class SchedulerStateManager {
     return next;
   }
 
+  peekQueue(): ToolCall | undefined {
+    return this.queue[0];
+  }
+
   get isActive(): boolean {
     return this.activeCalls.size > 0;
+  }
+
+  get allActiveCalls(): ToolCall[] {
+    return Array.from(this.activeCalls.values());
   }
 
   get activeCallCount(): number {
@@ -350,6 +358,7 @@ export class SchedulerStateManager {
       durationMs: startTime ? Date.now() - startTime : undefined,
       outcome: call.outcome,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 
@@ -366,6 +375,7 @@ export class SchedulerStateManager {
       durationMs: startTime ? Date.now() - startTime : undefined,
       outcome: call.outcome,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 
@@ -399,6 +409,7 @@ export class SchedulerStateManager {
       outcome: call.outcome,
       invocation: call.invocation,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 
@@ -424,6 +435,7 @@ export class SchedulerStateManager {
       outcome: call.outcome,
       invocation: call.invocation,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 
@@ -479,6 +491,7 @@ export class SchedulerStateManager {
       durationMs: startTime ? Date.now() - startTime : undefined,
       outcome: call.outcome,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 
@@ -500,6 +513,7 @@ export class SchedulerStateManager {
       outcome: call.outcome,
       invocation: call.invocation,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 
@@ -511,6 +525,12 @@ export class SchedulerStateManager {
       execData?.liveOutput ??
       ('liveOutput' in call ? call.liveOutput : undefined);
     const pid = execData?.pid ?? ('pid' in call ? call.pid : undefined);
+    const progressMessage =
+      execData?.progressMessage ??
+      ('progressMessage' in call ? call.progressMessage : undefined);
+    const progressPercent =
+      execData?.progressPercent ??
+      ('progressPercent' in call ? call.progressPercent : undefined);
 
     return {
       request: call.request,
@@ -521,7 +541,10 @@ export class SchedulerStateManager {
       invocation: call.invocation,
       liveOutput,
       pid,
+      progressMessage,
+      progressPercent,
       schedulerId: call.schedulerId,
+      approvalMode: call.approvalMode,
     };
   }
 }

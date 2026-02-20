@@ -24,6 +24,7 @@ import {
 } from '../tools/tools.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { ApprovalMode } from '../policy/types.js';
 
 describe('SchedulerStateManager', () => {
   const mockRequest: ToolCallRequestInfo = {
@@ -43,12 +44,16 @@ describe('SchedulerStateManager', () => {
     shouldConfirmExecute: vi.fn(),
   } as unknown as AnyToolInvocation;
 
-  const createValidatingCall = (id = 'call-1'): ValidatingToolCall => ({
+  const createValidatingCall = (
+    id = 'call-1',
+    mode: ApprovalMode = ApprovalMode.DEFAULT,
+  ): ValidatingToolCall => ({
     status: CoreToolCallStatus.Validating,
     request: { ...mockRequest, callId: id },
     tool: mockTool,
     invocation: mockInvocation,
     startTime: Date.now(),
+    approvalMode: mode,
   });
 
   const createMockResponse = (id: string): ToolCallResponseInfo => ({
@@ -208,7 +213,7 @@ describe('SchedulerStateManager', () => {
 
   describe('Status Transitions', () => {
     it('should transition validating to scheduled', () => {
-      const call = createValidatingCall();
+      const call = createValidatingCall('call-1', ApprovalMode.PLAN);
       stateManager.enqueue([call]);
       stateManager.dequeue();
 
@@ -220,6 +225,7 @@ describe('SchedulerStateManager', () => {
       const snapshot = stateManager.getSnapshot();
       expect(snapshot[0].status).toBe(CoreToolCallStatus.Scheduled);
       expect(snapshot[0].request.callId).toBe(call.request.callId);
+      expect(snapshot[0].approvalMode).toBe(ApprovalMode.PLAN);
     });
 
     it('should transition scheduled to executing', () => {
@@ -242,7 +248,7 @@ describe('SchedulerStateManager', () => {
     });
 
     it('should transition to success and move to completed batch', () => {
-      const call = createValidatingCall();
+      const call = createValidatingCall('call-1', ApprovalMode.PLAN);
       stateManager.enqueue([call]);
       stateManager.dequeue();
 
@@ -272,6 +278,7 @@ describe('SchedulerStateManager', () => {
       expect(completed.status).toBe(CoreToolCallStatus.Success);
       expect(completed.response).toEqual(response);
       expect(completed.durationMs).toBeDefined();
+      expect(completed.approvalMode).toBe(ApprovalMode.PLAN);
     });
 
     it('should transition to error and move to completed batch', () => {
@@ -487,6 +494,38 @@ describe('SchedulerStateManager', () => {
       active = stateManager.firstActiveCall as ExecutingToolCall;
       expect(active.liveOutput).toBe('chunk 2');
       expect(active.pid).toBe(1234);
+    });
+
+    it('should update progressMessage and progressPercent during executing updates', () => {
+      const call = createValidatingCall();
+      stateManager.enqueue([call]);
+      stateManager.dequeue();
+
+      // Update with progress
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Executing,
+        {
+          progressMessage: 'Starting...',
+          progressPercent: 10,
+        },
+      );
+      let active = stateManager.firstActiveCall as ExecutingToolCall;
+      expect(active.progressMessage).toBe('Starting...');
+      expect(active.progressPercent).toBe(10);
+
+      // Update progress further
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Executing,
+        {
+          progressMessage: 'Halfway!',
+          progressPercent: 50,
+        },
+      );
+      active = stateManager.firstActiveCall as ExecutingToolCall;
+      expect(active.progressMessage).toBe('Halfway!');
+      expect(active.progressPercent).toBe(50);
     });
   });
 

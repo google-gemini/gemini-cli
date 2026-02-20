@@ -5,7 +5,8 @@ exports[`<ChatList /> > handles invalid date formats gracefully 1`] = `
 
   - bad-date-chat (Invalid Date)
 
-Note: Newest last, oldest first"
+Note: Newest last, oldest first
+"
 `;
 
 exports[`<ChatList /> > renders correctly with a list of chats 1`] = `
@@ -14,7 +15,11 @@ exports[`<ChatList /> > renders correctly with a list of chats 1`] = `
   - chat-1 (2025-10-02 10:00:00)
   - another-chat (2025-10-01 12:30:00)
 
-Note: Newest last, oldest first"
+Note: Newest last, oldest first
+"
 `;
 
-exports[`<ChatList /> > renders correctly with no chats 1`] = `"No saved conversation checkpoints found."`;
+exports[`<ChatList /> > renders correctly with no chats 1`] = `
+"No saved conversation checkpoints found.
+"
+`;
