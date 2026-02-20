@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
 import readline from 'node:readline';
 import process from 'node:process';
@@ -27,73 +27,116 @@ vi.mock('./stdio.js', () => ({
 }));
 
 describe('getConsentForOauth', () => {
-  it('should use coreEvents when listeners are present', async () => {
+  beforeEach(() => {
     vi.restoreAllMocks();
-    const mockEmitConsentRequest = vi.spyOn(coreEvents, 'emitConsentRequest');
-    const mockListenerCount = vi
-      .spyOn(coreEvents, 'listenerCount')
-      .mockReturnValue(1);
+  });
 
-    mockEmitConsentRequest.mockImplementation((payload) => {
-      payload.onConfirm(true);
+  describe('in interactive mode', () => {
+    beforeEach(() => {
+      (isHeadlessMode as Mock).mockReturnValue(false);
     });
 
-    const result = await getConsentForOauth('Login required.');
+    it('should emit consent request when UI listeners are present', async () => {
+      const mockEmitConsentRequest = vi.spyOn(coreEvents, 'emitConsentRequest');
+      vi.spyOn(coreEvents, 'listenerCount').mockReturnValue(1);
 
-    expect(result).toBe(true);
-    expect(mockEmitConsentRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        prompt: expect.stringContaining(
-          'Login required. Opening authentication page in your browser.',
-        ),
-      }),
-    );
+      mockEmitConsentRequest.mockImplementation((payload) => {
+        payload.onConfirm(true);
+      });
 
-    mockListenerCount.mockRestore();
-    mockEmitConsentRequest.mockRestore();
+      const result = await getConsentForOauth('Login required.');
+
+      expect(result).toBe(true);
+      expect(mockEmitConsentRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: expect.stringContaining(
+            'Login required. Opening authentication page in your browser.',
+          ),
+        }),
+      );
+    });
+
+    it('should return false when user declines via UI', async () => {
+      const mockEmitConsentRequest = vi.spyOn(coreEvents, 'emitConsentRequest');
+      vi.spyOn(coreEvents, 'listenerCount').mockReturnValue(1);
+
+      mockEmitConsentRequest.mockImplementation((payload) => {
+        payload.onConfirm(false);
+      });
+
+      const result = await getConsentForOauth('Login required.');
+
+      expect(result).toBe(false);
+    });
+
+    it('should throw FatalAuthenticationError when no UI listeners are present', async () => {
+      vi.spyOn(coreEvents, 'listenerCount').mockReturnValue(0);
+
+      await expect(getConsentForOauth('Login required.')).rejects.toThrow(
+        FatalAuthenticationError,
+      );
+    });
   });
 
-  it('should use readline when no listeners are present and not headless', async () => {
-    vi.restoreAllMocks();
-    const mockListenerCount = vi
-      .spyOn(coreEvents, 'listenerCount')
-      .mockReturnValue(0);
-    (isHeadlessMode as Mock).mockReturnValue(false);
+  describe('in non-interactive mode', () => {
+    beforeEach(() => {
+      (isHeadlessMode as Mock).mockReturnValue(true);
+    });
 
-    const mockReadline = {
-      on: vi.fn((event, callback) => {
-        if (event === 'line') {
-          callback('y');
-        }
-      }),
-      close: vi.fn(),
-    };
-    (readline.createInterface as Mock).mockReturnValue(mockReadline);
+    it('should use readline to prompt for consent', async () => {
+      const mockReadline = {
+        on: vi.fn((event, callback) => {
+          if (event === 'line') {
+            callback('y');
+          }
+        }),
+        close: vi.fn(),
+      };
+      (readline.createInterface as Mock).mockReturnValue(mockReadline);
 
-    const result = await getConsentForOauth('Login required.');
+      const result = await getConsentForOauth('Login required.');
 
-    expect(result).toBe(true);
-    expect(readline.createInterface).toHaveBeenCalled();
-    expect(writeToStdout).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'Login required. Opening authentication page in your browser.',
-      ),
-    );
+      expect(result).toBe(true);
+      expect(readline.createInterface).toHaveBeenCalledWith(
+        expect.objectContaining({
+          terminal: true,
+        }),
+      );
+      expect(writeToStdout).toHaveBeenCalledWith(
+        expect.stringContaining('Login required.'),
+      );
+    });
 
-    mockListenerCount.mockRestore();
-  });
+    it('should accept empty response as "yes"', async () => {
+      const mockReadline = {
+        on: vi.fn((event, callback) => {
+          if (event === 'line') {
+            callback('');
+          }
+        }),
+        close: vi.fn(),
+      };
+      (readline.createInterface as Mock).mockReturnValue(mockReadline);
 
-  it('should throw FatalAuthenticationError when no listeners and headless', async () => {
-    vi.restoreAllMocks();
-    const mockListenerCount = vi
-      .spyOn(coreEvents, 'listenerCount')
-      .mockReturnValue(0);
-    (isHeadlessMode as Mock).mockReturnValue(true);
+      const result = await getConsentForOauth('Login required.');
 
-    await expect(getConsentForOauth('Login required.')).rejects.toThrow(
-      FatalAuthenticationError,
-    );
+      expect(result).toBe(true);
+    });
 
-    mockListenerCount.mockRestore();
+    it('should return false when user declines via readline', async () => {
+      const mockReadline = {
+        on: vi.fn((event, callback) => {
+          if (event === 'line') {
+            callback('n');
+          }
+        }),
+        close: vi.fn(),
+      };
+      (readline.createInterface as Mock).mockReturnValue(mockReadline);
+
+      const result = await getConsentForOauth('Login required.');
+
+      expect(result).toBe(false);
+    });
   });
 });

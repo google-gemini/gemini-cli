@@ -32,6 +32,7 @@ import { writeToStdout } from '../utils/stdio.js';
 import { FatalCancellationError } from '../utils/errors.js';
 import process from 'node:process';
 import { coreEvents } from '../utils/events.js';
+import { isHeadlessMode } from '../utils/headless.js';
 
 vi.mock('node:os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:os')>();
@@ -54,6 +55,9 @@ vi.mock('http');
 vi.mock('open');
 vi.mock('crypto');
 vi.mock('node:readline');
+vi.mock('../utils/headless.js', () => ({
+  isHeadlessMode: vi.fn(),
+}));
 vi.mock('../utils/browser.js', () => ({
   shouldAttemptBrowserLaunch: () => true,
 }));
@@ -98,6 +102,12 @@ global.fetch = vi.fn();
 
 describe('oauth2', () => {
   beforeEach(() => {
+    vi.mocked(isHeadlessMode).mockReturnValue(false);
+    (readline.createInterface as Mock).mockReturnValue({
+      question: vi.fn((_query, callback) => callback('')),
+      close: vi.fn(),
+      on: vi.fn(),
+    });
     vi.spyOn(coreEvents, 'listenerCount').mockReturnValue(1);
     vi.spyOn(coreEvents, 'emitConsentRequest').mockImplementation((payload) => {
       payload.onConfirm(true);
