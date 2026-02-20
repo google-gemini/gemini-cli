@@ -75,9 +75,6 @@ export function supportsTrueColor(): boolean {
   return false;
 }
 
-/**
- * Returns a list of compatibility warnings based on the current environment.
- */
 export enum WarningPriority {
   Low = 'low',
   High = 'high',
@@ -89,7 +86,12 @@ export interface StartupWarning {
   priority: WarningPriority;
 }
 
-export function getCompatibilityWarnings(): StartupWarning[] {
+/**
+ * Returns a list of compatibility warnings based on the current environment.
+ */
+export function getCompatibilityWarnings(options?: {
+  isAlternateBuffer?: boolean;
+}): StartupWarning[] {
   const warnings: StartupWarning[] = [];
 
   if (isWindows10()) {
