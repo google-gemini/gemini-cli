@@ -316,6 +316,14 @@ describe('telemetry', () => {
             prompt_id: 'p1',
             traceId: 'trace-1',
           },
+          response: {
+            resultDisplay: {
+              diffStat: {
+                model_added_lines: 5,
+                model_removed_lines: 3,
+              },
+            },
+          },
           outcome: ToolConfirmationOutcome.ProceedOnce,
           status: 'success',
         } as unknown as CompletedToolCall,
@@ -327,6 +335,8 @@ describe('telemetry', () => {
         traceId: 'trace-1',
         status: ActionStatus.ACTION_STATUS_NO_ERROR,
         interaction: ConversationInteractionInteraction.ACCEPT_FILE,
+        acceptedLines: '5',
+        removedLines: '3',
         isAgentic: true,
       });
     });
