@@ -663,7 +663,20 @@ export async function main() {
       config.isBrowserLaunchSuppressed()
     ) {
       // Do oauth before app renders to make copying the link possible.
-      await getOauthClient(settings.merged.security.auth.selectedType, config);
+      try {
+        await getOauthClient(
+          settings.merged.security.auth.selectedType,
+          config,
+        );
+      } catch (err) {
+        debugLogger.error('Error performing OAuth login:', err);
+        // Ensure we output the error even if UI isn't ready
+        writeToStderr(
+          `\nError: Failed to perform OAuth login.\n${cliConfig.getErrorMessage(err)}\n`,
+        );
+        await runExitCleanup();
+        process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
+      }
     }
 
     if (config.getExperimentalZedIntegration()) {

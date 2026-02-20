@@ -107,6 +107,15 @@ function getUseEncryptedStorageFlag() {
   return process.env[FORCE_ENCRYPTED_FILE_ENV_VAR] === 'true';
 }
 
+async function saveTokens(tokens: Credentials) {
+  const useEncryptedStorage = getUseEncryptedStorageFlag();
+  if (useEncryptedStorage) {
+    await OAuthCredentialStorage.saveCredentials(tokens);
+  } else {
+    await cacheCredentials(tokens);
+  }
+}
+
 async function initOauthClient(
   authType: AuthType,
   config: Config,
@@ -140,7 +149,6 @@ async function initOauthClient(
       proxy: config.getProxy(),
     },
   });
-  const useEncryptedStorage = getUseEncryptedStorageFlag();
 
   if (
     process.env['GOOGLE_GENAI_USE_GCA'] &&
@@ -153,14 +161,13 @@ async function initOauthClient(
     return client;
   }
 
-  client.on('tokens', async (tokens: Credentials) => {
-    if (useEncryptedStorage) {
-      await OAuthCredentialStorage.saveCredentials(tokens);
-    } else {
-      await cacheCredentials(tokens);
-    }
-
-    await triggerPostAuthCallbacks(tokens);
+  client.on('tokens', (tokens: Credentials) => {
+    saveTokens(tokens).catch((err) => {
+      debugLogger.log(
+        'Failed to save tokens from event:',
+        getErrorMessage(err),
+      );
+    });
   });
 
   if (credentials) {
@@ -177,7 +184,7 @@ async function initOauthClient(
             await fetchAndCacheUserInfo(client);
           } catch (error) {
             // Non-fatal, continue with existing auth.
-            debugLogger.warn(
+            debugLogger.log(
               'Failed to fetch user info:',
               getErrorMessage(error),
             );
@@ -434,6 +441,7 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
         redirect_uri: redirectUri,
       });
       client.setCredentials(tokens);
+      await saveTokens(tokens);
     } catch (error) {
       writeToStderr(
         'Failed to authenticate with authorization code:' +
@@ -521,6 +529,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
               redirect_uri: redirectUri,
             });
             client.setCredentials(tokens);
+            await saveTokens(tokens);
 
             // Retrieve and cache Google Account ID during authentication
             try {
@@ -673,6 +682,7 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
   try {
     const { token } = await client.getAccessToken();
     if (!token) {
+      debugLogger.log('No access token available to fetch user info.');
       return;
     }
 
@@ -694,10 +704,17 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
       return;
     }
 
-    const userInfo = await response.json();
-    await userAccountManager.cacheGoogleAccount(userInfo.email);
+    const userInfo = (await response.json()) as { email?: unknown };
+    if (userInfo && typeof userInfo.email === 'string' && userInfo.email) {
+      await userAccountManager.cacheGoogleAccount(userInfo.email);
+      debugLogger.log('Cached Google Account:', userInfo.email);
+    } else {
+      debugLogger.log(
+        'User info response did not contain a valid email address.',
+      );
+    }
   } catch (error) {
-    debugLogger.log('Error retrieving user info:', error);
+    debugLogger.log('Error retrieving user info:', getErrorMessage(error));
   }
 }
 
