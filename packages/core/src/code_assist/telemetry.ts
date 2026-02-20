@@ -168,7 +168,6 @@ function summarizeToolCalls(
           : ConversationInteractionInteraction.UNKNOWN,
         isEdit ? String(acceptedLines) : undefined,
         isEdit ? String(removedLines) : undefined,
-        InitiationMethod.COMMAND,
       )
     : undefined;
 }
@@ -179,7 +178,6 @@ function createConversationInteraction(
   interaction: ConversationInteractionInteraction,
   acceptedLines?: string,
   removedLines?: string,
-  initiationMethod?: InitiationMethod,
 ): ConversationInteraction {
   return {
     traceId,
@@ -187,7 +185,6 @@ function createConversationInteraction(
     interaction,
     acceptedLines,
     removedLines,
-    initiationMethod,
     isAgentic: true,
   };
 }

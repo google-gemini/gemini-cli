@@ -337,7 +337,6 @@ describe('telemetry', () => {
         interaction: ConversationInteractionInteraction.ACCEPT_FILE,
         acceptedLines: '5',
         removedLines: '3',
-        initiationMethod: InitiationMethod.COMMAND,
         isAgentic: true,
       });
     });
@@ -364,7 +363,6 @@ describe('telemetry', () => {
         traceId: 'trace-2',
         status: ActionStatus.ACTION_STATUS_NO_ERROR,
         interaction: ConversationInteractionInteraction.UNKNOWN,
-        initiationMethod: InitiationMethod.COMMAND,
         isAgentic: true,
       });
     });
