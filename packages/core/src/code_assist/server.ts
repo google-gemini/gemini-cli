@@ -36,6 +36,7 @@ import type {
   GenerateContentResponse,
 } from '@google/genai';
 import * as readline from 'node:readline';
+import { Readable } from 'node:stream';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import { UserTierId } from './types.js';
 import type {
@@ -357,9 +358,38 @@ export class CodeAssistServer implements ContentGenerator {
     });
 
     return (async function* (): AsyncGenerator<T> {
+      let input = res.data;
+
+      if (!input) {
+        throw new Error('API returned no data');
+      }
+
+      // Check if input is a Node stream (has .on method)
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      if (typeof (input as Record<string, unknown>)['on'] !== 'function') {
+        // If it's an async iterable (like a Web ReadableStream in Node 18+),
+        // wrap it in a Node Readable stream so readline can handle it correctly.
+        if (
+          input !== null &&
+          typeof input === 'object' &&
+          Symbol.asyncIterator in input
+        ) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          input = Readable.from(input as AsyncIterable<unknown>);
+        } else {
+          // If it's not a stream or iterable, it might be a JSON error object
+          // that wasn't thrown by gaxios.
+          throw new Error(
+            `Expected a stream but received ${typeof input}: ${JSON.stringify(
+              input,
+            )}`,
+          );
+        }
+      }
+
       const rl = readline.createInterface({
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        input: res.data as NodeJS.ReadableStream,
+        input: input as NodeJS.ReadableStream,
         crlfDelay: Infinity, // Recognizes '\r\n' and '\n' as line breaks
       });
 

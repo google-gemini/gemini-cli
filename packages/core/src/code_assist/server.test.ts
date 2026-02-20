@@ -432,6 +432,51 @@ describe('CodeAssistServer', () => {
     expect(results).toHaveLength(0);
   });
 
+  it('should handle async iterable input in requestStreamingPost', async () => {
+    const { server, mockRequest } = createTestServer();
+
+    // Create a mock async iterable (simulating a Web ReadableStream)
+    const mockAsyncIterable = {
+      async *[Symbol.asyncIterator]() {
+        yield 'data: {"response": {"candidates": [{"content": {"parts": [{"text": "Hello"}]}}]}}\n\n';
+      },
+    };
+
+    mockRequest.mockResolvedValue({ data: mockAsyncIterable });
+
+    const stream = await server.requestStreamingPost('testStream', {});
+
+    const results = [];
+    for await (const res of stream) {
+      results.push(res);
+    }
+
+    expect(results).toHaveLength(1);
+    const firstResult = results[0] as {
+      response: {
+        candidates: Array<{ content: { parts: Array<{ text: string }> } }>;
+      };
+    };
+    expect(firstResult.response.candidates[0].content.parts[0].text).toBe(
+      'Hello',
+    );
+  });
+
+  it('should throw descriptive error for non-stream input in requestStreamingPost', async () => {
+    const { server, mockRequest } = createTestServer();
+
+    // Mock a plain object response (unexpected for a stream)
+    mockRequest.mockResolvedValue({ data: { error: 'Something went wrong' } });
+
+    const stream = await server.requestStreamingPost('testStream', {});
+
+    await expect(async () => {
+      for await (const _ of stream) {
+        // empty
+      }
+    }).rejects.toThrow(/Expected a stream but received object/);
+  });
+
   it('should call the onboardUser endpoint', async () => {
     const { server } = createTestServer();
 
