@@ -43,7 +43,7 @@ export class ToolPreselectionService {
     // Threshold below which we don't bother with pre-selection.
     const threshold = options.maxTools ?? 5;
     if (tools.length <= threshold) {
-      return tools.map((t) => t.name!);
+      return tools.filter((t) => !!t.name).map((t) => t.name!);
     }
 
     const schema = {
@@ -84,8 +84,17 @@ ${toolsList}`;
         role: LlmRole.UTILITY_TOOL,
       });
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const selectedTools = result['relevant_tools'] as string[];
+      const selectedTools = result['relevant_tools'];
+
+      if (
+        !Array.isArray(selectedTools) ||
+        !selectedTools.every((item): item is string => typeof item === 'string')
+      ) {
+        throw new Error(
+          'Tool preselection returned invalid data format. Expected an array of strings.',
+        );
+      }
+
       debugLogger.debug(
         `ToolPreselectionService: Selected ${selectedTools.length} tools out of ${tools.length} for query: "${query.substring(0, 50)}..."`,
       );
@@ -93,7 +102,7 @@ ${toolsList}`;
     } catch (error) {
       debugLogger.error('ToolPreselectionService failed:', error);
       // Fallback: return all tools if pre-selection fails.
-      return tools.map((t) => t.name!);
+      return tools.filter((t) => !!t.name).map((t) => t.name!);
     }
   }
 }

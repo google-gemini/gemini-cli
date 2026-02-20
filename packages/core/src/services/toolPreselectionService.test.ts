@@ -124,4 +124,49 @@ describe('ToolPreselectionService', () => {
       'tool6',
     ]);
   });
+
+  it('falls back to all tools if LLM returns invalid format', async () => {
+    const tools: FunctionDeclaration[] = [
+      { name: 'tool1', description: 'desc1' },
+      { name: 'tool2', description: 'desc2' },
+      { name: 'tool3', description: 'desc3' },
+      { name: 'tool4', description: 'desc4' },
+      { name: 'tool5', description: 'desc5' },
+      { name: 'tool6', description: 'desc6' },
+    ];
+
+    // Missing 'relevant_tools' key
+    mockLlmClient['generateJson'].mockResolvedValue({
+      something_else: ['tool1'],
+    });
+
+    const result = await service.selectTools(
+      'query',
+      tools,
+      new AbortController().signal,
+    );
+    expect(result).toEqual([
+      'tool1',
+      'tool2',
+      'tool3',
+      'tool4',
+      'tool5',
+      'tool6',
+    ]);
+  });
+
+  it('safely handles tools with undefined names', async () => {
+    const tools: FunctionDeclaration[] = [
+      { name: 'tool1', description: 'desc1' },
+      { name: undefined, description: 'desc2' },
+    ];
+
+    const result = await service.selectTools(
+      'query',
+      tools,
+      new AbortController().signal,
+      { maxTools: 10 }, // Force threshold bypass
+    );
+    expect(result).toEqual(['tool1']);
+  });
 });

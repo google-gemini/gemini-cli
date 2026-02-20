@@ -286,7 +286,7 @@ export class GeminiClient {
       );
       const selectedSet = new Set(selectedNames);
       toolDeclarations = toolDeclarations.filter((t) =>
-        selectedSet.has(t.name!),
+        t.name ? selectedSet.has(t.name) : false,
       );
     }
 
