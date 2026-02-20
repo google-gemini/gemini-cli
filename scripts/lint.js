@@ -124,6 +124,12 @@ const LINTERS = {
 function runCommand(command, stdio = 'inherit') {
   try {
     const env = { ...process.env };
+    // Increase memory limit for all subprocesses (ESLint, etc) to prevent OOM in CI.
+    if (!env.NODE_OPTIONS || !env.NODE_OPTIONS.includes('max-old-space-size')) {
+      env.NODE_OPTIONS = `${
+        env.NODE_OPTIONS || ''
+      } --max-old-space-size=8192`.trim();
+    }
     const nodeBin = join(process.cwd(), 'node_modules', '.bin');
     env.PATH = `${nodeBin}:${TEMP_DIR}/actionlint:${TEMP_DIR}/shellcheck:${PYTHON_VENV_PATH}/bin:${env.PATH}`;
     execSync(command, { stdio, env });

@@ -78,6 +78,8 @@ async function getDependencyLicense(depName, depVersion) {
           `Warning: Failed to read license file for ${depName}: ${e.message}`,
         );
       }
+    } else if (depPackageJson.license) {
+      licenseContent = `License: ${depPackageJson.license}`;
     } else {
       console.warn(`Warning: Could not find license file for ${depName}`);
     }

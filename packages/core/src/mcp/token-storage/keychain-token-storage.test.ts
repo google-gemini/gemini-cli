@@ -49,9 +49,8 @@ describe('KeychainTokenStorage', () => {
     vi.resetAllMocks();
     // Reset the internal state of the keychain-token-storage module
     vi.resetModules();
-    const { KeychainTokenStorage } = await import(
-      './keychain-token-storage.js'
-    );
+    const { KeychainTokenStorage } =
+      await import('./keychain-token-storage.js');
     storage = new KeychainTokenStorage(mockServiceName);
   });
 

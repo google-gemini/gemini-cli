@@ -3292,9 +3292,8 @@ describe('AppContainer State Management', () => {
 
   describe('Permission Handling', () => {
     it('shows permission dialog when checkPermissions returns paths', async () => {
-      const { checkPermissions } = await import(
-        './hooks/atCommandProcessor.js'
-      );
+      const { checkPermissions } =
+        await import('./hooks/atCommandProcessor.js');
       vi.mocked(checkPermissions).mockResolvedValue(['/test/file.txt']);
 
       let unmount: () => void;
@@ -3316,9 +3315,8 @@ describe('AppContainer State Management', () => {
     it.each([true, false])(
       'handles permissions when allowed is %s',
       async (allowed) => {
-        const { checkPermissions } = await import(
-          './hooks/atCommandProcessor.js'
-        );
+        const { checkPermissions } =
+          await import('./hooks/atCommandProcessor.js');
         vi.mocked(checkPermissions).mockResolvedValue(['/test/file.txt']);
         const addReadOnlyPathSpy = vi.spyOn(
           mockConfig.getWorkspaceContext(),

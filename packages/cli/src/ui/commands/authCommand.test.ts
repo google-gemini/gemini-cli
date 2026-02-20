@@ -73,9 +73,8 @@ describe('authCommand', () => {
       const logoutCommand = authCommand.subCommands?.[1];
       expect(logoutCommand?.name).toBe('logout');
 
-      const { clearCachedCredentialFile } = await import(
-        '@google/gemini-cli-core'
-      );
+      const { clearCachedCredentialFile } =
+        await import('@google/gemini-cli-core');
 
       await logoutCommand!.action!(mockContext, '');
 

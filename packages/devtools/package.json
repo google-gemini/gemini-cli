@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "build": "npm run build:client && tsc -p tsconfig.build.json",
+    "build": "npm run build:client && tsc -p tsconfig.json",
     "build:client": "node esbuild.client.js"
   },
   "files": [

@@ -180,9 +180,8 @@ describe('gemini.tsx main function cleanup', () => {
   });
 
   it('should log error when cleanupExpiredSessions fails', async () => {
-    const { loadCliConfig, parseArguments } = await import(
-      './config/config.js'
-    );
+    const { loadCliConfig, parseArguments } =
+      await import('./config/config.js');
     const { loadSettings } = await import('./config/settings.js');
     cleanupMockState.shouldThrow = true;
     cleanupMockState.called = false;

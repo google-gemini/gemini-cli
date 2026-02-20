@@ -746,9 +746,8 @@ describe('gemini.tsx main function kitty protocol', () => {
   });
 
   it.skip('should log error when cleanupExpiredSessions fails', async () => {
-    const { cleanupExpiredSessions } = await import(
-      './utils/sessionCleanup.js'
-    );
+    const { cleanupExpiredSessions } =
+      await import('./utils/sessionCleanup.js');
     vi.mocked(cleanupExpiredSessions).mockRejectedValue(
       new Error('Cleanup failed'),
     );

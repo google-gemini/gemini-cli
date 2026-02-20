@@ -66,9 +66,8 @@ describe('sessionSummaryUtils', () => {
     mockGenerateSummary = vi.fn().mockResolvedValue('Add dark mode to the app');
 
     // Import the mocked module to access the constructor
-    const { SessionSummaryService } = await import(
-      './sessionSummaryService.js'
-    );
+    const { SessionSummaryService } =
+      await import('./sessionSummaryService.js');
     (
       SessionSummaryService as unknown as ReturnType<typeof vi.fn>
     ).mockImplementation(() => ({

@@ -1392,9 +1392,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, []);
   const shouldShowIdePrompt = Boolean(
     currentIDE &&
-      !config.getIdeMode() &&
-      !settings.merged.ide.hasSeenNudge &&
-      !idePromptAnswered,
+    !config.getIdeMode() &&
+    !settings.merged.ide.hasSeenNudge &&
+    !idePromptAnswered,
   );
 
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
@@ -1656,9 +1656,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
         if (settings.merged.general.devtools) {
           void (async () => {
-            const { toggleDevToolsPanel } = await import(
-              '../utils/devtoolsService.js'
-            );
+            const { toggleDevToolsPanel } =
+              await import('../utils/devtoolsService.js');
             await toggleDevToolsPanel(
               config,
               showErrorDetails,
@@ -2073,11 +2072,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
     let isMounted = true;
 
     const fetchBannerTexts = async () => {
-      const [defaultBanner, warningBanner] = await Promise.all([
-        // TODO: temporarily disabling the banner, it will be re-added.
-        '',
-        config.getBannerTextCapacityIssues(),
-      ]);
+      // TODO: temporarily disabling the banner, it will be re-added.
+      const defaultBanner = '';
+      const warningBanner = await config.getBannerTextCapacityIssues();
 
       if (isMounted) {
         setDefaultBannerText(defaultBanner);

@@ -47,13 +47,14 @@ describe('textUtils', () => {
   describe('getCachedStringWidth', () => {
     it('should handle unicode characters that crash string-width', () => {
       // U+0602 caused string-width to crash (see #16418)
+      // Newer versions of string-width correctly identify it as width 0.
       const char = '؂';
-      expect(getCachedStringWidth(char)).toBe(1);
+      expect(getCachedStringWidth(char)).toBe(0);
     });
 
     it('should handle unicode characters that crash string-width with ANSI codes', () => {
       const charWithAnsi = '\u001b[31m' + '؂' + '\u001b[0m';
-      expect(getCachedStringWidth(charWithAnsi)).toBe(1);
+      expect(getCachedStringWidth(charWithAnsi)).toBe(0);
     });
   });
 

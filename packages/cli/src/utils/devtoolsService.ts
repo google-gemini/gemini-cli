@@ -230,9 +230,8 @@ export async function toggleDevToolsPanel(
   }
 
   try {
-    const { openBrowserSecurely, shouldLaunchBrowser } = await import(
-      '@google/gemini-cli-core'
-    );
+    const { openBrowserSecurely, shouldLaunchBrowser } =
+      await import('@google/gemini-cli-core');
     const url = await startDevToolsServer(config);
     if (shouldLaunchBrowser()) {
       try {
@@ -256,4 +255,19 @@ export function resetForTesting() {
   promotionAttempts = 0;
   serverStartPromise = null;
   connectedUrl = null;
+}
+
+/**
+ * Stops the DevTools server if it was started by this process.
+ */
+export async function stopDevTools() {
+  try {
+    const mod = await import('@google/gemini-cli-devtools');
+    const devtools: IDevTools = mod.DevTools.getInstance();
+    await devtools.stop();
+    serverStartPromise = null;
+    connectedUrl = null;
+  } catch (err) {
+    debugLogger.debug('Failed to stop DevTools:', err);
+  }
 }

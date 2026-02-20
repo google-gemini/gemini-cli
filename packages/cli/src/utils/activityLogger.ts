@@ -561,6 +561,13 @@ export class ActivityLogger extends EventEmitter {
     }
     this.emit('console', enriched);
   }
+
+  dispose() {
+    this.networkLoggingEnabled = false;
+    this.removeAllListeners();
+    this.clearBufferedLogs();
+    this.emit('dispose');
+  }
 }
 
 /**
@@ -818,6 +825,12 @@ function setupNetworkLogging(
   capture.on('network-logging-enabled', () => {
     debugLogger.debug('Network logging enabled, flushing buffer...');
     flushBuffer();
+  });
+
+  capture.on('dispose', () => {
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (ws) ws.close();
+    cleanup();
   });
 
   // Cleanup on process exit

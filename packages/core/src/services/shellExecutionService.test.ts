@@ -1475,9 +1475,8 @@ describe('ShellExecutionService environment variables', () => {
     vi.stubEnv('GEMINI_CLI_TEST_VAR', 'test-value'); // A test var that should be kept
 
     vi.resetModules();
-    const { ShellExecutionService } = await import(
-      './shellExecutionService.js'
-    );
+    const { ShellExecutionService } =
+      await import('./shellExecutionService.js');
 
     // Test pty path
     await ShellExecutionService.execute(
@@ -1534,9 +1533,8 @@ describe('ShellExecutionService environment variables', () => {
     vi.stubEnv('GEMINI_CLI_TEST_VAR', 'test-value'); // A test var that should be kept
 
     vi.resetModules();
-    const { ShellExecutionService } = await import(
-      './shellExecutionService.js'
-    );
+    const { ShellExecutionService } =
+      await import('./shellExecutionService.js');
 
     // Test pty path
     await ShellExecutionService.execute(
@@ -1590,9 +1588,8 @@ describe('ShellExecutionService environment variables', () => {
     vi.stubEnv('GITHUB_SHA', '');
     vi.stubEnv('SURFACE', '');
     vi.resetModules();
-    const { ShellExecutionService } = await import(
-      './shellExecutionService.js'
-    );
+    const { ShellExecutionService } =
+      await import('./shellExecutionService.js');
 
     // Test pty path
     await ShellExecutionService.execute(

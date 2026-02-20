@@ -72,9 +72,8 @@ export async function runNonInteractive({
     });
 
     if (process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET']) {
-      const { setupInitialActivityLogger } = await import(
-        './utils/devtoolsService.js'
-      );
+      const { setupInitialActivityLogger } =
+        await import('./utils/devtoolsService.js');
       await setupInitialActivityLogger(config);
     }
 

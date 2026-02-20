@@ -142,15 +142,15 @@ const inScreen = (): boolean =>
 const isSSH = (): boolean =>
   Boolean(
     process.env['SSH_TTY'] ||
-      process.env['SSH_CONNECTION'] ||
-      process.env['SSH_CLIENT'],
+    process.env['SSH_CONNECTION'] ||
+    process.env['SSH_CLIENT'],
   );
 
 const isWSL = (): boolean =>
   Boolean(
     process.env['WSL_DISTRO_NAME'] ||
-      process.env['WSLENV'] ||
-      process.env['WSL_INTEROP'],
+    process.env['WSLENV'] ||
+    process.env['WSL_INTEROP'],
   );
 
 const isWindowsTerminal = (): boolean =>

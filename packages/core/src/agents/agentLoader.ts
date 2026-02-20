@@ -28,8 +28,7 @@ interface FrontmatterBaseAgentDefinition {
   display_name?: string;
 }
 
-interface FrontmatterLocalAgentDefinition
-  extends FrontmatterBaseAgentDefinition {
+interface FrontmatterLocalAgentDefinition extends FrontmatterBaseAgentDefinition {
   kind: 'local';
   description: string;
   tools?: string[];
@@ -57,8 +56,7 @@ interface FrontmatterAuthConfig {
   password?: string;
 }
 
-interface FrontmatterRemoteAgentDefinition
-  extends FrontmatterBaseAgentDefinition {
+interface FrontmatterRemoteAgentDefinition extends FrontmatterBaseAgentDefinition {
   kind: 'remote';
   description?: string;
   agent_card_url: string;

@@ -100,14 +100,14 @@ async function drainStdin() {
   await new Promise((resolve) => setTimeout(resolve, 50));
 }
 
-export async function cleanupCheckpoints() {
-  const storage = new Storage(process.cwd());
-  await storage.initialize();
-  const tempDir = storage.getProjectTempDir();
-  const checkpointsDir = join(tempDir, 'checkpoints');
+export async function cleanupCheckpoints(cwd?: string) {
   try {
+    const storage = new Storage(cwd || process.cwd());
+    await storage.initialize();
+    const tempDir = storage.getProjectTempDir();
+    const checkpointsDir = join(tempDir, 'checkpoints');
     await fs.rm(checkpointsDir, { recursive: true, force: true });
   } catch {
-    // Ignore errors if the directory doesn't exist or fails to delete.
+    // Ignore errors if the directory doesn't exist, process.cwd() fails, or it fails to delete.
   }
 }

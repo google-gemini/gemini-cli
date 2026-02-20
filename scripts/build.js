@@ -22,6 +22,16 @@ import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Increase memory limit for all subprocesses (tsc, etc) to prevent OOM in CI.
+if (
+  !process.env.NODE_OPTIONS ||
+  !process.env.NODE_OPTIONS.includes('max-old-space-size')
+) {
+  process.env.NODE_OPTIONS = `${
+    process.env.NODE_OPTIONS || ''
+  } --max-old-space-size=8192`.trim();
+}
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 

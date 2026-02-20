@@ -357,7 +357,8 @@ export const render = (
       debug: false,
       exitOnCtrlC: false,
       patchConsole: false,
-      onRender: (metrics: { output: string; staticOutput?: string }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      onRender: (metrics: any) => {
         stdout.onRender(metrics.staticOutput ?? '', metrics.output);
       },
     });
