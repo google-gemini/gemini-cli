@@ -12,9 +12,9 @@ implementation. It allows you to:
 > feedback is invaluable as we refine this feature. If you have ideas,
 > suggestions, or encounter issues:
 >
-> - Use the **/bug** command within Gemini CLI to file an issue.
 > - [Open an issue](https://github.com/google-gemini/gemini-cli/issues) on
 >   GitHub.
+> - Use the **/bug** command within Gemini CLI to file an issue.
 
 - [Enabling Plan Mode](#enabling-plan-mode)
 - [How to use Plan Mode](#how-to-use-plan-mode)
@@ -55,7 +55,15 @@ manually during a session.
   3.  Set the value to **Plan**.
 
   Alternatively, use the `gemini --approval-mode=plan` CLI flag or manually
-  update `settings.json` to set `general.defaultApprovalMode` to `"plan"`.
+  update:
+
+  ```json
+  {
+    "general": {
+      "defaultApprovalMode": "plan"
+    }
+  }
+  ```
 
 - **Keyboard Shortcut:** Press `Shift+Tab` to cycle through approval modes
   (`Default` -> `Auto-Edit` -> `Plan`).
@@ -67,7 +75,7 @@ manually during a session.
 
 - **Natural Language:** Ask Gemini CLI to "start a plan for...". Gemini CLI then
   calls the [`enter_plan_mode`] tool to switch modes.
-  - **Note:** This tool is not available when Gemini CLI is in [YOLO mode].
+  > **Note:** This tool is not available when Gemini CLI is in [YOLO mode].
 
 ### Planning Workflow
 
