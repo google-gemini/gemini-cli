@@ -477,6 +477,48 @@ describe('<Footer />', () => {
       expect(lastFrame()).toMatch(/\d+% context left/);
       unmount();
     });
+
+    it('displays token usage when showTokenUsage is true and there are active models', async () => {
+      const metricsWithModels = {
+        ...mockSessionStats.metrics,
+        models: {
+          'gemini-3-pro-preview': {
+            tokens: {
+              total: 1500,
+              input: 1000,
+              candidates: 500,
+              cached: 0,
+              thoughts: 0,
+              tool: 0,
+              prompt: 1000,
+            },
+            api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
+            roles: {},
+          },
+        },
+      };
+
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: {
+            sessionStats: { ...mockSessionStats, metrics: metricsWithModels },
+          },
+          settings: createMockSettings({
+            ui: {
+              footer: {
+                showTokenUsage: true,
+              },
+            },
+          }),
+        },
+      );
+      await waitUntilReady();
+      expect(lastFrame()).toContain('3P:1.5K');
+      unmount();
+    });
+
     it('renders complete footer in narrow terminal (baseline narrow)', async () => {
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <Footer />,

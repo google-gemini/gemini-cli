@@ -14,6 +14,7 @@ import {
   supportsModernFeatures,
   isAutoModel,
   getDisplayString,
+  getShortDisplayString,
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -212,6 +213,31 @@ describe('isAutoModel', () => {
     expect(isAutoModel(DEFAULT_GEMINI_MODEL)).toBe(false);
     expect(isAutoModel(PREVIEW_GEMINI_MODEL)).toBe(false);
     expect(isAutoModel('some-random-model')).toBe(false);
+  });
+});
+
+describe('getShortDisplayString', () => {
+  it('should return short abbreviations for known Gemini models', () => {
+    expect(getShortDisplayString(PREVIEW_GEMINI_MODEL)).toBe('3P');
+    expect(getShortDisplayString(PREVIEW_GEMINI_FLASH_MODEL)).toBe('3F');
+    expect(getShortDisplayString(DEFAULT_GEMINI_MODEL)).toBe('2.5P');
+    expect(getShortDisplayString(DEFAULT_GEMINI_FLASH_MODEL)).toBe('2.5F');
+    expect(getShortDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL)).toBe('2.5L');
+  });
+
+  it('should return Auto for auto models', () => {
+    expect(getShortDisplayString(PREVIEW_GEMINI_MODEL_AUTO)).toBe('Auto');
+    expect(getShortDisplayString(DEFAULT_GEMINI_MODEL_AUTO)).toBe('Auto');
+  });
+
+  it('should handle custom gemini models', () => {
+    expect(getShortDisplayString('gemini-1.5-flash')).toBe('1.5F');
+    expect(getShortDisplayString('gemini-1.5-pro')).toBe('1.5P');
+  });
+
+  it('should handle non-gemini models', () => {
+    expect(getShortDisplayString('gpt-4')).toBe('gpt-');
+    expect(getShortDisplayString('claude-3-opus')).toBe('clau');
   });
 });
 

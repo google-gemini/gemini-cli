@@ -347,6 +347,13 @@
               "markdownDescription": "Hides the context window remaining percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
               "type": "boolean"
+            },
+            "showTokenUsage": {
+              "title": "Show Token Usage",
+              "description": "Show cumulative token usage per model in the footer.",
+              "markdownDescription": "Show cumulative token usage per model in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
             }
           },
           "additionalProperties": false

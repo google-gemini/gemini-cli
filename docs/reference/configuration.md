@@ -266,6 +266,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hides the context window remaining percentage.
   - **Default:** `true`
 
+- **`ui.footer.showTokenUsage`** (boolean):
+  - **Description:** Show cumulative token usage per model in the footer.
+  - **Default:** `true`
+
 - **`ui.hideFooter`** (boolean):
   - **Description:** Hide the footer from the UI
   - **Default:** `false`

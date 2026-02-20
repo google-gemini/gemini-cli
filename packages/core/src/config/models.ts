@@ -107,6 +107,42 @@ export function getDisplayString(model: string) {
 }
 
 /**
+ * Returns a short, compact abbreviation for a model name.
+ *
+ * @param model The model name to abbreviate.
+ * @returns A short abbreviation (e.g., '3P', '2.5F').
+ */
+export function getShortDisplayString(model: string): string {
+  switch (model) {
+    case PREVIEW_GEMINI_MODEL:
+      return '3P';
+    case PREVIEW_GEMINI_FLASH_MODEL:
+      return '3F';
+    case DEFAULT_GEMINI_MODEL:
+      return '2.5P';
+    case DEFAULT_GEMINI_FLASH_MODEL:
+      return '2.5F';
+    case DEFAULT_GEMINI_FLASH_LITE_MODEL:
+      return '2.5L';
+    case PREVIEW_GEMINI_MODEL_AUTO:
+    case DEFAULT_GEMINI_MODEL_AUTO:
+      return 'Auto';
+    default: {
+      // For custom models, try to extract a short name
+      if (model.startsWith('gemini-')) {
+        const parts = model.split('-');
+        if (parts.length >= 2) {
+          const version = parts[1];
+          const type = parts[2]?.[0]?.toUpperCase() || '';
+          return `${version}${type}`;
+        }
+      }
+      return model.slice(0, 4);
+    }
+  }
+}
+
+/**
  * Checks if the model is a preview model.
  *
  * @param model The model name to check.

@@ -17,6 +17,7 @@ import process from 'node:process';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { QuotaDisplay } from './QuotaDisplay.js';
+import { TokenUsageIndicator } from './TokenUsageIndicator.js';
 import { DebugProfiler } from './DebugProfiler.js';
 import { isDevelopment } from '../../utils/installationInfo.js';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -64,6 +65,7 @@ export const Footer: React.FC = () => {
   const hideSandboxStatus = settings.merged.ui.footer.hideSandboxStatus;
   const hideModelInfo = settings.merged.ui.footer.hideModelInfo;
   const hideContextPercentage = settings.merged.ui.footer.hideContextPercentage;
+  const showTokenUsage = settings.merged.ui.footer.showTokenUsage;
 
   const pathLength = Math.max(20, Math.floor(terminalWidth * 0.25));
   const displayPath = shortenPath(tildeifyPath(targetDir), pathLength);
@@ -165,6 +167,7 @@ export const Footer: React.FC = () => {
                 </>
               )}
             </Text>
+            {showTokenUsage && <TokenUsageIndicator />}
             {showMemoryUsage && <MemoryUsageDisplay />}
           </Box>
           <Box alignItems="center">
