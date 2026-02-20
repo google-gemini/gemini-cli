@@ -33,6 +33,7 @@ export interface StartupPhaseHandle {
  */
 export class StartupProfiler {
   private phases: Map<string, StartupPhase> = new Map();
+  private completedPhases: StartupPhaseStats[] = [];
   private static instance: StartupProfiler;
 
   private constructor() {}
@@ -142,6 +143,14 @@ export class StartupProfiler {
   }
 
   /**
+   * Returns the completed startup phases for display purposes.
+   * Returns an empty array if flush() hasn't been called yet.
+   */
+  getStartupStats(): StartupPhaseStats[] {
+    return this.completedPhases;
+  }
+
+  /**
    * Flushes buffered metrics to the telemetry system.
    */
   flush(config: Config): void {
@@ -219,6 +228,7 @@ export class StartupProfiler {
     }
 
     if (startupPhases.length > 0) {
+      this.completedPhases = startupPhases;
       logStartupStats(
         config,
         new StartupStatsEvent(
