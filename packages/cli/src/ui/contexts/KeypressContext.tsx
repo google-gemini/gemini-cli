@@ -811,9 +811,18 @@ export function KeypressProvider({
       };
     }
 
-    stdin.on('data', dataListener);
+    if (typeof stdin.on === 'function') {
+      stdin.on('data', dataListener);
+    } else {
+      debugLogger.warn(
+        'stdin.on is not a function in KeypressContext. Input handling may be impaired.',
+      );
+    }
+
     return () => {
-      stdin.removeListener('data', dataListener);
+      if (typeof stdin.removeListener === 'function') {
+        stdin.removeListener('data', dataListener);
+      }
       if (wasRaw === false) {
         setRawMode(false);
       }
