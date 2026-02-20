@@ -54,99 +54,14 @@
     "items": [
       { "label": "Agent Skills", "slug": "docs/cli/skills" },
       {
-        "label": "/about - About Gemini CLI",
-        "link": "/docs/cli/commands/#about"
-      },
-      {
-        "label": "/auth - Authentication",
+        "label": "Authentication",
         "slug": "docs/get-started/authentication"
       },
-      { "label": "/bug - Report a bug", "link": "/docs/cli/commands/#bug" },
-      { "label": "/chat - Chat history", "link": "/docs/cli/commands/#chat" },
-      { "label": "/clear - Clear screen", "link": "/docs/cli/commands/#clear" },
-      {
-        "label": "/compress - Compress context",
-        "link": "/docs/cli/commands/#compress"
-      },
-      { "label": "/copy - Copy output", "link": "/docs/cli/commands/#copy" },
-      {
-        "label": "/directory - Manage workspace",
-        "link": "/docs/cli/commands/#directory-or-dir"
-      },
-      {
-        "label": "/docs - Open documentation",
-        "link": "/docs/cli/commands/#docs"
-      },
-      {
-        "label": "/editor - Select editor",
-        "link": "/docs/cli/commands/#editor"
-      },
-      {
-        "label": "/extensions - Manage extensions",
-        "slug": "docs/extensions"
-      },
-      { "label": "/help - Show help", "link": "/docs/cli/commands/#help-or" },
-      { "label": "/hooks - Hooks", "slug": "docs/hooks" },
-      { "label": "/ide - IDE integration", "slug": "docs/ide-integration" },
-      {
-        "label": "/init - Initialize context",
-        "link": "/docs/cli/commands/#init"
-      },
-      { "label": "/mcp - MCP servers", "slug": "docs/tools/mcp-server" },
-
-      {
-        "label": "/memory - Manage memory",
-        "link": "/docs/cli/commands/#memory"
-      },
-      { "label": "/model - Model selection", "slug": "docs/cli/model" },
-      {
-        "label": "/policies - Manage policies",
-        "link": "/docs/cli/commands/#policies"
-      },
-      {
-        "label": "/privacy - Privacy notice",
-        "link": "/docs/cli/commands/#privacy"
-      },
-      {
-        "label": "/quit - Exit CLI",
-        "link": "/docs/cli/commands/#quit-or-exit"
-      },
-      { "label": "/restore - Restore files", "slug": "docs/cli/checkpointing" },
-      {
-        "label": "/resume - Resume session",
-
-        "link": "/docs/cli/commands/#resume"
-      },
-      { "label": "/rewind - Rewind", "slug": "docs/cli/rewind" },
-      { "label": "/settings - Settings", "slug": "docs/cli/settings" },
-      {
-        "label": "/setup-github - GitHub setup",
-        "link": "/docs/cli/commands/#setup-github"
-      },
-      {
-        "label": "/shells - Manage processes",
-        "link": "/docs/cli/commands/#shells-or-bashes"
-      },
-      { "label": "/skills - Agent skills", "slug": "docs/cli/skills" },
-      {
-        "label": "/stats - Session statistics",
-        "link": "/docs/cli/commands/#stats"
-      },
-      {
-        "label": "/terminal-setup - Terminal keybindings",
-        "link": "/docs/cli/commands/#terminal-setup"
-      },
-      { "label": "/theme - Themes", "slug": "docs/cli/themes" },
-      { "label": "/tools - List tools", "link": "/docs/cli/commands/#tools" },
-      { "label": "/vim - Vim mode", "link": "/docs/cli/commands/#vim" },
-
-      {
-        "label": "Activate skill (tool)",
-        "slug": "docs/tools/activate-skill"
-      },
-      { "label": "Ask user (tool)", "slug": "docs/tools/ask-user" },
       { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
-      { "label": "File system (tool)", "slug": "docs/tools/file-system" },
+      {
+        "label": "Extensions",
+        "slug": "docs/extensions/index"
+      },
       { "label": "Headless mode", "slug": "docs/cli/headless" },
       { "label": "Help", "link": "/docs/reference/commands/#help-or" },
       { "label": "Hooks", "slug": "docs/hooks" },
@@ -276,7 +191,7 @@
   {
     "label": "Releases",
     "items": [
-      { "label": "Release notes", "slug": "docs/changelogs" },
+      { "label": "Release notes", "slug": "docs/changelogs/" },
       { "label": "Stable release", "slug": "docs/changelogs/latest" },
       { "label": "Preview release", "slug": "docs/changelogs/preview" }
     ]
