@@ -76,6 +76,15 @@ function isHttpRequestArgs(args: unknown[]): args is HttpRequestArgs {
   );
 }
 
+function isRequestOptions(value: unknown): value is http.RequestOptions {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !(value instanceof URL) &&
+    !Array.isArray(value)
+  );
+}
+
 function callHttpRequest(
   originalFn: typeof http.request,
   args: unknown[],
@@ -91,8 +100,8 @@ function callHttpRequest(
     if (typeof first === 'string' || first instanceof URL) {
       return originalFn(first);
     }
-    if (first && typeof first === 'object') {
-      return originalFn(first as http.RequestOptions);
+    if (isRequestOptions(first)) {
+      return originalFn(first);
     }
     return originalFn({});
   }
@@ -103,12 +112,12 @@ function callHttpRequest(
       if (typeof second === 'function') {
         return originalFn(first, second);
       }
-      if (typeof second === 'object') {
-        return originalFn(first, second as http.RequestOptions);
+      if (isRequestOptions(second)) {
+        return originalFn(first, second);
       }
     }
-    if (first && typeof first === 'object' && typeof second === 'function') {
-      return originalFn(first as http.RequestOptions, second);
+    if (isRequestOptions(first) && typeof second === 'function') {
+      return originalFn(first, second);
     }
   }
   if (args.length === 3) {
@@ -117,11 +126,10 @@ function callHttpRequest(
     const third = args[2];
     if (
       (typeof first === 'string' || first instanceof URL) &&
-      second &&
-      typeof second === 'object' &&
+      isRequestOptions(second) &&
       typeof third === 'function'
     ) {
-      return originalFn(first, second as http.RequestOptions, third);
+      return originalFn(first, second, third);
     }
   }
   return originalFn({});
@@ -504,8 +512,10 @@ export class ActivityLogger extends EventEmitter {
         options = firstArg;
       } else if (firstArg instanceof URL) {
         options = firstArg;
+      } else if (firstArg && typeof firstArg === 'object') {
+        options = isRequestOptions(firstArg) ? firstArg : {};
       } else {
-        options = (firstArg ?? {}) as http.RequestOptions;
+        options = {};
       }
 
       let url = '';
