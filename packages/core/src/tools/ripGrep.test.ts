@@ -2013,6 +2013,42 @@ describe('RipGrepTool', () => {
       expect(result.llmContent).not.toContain('fileB.txt');
       expect(result.llmContent).toContain('Copyright 2025 Google LLC');
     });
+
+    it('should reject total_max_matches that exceeds MAX_TOTAL_MAX_MATCHES', () => {
+      const params: RipGrepToolParams = {
+        pattern: 'world',
+        total_max_matches: 9999,
+      };
+      expect(() => grepTool.build(params)).toThrow(
+        'params/total_max_matches must be <= 500',
+      );
+    });
+
+    it('should truncate long match lines', async () => {
+      const longLine = 'x'.repeat(600);
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'long.txt' },
+                line_number: 1,
+                lines: { text: longLine + '\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'x+' };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('... (truncated)');
+      // The displayed line should be capped, not the full 600 chars
+      expect(result.llmContent).not.toContain(longLine);
+    });
   });
 });
 
