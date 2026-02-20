@@ -10,12 +10,14 @@ import type {
   ToolInvocation,
   ToolMcpConfirmationDetails,
   ToolResult,
-
+  PolicyUpdateOptions,
+} from './tools.js';
+import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
   ToolConfirmationOutcome,
-  type PolicyUpdateOptions} from './tools.js';
+} from './tools.js';
 import type { CallableTool, FunctionCall, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
 import type { Config } from '../config/config.js';
