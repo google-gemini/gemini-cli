@@ -1793,7 +1793,11 @@ export class Config {
     const isPlanModeTransition =
       currentMode !== mode &&
       (currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN);
-    if (isPlanModeTransition) {
+    const isYoloModeTransition =
+      currentMode !== mode &&
+      (currentMode === ApprovalMode.YOLO || mode === ApprovalMode.YOLO);
+
+    if (isPlanModeTransition || isYoloModeTransition) {
       this.syncPlanModeTools();
       this.updateSystemInstructionIfInitialized();
     }
@@ -1803,8 +1807,13 @@ export class Config {
    * Synchronizes enter/exit plan mode tools based on current mode.
    */
   syncPlanModeTools(): void {
-    const isPlanMode = this.getApprovalMode() === ApprovalMode.PLAN;
     const registry = this.getToolRegistry();
+    if (!registry) {
+      return;
+    }
+    const approvalMode = this.getApprovalMode();
+    const isPlanMode = approvalMode === ApprovalMode.PLAN;
+    const isYoloMode = approvalMode === ApprovalMode.YOLO;
 
     if (isPlanMode) {
       if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
@@ -1817,7 +1826,7 @@ export class Config {
       if (registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
         registry.unregisterTool(EXIT_PLAN_MODE_TOOL_NAME);
       }
-      if (this.planEnabled) {
+      if (this.planEnabled && !isYoloMode) {
         if (!registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
           registry.registerTool(new EnterPlanModeTool(this, this.messageBus));
         }
