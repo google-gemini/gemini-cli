@@ -12,6 +12,8 @@ import {
   GEMINI_DIR,
   homedir,
   GOOGLE_ACCOUNTS_FILENAME,
+  isSubpath,
+  resolveToRealPath,
 } from '../utils/paths.js';
 import { ProjectRegistry } from './projectRegistry.js';
 import { StorageMigration } from './storageMigration.js';
@@ -26,10 +28,15 @@ export class Storage {
   private readonly sessionId: string | undefined;
   private projectIdentifier: string | undefined;
   private initPromise: Promise<void> | undefined;
+  private customPlansDir: string | undefined;
 
   constructor(targetDir: string, sessionId?: string) {
     this.targetDir = targetDir;
     this.sessionId = sessionId;
+  }
+
+  setCustomPlansDir(dir: string | undefined): void {
+    this.customPlansDir = dir;
   }
 
   static getGlobalGeminiDir(): string {
@@ -251,6 +258,26 @@ export class Storage {
       return path.join(this.getProjectTempDir(), this.sessionId, 'plans');
     }
     return path.join(this.getProjectTempDir(), 'plans');
+  }
+
+  getPlansDir(): string {
+    if (this.customPlansDir) {
+      const resolvedPath = path.resolve(
+        this.getProjectRoot(),
+        this.customPlansDir,
+      );
+      const realProjectRoot = resolveToRealPath(this.getProjectRoot());
+      const realResolvedPath = resolveToRealPath(resolvedPath);
+
+      if (!isSubpath(realProjectRoot, realResolvedPath)) {
+        throw new Error(
+          `Custom plans directory '${this.customPlansDir}' resolves to '${realResolvedPath}', which is outside the project root '${realProjectRoot}'.`,
+        );
+      }
+
+      return resolvedPath;
+    }
+    return this.getProjectTempPlansDir();
   }
 
   getProjectTempTasksDir(): string {
