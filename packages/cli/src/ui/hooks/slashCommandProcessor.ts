@@ -86,6 +86,7 @@ interface SlashCommandProcessorActions {
   toggleBackgroundShell: () => void;
   toggleShortcutsHelp: () => void;
   setText: (text: string) => void;
+  toggleVoice: () => void;
 }
 
 /**
@@ -243,6 +244,7 @@ export const useSlashCommandProcessor = (
         removeComponent: () => setCustomDialog(null),
         toggleBackgroundShell: actions.toggleBackgroundShell,
         toggleShortcutsHelp: actions.toggleShortcutsHelp,
+        toggleVoice: actions.toggleVoice,
       },
       session: {
         stats: session.stats,

@@ -418,6 +418,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
       {uiState.isInputActive && (
         <InputPrompt
+          key="input-prompt"
           buffer={uiState.buffer}
           inputWidth={uiState.inputWidth}
           suggestionsWidth={uiState.suggestionsWidth}
