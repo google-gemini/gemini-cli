@@ -890,11 +890,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // We prioritize execution unless the user is explicitly selecting a different suggestion.
       if (
         completion.isPerfectMatch &&
-        completion.completionMode !== CompletionMode.AT &&
-        keyMatchers[Command.RETURN](key) &&
+        keyMatchers[Command.SUBMIT](key) &&
+        recentUnsafePasteTime === null &&
         (!completion.showSuggestions || completion.activeSuggestionIndex <= 0)
       ) {
         handleSubmit(buffer.text);
+        return true;
+      }
+
+      // Newline insertion
+      if (keyMatchers[Command.NEWLINE](key)) {
+        buffer.newline();
         return true;
       }
 
@@ -1075,12 +1081,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             handleSubmit(buffer.text);
           }
         }
-        return true;
-      }
-
-      // Newline insertion
-      if (keyMatchers[Command.NEWLINE](key)) {
-        buffer.newline();
         return true;
       }
 
