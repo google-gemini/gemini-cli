@@ -3079,6 +3079,7 @@ export class Config implements McpContext, AgentLoopContext {
     );
   }
 
+<<<<<<< HEAD
   /**
    * Returns whether the user has access to Pro models.
    * This is determined by the PRO_MODEL_NO_ACCESS experiment flag.
@@ -3197,6 +3198,11 @@ export class Config implements McpContext, AgentLoopContext {
     return (
       this.experiments?.flags[ExperimentFlags.GEMINI_3_1_FLASH_LITE_LAUNCHED]
         ?.boolValue ?? false
+=======
+  isAwesomeEnabled(): boolean {
+    return (
+      this.getExperimentValue<boolean>(ExperimentFlags.ENABLE_AWESOME) ?? false
+>>>>>>> d2ce1460f (feat(config): add enable-awesome experiment to show custom ASCII art)
     );
   }
 

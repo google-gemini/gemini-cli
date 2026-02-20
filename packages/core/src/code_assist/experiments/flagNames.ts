@@ -20,6 +20,7 @@ export const ExperimentFlags = {
   PRO_MODEL_NO_ACCESS: 45768879,
   GEMINI_3_1_FLASH_LITE_LAUNCHED: 45771641,
   DEFAULT_REQUEST_TIMEOUT: 45773134,
+  ENABLE_AWESOME: 45758820,
 } as const;
 
 export type ExperimentFlagName =
@@ -86,6 +87,11 @@ export const ExperimentMetadata: Record<number, ExperimentMetadataEntry> = {
     description: 'Protects the latest turn from being masked.',
     type: 'boolean',
     defaultValue: true,
+  },
+  [ExperimentFlags.ENABLE_AWESOME]: {
+    description: "When enabled, the ASCII art says 'matt'.",
+    type: 'boolean',
+    defaultValue: false,
   },
 };
 
