@@ -23,8 +23,8 @@ export abstract class BaseA2AAuthProvider implements A2AAuthProvider {
    */
   abstract headers(): Promise<HttpHeaders>;
 
-  private static readonly MAX_AUTH_RETRIES = 2;
-  private authRetryCount = 0;
+  protected static readonly MAX_AUTH_RETRIES = 2;
+  protected authRetryCount = 0;
 
   /**
    * Check if a request should be retried with new headers.
