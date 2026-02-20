@@ -57,8 +57,6 @@ export const ALLOWED_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.3;
 export const TRUSTED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.2;
 export const ALLOWED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.1;
 
-export const AUTO_SAVED_POLICY_FILENAME = 'auto-saved.toml';
-
 /**
  * Gets the list of directories to search for policy files, in order of increasing priority
  * (Default -> User -> Project -> Admin).
@@ -451,10 +449,7 @@ export function createPolicyUpdater(
           try {
             const workspacePoliciesDir = storage.getWorkspacePoliciesDir();
             await fs.mkdir(workspacePoliciesDir, { recursive: true });
-            const policyFile = path.join(
-              workspacePoliciesDir,
-              AUTO_SAVED_POLICY_FILENAME,
-            );
+            const policyFile = storage.getAutoSavedPolicyPath();
 
             // Read existing file
             let existingData: { rule?: TomlRule[] } = {};

@@ -15,15 +15,11 @@ import {
 } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import {
-  createPolicyUpdater,
-  ALWAYS_ALLOW_PRIORITY,
-  AUTO_SAVED_POLICY_FILENAME,
-} from './config.js';
+import { createPolicyUpdater, ALWAYS_ALLOW_PRIORITY } from './config.js';
 import { PolicyEngine } from './policy-engine.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
-import { Storage } from '../config/storage.js';
+import { Storage, AUTO_SAVED_POLICY_FILENAME } from '../config/storage.js';
 import { ApprovalMode } from './types.js';
 
 vi.mock('node:fs/promises');
@@ -53,9 +49,14 @@ describe('createPolicyUpdater', () => {
     createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
     const workspacePoliciesDir = '/mock/project/.gemini/policies';
+    const policyFile = path.join(
+      workspacePoliciesDir,
+      AUTO_SAVED_POLICY_FILENAME,
+    );
     vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
       workspacePoliciesDir,
     );
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
     (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
     (fs.readFile as unknown as Mock).mockRejectedValue(
       new Error('File not found'),
@@ -93,7 +94,7 @@ describe('createPolicyUpdater', () => {
     );
     expect(fs.rename).toHaveBeenCalledWith(
       expect.stringMatching(/\.tmp$/),
-      path.join(workspacePoliciesDir, AUTO_SAVED_POLICY_FILENAME),
+      policyFile,
     );
   });
 
@@ -115,9 +116,14 @@ describe('createPolicyUpdater', () => {
     createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
     const workspacePoliciesDir = '/mock/project/.gemini/policies';
+    const policyFile = path.join(
+      workspacePoliciesDir,
+      AUTO_SAVED_POLICY_FILENAME,
+    );
     vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
       workspacePoliciesDir,
     );
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
     (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
     (fs.readFile as unknown as Mock).mockRejectedValue(
       new Error('File not found'),
@@ -163,9 +169,14 @@ describe('createPolicyUpdater', () => {
     createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
     const workspacePoliciesDir = '/mock/project/.gemini/policies';
+    const policyFile = path.join(
+      workspacePoliciesDir,
+      AUTO_SAVED_POLICY_FILENAME,
+    );
     vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
       workspacePoliciesDir,
     );
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
     (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
     (fs.readFile as unknown as Mock).mockRejectedValue(
       new Error('File not found'),
@@ -204,9 +215,14 @@ describe('createPolicyUpdater', () => {
     createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
     const workspacePoliciesDir = '/mock/project/.gemini/policies';
+    const policyFile = path.join(
+      workspacePoliciesDir,
+      AUTO_SAVED_POLICY_FILENAME,
+    );
     vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
       workspacePoliciesDir,
     );
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
     (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
     (fs.readFile as unknown as Mock).mockRejectedValue(
       new Error('File not found'),
