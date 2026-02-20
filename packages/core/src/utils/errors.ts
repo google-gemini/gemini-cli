@@ -15,8 +15,8 @@ function isGaxiosError(error: unknown): error is GaxiosError {
     typeof error === 'object' &&
     error !== null &&
     'response' in error &&
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    typeof (error as GaxiosError).response === 'object'
+    typeof (error as { response: unknown }).response === 'object' &&
+    (error as { response: unknown }).response !== null
   );
 }
 

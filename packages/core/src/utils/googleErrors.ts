@@ -231,10 +231,9 @@ function isErrorShape(obj: unknown): obj is ErrorShape {
   return (
     typeof obj === 'object' &&
     obj !== null &&
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    (('message' in obj && typeof (obj as ErrorShape).message === 'string') ||
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      ('code' in obj && typeof (obj as ErrorShape).code === 'number'))
+    (('message' in obj &&
+      typeof (obj as { message: unknown }).message === 'string') ||
+      ('code' in obj && typeof (obj as { code: unknown }).code === 'number'))
   );
 }
 
