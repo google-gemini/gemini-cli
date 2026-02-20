@@ -145,16 +145,15 @@ describe('policy/utils', () => {
     });
 
     describe('commandRegex anchors', () => {
-      it('should transform ^ anchor correctly (TDD: currently failing to match)', () => {
+      it('should transform ^ anchor correctly', () => {
         const patterns = buildArgsPatterns(undefined, undefined, '^git status');
         const regex = new RegExp(patterns[0]!);
         // JSON stringified command: {"command":"git status"}
         const json = '{"command":"git status"}';
-        // This CURRENTLY fails because the pattern is "command":"^git status
         expect(regex.test(json)).toBe(true);
       });
 
-      it('should transform $ anchor correctly (TDD: currently failing to match)', () => {
+      it('should transform $ anchor correctly', () => {
         const patterns = buildArgsPatterns(
           undefined,
           undefined,
@@ -162,11 +161,10 @@ describe('policy/utils', () => {
         );
         const regex = new RegExp(patterns[0]!);
         const json = '{"command":"tmux send-keys -t superpowers:6 C-c"}';
-        // This CURRENTLY fails because $ matches end of JSON string, not end of command value
         expect(regex.test(json)).toBe(true);
       });
 
-      it('should handle $ anchor when other fields follow (TDD: currently failing)', () => {
+      it('should handle $ anchor when other fields follow', () => {
         const patterns = buildArgsPatterns(undefined, undefined, 'git status$');
         const regex = new RegExp(patterns[0]!);
         const json = '{"command":"git status","dir_path":"/tmp"}';

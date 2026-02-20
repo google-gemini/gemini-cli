@@ -111,7 +111,7 @@ priority = 100
       expect(result.errors).toHaveLength(0);
     });
 
-    it('should match if ^ is used in commandRegex (TDD: currently fails)', async () => {
+    it('should match if ^ is used in commandRegex', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
 toolName = "run_shell_command"
@@ -121,7 +121,7 @@ priority = 100
 `);
 
       expect(result.rules).toHaveLength(1);
-      // After the fix, this should match correctly
+      // The generated pattern is "command":"^git status
       expect(
         result.rules[0].argsPattern?.test('{"command":"git status"}'),
       ).toBe(true);
