@@ -1434,4 +1434,13 @@ describe('ClearcutLogger', () => {
       ]);
     });
   });
+
+  describe('logStartSessionEvent', () => {
+    it('should not throw if event is undefined', async () => {
+      const { logger } = setup();
+      await expect(
+        logger?.logStartSessionEvent(undefined as unknown as StartSessionEvent),
+      ).resolves.not.toThrow();
+    });
+  });
 });
