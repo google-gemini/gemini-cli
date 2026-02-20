@@ -17,8 +17,7 @@ import type {
   ExecutingToolCall,
   ToolCallResponseInfo,
 } from './types.js';
-import { CoreToolCallStatus } from './types.js';
-import { ROOT_SCHEDULER_ID } from './types.js';
+import { CoreToolCallStatus , ROOT_SCHEDULER_ID } from './types.js';
 import type {
   ToolConfirmationOutcome,
   ToolResultDisplay,
@@ -78,8 +77,16 @@ export class SchedulerStateManager {
     return next;
   }
 
+  peekQueue(): ToolCall | undefined {
+    return this.queue[0];
+  }
+
   get isActive(): boolean {
     return this.activeCalls.size > 0;
+  }
+
+  get allActiveCalls(): ToolCall[] {
+    return Array.from(this.activeCalls.values());
   }
 
   get activeCallCount(): number {
