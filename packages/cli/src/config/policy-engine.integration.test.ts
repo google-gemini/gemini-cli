@@ -353,6 +353,31 @@ describe('Policy Engine Integration Tests', () => {
           }
         });
 
+        it(`should allow ${toolName} with Windows-style paths to plans directory`, async () => {
+          const settings: Settings = {};
+          const config = await createPolicyEngineConfig(
+            settings,
+            ApprovalMode.PLAN,
+          );
+          const engine = new PolicyEngine(config);
+
+          const validWindowsPaths = [
+            'C:\\Users\\user\\.gemini\\tmp\\project-id\\session-id\\plans\\plan.md',
+            'D:\\gemini-cli\\.gemini\\tmp\\project-id\\session-1\\plans\\plan.md', // no session ID
+          ];
+
+          for (const file_path of validWindowsPaths) {
+            expect(
+              (
+                await engine.check(
+                  { name: toolName, args: { file_path } },
+                  undefined,
+                )
+              ).decision,
+            ).toBe(PolicyDecision.ALLOW);
+          }
+        });
+
         it(`should deny ${toolName} outside plans directory`, async () => {
           const settings: Settings = {};
           const config = await createPolicyEngineConfig(

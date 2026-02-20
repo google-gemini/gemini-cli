@@ -48,10 +48,18 @@ decision = "ask_user"
 priority = 70
 modes = ["plan"]
 
-# Allow write_file and replace for .md files in plans directory
+# Allow write_file and replace for .md files in Unix plans directory
 [[rule]]
 toolName = ["write_file", "replace"]
 decision = "allow"
 priority = 70
 modes = ["plan"]
 argsPattern = "\"file_path\":\"[^\"]+/\\.gemini/tmp/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+/plans/[a-zA-Z0-9_-]+\\.md\""
+
+# Allow write_file and replace for .md files in Windows plans directory
+[[rule]]
+toolName = ["write_file", "replace"]
+decision = "allow"
+priority = 70
+modes = ["plan"]
+argsPattern = "\"file_path\":\"[^\"]+[\\\\/]+\\.gemini[\\\\/]+tmp[\\\\/]+[a-zA-Z0-9_-]+[\\\\/]+[a-zA-Z0-9_-]+[\\\\/]+plans[\\\\/]+[a-zA-Z0-9_-]+\\.md\""
