@@ -217,7 +217,7 @@ priority = 100
 modes = ["plan"]
 # Adjust the pattern to match your custom directory.
 # This example matches any .md file in a .gemini/plans directory within the project.
-argsPattern = "\"file_path\":\".*\\\\.gemini/plans/.*\\\\.md\""
+argsPattern = "\"file_path\":\"[^\"]*/\\.gemini/plans/[a-zA-Z0-9_-]+\\.md\""
 ```
 
 [`list_directory`]: /docs/tools/file-system.md#1-list_directory-readfolder
