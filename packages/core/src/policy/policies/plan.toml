@@ -42,6 +42,14 @@ decision = "allow"
 priority = 70
 modes = ["plan"]
 
+# Allow MCP tools with read-only hint in Plan mode
+[[rule]]
+mcpName = "*"
+toolAnnotations = { readOnlyHint = true }
+decision = "allow"
+priority = 70
+modes = ["plan"]
+
 [[rule]]
 toolName = ["ask_user", "exit_plan_mode"]
 decision = "ask_user"

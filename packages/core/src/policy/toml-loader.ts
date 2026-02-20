@@ -48,6 +48,7 @@ const PolicyRuleSchema = z.object({
   modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
   allow_redirection: z.boolean().optional(),
   deny_message: z.string().optional(),
+  toolAnnotations: z.record(z.unknown()).optional(),
 });
 
 /**
@@ -75,6 +76,7 @@ const SafetyCheckerRuleSchema = z.object({
       config: z.record(z.unknown()).optional(),
     }),
   ]),
+  toolAnnotations: z.record(z.unknown()).optional(),
 });
 
 /**
@@ -386,6 +388,7 @@ export async function loadPoliciesFromToml(
                   allowRedirection: rule.allow_redirection,
                   source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,
                   denyMessage: rule.deny_message,
+                  toolAnnotations: rule.toolAnnotations,
                 };
 
                 // Compile regex pattern
@@ -468,6 +471,7 @@ export async function loadPoliciesFromToml(
                   checker: checker.checker as SafetyCheckerConfig,
                   modes: checker.modes,
                   source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,
+                  toolAnnotations: checker.toolAnnotations,
                 };
 
                 if (argsPattern) {

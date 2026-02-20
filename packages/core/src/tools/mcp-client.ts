@@ -22,8 +22,7 @@ import type {
   Prompt,
   ReadResourceResult,
   Resource,
-} from '@modelcontextprotocol/sdk/types.js';
-import {
+
   ListResourcesResultSchema,
   ListRootsRequestSchema,
   ReadResourceResultSchema,
@@ -31,9 +30,7 @@ import {
   ToolListChangedNotificationSchema,
   PromptListChangedNotificationSchema,
   ProgressNotificationSchema,
-  type Tool as McpTool,
-} from '@modelcontextprotocol/sdk/types.js';
-import { ApprovalMode, PolicyDecision } from '../policy/types.js';
+  type Tool as McpTool} from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
 import type { Config, MCPServerConfig } from '../config/config.js';
 import { AuthProviderType } from '../config/config.js';
@@ -1090,17 +1087,6 @@ export async function discoverTools(
           mcpServerConfig.extension?.name,
           mcpServerConfig.extension?.id,
         );
-
-        // If the tool is read-only, allow it in Plan mode
-        if (isReadOnly) {
-          cliConfig.getPolicyEngine().addRule({
-            toolName: tool.getFullyQualifiedName(),
-            decision: PolicyDecision.ASK_USER,
-            priority: 50, // Match priority of built-in plan tools
-            modes: [ApprovalMode.PLAN],
-            source: `MCP Annotation (readOnlyHint) - ${mcpServerName}`,
-          });
-        }
 
         discoveredTools.push(tool);
       } catch (error) {

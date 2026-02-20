@@ -39,6 +39,9 @@ function matchesWildcard(pattern: string, toolName: string): boolean {
     return false;
   }
   const prefix = getWildcardPrefix(pattern);
+  if (prefix === '*') {
+    return toolName.includes('__');
+  }
   return toolName.startsWith(prefix + '__');
 }
 
@@ -48,6 +51,7 @@ function ruleMatches(
   stringifiedArgs: string | undefined,
   serverName: string | undefined,
   currentApprovalMode: ApprovalMode,
+  toolAnnotations?: Record<string, unknown>,
 ): boolean {
   // Check if rule applies to current approval mode
   if (rule.modes && rule.modes.length > 0) {
@@ -61,12 +65,12 @@ function ruleMatches(
     // Support wildcard patterns: "serverName__*" matches "serverName__anyTool"
     if (isWildcardPattern(rule.toolName)) {
       const prefix = getWildcardPrefix(rule.toolName);
-      if (serverName !== undefined) {
-        // Robust check: if serverName is provided, it MUST match the prefix exactly.
-        // This prevents "malicious-server" from spoofing "trusted-server" by naming itself "trusted-server__malicious".
-        if (serverName !== prefix) {
+      if (prefix === '*') {
+        if (serverName === undefined) {
           return false;
         }
+      } else if (serverName !== undefined && serverName !== prefix) {
+        return false;
       }
       // Always verify the prefix, even if serverName matched
       if (!toolCall.name || !matchesWildcard(rule.toolName, toolCall.name)) {
@@ -74,6 +78,19 @@ function ruleMatches(
       }
     } else if (toolCall.name !== rule.toolName) {
       return false;
+    }
+  }
+
+  // Check tool annotations if specified
+  if (rule.toolAnnotations) {
+    if (!toolAnnotations) {
+      return false;
+    }
+    // All annotations in the rule must match the tool call
+    for (const [key, value] of Object.entries(rule.toolAnnotations)) {
+      if (toolAnnotations[key] !== value) {
+        return false;
+      }
     }
   }
 
@@ -304,6 +321,7 @@ export class PolicyEngine {
   async check(
     toolCall: FunctionCall,
     serverName: string | undefined,
+    toolAnnotations?: Record<string, unknown>,
   ): Promise<CheckResult> {
     let stringifiedArgs: string | undefined;
     // Compute stringified args once before the loop
@@ -356,7 +374,14 @@ export class PolicyEngine {
 
     for (const rule of this.rules) {
       const match = toolCallsToTry.some((tc) =>
-        ruleMatches(rule, tc, stringifiedArgs, serverName, this.approvalMode),
+        ruleMatches(
+          rule,
+          tc,
+          stringifiedArgs,
+          serverName,
+          this.approvalMode,
+          toolAnnotations,
+        ),
       );
 
       if (match) {
@@ -417,6 +442,7 @@ export class PolicyEngine {
             stringifiedArgs,
             serverName,
             this.approvalMode,
+            toolAnnotations,
           )
         ) {
           debugLogger.debug(

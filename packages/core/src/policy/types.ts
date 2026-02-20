@@ -150,6 +150,12 @@ export interface PolicyRule {
    * This message will be returned to the model/user.
    */
   denyMessage?: string;
+
+  /**
+   * Optional annotations to match against.
+   * A rule matches if all annotations specified here match the tool's annotations.
+   */
+  toolAnnotations?: Record<string, unknown>;
 }
 
 export interface SafetyCheckerRule {
@@ -188,6 +194,12 @@ export interface SafetyCheckerRule {
    * e.g. "my-policies.toml", "Workspace: project.toml", etc.
    */
   source?: string;
+
+  /**
+   * Optional annotations to match against.
+   * A rule matches if all annotations specified here match the tool's annotations.
+   */
+  toolAnnotations?: Record<string, unknown>;
 }
 
 export interface HookExecutionContext {
