@@ -295,6 +295,7 @@ export interface ConversationInteraction {
   status?: ActionStatus;
   interaction?: ConversationInteractionInteraction;
   acceptedLines?: string;
+  removedLines?: string;
   language?: string;
   isAgentic?: boolean;
 }
