@@ -126,8 +126,11 @@ import {
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath } from '../utils/paths.js';
 import { UserHintService } from './userHintService.js';
+import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
+import { loadPoliciesFromToml } from '../policy/toml-loader.js';
 
 export interface AccessibilitySettings {
+  /** @deprecated Use ui.loadingPhrases instead. */
   enableLoadingPhrases?: boolean;
   screenReader?: boolean;
 }
@@ -138,6 +141,10 @@ export interface BugCommandSettings {
 
 export interface SummarizeToolOutputSettings {
   tokenBudget?: number;
+}
+
+export interface PlanSettings {
+  directory?: string;
 }
 
 export interface TelemetrySettings {
@@ -375,6 +382,13 @@ export interface McpEnablementCallbacks {
   isFileEnabled: (serverId: string) => Promise<boolean>;
 }
 
+export interface PolicyUpdateConfirmationRequest {
+  scope: string;
+  identifier: string;
+  policyDir: string;
+  newHash: string;
+}
+
 export interface ConfigParameters {
   sessionId: string;
   clientVersion?: string;
@@ -455,6 +469,7 @@ export interface ConfigParameters {
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
+  policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
   output?: OutputSettings;
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
@@ -484,6 +499,7 @@ export interface ConfigParameters {
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
   plan?: boolean;
+  planSettings?: PlanSettings;
   modelSteering?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
@@ -633,6 +649,9 @@ export class Config {
   private readonly useWriteTodos: boolean;
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
+  private policyUpdateConfirmationRequest:
+    | PolicyUpdateConfirmationRequest
+    | undefined;
   private readonly outputSettings: OutputSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
@@ -838,6 +857,7 @@ export class Config {
     this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir, this.sessionId);
+    this.storage.setCustomPlansDir(params.planSettings?.directory);
 
     this.fakeResponses = params.fakeResponses;
     this.recordResponses = params.recordResponses;
@@ -849,6 +869,8 @@ export class Config {
       approvalMode:
         params.approvalMode ?? params.policyEngineConfig?.approvalMode,
     });
+    this.policyUpdateConfirmationRequest =
+      params.policyUpdateConfirmationRequest;
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
     this.acknowledgedAgentsService = new AcknowledgedAgentsService();
     this.skillManager = new SkillManager();
@@ -952,7 +974,7 @@ export class Config {
 
     // Add plans directory to workspace context for plan file storage
     if (this.planEnabled) {
-      const plansDir = this.storage.getProjectTempPlansDir();
+      const plansDir = this.storage.getPlansDir();
       await fs.promises.mkdir(plansDir, { recursive: true });
       this.workspaceContext.addDirectory(plansDir);
     }
@@ -1718,6 +1740,41 @@ export class Config {
     return this.policyEngine.getApprovalMode();
   }
 
+  getPolicyUpdateConfirmationRequest():
+    | PolicyUpdateConfirmationRequest
+    | undefined {
+    return this.policyUpdateConfirmationRequest;
+  }
+
+  /**
+   * Hot-loads workspace policies from the specified directory into the active policy engine.
+   * This allows applying newly accepted policies without requiring an application restart.
+   *
+   * @param policyDir The directory containing the workspace policy TOML files.
+   */
+  async loadWorkspacePolicies(policyDir: string): Promise<void> {
+    const { rules, checkers } = await loadPoliciesFromToml(
+      [policyDir],
+      () => WORKSPACE_POLICY_TIER,
+    );
+
+    // Clear existing workspace policies to prevent duplicates/stale rules
+    this.policyEngine.removeRulesByTier(WORKSPACE_POLICY_TIER);
+    this.policyEngine.removeCheckersByTier(WORKSPACE_POLICY_TIER);
+
+    for (const rule of rules) {
+      this.policyEngine.addRule(rule);
+    }
+
+    for (const checker of checkers) {
+      this.policyEngine.addChecker(checker);
+    }
+
+    this.policyUpdateConfirmationRequest = undefined;
+
+    debugLogger.debug(`Workspace policies loaded from: ${policyDir}`);
+  }
+
   setApprovalMode(mode: ApprovalMode): void {
     if (!this.isTrustedFolder() && mode !== ApprovalMode.DEFAULT) {
       throw new Error(
@@ -1740,7 +1797,11 @@ export class Config {
     const isPlanModeTransition =
       currentMode !== mode &&
       (currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN);
-    if (isPlanModeTransition) {
+    const isYoloModeTransition =
+      currentMode !== mode &&
+      (currentMode === ApprovalMode.YOLO || mode === ApprovalMode.YOLO);
+
+    if (isPlanModeTransition || isYoloModeTransition) {
       this.syncPlanModeTools();
       this.updateSystemInstructionIfInitialized();
     }
@@ -1750,8 +1811,13 @@ export class Config {
    * Synchronizes enter/exit plan mode tools based on current mode.
    */
   syncPlanModeTools(): void {
-    const isPlanMode = this.getApprovalMode() === ApprovalMode.PLAN;
     const registry = this.getToolRegistry();
+    if (!registry) {
+      return;
+    }
+    const approvalMode = this.getApprovalMode();
+    const isPlanMode = approvalMode === ApprovalMode.PLAN;
+    const isYoloMode = approvalMode === ApprovalMode.YOLO;
 
     if (isPlanMode) {
       if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
@@ -1764,7 +1830,7 @@ export class Config {
       if (registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
         registry.unregisterTool(EXIT_PLAN_MODE_TOOL_NAME);
       }
-      if (this.planEnabled) {
+      if (this.planEnabled && !isYoloMode) {
         if (!registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
           registry.registerTool(new EnterPlanModeTool(this, this.messageBus));
         }

@@ -36,6 +36,7 @@ import { toContents } from '../code_assist/converter.js';
 import { isStructuredError } from '../utils/quotaErrorDetection.js';
 import { runInDevTraceSpan, type SpanMetadata } from '../telemetry/trace.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { getErrorType } from '../utils/errors.js';
 
 interface StructuredError {
   status: number;
@@ -167,7 +168,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     serverDetails?: ServerDetails,
   ): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorType = error instanceof Error ? error.name : 'unknown';
+    const errorType = getErrorType(error);
 
     logApiError(
       this.config,

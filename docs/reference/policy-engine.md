@@ -92,11 +92,12 @@ rule with the highest priority wins**.
 To provide a clear hierarchy, policies are organized into three tiers. Each tier
 has a designated number that forms the base of the final priority calculation.
 
-| Tier    | Base | Description                                                                |
-| :------ | :--- | :------------------------------------------------------------------------- |
-| Default | 1    | Built-in policies that ship with the Gemini CLI.                           |
-| User    | 2    | Custom policies defined by the user.                                       |
-| Admin   | 3    | Policies managed by an administrator (e.g., in an enterprise environment). |
+| Tier      | Base | Description                                                                |
+| :-------- | :--- | :------------------------------------------------------------------------- |
+| Default   | 1    | Built-in policies that ship with the Gemini CLI.                           |
+| Workspace | 2    | Policies defined in the current workspace's configuration directory.       |
+| User      | 3    | Custom policies defined by the user.                                       |
+| Admin     | 4    | Policies managed by an administrator (e.g., in an enterprise environment). |
 
 Within a TOML policy file, you assign a priority value from **0 to 999**. The
 engine transforms this into a final priority using the following formula:
@@ -105,15 +106,17 @@ engine transforms this into a final priority using the following formula:
 
 This system guarantees that:
 
-- Admin policies always override User and Default policies.
-- User policies always override Default policies.
+- Admin policies always override User, Workspace, and Default policies.
+- User policies override Workspace and Default policies.
+- Workspace policies override Default policies.
 - You can still order rules within a single tier with fine-grained control.
 
 For example:
 
 - A `priority: 50` rule in a Default policy file becomes `1.050`.
-- A `priority: 100` rule in a User policy file becomes `2.100`.
-- A `priority: 20` rule in an Admin policy file becomes `3.020`.
+- A `priority: 10` rule in a Workspace policy policy file becomes `2.010`.
+- A `priority: 100` rule in a User policy file becomes `3.100`.
+- A `priority: 20` rule in an Admin policy file becomes `4.020`.
 
 ### Approval modes
 
@@ -156,10 +159,11 @@ User, and (if configured) Admin directories.
 
 ### Policy locations
 
-| Tier      | Type   | Location                    |
-| :-------- | :----- | :-------------------------- |
-| **User**  | Custom | `~/.gemini/policies/*.toml` |
-| **Admin** | System | _See below (OS specific)_   |
+| Tier          | Type   | Location                                  |
+| :------------ | :----- | :---------------------------------------- |
+| **User**      | Custom | `~/.gemini/policies/*.toml`               |
+| **Workspace** | Custom | `$WORKSPACE_ROOT/.gemini/policies/*.toml` |
+| **Admin**     | System | _See below (OS specific)_                 |
 
 #### System-wide policies (Admin)
 

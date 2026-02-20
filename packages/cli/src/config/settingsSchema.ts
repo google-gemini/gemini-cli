@@ -266,6 +266,27 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      plan: {
+        type: 'object',
+        label: 'Plan',
+        category: 'General',
+        requiresRestart: true,
+        default: {},
+        description: 'Planning features configuration.',
+        showInDialog: false,
+        properties: {
+          directory: {
+            type: 'string',
+            label: 'Plan Directory',
+            category: 'General',
+            requiresRestart: true,
+            default: undefined as string | undefined,
+            description:
+              'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.',
+            showInDialog: true,
+          },
+        },
+      },
       enablePromptCompletion: {
         type: 'boolean',
         label: 'Enable Prompt Completion',
@@ -682,6 +703,22 @@ const SETTINGS_SCHEMA = {
         description: 'Show the spinner during operations.',
         showInDialog: true,
       },
+      loadingPhrases: {
+        type: 'enum',
+        label: 'Loading Phrases',
+        category: 'UI',
+        requiresRestart: false,
+        default: 'tips',
+        description:
+          'What to show while the model is working: tips, witty comments, both, or nothing.',
+        showInDialog: true,
+        options: [
+          { value: 'tips', label: 'Tips' },
+          { value: 'witty', label: 'Witty' },
+          { value: 'all', label: 'All' },
+          { value: 'off', label: 'Off' },
+        ],
+      },
       customWittyPhrases: {
         type: 'array',
         label: 'Custom Witty Phrases',
@@ -710,8 +747,9 @@ const SETTINGS_SCHEMA = {
             category: 'UI',
             requiresRestart: true,
             default: true,
-            description: 'Enable loading phrases during operations.',
-            showInDialog: true,
+            description:
+              '@deprecated Use ui.loadingPhrases instead. Enable loading phrases during operations.',
+            showInDialog: false,
           },
           screenReader: {
             type: 'boolean',
@@ -1306,6 +1344,7 @@ const SETTINGS_SCHEMA = {
       },
     },
   },
+
   useWriteTodos: {
     type: 'boolean',
     label: 'Use WriteTodos',
@@ -1642,7 +1681,17 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description:
-          'Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).',
+          'Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).',
+        showInDialog: true,
+      },
+      useOSC52Copy: {
+        type: 'boolean',
+        label: 'Use OSC 52 Copy',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).',
         showInDialog: true,
       },
       plan: {
