@@ -50,6 +50,7 @@ export const GeneralistAgent = (
     const tools = config.getToolRegistry().getAllToolNames();
     return {
       tools,
+      preselectTools: true,
     };
   },
   get promptConfig() {

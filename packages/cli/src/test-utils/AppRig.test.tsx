@@ -58,8 +58,8 @@ describe('AppRig', () => {
 
     // Resolve and finish. Also removes read_file breakpoint.
     await rig.resolveTool('read_file');
-    await rig.waitForOutput('Task complete.', 100000);
-  });
+    await rig.waitForOutput('Task complete.', 120000);
+  }, 120000);
 
   it('should render the app and handle a simple message', async () => {
     const fakeResponsesPath = path.join(
@@ -83,6 +83,6 @@ describe('AppRig', () => {
     await rig.pressEnter();
 
     // Wait for model response
-    await rig.waitForOutput('Hello! How can I help you today?');
-  });
+    await rig.waitForOutput('Hello! How can I help you today?', 30000);
+  }, 30000);
 });

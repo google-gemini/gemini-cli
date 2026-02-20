@@ -16,6 +16,7 @@ import type {
   Schema,
 } from '@google/genai';
 import { ToolRegistry } from '../tools/tool-registry.js';
+import { ToolPreselectionService } from '../services/toolPreselectionService.js';
 import {
   DiscoveredMCPTool,
   MCP_QUALIFIED_NAME_SEPARATOR,
@@ -460,10 +461,40 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       };
 
       tools = this.prepareToolsList();
-      chat = await this.createChatObject(augmentedInputs, tools);
+
       const query = this.definition.promptConfig.query
         ? templateString(this.definition.promptConfig.query, augmentedInputs)
         : DEFAULT_QUERY_STRING;
+
+      // Tool Pre-selection
+      if (
+        this.definition.toolConfig?.preselectTools &&
+        this.runtimeContext.isToolPreselectionEnabled()
+      ) {
+        const preselector = new ToolPreselectionService(this.runtimeContext);
+        const selectedToolNames = await preselector.selectTools(
+          query,
+          tools,
+          combinedSignal,
+        );
+
+        // Filter the agent's tool registry to only include selected tools.
+        // We MUST always include the task completion tool.
+        const toolsToKeep = new Set(selectedToolNames);
+        toolsToKeep.add(TASK_COMPLETE_TOOL_NAME);
+
+        const allAgentTools = this.toolRegistry.getAllToolNames();
+        for (const toolName of allAgentTools) {
+          if (!toolsToKeep.has(toolName)) {
+            this.toolRegistry.unregisterTool(toolName);
+          }
+        }
+
+        // Re-prepare the tools list after filtering the registry.
+        tools = this.prepareToolsList();
+      }
+
+      chat = await this.createChatObject(augmentedInputs, tools);
 
       const pendingHintsQueue: string[] = [];
       const hintListener = (hint: string) => {

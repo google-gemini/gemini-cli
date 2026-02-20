@@ -139,6 +139,7 @@ export class AppRig {
       approvalMode,
       policyEngineConfig,
       enableEventDrivenScheduler: true,
+      toolPreselection: false,
       extensionLoader: new MockExtensionManager(),
       excludeTools: this.options.configOverrides?.excludeTools,
       ...this.options.configOverrides,
@@ -178,41 +179,29 @@ export class AppRig {
   }
 
   private createRigSettings(): LoadedSettings {
+    const userSettings = {
+      security: {
+        auth: {
+          selectedType: AuthType.USE_GEMINI,
+          useExternal: true,
+        },
+        folderTrust: {
+          enabled: true,
+        },
+      },
+      ide: {
+        enabled: false,
+        hasSeenNudge: true,
+      },
+    };
+
     return createMockSettings({
       user: {
         path: path.join(this.testDir, '.gemini', 'user_settings.json'),
-        settings: {
-          security: {
-            auth: {
-              selectedType: AuthType.USE_GEMINI,
-              useExternal: true,
-            },
-            folderTrust: {
-              enabled: true,
-            },
-          },
-          ide: {
-            enabled: false,
-            hasSeenNudge: true,
-          },
-        },
-        originalSettings: {},
+        settings: userSettings,
+        originalSettings: structuredClone(userSettings),
       },
-      merged: {
-        security: {
-          auth: {
-            selectedType: AuthType.USE_GEMINI,
-            useExternal: true,
-          },
-          folderTrust: {
-            enabled: true,
-          },
-        },
-        ide: {
-          enabled: false,
-          hasSeenNudge: true,
-        },
-      },
+      merged: userSettings,
     });
   }
 

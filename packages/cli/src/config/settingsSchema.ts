@@ -307,6 +307,16 @@ const SETTINGS_SCHEMA = {
           'Retry on "exception TypeError: fetch failed sending request" errors.',
         showInDialog: false,
       },
+      toolPreselection: {
+        type: 'boolean',
+        label: 'Tool Preselection',
+        category: 'General',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Exclude unneeded tools from context to save tokens and improve performance.',
+        showInDialog: true,
+      },
       debugKeystrokeLogging: {
         type: 'boolean',
         label: 'Debug Keystroke Logging',

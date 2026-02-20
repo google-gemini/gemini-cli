@@ -30,6 +30,7 @@ import {
 } from '../core/geminiChat.js';
 import {
   type FunctionCall,
+  type FunctionDeclaration,
   type Part,
   type GenerateContentResponse,
   type Content,
@@ -71,6 +72,7 @@ import type {
 import type { AgentRegistry } from './registry.js';
 import { getModelConfigAlias } from './registry.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
+import { ToolPreselectionService } from '../services/toolPreselectionService.js';
 
 const {
   mockSendMessageStream,
@@ -552,6 +554,70 @@ describe('LocalAgentExecutor', () => {
   });
 
   describe('run (Execution Loop and Logic)', () => {
+    it('should pre-select tools when preselectTools is enabled', async () => {
+      const definition = createTestDefinition([
+        LS_TOOL_NAME,
+        READ_FILE_TOOL_NAME,
+      ]);
+      definition.toolConfig!.preselectTools = true;
+      definition.promptConfig.query = '${goal}';
+
+      // Mock tool pre-selection to only keep LS
+      const selectToolsSpy = vi
+        .spyOn(ToolPreselectionService.prototype, 'selectTools')
+        .mockResolvedValue([LS_TOOL_NAME]);
+
+      // Mock a response to terminate the loop
+      mockSendMessageStream.mockImplementation(async () =>
+        (async function* () {
+          yield {
+            type: StreamEventType.CHUNK,
+            value: createMockResponseChunk(
+              [],
+              [
+                {
+                  name: TASK_COMPLETE_TOOL_NAME,
+                  args: { result: 'done' },
+                  id: 'call1',
+                },
+              ],
+            ),
+          } as StreamEvent;
+        })(),
+      );
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      const inputs = { goal: 'Test pre-selection' };
+      await executor.run(inputs, signal);
+
+      // Verify ToolPreselectionService was called
+      expect(selectToolsSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Test pre-selection'),
+        expect.arrayContaining([
+          expect.objectContaining({ name: LS_TOOL_NAME }),
+          expect.objectContaining({ name: READ_FILE_TOOL_NAME }),
+        ]),
+        expect.any(AbortSignal),
+      );
+
+      // Verify GeminiChat was initialized with ONLY LS and complete_task
+      const chatConstructorArgs = MockedGeminiChat.mock.calls[0];
+      const tools = chatConstructorArgs[2]![0]
+        .functionDeclarations as FunctionDeclaration[];
+      const toolNames = tools.map((t) => t.name);
+
+      expect(toolNames).toContain(LS_TOOL_NAME);
+      expect(toolNames).toContain(TASK_COMPLETE_TOOL_NAME);
+      expect(toolNames).not.toContain(READ_FILE_TOOL_NAME);
+
+      selectToolsSpy.mockRestore();
+    });
+
     it('should log AgentFinish with error if run throws', async () => {
       const definition = createTestDefinition();
       // Make the definition invalid to cause an error during run

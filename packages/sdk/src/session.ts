@@ -76,6 +76,7 @@ export class GeminiCliSession {
       fakeResponses: options.fakeResponses,
       skillsSupport: true,
       adminSkillsEnabled: true,
+      toolPreselection: false,
       policyEngineConfig: {
         // TODO: Revisit this default when we have a mechanism for wiring up approvals
         defaultDecision: PolicyDecision.ALLOW,

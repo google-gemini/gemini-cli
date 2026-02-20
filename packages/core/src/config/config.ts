@@ -193,6 +193,7 @@ export interface AgentRunConfig {
 export interface AgentOverride {
   modelConfig?: ModelConfig;
   runConfig?: AgentRunConfig;
+  preselectTools?: boolean;
   enabled?: boolean;
 }
 
@@ -474,6 +475,7 @@ export interface ConfigParameters {
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
+  toolPreselection?: boolean;
   shellToolInactivityTimeout?: number;
   fakeResponses?: string;
   recordResponses?: string;
@@ -653,6 +655,7 @@ export class Config {
   private readonly outputSettings: OutputSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
+  private readonly toolPreselection: boolean;
   private readonly enableShellOutputEfficiency: boolean;
   private readonly shellToolInactivityTimeout: number;
   readonly fakeResponses?: string;
@@ -875,6 +878,7 @@ export class Config {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
+    this.toolPreselection = params.toolPreselection ?? true;
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.rawOutput = params.rawOutput ?? false;
     this.acceptRawOutputRisk = params.acceptRawOutputRisk ?? false;
@@ -2443,6 +2447,10 @@ export class Config {
         (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
       this.truncateToolOutputThreshold,
     );
+  }
+
+  isToolPreselectionEnabled(): boolean {
+    return this.toolPreselection;
   }
 
   getNextCompressionTruncationId(): number {
