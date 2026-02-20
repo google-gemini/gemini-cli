@@ -22,7 +22,9 @@ import type {
   Prompt,
   ReadResourceResult,
   Resource,
-
+  Tool as McpTool,
+} from '@modelcontextprotocol/sdk/types.js';
+import {
   ListResourcesResultSchema,
   ListRootsRequestSchema,
   ReadResourceResultSchema,
@@ -30,7 +32,7 @@ import type {
   ToolListChangedNotificationSchema,
   PromptListChangedNotificationSchema,
   ProgressNotificationSchema,
-  type Tool as McpTool} from '@modelcontextprotocol/sdk/types.js';
+} from '@modelcontextprotocol/sdk/types.js';
 import { ApprovalMode, PolicyDecision } from '../policy/types.js';
 import { parse } from 'shell-quote';
 import type { Config, MCPServerConfig } from '../config/config.js';

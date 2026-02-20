@@ -88,6 +88,7 @@ const WARNING_CHECKS: readonly WarningCheck[] = [
 export async function getUserStartupWarnings(
   settings: Settings,
   workspaceRoot: string = process.cwd(),
+  options?: { isAlternateBuffer?: boolean },
 ): Promise<StartupWarning[]> {
   const results = await Promise.all(
     WARNING_CHECKS.map(async (check) => {
@@ -105,7 +106,11 @@ export async function getUserStartupWarnings(
   const warnings = results.filter((w): w is StartupWarning => w !== null);
 
   if (settings.ui?.showCompatibilityWarnings !== false) {
-    warnings.push(...getCompatibilityWarnings());
+    warnings.push(
+      ...getCompatibilityWarnings({
+        isAlternateBuffer: options?.isAlternateBuffer,
+      }),
+    );
   }
 
   return warnings;
