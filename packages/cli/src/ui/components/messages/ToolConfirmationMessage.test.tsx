@@ -146,6 +146,36 @@ describe('ToolConfirmationMessage', () => {
     unmount();
   });
 
+  it('should exclude shell delimiters from extracted URLs in exec type commands', async () => {
+    const confirmationDetails: SerializableConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm Execution',
+      command: 'curl https://еxample.com;ls',
+      rootCommand: 'curl',
+      rootCommands: ['curl'],
+    };
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <ToolConfirmationMessage
+        callId="test-call-id"
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
+    );
+
+    await waitUntilReady();
+
+    const output = lastFrame();
+    expect(output).toContain('Deceptive URL(s) detected');
+    // It should extract "https://еxample.com" and NOT "https://еxample.com;ls"
+    expect(output).toContain('Original: https://еxample.com/');
+    // The command itself still contains 'ls', so we check specifically that 'ls' is not part of the URL line.
+    expect(output).not.toContain('Original: https://еxample.com/;ls');
+    unmount();
+  });
+
   it('should aggregate multiple deceptive URLs into a single WarningMessage', async () => {
     const confirmationDetails: SerializableConfirmationDetails = {
       type: 'info',

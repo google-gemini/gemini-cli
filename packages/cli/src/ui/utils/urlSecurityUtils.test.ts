@@ -5,11 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  isDeceptiveUrl,
-  getDeceptiveUrlDetails,
-  toUnicodeUrl,
-} from './urlSecurityUtils.js';
+import { getDeceptiveUrlDetails, toUnicodeUrl } from './urlSecurityUtils.js';
 
 describe('urlSecurityUtils', () => {
   describe('toUnicodeUrl', () => {
@@ -45,28 +41,6 @@ describe('urlSecurityUtils', () => {
 
     it('should return the original string for already safe URLs', () => {
       expect(toUnicodeUrl('https://google.com/')).toBe('https://google.com/');
-    });
-  });
-
-  describe('isDeceptiveUrl', () => {
-    it('should return false for standard ASCII URLs', () => {
-      expect(isDeceptiveUrl('https://google.com')).toBe(false);
-      expect(isDeceptiveUrl('https://example.org/path?q=1')).toBe(false);
-      expect(isDeceptiveUrl('http://localhost:8080')).toBe(false);
-    });
-
-    it('should return true for non-ASCII characters in hostnames', () => {
-      expect(isDeceptiveUrl('https://täst.com')).toBe(true);
-    });
-
-    it('should return true for deceptive homoglyphs', () => {
-      // Using Cyrillic 'е' (U+0435) instead of Latin 'e'
-      expect(isDeceptiveUrl('https://еxample.com')).toBe(true);
-    });
-
-    it('should return false for non-URL strings', () => {
-      expect(isDeceptiveUrl('just a string')).toBe(false);
-      expect(isDeceptiveUrl('google.com')).toBe(false);
     });
   });
 
