@@ -22,6 +22,8 @@ import { useConfig } from '../../contexts/ConfigContext.js';
 import type { ExtensionManager } from '../../../config/extension-manager.js';
 import { useRegistrySearch } from '../../hooks/useRegistrySearch.js';
 
+import { useUIState } from '../../contexts/UIStateContext.js';
+
 interface ExtensionRegistryViewProps {
   onSelect?: (extension: RegistryExtension) => void;
   onClose?: () => void;
@@ -39,6 +41,7 @@ export function ExtensionRegistryView({
 }: ExtensionRegistryViewProps): React.JSX.Element {
   const { extensions, loading, error, search } = useExtensionRegistry();
   const config = useConfig();
+  const { terminalHeight, staticExtraHeight } = useUIState();
 
   const { extensionsUpdateState } = useExtensionUpdates(
     extensionManager,
@@ -83,7 +86,7 @@ export function ExtensionRegistryView({
               <Text
                 color={isActive ? theme.status.success : theme.text.secondary}
               >
-                {isActive ? '> ' : '  '}
+                {isActive ? '● ' : '  '}
               </Text>
             </Box>
             <Box flexShrink={0}>
@@ -164,6 +167,24 @@ export function ExtensionRegistryView({
     [],
   );
 
+  const maxItemsToShow = useMemo(() => {
+    // SearchableList layout overhead:
+    // Container paddingY: 0
+    // Title (marginBottom 1): 2
+    // Search buffer (border 2, marginBottom 1): 4
+    // Header (marginBottom 1): 2
+    // Footer (marginTop 1): 2
+    // List item (marginBottom 1): 2 per item
+    // Total static height = 2 + 4 + 2 + 2 = 10
+    const staticHeight = 10;
+    const availableTerminalHeight = terminalHeight - staticExtraHeight;
+    const remainingHeight = Math.max(0, availableTerminalHeight - staticHeight);
+    const itemHeight = 2; // Each item takes 2 lines (content + marginBottom 1)
+
+    // Ensure we show at least a few items and not more than we have
+    return Math.max(4, Math.floor(remainingHeight / itemHeight));
+  }, [terminalHeight, staticExtraHeight]);
+
   if (loading) {
     return (
       <Box padding={1}>
@@ -191,7 +212,7 @@ export function ExtensionRegistryView({
       renderItem={renderItem}
       header={header}
       footer={footer}
-      maxItemsToShow={8}
+      maxItemsToShow={maxItemsToShow}
       useSearch={useRegistrySearch}
       onSearch={search}
       resetSelectionOnItemsChange={true}
