@@ -17,6 +17,7 @@ export * from './policy/types.js';
 export * from './policy/policy-engine.js';
 export * from './policy/toml-loader.js';
 export * from './policy/config.js';
+export * from './policy/integrity.js';
 export * from './confirmation-bus/types.js';
 export * from './confirmation-bus/message-bus.js';
 

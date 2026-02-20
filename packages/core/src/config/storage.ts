@@ -8,11 +8,16 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
-import { GEMINI_DIR, homedir } from '../utils/paths.js';
+import {
+  GEMINI_DIR,
+  homedir,
+  GOOGLE_ACCOUNTS_FILENAME,
+  isSubpath,
+  resolveToRealPath,
+} from '../utils/paths.js';
 import { ProjectRegistry } from './projectRegistry.js';
 import { StorageMigration } from './storageMigration.js';
 
-export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
 export const OAUTH_FILE = 'oauth_creds.json';
 const TMP_DIR_NAME = 'tmp';
 const BIN_DIR_NAME = 'bin';
@@ -23,10 +28,15 @@ export class Storage {
   private readonly sessionId: string | undefined;
   private projectIdentifier: string | undefined;
   private initPromise: Promise<void> | undefined;
+  private customPlansDir: string | undefined;
 
   constructor(targetDir: string, sessionId?: string) {
     this.targetDir = targetDir;
     this.sessionId = sessionId;
+  }
+
+  setCustomPlansDir(dir: string | undefined): void {
+    this.customPlansDir = dir;
   }
 
   static getGlobalGeminiDir(): string {
@@ -93,6 +103,10 @@ export class Storage {
     );
   }
 
+  static getPolicyIntegrityStoragePath(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'policy_integrity.json');
+  }
+
   private static getSystemConfigDir(): string {
     if (os.platform() === 'darwin') {
       return '/Library/Application Support/GeminiCli';
@@ -134,6 +148,10 @@ export class Storage {
     const identifier = this.getProjectIdentifier();
     const tempDir = Storage.getGlobalTempDir();
     return path.join(tempDir, identifier);
+  }
+
+  getWorkspacePoliciesDir(): string {
+    return path.join(this.getGeminiDir(), 'policies');
   }
 
   ensureProjectTempDirExists(): void {
@@ -248,6 +266,26 @@ export class Storage {
       return path.join(this.getProjectTempDir(), this.sessionId, 'plans');
     }
     return path.join(this.getProjectTempDir(), 'plans');
+  }
+
+  getPlansDir(): string {
+    if (this.customPlansDir) {
+      const resolvedPath = path.resolve(
+        this.getProjectRoot(),
+        this.customPlansDir,
+      );
+      const realProjectRoot = resolveToRealPath(this.getProjectRoot());
+      const realResolvedPath = resolveToRealPath(resolvedPath);
+
+      if (!isSubpath(realProjectRoot, realResolvedPath)) {
+        throw new Error(
+          `Custom plans directory '${this.customPlansDir}' resolves to '${realResolvedPath}', which is outside the project root '${realProjectRoot}'.`,
+        );
+      }
+
+      return resolvedPath;
+    }
+    return this.getProjectTempPlansDir();
   }
 
   getProjectTempTasksDir(): string {

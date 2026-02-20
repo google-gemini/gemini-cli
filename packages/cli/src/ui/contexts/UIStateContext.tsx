@@ -28,6 +28,7 @@ import type {
   ValidationIntent,
   AgentDefinition,
   FolderDiscoveryResults,
+  PolicyUpdateConfirmationRequest,
 } from '@google/gemini-cli-core';
 import { type TransientMessageType } from '../../utils/events.js';
 import type { DOMElement } from 'ink';
@@ -114,6 +115,8 @@ export interface UIState {
   shouldShowIdePrompt: boolean;
   isFolderTrustDialogOpen: boolean;
   folderDiscoveryResults: FolderDiscoveryResults | null;
+  isPolicyUpdateDialogOpen: boolean;
+  policyUpdateConfirmationRequest: PolicyUpdateConfirmationRequest | undefined;
   isTrustedFolder: boolean | undefined;
   constrainHeight: boolean;
   showErrorDetails: boolean;
