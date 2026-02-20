@@ -16,9 +16,6 @@ import {
   type ModelPolicyStateMap,
   type ModelPolicyChain,
   type ModelPolicy,
-  SILENT_ACTIONS,
-  DEFAULT_ACTIONS,
-  DEFAULT_STATE,
 } from './modelPolicy.js';
 
 function definePolicy(config: {
@@ -37,6 +34,27 @@ function definePolicy(config: {
     },
   };
 }
+
+export const DEFAULT_ACTIONS: ModelPolicyActionMap = {
+  terminal: 'prompt',
+  transient: 'prompt',
+  not_found: 'prompt',
+  unknown: 'prompt',
+};
+
+export const SILENT_ACTIONS: ModelPolicyActionMap = {
+  terminal: 'silent',
+  transient: 'silent',
+  not_found: 'silent',
+  unknown: 'silent',
+};
+
+export const DEFAULT_STATE: ModelPolicyStateMap = {
+  terminal: 'terminal',
+  transient: 'terminal',
+  not_found: 'terminal',
+  unknown: 'terminal',
+};
 
 export const DEFAULT_CHAIN: ModelPolicyChain = [
   definePolicy({ model: DEFAULT_GEMINI_MODEL }),

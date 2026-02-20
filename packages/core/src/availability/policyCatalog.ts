@@ -11,12 +11,13 @@ import type {
   ModelPolicyStateMap,
 } from './modelPolicy.js';
 import type { Config } from '../config/config.js';
-import { DEFAULT_ACTIONS, DEFAULT_STATE } from './modelPolicy.js';
 import type { UserTierId } from '../code_assist/types.js';
 import {
   FLASH_LITE_CHAIN,
   PREVIEW_CHAIN,
   DEFAULT_CHAIN,
+  DEFAULT_ACTIONS,
+  DEFAULT_STATE,
 } from './defaultModelChains.js';
 
 // actions and stateTransitions are optional when defining ModelPolicy
