@@ -7,13 +7,13 @@ exports[`SearchableList > should match snapshot 1`] = `
  │ Search...                                                                                      │
  ╰────────────────────────────────────────────────────────────────────────────────────────────────╯
 
- > Item One
-   Description for item one
+  ● Item One
+    Description for item one
 
-   Item Two
-   Description for item two
+    Item Two
+    Description for item two
 
-   Item Three
-   Description for item three
+    Item Three
+    Description for item three
 "
 `;
