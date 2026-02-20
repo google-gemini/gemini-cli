@@ -192,7 +192,7 @@ Use the following guidelines to optimize your search and read patterns.
 - **Searching:** utilize search tools like ${GREP_TOOL_NAME} and ${GLOB_TOOL_NAME} with a conservative result count (\`total_max_matches\`) and a narrow scope (\`include\` and \`exclude\` parameters).
 - **Searching and editing:** utilize search tools like ${GREP_TOOL_NAME} with a conservative result count and a narrow scope. Use \`context\`, \`before\`, and/or \`after\` to request enough context to avoid the need to read the file before editing matches.
 - **Understanding:** minimize turns needed to understand a file. It's most efficient to read small files in their entirety.
-- **Large files:** utilize search tools like ${GREP_TOOL_NAME} and/or ${READ_FILE_TOOL_NAME} called in parallel with an offset and a limit to reduce the impact on context. Minmize extra turns, unless unavoidable due to the file being too large.
+- **Large files:** utilize search tools like ${GREP_TOOL_NAME} and/or ${READ_FILE_TOOL_NAME} called in parallel with 'start_line' and 'end_line' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
 
