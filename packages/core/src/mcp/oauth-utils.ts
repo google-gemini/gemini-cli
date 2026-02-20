@@ -97,7 +97,12 @@ export class OAuthUtils {
     resourceMetadataUrl: string,
   ): Promise<OAuthProtectedResourceMetadata | null> {
     try {
-      const response = await fetch(resourceMetadataUrl);
+      // Disable redirect following to prevent SSRF via open redirects.
+      // An attacker could provide a URI that passes origin checks but
+      // redirects to internal resources (e.g., 169.254.169.254).
+      const response = await fetch(resourceMetadataUrl, {
+        redirect: 'error',
+      });
       if (!response.ok) {
         return null;
       }
