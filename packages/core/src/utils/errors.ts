@@ -26,6 +26,15 @@ export function getErrorMessage(error: unknown): string {
   }
 }
 
+export function getErrorType(error: unknown): string {
+  if (!(error instanceof Error)) return 'unknown';
+
+  // Return constructor name if the generic 'Error' name is used (for custom errors)
+  return error.name === 'Error'
+    ? (error.constructor?.name ?? 'Error')
+    : error.name;
+}
+
 export class FatalError extends Error {
   constructor(
     message: string,

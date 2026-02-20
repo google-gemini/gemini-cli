@@ -1082,6 +1082,15 @@ export class GeminiClient {
         this.updateTelemetryTokenCount();
         this.forceFullIdeContext = true;
       }
+    } else if (info.compressionStatus === CompressionStatus.CONTENT_TRUNCATED) {
+      if (newHistory) {
+        // We truncated content to save space, but summarization is still "failed".
+        // We update the chat context directly without resetting the failure flag.
+        this.getChat().setHistory(newHistory);
+        this.updateTelemetryTokenCount();
+        // We don't reset the chat session fully like in COMPRESSED because
+        // this is a lighter-weight intervention.
+      }
     }
 
     return info;

@@ -217,11 +217,18 @@ Slash commands provide meta-level control over the CLI itself.
       model.
   - **Note:** For more details on how `GEMINI.md` files contribute to
     hierarchical memory, see the
-    [CLI Configuration documentation](../get-started/configuration.md).
+    [CLI Configuration documentation](./configuration.md).
 
 ### `/model`
 
 - **Description:** Opens a dialog to choose your Gemini model.
+
+### `/plan`
+
+- **Description:** Switch to Plan Mode (read-only) and view the current plan if
+  one has been generated.
+  - **Note:** This feature requires the `experimental.plan` setting to be
+    enabled in your configuration.
 
 ### `/policies`
 
@@ -247,7 +254,7 @@ Slash commands provide meta-level control over the CLI itself.
   checkpoints to restore from.
 - **Usage:** `/restore [tool_call_id]`
 - **Note:** Only available if checkpointing is configured via
-  [settings](../get-started/configuration.md). See
+  [settings](./configuration.md). See
   [Checkpointing documentation](../cli/checkpointing.md) for more details.
 
 ### `/rewind`
@@ -286,7 +293,8 @@ Slash commands provide meta-level control over the CLI itself.
   settings that control the behavior and appearance of Gemini CLI. It is
   equivalent to manually editing the `.gemini/settings.json` file, but with
   validation and guidance to prevent errors. See the
-  [settings documentation](./settings.md) for a full list of available settings.
+  [settings documentation](../cli/settings.md) for a full list of available
+  settings.
 - **Usage:** Simply run `/settings` and the editor will open. You can then
   browse or search for specific settings, view their current values, and modify
   them as desired. Changes to some settings are applied immediately, while
@@ -373,7 +381,8 @@ Slash commands provide meta-level control over the CLI itself.
 
 Custom commands allow you to create personalized shortcuts for your most-used
 prompts. For detailed instructions on how to create, manage, and use them,
-please see the dedicated [Custom Commands documentation](./custom-commands.md).
+please see the dedicated
+[Custom Commands documentation](../cli/custom-commands.md).
 
 ## Input prompt shortcuts
 

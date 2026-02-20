@@ -64,11 +64,13 @@
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {
-    "ink": "npm:@jrichman/ink@6.4.10",
+    "ink": "npm:@jrichman/ink@6.4.11",
     "wrap-ansi": "9.0.2",
     "cliui": {
       "wrap-ansi": "7.0.0"
-    }
+    },
+    "glob": "^12.0.0",
+    "node-domexception": "^1.0.0"
   },
   "bin": {
     "gemini": "bundle/gemini.js"
@@ -107,7 +109,6 @@
     "globals": "^16.0.0",
     "google-artifactregistry-auth": "^3.4.0",
     "husky": "^9.1.7",
-    "ink-testing-library": "^4.0.0",
     "json": "^11.0.0",
     "lint-staged": "^16.1.6",
     "memfs": "^4.42.0",
@@ -127,9 +128,10 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
-    "ink": "npm:@jrichman/ink@6.4.10",
+    "ink": "npm:@jrichman/ink@6.4.11",
     "latest-version": "^9.0.0",
     "proper-lockfile": "^4.1.2",
+    "punycode": "^2.3.1",
     "simple-git": "^3.28.0"
   },
   "optionalDependencies": {

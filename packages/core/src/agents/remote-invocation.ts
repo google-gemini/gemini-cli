@@ -117,8 +117,8 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       type: 'info',
       title: `Call Remote Agent: ${this.definition.displayName ?? this.definition.name}`,
       prompt: `Calling remote agent: "${this.params.query}"`,
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        await this.publishPolicyUpdate(outcome);
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // Policy updates are now handled centrally by the scheduler
       },
     };
   }

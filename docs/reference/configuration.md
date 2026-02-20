@@ -1,16 +1,5 @@
 # Gemini CLI configuration
 
-> **Note on configuration format, 9/17/25:** The format of the `settings.json`
-> file has been updated to a new, more organized structure.
->
-> - The new format will be supported in the stable release starting
->   **[09/10/25]**.
-> - Automatic migration from the old format to the new format will begin on
->   **[09/17/25]**.
->
-> For details on the previous format, please see the
-> [v1 Configuration documentation](./configuration-v1.md).
-
 Gemini CLI offers several ways to configure its behavior, including environment
 variables, command-line arguments, and settings files. This document outlines
 the different configuration methods and available settings.
@@ -132,9 +121,20 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable update notification prompts.
   - **Default:** `true`
 
+- **`general.enableNotifications`** (boolean):
+  - **Description:** Enable run-event notifications for action-required prompts
+    and session completion. Currently macOS only.
+  - **Default:** `false`
+
 - **`general.checkpointing.enabled`** (boolean):
   - **Description:** Enable session checkpointing for recovery
   - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`general.plan.directory`** (string):
+  - **Description:** The directory where planning artifacts are stored. If not
+    specified, defaults to the system temporary directory.
+  - **Default:** `undefined`
   - **Requires restart:** Yes
 
 - **`general.enablePromptCompletion`** (boolean):
@@ -228,6 +228,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`ui.showCompatibilityWarnings`** (boolean):
+  - **Description:** Show warnings about terminal or OS compatibility issues.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
 - **`ui.hideTips`** (boolean):
   - **Description:** Hide helpful tips in the UI
   - **Default:** `false`
@@ -306,13 +311,20 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Show the spinner during operations.
   - **Default:** `true`
 
+- **`ui.loadingPhrases`** (enum):
+  - **Description:** What to show while the model is working: tips, witty
+    comments, both, or nothing.
+  - **Default:** `"tips"`
+  - **Values:** `"tips"`, `"witty"`, `"all"`, `"off"`
+
 - **`ui.customWittyPhrases`** (array):
   - **Description:** Custom witty phrases to display during loading. When
     provided, the CLI cycles through these instead of the defaults.
   - **Default:** `[]`
 
 - **`ui.accessibility.enableLoadingPhrases`** (boolean):
-  - **Description:** Enable loading phrases during operations.
+  - **Description:** @deprecated Use ui.loadingPhrases instead. Enable loading
+    phrases during operations.
   - **Default:** `true`
   - **Requires restart:** Yes
 
@@ -942,14 +954,26 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`experimental.useOSC52Paste`** (boolean):
-  - **Description:** Use OSC 52 sequence for pasting instead of clipboardy
-    (useful for remote sessions).
+  - **Description:** Use OSC 52 for pasting. This may be more robust than the
+    default system when using remote terminal sessions (if your terminal is
+    configured to allow it).
+  - **Default:** `false`
+
+- **`experimental.useOSC52Copy`** (boolean):
+  - **Description:** Use OSC 52 for copying. This may be more robust than the
+    default system when using remote terminal sessions (if your terminal is
+    configured to allow it).
   - **Default:** `false`
 
 - **`experimental.plan`** (boolean):
   - **Description:** Enable planning features (Plan Mode and tools).
   - **Default:** `false`
   - **Requires restart:** Yes
+
+- **`experimental.modelSteering`** (boolean):
+  - **Description:** Enable model steering (user hints) to guide the model
+    during tool execution.
+  - **Default:** `false`
 
 #### `skills`
 
@@ -1210,8 +1234,8 @@ within your user's home folder.
 Environment variables are a common way to configure applications, especially for
 sensitive information like API keys or for settings that might change between
 environments. For authentication setup, see the
-[Authentication documentation](./authentication.md) which covers all available
-authentication methods.
+[Authentication documentation](../get-started/authentication.md) which covers
+all available authentication methods.
 
 The CLI automatically loads environment variables from an `.env` file. The
 loading order is:
@@ -1230,7 +1254,8 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 
 - **`GEMINI_API_KEY`**:
   - Your API key for the Gemini API.
-  - One of several available [authentication methods](./authentication.md).
+  - One of several available
+    [authentication methods](../get-started/authentication.md).
   - Set this in your shell profile (e.g., `~/.bashrc`, `~/.zshrc`) or an `.env`
     file.
 - **`GEMINI_MODEL`**:
@@ -1576,15 +1601,15 @@ conventions and context.
   about the active instructional context.
 - **Importing content:** You can modularize your context files by importing
   other Markdown files using the `@path/to/file.md` syntax. For more details,
-  see the [Memory Import Processor documentation](../core/memport.md).
+  see the [Memory Import Processor documentation](./memport.md).
 - **Commands for memory management:**
   - Use `/memory refresh` to force a re-scan and reload of all context files
     from all configured locations. This updates the AI's instructional context.
   - Use `/memory show` to display the combined instructional context currently
     loaded, allowing you to verify the hierarchy and content being used by the
     AI.
-  - See the [Commands documentation](../cli/commands.md#memory) for full details
-    on the `/memory` command and its sub-commands (`show` and `refresh`).
+  - See the [Commands documentation](./commands.md#memory) for full details on
+    the `/memory` command and its sub-commands (`show` and `refresh`).
 
 By understanding and utilizing these configuration layers and the hierarchical
 nature of context files, you can effectively manage the AI's memory and tailor
