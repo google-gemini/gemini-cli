@@ -200,6 +200,7 @@ export default tseslint.config(
     ignores: ['**/*.test.ts', '**/*.test.tsx'],
     rules: {
       '@typescript-eslint/no-unsafe-type-assertion': 'error',
+      '@typescript-eslint/no-unsafe-assignment': 'error',
     },
   },
   {

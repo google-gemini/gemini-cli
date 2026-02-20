@@ -57,6 +57,7 @@ export const useSessionBrowser = (
           const originalFilePath = path.join(chatsDir, fileName);
 
           // Load up the conversation.
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const conversation: ConversationRecord = JSON.parse(
             await fs.readFile(originalFilePath, 'utf8'),
           );

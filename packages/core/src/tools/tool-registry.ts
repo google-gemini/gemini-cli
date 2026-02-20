@@ -390,6 +390,7 @@ export class ToolRegistry {
 
       // execute discovery command and extract function declarations (w/ or w/o "tool" wrappers)
       const functions: FunctionDeclaration[] = [];
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const discoveredItems = JSON.parse(stdout.trim());
 
       if (!discoveredItems || !Array.isArray(discoveredItems)) {
