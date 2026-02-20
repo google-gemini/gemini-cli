@@ -181,6 +181,16 @@ function maybeToContent(content?: ContentUnion): Content | undefined {
   return toContent(content);
 }
 
+function isPart(c: ContentUnion): c is PartUnion {
+  return (
+    typeof c === 'object' &&
+    c !== null &&
+    !Array.isArray(c) &&
+    !('parts' in c) &&
+    !('role' in c)
+  );
+}
+
 function toContent(content: ContentUnion): Content {
   if (Array.isArray(content)) {
     // it's a PartsUnion[]
@@ -196,7 +206,7 @@ function toContent(content: ContentUnion): Content {
       parts: [{ text: content }],
     };
   }
-  if ('parts' in content) {
+  if (!isPart(content)) {
     // it's a Content - process parts to handle thought filtering
     return {
       ...content,
@@ -208,8 +218,7 @@ function toContent(content: ContentUnion): Content {
   // it's a Part
   return {
     role: 'user',
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    parts: [toPart(content as Part)],
+    parts: [toPart(content)],
   };
 }
 
