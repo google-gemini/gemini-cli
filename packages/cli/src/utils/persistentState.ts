@@ -15,6 +15,7 @@ interface PersistentStateData {
   tipsShown?: number;
   hasSeenScreenReaderNudge?: boolean;
   focusUiEnabled?: boolean;
+  startupWarningCounts?: Record<string, number>;
   // Add other persistent state keys here as needed
 }
 
