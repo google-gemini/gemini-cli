@@ -68,10 +68,10 @@ jobs:
           VERBOSE: 'true'
         shell: 'bash'
         run: |
-          if [[ "${{ env.IS_DOCKER }}" == "true" ]]; then
-            npm run deflake:test:integration:sandbox:docker -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
+          if [[ "${IS_DOCKER}" == "true" ]]; then
+            npm run deflake:test:integration:sandbox:docker -- --runs="${RUNS}" -- --testNamePattern "'${TEST_NAME_PATTERN}'"
           else
-            npm run deflake:test:integration:sandbox:none -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
+            npm run deflake:test:integration:sandbox:none -- --runs="${RUNS}" -- --testNamePattern "'${TEST_NAME_PATTERN}'"
           fi
 
   deflake_e2e_mac:
@@ -109,7 +109,7 @@ jobs:
           TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
           VERBOSE: 'true'
         run: |
-          npm run deflake:test:integration:sandbox:none -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
+          npm run deflake:test:integration:sandbox:none -- --runs="${RUNS}" -- --testNamePattern "'${TEST_NAME_PATTERN}'"
 
   deflake_e2e_windows:
     name: 'Slow E2E - Win'
@@ -167,4 +167,4 @@ jobs:
           TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
         shell: 'pwsh'
         run: |
-          npm run deflake:test:integration:sandbox:none -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
+          npm run deflake:test:integration:sandbox:none -- --runs="$env:RUNS" -- --testNamePattern "'$env:TEST_NAME_PATTERN'"
