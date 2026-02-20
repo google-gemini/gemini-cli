@@ -32,6 +32,36 @@ CLI's features.
 
 ## Creating an Evaluation
 
+To easily create a new evaluation, use the `eval-creator` skill with an exported
+conversation.
+
+### Using the `eval-creator` skill
+
+If you have a `chat.json` file exported from a session where the model exhibited
+incorrect behavior, use Gemini CLI to automatically generate a minimal,
+anonymized evaluation:
+
+1.  **Export the session:** Export the problematic conversation to a `chat.json`
+    file.
+2.  **Activate the skill:** Run the CLI and ask it to create an eval, activating
+    the skill:
+
+    ```bash
+    gemini "Create an eval from my-repro-chat.json" --skill eval-creator
+    ```
+
+    Alternatively, start an interactive session, activate the skill with
+    `/skill eval-creator`, and provide the file.
+
+3.  **Follow the prompts:** Answer the CLI prompts to clarify the type of issue
+    (Agent Misbehavior vs. Solution Issue) and confirm which specific
+    interactions to turn into a test.
+4.  **Review the generated test:** Manually review the `.eval.ts` file generated
+    in the `evals/` directory. Check the generated assertions and ensure the
+    test is fully anonymized.
+
+### Manual creation
+
 Evaluations are located in the `evals` directory. Each evaluation is a Vitest
 test file that uses the `evalTest` function from `evals/test-helper.ts`.
 
@@ -58,7 +88,17 @@ behaviors.
   flakiness due to non-deterministic behaviors. These are run nightly and used
   to track the health of the product from build to build.
 
-#### `EvalCase` Properties
+### Best Practices
+
+- **Initially Failing**: An evaluation is only valid to add if it is **initially
+  failing** (demonstrating the bug or missing behavior). Skip this requirement
+  only if you have clear evidence that the bug has already been fixed and the
+  test is for regression verification.
+- **Minimization**: Keep the `files` and `prompt` as minimal as possible to
+  reproduce the behavior.
+- **Anonymization**: Always anonymize code, paths, and identifiers.
+
+### `EvalCase` Properties
 
 - `name`: The name of the evaluation case.
 - `prompt`: The prompt to send to the model.
