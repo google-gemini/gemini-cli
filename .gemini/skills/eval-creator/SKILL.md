@@ -20,18 +20,23 @@ When the user asks you to create an eval from a `chat.json` file, follow these s
     *   Once the user clarifies the category, analyze the conversation history (the `Content[]` array) to identify *only* those failures, bugs, or regressions that match the specified category.
     *   Present a concise summary of the matching potential bugs to the user and **ask them which specific issues they want you to create evaluations for.** Do NOT proceed to create files until the user confirms.
 
-2.  **Minimize and Anonymize:**
-    *   Identify the "Repro Turn": the specific user prompt where the agent failed.
-    *   Discard all preceding conversation turns that are not strictly necessary to set up the environment or trigger the behavior.
-    *   **MANDATORY:** Use the `messages` array to include essential preceding context (user prompts, tool calls, and tool outputs). This "narrows the test trajectory" by replaying the specific logic, assumptions, or tool results that led to the failure. This makes reproduction significantly more reliable, makes the test faster to run, and ensures the agent starts with the exact context required.
-    *   **CRITICAL:** Anonymize all data. Replace absolute file paths (e.g., `/Users/username/code/...`) with generic relative paths (e.g., `src/app.ts`). Remove any sensitive tokens, API keys, or personal information. Replace user-specific code with generic, simplified code snippets that still reproduce the issue.
+2.  **Deeply Understand Bug:**
+    *   Explore the relevant parts of the codebase as needed to fully understand the bug and the conditions under which it repros.
+    *   Use scripts, if needed, to test your hypotheses as to what the problem is.
+    *   Proceed to the next step only after you fully understand what causes the issue.
 
-3.  **Reconstruct Initial State:**
+3.  **Minimize and Anonymize:**
+    *   Identify the "Repro Turn": the specific user prompt where the agent failed. You will want to make the test prompt either an anonymized version of that prompt or one of the messages far enough back in the history that the agent can recover when the bug is fixed later.
+    *   **CRITICAL:** Anonymize all data. Replace absolute file paths (e.g., `/Users/username/code/...`) with generic relative paths (e.g., `src/app.ts`). Remove any sensitive tokens, API keys, or personal information. Replace user-specific, company-specific, or domain-specific code and names with generic, simplified code snippets that still reproduce the issue.
+
+4.  **Reconstruct Initial State:**
     *   Determine the minimal set of files and their contents required to exist *before* the target prompt is issued. This will become the `files` object in the test.
 
-4.  **Generate Test Code:**
+5.  **Generate Test Code:**
     *   Create a valid TypeScript file using the `evalTest` framework from `evals/test-helper.ts`.
-    *   Use the following template:
+    *   **MANDATORY:** Use the `messages` array to include essential preceding context to setup the repro scenario. You can start with as much as you need and whittle it back.
+    *   Remember to anonymize before you are done.
+    *   Use the following test template:
 
 ```typescript
 import { describe, expect } from 'vitest';
