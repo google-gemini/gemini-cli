@@ -11,6 +11,7 @@ import {
   type ShellState,
   type ShellAction,
 } from './shellReducer.js';
+import { MAX_SHELL_OUTPUT_SIZE } from '../constants.js';
 
 describe('shellReducer', () => {
   it('should return the initial state', () => {
@@ -189,5 +190,48 @@ describe('shellReducer', () => {
     const state = shellReducer(registeredState, action);
     expect(state.backgroundShells.has(1001)).toBe(false);
     expect(state.isBackgroundShellVisible).toBe(false); // Auto-hide if last shell
+  });
+
+  it('should truncate shell output when it exceeds MAX_SHELL_OUTPUT_SIZE', () => {
+    const largeOutputState: ShellState = {
+      ...initialState,
+      isBackgroundShellVisible: false,
+      backgroundShells: new Map([
+        [
+          1001,
+          {
+            pid: 1001,
+            command: 'long-running-command',
+            output: 'a'.repeat(MAX_SHELL_OUTPUT_SIZE - 1000),
+            isBinary: false,
+            binaryBytesReceived: 0,
+            status: 'running',
+          },
+        ],
+      ]),
+    };
+
+    // Append a chunk that would exceed the limit
+    const largeChunk = 'b'.repeat(2000);
+    const action: ShellAction = {
+      type: 'APPEND_SHELL_OUTPUT',
+      pid: 1001,
+      chunk: largeChunk,
+    };
+    const state = shellReducer(largeOutputState, action);
+    const shell = state.backgroundShells.get(1001);
+    expect(shell).toBeDefined();
+    if (shell && typeof shell.output === 'string') {
+      // Should be truncated to MAX_SHELL_OUTPUT_SIZE
+      expect(shell.output.length).toBeLessThanOrEqual(MAX_SHELL_OUTPUT_SIZE);
+      // Should contain the most recent data (the 'b' chunk)
+      expect(shell.output).toContain('b');
+      // Should not contain all the old 'a' data (some was trimmed)
+      const originalSize = MAX_SHELL_OUTPUT_SIZE - 1000;
+      const newChunkSize = 2000;
+      const expectedSize = MAX_SHELL_OUTPUT_SIZE;
+      const trimmedAmount = originalSize + newChunkSize - expectedSize;
+      expect(trimmedAmount).toBeGreaterThan(0);
+    }
   });
 });
