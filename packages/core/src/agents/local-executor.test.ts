@@ -1541,7 +1541,9 @@ describe('LocalAgentExecutor', () => {
       const output = await runPromise;
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.TIMEOUT);
-      expect(output.result).toContain('Agent timed out after 0.5 minutes.');
+      expect(output.result).toContain(
+        "Agent 'TestAgent' timed out after 0.5 minutes.",
+      );
       expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
 
       // Verify activity stream reported the timeout
@@ -1550,7 +1552,9 @@ describe('LocalAgentExecutor', () => {
           type: 'ERROR',
           data: expect.objectContaining({
             context: 'timeout',
-            error: 'Agent timed out after 0.5 minutes.',
+            error: expect.stringContaining(
+              "Agent 'TestAgent' timed out after 0.5 minutes.",
+            ),
           }),
         }),
       );
@@ -1728,7 +1732,9 @@ describe('LocalAgentExecutor', () => {
       );
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.MAX_TURNS);
-      expect(output.result).toContain('Agent reached max turns limit');
+      expect(output.result).toContain(
+        "Agent 'TestAgent' reached max turns limit",
+      );
       expect(mockSendMessageStream).toHaveBeenCalledTimes(MAX + 1);
 
       expect(activities).toContainEqual(
@@ -1933,7 +1939,9 @@ describe('LocalAgentExecutor', () => {
 
       expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
       expect(output.terminate_reason).toBe(AgentTerminateMode.TIMEOUT);
-      expect(output.result).toContain('Agent timed out after 0.5 minutes.');
+      expect(output.result).toContain(
+        "Agent 'TestAgent' timed out after 0.5 minutes.",
+      );
 
       expect(activities).toContainEqual(
         expect.objectContaining({
