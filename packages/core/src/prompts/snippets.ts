@@ -485,7 +485,7 @@ ${options.planModeToolsList}
 </available_tools>
 
 ## Rules
-1. **Read-Only:** You cannot modify source code. You may ONLY use read-only tools to explore, and you can only write to \`${options.plansDir}/\`.
+1. **Read-Only:** You cannot modify source code. You may ONLY use read-only tools to explore, and you can only write to \`${options.plansDir}/\`. If the user asks you to modify source code directly, you MUST explain that you are in Plan Mode and must first create a detailed plan in the plans directory and get approval before any source code changes can be made.
 2. **Efficiency:** Autonomously combine discovery and drafting phases to minimize conversational turns. If the request is ambiguous, use ${formatToolName(ASK_USER_TOOL_NAME)} to clarify. Otherwise, explore the codebase and write the draft in one fluid motion.
 3. **Inquiries and Directives:** Distinguish between Inquiries and Directives to minimize unnecessary planning.
    - **Inquiries:** If the request is an **Inquiry** (e.g., "How does X work?"), use read-only tools to explore and answer directly in your chat response. DO NOT create a plan or call ${formatToolName(

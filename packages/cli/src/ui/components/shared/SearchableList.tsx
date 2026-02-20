@@ -1,136 +1,190 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
-import { useState, useEffect } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../../semantic-colors.js';
+import { useSelectionList } from '../../hooks/useSelectionList.js';
 import { TextInput } from './TextInput.js';
-import { useKeypress, type Key } from '../../hooks/useKeypress.js';
+import type { TextBuffer } from './text-buffer.js';
+import { useKeypress } from '../../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
-import {
-  useFuzzyList,
-  type GenericListItem,
-} from '../../hooks/useFuzzyList.js';
 
-export interface SearchableListProps<T extends GenericListItem> {
-  /** List title */
-  title?: string;
-  /** Available items */
-  items: T[];
-  /** Callback when an item is selected */
-  onSelect: (item: T) => void;
-  /** Callback when the list is closed (e.g. via Esc) */
-  onClose?: () => void;
-  /** Initial search query */
-  initialSearchQuery?: string;
-  /** Placeholder for search input */
-  searchPlaceholder?: string;
-  /** Max items to show at once */
-  maxItemsToShow?: number;
+/**
+ * Generic interface for items in a searchable list.
+ */
+export interface GenericListItem {
+  key: string;
+  label: string;
+  description?: string;
+  [key: string]: unknown;
 }
 
 /**
- * A generic searchable list component.
+ * State returned by the search hook.
+ */
+export interface SearchListState<T extends GenericListItem> {
+  filteredItems: T[];
+  searchBuffer: TextBuffer | undefined;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  maxLabelWidth: number;
+}
+
+/**
+ * Props for the SearchableList component.
+ */
+export interface SearchableListProps<T extends GenericListItem> {
+  title?: string;
+  items: T[];
+  onSelect: (item: T) => void;
+  onClose: () => void;
+  searchPlaceholder?: string;
+  /** Custom item renderer */
+  renderItem?: (
+    item: T,
+    isActive: boolean,
+    labelWidth: number,
+  ) => React.ReactNode;
+  /** Optional header content */
+  header?: React.ReactNode;
+  /** Optional footer content */
+  footer?: (info: {
+    startIndex: number;
+    endIndex: number;
+    totalVisible: number;
+  }) => React.ReactNode;
+  maxItemsToShow?: number;
+  /** Hook to handle search logic */
+  useSearch: (props: {
+    items: T[];
+    onSearch?: (query: string) => void;
+  }) => SearchListState<T>;
+  onSearch?: (query: string) => void;
+  /** Whether to reset selection to the top when items change (e.g. after search) */
+  resetSelectionOnItemsChange?: boolean;
+}
+
+/**
+ * A generic searchable list component with keyboard navigation.
  */
 export function SearchableList<T extends GenericListItem>({
   title,
   items,
   onSelect,
   onClose,
-  initialSearchQuery = '',
   searchPlaceholder = 'Search...',
+  renderItem,
+  header,
+  footer,
   maxItemsToShow = 10,
+  useSearch,
+  onSearch,
+  resetSelectionOnItemsChange = false,
 }: SearchableListProps<T>): React.JSX.Element {
-  const { filteredItems, searchBuffer, maxLabelWidth } = useFuzzyList({
+  const { filteredItems, searchBuffer, maxLabelWidth } = useSearch({
     items,
-    initialQuery: initialSearchQuery,
+    onSearch,
   });
 
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [scrollOffset, setScrollOffset] = useState(0);
-
-  // Reset selection when filtered items change
-  useEffect(() => {
-    setActiveIndex(0);
-    setScrollOffset(0);
-  }, [filteredItems]);
-
-  // Calculate visible items
-  const visibleItems = filteredItems.slice(
-    scrollOffset,
-    scrollOffset + maxItemsToShow,
+  const selectionItems = useMemo(
+    () =>
+      filteredItems.map((item) => ({
+        key: item.key,
+        value: item,
+      })),
+    [filteredItems],
   );
-  const showScrollUp = scrollOffset > 0;
-  const showScrollDown = scrollOffset + maxItemsToShow < filteredItems.length;
 
+  const handleSelectValue = useCallback(
+    (item: T) => {
+      onSelect(item);
+    },
+    [onSelect],
+  );
+
+  const { activeIndex, setActiveIndex } = useSelectionList({
+    items: selectionItems,
+    onSelect: handleSelectValue,
+    isFocused: true,
+    showNumbers: false,
+    wrapAround: true,
+  });
+
+  // Reset selection to top when items change if requested
+  const prevItemsRef = React.useRef(filteredItems);
+  React.useEffect(() => {
+    if (resetSelectionOnItemsChange && filteredItems !== prevItemsRef.current) {
+      setActiveIndex(0);
+    }
+    prevItemsRef.current = filteredItems;
+  }, [filteredItems, setActiveIndex, resetSelectionOnItemsChange]);
+
+  // Handle global Escape key to close the list
   useKeypress(
-    (key: Key) => {
-      // Navigation
-      if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
-        const newIndex =
-          activeIndex > 0 ? activeIndex - 1 : filteredItems.length - 1;
-        setActiveIndex(newIndex);
-        if (newIndex === filteredItems.length - 1) {
-          setScrollOffset(Math.max(0, filteredItems.length - maxItemsToShow));
-        } else if (newIndex < scrollOffset) {
-          setScrollOffset(newIndex);
-        }
-        return;
-      }
-      if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
-        const newIndex =
-          activeIndex < filteredItems.length - 1 ? activeIndex + 1 : 0;
-        setActiveIndex(newIndex);
-        if (newIndex === 0) {
-          setScrollOffset(0);
-        } else if (newIndex >= scrollOffset + maxItemsToShow) {
-          setScrollOffset(newIndex - maxItemsToShow + 1);
-        }
-        return;
-      }
-
-      // Selection
-      if (keyMatchers[Command.RETURN](key)) {
-        const item = filteredItems[activeIndex];
-        if (item) {
-          onSelect(item);
-        }
-        return;
-      }
-
-      // Close
+    (key) => {
       if (keyMatchers[Command.ESCAPE](key)) {
-        onClose?.();
-        return;
+        onClose();
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );
 
+  const scrollOffset = Math.max(
+    0,
+    Math.min(
+      activeIndex - Math.floor(maxItemsToShow / 2),
+      Math.max(0, filteredItems.length - maxItemsToShow),
+    ),
+  );
+
+  const visibleItems = filteredItems.slice(
+    scrollOffset,
+    scrollOffset + maxItemsToShow,
+  );
+
+  const defaultRenderItem = (
+    item: T,
+    isActive: boolean,
+    labelWidth: number,
+  ) => (
+    <Box flexDirection="column">
+      <Text
+        color={isActive ? theme.status.success : theme.text.primary}
+        bold={isActive}
+      >
+        {isActive ? '> ' : '  '}
+        {item.label.padEnd(labelWidth)}
+      </Text>
+      {item.description && (
+        <Box marginLeft={2}>
+          <Text color={theme.text.secondary} wrap="truncate-end">
+            {item.description}
+          </Text>
+        </Box>
+      )}
+    </Box>
+  );
+
   return (
-    <Box
-      borderStyle="round"
-      borderColor={theme.border.default}
-      flexDirection="column"
-      padding={1}
-      width="100%"
-    >
-      {/* Header */}
+    <Box flexDirection="column" width="100%" height="100%" paddingX={1}>
       {title && (
         <Box marginBottom={1}>
-          <Text bold>{title}</Text>
+          <Text bold color={theme.text.primary}>
+            {title}
+          </Text>
         </Box>
       )}
 
-      {/* Search Input */}
       {searchBuffer && (
         <Box
           borderStyle="round"
-          borderColor={theme.border.focused}
+          borderColor={theme.border.default}
           paddingX={1}
           marginBottom={1}
         >
@@ -142,46 +196,34 @@ export function SearchableList<T extends GenericListItem>({
         </Box>
       )}
 
-      {/* List */}
-      <Box flexDirection="column">
-        {visibleItems.length === 0 ? (
-          <Text color={theme.text.secondary}>No items found.</Text>
-        ) : (
-          visibleItems.map((item, idx) => {
-            const index = scrollOffset + idx;
-            const isActive = index === activeIndex;
+      {header && <Box marginBottom={1}>{header}</Box>}
 
+      <Box flexDirection="column" flexGrow={1}>
+        {filteredItems.length === 0 ? (
+          <Box marginX={2}>
+            <Text color={theme.text.secondary}>No items found.</Text>
+          </Box>
+        ) : (
+          visibleItems.map((item, index) => {
+            const isSelected = activeIndex === scrollOffset + index;
             return (
-              <Box key={item.key} flexDirection="row">
-                <Text
-                  color={isActive ? theme.status.success : theme.text.secondary}
-                >
-                  {isActive ? '> ' : '  '}
-                </Text>
-                <Box width={maxLabelWidth + 2}>
-                  <Text
-                    color={isActive ? theme.status.success : theme.text.primary}
-                  >
-                    {item.label}
-                  </Text>
-                </Box>
-                {item.description && (
-                  <Text color={theme.text.secondary}>{item.description}</Text>
-                )}
+              <Box key={item.key} marginBottom={1}>
+                {renderItem
+                  ? renderItem(item, isSelected, maxLabelWidth)
+                  : defaultRenderItem(item, isSelected, maxLabelWidth)}
               </Box>
             );
           })
         )}
       </Box>
 
-      {/* Footer/Scroll Indicators */}
-      {(showScrollUp || showScrollDown) && (
-        <Box marginTop={1} justifyContent="center">
-          <Text color={theme.text.secondary}>
-            {showScrollUp ? '▲ ' : '  '}
-            {filteredItems.length} items
-            {showScrollDown ? ' ▼' : '  '}
-          </Text>
+      {footer && (
+        <Box marginTop={1}>
+          {footer({
+            startIndex: scrollOffset,
+            endIndex: scrollOffset + visibleItems.length,
+            totalVisible: filteredItems.length,
+          })}
         </Box>
       )}
     </Box>

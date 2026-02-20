@@ -39,7 +39,7 @@ To enable Gemini 3 Pro and Gemini 3 Flash (if available), enable
 
 You can also use the `--model` flag to specify a particular Gemini model on
 startup. For more details, refer to the
-[configuration documentation](../get-started/configuration.md).
+[configuration documentation](../reference/configuration.md).
 
 Changes to these settings will be applied to all subsequent interactions with
 Gemini CLI.
