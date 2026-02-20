@@ -19,28 +19,36 @@ Gemini CLI uses a unified `Config` object as the source of truth. Every experime
 ## Workflow: Adding a New Experiment
 
 When a user asks to add a new experiment, follow these steps sequentially:
-
 ### 0. Research and Discovery
 - **Locate Existing Flags:** Read `packages/core/src/code_assist/experiments/flagNames.ts` to see current IDs and naming conventions.
 - **Check for Duplicates:** Ensure the proposed experiment doesn't already exist or overlap with another flag.
 - **Analyze Usage:** Search for `getExperimentValue` in `packages/core/src/config/config.ts` to see how similar experiments are wrapped and used.
 
-### 1. Scaffolding the Config Entry
+### 1. Define Behavior and Intent
+- **CRITICAL:** Before writing any code, you MUST ask the user: "What should the behavior be when the flag is enabled vs. disabled?"
+- Discuss the architectural impact: Will this change a routing strategy? Enable a new tool? Modify a prompt?
+- Document the intended logic to ensure the implementation aligns with the experiment's goals.
+
+### 2. Scaffolding the Config Entry
 - **File:** `packages/core/src/code_assist/experiments/flagNames.ts`
 - Add the new experiment ID to `ExperimentFlags`.
 - Add a corresponding entry to `ExperimentMetadata`, including `description`, `type`, and `defaultValue`.
 - **Note:** The key in `ExperimentFlags` (converted to kebab-case) will be the name used for CLI flags and Settings. For example, `MY_NEW_FEATURE` becomes `my-new-feature`.
 
-### 2. Usage in Code
+### 3. Usage in Code
 - **Generic Method:** `config.getExperimentValue<Type>(ExperimentFlags.YOUR_FLAG_ID)`
 - **Preferred Pattern (Strongly Typed Wrappers):** To maintain a clean and discoverable interface, you should add a strongly typed wrapper method in `packages/core/src/config/config.ts`. This allows other developers to easily find and use your experiment with proper type safety.
-  
+
   Example in `Config` class:
   ```typescript
   isNewFeatureEnabled(): boolean {
     return this.getExperimentValue<boolean>(ExperimentFlags.MY_NEW_FEATURE) ?? false;
   }
   ```
+
+- **Testing:** Add or update tests in `packages/core/src/config/config.experiment.test.ts` to verify the flag resolves correctly across all priority levels (CLI, Settings, Remote, Default).
+
+### 4. Telemetry and Metrics (Crucial)
 
 - **Dynamic Nature:** While `getExperimentValue` is dynamic and doesn't *require* a `Config` update for every flag, the wrapper pattern is highly encouraged for long-term maintainability.
 - **CLI Override:** Users can override via `--experiment your-flag-name=value`.
