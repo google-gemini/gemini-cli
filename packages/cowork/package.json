@@ -1,0 +1,44 @@
+{
+  "name": "@google/gemini-cowork",
+  "version": "0.1.0",
+  "description": "Gemini Cowork — AI agentic coding tool built on gemini-cli",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/google-gemini/gemini-cli.git"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "cowork": "dist/index.js"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build_package.js",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:ci": "vitest run"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@google/gemini-cli-core": "file:../core",
+    "chalk": "^5.4.1",
+    "ora": "^8.2.0",
+    "yargs": "^17.7.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/yargs": "^17.0.33",
+    "tsx": "^4.20.3",
+    "typescript": "^5.3.3",
+    "vitest": "^3.1.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
