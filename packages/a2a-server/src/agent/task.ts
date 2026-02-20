@@ -30,8 +30,7 @@ import {
   EDIT_TOOL_NAMES,
   processRestorableToolCalls,
 } from '@google/gemini-cli-core';
-import type { RequestContext } from '@a2a-js/sdk/server';
-import { type ExecutionEventBus } from '@a2a-js/sdk/server';
+import type { RequestContext , type ExecutionEventBus } from '@a2a-js/sdk/server';
 import type {
   TaskStatusUpdateEvent,
   TaskArtifactUpdateEvent,
@@ -376,11 +375,18 @@ export class Task {
       }
 
       if (tc.status === 'awaiting_approval' && tc.confirmationDetails) {
-        this.pendingToolConfirmationDetails.set(
-          tc.request.callId,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          tc.confirmationDetails as ToolCallConfirmationDetails,
-        );
+        const details = tc.confirmationDetails;
+        if (
+          typeof details === 'object' &&
+          details !== null &&
+          'onConfirm' in details &&
+          typeof details.onConfirm === 'function'
+        ) {
+          this.pendingToolConfirmationDetails.set(
+            tc.request.callId,
+            details as ToolCallConfirmationDetails,
+          );
+        }
       }
 
       // Only send an update if the status has actually changed.
