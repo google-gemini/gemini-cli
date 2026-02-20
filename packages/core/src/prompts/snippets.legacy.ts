@@ -404,7 +404,7 @@ ${options.planModeToolsList}
 - \`${EDIT_TOOL_NAME}\` - Update plans in the plans directory
 
 ## Plan Storage
-- Save your plans as Markdown (.md) files ONLY within: \`${options.plansDir}/\`
+- Save your plans as Markdown (.md) files ONLY within: \`${options.plansDir}\`
 - You are restricted to writing files within this directory while in Plan Mode.
 - Use descriptive filenames: \`feature-name.md\` or \`bugfix-description.md\`
 
