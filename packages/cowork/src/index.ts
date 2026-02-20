@@ -34,6 +34,8 @@ interface RunArgs {
   goal: string;
   root: string;
   maxIterations: number;
+  trace: boolean;
+  memory: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -79,6 +81,21 @@ function buildCli(argv: string[]) {
               describe: 'Maximum number of ReAct loop iterations',
               default: 10,
             })
+            .option('trace', {
+              alias: 't',
+              type: 'boolean',
+              describe:
+                'Record every Think/Act/Observe step to .cowork/traces/ as JSON + Markdown',
+              default: false,
+            })
+            .option('memory', {
+              alias: 'm',
+              type: 'boolean',
+              describe:
+                'Load persistent vector memory from .cowork/memory.json and inject ' +
+                'relevant past context into every Think step',
+              default: false,
+            })
             .example(
               '$0 run "Add unit tests for the auth module"',
               'Run with an explicit goal',
@@ -88,7 +105,12 @@ function buildCli(argv: string[]) {
               'Target a different project with a step cap',
             ),
         async (args) => {
-          const agent = new Coworker(args.root, args.maxIterations);
+          const agent = new Coworker({
+            projectRoot: args.root,
+            maxIterations: args.maxIterations,
+            trace: args.trace,
+            memory: args.memory,
+          });
           try {
             await agent.runLoop(args.goal);
           } catch (err) {
@@ -116,7 +138,7 @@ function buildCli(argv: string[]) {
       .epilog(
         chalk.dim(
           'Docs: https://github.com/google-gemini/gemini-cli\n' +
-            'Phase 2 will connect this loop to a live Gemini model.',
+            'Use --trace to save a full session post-mortem to .cowork/traces/',
         ),
       )
   );
@@ -141,15 +163,48 @@ if (isMain) {
 
 // ── Agent ───────────────────────────────────────────────────────────────────
 export { Coworker } from './agent/core.js';
-export type { AgentMemory, AgentStep, ToolCall } from './agent/core.js';
+export type { AgentMemory, AgentStep, CoworkerOptions, ToolCall } from './agent/core.js';
 
 export { ProjectIndexer } from './agent/context-manager.js';
 export type { FileEntry, ProjectContext } from './agent/context-manager.js';
 
+// ── Phase 3: Telemetry ───────────────────────────────────────────────────────
+export { Tracer } from './agent/tracer.js';
+export type { TraceEvent, TracePhase, TraceSession } from './agent/tracer.js';
+
+// ── Phase 3: Self-Healer ─────────────────────────────────────────────────────
+export { SelfHealer } from './agent/self-healer.js';
+export type {
+  FileChange,
+  HealAttempt,
+  HealResult,
+  ParsedError,
+} from './agent/self-healer.js';
+
+// ── Phase 3: Memory ──────────────────────────────────────────────────────────
+export { MemoryRetriever, MemoryStore } from './memory/vector-store.js';
+export type {
+  MemoryCategory,
+  MemoryEntry,
+  MemorySearchResult,
+} from './memory/vector-store.js';
+
+// ── Phase 3: MCP ─────────────────────────────────────────────────────────────
+export { MCPManager } from './mcp/client.js';
+export type {
+  MCPCallResult,
+  MCPServerConfig,
+  MCPSSETransport,
+  MCPStdioTransport,
+  MCPTool,
+} from './mcp/client.js';
+
 // ── Tool definitions (Zod schemas + registry) ───────────────────────────────
 export { TOOL_DEFINITIONS } from './tools/definitions.js';
 export type {
+  AutoTestInput,
   LogMonitorInput,
+  MCPCallInput,
   ReadFileInput,
   ScreenshotAnalyzeInput,
   SearchInput,

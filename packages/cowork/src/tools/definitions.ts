@@ -133,6 +133,47 @@ export type SearchInput = z.infer<typeof SearchInputSchema>;
 export type LogMonitorInput = z.infer<typeof LogMonitorInputSchema>;
 
 // ---------------------------------------------------------------------------
+// Phase 3 — MCP & self-healing schemas
+// ---------------------------------------------------------------------------
+
+export const MCPCallInputSchema = z.object({
+  qualifiedName: z
+    .string()
+    .min(1)
+    .describe(
+      'Fully-qualified MCP tool id: "serverId:toolName" ' +
+        '(e.g. "github:create_issue"). Use listMcpTools() to discover available tools.',
+    ),
+  args: z
+    .record(z.unknown())
+    .optional()
+    .default({})
+    .describe('Key-value arguments forwarded to the MCP tool.'),
+});
+
+export const AutoTestInputSchema = z.object({
+  testFilter: z
+    .string()
+    .optional()
+    .describe(
+      'Optional test name / file glob to limit the run ' +
+        '(forwarded to vitest/jest as a filter argument).',
+    ),
+  maxRetries: z
+    .number()
+    .int()
+    .min(1)
+    .max(10)
+    .optional()
+    .default(3)
+    .describe('Maximum Fix-Test-Repeat cycles before giving up (default 3).'),
+});
+
+// Inferred TypeScript types — Phase 3
+export type MCPCallInput = z.infer<typeof MCPCallInputSchema>;
+export type AutoTestInput = z.infer<typeof AutoTestInputSchema>;
+
+// ---------------------------------------------------------------------------
 // Tool registry interface
 // ---------------------------------------------------------------------------
 
@@ -146,7 +187,7 @@ export interface ToolDefinition<T extends z.ZodTypeAny> {
 }
 
 // ---------------------------------------------------------------------------
-// Combined registry — all tools, Phase 1 + Phase 2
+// Combined registry — all tools, Phase 1 + Phase 2 + Phase 3
 // ---------------------------------------------------------------------------
 
 export const TOOL_DEFINITIONS = {
@@ -198,6 +239,25 @@ export const TOOL_DEFINITIONS = {
       'duration. Ideal for watching dev servers, test runners, or build pipelines.',
     inputSchema: LogMonitorInputSchema,
   } satisfies ToolDefinition<typeof LogMonitorInputSchema>,
+
+  // ── Phase 3 ──────────────────────────────────────────────────────────────
+  mcp_call: {
+    name: 'mcp_call',
+    description:
+      'Invoke a tool exposed by a connected MCP (Model Context Protocol) server ' +
+      'using its qualified name ("serverId:toolName"). Available tools depend on ' +
+      'which servers are configured via CoworkerOptions.mcpServers.',
+    inputSchema: MCPCallInputSchema,
+  } satisfies ToolDefinition<typeof MCPCallInputSchema>,
+
+  auto_test: {
+    name: 'auto_test',
+    description:
+      'Run the project test suite and, if tests fail, autonomously apply ' +
+      'AI-generated fixes and re-run until all tests pass or retries are exhausted. ' +
+      'Requires vitest or jest to be installed in the target project.',
+    inputSchema: AutoTestInputSchema,
+  } satisfies ToolDefinition<typeof AutoTestInputSchema>,
 } as const;
 
 export type ToolName = keyof typeof TOOL_DEFINITIONS;

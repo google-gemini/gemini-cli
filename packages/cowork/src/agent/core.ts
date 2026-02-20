@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  *
- * Core agentic loop for Gemini Cowork — Phase 2 (Multimodal + Long Context).
+ * Core agentic loop for Gemini Cowork — Phase 3 (MCP · Memory · Self-Healing · Telemetry).
  *
  * ReAct (Reasoning + Acting) cycle
  * ─────────────────────────────────
@@ -26,6 +26,13 @@
  *   • LogMonitor      : streams live process output to the agent.
  *   • Dynamic routing : Think() inspects the goal for UI / search / monitoring
  *                       keywords and selects the appropriate tool automatically.
+ *
+ * Phase 3 additions
+ * ─────────────────
+ *   • MCPManager      : connect to any MCP server (stdio / SSE); `mcp_call` tool.
+ *   • MemoryRetriever : RAG-based persistent vector memory injected into Think.
+ *   • SelfHealer      : autonomous Fix-Test-Repeat loop after code changes.
+ *   • Tracer          : structured telemetry → .cowork/traces/*.json + *.md.
  */
 
 import { readdir, readFile } from 'node:fs/promises';
@@ -43,6 +50,11 @@ import { executeScreenshotAndAnalyze } from '../tools/vision.js';
 import { executeSearch } from '../tools/search.js';
 import { executeLogMonitor } from '../tools/log-monitor.js';
 import { ProjectIndexer } from './context-manager.js';
+import { Tracer } from './tracer.js';
+import { MemoryStore, MemoryRetriever } from '../memory/vector-store.js';
+import { MCPManager } from '../mcp/client.js';
+import type { MCPServerConfig } from '../mcp/client.js';
+import { SelfHealer } from './self-healer.js';
 import {
   ReadFileInputSchema,
   ScreenshotAnalyzeInputSchema,
@@ -56,11 +68,42 @@ import {
   type ShellRunInput,
   type LogMonitorInput,
   type WriteFileInput,
+  type MCPCallInput,
+  type AutoTestInput,
 } from '../tools/definitions.js';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+/**
+ * Construction options for `Coworker`.
+ *
+ * All Phase 3 integrations (MCP servers, memory, trace mode) are opt-in via
+ * this object so the Phase 1 / Phase 2 usage pattern is fully backwards-compatible.
+ */
+export interface CoworkerOptions {
+  /** Absolute path to the project to work on. Defaults to `process.cwd()`. */
+  projectRoot?: string;
+  /** Maximum number of ReAct loop iterations. Defaults to 10. */
+  maxIterations?: number;
+  /**
+   * When `true`, every Think / Act / Observe step is recorded to
+   * `.cowork/traces/<sessionId>.json` and `.md`.
+   */
+  trace?: boolean;
+  /**
+   * When `true`, a persistent vector memory store is loaded from
+   * `.cowork/memory.json` and relevant past context is injected into
+   * every Think step.
+   */
+  memory?: boolean;
+  /**
+   * MCP server configurations.  Each server is connected at startup and its
+   * tools become available via the `mcp_call` tool.
+   */
+  mcpServers?: MCPServerConfig[];
+}
 
 /** A single step recorded in the agent's history. */
 export interface AgentStep {
@@ -104,7 +147,9 @@ export type ToolCall =
   | { tool: 'shell_run'; input: ShellRunInput }
   | { tool: 'screenshot_and_analyze'; input: ScreenshotAnalyzeInput }
   | { tool: 'search'; input: SearchInput }
-  | { tool: 'log_monitor'; input: LogMonitorInput };
+  | { tool: 'log_monitor'; input: LogMonitorInput }
+  | { tool: 'mcp_call'; input: MCPCallInput }
+  | { tool: 'auto_test'; input: AutoTestInput };
 
 // ---------------------------------------------------------------------------
 // Visual helpers
@@ -118,8 +163,8 @@ const PHASE_LABEL: Record<AgentStep['phase'], string> = {
 
 const BANNER = [
   chalk.cyan('╔══════════════════════════════════════════════════╗'),
-  chalk.cyan('║   Gemini Cowork  ─  Agentic Loop  v0.2           ║'),
-  chalk.cyan('║   Multimodal · 2M Context · Live Search          ║'),
+  chalk.cyan('║   Gemini Cowork  ─  Agentic Loop  v0.3           ║'),
+  chalk.cyan('║   MCP · Memory · Self-Heal · Telemetry           ║'),
   chalk.cyan('╚══════════════════════════════════════════════════╝'),
 ].join('\n');
 
@@ -147,15 +192,58 @@ const MONITOR_KEYWORDS =
  * `Coworker` orchestrates the ReAct loop with multimodal capabilities.
  *
  * ```ts
+ * // Phase 1 / 2 usage — fully backwards-compatible:
  * const agent = new Coworker(process.cwd());
  * await agent.runLoop('Fix the broken hero section CSS and verify visually');
+ *
+ * // Phase 3 usage — with MCP, memory, and trace mode:
+ * const agent = new Coworker({
+ *   projectRoot: process.cwd(),
+ *   trace: true,
+ *   memory: true,
+ *   mcpServers: [{ id: 'github', name: 'GitHub MCP',
+ *     transport: { type: 'stdio', command: 'npx',
+ *       args: ['-y', '@modelcontextprotocol/server-github'] } }],
+ * });
+ * await agent.runLoop('Create a GitHub issue for the login bug');
  * ```
  */
 export class Coworker {
   private readonly memory: AgentMemory;
   private readonly maxIterations: number;
 
-  constructor(projectRoot: string = process.cwd(), maxIterations = 10) {
+  // Phase 3 — optional subsystems
+  private readonly tracer: Tracer | null;
+  private readonly memoryStore: MemoryStore | null;
+  private readonly memoryRetriever: MemoryRetriever | null;
+  private readonly mcp: MCPManager | null;
+  private readonly mcpServers: MCPServerConfig[];
+
+  /** Backwards-compatible overload: `new Coworker(root?, maxIterations?)`. */
+  constructor(projectRoot?: string, maxIterations?: number);
+  /** Phase 3 options overload: `new Coworker({ projectRoot, trace, memory, mcpServers })`. */
+  constructor(opts?: CoworkerOptions);
+  constructor(
+    rootOrOpts: string | CoworkerOptions | undefined = process.cwd(),
+    maxIterationsArg = 10,
+  ) {
+    let projectRoot: string;
+    let maxIterations: number;
+    let trace = false;
+    let useMemory = false;
+    let mcpServers: MCPServerConfig[] = [];
+
+    if (typeof rootOrOpts === 'string' || rootOrOpts === undefined) {
+      projectRoot = rootOrOpts ?? process.cwd();
+      maxIterations = maxIterationsArg;
+    } else {
+      projectRoot = rootOrOpts.projectRoot ?? process.cwd();
+      maxIterations = rootOrOpts.maxIterations ?? 10;
+      trace = rootOrOpts.trace ?? false;
+      useMemory = rootOrOpts.memory ?? false;
+      mcpServers = rootOrOpts.mcpServers ?? [];
+    }
+
     this.maxIterations = maxIterations;
     this.memory = {
       goal: '',
@@ -166,6 +254,23 @@ export class Coworker {
       contextSummary: null,
       visionEnabled: false,
     };
+
+    // ── Tracer ───────────────────────────────────────────────────────────────
+    this.tracer = trace ? new Tracer(projectRoot) : null;
+
+    // ── Persistent memory ────────────────────────────────────────────────────
+    if (useMemory) {
+      this.memoryStore = new MemoryStore(join(projectRoot, '.cowork', 'memory.json'));
+      this.memoryRetriever = new MemoryRetriever(this.memoryStore);
+    } else {
+      this.memoryStore = null;
+      this.memoryRetriever = null;
+    }
+
+    // ── MCP ──────────────────────────────────────────────────────────────────
+    // Servers are connected in runLoop (async) because addServer() is async.
+    this.mcp = mcpServers.length > 0 ? new MCPManager() : null;
+    this.mcpServers = mcpServers;
   }
 
   // -------------------------------------------------------------------------
@@ -192,6 +297,12 @@ export class Coworker {
       ? Object.keys(pkg['dependencies'] as Record<string, string>).join(', ')
       : 'none';
 
+    const mcpTools = this.mcp?.listAllTools() ?? [];
+    const mcpStr =
+      mcpTools.length > 0
+        ? `${mcpTools.length} tools (${mcpTools.map((t) => t.qualifiedName).slice(0, 3).join(', ')}${mcpTools.length > 3 ? '…' : ''})`
+        : chalk.dim('none');
+
     const lines = [
       `Project  : ${name} v${version}`,
       `Root     : ${this.memory.projectRoot}`,
@@ -200,6 +311,9 @@ export class Coworker {
       `Deps     : ${deps}`,
       `Goal     : ${this.memory.goal}`,
       `Vision   : ${this.memory.visionEnabled ? chalk.green('enabled') : chalk.dim('disabled')}`,
+      `MCP      : ${mcpStr}`,
+      `Memory   : ${this.memoryRetriever ? chalk.green('enabled') : chalk.dim('disabled')}`,
+      `Trace    : ${this.tracer ? chalk.green('enabled') : chalk.dim('disabled')}`,
     ];
 
     if (this.memory.contextSummary) {
@@ -263,14 +377,12 @@ export class Coworker {
     try {
       const ctx = await new ProjectIndexer(this.memory.projectRoot).index();
       this.memory.contextSummary = ctx.document;
-      indexSpinner.succeed(
-        chalk.dim(
-          `Codebase indexed: ${ctx.files.filter((f) => !f.skipped).length} files · ` +
-            `~${ctx.totalTokens.toLocaleString()} tokens`,
-        ),
-      );
+      const summary = `Codebase indexed: ${ctx.files.filter((f) => !f.skipped).length} files · ~${ctx.totalTokens.toLocaleString()} tokens`;
+      indexSpinner.succeed(chalk.dim(summary));
+      this.tracer?.record({ phase: 'env_scan', content: summary });
     } catch {
       indexSpinner.warn(chalk.yellow('Codebase indexing skipped (non-fatal).'));
+      this.tracer?.record({ phase: 'env_scan', content: 'Codebase indexing skipped.' });
     }
   }
 
@@ -287,13 +399,12 @@ export class Coworker {
    *   • Includes the ProjectIndexer context summary in every reasoning step
    *     so the agent has codebase-wide awareness.
    *
-   * Returns `null` to signal that the loop should terminate.
+   * Phase 3 additions:
+   *   • Injects relevant past memories from MemoryRetriever into the reasoning
+   *     context so the agent can learn across sessions.
+   *   • Records the reasoning step to the Tracer.
    *
-   * TODO (Phase 3): Replace the heuristic planner below with a live Gemini
-   *   model call via `@google/gemini-cli-core`'s `GeminiClient`, passing
-   *   `this.memory.contextSummary` as the system prompt, the history as
-   *   conversation turns, and receiving a structured `ToolCall` back from
-   *   the model's function-calling response.
+   * Returns `null` to signal that the loop should terminate.
    */
   private async think(iteration: number): Promise<ToolCall | null> {
     const spinner: Ora = ora({
@@ -304,16 +415,28 @@ export class Coworker {
     await new Promise<void>((r) => setTimeout(r, 200)); // model latency placeholder
     spinner.stop();
 
+    // ── Phase 3: retrieve relevant past memories ───────────────────────────
+    let memoryContext = '';
+    if (this.memoryRetriever) {
+      try {
+        memoryContext = await this.memoryRetriever.retrieve(this.memory.goal, 3);
+      } catch {
+        // non-fatal — continue without memory context
+      }
+    }
+
     const context = this.buildContext();
     const lastObservation =
       [...this.memory.history]
         .reverse()
         .find((s) => s.phase === 'observe')?.content ?? 'No prior observations.';
 
-    this.record(
-      'think',
-      `Iteration ${iteration}\n          ${context}\n          Last obs : ${lastObservation.slice(0, 150)}`,
-    );
+    const thinkContent =
+      `Iteration ${iteration}\n          ${context}\n          Last obs : ${lastObservation.slice(0, 150)}` +
+      (memoryContext ? `\n\n${memoryContext}` : '');
+
+    this.record('think', thinkContent);
+    this.tracer?.record({ phase: 'think', iteration, content: thinkContent });
 
     // ── Dynamic tool switching — classify goal on first iteration ──────────
 
@@ -439,12 +562,14 @@ export class Coworker {
    *   screenshot_and_analyze     → vision.ts   (Puppeteer + Gemini Vision)
    *   search                     → search.ts   (Gemini grounding)
    *   log_monitor                → log-monitor.ts (streaming process output)
+   *   mcp_call                   → mcp/client.ts (MCPManager.callTool)
+   *   auto_test                  → self-healer.ts (Fix-Test-Repeat loop)
    */
   private async act(toolCall: ToolCall): Promise<ToolResult> {
-    this.record(
-      'act',
-      `Tool: ${chalk.bold(toolCall.tool)}  Input: ${JSON.stringify(toolCall.input)}`,
-    );
+    const actContent = `Tool: ${chalk.bold(toolCall.tool)}  Input: ${JSON.stringify(toolCall.input)}`;
+    this.record('act', actContent);
+
+    const t0 = Date.now();
 
     // Suppress spinner for tools that interact with the user or write directly
     // to stdout (shell_run human prompt, log_monitor live output, URL capture).
@@ -483,12 +608,80 @@ export class Coworker {
         case 'log_monitor':
           result = await executeLogMonitor(toolCall.input);
           break;
+        case 'mcp_call': {
+          if (!this.mcp) {
+            result = { output: '', error: 'No MCP servers are configured.' };
+          } else {
+            const mcpResult = await this.mcp.callTool(
+              toolCall.input.qualifiedName,
+              toolCall.input.args ?? {},
+            );
+            const text = mcpResult.content
+              .map((c) =>
+                typeof c === 'object' && c !== null && 'text' in c
+                  ? String((c as { text: unknown }).text)
+                  : JSON.stringify(c),
+              )
+              .join('\n');
+            result = {
+              output: text,
+              ...(mcpResult.isError ? { error: 'MCP tool reported an error.' } : {}),
+            };
+          }
+          break;
+        }
+        case 'auto_test': {
+          const healer = new SelfHealer(
+            this.memory.projectRoot,
+            toolCall.input.maxRetries ?? 3,
+          );
+          const healResult = await healer.heal({
+            packageJson: this.memory.packageJson,
+            testFilter: toolCall.input.testFilter,
+            onAttempt: (attempt, passed, errors) => {
+              const msg = passed
+                ? `✓ Tests passed on attempt ${attempt}`
+                : `✗ Attempt ${attempt}: ${errors.length} error(s)`;
+              console.log(chalk.dim(`  [SelfHealer] ${msg}`));
+              this.tracer?.record({
+                phase: 'self_heal',
+                content: msg,
+                output: { attempt, passed, errorCount: errors.length },
+              });
+            },
+          });
+          result = {
+            output: healResult.success
+              ? `All tests pass after ${healResult.totalAttempts} attempt(s).`
+              : `Tests still failing after ${healResult.totalAttempts} attempt(s).\n${healResult.finalOutput.slice(0, 600)}`,
+            ...(healResult.success ? {} : { error: 'auto_test: tests did not pass.' }),
+          };
+          break;
+        }
       }
 
+      const durationMs = Date.now() - t0;
       spinner?.succeed(chalk.green.dim(`${toolCall.tool} complete.`));
+
+      this.tracer?.record({
+        phase: toolCall.tool === 'mcp_call' ? 'mcp_call' : 'act',
+        tool: toolCall.tool,
+        content: actContent,
+        input: toolCall.input,
+        output: result.output.slice(0, 1000),
+        durationMs,
+      });
+
       return result;
     } catch (err) {
       spinner?.fail(chalk.red(`${toolCall.tool} failed.`));
+      this.tracer?.record({
+        phase: 'act',
+        tool: toolCall.tool,
+        content: `ERROR in ${toolCall.tool}: ${err instanceof Error ? err.message : String(err)}`,
+        input: toolCall.input,
+        durationMs: Date.now() - t0,
+      });
       throw err;
     }
   }
@@ -513,6 +706,7 @@ export class Coworker {
       : `OUTPUT: ${preview}`;
 
     this.record('observe', observation);
+    this.tracer?.record({ phase: 'observe', content: observation, output: preview });
   }
 
   // -------------------------------------------------------------------------
@@ -523,6 +717,12 @@ export class Coworker {
    * Run the ReAct loop until the agent signals completion or `maxIterations`
    * is reached.
    *
+   * Phase 3 additions:
+   *   • Connects any configured MCP servers before the first iteration.
+   *   • Loads the persistent memory store (if enabled) before the first Think.
+   *   • Wraps the entire session in a Tracer (if enabled), writing JSON + Markdown
+   *     artefacts on completion.
+   *
    * @param goal  Natural-language description of the task to accomplish.
    */
   async runLoop(goal: string): Promise<void> {
@@ -531,16 +731,72 @@ export class Coworker {
     console.log(`\n${BANNER}\n`);
     console.log(chalk.white(`Goal: ${chalk.bold(goal)}\n`));
 
+    // ── Phase 3: start trace session ─────────────────────────────────────────
+    this.tracer?.startSession(goal);
+    this.tracer?.record({ phase: 'session_start', content: `Goal: ${goal}` });
+
+    // ── Phase 3: connect MCP servers ─────────────────────────────────────────
+    if (this.mcp && this.mcpServers.length > 0) {
+      const mcpSpinner = ora({
+        text: chalk.dim(`Connecting ${this.mcpServers.length} MCP server(s)…`),
+        color: 'cyan',
+      }).start();
+      const results = await Promise.allSettled(
+        this.mcpServers.map((cfg) => this.mcp!.addServer(cfg)),
+      );
+      const connected = results.filter((r) => r.status === 'fulfilled').length;
+      mcpSpinner.succeed(
+        chalk.dim(`MCP: ${connected}/${this.mcpServers.length} server(s) connected.`),
+      );
+    }
+
+    // ── Phase 3: load persistent memory ──────────────────────────────────────
+    if (this.memoryStore) {
+      try {
+        await this.memoryStore.load();
+      } catch {
+        // non-fatal
+      }
+    }
+
     await this.scanEnvironment();
 
-    for (let i = 1; i <= this.maxIterations; i++) {
-      console.log(chalk.dim(`\n${'─'.repeat(52)} iteration ${i}`));
+    let outcome: 'success' | 'error' | 'max_iterations' = 'success';
 
-      const toolCall = await this.think(i);
-      if (toolCall === null) break;
+    try {
+      for (let i = 1; i <= this.maxIterations; i++) {
+        console.log(chalk.dim(`\n${'─'.repeat(52)} iteration ${i}`));
 
-      const result = await this.act(toolCall);
-      this.observe(result);
+        const toolCall = await this.think(i);
+        if (toolCall === null) break;
+
+        const result = await this.act(toolCall);
+        this.observe(result);
+
+        if (i === this.maxIterations) {
+          outcome = 'max_iterations';
+        }
+      }
+    } catch (err) {
+      outcome = 'error';
+      this.tracer?.record({
+        phase: 'observe',
+        content: `Fatal error: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      throw err;
+    } finally {
+      // ── Phase 3: end trace session ─────────────────────────────────────────
+      if (this.tracer?.active) {
+        try {
+          const tracePath = await this.tracer.endSession(outcome);
+          console.log(chalk.dim(`\nTrace saved → ${tracePath}`));
+        } catch {
+          // non-fatal
+        }
+      }
+
+      // ── Phase 3: disconnect MCP servers ──────────────────────────────────
+      await this.mcp?.dispose().catch(() => undefined);
     }
 
     console.log(
