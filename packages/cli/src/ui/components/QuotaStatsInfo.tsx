@@ -69,7 +69,13 @@ export const QuotaStatsInfo: React.FC<QuotaStatsInfoProps> = ({
                 : ''}
             </Text>
           )}
-          {resetTime && `, ${formatResetTime(resetTime)}`}
+          {resetTime &&
+            `, ${(function (t) {
+              const formatted = formatResetTime(t);
+              return formatted === 'Resetting...' || formatted === '< 1m'
+                ? formatted
+                : `resets in ${formatted}`;
+            })(resetTime)}`}
         </Text>
       )}
       {showDetails && (

@@ -115,7 +115,7 @@ export const formatResetTime = (resetTime: string): string => {
   }
 
   const diff = date.getTime() - Date.now();
-  if (diff <= 0) return '(Resetting...)';
+  if (diff <= 0) return 'Resetting...';
 
   const totalMinutes = Math.ceil(diff / (1000 * 60));
   const hours = Math.floor(totalMinutes / 60);
@@ -128,16 +128,13 @@ export const formatResetTime = (resetTime: string): string => {
       unitDisplay: 'narrow',
     }).format(val);
 
-  let timeStr = '';
   if (hours > 0 && minutes > 0) {
-    timeStr = `${fmt(hours, 'hour')} ${fmt(minutes, 'minute')}`;
+    return `${fmt(hours, 'hour')} ${fmt(minutes, 'minute')}`;
   } else if (hours > 0) {
-    timeStr = fmt(hours, 'hour');
+    return fmt(hours, 'hour');
   } else if (minutes > 0) {
-    timeStr = fmt(minutes, 'minute');
+    return fmt(minutes, 'minute');
   } else {
-    timeStr = '< 1m';
+    return '< 1m';
   }
-
-  return `resets in ${timeStr}`;
 };

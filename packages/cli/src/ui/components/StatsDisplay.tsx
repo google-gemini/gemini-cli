@@ -365,10 +365,13 @@ const ModelUsageTable: React.FC<{
                       <Text color={theme.text.secondary}>
                         {' '}
                         (
-                        {formatResetTime(row.bucket.resetTime).replace(
-                          'resets in',
-                          'Resets in',
-                        )}
+                        {(function (t) {
+                          const formatted = formatResetTime(t);
+                          return formatted === 'Resetting...' ||
+                            formatted === '< 1m'
+                            ? formatted
+                            : `Resets in ${formatted}`;
+                        })(row.bucket.resetTime)}
                         )
                       </Text>
                     )}
