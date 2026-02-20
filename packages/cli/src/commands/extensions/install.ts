@@ -5,10 +5,13 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { debugLogger } from '@google/gemini-cli-core';
+import * as path from 'node:path';
+import chalk from 'chalk';
+import { debugLogger , FolderTrustDiscoveryService } from '@google/gemini-cli-core';
 import { getErrorMessage } from '../../utils/errors.js';
 import {
   INSTALL_WARNING_MESSAGE,
+  promptForConsentNonInteractive,
   requestConsentNonInteractive,
 } from '../../config/extensions/consent.js';
 import {
@@ -16,6 +19,11 @@ import {
   inferInstallMetadata,
 } from '../../config/extension-manager.js';
 import { loadSettings } from '../../config/settings.js';
+import {
+  isWorkspaceTrusted,
+  loadTrustedFolders,
+  TrustLevel,
+} from '../../config/trustedFolders.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { exitCli } from '../utils.js';
 
@@ -36,6 +44,94 @@ export async function handleInstall(args: InstallArgs) {
       allowPreRelease: args.allowPreRelease,
     });
 
+    const workspaceDir = process.cwd();
+    const settings = loadSettings(workspaceDir).merged;
+
+    if (installMetadata.type === 'local' || installMetadata.type === 'link') {
+      const resolvedPath = path.resolve(source);
+      const trustResult = isWorkspaceTrusted(settings, resolvedPath);
+      if (trustResult.isTrusted !== true) {
+        const discoveryResults =
+          await FolderTrustDiscoveryService.discover(resolvedPath);
+
+        const hasDiscovery =
+          discoveryResults.commands.length > 0 ||
+          discoveryResults.mcps.length > 0 ||
+          discoveryResults.hooks.length > 0 ||
+          discoveryResults.skills.length > 0 ||
+          discoveryResults.settings.length > 0;
+
+        const promptLines = [
+          '',
+          chalk.bold('Do you trust the files in this folder?'),
+          '',
+          `The extension source at "${resolvedPath}" is not trusted.`,
+          '',
+          'Trusting a folder allows Gemini CLI to load its local configurations,',
+          'including custom commands, hooks, MCP servers, agent skills, and',
+          'settings. These configurations could execute code on your behalf or',
+          'change the behavior of the CLI.',
+          '',
+        ];
+
+        if (discoveryResults.discoveryErrors.length > 0) {
+          promptLines.push(chalk.red('❌ Discovery Errors:'));
+          for (const error of discoveryResults.discoveryErrors) {
+            promptLines.push(chalk.red(`  • ${error}`));
+          }
+          promptLines.push('');
+        }
+
+        if (discoveryResults.securityWarnings.length > 0) {
+          promptLines.push(chalk.yellow('⚠️  Security Warnings:'));
+          for (const warning of discoveryResults.securityWarnings) {
+            promptLines.push(chalk.yellow(`  • ${warning}`));
+          }
+          promptLines.push('');
+        }
+
+        if (hasDiscovery) {
+          promptLines.push(chalk.bold('This folder contains:'));
+          const groups = [
+            { label: 'Commands', items: discoveryResults.commands },
+            { label: 'MCP Servers', items: discoveryResults.mcps },
+            { label: 'Hooks', items: discoveryResults.hooks },
+            { label: 'Skills', items: discoveryResults.skills },
+            { label: 'Setting overrides', items: discoveryResults.settings },
+          ].filter((g) => g.items.length > 0);
+
+          for (const group of groups) {
+            promptLines.push(
+              `  • ${chalk.bold(group.label)} (${group.items.length}):`,
+            );
+            for (const item of group.items) {
+              promptLines.push(`    - ${item}`);
+            }
+          }
+          promptLines.push('');
+        }
+
+        promptLines.push(
+          chalk.yellow(
+            'Do you want to trust this folder and continue with the installation? [y/N]: ',
+          ),
+        );
+
+        const confirmed = await promptForConsentNonInteractive(
+          promptLines.join('\n'),
+          false,
+        );
+        if (confirmed) {
+          const trustedFolders = loadTrustedFolders();
+          await trustedFolders.setValue(resolvedPath, TrustLevel.TRUST_FOLDER);
+        } else {
+          throw new Error(
+            `Installation aborted: Folder "${resolvedPath}" is not trusted.`,
+          );
+        }
+      }
+    }
+
     const requestConsent = args.consent
       ? () => Promise.resolve(true)
       : requestConsentNonInteractive;
@@ -44,12 +140,11 @@ export async function handleInstall(args: InstallArgs) {
       debugLogger.log(INSTALL_WARNING_MESSAGE);
     }
 
-    const workspaceDir = process.cwd();
     const extensionManager = new ExtensionManager({
       workspaceDir,
       requestConsent,
       requestSetting: promptForSetting,
-      settings: loadSettings(workspaceDir).merged,
+      settings,
     });
     await extensionManager.loadExtensions();
     const extension =

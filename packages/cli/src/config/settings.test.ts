@@ -1826,7 +1826,7 @@ describe('Settings Loading and Merging', () => {
       loadEnvironment(settings, MOCK_WORKSPACE_DIR, mockTrustFn);
 
       expect(process.env['TESTTEST']).not.toEqual('1234');
-      expect(process.env['GEMINI_API_KEY']).not.toEqual('test-key');
+      expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
     });
 
     it('loads whitelisted env files from untrusted spaces if sandboxing is enabled', () => {
@@ -2748,7 +2748,7 @@ describe('Settings Loading and Merging', () => {
           MOCK_WORKSPACE_DIR,
         );
 
-        expect(process.env['GEMINI_API_KEY']).toBeUndefined();
+        expect(process.env['GEMINI_API_KEY']).toEqual('secret');
       });
 
       it('should NOT be tricked by positional arguments that look like flags', () => {
@@ -2767,7 +2767,7 @@ describe('Settings Loading and Merging', () => {
           MOCK_WORKSPACE_DIR,
         );
 
-        expect(process.env['GEMINI_API_KEY']).toBeUndefined();
+        expect(process.env['GEMINI_API_KEY']).toEqual('secret');
       });
     });
 

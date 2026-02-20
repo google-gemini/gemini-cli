@@ -573,10 +573,6 @@ export function loadEnvironment(
     relevantArgs.includes('-s') ||
     relevantArgs.includes('--sandbox');
 
-  if (trustResult.isTrusted !== true && !isSandboxed) {
-    return;
-  }
-
   // Cloud Shell environment variable handling
   if (process.env['CLOUD_SHELL'] === 'true') {
     setUpCloudShellEnvironment(envFilePath, isTrusted, isSandboxed);
@@ -596,8 +592,8 @@ export function loadEnvironment(
       for (const key in parsedEnv) {
         if (Object.hasOwn(parsedEnv, key)) {
           let value = parsedEnv[key];
-          // If the workspace is untrusted but we are sandboxed, only allow whitelisted variables.
-          if (!isTrusted && isSandboxed) {
+          // If the workspace is untrusted, only allow whitelisted variables.
+          if (!isTrusted) {
             if (!AUTH_ENV_VAR_WHITELIST.includes(key)) {
               continue;
             }
