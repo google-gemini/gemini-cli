@@ -40,7 +40,7 @@ const MAX_CONTENT_LENGTH = 100000;
 // Rate limiting configuration
 const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 10;
-const hostRequestHistory = new Map<string, number[]>();
+const hostRequestHistory = new LRUCache<string, number[]>({ max: 1000 });
 
 function checkRateLimit(url: string): {
   allowed: boolean;
