@@ -1338,7 +1338,9 @@ export class Config {
       // For reset time, take the one that is nearest in the future (soonest reset)
       const resetTime = [proQuota?.resetTime, flashQuota?.resetTime]
         .filter((t): t is string => !!t)
-        .sort()[0];
+        .map((t) => new Date(t))
+        .sort((a, b) => a.getTime() - b.getTime())[0]
+        ?.toISOString();
 
       return {
         remaining: (proQuota?.remaining ?? 0) + (flashQuota?.remaining ?? 0),

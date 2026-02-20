@@ -57,18 +57,9 @@ export const QuotaStatsInfo: React.FC<QuotaStatsInfoProps> = ({
               ? `Limit reached`
               : percentage !== undefined
                 ? `${percentage.toFixed(0)}%`
-                : remaining !== undefined && remaining !== null
-                  ? `${remaining.toLocaleString()}`
-                  : 'Limit reached'}
+                : 'Limit reached'}
           </Text>
-          {remaining !== 0 && (
-            <Text>
-              {percentage !== undefined ||
-              (remaining !== undefined && remaining !== null)
-                ? ' usage remaining'
-                : ''}
-            </Text>
-          )}
+          {remaining !== 0 && <Text> usage remaining</Text>}
           {resetTime &&
             `, ${(function (t) {
               const formatted = formatResetTime(t);

@@ -105,7 +105,8 @@ export const formatResetTime = (resetTime: string): string => {
   if (isNaN(date.getTime())) {
     const timestamp = parseInt(resetTime, 10);
     if (!isNaN(timestamp)) {
-      // Could be seconds or milliseconds. If < 10^12, likely seconds.
+      // Heuristic: If the timestamp is less than 10^12, it is likely in seconds
+      // (as 10^12 ms is year 2001, while 10^12 s is far in the future).
       date = new Date(timestamp < 10000000000 ? timestamp * 1000 : timestamp);
     }
   }
