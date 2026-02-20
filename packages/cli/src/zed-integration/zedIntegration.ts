@@ -118,9 +118,7 @@ export class GeminiAgent {
       },
     ];
 
-    ];
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const meta = hasMeta(args) ? args._meta : undefined;
     const apiKey =
       typeof meta?.['apiKey'] === 'string' ? meta['apiKey'] : undefined;
