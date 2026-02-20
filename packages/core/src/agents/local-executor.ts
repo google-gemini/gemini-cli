@@ -33,6 +33,7 @@ import {
 import {
   AgentStartEvent,
   AgentFinishEvent,
+  LlmRole,
   RecoveryAttemptEvent,
   LlmRole,
 } from '../telemetry/types.js';
@@ -48,6 +49,7 @@ import {
   DEFAULT_MAX_TURNS,
   DEFAULT_MAX_TIME_MINUTES,
 } from './types.js';
+import { getErrorMessage } from '../utils/errors.js';
 import { templateString } from './utils.js';
 import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
@@ -826,16 +828,19 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         systemInstruction,
         [{ functionDeclarations: tools }],
         startHistory,
+        undefined,
+        undefined,
+        'subagent',
       );
-    } catch (error) {
+    } catch (e: unknown) {
       await reportError(
-        error,
+        e,
         `Error initializing Gemini chat for agent ${this.definition.name}.`,
         startHistory,
         'startChat',
       );
       // Re-throw as a more specific error after reporting.
-      throw new Error(`Failed to create chat object: ${error}`);
+      throw new Error(`Failed to create chat object: ${getErrorMessage(e)}`);
     }
   }
 
