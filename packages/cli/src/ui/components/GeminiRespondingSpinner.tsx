@@ -105,7 +105,8 @@ export const GeminiSpinner: React.FC<GeminiSpinnerProps> = ({
       return;
     }
 
-    debugState.debugNumAnimatedComponents++;
+    debugState.debugNumAnimatedComponents =
+      (debugState.debugNumAnimatedComponents || 0) + 1;
 
     const dotsInterval = setInterval(() => {
       setDotsFrame((prev) => (prev + 1) % DOTS_PATTERN.length);
@@ -113,7 +114,10 @@ export const GeminiSpinner: React.FC<GeminiSpinnerProps> = ({
 
     return () => {
       clearInterval(dotsInterval);
-      debugState.debugNumAnimatedComponents--;
+      debugState.debugNumAnimatedComponents = Math.max(
+        0,
+        (debugState.debugNumAnimatedComponents || 0) - 1,
+      );
     };
   }, [isTmux, isScreenReaderEnabled]);
 
