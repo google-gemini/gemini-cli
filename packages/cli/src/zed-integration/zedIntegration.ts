@@ -88,6 +88,7 @@ export async function runZedIntegration(
 export class GeminiAgent {
   private sessions: Map<string, Session> = new Map();
   private clientCapabilities: acp.ClientCapabilities | undefined;
+  private apiKey: string | undefined;
 
   constructor(
     private config: Config,
@@ -161,7 +162,10 @@ export class GeminiAgent {
     // This will reuse existing credentials if they're valid,
     // or perform new authentication if needed
     try {
-      await this.config.refreshAuth(method, apiKey);
+      if (apiKey) {
+        this.apiKey = apiKey;
+      }
+      await this.config.refreshAuth(method, apiKey ?? this.apiKey);
     } catch (e) {
       throw new acp.RequestError(-32000, getAcpErrorMessage(e));
     }
@@ -191,7 +195,7 @@ export class GeminiAgent {
     let isAuthenticated = false;
     let authErrorMessage = '';
     try {
-      await config.refreshAuth(authType);
+      await config.refreshAuth(authType, this.apiKey);
       isAuthenticated = true;
 
       // Extra validation for Gemini API key
@@ -318,7 +322,7 @@ export class GeminiAgent {
     // This satisfies the security requirement to verify the user before executing
     // potentially unsafe server definitions.
     try {
-      await config.refreshAuth(selectedAuthType);
+      await config.refreshAuth(selectedAuthType, this.apiKey);
     } catch (e) {
       debugLogger.error(`Authentication failed: ${e}`);
       throw acp.RequestError.authRequired();

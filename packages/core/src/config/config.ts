@@ -68,7 +68,9 @@ import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
-import { logRipgrepFallback, logFlashFallback ,
+import {
+  logRipgrepFallback,
+  logFlashFallback,
   logApprovalModeSwitch,
   logApprovalModeDuration,
 } from '../telemetry/loggers.js';
@@ -106,7 +108,11 @@ import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
-import type { UserTierId , RetrieveUserQuotaResponse , AdminControlsSettings } from '../code_assist/types.js';
+import type {
+  UserTierId,
+  RetrieveUserQuotaResponse,
+  AdminControlsSettings,
+} from '../code_assist/types.js';
 import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
