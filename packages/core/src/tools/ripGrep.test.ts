@@ -1853,6 +1853,107 @@ describe('RipGrepTool', () => {
     });
   });
 
+  describe('hidden directory search', () => {
+    it('should pass --hidden flag and surface matches from hidden directories', async () => {
+      await fs.mkdir(path.join(tempRootDir, '.hidden'), { recursive: true });
+
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: '.hidden/fileA.txt' },
+                line_number: 1,
+                lines: { text: 'hello world\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'hello' };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(mockSpawn).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.arrayContaining(['--hidden']),
+        expect.anything(),
+      );
+      expect(result.llmContent).toContain(path.join('.hidden', 'fileA.txt'));
+      expect(result.llmContent).toContain('L1: hello world');
+    });
+
+    it('should discard matches from hidden directories listed in .geminiignore', async () => {
+      await fs.writeFile(
+        path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME),
+        '.hidden/\n',
+      );
+      await fs.mkdir(path.join(tempRootDir, '.hidden'), { recursive: true });
+
+      const toolWithIgnore = new RipGrepTool(
+        mockConfig,
+        createMockMessageBus(),
+      );
+
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: '.hidden/fileA.txt' },
+                line_number: 1,
+                lines: { text: 'hello world\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'hello' };
+      const invocation = toolWithIgnore.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).not.toContain('.hidden');
+      expect(result.llmContent).not.toContain('hello world');
+    });
+
+    it('should not discard matches from hidden directories not listed in .geminiignore', async () => {
+      await fs.writeFile(
+        path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME),
+        '.hidden/\n',
+      );
+      const toolWithIgnore = new RipGrepTool(
+        mockConfig,
+        createMockMessageBus(),
+      );
+
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: '.config/fileB.txt' },
+                line_number: 1,
+                lines: { text: 'hello world\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'hello' };
+      const invocation = toolWithIgnore.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain(path.join('.config', 'fileB.txt'));
+      expect(result.llmContent).toContain('L1: hello world');
+    });
+  });
+
   describe('new parameters', () => {
     it('should pass --max-count when max_matches_per_file is provided', async () => {
       mockSpawn.mockImplementationOnce(

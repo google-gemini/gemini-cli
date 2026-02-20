@@ -379,7 +379,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       max_matches_per_file,
     } = options;
 
-    const rgArgs = ['--json'];
+    const rgArgs = ['--json', '--hidden'];
 
     if (!case_sensitive) {
       rgArgs.push('--ignore-case');
