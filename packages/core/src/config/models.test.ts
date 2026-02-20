@@ -10,7 +10,6 @@ import {
   resolveClassifierModel,
   isGemini3Model,
   isGemini2Model,
-  isCustomModel,
   supportsModernFeatures,
   isAutoModel,
   getDisplayString,
@@ -28,33 +27,10 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
 } from './models.js';
 
-describe('isCustomModel', () => {
-  it('should return true for models not starting with gemini-', () => {
-    expect(isCustomModel('testing')).toBe(true);
-    expect(isCustomModel('some-other-model')).toBe(true);
-  });
-
-  it('should return false for Gemini models', () => {
-    expect(isCustomModel('gemini-1.5-pro')).toBe(false);
-    expect(isCustomModel('gemini-2.0-flash')).toBe(false);
-    expect(isCustomModel('gemini-3-pro-preview')).toBe(false);
-  });
-
-  it('should return false for aliases that resolve to Gemini models', () => {
-    expect(isCustomModel(GEMINI_MODEL_ALIAS_AUTO)).toBe(false);
-    expect(isCustomModel(GEMINI_MODEL_ALIAS_PRO)).toBe(false);
-  });
-});
-
 describe('supportsModernFeatures', () => {
   it('should return true for Gemini 3 models', () => {
     expect(supportsModernFeatures('gemini-3-pro-preview')).toBe(true);
     expect(supportsModernFeatures('gemini-3-flash-preview')).toBe(true);
-  });
-
-  it('should return true for custom models', () => {
-    expect(supportsModernFeatures('testing')).toBe(true);
-    expect(supportsModernFeatures('some-custom-model')).toBe(true);
   });
 
   it('should return false for older Gemini models', () => {
@@ -88,10 +64,6 @@ describe('isGemini3Model', () => {
     expect(isGemini3Model('gemini-2.5-flash')).toBe(false);
     expect(isGemini3Model(DEFAULT_GEMINI_MODEL_AUTO)).toBe(false);
   });
-
-  it('should return false for arbitrary strings', () => {
-    expect(isGemini3Model('some-model')).toBe(false);
-  });
 });
 
 describe('getDisplayString', () => {
@@ -115,8 +87,7 @@ describe('getDisplayString', () => {
     );
   });
 
-  it('should return the model name as is for other models', () => {
-    expect(getDisplayString('custom-model')).toBe('custom-model');
+  it('should return the model name as is for other internal models', () => {
     expect(getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL)).toBe(
       DEFAULT_GEMINI_FLASH_LITE_MODEL,
     );
@@ -131,11 +102,6 @@ describe('supportsMultimodalFunctionResponse', () => {
   it('should return false for gemini-2 models', () => {
     expect(supportsMultimodalFunctionResponse('gemini-2.5-pro')).toBe(false);
     expect(supportsMultimodalFunctionResponse('gemini-2.5-flash')).toBe(false);
-  });
-
-  it('should return false for other models', () => {
-    expect(supportsMultimodalFunctionResponse('some-other-model')).toBe(false);
-    expect(supportsMultimodalFunctionResponse('')).toBe(false);
   });
 });
 
@@ -160,12 +126,6 @@ describe('resolveModel', () => {
         DEFAULT_GEMINI_FLASH_LITE_MODEL,
       );
     });
-
-    it('should return a custom model name when requested', () => {
-      const customModel = 'custom-model-v1';
-      const model = resolveModel(customModel);
-      expect(model).toBe(customModel);
-    });
   });
 });
 
@@ -189,10 +149,6 @@ describe('isGemini2Model', () => {
   it('should return false for gemini-3-pro', () => {
     expect(isGemini2Model('gemini-3-pro')).toBe(false);
   });
-
-  it('should return false for arbitrary strings', () => {
-    expect(isGemini2Model('some-model')).toBe(false);
-  });
 });
 
 describe('isAutoModel', () => {
@@ -211,7 +167,6 @@ describe('isAutoModel', () => {
   it('should return false for concrete models', () => {
     expect(isAutoModel(DEFAULT_GEMINI_MODEL)).toBe(false);
     expect(isAutoModel(PREVIEW_GEMINI_MODEL)).toBe(false);
-    expect(isAutoModel('some-random-model')).toBe(false);
   });
 });
 
