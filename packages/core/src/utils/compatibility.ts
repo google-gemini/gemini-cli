@@ -104,14 +104,13 @@ export function getCompatibilityWarnings(options?: {
   }
 
   if (isJetBrainsTerminal() && options?.isAlternateBuffer) {
-    let suggestedTerminals = '';
-    if (os.platform() === 'win32') {
-      suggestedTerminals = ' (e.g., Windows Terminal)';
-    } else if (os.platform() === 'darwin') {
-      suggestedTerminals = ' (e.g., iTerm2 or Ghostty)';
-    } else if (os.platform() === 'linux') {
-      suggestedTerminals = ' (e.g., Ghostty)';
-    }
+    const platformTerminals: Partial<Record<NodeJS.Platform, string>> = {
+      win32: 'Windows Terminal',
+      darwin: 'iTerm2 or Ghostty',
+      linux: 'Ghostty',
+    };
+    const suggestion = platformTerminals[os.platform()];
+    const suggestedTerminals = suggestion ? ` (e.g., ${suggestion})` : '';
 
     warnings.push({
       id: 'jetbrains-terminal',
