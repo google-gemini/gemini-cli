@@ -37,7 +37,7 @@ export enum KeypressPriority {
 // Parse the key itself
 const KEY_INFO_MAP: Record<
   string,
-  { name: string; shift?: boolean; ctrl?: boolean }
+  { name: string; sequence?: string; shift?: boolean; ctrl?: boolean }
 > = {
   '[200~': { name: 'paste-start' },
   '[201~': { name: 'paste-end' },
@@ -120,6 +120,21 @@ const KEY_INFO_MAP: Record<
   '[6^': { name: 'pagedown', ctrl: true },
   '[7^': { name: 'home', ctrl: true },
   '[8^': { name: 'end', ctrl: true },
+  Oj: { name: '*', sequence: '*' },
+  Ok: { name: '+', sequence: '+' },
+  Om: { name: '-', sequence: '-' },
+  Oo: { name: '/', sequence: '/' },
+  Op: { name: '0', sequence: '0' },
+  Oq: { name: '1', sequence: '1' },
+  Or: { name: '2', sequence: '2' },
+  Os: { name: '3', sequence: '3' },
+  Ot: { name: '4', sequence: '4' },
+  Ou: { name: '5', sequence: '5' },
+  Ov: { name: '6', sequence: '6' },
+  Ow: { name: '7', sequence: '7' },
+  Ox: { name: '8', sequence: '8' },
+  Oy: { name: '9', sequence: '9' },
+  On: { name: '.', sequence: '.' },
 };
 
 const kUTF16SurrogateThreshold = 0x10000; // 2 ** 16
@@ -527,6 +542,10 @@ function* emitKeys(
       const keyInfo = KEY_INFO_MAP[code];
       if (keyInfo) {
         name = keyInfo.name;
+        if (keyInfo.sequence) {
+          sequence = keyInfo.sequence;
+          insertable = true;
+        }
         if (keyInfo.shift) {
           shift = true;
         }
