@@ -37,11 +37,16 @@ import {
   partListUnionToString,
   LlmRole,
   ApprovalMode,
+  getVersion,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
 import { getAcpErrorMessage } from './acpErrors.js';
 import { Readable, Writable } from 'node:stream';
+
+function hasMeta(obj: unknown): obj is { _meta?: Record<string, unknown> } {
+  return typeof obj === 'object' && obj !== null && '_meta' in obj;
+}
 import type { Content, Part, FunctionCall } from '@google/genai';
 import type { LoadedSettings } from '../config/settings.js';
 import { SettingScope, loadSettings } from '../config/settings.js';
@@ -83,6 +88,7 @@ export async function runZedIntegration(
 export class GeminiAgent {
   private sessions: Map<string, Session> = new Map();
   private clientCapabilities: acp.ClientCapabilities | undefined;
+  private apiKey: string | undefined;
 
   constructor(
     private config: Config,
@@ -99,25 +105,30 @@ export class GeminiAgent {
       {
         id: AuthType.LOGIN_WITH_GOOGLE,
         name: 'Log in with Google',
-        description: null,
+        description: 'Log in with your Google account',
       },
       {
         id: AuthType.USE_GEMINI,
-        name: 'Use Gemini API key',
-        description:
-          'Requires setting the `GEMINI_API_KEY` environment variable',
+        name: 'Gemini API key',
+        description: 'Use an API key with Gemini Developer API',
       },
       {
         id: AuthType.USE_VERTEX_AI,
         name: 'Vertex AI',
-        description: null,
+        description: 'Use an API key with Vertex AI GenAI API',
       },
     ];
 
     await this.config.initialize();
+    const version = await getVersion();
     return {
       protocolVersion: acp.PROTOCOL_VERSION,
       authMethods,
+      agentInfo: {
+        name: 'gemini-cli',
+        title: 'Gemini CLI',
+        version,
+      },
       agentCapabilities: {
         loadSession: true,
         promptCapabilities: {
@@ -133,7 +144,8 @@ export class GeminiAgent {
     };
   }
 
-  async authenticate({ methodId }: acp.AuthenticateRequest): Promise<void> {
+  async authenticate(req: acp.AuthenticateRequest): Promise<void> {
+    const { methodId } = req;
     const method = z.nativeEnum(AuthType).parse(methodId);
     const selectedAuthType = this.settings.merged.security.auth.selectedType;
 
@@ -141,17 +153,21 @@ export class GeminiAgent {
     if (selectedAuthType && selectedAuthType !== method) {
       await clearCachedCredentialFile();
     }
+    // Check for apiKey in _meta
+    const meta = hasMeta(req) ? req._meta : undefined;
+    const apiKey =
+      typeof meta?.['apiKey'] === 'string' ? meta['apiKey'] : undefined;
 
     // Refresh auth with the requested method
     // This will reuse existing credentials if they're valid,
     // or perform new authentication if needed
     try {
-      await this.config.refreshAuth(method);
+      if (apiKey) {
+        this.apiKey = apiKey;
+      }
+      await this.config.refreshAuth(method, apiKey ?? this.apiKey);
     } catch (e) {
-      throw new acp.RequestError(
-        getErrorStatus(e) || 401,
-        getAcpErrorMessage(e),
-      );
+      throw new acp.RequestError(-32000, getAcpErrorMessage(e));
     }
     this.settings.setValue(
       SettingScope.User,
@@ -179,7 +195,7 @@ export class GeminiAgent {
     let isAuthenticated = false;
     let authErrorMessage = '';
     try {
-      await config.refreshAuth(authType);
+      await config.refreshAuth(authType, this.apiKey);
       isAuthenticated = true;
 
       // Extra validation for Gemini API key
@@ -201,7 +217,7 @@ export class GeminiAgent {
 
     if (!isAuthenticated) {
       throw new acp.RequestError(
-        401,
+        -32000,
         authErrorMessage || 'Authentication required.',
       );
     }
@@ -306,7 +322,7 @@ export class GeminiAgent {
     // This satisfies the security requirement to verify the user before executing
     // potentially unsafe server definitions.
     try {
-      await config.refreshAuth(selectedAuthType);
+      await config.refreshAuth(selectedAuthType, this.apiKey);
     } catch (e) {
       debugLogger.error(`Authentication failed: ${e}`);
       throw acp.RequestError.authRequired();
