@@ -170,7 +170,13 @@ export async function formatGrepResults(
 
   if (names_only) {
     const filePaths = Object.keys(matchesByFile).sort();
-    let llmContent = `Found ${filePaths.length} files with matches for pattern "${pattern}" ${searchLocationDescription}${include ? ` (filter: "${include}")` : ''}${wasTruncated ? ` (results limited to ${totalMaxMatches} matches for performance)` : ''}:\n`;
+    let llmContent = `Found ${filePaths.length} files with matches for pattern "${pattern}" ${searchLocationDescription}${
+      include ? ` (filter: "${include}")` : ''
+    }${
+      wasTruncated
+        ? ` (results limited to ${totalMaxMatches} matches for performance)`
+        : ''
+    }:\n`;
     llmContent += filePaths.join('\n');
     return {
       llmContent: llmContent.trim(),
