@@ -46,36 +46,6 @@ function isBufferEncoding(value: unknown): value is BufferEncoding {
   );
 }
 
-type HttpRequestArgs =
-  | [http.RequestOptions | string | URL]
-  | [http.RequestOptions | string | URL, (res: http.IncomingMessage) => void]
-  | [string | URL, http.RequestOptions]
-  | [string | URL, http.RequestOptions, (res: http.IncomingMessage) => void];
-
-function isHttpRequestArgs(args: unknown[]): args is HttpRequestArgs {
-  if (args.length === 0 || args.length > 3) return false;
-  const first = args[0];
-  if (args.length === 1) {
-    return (
-      typeof first === 'string' ||
-      first instanceof URL ||
-      (typeof first === 'object' && first !== null)
-    );
-  }
-  if (args.length === 2) {
-    const second = args[1];
-    return (
-      (typeof first === 'string' || first instanceof URL) &&
-      (typeof second === 'object' || typeof second === 'function')
-    );
-  }
-  return (
-    (typeof first === 'string' || first instanceof URL) &&
-    typeof args[1] === 'object' &&
-    typeof args[2] === 'function'
-  );
-}
-
 function isRequestOptions(value: unknown): value is http.RequestOptions {
   return (
     typeof value === 'object' &&
@@ -85,13 +55,16 @@ function isRequestOptions(value: unknown): value is http.RequestOptions {
   );
 }
 
+function isIncomingMessageCallback(
+  value: unknown,
+): value is (res: http.IncomingMessage) => void {
+  return typeof value === 'function';
+}
+
 function callHttpRequest(
   originalFn: typeof http.request,
   args: unknown[],
 ): http.ClientRequest {
-  if (isHttpRequestArgs(args)) {
-    return originalFn.apply(http, args);
-  }
   if (args.length === 0) {
     return originalFn({});
   }
@@ -108,15 +81,15 @@ function callHttpRequest(
   if (args.length === 2) {
     const first = args[0];
     const second = args[1];
-    if ((typeof first === 'string' || first instanceof URL) && second) {
-      if (typeof second === 'function') {
+    if (typeof first === 'string' || first instanceof URL) {
+      if (isIncomingMessageCallback(second)) {
         return originalFn(first, second);
       }
       if (isRequestOptions(second)) {
         return originalFn(first, second);
       }
     }
-    if (isRequestOptions(first) && typeof second === 'function') {
+    if (isRequestOptions(first) && isIncomingMessageCallback(second)) {
       return originalFn(first, second);
     }
   }
@@ -127,45 +100,12 @@ function callHttpRequest(
     if (
       (typeof first === 'string' || first instanceof URL) &&
       isRequestOptions(second) &&
-      typeof third === 'function'
+      isIncomingMessageCallback(third)
     ) {
       return originalFn(first, second, third);
     }
   }
   return originalFn({});
-}
-
-type HttpRequestArgs =
-  | [http.RequestOptions | string | URL]
-  | [http.RequestOptions | string | URL, (res: http.IncomingMessage) => void]
-  | [string | URL, http.RequestOptions]
-  | [string | URL, http.RequestOptions, (res: http.IncomingMessage) => void];
-
-function isHttpRequestArgs(args: unknown[]): args is HttpRequestArgs {
-  if (args.length === 0) return false;
-  const first = args[0];
-  if (args.length === 1) {
-    return (
-      typeof first === 'string' ||
-      first instanceof URL ||
-      (typeof first === 'object' && first !== null)
-    );
-  }
-  if (args.length === 2) {
-    const second = args[1];
-    return (
-      (typeof first === 'string' || first instanceof URL) &&
-      (typeof second === 'object' || typeof second === 'function')
-    );
-  }
-  if (args.length === 3) {
-    return (
-      (typeof first === 'string' || first instanceof URL) &&
-      typeof args[1] === 'object' &&
-      typeof args[2] === 'function'
-    );
-  }
-  return false;
 }
 
 export interface NetworkLog {
@@ -575,7 +515,7 @@ export class ActivityLogger extends EventEmitter {
                   ),
           );
         }
-        return oldWrite.call(this, chunk, ...etc);
+        return Function.prototype.apply.call(oldWrite, this, [chunk, ...etc]);
       };
 
       req.end = function (
@@ -606,7 +546,7 @@ export class ActivityLogger extends EventEmitter {
           body,
           pending: true,
         });
-        return oldEnd.call(this, chunk, ...etc);
+        return Function.prototype.apply.call(oldEnd, this, [chunk, ...etc]);
       };
 
       req.on('response', (res: http.IncomingMessage) => {
