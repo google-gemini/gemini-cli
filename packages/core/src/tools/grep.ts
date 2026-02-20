@@ -14,6 +14,8 @@ import type { ToolInvocation, ToolResult } from './tools.js';
 import { execStreaming } from '../utils/shell-utils.js';
 import {
   DEFAULT_TOTAL_MAX_MATCHES,
+  MAX_TOTAL_MAX_MATCHES,
+  MAX_LINE_LENGTH,
   DEFAULT_SEARCH_TIMEOUT_MS,
 } from './constants.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
@@ -209,8 +211,10 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       // Collect matches from all search directories
       let allMatches: GrepMatch[] = [];
-      const totalMaxMatches =
-        this.params.total_max_matches ?? DEFAULT_TOTAL_MAX_MATCHES;
+      const totalMaxMatches = Math.min(
+        this.params.total_max_matches ?? DEFAULT_TOTAL_MAX_MATCHES,
+        MAX_TOTAL_MAX_MATCHES,
+      );
 
       // Create a timeout controller to prevent indefinitely hanging searches
       const timeoutController = new AbortController();
@@ -314,7 +318,11 @@ class GrepToolInvocation extends BaseToolInvocation<
 `;
         matchesByFile[filePath].forEach((match) => {
           const trimmedLine = match.line.trim();
-          llmContent += `L${match.lineNumber}: ${trimmedLine}\n`;
+          const displayLine =
+            trimmedLine.length > MAX_LINE_LENGTH
+              ? trimmedLine.substring(0, MAX_LINE_LENGTH) + '... (truncated)'
+              : trimmedLine;
+          llmContent += `L${match.lineNumber}: ${displayLine}\n`;
         });
         llmContent += '---\n';
       }

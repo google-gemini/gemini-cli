@@ -22,7 +22,6 @@ import {
   ToolConfirmationOutcome,
   MessageBusType,
   promptIdContext,
-  tokenLimit,
   debugLogger,
   runInDevTraceSpan,
   EDIT_TOOL_NAMES,
@@ -1023,24 +1022,18 @@ export const useGeminiStream = (
     (estimatedRequestTokenCount: number, remainingTokenCount: number) => {
       onCancelSubmit(true);
 
-      const limit = tokenLimit(config.getModel());
-
-      const isLessThan75Percent =
-        limit > 0 && remainingTokenCount < limit * 0.75;
-
-      let text = `Sending this message (${estimatedRequestTokenCount} tokens) might exceed the remaining context window limit (${remainingTokenCount} tokens).`;
-
-      if (isLessThan75Percent) {
-        text +=
-          ' Please try reducing the size of your message or use the `/compress` command to compress the chat history.';
-      }
+      let text = `The next message cannot be sent — it requires ${estimatedRequestTokenCount.toLocaleString()} tokens, but only ${remainingTokenCount.toLocaleString()} tokens remain in the context window.`;
+      text +=
+        ' This can happen when large tool outputs (like broad searches) fill up the context.';
+      text +=
+        ' Try using the `/compress` command to compress the chat history, or start a new session.';
 
       addItem({
         type: 'info',
         text,
       });
     },
-    [addItem, onCancelSubmit, config],
+    [addItem, onCancelSubmit],
   );
 
   const handleChatModelEvent = useCallback(

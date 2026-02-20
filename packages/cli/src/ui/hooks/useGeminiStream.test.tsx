@@ -34,7 +34,6 @@ import {
   ToolErrorType,
   ToolConfirmationOutcome,
   MessageBusType,
-  tokenLimit,
   debugLogger,
   coreEvents,
   CoreEvent,
@@ -109,7 +108,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     UserPromptEvent: MockedUserPromptEvent,
     ValidationRequiredError: MockValidationRequiredError,
     parseAndFormatApiError: mockParseAndFormatApiError,
-    tokenLimit: vi.fn().mockReturnValue(100), // Mock tokenLimit
     recordToolCallInteractions: vi.fn().mockResolvedValue(undefined),
     getCodeAssistServer: vi.fn().mockReturnValue(undefined),
   };
@@ -2137,24 +2135,20 @@ describe('useGeminiStream', () => {
     });
 
     describe('ContextWindowWillOverflow event', () => {
-      beforeEach(() => {
-        vi.mocked(tokenLimit).mockReturnValue(100);
-      });
-
       it.each([
         {
-          name: 'without suggestion when remaining tokens are > 75% of limit',
+          name: 'with actionable guidance',
           requestTokens: 20,
           remainingTokens: 80,
           expectedMessage:
-            'Sending this message (20 tokens) might exceed the remaining context window limit (80 tokens).',
+            'The next message cannot be sent — it requires 20 tokens, but only 80 tokens remain in the context window. This can happen when large tool outputs (like broad searches) fill up the context. Try using the `/compress` command to compress the chat history, or start a new session.',
         },
         {
-          name: 'with suggestion when remaining tokens are < 75% of limit',
+          name: 'with formatted token counts',
           requestTokens: 30,
           remainingTokens: 70,
           expectedMessage:
-            'Sending this message (30 tokens) might exceed the remaining context window limit (70 tokens). Please try reducing the size of your message or use the `/compress` command to compress the chat history.',
+            'The next message cannot be sent — it requires 30 tokens, but only 70 tokens remain in the context window. This can happen when large tool outputs (like broad searches) fill up the context. Try using the `/compress` command to compress the chat history, or start a new session.',
         },
       ])(
         'should add message $name',

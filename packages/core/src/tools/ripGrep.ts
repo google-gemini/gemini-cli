@@ -27,6 +27,8 @@ import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { execStreaming } from '../utils/shell-utils.js';
 import {
   DEFAULT_TOTAL_MAX_MATCHES,
+  MAX_TOTAL_MAX_MATCHES,
+  MAX_LINE_LENGTH,
   DEFAULT_SEARCH_TIMEOUT_MS,
 } from './constants.js';
 import { RIP_GREP_DEFINITION } from './definitions/coreTools.js';
@@ -230,8 +232,10 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       const searchDirDisplay = pathParam;
 
-      const totalMaxMatches =
-        this.params.total_max_matches ?? DEFAULT_TOTAL_MAX_MATCHES;
+      const totalMaxMatches = Math.min(
+        this.params.total_max_matches ?? DEFAULT_TOTAL_MAX_MATCHES,
+        MAX_TOTAL_MAX_MATCHES,
+      );
       if (this.config.getDebugMode()) {
         debugLogger.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
       }
@@ -328,7 +332,11 @@ class GrepToolInvocation extends BaseToolInvocation<
         llmContent += `File: ${filePath}\n`;
         matchesByFile[filePath].forEach((match) => {
           const separator = match.isContext ? '-' : ':';
-          llmContent += `L${match.lineNumber}${separator} ${match.line}\n`;
+          const displayLine =
+            match.line.length > MAX_LINE_LENGTH
+              ? match.line.substring(0, MAX_LINE_LENGTH) + '... (truncated)'
+              : match.line;
+          llmContent += `L${match.lineNumber}${separator} ${displayLine}\n`;
         });
         llmContent += '---\n';
       }
