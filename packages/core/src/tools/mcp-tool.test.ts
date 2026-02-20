@@ -788,7 +788,8 @@ describe('DiscoveredMCPTool', () => {
     });
 
     it('should return confirmation details if not trusted and not allowlisted', async () => {
-      const invocation = tool.build({ param: 'mock' });
+      const params = { param: 'mock' };
+      const invocation = tool.build(params);
       const confirmation = await invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
@@ -798,6 +799,7 @@ describe('DiscoveredMCPTool', () => {
         expect(confirmation.type).toBe('mcp');
         expect(confirmation.serverName).toBe(serverName);
         expect(confirmation.toolName).toBe(serverToolName);
+        expect(confirmation.args).toEqual(params);
       } else if (confirmation) {
         // Handle other possible confirmation types if necessary, or strengthen test if only MCP is expected
         throw new Error(
@@ -807,6 +809,29 @@ describe('DiscoveredMCPTool', () => {
         throw new Error(
           'Confirmation details not in expected format or was false',
         );
+      }
+    });
+
+    it('should set args to undefined when params is empty', async () => {
+      const bus = createMockMessageBus();
+      getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
+      // Use a schema with no required fields so an empty params object is valid.
+      const noRequiredSchema = { type: 'object', properties: {} };
+      const emptyParamTool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        noRequiredSchema,
+        bus,
+      );
+      const invocation = emptyParamTool.build({});
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+      if (confirmation && confirmation.type === 'mcp') {
+        expect(confirmation.args).toBeUndefined();
       }
     });
 

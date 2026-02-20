@@ -148,6 +148,7 @@ describe('ToolConfirmationMessage', () => {
       serverName: 'test-server',
       toolName: 'test-tool',
       toolDisplayName: 'Test Tool',
+      args: { query: 'hello world', limit: 10 },
     };
 
     describe.each([

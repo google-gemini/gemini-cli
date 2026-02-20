@@ -757,6 +757,8 @@ export interface ToolMcpConfirmationDetails {
   serverName: string;
   toolName: string;
   toolDisplayName: string;
+  /** The arguments the model passed to the tool, shown in the approval dialog. */
+  args?: Record<string, unknown>;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
 }
 
