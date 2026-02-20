@@ -7,8 +7,8 @@
 import express from 'express';
 
 import type { AgentCard, Message } from '@a2a-js/sdk';
-import type {
-  TaskStore,
+import {
+  type TaskStore,
   DefaultRequestHandler,
   InMemoryTaskStore,
   DefaultExecutionEventBus,

@@ -7,8 +7,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import type {
-  MCPServerConfig,
+import {
+  type MCPServerConfig,
   debugLogger,
   GEMINI_DIR,
   getErrorMessage,
