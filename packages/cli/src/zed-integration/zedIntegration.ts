@@ -118,17 +118,6 @@ export class GeminiAgent {
       },
     ];
 
-     
-    const meta = hasMeta(args) ? args._meta : undefined;
-    const apiKey =
-      typeof meta?.['apiKey'] === 'string' ? meta['apiKey'] : undefined;
-
-    if (apiKey) {
-      // If we have an API key from the client, we can try to use it to refresh auth
-      // This is useful if the client wants to provide the key during initialization
-      await this.config.refreshAuth(AuthType.USE_GEMINI, apiKey);
-    }
-
     await this.config.initialize();
     const version = await getVersion();
     return {
@@ -165,6 +154,8 @@ export class GeminiAgent {
     }
     // Check for apiKey in _meta
     const meta = hasMeta(req) ? req._meta : undefined;
+    const apiKey =
+      typeof meta?.['apiKey'] === 'string' ? meta['apiKey'] : undefined;
     const apiKey =
       typeof meta?.['apiKey'] === 'string' ? meta['apiKey'] : undefined;
 
