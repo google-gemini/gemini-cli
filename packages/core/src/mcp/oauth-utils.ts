@@ -342,6 +342,20 @@ export class OAuthUtils {
       return null;
     }
 
+    // Verify the resource_metadata URI has the same origin as the MCP server
+    // to prevent SSRF via attacker-controlled WWW-Authenticate headers.
+    if (mcpServerUrl) {
+      try {
+        const metadataOrigin = new URL(resourceMetadataUri).origin;
+        const serverOrigin = new URL(mcpServerUrl).origin;
+        if (metadataOrigin !== serverOrigin) {
+          return null;
+        }
+      } catch {
+        return null;
+      }
+    }
+
     const resourceMetadata =
       await this.fetchProtectedResourceMetadata(resourceMetadataUri);
 

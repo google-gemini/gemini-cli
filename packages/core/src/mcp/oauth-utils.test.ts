@@ -440,4 +440,71 @@ describe('OAuthUtils', () => {
       expect(result).toBeUndefined();
     });
   });
+
+  describe('discoverOAuthFromWWWAuthenticate', () => {
+    it('should reject resource_metadata URI with a different origin than the server', async () => {
+      const wwwAuthenticate =
+        'Bearer resource_metadata="https://evil.com/.well-known/oauth-protected-resource"';
+      const result = await OAuthUtils.discoverOAuthFromWWWAuthenticate(
+        wwwAuthenticate,
+        'https://legitimate-server.com/mcp',
+      );
+      expect(result).toBeNull();
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should allow resource_metadata URI with the same origin as the server', async () => {
+      const wwwAuthenticate =
+        'Bearer resource_metadata="https://server.com/.well-known/oauth-protected-resource"';
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          resource: 'https://server.com/mcp',
+          authorization_servers: ['https://auth.server.com'],
+        }),
+      });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          issuer: 'https://auth.server.com',
+          authorization_endpoint: 'https://auth.server.com/authorize',
+          token_endpoint: 'https://auth.server.com/token',
+        }),
+      });
+
+      const result = await OAuthUtils.discoverOAuthFromWWWAuthenticate(
+        wwwAuthenticate,
+        'https://server.com/mcp',
+      );
+      expect(result).not.toBeNull();
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    it('should skip origin check when no server URL is provided', async () => {
+      const wwwAuthenticate =
+        'Bearer resource_metadata="https://any-server.com/.well-known/oauth-protected-resource"';
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          resource: 'https://any-server.com',
+          authorization_servers: ['https://auth.example.com'],
+        }),
+      });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          issuer: 'https://auth.example.com',
+          authorization_endpoint: 'https://auth.example.com/authorize',
+          token_endpoint: 'https://auth.example.com/token',
+        }),
+      });
+
+      const result =
+        await OAuthUtils.discoverOAuthFromWWWAuthenticate(wwwAuthenticate);
+      expect(result).not.toBeNull();
+      expect(mockFetch).toHaveBeenCalled();
+    });
+  });
 });
