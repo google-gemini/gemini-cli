@@ -11,8 +11,8 @@ import { CommandKind } from './types.js';
 
 /** Returns true for internal system/steering messages that should not be shown to the user. */
 const isSystemMessage = (text: string): boolean =>
-  text.includes('<session_context>') ||
-  (text.includes('<user_input>') && text.includes('Internal instruction:'));
+  text.startsWith('<session_context>') ||
+  (text.startsWith('<user_input>') && text.includes('Internal instruction:'));
 
 /** Extracts the visible text from a history item, excluding thought/reasoning parts. */
 const visibleText = (item: Content): string =>
