@@ -47,7 +47,7 @@ export async function main(argv = process.argv.slice(2)) {
     path.dirname(fileURLToPath(import.meta.url)),
     '..',
   );
-  const docPath = path.join(repoRoot, 'docs/get-started/configuration.md');
+  const docPath = path.join(repoRoot, 'docs/reference/configuration.md');
   const cliSettingsDocPath = path.join(repoRoot, 'docs/cli/settings.md');
 
   const { getSettingsSchema } = await loadSettingsSchemaModule();
