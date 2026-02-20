@@ -256,11 +256,12 @@ export class HookRunner {
     startTime: number,
   ): Promise<HookExecutionResult> {
     const timeout = hookConfig.timeout ?? DEFAULT_HOOK_TIMEOUT;
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
     try {
       // Create a promise that rejects after timeout
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(
+        timeoutHandle = setTimeout(
           () => reject(new Error(`Hook timed out after ${timeout}ms`)),
           timeout,
         );
@@ -290,6 +291,10 @@ export class HookRunner {
         error: error instanceof Error ? error : new Error(String(error)),
         duration: Date.now() - startTime,
       };
+    } finally {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
     }
   }
 
