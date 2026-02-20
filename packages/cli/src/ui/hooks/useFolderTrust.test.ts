@@ -36,6 +36,9 @@ vi.mock('@google/gemini-cli-core', async () => {
   return {
     ...actual,
     isHeadlessMode: vi.fn().mockReturnValue(false),
+    FolderTrustDiscoveryService: {
+      discover: vi.fn(() => new Promise(() => {})),
+    },
   };
 });
 

@@ -35,7 +35,7 @@ export async function getExperiments(
         const expPath = process.env['GEMINI_EXP'];
         debugLogger.debug('Reading experiments from', expPath);
         const content = await fs.promises.readFile(expPath, 'utf8');
-        const response = JSON.parse(content);
+        const response: ListExperimentsResponse = JSON.parse(content);
         if (
           (response.flags && !Array.isArray(response.flags)) ||
           (response.experimentIds && !Array.isArray(response.experimentIds))
@@ -44,8 +44,7 @@ export async function getExperiments(
             'Invalid format for experiments file: `flags` and `experimentIds` must be arrays if present.',
           );
         }
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        return parseExperiments(response as ListExperimentsResponse);
+        return parseExperiments(response);
       } catch (e) {
         debugLogger.debug('Failed to read experiments from GEMINI_EXP', e);
       }

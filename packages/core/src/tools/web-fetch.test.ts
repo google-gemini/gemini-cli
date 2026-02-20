@@ -183,6 +183,26 @@ describe('WebFetchTool', () => {
   });
 
   describe('execute', () => {
+    it('should return WEB_FETCH_PROCESSING_ERROR on rate limit exceeded', async () => {
+      vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(false);
+      mockGenerateContent.mockResolvedValue({
+        candidates: [{ content: { parts: [{ text: 'response' }] } }],
+      });
+      const tool = new WebFetchTool(mockConfig, bus);
+      const params = { prompt: 'fetch https://ratelimit.example.com' };
+      const invocation = tool.build(params);
+
+      // Execute 10 times to hit the limit
+      for (let i = 0; i < 10; i++) {
+        await invocation.execute(new AbortController().signal);
+      }
+
+      // The 11th time should fail due to rate limit
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.error?.type).toBe(ToolErrorType.WEB_FETCH_PROCESSING_ERROR);
+      expect(result.error?.message).toContain('Rate limit exceeded for host');
+    });
+
     it('should return WEB_FETCH_FALLBACK_FAILED on fallback fetch failure', async () => {
       vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(true);
       vi.spyOn(fetchUtils, 'fetchWithTimeout').mockRejectedValue(

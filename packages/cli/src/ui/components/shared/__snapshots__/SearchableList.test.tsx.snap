@@ -1,0 +1,67 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SearchableList > should match snapshot 1`] = `
+" Test List
+
+ ╭────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │ Search...                                                                                      │
+ ╰────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+  ● Item One
+    Description for item one
+
+    Item Two
+    Description for item two
+
+    Item Three
+    Description for item three
+"
+`;
+
+exports[`SearchableList > should reset selection to top when items change if resetSelectionOnItemsChange is true 1`] = `
+" Test List
+
+ ╭────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │ Search...                                                                                      │
+ ╰────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+    Item One
+    Description for item one
+
+  ● Item Two
+    Description for item two
+
+    Item Three
+    Description for item three
+"
+`;
+
+exports[`SearchableList > should reset selection to top when items change if resetSelectionOnItemsChange is true 2`] = `
+" Test List
+
+ ╭────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │ One                                                                                            │
+ ╰────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+  ● Item One
+    Description for item one
+"
+`;
+
+exports[`SearchableList > should reset selection to top when items change if resetSelectionOnItemsChange is true 3`] = `
+" Test List
+
+ ╭────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │ Search...                                                                                      │
+ ╰────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+  ● Item One
+    Description for item one
+
+    Item Two
+    Description for item two
+
+    Item Three
+    Description for item three
+"
+`;
