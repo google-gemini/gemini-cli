@@ -7,6 +7,10 @@ description: Guide developers through the process of adding new remote experimen
 
 This skill assists developers in adding net-new remote experiments (feature flags) to the Gemini CLI codebase. It acts as an interactive guide to ensure all necessary scaffolding, telemetry, command-line overrides, settings, and code placement are considered.
 
+## Key Files
+- `packages/core/src/code_assist/experiments/flagNames.ts`: Definitions and metadata for all experiment flags.
+- `packages/core/src/config/config.ts`: Unified configuration object where strongly typed wrappers for experiments are added.
+
 ## Core Pattern: Unified Configuration
 
 Gemini CLI uses a unified `Config` object as the source of truth. Every experiment should be accessed via the `config.getExperimentValue(flagId)` method, which internally handles the priority of overrides:
@@ -15,6 +19,11 @@ Gemini CLI uses a unified `Config` object as the source of truth. Every experime
 ## Workflow: Adding a New Experiment
 
 When a user asks to add a new experiment, follow these steps sequentially:
+
+### 0. Research and Discovery
+- **Locate Existing Flags:** Read `packages/core/src/code_assist/experiments/flagNames.ts` to see current IDs and naming conventions.
+- **Check for Duplicates:** Ensure the proposed experiment doesn't already exist or overlap with another flag.
+- **Analyze Usage:** Search for `getExperimentValue` in `packages/core/src/config/config.ts` to see how similar experiments are wrapped and used.
 
 ### 1. Scaffolding the Config Entry
 - **File:** `packages/core/src/code_assist/experiments/flagNames.ts`
