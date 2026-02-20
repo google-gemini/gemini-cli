@@ -48,9 +48,6 @@ function clearFlattenedSchema() {
   _FLATTENED_SCHEMA = undefined;
 }
 
-/**
- * Get all settings grouped by category
- */
 export function getSettingsByCategory(): Record<
   string,
   Array<SettingDefinition & { key: string }>
@@ -71,25 +68,16 @@ export function getSettingsByCategory(): Record<
   return categories;
 }
 
-/**
- * Get a setting definition by key
- */
 export function getSettingDefinition(
   key: string,
 ): (SettingDefinition & { key: string }) | undefined {
   return getFlattenedSchema()[key];
 }
 
-/**
- * Check if a setting requires restart
- */
 export function requiresRestart(key: string): boolean {
   return getFlattenedSchema()[key]?.requiresRestart ?? false;
 }
 
-/**
- * Get the default value for a setting
- */
 export function getDefaultValue(key: string): SettingsValue {
   return getFlattenedSchema()[key]?.default;
 }
@@ -116,9 +104,6 @@ export function getEffectiveDefaultValue(
   return getDefaultValue(key);
 }
 
-/**
- * Get all setting keys that require restart
- */
 export function getRestartRequiredSettings(): string[] {
   return Object.values(getFlattenedSchema())
     .filter((definition) => definition.requiresRestart)
@@ -139,36 +124,42 @@ export function getDialogRestartRequiredSettings(): string[] {
     .map((definition) => definition.key);
 }
 
-/**
- * Recursively gets a value from a nested object using a key path array.
- */
-export function getNestedValue(
-  obj: Record<string, unknown>,
-  path: string[],
-): unknown {
-  const [first, ...rest] = path;
-  if (!first || !(first in obj)) {
-    return undefined;
-  }
-  const value = obj[first];
-  if (rest.length === 0) {
-    return value;
-  }
-  if (value && typeof value === 'object' && value !== null) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return getNestedValue(value as Record<string, unknown>, rest);
-  }
-  return undefined;
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isSettingsValue(value: unknown): value is SettingsValue {
+  if (value === undefined) return true;
+  if (value === null) return false;
+  const type = typeof value;
+  return (
+    type === 'string' ||
+    type === 'number' ||
+    type === 'boolean' ||
+    type === 'object'
+  );
 }
 
 /**
- * Get the effective value for a setting, considering inheritance from higher scopes
- * Always returns a value (never undefined) - falls back to default if not set anywhere
+ * Gets a value from a nested object using a key path array iteratively.
+ */
+export function getNestedValue(obj: unknown, path: string[]): unknown {
+  let current = obj;
+  for (const key of path) {
+    if (!isRecord(current) || !(key in current)) {
+      return undefined;
+    }
+    current = current[key];
+  }
+  return current;
+}
+
+/**
+ * Get the effective value for a setting falling back to the default value
  */
 export function getEffectiveValue(
   key: string,
   settings: Settings,
-  mergedSettings: Settings,
 ): SettingsValue {
   const definition = getSettingDefinition(key);
   if (!definition) {
@@ -178,33 +169,19 @@ export function getEffectiveValue(
   const path = key.split('.');
 
   // Check the current scope's settings first
-  let value = getNestedValue(settings as Record<string, unknown>, path);
-  if (value !== undefined) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return value as SettingsValue;
-  }
-
-  // Check the merged settings for an inherited value
-  value = getNestedValue(mergedSettings as Record<string, unknown>, path);
-  if (value !== undefined) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return value as SettingsValue;
+  const value = getNestedValue(settings, path);
+  if (value !== undefined && isSettingsValue(value)) {
+    return value;
   }
 
   // Return default value if no value is set anywhere
   return definition.default;
 }
 
-/**
- * Get all setting keys from the schema
- */
 export function getAllSettingKeys(): string[] {
   return Object.keys(getFlattenedSchema());
 }
 
-/**
- * Get settings by type
- */
 export function getSettingsByType(
   type: SettingsType,
 ): Array<SettingDefinition & { key: string }> {
@@ -213,9 +190,6 @@ export function getSettingsByType(
   );
 }
 
-/**
- * Get settings that require restart
- */
 export function getSettingsRequiringRestart(): Array<
   SettingDefinition & {
     key: string;
@@ -233,22 +207,22 @@ export function isValidSettingKey(key: string): boolean {
   return key in getFlattenedSchema();
 }
 
-/**
- * Get the category for a setting
- */
 export function getSettingCategory(key: string): string | undefined {
   return getFlattenedSchema()[key]?.category;
 }
 
-/**
- * Check if a setting should be shown in the settings dialog
- */
 export function shouldShowInDialog(key: string): boolean {
   return getFlattenedSchema()[key]?.showInDialog ?? true; // Default to true for backward compatibility
 }
 
+export function getDialogSettingKeys(): string[] {
+  return Object.values(getFlattenedSchema())
+    .filter((definition) => definition.showInDialog !== false)
+    .map((definition) => definition.key);
+}
+
 /**
- * Get all settings that should be shown in the dialog, grouped by category
+ * Get all settings that should be shown in the dialog, grouped by category like "Advanced", "General", etc.
  */
 export function getDialogSettingsByCategory(): Record<
   string,
@@ -272,9 +246,6 @@ export function getDialogSettingsByCategory(): Record<
   return categories;
 }
 
-/**
- * Get settings by type that should be shown in the dialog
- */
 export function getDialogSettingsByType(
   type: SettingsType,
 ): Array<SettingDefinition & { key: string }> {
@@ -284,69 +255,14 @@ export function getDialogSettingsByType(
   );
 }
 
-/**
- * Get all setting keys that should be shown in the dialog
- */
-export function getDialogSettingKeys(): string[] {
-  return Object.values(getFlattenedSchema())
-    .filter((definition) => definition.showInDialog !== false)
-    .map((definition) => definition.key);
-}
-
-// ============================================================================
-// BUSINESS LOGIC UTILITIES (Higher-level utilities for setting operations)
-// ============================================================================
-
-/**
- * Get the current value for a setting in a specific scope
- * Always returns a value (never undefined) - falls back to default if not set anywhere
- */
-export function getSettingValue(
-  key: string,
-  settings: Settings,
-  mergedSettings: Settings,
-): boolean {
-  const definition = getSettingDefinition(key);
-  if (!definition) {
-    return false; // Default fallback for invalid settings
-  }
-
-  const value = getEffectiveValue(key, settings, mergedSettings);
-  // Ensure we return a boolean value, converting from the more general type
-  if (typeof value === 'boolean') {
-    return value;
-  }
-
-  return false; // Final fallback
-}
-
-/**
- * Check if a setting value is modified from its default
- */
-export function isSettingModified(key: string, value: boolean): boolean {
-  const defaultValue = getDefaultValue(key);
-  // Handle type comparison properly
-  if (typeof defaultValue === 'boolean') {
-    return value !== defaultValue;
-  }
-  // If default is not a boolean, consider it modified if value is true
-  return value === true;
-}
-
-/**
- * Check if a setting exists in the original settings file for a scope
- */
-export function settingExistsInScope(
-  key: string,
-  scopeSettings: Settings,
-): boolean {
+export function isInScope(key: string, scopeSettings: Settings): boolean {
   const path = key.split('.');
-  const value = getNestedValue(scopeSettings as Record<string, unknown>, path);
+  const value = getNestedValue(scopeSettings, path);
   return value !== undefined;
 }
 
 /**
- * Get the display value for a setting, showing current scope value with default change indicator
+ * Appends a star (*) to settings that exist in the scope
  */
 export function getDisplayValue(
   key: string,
@@ -354,14 +270,12 @@ export function getDisplayValue(
   _mergedSettings: Settings,
 ): string {
   const definition = getSettingDefinition(key);
-  const existsInScope = settingExistsInScope(key, scopeSettings);
+  const existsInScope = isInScope(key, scopeSettings);
 
   let value: SettingsValue;
   if (existsInScope) {
-    // Show the value defined at the current scope if present
-    value = getEffectiveValue(key, scopeSettings, {});
+    value = getEffectiveValue(key, scopeSettings);
   } else {
-    // Fall back to the schema default when unset in this scope
     value = getDefaultValue(key);
   }
 
@@ -377,36 +291,6 @@ export function getDisplayValue(
   }
 
   return valueString;
-}
-
-/**
- * Check if a setting doesn't exist in current scope (should be greyed out)
- */
-export function isDefaultValue(key: string, settings: Settings): boolean {
-  return !settingExistsInScope(key, settings);
-}
-
-/**
- * Check if a setting value is inherited (not set at current scope)
- */
-export function isValueInherited(
-  key: string,
-  settings: Settings,
-  _mergedSettings: Settings,
-): boolean {
-  return !settingExistsInScope(key, settings);
-}
-
-/**
- * Get the effective value for display, considering inheritance
- * Always returns a boolean value (never undefined)
- */
-export function getEffectiveDisplayValue(
-  key: string,
-  settings: Settings,
-  mergedSettings: Settings,
-): boolean {
-  return getSettingValue(key, settings, mergedSettings);
 }
 
 export const TEST_ONLY = { clearFlattenedSchema };

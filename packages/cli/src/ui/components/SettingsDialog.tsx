@@ -16,11 +16,11 @@ import {
   getDialogSettingKeys,
   getDisplayValue,
   getSettingDefinition,
-  isDefaultValue,
   getDialogRestartRequiredSettings,
   getEffectiveDefaultValue,
   getEffectiveValue,
-  settingExistsInScope,
+  isInScope,
+  isRecord,
 } from '../../utils/settingsUtils.js';
 import {
   useSettingsStore,
@@ -49,8 +49,6 @@ interface SettingsDialogProps {
 
 const MAX_ITEMS_TO_SHOW = 8;
 
-type ParseEditResult = { valid: true; value: SettingsValue } | { valid: false };
-
 function getEditValue(
   type: SettingsType,
   rawValue: SettingsValue,
@@ -70,80 +68,86 @@ function getEditValue(
   return undefined;
 }
 
-function parseStringArrayValue(input: string): string[] {
-  const trimmed = input.trim();
-  if (trimmed === '') {
-    return [];
-  }
-
+function tryParseJsonStringArray(input: string): string[] | null {
   try {
-    const parsed = JSON.parse(trimmed);
+    const parsed = JSON.parse(input);
     if (
       Array.isArray(parsed) &&
-      parsed.every((item) => typeof item === 'string')
+      parsed.every((item): item is string => typeof item === 'string')
     ) {
       return parsed;
     }
+    return null;
   } catch {
-    // Fall through to comma-delimited parsing.
+    return null;
+  }
+}
+
+function tryParseJsonObject(input: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(input);
+    if (isRecord(parsed) && !Array.isArray(parsed)) {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function parseStringArrayValue(input: string): string[] {
+  const trimmed = input.trim();
+  if (trimmed === '') return [];
+
+  return (
+    tryParseJsonStringArray(trimmed) ??
+    input
+      .split(',')
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0)
+  );
+}
+
+function parseObjectValue(input: string): Record<string, unknown> | null {
+  const trimmed = input.trim();
+  if (trimmed === '') {
+    return null;
   }
 
-  return input
-    .split(',')
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0);
+  return tryParseJsonObject(trimmed);
 }
 
 function parseEditedValue(
   type: SettingsType,
   newValue: string,
-): ParseEditResult {
+): SettingsValue | null {
   if (type === 'number') {
     if (newValue.trim() === '') {
-      return { valid: false };
+      return null;
     }
 
     const numParsed = Number(newValue.trim());
     if (Number.isNaN(numParsed)) {
-      return { valid: false };
+      return null;
     }
 
-    return { valid: true, value: numParsed };
+    return numParsed;
   }
 
   if (type === 'array') {
-    return { valid: true, value: parseStringArrayValue(newValue) };
+    return parseStringArrayValue(newValue);
   }
 
   if (type === 'object') {
-    const trimmed = newValue.trim();
-    if (trimmed === '') {
-      return { valid: false };
-    }
-
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (
-        parsed !== null &&
-        typeof parsed === 'object' &&
-        !Array.isArray(parsed)
-      ) {
-        return { valid: true, value: parsed };
-      }
-    } catch {
-      // Invalid JSON object input.
-    }
-
-    return { valid: false };
+    return parseObjectValue(newValue);
   }
 
-  return { valid: true, value: newValue };
+  return newValue;
 }
 
 function capturePerScopeRestartSnapshot(
   settings: SettingsState,
 ): Map<string, Map<string, string>> {
-  // Map<key, Map<scopeName, json>>
   const snapshot = new Map<string, Map<string, string>>();
   const scopes: Array<[string, Settings]> = [
     ['User', settings.user.settings],
@@ -155,8 +159,8 @@ function capturePerScopeRestartSnapshot(
     const scopeMap = new Map<string, string>();
     for (const [scopeName, scopeSettings] of scopes) {
       // Raw per-scope value (undefined if not in file)
-      const value = settingExistsInScope(key, scopeSettings)
-        ? getEffectiveValue(key, scopeSettings, {})
+      const value = isInScope(key, scopeSettings)
+        ? getEffectiveValue(key, scopeSettings)
         : undefined;
       scopeMap.set(scopeName, JSON.stringify(value));
     }
@@ -174,10 +178,7 @@ export function SettingsDialog({
   // Reactive settings from store (re-renders on any settings change)
   const { settings, setSetting } = useSettingsStore();
 
-  // Get vim mode context to sync vim mode changes
   const { vimEnabled, toggleVimEnabled } = useVimMode();
-
-  // Scope selector state (User by default)
   const [selectedScope, setSelectedScope] = useState<LoadableSettingScope>(
     SettingScope.User,
   );
@@ -197,8 +198,8 @@ export function SettingsDialog({
 
     for (const [key, initialScopeMap] of initialRestartValues) {
       for (const [scopeName, scopeSettings] of scopes) {
-        const currentValue = settingExistsInScope(key, scopeSettings)
-          ? getEffectiveValue(key, scopeSettings, {})
+        const currentValue = !isInScope(key, scopeSettings)
+          ? getEffectiveValue(key, scopeSettings)
           : undefined;
         const initialJson = initialScopeMap.get(scopeName);
         if (JSON.stringify(currentValue) !== initialJson) {
@@ -210,7 +211,6 @@ export function SettingsDialog({
     return changed;
   }, [settings, initialRestartValues]);
 
-  // Derived: whether to show restart prompt
   const showRestartPrompt = restartChangedKeys.size > 0;
 
   // Generate items for SearchableList
@@ -234,11 +234,12 @@ export function SettingsDialog({
         settings,
       );
 
-      // Check if the value is at default (grey it out)
-      const isGreyedOut = isDefaultValue(key, scopeSettings);
+      // Grey out values that defer to defaults
+      const isGreyedOut = !isInScope(key, scopeSettings);
 
-      // Get raw value for edit mode initialization
-      const rawValue = getEffectiveValue(key, scopeSettings, mergedSettings);
+      // Some settings can be edited by an inline editor
+      const rawValue = getEffectiveValue(key, scopeSettings);
+      // The inline editor needs a string but non primitive settings like Arrays and Objects exist
       const editValue = getEditValue(type, rawValue);
 
       return {
@@ -259,7 +260,6 @@ export function SettingsDialog({
     items,
   });
 
-  // Scope selection handler
   const handleScopeChange = useCallback((scope: LoadableSettingScope) => {
     setSelectedScope(scope);
   }, []);
@@ -273,11 +273,7 @@ export function SettingsDialog({
       }
 
       const scopeSettings = settings.forScope(selectedScope).settings;
-      const currentValue = getEffectiveValue(
-        key,
-        scopeSettings,
-        settings.merged,
-      );
+      const currentValue = getEffectiveValue(key, scopeSettings);
       let newValue: SettingsValue;
 
       if (definition?.type === 'boolean') {
@@ -318,18 +314,18 @@ export function SettingsDialog({
     [settings, selectedScope, setSetting, vimEnabled, toggleVimEnabled],
   );
 
-  // Edit commit handler
+  // For inline editor
   const handleEditCommit = useCallback(
     (key: string, newValue: string, _item: SettingsDialogItem) => {
       const definition = getSettingDefinition(key);
       const type: SettingsType = definition?.type ?? 'string';
       const parsed = parseEditedValue(type, newValue);
 
-      if (!parsed.valid) {
+      if (!parsed) {
         return;
       }
 
-      setSetting(selectedScope, key, parsed.value);
+      setSetting(selectedScope, key, parsed);
     },
     [selectedScope, setSetting],
   );
@@ -358,7 +354,6 @@ export function SettingsDialog({
     [config, selectedScope, setSetting, vimEnabled, toggleVimEnabled],
   );
 
-  // Close handler
   const handleClose = useCallback(() => {
     onSelect(undefined, selectedScope as SettingScope);
   }, [onSelect, selectedScope]);
@@ -458,7 +453,6 @@ export function SettingsDialog({
       showRestartPrompt,
     ]);
 
-  // Footer content for restart prompt
   const footerContent = showRestartPrompt ? (
     <Text color={theme.status.warning}>
       To see changes, Gemini CLI must be restarted. Press r to exit and apply

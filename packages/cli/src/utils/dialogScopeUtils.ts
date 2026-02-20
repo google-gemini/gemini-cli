@@ -6,7 +6,7 @@
 
 import type { LoadableSettingScope, Settings } from '../config/settings.js';
 import { isLoadableSettingScope, SettingScope } from '../config/settings.js';
-import { settingExistsInScope } from './settingsUtils.js';
+import { isInScope } from './settingsUtils.js';
 
 /**
  * Shared scope labels for dialog components that need to display setting scopes
@@ -50,7 +50,7 @@ export function getScopeMessageForSetting(
 
   const modifiedInOtherScopes = otherScopes.filter((scope) => {
     const scopeSettings = settings.forScope(scope).settings;
-    return settingExistsInScope(settingKey, scopeSettings);
+    return isInScope(settingKey, scopeSettings);
   });
 
   if (modifiedInOtherScopes.length === 0) {
@@ -59,10 +59,7 @@ export function getScopeMessageForSetting(
 
   const modifiedScopesStr = modifiedInOtherScopes.join(', ');
   const currentScopeSettings = settings.forScope(selectedScope).settings;
-  const existsInCurrentScope = settingExistsInScope(
-    settingKey,
-    currentScopeSettings,
-  );
+  const existsInCurrentScope = isInScope(settingKey, currentScopeSettings);
 
   return existsInCurrentScope
     ? `(Also modified in ${modifiedScopesStr})`
