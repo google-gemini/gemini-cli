@@ -278,6 +278,15 @@ class GrepToolInvocation extends BaseToolInvocation<
         );
       }
 
+      const matchCount = allMatches.filter((m) => !m.isContext).length;
+      allMatches = await this.enrichWithRipgrepAutoContext(
+        allMatches,
+        matchCount,
+        totalMaxMatches,
+        searchDirAbs,
+        timeoutController.signal,
+      );
+
       const searchLocationDescription = `in path "${searchDirDisplay}"`;
 
       return await formatGrepResults(
@@ -296,9 +305,61 @@ class GrepToolInvocation extends BaseToolInvocation<
     }
   }
 
+  private async enrichWithRipgrepAutoContext(
+    allMatches: GrepMatch[],
+    matchCount: number,
+    totalMaxMatches: number,
+    searchDirAbs: string,
+    signal: AbortSignal,
+  ): Promise<GrepMatch[]> {
+    if (
+      matchCount >= 1 &&
+      matchCount <= 3 &&
+      !this.params.names_only &&
+      this.params.context === undefined &&
+      this.params.before === undefined &&
+      this.params.after === undefined
+    ) {
+      const contextLines = matchCount === 1 ? 50 : 15;
+      const uniqueFiles = Array.from(
+        new Set(allMatches.map((m) => m.absolutePath)),
+      );
+
+      let enrichedMatches = await this.performRipgrepSearch({
+        pattern: this.params.pattern,
+        path: uniqueFiles,
+        basePath: searchDirAbs,
+        include: this.params.include,
+        exclude_pattern: this.params.exclude_pattern,
+        case_sensitive: this.params.case_sensitive,
+        fixed_strings: this.params.fixed_strings,
+        context: contextLines,
+        no_ignore: this.params.no_ignore,
+        maxMatches: totalMaxMatches,
+        max_matches_per_file: this.params.max_matches_per_file,
+        signal,
+      });
+
+      if (!this.params.no_ignore) {
+        const allowedFiles = this.fileDiscoveryService.filterFiles(uniqueFiles);
+        const allowedSet = new Set(allowedFiles);
+        enrichedMatches = enrichedMatches.filter((m) =>
+          allowedSet.has(m.absolutePath),
+        );
+      }
+
+      // Set context to prevent grep-utils from doing the JS fallback auto-context
+      this.params.context = contextLines;
+      return enrichedMatches;
+    }
+
+    return allMatches;
+  }
+
   private async performRipgrepSearch(options: {
     pattern: string;
-    path: string;
+    path: string | string[];
+    basePath?: string;
     include?: string;
     exclude_pattern?: string;
     case_sensitive?: boolean;
@@ -313,7 +374,8 @@ class GrepToolInvocation extends BaseToolInvocation<
   }): Promise<GrepMatch[]> {
     const {
       pattern,
-      path: absolutePath,
+      path,
+      basePath,
       include,
       exclude_pattern,
       case_sensitive,
@@ -325,6 +387,8 @@ class GrepToolInvocation extends BaseToolInvocation<
       maxMatches,
       max_matches_per_file,
     } = options;
+
+    const searchPaths = Array.isArray(path) ? path : [path];
 
     const rgArgs = ['--json'];
 
@@ -384,7 +448,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     }
 
     rgArgs.push('--threads', '4');
-    rgArgs.push(absolutePath);
+    rgArgs.push(...searchPaths);
 
     const results: GrepMatch[] = [];
     try {
@@ -400,8 +464,10 @@ class GrepToolInvocation extends BaseToolInvocation<
         excludeRegex = new RegExp(exclude_pattern, case_sensitive ? '' : 'i');
       }
 
+      const parseBasePath = basePath || searchPaths[0];
+
       for await (const line of generator) {
-        const match = this.parseRipgrepJsonLine(line, absolutePath);
+        const match = this.parseRipgrepJsonLine(line, parseBasePath);
         if (match) {
           if (excludeRegex && excludeRegex.test(match.line)) {
             continue;
