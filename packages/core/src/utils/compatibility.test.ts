@@ -131,7 +131,7 @@ describe('compatibility', () => {
       );
     });
 
-    it('should return JetBrains warning when detected', () => {
+    it('should return JetBrains warning when detected on macOS', () => {
       vi.mocked(os.platform).mockReturnValue('darwin');
       vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
 
@@ -139,7 +139,34 @@ describe('compatibility', () => {
       expect(warnings).toContainEqual(
         expect.objectContaining({
           id: 'jetbrains-terminal',
-          message: expect.stringContaining('JetBrains terminal detected'),
+          message: expect.stringContaining('iTerm2 or Terminal.app'),
+        }),
+      );
+    });
+
+    it('should return JetBrains warning with Windows Terminal recommendation on Windows', () => {
+      vi.mocked(os.platform).mockReturnValue('win32');
+      vi.mocked(os.release).mockReturnValue('10.0.22000');
+      vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
+
+      const warnings = getCompatibilityWarnings();
+      expect(warnings).toContainEqual(
+        expect.objectContaining({
+          id: 'jetbrains-terminal',
+          message: expect.stringContaining('Windows Terminal'),
+        }),
+      );
+    });
+
+    it('should return JetBrains warning with native terminal recommendation on Linux', () => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+      vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
+
+      const warnings = getCompatibilityWarnings();
+      expect(warnings).toContainEqual(
+        expect.objectContaining({
+          id: 'jetbrains-terminal',
+          message: expect.stringContaining('native terminal emulator'),
         }),
       );
     });
@@ -205,6 +232,7 @@ describe('compatibility', () => {
       expect(warnings).toHaveLength(3);
       expect(warnings[0].message).toContain('Windows 10 detected');
       expect(warnings[1].message).toContain('JetBrains terminal detected');
+      expect(warnings[1].message).toContain('Windows Terminal');
       expect(warnings[2].message).toContain(
         'True color (24-bit) support not detected',
       );

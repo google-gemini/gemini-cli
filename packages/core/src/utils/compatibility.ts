@@ -102,10 +102,20 @@ export function getCompatibilityWarnings(): StartupWarning[] {
   }
 
   if (isJetBrainsTerminal()) {
+    const platform = os.platform();
+    let terminalRecommendation = '';
+
+    if (platform === 'win32') {
+      terminalRecommendation = 'Windows Terminal';
+    } else if (platform === 'darwin') {
+      terminalRecommendation = 'iTerm2 or Terminal.app';
+    } else {
+      terminalRecommendation = 'a native terminal emulator';
+    }
+
     warnings.push({
       id: 'jetbrains-terminal',
-      message:
-        'Warning: JetBrains terminal detected. You may experience rendering or scrolling issues. Using an external terminal (e.g., Windows Terminal, iTerm2) is recommended.',
+      message: `Warning: JetBrains terminal detected. You may experience rendering or scrolling issues. Using ${terminalRecommendation} is recommended.`,
       priority: WarningPriority.High,
     });
   }
