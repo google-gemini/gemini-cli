@@ -58,6 +58,30 @@ import type { PartUnion, Part as genAiPart } from '@google/genai';
 
 type UnionKeys<T> = T extends T ? keyof T : never;
 
+function isToolCallConfirmationDetails(
+  value: unknown,
+): value is ToolCallConfirmationDetails {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('onConfirm' in value) ||
+    typeof value.onConfirm !== 'function' ||
+    !('type' in value) ||
+    typeof value.type !== 'string'
+  ) {
+    return false;
+  }
+  const validTypes = [
+    'edit',
+    'exec',
+    'mcp',
+    'info',
+    'ask_user',
+    'exit_plan_mode',
+  ];
+  return validTypes.includes(value.type);
+}
+
 export class Task {
   id: string;
   contextId: string;
@@ -376,16 +400,8 @@ export class Task {
 
       if (tc.status === 'awaiting_approval' && tc.confirmationDetails) {
         const details = tc.confirmationDetails;
-        if (
-          typeof details === 'object' &&
-          details !== null &&
-          'onConfirm' in details &&
-          typeof details.onConfirm === 'function'
-        ) {
-          this.pendingToolConfirmationDetails.set(
-            tc.request.callId,
-            details as ToolCallConfirmationDetails,
-          );
+        if (isToolCallConfirmationDetails(details)) {
+          this.pendingToolConfirmationDetails.set(tc.request.callId, details);
         }
       }
 
@@ -419,16 +435,9 @@ export class Task {
       toolCalls.forEach((tc: ToolCall) => {
         if (tc.status === 'awaiting_approval' && tc.confirmationDetails) {
           const details = tc.confirmationDetails;
-          if (
-            typeof details === 'object' &&
-            details !== null &&
-            'onConfirm' in details &&
-            typeof details.onConfirm === 'function'
-          ) {
+          if (isToolCallConfirmationDetails(details)) {
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            (details as ToolCallConfirmationDetails).onConfirm(
-              ToolConfirmationOutcome.ProceedOnce,
-            );
+            details.onConfirm(ToolConfirmationOutcome.ProceedOnce);
             this.pendingToolConfirmationDetails.delete(tc.request.callId);
           }
         }
