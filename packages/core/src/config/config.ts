@@ -2227,11 +2227,11 @@ export class Config {
     return remoteThreshold;
   }
 
-  getUserCaching(): boolean | undefined {
+  async getUserCaching(): Promise<boolean | undefined> {
     return this.getExperimentValue<boolean>(ExperimentFlags.USER_CACHING);
   }
 
-  isNumericalRoutingEnabled(): boolean {
+  async getNumericalRoutingEnabled(): Promise<boolean> {
     return (
       this.getExperimentValue<boolean>(
         ExperimentFlags.ENABLE_NUMERICAL_ROUTING,
@@ -2239,13 +2239,13 @@ export class Config {
     );
   }
 
-  getClassifierThreshold(): number | undefined {
+  async getClassifierThreshold(): Promise<number | undefined> {
     return this.getExperimentValue<number>(
       ExperimentFlags.CLASSIFIER_THRESHOLD,
     );
   }
 
-  getBannerTextNoCapacityIssues(): string {
+  async getBannerTextNoCapacityIssues(): Promise<string> {
     return (
       this.getExperimentValue<string>(
         ExperimentFlags.BANNER_TEXT_NO_CAPACITY_ISSUES,
@@ -2253,7 +2253,7 @@ export class Config {
     );
   }
 
-  getBannerTextCapacityIssues(): string {
+  async getBannerTextCapacityIssues(): Promise<string> {
     return (
       this.getExperimentValue<string>(
         ExperimentFlags.BANNER_TEXT_CAPACITY_ISSUES,

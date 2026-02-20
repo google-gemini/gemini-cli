@@ -135,7 +135,10 @@ export class ClassifierStrategy implements RoutingStrategy {
     const startTime = Date.now();
     try {
       const model = context.requestedModel ?? config.getModel();
-      if (config.isNumericalRoutingEnabled() && isGemini3Model(model)) {
+      if (
+        (await config.getNumericalRoutingEnabled()) &&
+        isGemini3Model(model)
+      ) {
         return null;
       }
 

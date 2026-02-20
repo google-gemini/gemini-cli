@@ -410,7 +410,7 @@ describe('Server Config (config.ts)', () => {
     });
 
     describe('getUserCaching', () => {
-      it('should return the remote experiment flag when available', () => {
+      it('should return the remote experiment flag when available', async () => {
         const config = new Config({
           ...baseParams,
           experiments: {
@@ -422,10 +422,10 @@ describe('Server Config (config.ts)', () => {
             experimentIds: [],
           },
         });
-        expect(config.getUserCaching()).toBe(true);
+        expect(await config.getUserCaching()).toBe(true);
       });
 
-      it('should return false when the remote flag is false', () => {
+      it('should return false when the remote flag is false', async () => {
         const config = new Config({
           ...baseParams,
           experiments: {
@@ -437,12 +437,12 @@ describe('Server Config (config.ts)', () => {
             experimentIds: [],
           },
         });
-        expect(config.getUserCaching()).toBe(false);
+        expect(await config.getUserCaching()).toBe(false);
       });
 
-      it('should return the default value if there are no experiments', () => {
+      it('should return the default value if there are no experiments', async () => {
         const config = new Config(baseParams);
-        expect(config.getUserCaching()).toBe(false);
+        expect(await config.getUserCaching()).toBe(false);
       });
     });
   });

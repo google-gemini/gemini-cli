@@ -50,7 +50,7 @@ describe('NumericalClassifierStrategy', () => {
       },
       getModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO),
       getSessionId: vi.fn().mockReturnValue('control-group-id'), // Default to Control Group (Hash 71 >= 50)
-      isNumericalRoutingEnabled: vi.fn().mockReturnValue(true),
+      getNumericalRoutingEnabled: vi.fn().mockResolvedValue(true),
       getClassifierThreshold: vi.fn().mockResolvedValue(undefined),
     } as unknown as Config;
     mockBaseLlmClient = {
@@ -65,7 +65,7 @@ describe('NumericalClassifierStrategy', () => {
   });
 
   it('should return null if numerical routing is disabled', async () => {
-    vi.mocked(mockConfig.isNumericalRoutingEnabled).mockReturnValue(false);
+    vi.mocked(mockConfig.getNumericalRoutingEnabled).mockResolvedValue(false);
 
     const decision = await strategy.route(
       mockContext,
@@ -237,7 +237,7 @@ describe('NumericalClassifierStrategy', () => {
 
   describe('Remote Threshold Logic', () => {
     it('should use the remote CLASSIFIER_THRESHOLD if provided (int value)', async () => {
-      vi.mocked(mockConfig.getClassifierThreshold).mockReturnValue(70);
+      vi.mocked(mockConfig.getClassifierThreshold).mockResolvedValue(70);
       const mockApiResponse = {
         complexity_reasoning: 'Test task',
         complexity_score: 60,
@@ -263,7 +263,7 @@ describe('NumericalClassifierStrategy', () => {
     });
 
     it('should use the remote CLASSIFIER_THRESHOLD if provided (float value)', async () => {
-      vi.mocked(mockConfig.getClassifierThreshold).mockReturnValue(45.5);
+      vi.mocked(mockConfig.getClassifierThreshold).mockResolvedValue(45.5);
       const mockApiResponse = {
         complexity_reasoning: 'Test task',
         complexity_score: 40,
@@ -289,7 +289,7 @@ describe('NumericalClassifierStrategy', () => {
     });
 
     it('should use PRO model if score >= remote CLASSIFIER_THRESHOLD', async () => {
-      vi.mocked(mockConfig.getClassifierThreshold).mockReturnValue(30);
+      vi.mocked(mockConfig.getClassifierThreshold).mockResolvedValue(30);
       const mockApiResponse = {
         complexity_reasoning: 'Test task',
         complexity_score: 35,
