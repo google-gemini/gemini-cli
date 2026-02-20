@@ -17,6 +17,7 @@ import {
 } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { RenderInline } from './InlineMarkdownRenderer.js';
+import { stripUnsafeCharacters } from './textUtils.js';
 
 interface TableRendererProps {
   headers: string[];
@@ -60,12 +61,18 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   );
 
   const styledHeaders = useMemo(
-    () => cleanedHeaders.map((header) => toStyledCharacters(header)),
+    () =>
+      cleanedHeaders.map((header) =>
+        toStyledCharacters(stripUnsafeCharacters(header)),
+      ),
     [cleanedHeaders],
   );
 
   const styledRows = useMemo(
-    () => rows.map((row) => row.map((cell) => toStyledCharacters(cell))),
+    () =>
+      rows.map((row) =>
+        row.map((cell) => toStyledCharacters(stripUnsafeCharacters(cell))),
+      ),
     [rows],
   );
 
