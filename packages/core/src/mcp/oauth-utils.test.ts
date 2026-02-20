@@ -178,10 +178,12 @@ describe('OAuthUtils', () => {
       expect(mockFetch).nthCalledWith(
         1,
         'https://auth.example.com/.well-known/oauth-authorization-server',
+        { redirect: 'error' },
       );
       expect(mockFetch).nthCalledWith(
         2,
         'https://auth.example.com/.well-known/openid-configuration',
+        { redirect: 'error' },
       );
     });
 
@@ -207,14 +209,17 @@ describe('OAuthUtils', () => {
       expect(mockFetch).nthCalledWith(
         1,
         'https://auth.example.com/.well-known/oauth-authorization-server/mcp',
+        { redirect: 'error' },
       );
       expect(mockFetch).nthCalledWith(
         2,
         'https://auth.example.com/.well-known/openid-configuration/mcp',
+        { redirect: 'error' },
       );
       expect(mockFetch).nthCalledWith(
         3,
         'https://auth.example.com/mcp/.well-known/openid-configuration',
+        { redirect: 'error' },
       );
     });
   });
@@ -370,6 +375,32 @@ describe('OAuthUtils', () => {
     });
   });
 
+  describe('isPrivateHost', () => {
+    it('should detect localhost', () => {
+      expect(OAuthUtils.isPrivateHost('localhost')).toBe(true);
+      expect(OAuthUtils.isPrivateHost('127.0.0.1')).toBe(true);
+      expect(OAuthUtils.isPrivateHost('::1')).toBe(true);
+    });
+
+    it('should detect cloud metadata endpoint', () => {
+      expect(OAuthUtils.isPrivateHost('169.254.169.254')).toBe(true);
+    });
+
+    it('should detect private IPv4 ranges', () => {
+      expect(OAuthUtils.isPrivateHost('10.0.0.1')).toBe(true);
+      expect(OAuthUtils.isPrivateHost('172.16.0.1')).toBe(true);
+      expect(OAuthUtils.isPrivateHost('172.31.255.255')).toBe(true);
+      expect(OAuthUtils.isPrivateHost('192.168.1.1')).toBe(true);
+      expect(OAuthUtils.isPrivateHost('0.0.0.0')).toBe(true);
+    });
+
+    it('should allow public hosts', () => {
+      expect(OAuthUtils.isPrivateHost('auth.example.com')).toBe(false);
+      expect(OAuthUtils.isPrivateHost('8.8.8.8')).toBe(false);
+      expect(OAuthUtils.isPrivateHost('172.32.0.1')).toBe(false);
+    });
+  });
+
   describe('buildResourceParameter', () => {
     it('should build resource parameter from endpoint URL', () => {
       const result = OAuthUtils.buildResourceParameter(
@@ -479,6 +510,27 @@ describe('OAuthUtils', () => {
       );
       expect(result).not.toBeNull();
       expect(mockFetch).toHaveBeenCalled();
+    });
+
+    it('should reject authorization_servers pointing to private/internal hosts', async () => {
+      const wwwAuthenticate =
+        'Bearer resource_metadata="https://server.com/.well-known/oauth-protected-resource"';
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          resource: 'https://server.com/mcp',
+          authorization_servers: ['https://169.254.169.254/latest/meta-data'],
+        }),
+      });
+
+      const result = await OAuthUtils.discoverOAuthFromWWWAuthenticate(
+        wwwAuthenticate,
+        'https://server.com/mcp',
+      );
+      expect(result).toBeNull();
+      // Only the resource metadata fetch should happen, not the auth server fetch
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
     it('should skip origin check when no server URL is provided', async () => {

@@ -126,7 +126,9 @@ export class OAuthUtils {
     authServerMetadataUrl: string,
   ): Promise<OAuthAuthorizationServerMetadata | null> {
     try {
-      const response = await fetch(authServerMetadataUrl);
+      const response = await fetch(authServerMetadataUrl, {
+        redirect: 'error',
+      });
       if (!response.ok) {
         return null;
       }
@@ -379,6 +381,20 @@ export class OAuthUtils {
     }
 
     const authServerUrl = resourceMetadata.authorization_servers[0];
+
+    // Validate that the authorization server URL doesn't point to
+    // private/internal networks to prevent SSRF via metadata poisoning.
+    if (mcpServerUrl) {
+      try {
+        const authServerHost = new URL(authServerUrl).hostname;
+        if (this.isPrivateHost(authServerHost)) {
+          return null;
+        }
+      } catch {
+        return null;
+      }
+    }
+
     const authServerMetadata =
       await this.discoverAuthorizationServerMetadata(authServerUrl);
 
@@ -408,6 +424,36 @@ export class OAuthUtils {
    */
   static isSSEEndpoint(url: string): boolean {
     return url.includes('/sse') || !url.includes('/mcp');
+  }
+
+  /**
+   * Check if a hostname points to a private or reserved network.
+   *
+   * @param hostname The hostname to check
+   * @returns True if the hostname is a private/reserved address
+   */
+  static isPrivateHost(hostname: string): boolean {
+    // Loopback
+    if (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1'
+    ) {
+      return true;
+    }
+    // Link-local metadata (cloud provider metadata endpoints)
+    if (hostname === '169.254.169.254') {
+      return true;
+    }
+    // Private IPv4 ranges
+    const parts = hostname.split('.').map(Number);
+    if (parts.length === 4 && parts.every((p) => !isNaN(p))) {
+      if (parts[0] === 10) return true; // 10.0.0.0/8
+      if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true; // 172.16.0.0/12
+      if (parts[0] === 192 && parts[1] === 168) return true; // 192.168.0.0/16
+      if (parts[0] === 0) return true; // 0.0.0.0/8
+    }
+    return false;
   }
 
   /**
