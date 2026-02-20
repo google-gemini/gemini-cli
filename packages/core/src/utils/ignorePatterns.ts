@@ -163,8 +163,7 @@ export class FileExclusions {
       patterns.push(`**/${getCurrentGeminiMdFilename()}`);
     }
 
-    // Add custom patterns from configuration
-    // TODO: getCustomExcludes method needs to be implemented in Config interface
+    // Add custom patterns from configuration (Config.getCustomExcludes is optional)
     if (this.config) {
       const configCustomExcludes = this.config.getCustomExcludes?.() ?? [];
       patterns.push(...configCustomExcludes);
@@ -198,8 +197,7 @@ export class FileExclusions {
   getGlobExcludes(additionalExcludes: string[] = []): string[] {
     const corePatterns = this.getCoreIgnorePatterns();
 
-    // Add any custom patterns from config if available
-    // TODO: getCustomExcludes method needs to be implemented in Config interface
+    // Add any custom patterns from config if available (Config.getCustomExcludes is optional)
     const configPatterns = this.config?.getCustomExcludes?.() ?? [];
 
     return [...corePatterns, ...configPatterns, ...additionalExcludes];
