@@ -202,6 +202,21 @@ export function classifyGoogleError(error: unknown): unknown {
     }
   }
 
+  // Check for 503 Service Unavailable errors
+  if (status === 503) {
+    const errorMessage =
+      googleApiError?.message ||
+      (error instanceof Error ? error.message : String(error));
+    return new RetryableQuotaError(
+      errorMessage,
+      googleApiError ?? {
+        code: 503,
+        message: errorMessage,
+        details: [],
+      },
+    );
+  }
+
   if (
     !googleApiError ||
     googleApiError.code !== 429 ||
