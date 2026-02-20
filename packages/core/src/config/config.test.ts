@@ -1390,7 +1390,22 @@ describe('setApprovalMode with folder trust', () => {
     expect(updateSpy).toHaveBeenCalled();
   });
 
-  it('should not update system instruction when switching between non-Plan modes', () => {
+  it('should update system instruction when entering YOLO mode', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue({
+      getTool: vi.fn().mockReturnValue(undefined),
+      unregisterTool: vi.fn(),
+      registerTool: vi.fn(),
+    } as Partial<ToolRegistry> as ToolRegistry);
+    const updateSpy = vi.spyOn(config, 'updateSystemInstructionIfInitialized');
+
+    config.setApprovalMode(ApprovalMode.YOLO);
+
+    expect(updateSpy).toHaveBeenCalled();
+  });
+
+  it('should not update system instruction when switching between non-Plan/non-YOLO modes', () => {
     const config = new Config(baseParams);
     vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
     const updateSpy = vi.spyOn(config, 'updateSystemInstructionIfInitialized');
@@ -2631,6 +2646,27 @@ describe('syncPlanModeTools', () => {
       ...baseParams,
       approvalMode: ApprovalMode.DEFAULT,
       plan: false,
+    });
+    const registry = new ToolRegistry(config, config.getMessageBus());
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue(registry);
+
+    const registerSpy = vi.spyOn(registry, 'registerTool');
+    vi.spyOn(registry, 'getTool').mockReturnValue(undefined);
+
+    config.syncPlanModeTools();
+
+    const { EnterPlanModeTool } = await import('../tools/enter-plan-mode.js');
+    const registeredTool = registerSpy.mock.calls.find(
+      (call) => call[0] instanceof EnterPlanModeTool,
+    );
+    expect(registeredTool).toBeUndefined();
+  });
+
+  it('should NOT register EnterPlanModeTool when in YOLO mode, even if plan is enabled', async () => {
+    const config = new Config({
+      ...baseParams,
+      approvalMode: ApprovalMode.YOLO,
+      plan: true,
     });
     const registry = new ToolRegistry(config, config.getMessageBus());
     vi.spyOn(config, 'getToolRegistry').mockReturnValue(registry);
