@@ -25,6 +25,7 @@ Gemini CLI uses a unified `Config` object as the source of truth. Every experime
 ### 1. List Current Experiments
 - **File:** `packages/core/src/code_assist/experiments/flagNames.ts`
 - Read this file and list all existing experiments to the user. This ensures you pick a unique ID and avoid duplicate names.
+- **Analyze Usage:** Search for `getExperimentValue` in `packages/core/src/config/config.ts` to see how similar experiments are wrapped and used.
 
 ### 2. Ask for Details (Behavior & Intent)
 - **CRITICAL:** You MUST ask the user:
@@ -32,7 +33,7 @@ Gemini CLI uses a unified `Config` object as the source of truth. Every experime
   2. "What is the data type?" (boolean, number, or string)
   3. "What should the behavior be when the flag is enabled vs. disabled?"
   4. "What are the architectural impacts (routing, tools, prompt construction, etc.)?"
-- Do not proceed until the behavior is clearly defined.
+- Do not proceed until the behavior is clearly defined and documented.
 
 ### 3. Add Experiment ID and Metadata
 - **File:** `packages/core/src/code_assist/experiments/flagNames.ts`
@@ -46,7 +47,7 @@ Gemini CLI uses a unified `Config` object as the source of truth. Every experime
     return this.getExperimentValue<boolean>(ExperimentFlags.ENABLE_NEW_THING) ?? false;
   }
   ```
-- **Step B (Schema):** In `packages/cli/src/config/settingsSchema.ts`, add the kebab-case name to the `experimental.properties` section.
+- **Step B (Schema):** In `packages/cli/src/config/settingsSchema.ts`, add the kebab-case name to the `experimental.properties` section to enable IDE autocompletion.
 - **Step C (Regenerate):** Run `npm run schema:settings` to update `schemas/settings.schema.json`.
 
 ### 5. Implement Code Change with Debug Logging
@@ -55,17 +56,18 @@ Gemini CLI uses a unified `Config` object as the source of truth. Every experime
   ```typescript
   debugLogger.debug('New thing enabled:', config.isNewThingEnabled());
   ```
+- **Telemetry (Crucial):** Prompt the user to think about success metrics. Ask: "How will we know if this feature is working as intended?" and help them add telemetry calls to capture these insights.
 
 ### 6. Update Tests
 - **File:** `packages/core/src/config/config.experiment.test.ts`
-- Add a test case to verify that the flag resolves correctly (e.g., `expect(config.isNewThingEnabled()).toBe(true)` when passed via `experimentalCliArgs`).
+- Add a test case to verify that the flag resolves correctly across all priority levels (CLI, Settings, Remote, Default).
+- Example: `expect(config.isNewThingEnabled()).toBe(true)` when passed via `experimentalCliArgs`.
 
-### 7. Final Validation
-- **Action:** Run the CLI with debugging enabled and the new flag set via the command line:
+### 7. Final Validation and PR Preparation
+- **Validation Action:** Run the CLI with debugging enabled and the new flag set via the command line:
   ```bash
   npm run start -- --debug --experiment your-flag-name=value --prompt "test"
   ```
-- **Verification:** Check the console output for:
-  1. The "Experimental CLI args" normalization log.
-  2. The custom debug log you added in Step 5.
-  3. The intended behavior change in the CLI.
+- **Log Verification:** Check the console for the "Experimental CLI args" normalization log and your custom debug log.
+- **Branching:** If not already on a dedicated branch, help the user create one (e.g., `git checkout -b exp/feature-name`).
+- **Pre-flight:** Remind the user to run local tests and linting (`npm run lint:all`, `npm test` or `npm run preflight`) before preparing a Pull Request.
