@@ -8,13 +8,11 @@ import type {
   ToolCallConfirmationDetails,
   ToolInvocation,
   ToolResult,
-} from './tools.js';
-import {
+
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
-  type ToolConfirmationOutcome,
-} from './tools.js';
+  type ToolConfirmationOutcome} from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -34,6 +32,7 @@ import { retryWithBackoff } from '../utils/retry.js';
 import { WEB_FETCH_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { LRUCache } from 'mnemonist';
+import { z } from 'zod';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
@@ -131,6 +130,26 @@ interface GroundingSupportItem {
   segment?: GroundingSupportSegment;
   groundingChunkIndices?: number[];
 }
+
+const groundingChunkItemSchema = z.object({
+  web: z
+    .object({
+      uri: z.string().optional(),
+      title: z.string().optional(),
+    })
+    .optional(),
+});
+
+const groundingSupportItemSchema = z.object({
+  segment: z
+    .object({
+      startIndex: z.number(),
+      endIndex: z.number(),
+      text: z.string().optional(),
+    })
+    .optional(),
+  groundingChunkIndices: z.array(z.number()).optional(),
+});
 
 /**
  * Parameters for the WebFetch tool
@@ -234,9 +253,9 @@ ${textContent}
         returnDisplay: `Content for ${url} processed using fallback fetch.`,
       };
     } catch (e) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const error = e as Error;
-      const errorMessage = `Error during fallback fetch for ${url}: ${error.message}`;
+      const errorMessage = `Error during fallback fetch for ${url}: ${getErrorMessage(
+        e,
+      )}`;
       return {
         llmContent: `Error: ${errorMessage}`,
         returnDisplay: `Error: ${errorMessage}`,
@@ -342,13 +361,18 @@ ${textContent}
       let responseText = getResponseText(response) || '';
       const urlContextMeta = response.candidates?.[0]?.urlContextMetadata;
       const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
-      const sources = groundingMetadata?.groundingChunks as
-        | GroundingChunkItem[]
-        | undefined;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const groundingSupports = groundingMetadata?.groundingSupports as
-        | GroundingSupportItem[]
-        | undefined;
+      const sourceParseResult = z
+        .array(groundingChunkItemSchema)
+        .safeParse(groundingMetadata?.groundingChunks);
+      const sources = sourceParseResult.success
+        ? sourceParseResult.data
+        : undefined;
+      const supportParseResult = z
+        .array(groundingSupportItemSchema)
+        .safeParse(groundingMetadata?.groundingSupports);
+      const groundingSupports = supportParseResult.success
+        ? supportParseResult.data
+        : undefined;
 
       // Error Handling
       let processingError = false;

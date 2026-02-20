@@ -19,6 +19,13 @@ import {
   type Question,
 } from '../confirmation-bus/types.js';
 import { type ApprovalMode } from '../policy/types.js';
+import { z } from 'zod';
+
+const toolCallArgsSchema = z.record(z.string(), z.unknown());
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
 
 /**
  * Represents a validated and ready-to-execute tool call.
@@ -195,8 +202,7 @@ export abstract class BaseToolInvocation<
       correlationId,
       toolCall: {
         name: this._toolName,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        args: this.params as Record<string, unknown>,
+        args: toolCallArgsSchema.parse(this.params),
       },
       serverName: this._serverName,
     };
@@ -546,8 +552,7 @@ export function isTool(obj: unknown): obj is AnyDeclarativeTool {
     obj !== null &&
     'name' in obj &&
     'build' in obj &&
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    typeof (obj as AnyDeclarativeTool).build === 'function'
+    typeof obj.build === 'function'
   );
 }
 
@@ -595,17 +600,14 @@ export function hasCycleInSchema(schema: object): boolean {
     let current: unknown = schema;
     for (const segment of path) {
       if (
-        typeof current !== 'object' ||
-        current === null ||
+        !isRecord(current) ||
         !Object.prototype.hasOwnProperty.call(current, segment)
       ) {
         return null;
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      current = (current as Record<string, unknown>)[segment];
+      current = current[segment];
     }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return current as object;
+    return isRecord(current) ? current : null;
   }
 
   function traverse(
@@ -649,15 +651,8 @@ export function hasCycleInSchema(schema: object): boolean {
 
     // Crawl all the properties of node
     for (const key in node) {
-      if (Object.prototype.hasOwnProperty.call(node, key)) {
-        if (
-          traverse(
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            (node as Record<string, unknown>)[key],
-            visitedRefs,
-            pathRefs,
-          )
-        ) {
+      if (isRecord(node) && Object.prototype.hasOwnProperty.call(node, key)) {
+        if (traverse(node[key], visitedRefs, pathRefs)) {
           return true;
         }
       }
