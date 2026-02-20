@@ -63,13 +63,12 @@ export const GEMINI_3_SET: CoreToolSet = {
 
   write_file: {
     name: WRITE_FILE_TOOL_NAME,
-    description: `Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use 'replace' for targeted edits to large files.`,
+    description: `Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use '${EDIT_TOOL_NAME}' for targeted edits to large files.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
         file_path: {
-          description:
-            'Path to the file. Missing parent directories are created automatically.',
+          description: 'Path to the file.',
           type: 'string',
         },
         content: {
@@ -327,8 +326,7 @@ The user has the ability to modify the \`new_string\` content. If modified, this
 
   google_web_search: {
     name: WEB_SEARCH_TOOL_NAME,
-    description:
-      "Performs a grounded Google Search to find information across the internet. Returns a synthesized answer with citations (e.g., [1]) and source URIs. Best for finding up-to-date documentation, troubleshooting obscure errors, or broad research. Use this when you don't have a specific URL. If a search result requires deeper analysis, follow up by using 'web_fetch' on the provided URI.",
+    description: `Performs a grounded Google Search to find information across the internet. Returns a synthesized answer with citations (e.g., [1]) and source URIs. Best for finding up-to-date documentation, troubleshooting obscure errors, or broad research. Use this when you don't have a specific URL. If a search result requires deeper analysis, follow up by using '${WEB_FETCH_TOOL_NAME}' on the provided URI.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -431,7 +429,7 @@ Use this tool when the user's query implies needing the content of several files
 
   save_memory: {
     name: MEMORY_TOOL_NAME,
-    description: `Persists global preferences or facts across ALL future sessions. Use this for recurring instructions like coding styles or tool aliases. Unlike 'write_file', which is for project-specific files, this appends to a global memory file loaded in every workspace. If you are unsure whether a fact should be remembered globally, ask the user first. CRITICAL: Do not use for session-specific context or temporary data.`,
+    description: `Persists global preferences or facts across ALL future sessions. Use this for recurring instructions like coding styles or tool aliases. Unlike '${WRITE_FILE_TOOL_NAME}', which is for project-specific files, this appends to a global memory file loaded in every workspace. If you are unsure whether a fact should be remembered globally, ask the user first. CRITICAL: Do not use for session-specific context or temporary data.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
