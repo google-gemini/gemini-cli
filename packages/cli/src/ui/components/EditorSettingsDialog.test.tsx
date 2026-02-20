@@ -29,6 +29,7 @@ vi.mock('../editors/editorSettingsManager.js', () => ({
     getAvailableEditorDisplays: () => [
       { name: 'VS Code', type: 'vscode', disabled: false },
       { name: 'Vim', type: 'vim', disabled: false },
+      { name: 'Kakoune', type: 'kak', disabled: false },
     ],
   },
 }));
