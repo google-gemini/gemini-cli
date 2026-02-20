@@ -6,13 +6,12 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ToolExecutor } from './tool-executor.js';
-import type { Config } from '../index.js';
+import type { Config, AnyToolInvocation } from '../index.js';
 import type { ToolResult } from '../tools/tools.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 import type { ScheduledToolCall } from './types.js';
 import { CoreToolCallStatus } from './types.js';
-import type { AnyToolInvocation } from '../index.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import * as fileUtils from '../utils/fileUtils.js';
 import * as coreToolHookTriggers from '../core/coreToolHookTriggers.js';
@@ -234,7 +233,10 @@ describe('ToolExecutor', () => {
       const response = result.response.responseParts[0]?.functionResponse
         ?.response as Record<string, unknown>;
       // The content should be the *truncated* version returned by the mock formatTruncatedToolOutput
-      expect(response).toEqual({ output: 'TruncatedContent...' });
+      expect(response).toEqual({
+        output: 'TruncatedContent...',
+        outputFile: '/tmp/truncated_output.txt',
+      });
       expect(result.response.outputFile).toBe('/tmp/truncated_output.txt');
     }
   });

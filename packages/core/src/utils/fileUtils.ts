@@ -604,6 +604,48 @@ ${tail}`;
 }
 
 /**
+ * Moves tool output from a source path to a temporary file for later retrieval.
+ */
+export async function moveToolOutputToFile(
+  sourcePath: string,
+  toolName: string,
+  id: string | number, // Accept string (callId) or number (truncationId)
+  projectTempDir: string,
+  sessionId?: string,
+): Promise<{ outputFile: string }> {
+  const safeToolName = sanitizeFilenamePart(toolName).toLowerCase();
+  const safeId = sanitizeFilenamePart(id.toString()).toLowerCase();
+  const fileName = safeId.startsWith(safeToolName)
+    ? `${safeId}.txt`
+    : `${safeToolName}_${safeId}.txt`;
+
+  let toolOutputDir = path.join(projectTempDir, TOOL_OUTPUTS_DIR);
+  if (sessionId) {
+    const safeSessionId = sanitizeFilenamePart(sessionId);
+    toolOutputDir = path.join(toolOutputDir, `session-${safeSessionId}`);
+  }
+  const outputFile = path.join(toolOutputDir, fileName);
+
+  await fsPromises.mkdir(toolOutputDir, { recursive: true });
+
+  try {
+    // Attempt rename (efficient if on the same filesystem)
+    await fsPromises.rename(sourcePath, outputFile);
+  } catch (error: unknown) {
+    // If rename fails (e.g. cross-filesystem), copy and then delete
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    if ((error as { code?: string }).code === 'EXDEV') {
+      await fsPromises.copyFile(sourcePath, outputFile);
+      await fsPromises.unlink(sourcePath);
+    } else {
+      throw error;
+    }
+  }
+
+  return { outputFile };
+}
+
+/**
  * Saves tool output to a temporary file for later retrieval.
  */
 export const TOOL_OUTPUTS_DIR = 'tool-outputs';

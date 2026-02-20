@@ -23,6 +23,7 @@ import { executeToolWithHooks } from '../core/coreToolHookTriggers.js';
 import {
   saveTruncatedToolOutput,
   formatTruncatedToolOutput,
+  moveToolOutputToFile,
 } from '../utils/fileUtils.js';
 import { convertToFunctionResponse } from '../utils/generateContentResponseUtilities.js';
 import type {
@@ -207,7 +208,30 @@ export class ToolExecutor {
     const toolName = call.request.name;
     const callId = call.request.callId;
 
-    if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
+    if (toolResult.fullOutputFilePath) {
+      const { outputFile: savedPath } = await moveToolOutputToFile(
+        toolResult.fullOutputFilePath,
+        toolName,
+        callId,
+        this.config.storage.getProjectTempDir(),
+        this.config.getSessionId(),
+      );
+      outputFile = savedPath;
+
+      const threshold = this.config.getTruncateToolOutputThreshold();
+      if (
+        threshold > 0 &&
+        typeof content === 'string' &&
+        content.length > threshold
+      ) {
+        content = formatTruncatedToolOutput(content, outputFile, threshold);
+      } else if (typeof content === 'string') {
+        // If we have a full output file but content is not truncated by threshold,
+        // we still append a message about the file to ensure the user knows it's
+        // available (useful for ANSI colors/binary output captured in file).
+        content = `${content}\n\n[Full command output saved to: ${outputFile}]`;
+      }
+    } else if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
       const threshold = this.config.getTruncateToolOutputThreshold();
 
       if (threshold > 0 && content.length > threshold) {
@@ -239,6 +263,7 @@ export class ToolExecutor {
       callId,
       content,
       this.config.getActiveModel(),
+      outputFile,
     );
 
     const successResponse: ToolCallResponseInfo = {

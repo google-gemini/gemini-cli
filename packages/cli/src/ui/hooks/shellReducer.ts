@@ -99,6 +99,13 @@ export function shellReducer(
           typeof shell.output === 'string'
             ? shell.output + action.chunk
             : action.chunk;
+        const MAX_BG_OUTPUT_LENGTH = 100000;
+        if (
+          typeof newOutput === 'string' &&
+          newOutput.length > MAX_BG_OUTPUT_LENGTH
+        ) {
+          newOutput = newOutput.slice(-MAX_BG_OUTPUT_LENGTH);
+        }
       } else {
         newOutput = action.chunk;
       }

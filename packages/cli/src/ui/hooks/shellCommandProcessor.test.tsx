@@ -121,6 +121,14 @@ describe('useShellCommandProcessor', () => {
     mockIsBinary.mockReturnValue(false);
     vi.mocked(fs.existsSync).mockReturnValue(false);
 
+    vi.mocked(fs.createWriteStream).mockReturnValue({
+      write: vi.fn(),
+      end: vi.fn(),
+      destroy: vi.fn(),
+      bytesWritten: 0,
+      closed: false,
+    } as unknown as fs.WriteStream);
+
     mockShellExecutionService.mockImplementation((_cmd, _cwd, callback) => {
       mockShellOutputCallback = callback;
       return Promise.resolve({

@@ -5,23 +5,22 @@
  */
 
 import fsPromises from 'node:fs/promises';
+import fs from 'node:fs';
 import path from 'node:path';
 import os, { EOL } from 'node:os';
 import crypto from 'node:crypto';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../index.js';
 import { ToolErrorType } from './tool-error.js';
-import type {
-  ToolInvocation,
-  ToolResult,
-  ToolCallConfirmationDetails,
-  ToolExecuteConfirmationDetails,
-} from './tools.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   ToolConfirmationOutcome,
   Kind,
+  type ToolInvocation,
+  type ToolResult,
+  type ToolCallConfirmationDetails,
+  type ToolExecuteConfirmationDetails,
   type PolicyUpdateOptions,
 } from './tools.js';
 
@@ -177,6 +176,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
     const onAbort = () => combinedController.abort();
 
+    const outputFileName = `gemini_shell_output_${crypto.randomBytes(6).toString('hex')}.log`;
+    const outputFilePath = path.join(os.tmpdir(), outputFileName);
+    const outputStream = fs.createWriteStream(outputFilePath);
+
+    let fullOutputReturned = false;
+
     try {
       // pgrep is not available on Windows, so we can't get background PIDs
       const commandToExecute = isWindows
@@ -231,31 +236,41 @@ export class ShellToolInvocation extends BaseToolInvocation<
           cwd,
           (event: ShellOutputEvent) => {
             resetTimeout(); // Reset timeout on any event
-            if (!updateOutput) {
-              return;
-            }
-
-            let shouldUpdate = false;
 
             switch (event.type) {
+              case 'raw_data':
+                if (!isBinaryStream) {
+                  outputStream.write(event.chunk);
+                }
+                break;
               case 'data':
                 if (isBinaryStream) break;
                 cumulativeOutput = event.chunk;
-                shouldUpdate = true;
+                if (updateOutput && !this.params.is_background) {
+                  updateOutput(cumulativeOutput);
+                  lastUpdateTime = Date.now();
+                }
                 break;
               case 'binary_detected':
                 isBinaryStream = true;
                 cumulativeOutput =
                   '[Binary output detected. Halting stream...]';
-                shouldUpdate = true;
+                if (updateOutput && !this.params.is_background) {
+                  updateOutput(cumulativeOutput);
+                }
                 break;
               case 'binary_progress':
                 isBinaryStream = true;
                 cumulativeOutput = `[Receiving binary output... ${formatBytes(
                   event.bytesReceived,
                 )} received]`;
-                if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
-                  shouldUpdate = true;
+                if (
+                  updateOutput &&
+                  !this.params.is_background &&
+                  Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS
+                ) {
+                  updateOutput(cumulativeOutput);
+                  lastUpdateTime = Date.now();
                 }
                 break;
               case 'exit':
@@ -263,11 +278,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
               default: {
                 throw new Error('An unhandled ShellOutputEvent was found.');
               }
-            }
-
-            if (shouldUpdate && !this.params.is_background) {
-              updateOutput(cumulativeOutput);
-              lastUpdateTime = Date.now();
             }
           },
           combinedController.signal,
@@ -295,6 +305,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
 
       const result = await resultPromise;
+      outputStream.end();
 
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {
@@ -427,27 +438,49 @@ export class ShellToolInvocation extends BaseToolInvocation<
           this.config.getGeminiClient(),
           signal,
         );
-        return {
+        const toolResult: ToolResult = {
           llmContent: summary,
           returnDisplay: returnDisplayMessage,
+          fullOutputFilePath:
+            outputStream.bytesWritten > 0 ? outputFilePath : undefined,
           ...executionError,
         };
+        if (toolResult.fullOutputFilePath) {
+          fullOutputReturned = true;
+        }
+        return toolResult;
       }
 
-      return {
+      const toolResult: ToolResult = {
         llmContent,
         returnDisplay: returnDisplayMessage,
         data,
+        fullOutputFilePath:
+          outputStream.bytesWritten > 0 ? outputFilePath : undefined,
         ...executionError,
       };
+      if (toolResult.fullOutputFilePath) {
+        fullOutputReturned = true;
+      }
+      return toolResult;
     } finally {
       if (timeoutTimer) clearTimeout(timeoutTimer);
+      if (!outputStream.closed) {
+        outputStream.destroy();
+      }
       signal.removeEventListener('abort', onAbort);
       timeoutController.signal.removeEventListener('abort', onAbort);
       try {
         await fsPromises.unlink(tempFilePath);
       } catch {
         // Ignore errors during unlink
+      }
+      if (!fullOutputReturned) {
+        try {
+          await fsPromises.unlink(outputFilePath);
+        } catch {
+          // Ignore errors during unlink
+        }
       }
     }
   }

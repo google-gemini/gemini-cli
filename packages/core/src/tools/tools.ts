@@ -579,6 +579,13 @@ export interface ToolResult {
    * Optional data payload for passing structured information back to the caller.
    */
   data?: Record<string, unknown>;
+
+  /**
+   * Optional path to a file containing the full, non-truncated output of the tool.
+   * If provided, the scheduler may use this file for long-term storage and
+   * reference it in the conversation history if the output is truncated.
+   */
+  fullOutputFilePath?: string;
 }
 
 /**

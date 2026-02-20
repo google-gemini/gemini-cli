@@ -82,9 +82,9 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   );
 
   const truncatedResultDisplay = React.useMemo(() => {
-    // Only truncate string output if not in alternate buffer mode to ensure
-    // we can scroll through the full output.
-    if (typeof resultDisplay === 'string' && !isAlternateBuffer) {
+    // Always truncate string output to prevent massive memory usage and hanging
+    // by the Ink layout engine when rendering very large strings.
+    if (typeof resultDisplay === 'string') {
       let text = resultDisplay;
       if (text.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
         text = '...' + text.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
@@ -93,16 +93,19 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         const hasTrailingNewline = text.endsWith('\n');
         const contentText = hasTrailingNewline ? text.slice(0, -1) : text;
         const lines = contentText.split('\n');
-        if (lines.length > maxLines) {
+
+        // Preserve scrollback in alternate buffer mode, but still cap it to prevent hangs
+        const limit = isAlternateBuffer ? Math.max(maxLines, 1000) : maxLines;
+
+        if (lines.length > limit) {
           text =
-            lines.slice(-maxLines).join('\n') +
-            (hasTrailingNewline ? '\n' : '');
+            lines.slice(-limit).join('\n') + (hasTrailingNewline ? '\n' : '');
         }
       }
       return text;
     }
     return resultDisplay;
-  }, [resultDisplay, isAlternateBuffer, maxLines]);
+  }, [resultDisplay, maxLines, isAlternateBuffer]);
 
   if (!truncatedResultDisplay) return null;
 
