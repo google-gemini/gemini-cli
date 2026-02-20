@@ -19,10 +19,14 @@ import { ShellToolInvocation } from '../tools/shell.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 // Mock file utils
-vi.mock('../utils/fileUtils.js', () => ({
-  saveTruncatedToolOutput: vi.fn(),
-  formatTruncatedToolOutput: vi.fn(),
-}));
+vi.mock('../utils/fileUtils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/fileUtils.js')>();
+  return {
+    ...actual,
+    saveTruncatedToolOutput: vi.fn(),
+    formatTruncatedToolOutput: vi.fn(),
+  };
+});
 
 // Mock executeToolWithHooks
 vi.mock('../core/coreToolHookTriggers.js', () => ({
