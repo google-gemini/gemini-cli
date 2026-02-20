@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import path from 'node:path';
 import {
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
@@ -450,7 +449,7 @@ export function renderPlanningWorkflow(
   return `
 # Active Approval Mode: Plan
 
-You are operating in **Plan Mode**. Your goal is to produce a detailed implementation plan in \`${options.plansDir}${path.sep}\` and get user approval before editing source code.
+You are operating in **Plan Mode**. Your goal is to produce a detailed implementation plan in \`${options.plansDir}\` and get user approval before editing source code.
 
 ## Available Tools
 The following read-only tools are available in Plan Mode:
@@ -461,7 +460,7 @@ ${options.planModeToolsList}
 </available_tools>
 
 ## Rules
-1. **Read-Only:** You cannot modify source code. You may ONLY use read-only tools to explore, and you can only write to \`${options.plansDir}${path.sep}\`.
+1. **Read-Only:** You cannot modify source code. You may ONLY use read-only tools to explore, and you can only write to \`${options.plansDir}\`.
 2. **Efficiency:** Autonomously combine discovery and drafting phases to minimize conversational turns. If the request is ambiguous, use ${formatToolName(ASK_USER_TOOL_NAME)} to clarify. Otherwise, explore the codebase and write the draft in one fluid motion.
 3. **Inquiries and Directives:** Distinguish between Inquiries and Directives to minimize unnecessary planning.
    - **Inquiries:** If the request is an **Inquiry** (e.g., "How does X work?"), use read-only tools to explore and answer directly in your chat response. DO NOT create a plan or call ${formatToolName(
