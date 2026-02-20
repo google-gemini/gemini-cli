@@ -36,6 +36,8 @@ import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
+import { StashContextTool } from '../tools/stash-context.js';
+import { QueryArchiveTool } from '../tools/query-archive.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
@@ -97,6 +99,7 @@ import type { AnyToolInvocation, AnyDeclarativeTool } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
 import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
+import { LRUCache } from 'mnemonist';
 import { FileExclusions } from '../utils/ignorePatterns.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { EventEmitter } from 'node:events';
@@ -697,6 +700,7 @@ export class Config {
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
   private lastModeSwitchTime: number = Date.now();
+  private contextArchive = new LRUCache<string, string>(10);
   readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
 
@@ -2110,6 +2114,14 @@ export class Config {
     return this.summarizeToolOutput;
   }
 
+  stashContext(key: string, content: string): void {
+    this.contextArchive.set(key, content);
+  }
+
+  retrieveStashedContext(key: string): string | undefined {
+    return this.contextArchive.get(key);
+  }
+
   getIdeMode(): boolean {
     return this.ideMode;
   }
@@ -2574,6 +2586,12 @@ export class Config {
     );
     maybeRegister(AskUserTool, () =>
       registry.registerTool(new AskUserTool(this.messageBus)),
+    );
+    maybeRegister(StashContextTool, () =>
+      registry.registerTool(new StashContextTool(this, this.messageBus)),
+    );
+    maybeRegister(QueryArchiveTool, () =>
+      registry.registerTool(new QueryArchiveTool(this, this.messageBus)),
     );
     if (this.getUseWriteTodos()) {
       maybeRegister(WriteTodosTool, () =>

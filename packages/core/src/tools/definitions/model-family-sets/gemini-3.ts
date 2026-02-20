@@ -25,6 +25,8 @@ import {
   GET_INTERNAL_DOCS_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  STASH_CONTEXT_TOOL_NAME,
+  QUERY_ARCHIVE_TOOL_NAME,
 } from '../base-declarations.js';
 import {
   getShellDeclaration,
@@ -648,6 +650,51 @@ The agent did not use the todo list because this task could be completed by a ti
             'Short reason explaining why you are entering plan mode.',
         },
       },
+    },
+  },
+
+  stash_context: {
+    name: STASH_CONTEXT_TOOL_NAME,
+    description: `The agent uses this when a previous tool returned massive, noisy output. The CLI takes the raw output of the specified tool_call_id, saves it into the ContextArchive under the archive_key, and mutates the active chat history by replacing that massive raw output with the provided summary. This clears the context window of noise immediately, but ensures zero data is permanently lost.`,
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        archive_key: {
+          description:
+            'A unique key to identify this stashed content (e.g., "db_logs_01").',
+          type: 'string',
+        },
+        summary: {
+          description:
+            'A concise summary of the stashed content to remain in the active context.',
+          type: 'string',
+        },
+        tool_call_id_to_stash: {
+          description: 'The ID of the tool call whose output should be stashed.',
+          type: 'string',
+        },
+      },
+      required: ['archive_key', 'summary', 'tool_call_id_to_stash'],
+    },
+  },
+
+  query_archive: {
+    name: QUERY_ARCHIVE_TOOL_NAME,
+    description: `The agent uses this when it realizes it needs a specific detail from a previously stashed log. The CLI does a background LLM call against the raw text stored in ContextArchive[archive_key] using the query, and returns only the specific answer to the active context window.`,
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        archive_key: {
+          description: 'The key of the stashed content to query.',
+          type: 'string',
+        },
+        query: {
+          description:
+            'The specific question or detail to retrieve from the stashed content.',
+          type: 'string',
+        },
+      },
+      required: ['archive_key', 'query'],
     },
   },
 

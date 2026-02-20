@@ -38,6 +38,8 @@ export {
   ASK_USER_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  STASH_CONTEXT_TOOL_NAME,
+  QUERY_ARCHIVE_TOOL_NAME,
 } from './base-declarations.js';
 
 // Re-export sets for compatibility
@@ -96,6 +98,20 @@ export const WEB_SEARCH_DEFINITION: ToolDefinition = {
     return DEFAULT_LEGACY_SET.google_web_search;
   },
   overrides: (modelId) => getToolSet(modelId).google_web_search,
+};
+
+export const STASH_CONTEXT_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.stash_context;
+  },
+  overrides: (modelId) => getToolSet(modelId).stash_context,
+};
+
+export const QUERY_ARCHIVE_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.query_archive;
+  },
+  overrides: (modelId) => getToolSet(modelId).query_archive,
 };
 
 export const EDIT_DEFINITION: ToolDefinition = {
