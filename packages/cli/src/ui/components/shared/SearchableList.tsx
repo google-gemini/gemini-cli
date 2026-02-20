@@ -132,11 +132,9 @@ export function SearchableList<T extends GenericListItem>({
   }
 
   // Update state to match derived value if it changed
-  React.useLayoutEffect(() => {
-    if (scrollOffsetState !== scrollOffset) {
-      setScrollOffsetState(scrollOffset);
-    }
-  }, [scrollOffset, scrollOffsetState]);
+  if (scrollOffsetState !== scrollOffset) {
+    setScrollOffsetState(scrollOffset);
+  }
 
   // Reset selection to top when items change if requested
   const prevItemsRef = React.useRef(filteredItems);

@@ -26,14 +26,17 @@ export function useRegistrySearch<T extends GenericListItem>(props: {
 
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const isFirstRender = useRef(true);
+  const onSearchRef = useRef(onSearch);
+
+  onSearchRef.current = onSearch;
 
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
     }
-    onSearch?.(searchQuery);
-  }, [searchQuery, onSearch]);
+    onSearchRef.current?.(searchQuery);
+  }, [searchQuery]);
 
   const searchBuffer = useSearchBuffer({
     initialText: searchQuery,
