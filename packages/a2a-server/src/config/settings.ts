@@ -7,12 +7,12 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import type { MCPServerConfig } from '@google/gemini-cli-core';
 import {
   debugLogger,
   GEMINI_DIR,
   getErrorMessage,
   type TelemetrySettings,
+  type MCPServerConfig,
   homedir,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';

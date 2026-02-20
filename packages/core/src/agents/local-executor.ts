@@ -34,6 +34,7 @@ import {
   AgentStartEvent,
   AgentFinishEvent,
   RecoveryAttemptEvent,
+  LlmRole,
 } from '../telemetry/types.js';
 import type {
   LocalAgentDefinition,
@@ -59,7 +60,6 @@ import { getVersion } from '../utils/version.js';
 import { getToolCallContext } from '../utils/toolCallContext.js';
 import { scheduleAgentTools } from './agent-scheduler.js';
 import { DeadlineTimer } from '../utils/deadlineTimer.js';
-import { LlmRole } from '../telemetry/types.js';
 import { formatUserHintsForModel } from '../utils/fastAckHelper.js';
 
 /** A callback function to report on agent activity. */
