@@ -642,15 +642,21 @@ export class Task {
           request.args['old_string'] &&
           request.args['new_string']
         ) {
-          const newContent = await this.getProposedContent(
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            request.args['file_path'] as string,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            request.args['old_string'] as string,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            request.args['new_string'] as string,
-          );
-          return { ...request, args: { ...request.args, newContent } };
+          const filePath = request.args['file_path'];
+          const oldString = request.args['old_string'];
+          const newString = request.args['new_string'];
+          if (
+            typeof filePath === 'string' &&
+            typeof oldString === 'string' &&
+            typeof newString === 'string'
+          ) {
+            const newContent = await this.getProposedContent(
+              filePath,
+              oldString,
+              newString,
+            );
+            return { ...request, args: { ...request.args, newContent } };
+          }
         }
         return request;
       }),
