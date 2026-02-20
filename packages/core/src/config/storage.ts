@@ -23,6 +23,8 @@ const TMP_DIR_NAME = 'tmp';
 const BIN_DIR_NAME = 'bin';
 const AGENTS_DIR_NAME = '.agents';
 
+export const AUTO_SAVED_POLICY_FILENAME = 'auto-saved.toml';
+
 export class Storage {
   private readonly targetDir: string;
   private readonly sessionId: string | undefined;
@@ -152,6 +154,13 @@ export class Storage {
 
   getWorkspacePoliciesDir(): string {
     return path.join(this.getGeminiDir(), 'policies');
+  }
+
+  getAutoSavedPolicyPath(): string {
+    return path.join(
+      this.getWorkspacePoliciesDir(),
+      AUTO_SAVED_POLICY_FILENAME,
+    );
   }
 
   ensureProjectTempDirExists(): void {
