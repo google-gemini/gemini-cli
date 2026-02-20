@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import type { RegistryExtension } from '../../../config/extensionRegistryClient.js';
 
@@ -59,97 +59,109 @@ export function ExtensionRegistryView({
     [extensions],
   );
 
-  const handleSelect = (item: ExtensionItem) => {
-    onSelect?.(item.extension);
-  };
+  const handleSelect = useCallback(
+    (item: ExtensionItem) => {
+      onSelect?.(item.extension);
+    },
+    [onSelect],
+  );
 
-  const renderItem = (
-    item: ExtensionItem,
-    isActive: boolean,
-    _labelWidth: number,
-  ) => {
-    const isInstalled = installedExtensions.some(
-      (e) => e.name === item.extension.extensionName,
-    );
-    const updateState = extensionsUpdateState.get(item.extension.extensionName);
-    const hasUpdate = updateState === ExtensionUpdateState.UPDATE_AVAILABLE;
+  const renderItem = useCallback(
+    (item: ExtensionItem, isActive: boolean, _labelWidth: number) => {
+      const isInstalled = installedExtensions.some(
+        (e) => e.name === item.extension.extensionName,
+      );
+      const updateState = extensionsUpdateState.get(
+        item.extension.extensionName,
+      );
+      const hasUpdate = updateState === ExtensionUpdateState.UPDATE_AVAILABLE;
 
-    return (
-      <Box flexDirection="row" width="100%" justifyContent="space-between">
-        <Box flexDirection="row" flexShrink={1} minWidth={0}>
-          <Box width={2} flexShrink={0}>
+      return (
+        <Box flexDirection="row" width="100%" justifyContent="space-between">
+          <Box flexDirection="row" flexShrink={1} minWidth={0}>
+            <Box width={2} flexShrink={0}>
+              <Text
+                color={isActive ? theme.status.success : theme.text.secondary}
+              >
+                {isActive ? '> ' : '  '}
+              </Text>
+            </Box>
+            <Box flexShrink={0}>
+              <Text
+                bold={isActive}
+                color={isActive ? theme.status.success : theme.text.primary}
+              >
+                {item.label}
+              </Text>
+            </Box>
+            <Box flexShrink={0} marginX={1}>
+              <Text color={theme.text.secondary}>|</Text>
+            </Box>
+            {isInstalled && (
+              <Box marginRight={1} flexShrink={0}>
+                <Text color={theme.status.success}>[Installed]</Text>
+              </Box>
+            )}
+            {hasUpdate && (
+              <Box marginRight={1} flexShrink={0}>
+                <Text color={theme.status.warning}>[Update available]</Text>
+              </Box>
+            )}
+            <Box flexShrink={1} minWidth={0}>
+              <Text color={theme.text.secondary} wrap="truncate-end">
+                {item.description}
+              </Text>
+            </Box>
+          </Box>
+          <Box flexShrink={0} marginLeft={2} width={8} flexDirection="row">
+            <Text color={theme.status.warning}>⭐</Text>
             <Text
               color={isActive ? theme.status.success : theme.text.secondary}
             >
-              {isActive ? '> ' : '  '}
-            </Text>
-          </Box>
-          <Box flexShrink={0}>
-            <Text
-              bold={isActive}
-              color={isActive ? theme.status.success : theme.text.primary}
-            >
-              {item.label}
-            </Text>
-          </Box>
-          <Box flexShrink={0} marginX={1}>
-            <Text color={theme.text.secondary}>|</Text>
-          </Box>
-          {isInstalled && (
-            <Box marginRight={1} flexShrink={0}>
-              <Text color={theme.status.success}>[Installed]</Text>
-            </Box>
-          )}
-          {hasUpdate && (
-            <Box marginRight={1} flexShrink={0}>
-              <Text color={theme.status.warning}>[Update available]</Text>
-            </Box>
-          )}
-          <Box flexShrink={1} minWidth={0}>
-            <Text color={theme.text.secondary} wrap="truncate-end">
-              {item.description}
+              {' '}
+              {item.extension.stars || 0}
             </Text>
           </Box>
         </Box>
-        <Box flexShrink={0} marginLeft={2} width={8} flexDirection="row">
-          <Text color={theme.status.warning}>⭐</Text>
-          <Text color={isActive ? theme.status.success : theme.text.secondary}>
-            {' '}
-            {item.extension.stars || 0}
+      );
+    },
+    [installedExtensions, extensionsUpdateState],
+  );
+
+  const header = useMemo(
+    () => (
+      <Box flexDirection="row" justifyContent="space-between" width="100%">
+        <Box flexShrink={1}>
+          <Text color={theme.text.secondary} wrap="truncate">
+            Browse and search extensions from the registry.
+          </Text>
+        </Box>
+        <Box flexShrink={0} marginLeft={2}>
+          <Text color={theme.text.secondary}>
+            {installedExtensions.length &&
+              `${installedExtensions.length} installed`}
           </Text>
         </Box>
       </Box>
-    );
-  };
-
-  const header = (
-    <Box flexDirection="row" justifyContent="space-between" width="100%">
-      <Box flexShrink={1}>
-        <Text color={theme.text.secondary} wrap="truncate">
-          Browse and search extensions from the registry.
-        </Text>
-      </Box>
-      <Box flexShrink={0} marginLeft={2}>
-        <Text color={theme.text.secondary}>
-          {installedExtensions.length &&
-            `${installedExtensions.length} installed`}
-        </Text>
-      </Box>
-    </Box>
+    ),
+    [installedExtensions.length],
   );
 
-  const footer = ({
-    startIndex,
-    endIndex,
-    totalVisible,
-  }: {
-    startIndex: number;
-    endIndex: number;
-    totalVisible: number;
-  }) => (
-    <Text color={theme.text.secondary}>
-      ({startIndex + 1}-{endIndex}) / {totalVisible}
-    </Text>
+  const footer = useCallback(
+    ({
+      startIndex,
+      endIndex,
+      totalVisible,
+    }: {
+      startIndex: number;
+      endIndex: number;
+      totalVisible: number;
+    }) => (
+      <Text color={theme.text.secondary}>
+        ({startIndex + 1}-{endIndex}) / {totalVisible}
+      </Text>
+    ),
+    [],
   );
 
   if (loading) {
@@ -169,8 +181,6 @@ export function ExtensionRegistryView({
     );
   }
 
-  // ... (existing code)
-
   return (
     <SearchableList<ExtensionItem>
       title="Extensions"
@@ -184,6 +194,7 @@ export function ExtensionRegistryView({
       maxItemsToShow={8}
       useSearch={useRegistrySearch}
       onSearch={search}
+      resetSelectionOnItemsChange={true}
     />
   );
 }
