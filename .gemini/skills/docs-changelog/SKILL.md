@@ -109,23 +109,41 @@ detailed **highlights** section for the release-specific page.
 
 - **Target File**: `docs/changelogs/latest.md`
 - Perform the following edits on the target file:
-    1.  Update the version in the main header.
-    2.  Update the "Released:" date.
+    1.  Update the version in the main header. The line should read,
+        `# Latest stable release: {{version}}`
+    2.  Update the rease date. The line should read,
+        `Released: {{release_date_month_dd_yyyy}}`
     3.  **Prepend** the processed "What's Changed" list from the temporary file
-        to the existing "What's Changed" list in the file.
-    4.  In the "Full Changelog" URL, replace only the trailing version with the
-        new patch version.
+        to the existing "What's Changed" list in `latest.md`. Do not change or
+        replace the existing list, **only add** to the beginning of it.
+    4.  In the "Full Changelog", edit **only** the end of the URL. Identify the
+        last part of the URL that looks like `...{previous_version}` and update
+        it to be `...{version}`.
+
+        Example: assume the patch version is `v0.29.1`. Change
+        `Full Changelog: https://github.com/google-gemini/gemini-cli/compare/v0.28.2…v0.29.0`
+        to
+        `Full Changelog: https://github.com/google-gemini/gemini-cli/compare/v0.28.2…v0.29.1`
 
 ### B.2: Preview Patch (e.g., `v0.29.0-preview.3`)
 
 - **Target File**: `docs/changelogs/preview.md`
 - Perform the following edits on the target file:
-    1.  Update the version in the main header.
-    2.  Update the "Released:" date.
+    1.  Update the version in the main header. The line should read,
+        `# Preview release: {{version}}`
+    2.  Update the rease date. The line should read,
+        `Released: {{release_date_month_dd_yyyy}}`
     3.  **Prepend** the processed "What's Changed" list from the temporary file
-        to the existing "What's Changed" list in the file.
-    4.  In the "Full Changelog" URL, replace only the trailing version with the
-        new patch version.
+        to the existing "What's Changed" list in `preview.md`. Do not change or
+        replace the existing list, **only add** to the beginning of it.
+    4.  In the "Full Changelog", edit **only** the end of the URL. Identify the
+        last part of the URL that looks like `...{previous_version}` and update
+        it to be `...{version}`.
+
+        Example: assume the patch version is `v0.29.0-preview.1`. Change
+        `Full Changelog: https://github.com/google-gemini/gemini-cli/compare/v0.28.2…v0.29.0-preview.0`
+        to
+        `Full Changelog: https://github.com/google-gemini/gemini-cli/compare/v0.28.2…v0.29.0-preview.1`
 
 ---
 

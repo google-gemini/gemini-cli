@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render as inkRenderDirect, type Instance as InkInstance } from 'ink';
+import {
+  render as inkRenderDirect,
+  type Instance as InkInstance,
+  type RenderOptions,
+} from 'ink';
 import { EventEmitter } from 'node:events';
 import { Box } from 'ink';
 import type React from 'react';
@@ -68,6 +72,25 @@ type TerminalState = {
   rows: number;
 };
 
+type RenderMetrics = Parameters<NonNullable<RenderOptions['onRender']>>[0];
+
+interface InkRenderMetrics extends RenderMetrics {
+  output: string;
+  staticOutput?: string;
+}
+
+function isInkRenderMetrics(
+  metrics: RenderMetrics,
+): metrics is InkRenderMetrics {
+  const m = metrics as Record<string, unknown>;
+  return (
+    typeof m === 'object' &&
+    m !== null &&
+    'output' in m &&
+    typeof m['output'] === 'string'
+  );
+}
+
 class XtermStdout extends EventEmitter {
   private state: TerminalState;
   private pendingWrites = 0;
@@ -76,7 +99,6 @@ class XtermStdout extends EventEmitter {
   isTTY = true;
 
   private lastRenderOutput: string | undefined = undefined;
-  private lastRenderStaticContent: string | undefined = undefined;
 
   constructor(state: TerminalState, queue: { promise: Promise<void> }) {
     super();
@@ -109,7 +131,6 @@ class XtermStdout extends EventEmitter {
   clear = () => {
     this.state.terminal.reset();
     this.lastRenderOutput = undefined;
-    this.lastRenderStaticContent = undefined;
   };
 
   dispose = () => {
@@ -118,32 +139,22 @@ class XtermStdout extends EventEmitter {
 
   onRender = (staticContent: string, output: string) => {
     this.renderCount++;
-    this.lastRenderStaticContent = staticContent;
     this.lastRenderOutput = output;
     this.emit('render');
   };
 
   lastFrame = (options: { allowEmpty?: boolean } = {}) => {
-    let result: string;
-    // On Windows, xterm.js headless can sometimes have timing or rendering issues
-    // that lead to duplicated content or incorrect buffer state in tests.
-    // As a fallback, we can trust the raw output Ink provided during onRender.
-    if (os.platform() === 'win32') {
-      result =
-        (this.lastRenderStaticContent ?? '') + (this.lastRenderOutput ?? '');
-    } else {
-      const buffer = this.state.terminal.buffer.active;
-      const allLines: string[] = [];
-      for (let i = 0; i < buffer.length; i++) {
-        allLines.push(buffer.getLine(i)?.translateToString(true) ?? '');
-      }
-
-      const trimmed = [...allLines];
-      while (trimmed.length > 0 && trimmed[trimmed.length - 1] === '') {
-        trimmed.pop();
-      }
-      result = trimmed.join('\n');
+    const buffer = this.state.terminal.buffer.active;
+    const allLines: string[] = [];
+    for (let i = 0; i < buffer.length; i++) {
+      allLines.push(buffer.getLine(i)?.translateToString(true) ?? '');
     }
+
+    const trimmed = [...allLines];
+    while (trimmed.length > 0 && trimmed[trimmed.length - 1] === '') {
+      trimmed.pop();
+    }
+    const result = trimmed.join('\n');
 
     // Normalize for cross-platform snapshot stability:
     // Normalize any \r\n to \n
@@ -195,9 +206,7 @@ class XtermStdout extends EventEmitter {
       const currentFrame = stripAnsi(
         this.lastFrame({ allowEmpty: true }),
       ).trim();
-      const expectedFrame = stripAnsi(
-        (this.lastRenderStaticContent ?? '') + (this.lastRenderOutput ?? ''),
-      )
+      const expectedFrame = stripAnsi(this.lastRenderOutput ?? '')
         .trim()
         .replace(/\r\n/g, '\n');
 
@@ -336,7 +345,11 @@ export const render = (
   terminalWidth?: number,
 ): RenderInstance => {
   const cols = terminalWidth ?? 100;
-  const rows = 40;
+  // We use 1000 rows to avoid windows with incorrect snapshots if a correct
+  // value was used (e.g. 40 rows). The alternatives to make things worse are
+  // windows unfortunately with odd duplicate content in the backbuffer
+  // which does not match actual behavior in xterm.js on windows.
+  const rows = 1000;
   const terminal = new Terminal({
     cols,
     rows,
@@ -367,8 +380,10 @@ export const render = (
       debug: false,
       exitOnCtrlC: false,
       patchConsole: false,
-      onRender: (metrics: { output: string; staticOutput?: string }) => {
-        stdout.onRender(metrics.staticOutput ?? '', metrics.output);
+      onRender: (metrics: RenderMetrics) => {
+        if (isInkRenderMetrics(metrics)) {
+          stdout.onRender(metrics.staticOutput ?? '', metrics.output);
+        }
       },
     });
   });
@@ -516,6 +531,7 @@ const mockUIActions: UIActions = {
   vimHandleInput: vi.fn(),
   handleIdePromptComplete: vi.fn(),
   handleFolderTrustSelect: vi.fn(),
+  setIsPolicyUpdateDialogOpen: vi.fn(),
   setConstrainHeight: vi.fn(),
   onEscapePromptChange: vi.fn(),
   refreshStatic: vi.fn(),

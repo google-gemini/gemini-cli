@@ -44,6 +44,7 @@ import {
   GEN_AI_REQUEST_MODEL,
 } from '../telemetry/constants.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import { getErrorType } from '../utils/errors.js';
 
 interface StructuredError {
   status: number;
@@ -175,7 +176,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     serverDetails?: ServerDetails,
   ): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorType = error instanceof Error ? error.name : 'unknown';
+    const errorType = getErrorType(error);
 
     logApiError(
       this.config,

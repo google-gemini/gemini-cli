@@ -11,6 +11,7 @@ import {
   type ToolResult,
   BaseToolInvocation,
   type ToolCallConfirmationDetails,
+  isTool,
 } from '../tools/tools.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { Config } from '../config/config.js';
@@ -52,6 +53,53 @@ export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ true,
     );
+  }
+
+  private _memoizedIsReadOnly: boolean | undefined;
+
+  override get isReadOnly(): boolean {
+    if (this._memoizedIsReadOnly !== undefined) {
+      return this._memoizedIsReadOnly;
+    }
+    // No try-catch here. If getToolRegistry() throws, we let it throw.
+    // This is an invariant: you can't check read-only status if the system isn't initialized.
+    this._memoizedIsReadOnly = SubagentTool.checkIsReadOnly(
+      this.definition,
+      this.config,
+    );
+    return this._memoizedIsReadOnly;
+  }
+
+  private static checkIsReadOnly(
+    definition: AgentDefinition,
+    config: Config,
+  ): boolean {
+    if (definition.kind === 'remote') {
+      return false;
+    }
+    const tools = definition.toolConfig?.tools ?? [];
+    const registry = config.getToolRegistry();
+
+    if (!registry) {
+      return false;
+    }
+
+    for (const tool of tools) {
+      if (typeof tool === 'string') {
+        const resolvedTool = registry.getTool(tool);
+        if (!resolvedTool || !resolvedTool.isReadOnly) {
+          return false;
+        }
+      } else if (isTool(tool)) {
+        if (!tool.isReadOnly) {
+          return false;
+        }
+      } else {
+        // FunctionDeclaration - we don't know, so assume NOT read-only
+        return false;
+      }
+    }
+    return true;
   }
 
   protected createInvocation(
