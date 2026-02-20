@@ -21,7 +21,7 @@ classification helps the Gemini CLI [Policy Engine](../core/policy-engine.md)
 determine security requirements.
 
 - **User confirmation:** You must manually approve tools that modify files or
-  execute shell commands (Mutators). The CLI shows you a diff or the exact
+  execute shell commands (mutators). The CLI shows you a diff or the exact
   command before you confirm.
 - **Sandboxing:** You can run tool executions in secure, containerized
   environments to isolate changes from your host system. For more details, see
@@ -35,7 +35,7 @@ Always review confirmation prompts carefully before allowing a tool to execute.
 ## User-triggered tools
 
 Most of Gemini CLI's tools are triggered by Gemini CLI. There are two tools you
-directkly trigger using special syntax:
+can directly trigger using special syntax:
 
 - **[File access](../tools/file-system.md#read_many_files) (`@`):** Use the `@`
   symbol followed by a file or directory path to include its content in your
@@ -46,12 +46,12 @@ directkly trigger using special syntax:
 
 ## The `/tools` command
 
-Explore the tools currently available to the Gemini model using the `/tools`
+You can explore the tools currently available to Gemini CLI using the `/tools`
 command.
 
 - **`/tools`**: Lists all registered tools with their display names.
 - **`/tools desc`**: Lists all tools with their full descriptions as provided to
-  the Gemini model.
+  Gemini CLI.
 
 This command is useful for verifying which tools are active, especially when
 using custom tools.
@@ -64,7 +64,7 @@ web.
 
 ### File system tools
 
-These tools let the model explore and modify your local codebase.
+Explore and modify your local codebase.
 
 | Tool                                        | Kind     | Parameters                                                                                                     | Description                                                                                          |
 | ------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
@@ -77,7 +77,7 @@ These tools let the model explore and modify your local codebase.
 
 ### Execution tools
 
-The execution tool lets the model run shell commands on your local machine.
+Let the model run shell commands on your local machine.
 
 | Tool                                     | Kind      | Parameters                                            | Description                                                                                                              |
 | ---------------------------------------- | --------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -85,7 +85,7 @@ The execution tool lets the model run shell commands on your local machine.
 
 ### Web tools
 
-Web tools let the model fetch content from URLs and perform web searches.
+Let the model fetch content from URLs and perform web searches.
 
 | Tool                                          | Kind     | Parameters | Description                                              |
 | --------------------------------------------- | -------- | ---------- | -------------------------------------------------------- |
@@ -94,8 +94,8 @@ Web tools let the model fetch content from URLs and perform web searches.
 
 ## Agent workflow tools
 
-Agent workflow tools let the model interact with you, plan its approach, and
-track its progress through multi-step tasks.
+Let the model interact with you, plan its approach, and track its progress
+through multi-step tasks.
 
 | Tool                                      | Kind          | Parameters  | Description                                                                                                  |
 | ----------------------------------------- | ------------- | ----------- | ------------------------------------------------------------------------------------------------------------ |
@@ -106,9 +106,9 @@ track its progress through multi-step tasks.
 
 ## Internal coordination tools
 
-Internal coordination tools let the model manage its own internal state, access
-its documentation, and handle specialized sub-tasks. These tools usually run
-without your direct interaction.
+Let the model manage its own internal state, access its documentation, and
+handle specialized sub-tasks. These tools usually run without your direct
+interaction.
 
 | Tool                                             | Kind    | Parameters                                                                        | Description                                                                                                        |
 | ------------------------------------------------ | ------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -123,7 +123,7 @@ without your direct interaction.
 For developers, the tool system is designed to be extensible and robust. The
 `ToolRegistry` class manages all available tools.
 
-You can extend Gemini CLI with custom tools by configuring a
+You can extend Gemini CLI with custom tools by configuring
 `tools.discoveryCommand` in your settings or by connecting to MCP servers.
 
 > **Note:** For a deep dive into the internal Tool API and how to implement your
