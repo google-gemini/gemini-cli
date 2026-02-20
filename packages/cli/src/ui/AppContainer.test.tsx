@@ -3468,7 +3468,7 @@ describe('AppContainer State Management', () => {
       vi.spyOn(fs, 'mkdtempSync').mockReturnValue('/tmp/gemini-chat-test');
       vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
       vi.spyOn(fs, 'unlinkSync').mockImplementation(() => {});
-      vi.spyOn(fs, 'rmdirSync').mockImplementation(() => {});
+      vi.spyOn(fs, 'rmSync').mockImplementation(() => {});
 
       // Capture slashCommandActions by shape, not by arg index, so the test
       // stays valid if the hook signature changes.
@@ -3516,7 +3516,7 @@ describe('AppContainer State Management', () => {
       unmount!();
     };
 
-    it('always uses shell: false and splits $EDITOR into exe and embedded args', async () => {
+    it('uses shell: false on non-Windows and splits $EDITOR into exe and embedded args', async () => {
       vi.stubEnv('EDITOR', 'vim -u NONE');
       await renderAndCall();
 
@@ -3531,7 +3531,7 @@ describe('AppContainer State Management', () => {
       );
     });
 
-    it('wraps .cmd editors with cmd.exe on Windows, passing args as array', async () => {
+    it('uses shell: true on Windows for .cmd editors', async () => {
       vi.stubEnv('EDITOR', 'code.cmd');
       Object.defineProperty(process, 'platform', {
         value: 'win32',
@@ -3540,17 +3540,13 @@ describe('AppContainer State Management', () => {
       await renderAndCall();
 
       expect(spawnSync).toHaveBeenCalledWith(
-        'cmd.exe',
-        expect.arrayContaining([
-          '/c',
-          'code.cmd',
-          expect.stringContaining('chat.md'),
-        ]),
-        expect.objectContaining({ shell: false }),
+        'code.cmd',
+        expect.arrayContaining([expect.stringContaining('chat.md')]),
+        expect.objectContaining({ shell: true }),
       );
     });
 
-    it('passes shell metacharacters in $EDITOR as literal argv, not shell-expanded', async () => {
+    it('uses shell: true on Windows with metacharacters in $EDITOR', async () => {
       vi.stubEnv('EDITOR', 'notepad & calc');
       Object.defineProperty(process, 'platform', {
         value: 'win32',
@@ -3565,7 +3561,7 @@ describe('AppContainer State Management', () => {
           'calc',
           expect.stringContaining('chat.md'),
         ]),
-        expect.objectContaining({ shell: false }),
+        expect.objectContaining({ shell: true }),
       );
     });
 

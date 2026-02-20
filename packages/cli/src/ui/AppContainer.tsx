@@ -564,19 +564,14 @@ export const AppContainer = (props: AppContainerProps) => {
       const [exe = '', ...embeddedArgs] = tokens;
       const allArgs = [...embeddedArgs, ...args];
 
-      // .cmd/.bat files on Windows cannot be executed directly; they need
-      // cmd.exe. Pass all args as an array so cmd.exe never shell-expands them.
-      const [spawnCmd, spawnArgs]: [string, string[]] =
-        process.platform === 'win32' && /\.(cmd|bat)$/i.test(exe)
-          ? ['cmd.exe', ['/c', exe, ...allArgs]]
-          : [exe, allArgs];
+      const [spawnCmd, spawnArgs] = [exe, allArgs];
 
       const wasRaw = stdin?.isRaw ?? false;
       try {
         setRawMode?.(false);
         const { status, error } = spawnSync(spawnCmd, spawnArgs, {
           stdio: 'inherit',
-          shell: false,
+          shell: process.platform === 'win32',
         });
         if (error) throw error;
         if (typeof status === 'number' && status !== 0) {
@@ -597,7 +592,7 @@ export const AppContainer = (props: AppContainerProps) => {
           /* ignore */
         }
         try {
-          fs.rmdirSync(tmpDir);
+          fs.rmSync(tmpDir, { recursive: true, force: true });
         } catch {
           /* ignore */
         }
