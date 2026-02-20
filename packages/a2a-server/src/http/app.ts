@@ -7,8 +7,8 @@
 import express from 'express';
 
 import type { AgentCard, Message } from '@a2a-js/sdk';
-import type {
-  TaskStore,
+import {
+  type TaskStore,
   DefaultRequestHandler,
   InMemoryTaskStore,
   DefaultExecutionEventBus,
@@ -91,6 +91,7 @@ async function handleExecuteCommand(
   },
 ) {
   logger.info('[CoreAgent] Received /executeCommand request: ', req.body);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const { command, args } = req.body;
   try {
     if (typeof command !== 'string') {
@@ -214,6 +215,7 @@ export async function createApp() {
         const agentSettings = req.body.agentSettings as
           | AgentSettings
           | undefined;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const contextId = req.body.contextId || uuidv4();
         const wrapper = await agentExecutor.createTask(
           taskId,

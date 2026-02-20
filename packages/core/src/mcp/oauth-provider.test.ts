@@ -36,6 +36,23 @@ vi.mock('../utils/events.js', () => ({
 vi.mock('../utils/authConsent.js', () => ({
   getConsentForOauth: vi.fn(() => Promise.resolve(true)),
 }));
+vi.mock('../utils/headless.js', () => ({
+  isHeadlessMode: vi.fn(() => false),
+}));
+vi.mock('node:readline', () => ({
+  default: {
+    createInterface: vi.fn(() => ({
+      question: vi.fn((_query, callback) => callback('')),
+      close: vi.fn(),
+      on: vi.fn(),
+    })),
+  },
+  createInterface: vi.fn(() => ({
+    question: vi.fn((_query, callback) => callback('')),
+    close: vi.fn(),
+    on: vi.fn(),
+  })),
+}));
 
 import * as http from 'node:http';
 import * as crypto from 'node:crypto';

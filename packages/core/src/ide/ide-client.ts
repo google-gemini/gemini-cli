@@ -345,6 +345,7 @@ export class IdeClient {
 
       if (textPart?.text) {
         try {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const parsedJson = JSON.parse(textPart.text);
           if (parsedJson && typeof parsedJson.content === 'string') {
             return parsedJson.content;

@@ -925,6 +925,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
               continue;
             }
 
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             const validatedOutput = validationResult.data;
             if (this.definition.processOutput) {
               submittedOutput = this.definition.processOutput(validatedOutput);

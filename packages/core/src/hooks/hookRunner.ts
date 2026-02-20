@@ -356,8 +356,10 @@ export class HookRunner {
         const textToParse = stdout.trim() || stderr.trim();
         if (textToParse) {
           try {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             let parsed = JSON.parse(textToParse);
             if (typeof parsed === 'string') {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               parsed = JSON.parse(parsed);
             }
             if (parsed && typeof parsed === 'object') {
