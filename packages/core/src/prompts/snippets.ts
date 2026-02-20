@@ -115,6 +115,8 @@ ${renderOperationalGuidelines(options.operationalGuidelines)}
 
 ${renderInteractiveYoloMode(options.interactiveYoloMode)}
 
+${renderSandbox(options.sandbox)}
+
 ${renderGitRepo(options.gitRepo)}
 ${renderObservationLog(options.reviewedResources)}
 `.trim();
