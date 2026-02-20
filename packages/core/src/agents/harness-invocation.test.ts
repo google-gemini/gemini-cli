@@ -11,7 +11,8 @@ import { AgentFactory } from './agent-factory.js';
 import { type Turn } from '../core/turn.js';
 import { type Config } from '../config/config.js';
 import { type MessageBus } from '../confirmation-bus/message-bus.js';
-import { z } from 'zod';
+import type { z } from 'zod';
+import type { Part } from '@google/genai';
 import { type LocalAgentDefinition } from './types.js';
 
 vi.mock('../core/geminiChat.js', () => ({
@@ -64,6 +65,7 @@ describe('HarnessSubagentInvocation', () => {
       run: vi.fn().mockReturnValue(
         (async function* () {
           // No intermediate events
+          yield* [];
         })(),
       ),
     };
@@ -93,6 +95,7 @@ describe('HarnessSubagentInvocation', () => {
     // Simulate the generator returning the final turn
     mockHarness.run.mockReturnValue(
       (async function* () {
+        yield* [];
         return mockTurn;
       })(),
     );
@@ -100,12 +103,17 @@ describe('HarnessSubagentInvocation', () => {
     const result = await invocation.execute(new AbortController().signal);
 
     expect(result.data?.['result']).toBe('Extracted Finding');
-    expect((result.llmContent as any)?.[0]).toEqual({ text: 'Extracted Finding' });
+    expect((result.llmContent as Part[])?.[0]).toEqual({
+      text: `Subagent 'test-agent' finished.
+Termination Reason: goal
+Result:
+Extracted Finding`,
+    });
     expect(result.returnDisplay).toContain('Extracted Finding');
   });
 
   it('prefers direct text response over complete_task arguments if available', async () => {
-     const invocation = new HarnessSubagentInvocation(
+    const invocation = new HarnessSubagentInvocation(
       definition,
       mockConfig,
       {},
@@ -133,6 +141,7 @@ describe('HarnessSubagentInvocation', () => {
 
     mockHarness.run.mockReturnValue(
       (async function* () {
+        yield* [];
         return mockTurn;
       })(),
     );
@@ -140,7 +149,12 @@ describe('HarnessSubagentInvocation', () => {
     const result = await invocation.execute(new AbortController().signal);
 
     expect(result.data?.['result']).toBe('Textual Result');
-    expect((result.llmContent as any)?.[0]).toEqual({ text: 'Textual Result' });
+    expect((result.llmContent as Part[])?.[0]).toEqual({
+      text: `Subagent 'test-agent' finished.
+Termination Reason: goal
+Result:
+Textual Result`,
+    });
     expect(result.returnDisplay).toContain('Textual Result');
   });
 
@@ -168,6 +182,7 @@ describe('HarnessSubagentInvocation', () => {
 
     mockHarness.run.mockReturnValue(
       (async function* () {
+        yield* [];
         return mockTurn;
       })(),
     );
@@ -222,6 +237,7 @@ describe('HarnessSubagentInvocation', () => {
 
     mockHarness.run.mockReturnValue(
       (async function* () {
+        yield* [];
         return mockTurn;
       })(),
     );
@@ -249,7 +265,10 @@ describe('HarnessSubagentInvocation', () => {
       getHistory: vi.fn().mockReturnValue([
         {
           role: 'model',
-          parts: [{ thought: true, text: 'Thinking about finishing...' } as any],
+          parts: [
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            { thought: true, text: 'Thinking about finishing...' } as any,
+          ],
         },
       ]),
     };
@@ -261,6 +280,7 @@ describe('HarnessSubagentInvocation', () => {
 
     mockHarness.run.mockReturnValue(
       (async function* () {
+        yield* [];
         return mockTurn;
       })(),
     );
@@ -277,6 +297,7 @@ describe('HarnessSubagentInvocation', () => {
       outputConfig: {
         outputName: 'report',
         description: 'A custom report',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         schema: { type: 'string' } as any,
       },
     };
@@ -316,13 +337,14 @@ describe('HarnessSubagentInvocation', () => {
 
     mockHarness.run.mockReturnValue(
       (async function* () {
+        yield* [];
         return mockTurn;
       })(),
     );
 
     const result = await invocation.execute(new AbortController().signal);
 
-    expect(result.data?.['result']).toBe('The custom report content');
+    expect(result.data?.['report']).toBe('The custom report content');
     expect(result.returnDisplay).toContain('The custom report content');
   });
 
@@ -363,6 +385,7 @@ describe('HarnessSubagentInvocation', () => {
 
     mockHarness.run.mockReturnValue(
       (async function* () {
+        yield* [];
         return mockTurn;
       })(),
     );
@@ -373,4 +396,3 @@ describe('HarnessSubagentInvocation', () => {
     expect(result.returnDisplay).toContain('Actual Result');
   });
 });
-

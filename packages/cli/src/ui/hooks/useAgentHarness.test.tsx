@@ -12,11 +12,16 @@ import {
   GeminiEventType as ServerGeminiEventType,
   ROOT_SCHEDULER_ID,
 } from '@google/gemini-cli-core';
+import { makeFakeConfig } from '../../../../core/src/test-utils/config.js';
+import type {
+  Config,
+  ServerGeminiStreamEvent as GeminiEvent,
+} from '@google/gemini-cli-core';
 import { StreamingState, MessageType } from '../types.js';
-import { makeFakeConfig } from '@google/gemini-cli-core/dist/src/test-utils/config.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
     AgentFactory: {
@@ -27,7 +32,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 
 describe('useAgentHarness', () => {
   let mockAddItem: Mock;
-  let mockConfig: any;
+  let mockConfig: Config;
   let mockOnCancelSubmit: Mock;
 
   beforeEach(() => {
@@ -35,19 +40,22 @@ describe('useAgentHarness', () => {
     mockConfig = makeFakeConfig();
     mockOnCancelSubmit = vi.fn();
 
-    mockConfig.getToolRegistry = vi.fn().mockReturnValue({
+    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue({
       getTool: vi.fn().mockReturnValue({
-          displayName: 'TestTool',
-          createInvocation: vi.fn().mockReturnValue({
-              getDescription: () => 'Test Tool Description'
-          })
+        displayName: 'codebase_investigator',
+        createInvocation: vi.fn().mockReturnValue({
+          getDescription: () => 'Test Tool Description',
+        }),
       }),
-    });
-    
-    mockConfig.getMessageBus = vi.fn().mockReturnValue({
-        subscribe: vi.fn().mockReturnValue(vi.fn()),
-        publish: vi.fn(),
-    });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+
+    vi.spyOn(mockConfig, 'getMessageBus').mockReturnValue({
+      subscribe: vi.fn().mockReturnValue(vi.fn()),
+      unsubscribe: vi.fn(),
+      publish: vi.fn(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
 
     vi.clearAllMocks();
   });
@@ -68,29 +76,34 @@ describe('useAgentHarness', () => {
 
     // 1. Send content
     await act(async () => {
-      (result.current as any).processEvent({
+      result.current.processEvent({
         type: ServerGeminiEventType.Content,
         value: 'Hello',
-      });
+      } as GeminiEvent);
     });
     expect(result.current.streamingContent).toBe('Hello');
     expect(result.current.streamingState).toBe(StreamingState.Responding);
 
     // 2. Send thought
     await act(async () => {
-      (result.current as any).processEvent({
+      result.current.processEvent({
         type: ServerGeminiEventType.Thought,
         value: { subject: 'Thinking' },
-      });
+      } as GeminiEvent);
     });
     expect(result.current.thought?.subject).toBe('Thinking');
 
     // 3. Send tool request
     await act(async () => {
-      (result.current as any).processEvent({
+      result.current.processEvent({
         type: ServerGeminiEventType.ToolCallRequest,
-        value: { name: 'tool_1', callId: 'c1', args: {}, schedulerId: ROOT_SCHEDULER_ID },
-      });
+        value: {
+          name: 'tool_1',
+          callId: 'c1',
+          args: {},
+          schedulerId: ROOT_SCHEDULER_ID,
+        },
+      } as GeminiEvent);
     });
     expect(result.current.toolCalls).toHaveLength(1);
     expect(result.current.toolCalls[0].request.name).toBe('tool_1');
@@ -103,28 +116,34 @@ describe('useAgentHarness', () => {
 
     // Start a delegation tool
     await act(async () => {
-      (result.current as any).processEvent({
+      result.current.processEvent({
         type: ServerGeminiEventType.ToolCallRequest,
-        value: { name: 'subagent_tool', callId: 'c1', args: {}, schedulerId: ROOT_SCHEDULER_ID },
-      });
+        value: {
+          name: 'subagent_tool',
+          callId: 'c1',
+          args: {},
+          schedulerId: ROOT_SCHEDULER_ID,
+        },
+      } as GeminiEvent);
     });
 
     // Send subagent activity
     await act(async () => {
-      (result.current as any).processEvent({
+      result.current.processEvent({
         type: ServerGeminiEventType.SubagentActivity,
         value: {
           agentName: 'codebase_investigator',
           type: 'THOUGHT',
           data: { subject: 'Analyzing logs' },
         },
-      });
+      } as GeminiEvent);
     });
 
     // Verify the tool box resultDisplay was updated with the thought
-    expect((result.current.toolCalls[0] as any).response?.resultDisplay).toContain(
-      '🤖💭 Analyzing logs',
-    );
+    expect(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (result.current.toolCalls[0] as any).response?.resultDisplay,
+    ).toContain('🤖💭 Analyzing logs');
 
     // Send another activity
     await act(async () => {
@@ -135,12 +154,13 @@ describe('useAgentHarness', () => {
           type: 'TOOL_CALL_START',
           data: { name: 'list_directory' },
         },
-      });
+      } as GeminiEvent);
     });
 
-    expect((result.current.toolCalls[0] as any).response?.resultDisplay).toContain(
-      '🛠️ Calling TestTool...',
-    );
+    expect(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (result.current.toolCalls[0] as any).response?.resultDisplay,
+    ).toContain('🛠️ Calling codebase_investigator...');
   });
 
   it('flushes to history on TurnFinished', async () => {
@@ -150,14 +170,21 @@ describe('useAgentHarness', () => {
 
     // Setup some state
     await act(async () => {
-        (result.current as any).processEvent({ type: ServerGeminiEventType.Content, value: 'Done' });
-        (result.current as any).processEvent({ type: ServerGeminiEventType.TurnFinished });
+      result.current.processEvent({
+        type: ServerGeminiEventType.Content,
+        value: 'Done',
+      } as GeminiEvent);
+      result.current.processEvent({
+        type: ServerGeminiEventType.TurnFinished,
+      } as GeminiEvent);
     });
 
-    expect(mockAddItem).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mockAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({
         type: MessageType.GEMINI,
-        text: 'Done'
-    }));
+        text: 'Done',
+      }),
+    );
     expect(result.current.streamingContent).toBe(''); // Should be cleared
   });
 });

@@ -40,7 +40,9 @@ export async function resolveAuthValue(value: string): Promise<string> {
           `Please set it before using this agent.`,
       );
     }
-    debugLogger.debug(`[AgentHarness] [AuthValueResolver] Resolved env var: ${envVar}`);
+    debugLogger.debug(
+      `[AgentHarness] [AuthValueResolver] Resolved env var: ${envVar}`,
+    );
     return resolved;
   }
 
@@ -51,7 +53,9 @@ export async function resolveAuthValue(value: string): Promise<string> {
       throw new Error('Empty command in auth value. Expected format: !command');
     }
 
-    debugLogger.debug(`[AgentHarness] [AuthValueResolver] Executing command for auth value`);
+    debugLogger.debug(
+      `[AgentHarness] [AuthValueResolver] Executing command for auth value`,
+    );
 
     const shellConfig = getShellConfiguration();
     try {

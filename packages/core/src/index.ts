@@ -138,6 +138,7 @@ export * from './prompts/mcp-prompts.js';
 
 // Export agent definitions
 export * from './agents/types.js';
+export * from './agents/agent-factory.js';
 export * from './agents/agentLoader.js';
 export * from './agents/local-executor.js';
 

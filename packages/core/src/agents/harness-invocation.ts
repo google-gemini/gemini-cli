@@ -11,6 +11,7 @@ import { ToolErrorType } from '../tools/tool-error.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { LocalAgentDefinition, AgentInputs } from './types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { MessageBusType } from '../confirmation-bus/types.js';
 import { AgentFactory } from './agent-factory.js';
 import { type Turn, GeminiEventType } from '../core/turn.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
@@ -96,13 +97,13 @@ export class HarnessSubagentInvocation extends BaseToolInvocation<
 
             // Also publish to message bus so UI hooks can see it regardless of where they listen
             void this.messageBus.publish({
-              type: 'subagent-activity',
+              type: MessageBusType.SUBAGENT_ACTIVITY,
               activity: {
                 agentName: this.definition.name,
                 type: 'THOUGHT',
                 data: { subject: lastThought },
               },
-            } as never);
+            });
           } else if (
             event.type === GeminiEventType.SubagentActivity &&
             'value' in event
@@ -114,9 +115,10 @@ export class HarnessSubagentInvocation extends BaseToolInvocation<
 
             // Forward the core activity to the global bus
             void this.messageBus.publish({
-              type: 'subagent-activity',
-              activity: event.value,
-            } as never);
+              type: MessageBusType.SUBAGENT_ACTIVITY,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+              activity: event.value as any,
+            });
           }
         }
       }
@@ -127,7 +129,6 @@ export class HarnessSubagentInvocation extends BaseToolInvocation<
 
       // 1. Initialize result with the explicit submitted output if available
       let finalResultRaw: unknown = turn.submittedOutput;
-      let finalResultString: string | undefined;
 
       // 2. Fallback: If no explicit output, try textual response
       if (finalResultRaw === undefined) {
@@ -202,8 +203,7 @@ export class HarnessSubagentInvocation extends BaseToolInvocation<
             // Check for complete_task call in history (what the tests use)
             const callPart = lastMsgWithResult.parts.find(
               (p) =>
-                'functionCall' in p &&
-                p.functionCall?.name === 'complete_task',
+                'functionCall' in p && p.functionCall?.name === 'complete_task',
             );
             if (
               callPart &&
@@ -211,9 +211,11 @@ export class HarnessSubagentInvocation extends BaseToolInvocation<
               callPart.functionCall
             ) {
               finalResultRaw =
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                 (callPart.functionCall.args as Record<string, unknown>)?.[
                   outputName
                 ] ||
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                 (callPart.functionCall.args as Record<string, unknown>)?.[
                   'result'
                 ];
@@ -227,7 +229,7 @@ export class HarnessSubagentInvocation extends BaseToolInvocation<
         }
       }
 
-      finalResultString =
+      const finalResultString =
         typeof finalResultRaw === 'object'
           ? JSON.stringify(finalResultRaw, null, 2)
           : String(finalResultRaw ?? 'Task completed.');
@@ -265,10 +267,18 @@ ${finalResultString}
         ).slice(0, 500)}...`,
       );
 
+      const resultContent = `Subagent '${this.definition.name}' finished.
+Termination Reason: goal
+Result:
+${finalResultString}`;
+
       return {
-        llmContent: [{ text: finalResultString }],
+        llmContent: [{ text: resultContent }],
         returnDisplay: displayContent,
-        data: { [outputName]: finalResultData },
+        data: {
+          [outputName]: finalResultData,
+          result: finalResultData,
+        },
       };
     } catch (error) {
       const errorMessage =

@@ -19,8 +19,18 @@ export enum MessageBusType {
   TOOL_EXECUTION_FAILURE = 'tool-execution-failure',
   UPDATE_POLICY = 'update-policy',
   TOOL_CALLS_UPDATE = 'tool-calls-update',
+  SUBAGENT_ACTIVITY = 'subagent-activity',
   ASK_USER_REQUEST = 'ask-user-request',
   ASK_USER_RESPONSE = 'ask-user-response',
+}
+
+export interface SubagentActivityMessage {
+  type: MessageBusType.SUBAGENT_ACTIVITY;
+  activity: {
+    agentName: string;
+    type: 'THOUGHT' | 'TOOL_CALL_START';
+    data: Record<string, unknown>;
+  };
 }
 
 export interface ToolCallsUpdateMessage {
@@ -180,4 +190,5 @@ export type Message =
   | UpdatePolicy
   | AskUserRequest
   | AskUserResponse
-  | ToolCallsUpdateMessage;
+  | ToolCallsUpdateMessage
+  | SubagentActivityMessage;

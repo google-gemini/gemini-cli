@@ -106,7 +106,7 @@ export class A2AClientManager {
   clearCache(): void {
     this.clients.clear();
     this.agentCards.clear();
-    debugLogger.debug('[AgentHarness] [A2AClientManager] Cache cleared.');
+    debugLogger.debug('[A2AClientManager] Cache cleared.');
   }
 
   /**

@@ -8,12 +8,16 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   GeminiEventType as ServerGeminiEventType,
   ROOT_SCHEDULER_ID,
+  AgentFactory,
+  MessageBusType,
 } from '@google/gemini-cli-core';
-import { AgentFactory } from '@google/gemini-cli-core/dist/src/agents/agent-factory.js';
 import type {
   Config,
   ServerGeminiStreamEvent as GeminiEvent,
   ThoughtSummary,
+  RetryAttemptPayload,
+  ToolCallsUpdateMessage,
+  ValidatingToolCall,
 } from '@google/gemini-cli-core';
 import { type PartListUnion, type Part } from '@google/genai';
 import {
@@ -27,7 +31,6 @@ import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { mapToDisplay as mapTrackedToolCallsToDisplay } from './toolMapping.js';
 import type { TrackedToolCall } from './useToolScheduler.js';
 import { type BackgroundShell } from './shellReducer.js';
-import type { RetryAttemptPayload } from '@google/gemini-cli-core';
 
 export interface UseAgentHarnessReturn {
   streamingState: StreamingState;
@@ -87,7 +90,7 @@ export const useAgentHarness = (
   // Listen to the MessageBus for live tool updates (e.g. from subagents or long-running tools)
   useEffect(() => {
     const bus = config.getMessageBus();
-    const handler = (event: any) => {
+    const handler = (event: ToolCallsUpdateMessage) => {
       setToolCalls((prev) => {
         const next = [...prev];
         for (const coreCall of event.toolCalls) {
@@ -98,16 +101,16 @@ export const useAgentHarness = (
             next[index] = {
               ...next[index],
               ...coreCall,
-            } as TrackedToolCall;
+            };
           }
         }
         toolCallsRef.current = next;
         return next;
       });
     };
-    bus.subscribe('tool-calls-update' as any, handler);
+    bus.subscribe(MessageBusType.TOOL_CALLS_UPDATE, handler);
     return () => {
-      bus.unsubscribe('tool-calls-update' as any, handler);
+      bus.unsubscribe(MessageBusType.TOOL_CALLS_UPDATE, handler);
     };
   }, [config]);
 
@@ -120,7 +123,7 @@ export const useAgentHarness = (
       items.push({
         type: MessageType.THINKING,
         thought,
-      } as any as HistoryItemWithoutId);
+      } as HistoryItemWithoutId);
     }
     if (toolCalls.length > 0) {
       const unpushed = toolCalls.filter(
@@ -128,7 +131,7 @@ export const useAgentHarness = (
       );
       if (unpushed.length > 0) {
         items.push(
-          mapToDisplayInternal(unpushed as TrackedToolCall[], {
+          mapToDisplayInternal(unpushed, {
             borderBottom: true,
           }),
         );
@@ -181,7 +184,7 @@ export const useAgentHarness = (
           {
             setThought(null);
             const tool = config.getToolRegistry().getTool(event.value.name);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
             const invocation = (tool as any)?.createInvocation?.(
               event.value.args,
               config.getMessageBus(),
@@ -189,16 +192,17 @@ export const useAgentHarness = (
 
             // In Harness mode, top-level calls might not have schedulerId set yet.
             // We default to ROOT_SCHEDULER_ID to ensure they are visible.
-            const newCall = {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            const newCall: TrackedToolCall = {
               request: {
                 ...event.value,
                 schedulerId: event.value.schedulerId || ROOT_SCHEDULER_ID,
               },
               status: 'validating',
               schedulerId: event.value.schedulerId || ROOT_SCHEDULER_ID,
-              tool,
-              invocation,
-            } as TrackedToolCall;
+              tool: tool || undefined,
+              invocation: invocation || undefined,
+            } as ValidatingToolCall;
 
             const nextCalls = [...toolCallsRef.current, newCall];
             toolCallsRef.current = nextCalls;
@@ -211,10 +215,11 @@ export const useAgentHarness = (
             const response = event.value;
             const nextCalls = toolCallsRef.current.map((tc) =>
               tc.request.callId === response.callId
-                ? ({
+                ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+                  ({
                     ...tc,
                     status: 'success',
-                    response: response,
+                    response,
                   } as unknown as TrackedToolCall)
                 : tc,
             );
@@ -229,7 +234,7 @@ export const useAgentHarness = (
             addItem({
               type: MessageType.THINKING,
               thought: thoughtRef.current,
-            } as any as HistoryItemWithoutId);
+            } as HistoryItemWithoutId);
             setThought(null);
           }
 
@@ -239,7 +244,7 @@ export const useAgentHarness = (
             );
             if (unpushed.length > 0) {
               addItem(
-                mapToDisplayInternal(unpushed as TrackedToolCall[], {
+                mapToDisplayInternal(unpushed, {
                   borderBottom: true,
                 }),
               );
@@ -275,8 +280,14 @@ export const useAgentHarness = (
                 (tc.tool?.displayName || tc.request.name) === activity.agentName
               ) {
                 matched = true;
-                const currentCall = tc as any;
-                let output = currentCall.response?.resultDisplay || '';
+                let output = '';
+                if (
+                  tc.status === 'success' ||
+                  tc.status === 'error' ||
+                  tc.status === 'cancelled'
+                ) {
+                  output = String(tc.response.resultDisplay || '');
+                }
                 if (typeof output !== 'string') output = '';
 
                 if (activity.type === 'TOOL_CALL_START') {
@@ -285,14 +296,24 @@ export const useAgentHarness = (
                   const displayName = tool?.displayName || rawName;
                   output += `🛠️ Calling ${displayName}...\n`;
                 } else if (activity.type === 'THOUGHT') {
-                  const subject = String(activity.data['subject'] || 'Thinking');
+                  const subject = String(
+                    activity.data['subject'] || 'Thinking',
+                  );
                   output += `🤖💭 ${subject}\n`;
                 }
 
+                const currentResponse =
+                  tc.status === 'success' ||
+                  tc.status === 'error' ||
+                  tc.status === 'cancelled'
+                    ? tc.response
+                    : {};
+
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                 return {
                   ...tc,
                   response: {
-                    ...(currentCall.response || {}),
+                    ...currentResponse,
                     resultDisplay: output,
                   },
                 } as unknown as TrackedToolCall;
@@ -329,15 +350,17 @@ export const useAgentHarness = (
   // Listen for nested subagent activity on the MessageBus
   useEffect(() => {
     const bus = config.getMessageBus();
+    /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion */
     const handler = (event: any) => {
       processEvent({
         type: ServerGeminiEventType.SubagentActivity,
         value: event.activity,
-      });
+      } as any as GeminiEvent);
     };
-    bus.subscribe('subagent-activity' as any, handler);
+    /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion */
+    bus.subscribe(MessageBusType.SUBAGENT_ACTIVITY, handler);
     return () => {
-      bus.unsubscribe('subagent-activity' as any, handler);
+      bus.unsubscribe(MessageBusType.SUBAGENT_ACTIVITY, handler);
     };
   }, [config, processEvent]);
 
@@ -350,9 +373,11 @@ export const useAgentHarness = (
       const harness = AgentFactory.createHarness(config);
 
       // Convert parts to Part[] array for harness
+      /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
       const requestParts: Part[] = Array.isArray(parts)
         ? (parts as Part[])
         : [{ text: String(parts) }];
+      /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
 
       const stream = harness.run(
         requestParts,
@@ -406,15 +431,16 @@ export const useAgentHarness = (
  */
 function mapToDisplayInternal(
   calls: TrackedToolCall[],
-  options: any,
+  options: { borderTop?: boolean; borderBottom?: boolean },
 ): HistoryItemWithoutId {
   // We filter out any tool calls that are NOT part of the root harness level.
   // This prevents internal subagent work (like list_directory) from appearing
   // as loose tool boxes in the main chat.
-  const filtered = calls.filter((c) => {
-    // Only show tools belonging to the main top-level session.
-    return c.schedulerId === ROOT_SCHEDULER_ID;
-  });
+  const filtered = calls.filter(
+    (c) =>
+      // Only show tools belonging to the main top-level session.
+      c.schedulerId === ROOT_SCHEDULER_ID,
+  );
 
-  return mapTrackedToolCallsToDisplay(filtered as any, options);
+  return mapTrackedToolCallsToDisplay(filtered, options);
 }

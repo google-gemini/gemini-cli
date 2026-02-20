@@ -56,6 +56,9 @@ export interface AgentBehavior {
   /** The human-readable name of the agent. */
   readonly name: string;
 
+  /** The definition of the agent, if applicable. */
+  readonly definition?: LocalAgentDefinition;
+
   /** Initializes any state needed for the agent. */
   initialize(toolRegistry: ToolRegistry): Promise<void>;
 
@@ -341,7 +344,7 @@ export class SubagentBehavior implements AgentBehavior {
 
   constructor(
     private readonly config: Config,
-    public readonly definition: LocalAgentDefinition,
+    readonly definition: LocalAgentDefinition,
     private readonly inputs?: AgentInputs,
     parentPromptId?: string,
   ) {
@@ -550,7 +553,7 @@ export class SubagentBehavior implements AgentBehavior {
               : String(rawFindings);
 
           debugLogger.debug(
-            `[AgentHarness] [${this.name}:${this.agentId}] Captured findings from recovery complete_task. Length: ${turn.submittedOutput.length}`,
+            `[AgentHarness] [${this.name}:${this.agentId}] Captured findings from recovery complete_task. Length: ${String(turn.submittedOutput).length}`,
           );
         }
       }

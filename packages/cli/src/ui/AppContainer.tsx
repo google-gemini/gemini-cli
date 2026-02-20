@@ -1020,10 +1020,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
   } = activeStream;
 
   const activePtyId = rawActivePtyId ?? undefined;
-  const loopDetectionConfirmationRequest =
-    rawLoopDetectionConfirmationRequest as any;
-  const backgroundShells = rawBackgroundShells as any;
-  const retryStatus = rawRetryStatus as any;
+  const loopDetectionConfirmationRequest = rawLoopDetectionConfirmationRequest;
+  const backgroundShells = rawBackgroundShells;
+  const retryStatus = rawRetryStatus;
 
   toggleBackgroundShellRef.current = toggleBackgroundShell;
   isBackgroundShellVisibleRef.current = isBackgroundShellVisible;
@@ -1629,7 +1628,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return false;
       } else if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
         if (activePtyId) {
-          (backgroundCurrentShell as any)?.();
+          backgroundCurrentShell?.();
           // After backgrounding, we explicitly do NOT show or focus the background UI.
         } else {
           toggleBackgroundShell();

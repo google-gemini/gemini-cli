@@ -16,6 +16,7 @@ import {
 } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { awaitConfirmation, resolveConfirmation } from './confirmation.js';
+import * as EditorUtils from '../utils/editor.js';
 import {
   MessageBusType,
   type ToolConfirmationResponse,
@@ -32,6 +33,8 @@ import type { ValidatingToolCall, WaitingToolCall } from './types.js';
 import { ROOT_SCHEDULER_ID } from './types.js';
 import type { Config } from '../config/config.js';
 import type { EditorType } from '../utils/editor.js';
+import { randomUUID } from 'node:crypto';
+
 import { randomUUID } from 'node:crypto';
 
 // Mock Dependencies
@@ -123,6 +126,7 @@ describe('confirmation.ts', () => {
     let toolMock: Mocked<AnyDeclarativeTool>;
 
     beforeEach(() => {
+      vi.spyOn(EditorUtils, 'resolveEditorAsync').mockResolvedValue('vim');
       signal = new AbortController().signal;
 
       mockState = {
