@@ -1048,12 +1048,23 @@ export function saveSettings(settingsFile: SettingsFile): void {
       settingsFile.path,
       settingsToSave as Record<string, unknown>,
     );
-  } catch (error) {
-    coreEvents.emitFeedback(
-      'error',
-      'There was an error saving your latest settings changes.',
-      error,
-    );
+  } catch (error: unknown) {
+    if (
+      error instanceof Error &&
+      (error as NodeJS.ErrnoException).code === 'EACCES'
+    ) {
+      coreEvents.emitFeedback(
+        'error',
+        `Permission denied: Cannot write to ${settingsFile.path}. Try running with sudo.`,
+        error,
+      );
+    } else {
+      coreEvents.emitFeedback(
+        'error',
+        'There was an error saving your latest settings changes.',
+        error,
+      );
+    }
   }
 }
 
