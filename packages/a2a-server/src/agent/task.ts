@@ -30,7 +30,10 @@ import {
   EDIT_TOOL_NAMES,
   processRestorableToolCalls,
 } from '@google/gemini-cli-core';
-import type { RequestContext , type ExecutionEventBus } from '@a2a-js/sdk/server';
+import type {
+  RequestContext,
+  type ExecutionEventBus,
+} from '@a2a-js/sdk/server';
 import type {
   TaskStatusUpdateEvent,
   TaskArtifactUpdateEvent,
@@ -418,11 +421,19 @@ export class Task {
       );
       toolCalls.forEach((tc: ToolCall) => {
         if (tc.status === 'awaiting_approval' && tc.confirmationDetails) {
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises, @typescript-eslint/no-unsafe-type-assertion
-          (tc.confirmationDetails as ToolCallConfirmationDetails).onConfirm(
-            ToolConfirmationOutcome.ProceedOnce,
-          );
-          this.pendingToolConfirmationDetails.delete(tc.request.callId);
+          const details = tc.confirmationDetails;
+          if (
+            typeof details === 'object' &&
+            details !== null &&
+            'onConfirm' in details &&
+            typeof details.onConfirm === 'function'
+          ) {
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+            (details as ToolCallConfirmationDetails).onConfirm(
+              ToolConfirmationOutcome.ProceedOnce,
+            );
+            this.pendingToolConfirmationDetails.delete(tc.request.callId);
+          }
         }
       });
       return;
