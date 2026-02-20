@@ -197,7 +197,10 @@ export async function createContentGenerator(
           'x-gemini-api-privileged-user-id': `${installationId}`,
         };
       }
-      const httpOptions = { headers };
+      const baseUrl = config.vertexai
+        ? process.env['GOOGLE_VERTEX_BASE_URL']
+        : process.env['GOOGLE_GEMINI_BASE_URL'];
+      const httpOptions = { headers, ...(baseUrl && { baseUrl }) };
 
       const googleGenAI = new GoogleGenAI({
         apiKey: config.apiKey === '' ? undefined : config.apiKey,
