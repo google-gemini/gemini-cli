@@ -104,11 +104,11 @@ export const enableCommand: CommandModule = {
         return true;
       }),
   handler: async (argv) => {
+    const name = argv['name'];
+    const scope = argv['scope'];
     await handleEnable({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      name: argv['name'] as string,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      scope: argv['scope'] as string,
+      name: typeof name === 'string' ? name : '',
+      scope: typeof scope === 'string' ? scope : undefined,
     });
     await exitCli();
   },

@@ -154,11 +154,11 @@ export const updateCommand: CommandModule = {
         return true;
       }),
   handler: async (argv) => {
+    const name = argv['name'];
+    const all = argv['all'];
     await handleUpdate({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      name: argv['name'] as string | undefined,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      all: argv['all'] as boolean | undefined,
+      name: typeof name === 'string' ? name : undefined,
+      all: typeof all === 'boolean' ? all : undefined,
     });
     await exitCli();
   },

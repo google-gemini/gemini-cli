@@ -98,17 +98,19 @@ export const installCommand: CommandModule = {
         return true;
       }),
   handler: async (argv) => {
+    const source = argv['source'];
+    const ref = argv['ref'];
+    const autoUpdate = argv['auto-update'];
+    const allowPreRelease = argv['pre-release'];
+    const consent = argv['consent'];
+
     await handleInstall({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      source: argv['source'] as string,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      ref: argv['ref'] as string | undefined,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      autoUpdate: argv['auto-update'] as boolean | undefined,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      allowPreRelease: argv['pre-release'] as boolean | undefined,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      consent: argv['consent'] as boolean | undefined,
+      source: typeof source === 'string' ? source : '',
+      ref: typeof ref === 'string' ? ref : undefined,
+      autoUpdate: typeof autoUpdate === 'boolean' ? autoUpdate : undefined,
+      allowPreRelease:
+        typeof allowPreRelease === 'boolean' ? allowPreRelease : undefined,
+      consent: typeof consent === 'boolean' ? consent : undefined,
     });
     await exitCli();
   },

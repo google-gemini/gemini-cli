@@ -112,7 +112,12 @@ export const enableCommand: CommandModule<object, Args> = {
         default: false,
       }),
   handler: async (argv) => {
-    await handleEnable(argv as Args);
+    const name = argv['name'];
+    const session = argv['session'];
+    await handleEnable({
+      name: typeof name === 'string' ? name : '',
+      session: typeof session === 'boolean' ? session : undefined,
+    });
     await exitCli();
   },
 };
@@ -133,7 +138,12 @@ export const disableCommand: CommandModule<object, Args> = {
         default: false,
       }),
   handler: async (argv) => {
-    await handleDisable(argv as Args);
+    const name = argv['name'];
+    const session = argv['session'];
+    await handleDisable({
+      name: typeof name === 'string' ? name : '',
+      session: typeof session === 'boolean' ? session : undefined,
+    });
     await exitCli();
   },
 };

@@ -97,11 +97,11 @@ export const newCommand: CommandModule = {
       });
   },
   handler: async (args) => {
+    const path = args['path'];
+    const template = args['template'];
     await handleNew({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      path: args['path'] as string,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      template: args['template'] as string | undefined,
+      path: typeof path === 'string' ? path : '',
+      template: typeof template === 'string' ? template : undefined,
     });
     await exitCli();
   },

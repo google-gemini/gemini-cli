@@ -63,6 +63,10 @@ import {
 } from '../components/LogoutConfirmationDialog.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
 
+function isRecord(obj: unknown): obj is Record<string, unknown> {
+  return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
+}
+
 interface SlashCommandProcessorActions {
   openAuthDialog: () => void;
   openThemeDialog: () => void;
@@ -498,10 +502,9 @@ export const useSlashCommandProcessor = (
                       actions.openModelDialog();
                       return { type: 'handled' };
                     case 'agentConfig': {
-                      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-                      const props = result.props as Record<string, unknown>;
+                      const props = result.props;
                       if (
-                        !props ||
+                        !isRecord(props) ||
                         typeof props['name'] !== 'string' ||
                         typeof props['displayName'] !== 'string' ||
                         !props['definition']
@@ -519,12 +522,15 @@ export const useSlashCommandProcessor = (
                       );
                       return { type: 'handled' };
                     }
-                    case 'permissions':
+                    case 'permissions': {
+                      const props = result.props;
                       actions.openPermissionsDialog(
-                        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-                        result.props as { targetDirectory?: string },
+                        isRecord(props)
+                          ? (props as { targetDirectory?: string })
+                          : undefined,
                       );
                       return { type: 'handled' };
+                    }
                     case 'help':
                       return { type: 'handled' };
                     default: {
