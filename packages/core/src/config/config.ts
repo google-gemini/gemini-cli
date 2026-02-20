@@ -3020,15 +3020,15 @@ export class Config implements McpContext, AgentLoopContext {
     return remoteThreshold;
   }
 
-  getUserCaching(): boolean | undefined {
+  async getUserCaching(): Promise<boolean | undefined> {
     return this.getExperimentValue<boolean>(ExperimentFlags.USER_CACHING);
   }
 
-  getPlanModeRoutingEnabled(): boolean {
+  async getPlanModeRoutingEnabled(): Promise<boolean> {
     return this.planModeRoutingEnabled;
   }
 
-  isNumericalRoutingEnabled(): boolean {
+  async getNumericalRoutingEnabled(): Promise<boolean> {
     return (
       this.getExperimentValue<boolean>(
         ExperimentFlags.ENABLE_NUMERICAL_ROUTING,
@@ -3041,8 +3041,8 @@ export class Config implements McpContext, AgentLoopContext {
    * If a remote threshold is provided and within range (0-100), it is returned.
    * Otherwise, the default threshold (90) is returned.
    */
-  getResolvedClassifierThreshold(): number {
-    const remoteValue = this.getClassifierThreshold();
+  async getResolvedClassifierThreshold(): Promise<number> {
+    const remoteValue = await this.getClassifierThreshold();
     const defaultValue = 90;
 
     if (
@@ -3057,13 +3057,13 @@ export class Config implements McpContext, AgentLoopContext {
     return defaultValue;
   }
 
-  getClassifierThreshold(): number | undefined {
+  async getClassifierThreshold(): Promise<number | undefined> {
     return this.getExperimentValue<number>(
       ExperimentFlags.CLASSIFIER_THRESHOLD,
     );
   }
 
-  getBannerTextNoCapacityIssues(): string {
+  async getBannerTextNoCapacityIssues(): Promise<string> {
     return (
       this.getExperimentValue<string>(
         ExperimentFlags.BANNER_TEXT_NO_CAPACITY_ISSUES,
@@ -3071,7 +3071,7 @@ export class Config implements McpContext, AgentLoopContext {
     );
   }
 
-  getBannerTextCapacityIssues(): string {
+  async getBannerTextCapacityIssues(): Promise<string> {
     return (
       this.getExperimentValue<string>(
         ExperimentFlags.BANNER_TEXT_CAPACITY_ISSUES,
@@ -3079,7 +3079,6 @@ export class Config implements McpContext, AgentLoopContext {
     );
   }
 
-<<<<<<< HEAD
   /**
    * Returns whether the user has access to Pro models.
    * This is determined by the PRO_MODEL_NO_ACCESS experiment flag.
@@ -3198,11 +3197,12 @@ export class Config implements McpContext, AgentLoopContext {
     return (
       this.experiments?.flags[ExperimentFlags.GEMINI_3_1_FLASH_LITE_LAUNCHED]
         ?.boolValue ?? false
-=======
+    );
+  }
+
   isAwesomeEnabled(): boolean {
     return (
       this.getExperimentValue<boolean>(ExperimentFlags.ENABLE_AWESOME) ?? false
->>>>>>> d2ce1460f (feat(config): add enable-awesome experiment to show custom ASCII art)
     );
   }
 

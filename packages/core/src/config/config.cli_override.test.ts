@@ -14,7 +14,7 @@ describe('Config CLI Override', () => {
   const cwd = process.cwd();
   const model = 'gemini-pro';
 
-  it('should prioritize CLI argument over local setting', () => {
+  it('should prioritize CLI argument over local setting', async () => {
     const config = new Config({
       sessionId,
       targetDir,
@@ -25,10 +25,10 @@ describe('Config CLI Override', () => {
       experimentalSettings: { 'enable-numerical-routing': false },
     });
 
-    expect(config.isNumericalRoutingEnabled()).toBe(true);
+    expect(await config.getNumericalRoutingEnabled()).toBe(true);
   });
 
-  it('should prioritize CLI argument over remote experiment', () => {
+  it('should prioritize CLI argument over remote experiment', async () => {
     const config = new Config({
       sessionId,
       targetDir,
@@ -44,6 +44,6 @@ describe('Config CLI Override', () => {
       },
     });
 
-    expect(config.isNumericalRoutingEnabled()).toBe(true);
+    expect(await config.getNumericalRoutingEnabled()).toBe(true);
   });
 });
