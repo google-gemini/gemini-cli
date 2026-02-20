@@ -17,6 +17,14 @@ exports[`<StatsDisplay /> > Code Changes Display > displays Code Changes when li
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              100ms (100.0%)                                                      │
 │                                                                                                  │
+│  Model Usage                                                                                     │
+│  Usage limits span all sessions and reset daily.                                                 │
+│  /auth to upgrade or switch to API key.                                                          │
+│                                                                                                  │
+│  Model                    Reqs   Input Tokens   Cache Reads  Output Tokens                       │
+│  ─────────────────────────────────────────────────────────────────────────                       │
+│  No model usage recorded.                                                                        │
+│                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
 `;
@@ -36,6 +44,14 @@ exports[`<StatsDisplay /> > Code Changes Display > hides Code Changes when no li
 │  Agent Active:               100ms                                                               │
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              100ms (100.0%)                                                      │
+│                                                                                                  │
+│  Model Usage                                                                                     │
+│  Usage limits span all sessions and reset daily.                                                 │
+│  /auth to upgrade or switch to API key.                                                          │
+│                                                                                                  │
+│  Model                    Reqs   Input Tokens   Cache Reads  Output Tokens                       │
+│  ─────────────────────────────────────────────────────────────────────────                       │
+│  No model usage recorded.                                                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
@@ -57,6 +73,14 @@ exports[`<StatsDisplay /> > Conditional Color Tests > renders success rate in gr
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
+│  Model Usage                                                                                     │
+│  Usage limits span all sessions and reset daily.                                                 │
+│  /auth to upgrade or switch to API key.                                                          │
+│                                                                                                  │
+│  Model                    Reqs   Input Tokens   Cache Reads  Output Tokens                       │
+│  ─────────────────────────────────────────────────────────────────────────                       │
+│  No model usage recorded.                                                                        │
+│                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
 `;
@@ -77,6 +101,14 @@ exports[`<StatsDisplay /> > Conditional Color Tests > renders success rate in re
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
+│  Model Usage                                                                                     │
+│  Usage limits span all sessions and reset daily.                                                 │
+│  /auth to upgrade or switch to API key.                                                          │
+│                                                                                                  │
+│  Model                    Reqs   Input Tokens   Cache Reads  Output Tokens                       │
+│  ─────────────────────────────────────────────────────────────────────────                       │
+│  No model usage recorded.                                                                        │
+│                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
 `;
@@ -96,6 +128,14 @@ exports[`<StatsDisplay /> > Conditional Color Tests > renders success rate in ye
 │  Agent Active:               0s                                                                  │
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              0s (0.0%)                                                           │
+│                                                                                                  │
+│  Model Usage                                                                                     │
+│  Usage limits span all sessions and reset daily.                                                 │
+│  /auth to upgrade or switch to API key.                                                          │
+│                                                                                                  │
+│  Model                    Reqs   Input Tokens   Cache Reads  Output Tokens                       │
+│  ─────────────────────────────────────────────────────────────────────────                       │
+│  No model usage recorded.                                                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
@@ -118,6 +158,9 @@ exports[`<StatsDisplay /> > Conditional Rendering Tests > hides Efficiency secti
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
 │  Model Usage                                                                                     │
+│  Usage limits span all sessions and reset daily.                                                 │
+│  /auth to upgrade or switch to API key.                                                          │
+│                                                                                                  │
 │  Model                    Reqs   Input Tokens   Cache Reads  Output Tokens                       │
 │  ─────────────────────────────────────────────────────────────────────────                       │
 │  gemini-2.5-pro              1            100             0            100                       │
@@ -142,6 +185,14 @@ exports[`<StatsDisplay /> > Conditional Rendering Tests > hides User Agreement w
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              123ms (100.0%)                                                      │
 │                                                                                                  │
+│  Model Usage                                                                                     │
+│  Usage limits span all sessions and reset daily.                                                 │
+│  /auth to upgrade or switch to API key.                                                          │
+│                                                                                                  │
+│  Model                    Reqs   Input Tokens   Cache Reads  Output Tokens                       │
+│  ─────────────────────────────────────────────────────────────────────────                       │
+│  No model usage recorded.                                                                        │
+│                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
 `;
@@ -163,6 +214,9 @@ exports[`<StatsDisplay /> > Quota Display > renders model table quota percentage
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
 │  Model Usage                                                                                     │
+│  Usage limits span all sessions and reset daily.                                                 │
+│  /auth to upgrade or switch to API key.                                                          │
+│                                                                                                  │
 │  Model                    Reqs                              Usage left                           │
 │  ─────────────────────────────────────────────────────────────────────                           │
 │  gemini-2.5-flash            -                                   50.0%                           │
@@ -193,6 +247,9 @@ exports[`<StatsDisplay /> > Quota Display > renders pooled quota even when no mo
 │  /auth to upgrade or switch to API key.                                                          │
 │  For a full token breakdown, run \`/stats model\`.                                                 │
 │                                                                                                  │
+│  Model                    Reqs   Input Tokens   Cache Reads  Output Tokens                       │
+│  ─────────────────────────────────────────────────────────────────────────                       │
+│  No model usage recorded.                                                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
@@ -246,6 +303,9 @@ exports[`<StatsDisplay /> > Quota Display > renders quota information for unused
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
 │  Model Usage                                                                                     │
+│  Usage limits span all sessions and reset daily.                                                 │
+│  /auth to upgrade or switch to API key.                                                          │
+│                                                                                                  │
 │  Model                    Reqs                              Usage left                           │
 │  ─────────────────────────────────────────────────────────────────────                           │
 │  gemini-2.5-flash            -                    50.0% (Resets in 2h)                           │
@@ -271,6 +331,9 @@ exports[`<StatsDisplay /> > Quota Display > renders quota information when quota
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
 │  Model Usage                                                                                     │
+│  Usage limits span all sessions and reset daily.                                                 │
+│  /auth to upgrade or switch to API key.                                                          │
+│                                                                                                  │
 │  Model                    Reqs                              Usage left                           │
 │  ─────────────────────────────────────────────────────────────────────                           │
 │  gemini-2.5-pro              1                75.0% (Resets in 1h 30m)                           │
@@ -295,6 +358,14 @@ exports[`<StatsDisplay /> > Title Rendering > renders the custom title when a ti
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
+│  Model Usage                                                                                     │
+│  Usage limits span all sessions and reset daily.                                                 │
+│  /auth to upgrade or switch to API key.                                                          │
+│                                                                                                  │
+│  Model                    Reqs   Input Tokens   Cache Reads  Output Tokens                       │
+│  ─────────────────────────────────────────────────────────────────────────                       │
+│  No model usage recorded.                                                                        │
+│                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
 `;
@@ -314,6 +385,14 @@ exports[`<StatsDisplay /> > Title Rendering > renders the default title when no 
 │  Agent Active:               0s                                                                  │
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              0s (0.0%)                                                           │
+│                                                                                                  │
+│  Model Usage                                                                                     │
+│  Usage limits span all sessions and reset daily.                                                 │
+│  /auth to upgrade or switch to API key.                                                          │
+│                                                                                                  │
+│  Model                    Reqs   Input Tokens   Cache Reads  Output Tokens                       │
+│  ─────────────────────────────────────────────────────────────────────────                       │
+│  No model usage recorded.                                                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
@@ -336,6 +415,9 @@ exports[`<StatsDisplay /> > renders a table with two models correctly 1`] = `
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
 │  Model Usage                                                                                     │
+│  Usage limits span all sessions and reset daily.                                                 │
+│  /auth to upgrade or switch to API key.                                                          │
+│                                                                                                  │
 │  Model                    Reqs   Input Tokens   Cache Reads  Output Tokens                       │
 │  ─────────────────────────────────────────────────────────────────────────                       │
 │  gemini-2.5-pro              3            500           500          2,000                       │
@@ -365,6 +447,9 @@ exports[`<StatsDisplay /> > renders all sections when all data is present 1`] = 
 │    » Tool Time:              123ms (55.2%)                                                       │
 │                                                                                                  │
 │  Model Usage                                                                                     │
+│  Usage limits span all sessions and reset daily.                                                 │
+│  /auth to upgrade or switch to API key.                                                          │
+│                                                                                                  │
 │  Model                    Reqs   Input Tokens   Cache Reads  Output Tokens                       │
 │  ─────────────────────────────────────────────────────────────────────────                       │
 │  gemini-2.5-pro              1             50            50            100                       │
@@ -390,6 +475,14 @@ exports[`<StatsDisplay /> > renders only the Performance section in its zero sta
 │  Agent Active:               0s                                                                  │
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              0s (0.0%)                                                           │
+│                                                                                                  │
+│  Model Usage                                                                                     │
+│  Usage limits span all sessions and reset daily.                                                 │
+│  /auth to upgrade or switch to API key.                                                          │
+│                                                                                                  │
+│  Model                    Reqs   Input Tokens   Cache Reads  Output Tokens                       │
+│  ─────────────────────────────────────────────────────────────────────────                       │
+│  No model usage recorded.                                                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "

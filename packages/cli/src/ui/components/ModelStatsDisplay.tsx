@@ -65,21 +65,6 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
     ([, metrics]) => metrics.api.totalRequests > 0,
   );
 
-  if (activeModels.length === 0) {
-    return (
-      <Box
-        borderStyle="round"
-        borderColor={theme.border.default}
-        paddingTop={1}
-        paddingX={2}
-      >
-        <Text color={theme.text.primary}>
-          No API calls have been made in this session.
-        </Text>
-      </Box>
-    );
-  }
-
   const modelNames = activeModels.map(([name]) => name);
 
   const hasThoughts = activeModels.some(
@@ -354,19 +339,20 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
           <Text color={theme.text.primary}>{tier}</Text>
         </Box>
       )}
-      {isAuto &&
-        pooledRemaining !== undefined &&
-        pooledLimit !== undefined &&
-        pooledLimit > 0 && (
-          <QuotaStatsInfo
-            remaining={pooledRemaining}
-            limit={pooledLimit}
-            resetTime={pooledResetTime}
-          />
-        )}
+      <QuotaStatsInfo
+        remaining={pooledRemaining}
+        limit={pooledLimit}
+        resetTime={pooledResetTime}
+      />
       {(showUserIdentity || isAuto) && <Box height={1} />}
 
-      <Table data={rows} columns={columns} />
+      {activeModels.length === 0 ? (
+        <Text color={theme.text.primary}>
+          No API calls have been made in this session.
+        </Text>
+      ) : (
+        <Table data={rows} columns={columns} />
+      )}
     </Box>
   );
 };
