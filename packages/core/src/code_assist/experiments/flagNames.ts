@@ -16,6 +16,7 @@ export const ExperimentFlags = {
   MASKING_PROTECTION_THRESHOLD: 45758817,
   MASKING_PRUNABLE_THRESHOLD: 45758818,
   MASKING_PROTECT_LATEST_TURN: 45758819,
+  ENABLE_AWESOME: 45758820,
 } as const;
 
 export type ExperimentFlagName =
@@ -82,6 +83,11 @@ export const ExperimentMetadata: Record<number, ExperimentMetadataEntry> = {
     description: 'Protects the latest turn from being masked.',
     type: 'boolean',
     defaultValue: true,
+  },
+  [ExperimentFlags.ENABLE_AWESOME]: {
+    description: "When enabled, the ASCII art says 'matt'.",
+    type: 'boolean',
+    defaultValue: false,
   },
 };
 

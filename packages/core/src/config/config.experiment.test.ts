@@ -126,4 +126,17 @@ describe('Config getExperimentValue', () => {
       config.getExperimentValue<number>(ExperimentFlags.CLASSIFIER_THRESHOLD),
     ).toBe(0.7);
   });
+
+  it('should return true for isAwesomeEnabled when flag is set', () => {
+    const config = new Config({
+      sessionId,
+      targetDir,
+      cwd,
+      model,
+      debugMode: false,
+      experimentalCliArgs: { 'enable-awesome': true },
+    });
+
+    expect(config.isAwesomeEnabled()).toBe(true);
+  });
 });

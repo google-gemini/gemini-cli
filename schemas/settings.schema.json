@@ -1620,6 +1620,13 @@
           "markdownDescription": "Enable model steering (user hints) to guide the model during tool execution.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
+        },
+        "enable-awesome": {
+          "title": "Enable Awesome",
+          "description": "When enabled, the ASCII art says 'matt'.",
+          "markdownDescription": "When enabled, the ASCII art says 'matt'.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false
