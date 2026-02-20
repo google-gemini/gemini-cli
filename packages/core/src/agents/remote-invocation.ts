@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ToolConfirmationOutcome ,
+import type { ToolConfirmationOutcome } from '../tools/tools.js';
+import {
   BaseToolInvocation,
   type ToolResult,
   type ToolCallConfirmationDetails,

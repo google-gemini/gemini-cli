@@ -16,12 +16,14 @@ import type {
   ToolResult,
   ToolCallConfirmationDetails,
   ToolExecuteConfirmationDetails,
-
+} from './tools.js';
+import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   ToolConfirmationOutcome,
   Kind,
-  type PolicyUpdateOptions} from './tools.js';
+  type PolicyUpdateOptions,
+} from './tools.js';
 
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
