@@ -678,12 +678,22 @@ export class ActivityLogger extends EventEmitter {
       return req;
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-    (http as any).request = (...args: unknown[]) =>
-      wrapRequest(originalRequest, args, 'http:');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-    (https as any).request = (...args: unknown[]) =>
-      wrapRequest(originalHttpsRequest as typeof http.request, args, 'https:');
+    Object.defineProperty(http, 'request', {
+      value: (...args: unknown[]) =>
+        wrapRequest(originalRequest, args, 'http:'),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(https, 'request', {
+      value: (...args: unknown[]) =>
+        wrapRequest(
+          originalHttpsRequest as typeof http.request,
+          args,
+          'https:',
+        ),
+      writable: true,
+      configurable: true,
+    });
   }
 
   logConsole(payload: ConsoleLogPayload) {
