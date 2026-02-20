@@ -54,6 +54,7 @@ export async function scheduleAgentTools(
   } = options;
 
   // Create a proxy/override of the config to provide the agent-specific tool registry.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const agentConfig: Config = Object.create(config);
   agentConfig.getToolRegistry = () => toolRegistry;
 

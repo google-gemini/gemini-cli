@@ -409,6 +409,7 @@ export class OAuthUtils {
    */
   static parseTokenExpiry(idToken: string): number | undefined {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const payload = JSON.parse(
         Buffer.from(idToken.split('.')[1], 'base64').toString(),
       );

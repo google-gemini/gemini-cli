@@ -145,6 +145,7 @@ class RecursiveFileSearch implements FileSearch {
       if (pattern.includes('*') || !this.fzf) {
         filteredCandidates = await filter(candidates, pattern, options.signal);
       } else {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         filteredCandidates = await this.fzf
           .find(pattern)
           .then((results: Array<FzfResultItem<string>>) =>

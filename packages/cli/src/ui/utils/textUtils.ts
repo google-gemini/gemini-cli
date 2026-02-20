@@ -233,7 +233,9 @@ export function escapeAnsiCtrlCodes<T>(obj: T): T {
     let newArr: unknown[] | null = null;
 
     for (let i = 0; i < obj.length; i++) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const value = obj[i];
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const escapedValue = escapeAnsiCtrlCodes(value);
       if (escapedValue !== value) {
         if (newArr === null) {

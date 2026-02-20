@@ -394,6 +394,7 @@ export class AgentRegistry {
     }
 
     // Use Object.create to preserve lazy getters on the definition object
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const merged: LocalAgentDefinition<TOutput> = Object.create(definition);
 
     if (overrides.runConfig) {

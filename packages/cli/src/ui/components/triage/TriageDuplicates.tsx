@@ -451,6 +451,7 @@ Return a JSON object with:
         '--limit',
         String(limit),
       ]);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const issues: Issue[] = JSON.parse(stdout);
       if (issues.length === 0) {
         setState((s) => ({

@@ -7,8 +7,8 @@
 import express from 'express';
 
 import type { AgentCard, Message } from '@a2a-js/sdk';
-import type { TaskStore } from '@a2a-js/sdk/server';
 import {
+  type TaskStore,
   DefaultRequestHandler,
   InMemoryTaskStore,
   DefaultExecutionEventBus,
@@ -25,9 +25,12 @@ import { loadConfig, loadEnvironment, setTargetDir } from '../config/config.js';
 import { loadSettings } from '../config/settings.js';
 import { loadExtensions } from '../config/extension.js';
 import { commandRegistry } from '../commands/command-registry.js';
-import { debugLogger, SimpleExtensionLoader } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  SimpleExtensionLoader,
+  GitService,
+} from '@google/gemini-cli-core';
 import type { Command, CommandArgument } from '../commands/types.js';
-import { GitService } from '@google/gemini-cli-core';
 
 type CommandResponse = {
   name: string;
@@ -88,6 +91,7 @@ async function handleExecuteCommand(
   },
 ) {
   logger.info('[CoreAgent] Received /executeCommand request: ', req.body);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const { command, args } = req.body;
   try {
     if (typeof command !== 'string') {
@@ -211,6 +215,7 @@ export async function createApp() {
         const agentSettings = req.body.agentSettings as
           | AgentSettings
           | undefined;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const contextId = req.body.contextId || uuidv4();
         const wrapper = await agentExecutor.createTask(
           taskId,

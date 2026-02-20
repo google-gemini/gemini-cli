@@ -371,6 +371,7 @@ export function setPendingSettingValue(
   pendingSettings: Settings,
 ): Settings {
   const path = key.split('.');
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const newSettings = JSON.parse(JSON.stringify(pendingSettings));
   setNestedValue(newSettings, path, value);
   return newSettings;

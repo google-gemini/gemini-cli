@@ -166,6 +166,7 @@ async function searchResourceCandidates(
   const fzf = new AsyncFzf(candidates, {
     selector: (candidate: ResourceSuggestionCandidate) => candidate.searchKey,
   });
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const results = await fzf.find(normalizedPattern, {
     limit: MAX_SUGGESTIONS_TO_SHOW * 3,
   });
@@ -188,6 +189,7 @@ async function searchAgentCandidates(
   const fzf = new AsyncFzf(candidates, {
     selector: (s: Suggestion) => s.label,
   });
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const results = await fzf.find(normalizedPattern, {
     limit: MAX_SUGGESTIONS_TO_SHOW,
   });

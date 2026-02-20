@@ -27,6 +27,7 @@ export class AcknowledgedAgentsService {
     const filePath = Storage.getAcknowledgedAgentsPath();
     try {
       const content = await fs.readFile(filePath, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       this.acknowledgedAgents = JSON.parse(content);
     } catch (error: unknown) {
       if (!isNodeError(error) || error.code !== 'ENOENT') {

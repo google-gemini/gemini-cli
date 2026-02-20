@@ -166,10 +166,12 @@ export function parseGoogleApiError(error: unknown): GoogleApiError | null {
     depth < maxDepth
   ) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const parsedMessage = JSON.parse(
         currentError.message.replace(/\u00A0/g, '').replace(/\n/g, ' '),
       );
       if (parsedMessage.error) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         currentError = parsedMessage.error;
         depth++;
       } else {
@@ -243,6 +245,7 @@ function fromGaxiosError(errorObj: object): ErrorShape | undefined {
 
     if (typeof data === 'string') {
       try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data = JSON.parse(data);
       } catch (_) {
         // Not a JSON string, can't parse.
@@ -250,6 +253,7 @@ function fromGaxiosError(errorObj: object): ErrorShape | undefined {
     }
 
     if (Array.isArray(data) && data.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       data = data[0];
     }
 
@@ -288,6 +292,7 @@ function fromApiError(errorObj: object): ErrorShape | undefined {
 
     if (typeof data === 'string') {
       try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data = JSON.parse(data);
       } catch (_) {
         // Not a JSON string, can't parse.
@@ -297,6 +302,7 @@ function fromApiError(errorObj: object): ErrorShape | undefined {
           const lastBrace = data.lastIndexOf('}');
           if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
             try {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               data = JSON.parse(data.substring(firstBrace, lastBrace + 1));
             } catch (__) {
               // Still failed
@@ -307,6 +313,7 @@ function fromApiError(errorObj: object): ErrorShape | undefined {
     }
 
     if (Array.isArray(data) && data.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       data = data[0];
     }
 
