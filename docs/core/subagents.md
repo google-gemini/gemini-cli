@@ -149,6 +149,34 @@ it yourself; just report it.
 | `max_turns`    | number | No       | Maximum number of conversation turns allowed for this agent before it must return. Defaults to `15`.                      |
 | `timeout_mins` | number | No       | Maximum execution time in minutes. Defaults to `5`.                                                                       |
 
+### Configuring execution limits
+
+Each subagent has a maximum number of turns (`max_turns`) and a time limit
+(`timeout_mins`). When a subagent exceeds these limits, you will see an
+`Execution limit reached` error.
+
+You can override the execution limits for **any** agent (built-in or custom) in
+your `settings.json`:
+
+```json
+{
+  "agents": {
+    "overrides": {
+      "agent": {
+        "runConfig": {
+          "maxTurns": 30,
+          "maxTimeMinutes": 10
+        }
+      }
+    }
+  }
+}
+```
+
+Replace `agent` with the name of the agent you want to configure. You can
+override one or both values. Settings overrides apply on top of the agent's
+definition, so you only need to specify the values you want to change.
+
 ### Optimizing your subagent
 
 The main agent's system prompt encourages it to use an expert subagent when one
