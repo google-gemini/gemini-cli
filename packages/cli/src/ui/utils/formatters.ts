@@ -99,8 +99,23 @@ export function stripReferenceContent(text: string): string {
 }
 
 export const formatResetTime = (resetTime: string): string => {
-  const diff = new Date(resetTime).getTime() - Date.now();
-  if (diff <= 0) return '';
+  let date = new Date(resetTime);
+
+  // If invalid, try parsing as a number (unix timestamp)
+  if (isNaN(date.getTime())) {
+    const timestamp = parseInt(resetTime, 10);
+    if (!isNaN(timestamp)) {
+      // Could be seconds or milliseconds. If < 10^12, likely seconds.
+      date = new Date(timestamp < 10000000000 ? timestamp * 1000 : timestamp);
+    }
+  }
+
+  if (isNaN(date.getTime())) {
+    return '';
+  }
+
+  const diff = date.getTime() - Date.now();
+  if (diff <= 0) return '(Resetting...)';
 
   const totalMinutes = Math.ceil(diff / (1000 * 60));
   const hours = Math.floor(totalMinutes / 60);
@@ -113,11 +128,16 @@ export const formatResetTime = (resetTime: string): string => {
       unitDisplay: 'narrow',
     }).format(val);
 
+  let timeStr = '';
   if (hours > 0 && minutes > 0) {
-    return `resets in ${fmt(hours, 'hour')} ${fmt(minutes, 'minute')}`;
+    timeStr = `${fmt(hours, 'hour')} ${fmt(minutes, 'minute')}`;
   } else if (hours > 0) {
-    return `resets in ${fmt(hours, 'hour')}`;
+    timeStr = fmt(hours, 'hour');
+  } else if (minutes > 0) {
+    timeStr = fmt(minutes, 'minute');
+  } else {
+    timeStr = '< 1m';
   }
 
-  return `resets in ${fmt(minutes, 'minute')}`;
+  return `resets in ${timeStr}`;
 };

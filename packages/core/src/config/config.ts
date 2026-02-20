@@ -1335,11 +1335,10 @@ export class Config {
     const flashQuota = this.modelQuotas.get(flashModel);
 
     if (proQuota || flashQuota) {
-      // For reset time, take the one that is furthest in the future (most conservative)
+      // For reset time, take the one that is nearest in the future (soonest reset)
       const resetTime = [proQuota?.resetTime, flashQuota?.resetTime]
         .filter((t): t is string => !!t)
-        .sort()
-        .reverse()[0];
+        .sort()[0];
 
       return {
         remaining: (proQuota?.remaining ?? 0) + (flashQuota?.remaining ?? 0),
