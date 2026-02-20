@@ -5,6 +5,7 @@
  */
 
 import type { AnsiOutput } from '@google/gemini-cli-core';
+import { MAX_SHELL_OUTPUT_SIZE } from '../constants.js';
 
 export interface BackgroundShell {
   pid: number;
@@ -95,10 +96,17 @@ export function shellReducer(
       // This is an intentional performance optimization for the CLI.
       let newOutput = shell.output;
       if (typeof action.chunk === 'string') {
-        newOutput =
-          typeof shell.output === 'string'
-            ? shell.output + action.chunk
-            : action.chunk;
+        if (typeof shell.output === 'string') {
+          const combined = shell.output + action.chunk;
+          if (combined.length > MAX_SHELL_OUTPUT_SIZE) {
+            const excess = combined.length - MAX_SHELL_OUTPUT_SIZE;
+            newOutput = combined.slice(excess);
+          } else {
+            newOutput = combined;
+          }
+        } else {
+          newOutput = action.chunk;
+        }
       } else {
         newOutput = action.chunk;
       }
