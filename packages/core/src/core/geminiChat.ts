@@ -496,13 +496,14 @@ export class GeminiChat {
     const initialActiveModel = this.config.getActiveModel();
 
     const apiCall = async () => {
+      const useGemini3_1 = (await this.config.getGemini31Launched?.()) ?? false;
       // Default to the last used model (which respects arguments/availability selection)
-      let modelToUse = resolveModel(lastModelToUse);
+      let modelToUse = resolveModel(lastModelToUse, useGemini3_1);
 
       // If the active model has changed (e.g. due to a fallback updating the config),
       // we switch to the new active model.
       if (this.config.getActiveModel() !== initialActiveModel) {
-        modelToUse = resolveModel(this.config.getActiveModel());
+        modelToUse = resolveModel(this.config.getActiveModel(), useGemini3_1);
       }
 
       if (modelToUse !== lastModelToUse) {

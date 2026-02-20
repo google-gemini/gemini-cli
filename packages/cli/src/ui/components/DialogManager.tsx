@@ -164,6 +164,7 @@ export const DialogManager = ({
       <FolderTrustDialog
         onSelect={uiActions.handleFolderTrustSelect}
         isRestarting={uiState.isRestarting}
+        discoveryResults={uiState.folderDiscoveryResults}
       />
     );
   }

@@ -26,6 +26,8 @@ import {
   CoreEvent,
   type UserFeedbackPayload,
   type ResumedSessionData,
+  type StartupWarning,
+  WarningPriority,
   AuthType,
   type AgentDefinition,
   CoreToolCallStatus,
@@ -248,7 +250,7 @@ describe('AppContainer State Management', () => {
     config?: Config;
     version?: string;
     initResult?: InitializationResult;
-    startupWarnings?: string[];
+    startupWarnings?: StartupWarning[];
     resumedSessionData?: ResumedSessionData;
   } = {}) => (
     <SettingsContext.Provider value={settings}>
@@ -501,7 +503,18 @@ describe('AppContainer State Management', () => {
     });
 
     it('renders with startup warnings', async () => {
-      const startupWarnings = ['Warning 1', 'Warning 2'];
+      const startupWarnings: StartupWarning[] = [
+        {
+          id: 'w1',
+          message: 'Warning 1',
+          priority: WarningPriority.High,
+        },
+        {
+          id: 'w2',
+          message: 'Warning 2',
+          priority: WarningPriority.High,
+        },
+      ];
 
       let unmount: () => void;
       await act(async () => {

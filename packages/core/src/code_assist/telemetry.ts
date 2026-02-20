@@ -22,6 +22,10 @@ import { EDIT_TOOL_NAMES } from '../tools/tool-names.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { CodeAssistServer } from './server.js';
 import { ToolConfirmationOutcome } from '../tools/tools.js';
+import {
+  computeModelAddedAndRemovedLines,
+  getFileDiffFromResultDisplay,
+} from '../utils/fileDiffUtils.js';
 
 export async function recordConversationOffered(
   server: CodeAssistServer,
@@ -110,6 +114,8 @@ function summarizeToolCalls(
 
   // Treat file edits as ACCEPT_FILE and everything else as unknown.
   let isEdit = false;
+  let acceptedLines = 0;
+  let removedLines = 0;
 
   // Iterate the tool calls and summarize them into a single conversation
   // interaction so that the ConversationOffered and ConversationInteraction
@@ -136,7 +142,18 @@ function summarizeToolCalls(
 
       // Edits are ACCEPT_FILE, everything else is UNKNOWN.
       if (EDIT_TOOL_NAMES.has(toolCall.request.name)) {
-        isEdit ||= true;
+        isEdit = true;
+
+        if (toolCall.status === 'success') {
+          const fileDiff = getFileDiffFromResultDisplay(
+            toolCall.response.resultDisplay,
+          );
+          if (fileDiff?.diffStat) {
+            const lines = computeModelAddedAndRemovedLines(fileDiff.diffStat);
+            acceptedLines += lines.addedLines;
+            removedLines += lines.removedLines;
+          }
+        }
       }
     }
   }
@@ -149,6 +166,8 @@ function summarizeToolCalls(
         isEdit
           ? ConversationInteractionInteraction.ACCEPT_FILE
           : ConversationInteractionInteraction.UNKNOWN,
+        isEdit ? String(acceptedLines) : undefined,
+        isEdit ? String(removedLines) : undefined,
       )
     : undefined;
 }
@@ -157,15 +176,18 @@ function createConversationInteraction(
   traceId: string,
   status: ActionStatus,
   interaction: ConversationInteractionInteraction,
+  acceptedLines?: string,
+  removedLines?: string,
 ): ConversationInteraction {
   return {
     traceId,
     status,
     interaction,
+    acceptedLines,
+    removedLines,
     isAgentic: true,
   };
 }
-
 function includesCode(resp: GenerateContentResponse): boolean {
   if (!resp.candidates) {
     return false;
