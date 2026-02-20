@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   ApprovalMode,
   type Config,
@@ -32,10 +32,19 @@ export function useApprovalModeIndicator({
 }: UseApprovalModeIndicatorArgs): ApprovalMode {
   const currentConfigValue = config.getApprovalMode();
   const [showApprovalMode, setApprovalMode] = useState(currentConfigValue);
+  const initialModeRef = useRef<ApprovalMode | null>(null);
 
   useEffect(() => {
     setApprovalMode(currentConfigValue);
   }, [currentConfigValue]);
+
+  useEffect(() => {
+    if (initialModeRef.current === null) {
+      const mode = config.getApprovalMode();
+      initialModeRef.current =
+        mode === ApprovalMode.PLAN ? ApprovalMode.DEFAULT : mode;
+    }
+  }, [config]);
 
   useKeypress(
     (key) => {
@@ -72,20 +81,29 @@ export function useApprovalModeIndicator({
             : ApprovalMode.YOLO;
       } else if (keyMatchers[Command.CYCLE_APPROVAL_MODE](key)) {
         const currentMode = config.getApprovalMode();
+        const initial = initialModeRef.current ?? ApprovalMode.DEFAULT;
+        const fromYolo = initial === ApprovalMode.YOLO;
+
         switch (currentMode) {
           case ApprovalMode.DEFAULT:
-            nextApprovalMode = ApprovalMode.AUTO_EDIT;
+            nextApprovalMode =
+              allowPlanMode && !fromYolo
+                ? ApprovalMode.PLAN
+                : ApprovalMode.AUTO_EDIT;
             break;
           case ApprovalMode.AUTO_EDIT:
-            nextApprovalMode = allowPlanMode
-              ? ApprovalMode.PLAN
-              : ApprovalMode.DEFAULT;
+            nextApprovalMode =
+              fromYolo && allowPlanMode
+                ? ApprovalMode.PLAN
+                : ApprovalMode.DEFAULT;
             break;
           case ApprovalMode.PLAN:
-            nextApprovalMode = ApprovalMode.DEFAULT;
+            nextApprovalMode = fromYolo
+              ? ApprovalMode.YOLO
+              : ApprovalMode.AUTO_EDIT;
             break;
           case ApprovalMode.YOLO:
-            nextApprovalMode = ApprovalMode.AUTO_EDIT;
+            nextApprovalMode = ApprovalMode.DEFAULT;
             break;
           default:
         }
@@ -94,10 +112,7 @@ export function useApprovalModeIndicator({
       if (nextApprovalMode) {
         try {
           config.setApprovalMode(nextApprovalMode);
-          // Update local state immediately for responsiveness
           setApprovalMode(nextApprovalMode);
-
-          // Notify the central handler about the approval mode change
           onApprovalModeChange?.(nextApprovalMode);
         } catch (e) {
           if (addItem) {
