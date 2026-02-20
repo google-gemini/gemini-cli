@@ -68,7 +68,12 @@ import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
-import { logRipgrepFallback, logFlashFallback } from '../telemetry/loggers.js';
+import {
+  logRipgrepFallback,
+  logFlashFallback,
+  logApprovalModeSwitch,
+  logApprovalModeDuration,
+} from '../telemetry/loggers.js';
 import {
   RipgrepFallbackEvent,
   FlashFallbackEvent,
@@ -103,9 +108,11 @@ import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
-import type { UserTierId } from '../code_assist/types.js';
-import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
-import type { AdminControlsSettings } from '../code_assist/types.js';
+import type {
+  UserTierId,
+  RetrieveUserQuotaResponse,
+  AdminControlsSettings,
+} from '../code_assist/types.js';
 import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
@@ -114,15 +121,15 @@ import { AcknowledgedAgentsService } from '../agents/acknowledgedAgents.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentTool } from '../agents/subagent-tool.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
-import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
+import {
+  ExperimentFlags,
+  ExperimentMetadata,
+  getExperimentFlagName,
+} from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
-import {
-  logApprovalModeSwitch,
-  logApprovalModeDuration,
-} from '../telemetry/loggers.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath } from '../utils/paths.js';
 import { UserHintService } from './userHintService.js';
@@ -489,6 +496,8 @@ export interface ConfigParameters {
   disabledHooks?: string[];
   projectHooks?: { [K in HookEventName]?: HookDefinition[] };
   enableAgents?: boolean;
+  experimentalSettings?: Record<string, unknown>;
+  experimentalCliArgs?: Record<string, unknown>;
   enableEventDrivenScheduler?: boolean;
   skillsSupport?: boolean;
   disabledSkills?: string[];
@@ -683,6 +692,8 @@ export class Config {
 
   private readonly enableAgents: boolean;
   private agents: AgentSettings;
+  private experimentalSettings: Record<string, unknown>;
+  private readonly experimentalCliArgs: Record<string, unknown>;
   private readonly enableEventDrivenScheduler: boolean;
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
@@ -778,6 +789,8 @@ export class Config {
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
+    this.experimentalSettings = params.experimentalSettings ?? {};
+    this.experimentalCliArgs = params.experimentalCliArgs ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
@@ -2215,41 +2228,36 @@ export class Config {
   }
 
   async getUserCaching(): Promise<boolean | undefined> {
-    await this.ensureExperimentsLoaded();
-
-    return this.experiments?.flags[ExperimentFlags.USER_CACHING]?.boolValue;
+    return this.getExperimentValue<boolean>(ExperimentFlags.USER_CACHING);
   }
 
   async getNumericalRoutingEnabled(): Promise<boolean> {
-    await this.ensureExperimentsLoaded();
-
-    return !!this.experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING]
-      ?.boolValue;
+    return (
+      this.getExperimentValue<boolean>(
+        ExperimentFlags.ENABLE_NUMERICAL_ROUTING,
+      ) ?? false
+    );
   }
 
   async getClassifierThreshold(): Promise<number | undefined> {
-    await this.ensureExperimentsLoaded();
-
-    const flag = this.experiments?.flags[ExperimentFlags.CLASSIFIER_THRESHOLD];
-    if (flag?.intValue !== undefined) {
-      return parseInt(flag.intValue, 10);
-    }
-    return flag?.floatValue;
+    return this.getExperimentValue<number>(
+      ExperimentFlags.CLASSIFIER_THRESHOLD,
+    );
   }
 
   async getBannerTextNoCapacityIssues(): Promise<string> {
-    await this.ensureExperimentsLoaded();
     return (
-      this.experiments?.flags[ExperimentFlags.BANNER_TEXT_NO_CAPACITY_ISSUES]
-        ?.stringValue ?? ''
+      this.getExperimentValue<string>(
+        ExperimentFlags.BANNER_TEXT_NO_CAPACITY_ISSUES,
+      ) ?? ''
     );
   }
 
   async getBannerTextCapacityIssues(): Promise<string> {
-    await this.ensureExperimentsLoaded();
     return (
-      this.experiments?.flags[ExperimentFlags.BANNER_TEXT_CAPACITY_ISSUES]
-        ?.stringValue ?? ''
+      this.getExperimentValue<string>(
+        ExperimentFlags.BANNER_TEXT_CAPACITY_ISSUES,
+      ) ?? ''
     );
   }
 
@@ -2619,6 +2627,74 @@ export class Config {
    */
   getExperiments(): Experiments | undefined {
     return this.experiments;
+  }
+
+  /**
+   * Resolves the value of an experiment flag based on priority:
+   * 1. Command-line argument (--experiment-<flag-name>)
+   * 2. Local setting (experimental.<flag-name>)
+   * 3. Remote experiment
+   * 4. Default value
+   */
+  getExperimentValue<T extends boolean | number | string>(
+    flagId: number,
+  ): T | undefined {
+    const flagName = getExperimentFlagName(flagId);
+    if (!flagName) {
+      return undefined;
+    }
+
+    // 1. Command-line argument
+    const cliValue = this.experimentalCliArgs[flagName];
+    if (cliValue !== undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return cliValue as T;
+    }
+
+    // 2. Local setting
+    const settingValue = this.experimentalSettings[flagName];
+    if (settingValue !== undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return settingValue as T;
+    }
+
+    // 3. Remote experiment
+    const remoteFlag = this.experiments?.flags[flagId];
+    if (remoteFlag) {
+      const val =
+        remoteFlag.boolValue ??
+        remoteFlag.floatValue ??
+        remoteFlag.intValue ??
+        remoteFlag.stringValue;
+      if (val !== undefined) {
+        // Handle string representation of numbers if necessary
+        if (typeof val === 'string' && !isNaN(Number(val))) {
+          const metadata = ExperimentMetadata[flagId];
+          if (metadata?.type === 'number') {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            return Number(val) as unknown as T;
+          }
+        }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        return val as unknown as T;
+      }
+    }
+
+    // 4. Default value from metadata
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return ExperimentMetadata[flagId]?.defaultValue as unknown as T;
+  }
+
+  /**
+   * Updates experimental settings.
+   */
+  updateExperimentalSettings(settings: Record<string, unknown>): void {
+    // Only update if settings have actually changed to avoid unnecessary re-initialization logic
+    // if we add any in the future.
+    this.experimentalSettings = {
+      ...this.experimentalSettings,
+      ...settings,
+    };
   }
 
   /**

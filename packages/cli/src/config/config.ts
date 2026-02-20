@@ -97,6 +97,7 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
+  [key: string]: unknown;
 }
 
 export async function parseArguments(
@@ -288,6 +289,16 @@ export async function parseArguments(
         .option('accept-raw-output-risk', {
           type: 'boolean',
           description: 'Suppress the security warning when using --raw-output.',
+        })
+        .option('experiment', {
+          type: 'array',
+          string: true,
+          nargs: 1,
+          description:
+            'Override experiment flags locally (format: flag=value, comma-separated or multiple --experiment)',
+          coerce: (exps: string[]) =>
+            // Handle comma-separated values
+            exps.flatMap((e) => e.split(',').map((s) => s.trim())),
         }),
     )
     // Register MCP subcommands
@@ -753,6 +764,32 @@ export async function loadCliConfig(
     }
   }
 
+  const experimentalCliArgs: Record<string, unknown> = Object.create(null);
+  if (argv['experiment'] && Array.isArray(argv['experiment'])) {
+    for (const entry of argv['experiment']) {
+      const [key, ...valueParts] = entry.split('=');
+      const value = valueParts.join('=');
+      if (key && value !== undefined) {
+        // Normalize key to kebab-case (e.g., enableNumericalRouting -> enable-numerical-routing)
+        const normalizedKey = key
+          .replace(/([a-z])([A-Z])/g, '$1-$2')
+          .toLowerCase()
+          .replace(/_/g, '-');
+
+        // Simple type inference for CLI args
+        if (value === 'true') experimentalCliArgs[normalizedKey] = true;
+        else if (value === 'false') experimentalCliArgs[normalizedKey] = false;
+        else if (!isNaN(Number(value)))
+          experimentalCliArgs[normalizedKey] = Number(value);
+        else experimentalCliArgs[normalizedKey] = value;
+      }
+    }
+  }
+
+  if (debugMode && Object.keys(experimentalCliArgs).length > 0) {
+    debugLogger.debug('Experimental CLI args:', experimentalCliArgs);
+  }
+
   return new Config({
     sessionId,
     clientVersion: await getVersion(),
@@ -826,6 +863,8 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
+    experimentalSettings: settings.experimental,
+    experimentalCliArgs,
     planSettings: settings.general.plan,
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
