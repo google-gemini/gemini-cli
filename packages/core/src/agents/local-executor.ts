@@ -34,7 +34,8 @@ import {
   AgentStartEvent,
   AgentFinishEvent,
   RecoveryAttemptEvent,
- LlmRole } from '../telemetry/types.js';
+  LlmRole,
+} from '../telemetry/types.js';
 import type {
   LocalAgentDefinition,
   AgentInputs,

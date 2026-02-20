@@ -5,7 +5,8 @@
  */
 
 import { spawn } from 'node:child_process';
-import type { HookConfig ,
+import type {
+  HookConfig,
   HookInput,
   HookOutput,
   HookExecutionResult,
