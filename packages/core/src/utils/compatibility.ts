@@ -75,9 +75,6 @@ export function supportsTrueColor(): boolean {
   return false;
 }
 
-/**
- * Returns a list of compatibility warnings based on the current environment.
- */
 export enum WarningPriority {
   Low = 'low',
   High = 'high',
@@ -89,7 +86,12 @@ export interface StartupWarning {
   priority: WarningPriority;
 }
 
-export function getCompatibilityWarnings(): StartupWarning[] {
+/**
+ * Returns a list of compatibility warnings based on the current environment.
+ */
+export function getCompatibilityWarnings(options?: {
+  isAlternateBuffer?: boolean;
+}): StartupWarning[] {
   const warnings: StartupWarning[] = [];
 
   if (isWindows10()) {
@@ -101,11 +103,19 @@ export function getCompatibilityWarnings(): StartupWarning[] {
     });
   }
 
-  if (isJetBrainsTerminal()) {
+  if (isJetBrainsTerminal() && options?.isAlternateBuffer) {
+    let suggestedTerminals = '';
+    if (os.platform() === 'win32') {
+      suggestedTerminals = ' (e.g., Windows Terminal)';
+    } else if (os.platform() === 'darwin') {
+      suggestedTerminals = ' (e.g., iTerm2 or Ghostty)';
+    } else if (os.platform() === 'linux') {
+      suggestedTerminals = ' (e.g., Ghostty)';
+    }
+
     warnings.push({
       id: 'jetbrains-terminal',
-      message:
-        'Warning: JetBrains terminal detected. You may experience rendering or scrolling issues. Using an external terminal (e.g., Windows Terminal, iTerm2) is recommended.',
+      message: `Warning: JetBrains mouse scrolling is unreliable. Disabling alternate buffer mode in settings or using an external terminal${suggestedTerminals} is recommended.`,
       priority: WarningPriority.High,
     });
   }
