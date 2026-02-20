@@ -56,7 +56,7 @@ export default tseslint.config(
   },
   {
     // Import specific config
-    files: ['packages/cli/src/**/*.{ts,tsx}'], // Target only TS/TSX in the cli package
+    files: ['packages/*/src/**/*.{ts,tsx}'], // Target all TS/TSX in the packages
     plugins: {
       import: importPlugin,
     },
