@@ -21,6 +21,8 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
   ({
     getUserTier: () => undefined,
     getModel: () => 'gemini-2.5-pro',
+    getEnableModelConfigurability: () => false,
+    getModelChains: () => undefined,
     ...overrides,
   }) as unknown as Config;
 
@@ -127,6 +129,23 @@ describe('policyHelpers', () => {
       expect(chain).toHaveLength(2);
       expect(chain[0]?.model).toBe('gemini-2.5-pro');
       expect(chain[1]?.model).toBe('gemini-2.5-flash');
+    });
+
+    it('uses custom chain when enableModelConfigurability is true', () => {
+      const customChain = [
+        createDefaultPolicy('gemini-2.5-pro'),
+        createDefaultPolicy('custom-model-2', { isLastResort: true }),
+      ];
+      const config = createMockConfig({
+        getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
+        getEnableModelConfigurability: () => true,
+        getModelChains: () => ({ default: customChain }),
+      });
+      const chain = resolvePolicyChain(config);
+
+      expect(chain).toHaveLength(2);
+      expect(chain[0]?.model).toBe('gemini-2.5-pro');
+      expect(chain[1]?.model).toBe('custom-model-2');
     });
   });
 

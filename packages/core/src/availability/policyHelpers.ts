@@ -50,7 +50,7 @@ export function resolvePolicyChain(
   const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? true;
 
   if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
-    chain = getFlashLitePolicyChain();
+    chain = getFlashLitePolicyChain(config);
   } else if (
     isGemini3Model(resolvedModel) ||
     isAutoPreferred ||
@@ -61,22 +61,35 @@ export function resolvePolicyChain(
         isGemini3Model(resolvedModel) ||
         preferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
         configuredModel === PREVIEW_GEMINI_MODEL_AUTO;
-      chain = getModelPolicyChain({
-        previewEnabled,
-        userTier: config.getUserTier(),
-      });
+      chain = getModelPolicyChain(
+        {
+          previewEnabled,
+          userTier: config.getUserTier(),
+        },
+        config,
+      );
     } else {
       // User requested Gemini 3 but has no access. Proactively downgrade
       // to the stable Gemini 2.5 chain.
-      return getModelPolicyChain({
-        previewEnabled: false,
-        userTier: config.getUserTier(),
-      });
+      chain = getModelPolicyChain(
+        {
+          previewEnabled: false,
+          userTier: config.getUserTier(),
+        },
+        config,
+      );
+      if (chain) {
+        return chain;
+      }
     }
   } else {
     chain = createSingleModelChain(modelFromConfig);
   }
 
+  // If the requested model chain wasn't found, default to a single model chain.
+  if (!chain) {
+    chain = createSingleModelChain(modelFromConfig);
+  }
   const activeIndex = chain.findIndex(
     (policy) => policy.model === resolvedModel,
   );

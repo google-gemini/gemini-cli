@@ -10,14 +10,14 @@ import type {
   ModelPolicyChain,
   ModelPolicyStateMap,
 } from './modelPolicy.js';
-import {
-  DEFAULT_GEMINI_FLASH_LITE_MODEL,
-  DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL,
-  PREVIEW_GEMINI_FLASH_MODEL,
-  PREVIEW_GEMINI_MODEL,
-} from '../config/models.js';
+import type { Config } from '../config/config.js';
+import { DEFAULT_ACTIONS, DEFAULT_STATE } from './modelPolicy.js';
 import type { UserTierId } from '../code_assist/types.js';
+import {
+  FLASH_LITE_CHAIN,
+  PREVIEW_CHAIN,
+  DEFAULT_CHAIN,
+} from './defaultModelChains.js';
 
 // actions and stateTransitions are optional when defining ModelPolicy
 type PolicyConfig = Omit<ModelPolicy, 'actions' | 'stateTransitions'> & {
@@ -30,63 +30,26 @@ export interface ModelPolicyOptions {
   userTier?: UserTierId;
 }
 
-const DEFAULT_ACTIONS: ModelPolicyActionMap = {
-  terminal: 'prompt',
-  transient: 'prompt',
-  not_found: 'prompt',
-  unknown: 'prompt',
-};
-
-const SILENT_ACTIONS: ModelPolicyActionMap = {
-  terminal: 'silent',
-  transient: 'silent',
-  not_found: 'silent',
-  unknown: 'silent',
-};
-
-const DEFAULT_STATE: ModelPolicyStateMap = {
-  terminal: 'terminal',
-  transient: 'terminal',
-  not_found: 'terminal',
-  unknown: 'terminal',
-};
-
-const DEFAULT_CHAIN: ModelPolicyChain = [
-  definePolicy({ model: DEFAULT_GEMINI_MODEL }),
-  definePolicy({ model: DEFAULT_GEMINI_FLASH_MODEL, isLastResort: true }),
-];
-
-const PREVIEW_CHAIN: ModelPolicyChain = [
-  definePolicy({ model: PREVIEW_GEMINI_MODEL }),
-  definePolicy({ model: PREVIEW_GEMINI_FLASH_MODEL, isLastResort: true }),
-];
-
-const FLASH_LITE_CHAIN: ModelPolicyChain = [
-  definePolicy({
-    model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
-    actions: SILENT_ACTIONS,
-  }),
-  definePolicy({
-    model: DEFAULT_GEMINI_FLASH_MODEL,
-    actions: SILENT_ACTIONS,
-  }),
-  definePolicy({
-    model: DEFAULT_GEMINI_MODEL,
-    isLastResort: true,
-    actions: SILENT_ACTIONS,
-  }),
-];
-
 /**
  * Returns the default ordered model policy chain for the user.
  */
 export function getModelPolicyChain(
   options: ModelPolicyOptions,
-): ModelPolicyChain {
+  config: Config,
+): ModelPolicyChain | undefined {
+  if (config.getEnableModelConfigurability?.()) {
+    const chainKey = options.previewEnabled ? 'preview' : 'default';
+    const chains = config.getModelChains?.();
+    const requestedChain = chains?.[chainKey];
+    if (requestedChain) {
+      return cloneChain(requestedChain);
+    }
+    return undefined;
+  }
+
   if (options.previewEnabled) {
     return cloneChain(PREVIEW_CHAIN);
   }
-
   return cloneChain(DEFAULT_CHAIN);
 }
 
@@ -94,7 +57,17 @@ export function createSingleModelChain(model: string): ModelPolicyChain {
   return [definePolicy({ model, isLastResort: true })];
 }
 
-export function getFlashLitePolicyChain(): ModelPolicyChain {
+export function getFlashLitePolicyChain(
+  config?: Config,
+): ModelPolicyChain | undefined {
+  if (config?.getEnableModelConfigurability?.()) {
+    const requestedChain = config.getModelChains?.()['flash-lite'];
+    if (requestedChain) {
+      return cloneChain(requestedChain);
+    }
+    return undefined;
+  }
+
   return cloneChain(FLASH_LITE_CHAIN);
 }
 

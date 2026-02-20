@@ -81,6 +81,8 @@ import type {
 } from '../fallback/types.js';
 import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
+import { type ModelPolicyChain } from '../availability/modelPolicy.js';
+import { DEFAULT_MODEL_CHAINS } from '../availability/defaultModelChains.js';
 import { OutputFormat } from '../output/types.js';
 import type {
   ModelConfig,
@@ -480,9 +482,11 @@ export interface ConfigParameters {
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
   plan?: boolean;
+  enableModelConfigurability?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
+  modelChains?: Record<string, ModelPolicyChain>;
   agents?: AgentSettings;
   onReload?: () => Promise<{
     disabledSkills?: string[];
@@ -540,6 +544,7 @@ export class Config {
   private baseLlmClient!: BaseLlmClient;
   private modelRouterService: ModelRouterService;
   private readonly modelAvailabilityService: ModelAvailabilityService;
+  private readonly modelChains: Record<string, ModelPolicyChain>;
   private readonly fileFiltering: {
     respectGitIgnore: boolean;
     respectGeminiIgnore: boolean;
@@ -665,6 +670,7 @@ export class Config {
   private readonly adminSkillsEnabled: boolean;
 
   private readonly experimentalJitContext: boolean;
+  private readonly enableModelConfigurability: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
   private contextManager?: ContextManager;
@@ -760,6 +766,9 @@ export class Config {
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
     this.modelAvailabilityService = new ModelAvailabilityService();
+    this.modelChains = params.modelChains ?? DEFAULT_MODEL_CHAINS;
+    this.enableModelConfigurability =
+      params.enableModelConfigurability ?? false;
     this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.toolOutputMasking = {
       enabled: params.toolOutputMasking?.enabled ?? true,
@@ -1845,6 +1854,14 @@ export class Config {
 
   getModelAvailabilityService(): ModelAvailabilityService {
     return this.modelAvailabilityService;
+  }
+
+  getModelChains(): Record<string, ModelPolicyChain> {
+    return this.modelChains;
+  }
+
+  getEnableModelConfigurability(): boolean {
+    return this.enableModelConfigurability;
   }
 
   getEnableRecursiveFileSearch(): boolean {

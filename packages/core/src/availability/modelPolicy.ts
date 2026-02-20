@@ -61,3 +61,24 @@ export interface RetryAvailabilityContext {
   service: ModelAvailabilityService;
   policy: ModelPolicy;
 }
+
+export const DEFAULT_ACTIONS: ModelPolicyActionMap = {
+  terminal: 'prompt',
+  transient: 'prompt',
+  not_found: 'prompt',
+  unknown: 'prompt',
+};
+
+export const SILENT_ACTIONS: ModelPolicyActionMap = {
+  terminal: 'silent',
+  transient: 'silent',
+  not_found: 'silent',
+  unknown: 'silent',
+};
+
+export const DEFAULT_STATE: ModelPolicyStateMap = {
+  terminal: 'terminal',
+  transient: 'terminal',
+  not_found: 'terminal',
+  unknown: 'terminal',
+};

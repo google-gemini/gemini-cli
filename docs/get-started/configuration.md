@@ -614,6 +614,131 @@ their corresponding top-level category object in your `settings.json` file.
     used.
   - **Default:** `[]`
 
+#### `modelChains`
+
+- **`modelChains`** (object):
+  - **Description:** Model chains for availability and fallback.
+  - **Default:**
+
+    ```json
+    {
+      "default": [
+        {
+          "model": "gemini-2.5-pro",
+          "actions": {
+            "terminal": "prompt",
+            "transient": "prompt",
+            "not_found": "prompt",
+            "unknown": "prompt"
+          },
+          "stateTransitions": {
+            "terminal": "terminal",
+            "transient": "terminal",
+            "not_found": "terminal",
+            "unknown": "terminal"
+          }
+        },
+        {
+          "model": "gemini-2.5-flash",
+          "isLastResort": true,
+          "actions": {
+            "terminal": "prompt",
+            "transient": "prompt",
+            "not_found": "prompt",
+            "unknown": "prompt"
+          },
+          "stateTransitions": {
+            "terminal": "terminal",
+            "transient": "terminal",
+            "not_found": "terminal",
+            "unknown": "terminal"
+          }
+        }
+      ],
+      "preview": [
+        {
+          "model": "gemini-3-pro-preview",
+          "actions": {
+            "terminal": "prompt",
+            "transient": "prompt",
+            "not_found": "prompt",
+            "unknown": "prompt"
+          },
+          "stateTransitions": {
+            "terminal": "terminal",
+            "transient": "terminal",
+            "not_found": "terminal",
+            "unknown": "terminal"
+          }
+        },
+        {
+          "model": "gemini-3-flash-preview",
+          "isLastResort": true,
+          "actions": {
+            "terminal": "prompt",
+            "transient": "prompt",
+            "not_found": "prompt",
+            "unknown": "prompt"
+          },
+          "stateTransitions": {
+            "terminal": "terminal",
+            "transient": "terminal",
+            "not_found": "terminal",
+            "unknown": "terminal"
+          }
+        }
+      ],
+      "flash-lite": [
+        {
+          "model": "gemini-2.5-flash-lite",
+          "actions": {
+            "terminal": "silent",
+            "transient": "silent",
+            "not_found": "silent",
+            "unknown": "silent"
+          },
+          "stateTransitions": {
+            "terminal": "terminal",
+            "transient": "terminal",
+            "not_found": "terminal",
+            "unknown": "terminal"
+          }
+        },
+        {
+          "model": "gemini-2.5-flash",
+          "actions": {
+            "terminal": "silent",
+            "transient": "silent",
+            "not_found": "silent",
+            "unknown": "silent"
+          },
+          "stateTransitions": {
+            "terminal": "terminal",
+            "transient": "terminal",
+            "not_found": "terminal",
+            "unknown": "terminal"
+          }
+        },
+        {
+          "model": "gemini-2.5-pro",
+          "isLastResort": true,
+          "actions": {
+            "terminal": "silent",
+            "transient": "silent",
+            "not_found": "silent",
+            "unknown": "silent"
+          },
+          "stateTransitions": {
+            "terminal": "terminal",
+            "transient": "terminal",
+            "not_found": "terminal",
+            "unknown": "terminal"
+          }
+        }
+      ]
+    }
+    ```
+
 #### `agents`
 
 - **`agents.overrides`** (object):
@@ -930,6 +1055,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.plan`** (boolean):
   - **Description:** Enable planning features (Plan Mode and tools).
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.enableModelConfigurability`** (boolean):
+  - **Description:** Use model chains from settings instead of hardcoded ones.
   - **Default:** `false`
   - **Requires restart:** Yes
 

@@ -12,8 +12,10 @@
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
+  DEFAULT_MODEL_CHAINS,
   type MCPServerConfig,
   type BugCommandSettings,
+  // type ModelPolicyChain,
   type TelemetrySettings,
   type AuthType,
   type AgentOverride,
@@ -894,6 +896,20 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  modelChains: {
+    type: 'object',
+    label: 'Model Chains',
+    category: 'Model',
+    requiresRestart: false,
+    default: DEFAULT_MODEL_CHAINS as Record<string, ModelPolicyChain>,
+    description: 'Model chains for availability and fallback.',
+    showInDialog: false,
+    additionalProperties: {
+      type: 'array',
+      ref: 'ModelPolicyChain',
+    },
+  },
+
   agents: {
     type: 'object',
     label: 'Agents',
@@ -1615,6 +1631,15 @@ const SETTINGS_SCHEMA = {
         description: 'Enable planning features (Plan Mode and tools).',
         showInDialog: true,
       },
+      enableModelConfigurability: {
+        type: 'boolean',
+        label: 'Enable Model Configurability',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable model configurability features.',
+        showInDialog: true,
+      },
     },
   },
 
@@ -2167,6 +2192,41 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         description:
           'Maximum number of tokens used when summarizing tool output.',
       },
+    },
+  },
+  ModelPolicy: {
+    type: 'object',
+    description:
+      'Defines the policy for a single model in the availability chain.',
+    properties: {
+      model: {
+        type: 'string',
+        description: 'The model identifier.',
+      },
+      isLastResort: {
+        type: 'boolean',
+        description: 'Whether this model is considered a "last resort".',
+      },
+      actions: {
+        type: 'object',
+        description:
+          'Map from model API failure reason to user interaction (prompt or silent).',
+        additionalProperties: { type: 'string' },
+      },
+      stateTransitions: {
+        type: 'object',
+        description:
+          "How the model's health status should transition upon failure.",
+        additionalProperties: { type: 'string' },
+      },
+    },
+  },
+  ModelPolicyChain: {
+    type: 'array',
+    description: 'A list of model policies forming a chain.',
+    items: {
+      type: 'object',
+      ref: 'ModelPolicy',
     },
   },
   AgentOverride: {

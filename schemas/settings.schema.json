@@ -1013,6 +1013,131 @@
       },
       "additionalProperties": false
     },
+    "modelChains": {
+      "title": "Model Chains",
+      "description": "Model chains for availability and fallback.",
+      "markdownDescription": "Model chains for availability and fallback.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{\n  \"default\": [\n    {\n      \"model\": \"gemini-2.5-pro\",\n      \"actions\": {\n        \"terminal\": \"prompt\",\n        \"transient\": \"prompt\",\n        \"not_found\": \"prompt\",\n        \"unknown\": \"prompt\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    },\n    {\n      \"model\": \"gemini-2.5-flash\",\n      \"isLastResort\": true,\n      \"actions\": {\n        \"terminal\": \"prompt\",\n        \"transient\": \"prompt\",\n        \"not_found\": \"prompt\",\n        \"unknown\": \"prompt\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    }\n  ],\n  \"preview\": [\n    {\n      \"model\": \"gemini-3-pro-preview\",\n      \"actions\": {\n        \"terminal\": \"prompt\",\n        \"transient\": \"prompt\",\n        \"not_found\": \"prompt\",\n        \"unknown\": \"prompt\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    },\n    {\n      \"model\": \"gemini-3-flash-preview\",\n      \"isLastResort\": true,\n      \"actions\": {\n        \"terminal\": \"prompt\",\n        \"transient\": \"prompt\",\n        \"not_found\": \"prompt\",\n        \"unknown\": \"prompt\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    }\n  ],\n  \"flash-lite\": [\n    {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"actions\": {\n        \"terminal\": \"silent\",\n        \"transient\": \"silent\",\n        \"not_found\": \"silent\",\n        \"unknown\": \"silent\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    },\n    {\n      \"model\": \"gemini-2.5-flash\",\n      \"actions\": {\n        \"terminal\": \"silent\",\n        \"transient\": \"silent\",\n        \"not_found\": \"silent\",\n        \"unknown\": \"silent\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    },\n    {\n      \"model\": \"gemini-2.5-pro\",\n      \"isLastResort\": true,\n      \"actions\": {\n        \"terminal\": \"silent\",\n        \"transient\": \"silent\",\n        \"not_found\": \"silent\",\n        \"unknown\": \"silent\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    }\n  ]\n}`",
+      "default": {
+        "default": [
+          {
+            "model": "gemini-2.5-pro",
+            "actions": {
+              "terminal": "prompt",
+              "transient": "prompt",
+              "not_found": "prompt",
+              "unknown": "prompt"
+            },
+            "stateTransitions": {
+              "terminal": "terminal",
+              "transient": "terminal",
+              "not_found": "terminal",
+              "unknown": "terminal"
+            }
+          },
+          {
+            "model": "gemini-2.5-flash",
+            "isLastResort": true,
+            "actions": {
+              "terminal": "prompt",
+              "transient": "prompt",
+              "not_found": "prompt",
+              "unknown": "prompt"
+            },
+            "stateTransitions": {
+              "terminal": "terminal",
+              "transient": "terminal",
+              "not_found": "terminal",
+              "unknown": "terminal"
+            }
+          }
+        ],
+        "preview": [
+          {
+            "model": "gemini-3-pro-preview",
+            "actions": {
+              "terminal": "prompt",
+              "transient": "prompt",
+              "not_found": "prompt",
+              "unknown": "prompt"
+            },
+            "stateTransitions": {
+              "terminal": "terminal",
+              "transient": "terminal",
+              "not_found": "terminal",
+              "unknown": "terminal"
+            }
+          },
+          {
+            "model": "gemini-3-flash-preview",
+            "isLastResort": true,
+            "actions": {
+              "terminal": "prompt",
+              "transient": "prompt",
+              "not_found": "prompt",
+              "unknown": "prompt"
+            },
+            "stateTransitions": {
+              "terminal": "terminal",
+              "transient": "terminal",
+              "not_found": "terminal",
+              "unknown": "terminal"
+            }
+          }
+        ],
+        "flash-lite": [
+          {
+            "model": "gemini-2.5-flash-lite",
+            "actions": {
+              "terminal": "silent",
+              "transient": "silent",
+              "not_found": "silent",
+              "unknown": "silent"
+            },
+            "stateTransitions": {
+              "terminal": "terminal",
+              "transient": "terminal",
+              "not_found": "terminal",
+              "unknown": "terminal"
+            }
+          },
+          {
+            "model": "gemini-2.5-flash",
+            "actions": {
+              "terminal": "silent",
+              "transient": "silent",
+              "not_found": "silent",
+              "unknown": "silent"
+            },
+            "stateTransitions": {
+              "terminal": "terminal",
+              "transient": "terminal",
+              "not_found": "terminal",
+              "unknown": "terminal"
+            }
+          },
+          {
+            "model": "gemini-2.5-pro",
+            "isLastResort": true,
+            "actions": {
+              "terminal": "silent",
+              "transient": "silent",
+              "not_found": "silent",
+              "unknown": "silent"
+            },
+            "stateTransitions": {
+              "terminal": "terminal",
+              "transient": "terminal",
+              "not_found": "terminal",
+              "unknown": "terminal"
+            }
+          }
+        ]
+      },
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/ModelPolicyChain"
+      }
+    },
     "agents": {
       "title": "Agents",
       "description": "Settings for subagents.",
@@ -1551,6 +1676,13 @@
           "markdownDescription": "Enable planning features (Plan Mode and tools).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
+        },
+        "enableModelConfigurability": {
+          "title": "Enable Model Configurability",
+          "description": "Use model chains from settings instead of hardcoded ones.",
+          "markdownDescription": "Use model chains from settings instead of hardcoded ones.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -1985,6 +2117,42 @@
           "type": "number",
           "description": "Maximum number of tokens used when summarizing tool output."
         }
+      }
+    },
+    "ModelPolicy": {
+      "type": "object",
+      "description": "Defines the policy for a single model in the availability chain.",
+      "properties": {
+        "model": {
+          "type": "string",
+          "description": "The model identifier."
+        },
+        "isLastResort": {
+          "type": "boolean",
+          "description": "Whether this model is considered a \"last resort\"."
+        },
+        "actions": {
+          "type": "object",
+          "description": "Map from model API failure reason to user interaction (prompt or silent).",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "stateTransitions": {
+          "type": "object",
+          "description": "How the model's health status should transition upon failure.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ModelPolicyChain": {
+      "type": "array",
+      "description": "A list of model policies forming a chain.",
+      "items": {
+        "type": "object",
+        "ref": "ModelPolicy"
       }
     },
     "AgentOverride": {
