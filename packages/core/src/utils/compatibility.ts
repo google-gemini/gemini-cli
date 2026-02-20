@@ -103,18 +103,18 @@ export function getCompatibilityWarnings(options?: {
     });
   }
 
-  if (isJetBrainsTerminal() && options?.isAlternateBuffer) {
-    const platformTerminals: Partial<Record<NodeJS.Platform, string>> = {
+  if (isJetBrainsTerminal()) {
+    const platform = os.platform();
+    const recommendations: Record<string, string> = {
       win32: 'Windows Terminal',
-      darwin: 'iTerm2 or Ghostty',
-      linux: 'Ghostty',
+      darwin: 'iTerm2 or Terminal.app',
     };
-    const suggestion = platformTerminals[os.platform()];
-    const suggestedTerminals = suggestion ? ` (e.g., ${suggestion})` : '';
+    const terminalRecommendation =
+      recommendations[platform] ?? 'a native terminal emulator';
 
     warnings.push({
       id: 'jetbrains-terminal',
-      message: `Warning: JetBrains mouse scrolling is unreliable. Disabling alternate buffer mode in settings or using an external terminal${suggestedTerminals} is recommended.`,
+      message: `Warning: JetBrains terminal detected. You may experience rendering or scrolling issues. Using ${terminalRecommendation} is recommended.`,
       priority: WarningPriority.High,
     });
   }
