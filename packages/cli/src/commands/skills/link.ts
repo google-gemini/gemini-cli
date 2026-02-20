@@ -83,13 +83,14 @@ export const linkCommand: CommandModule = {
         return true;
       }),
   handler: async (argv) => {
+    const path = argv['path'];
+    const scope = argv['scope'];
+    const consent = argv['consent'];
+
     await handleLink({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      path: argv['path'] as string,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      scope: argv['scope'] as 'user' | 'workspace',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      consent: argv['consent'] as boolean | undefined,
+      path: typeof path === 'string' ? path : '',
+      scope: scope === 'user' || scope === 'workspace' ? scope : undefined,
+      consent: typeof consent === 'boolean' ? consent : undefined,
     });
     await exitCli();
   },

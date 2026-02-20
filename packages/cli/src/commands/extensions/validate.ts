@@ -99,9 +99,9 @@ export const validateCommand: CommandModule = {
       demandOption: true,
     }),
   handler: async (args) => {
+    const path = args['path'];
     await handleValidate({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      path: args['path'] as string,
+      path: typeof path === 'string' ? path : '',
     });
     await exitCli();
   },

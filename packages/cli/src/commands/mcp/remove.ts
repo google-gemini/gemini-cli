@@ -55,10 +55,10 @@ export const removeCommand: CommandModule = {
         choices: ['user', 'project'],
       }),
   handler: async (argv) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    await removeMcpServer(argv['name'] as string, {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      scope: argv['scope'] as string,
+    const name = argv['name'];
+    const scope = argv['scope'];
+    await removeMcpServer(typeof name === 'string' ? name : '', {
+      scope: typeof scope === 'string' ? scope : 'project',
     });
     await exitCli();
   },

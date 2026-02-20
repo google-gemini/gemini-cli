@@ -12,10 +12,6 @@ import { loadSettings, SettingScope } from '../../config/settings.js';
 import { exitCli } from '../utils.js';
 import stripJsonComments from 'strip-json-comments';
 
-interface MigrateArgs {
-  fromClaude: boolean;
-}
-
 /**
  * Mapping from Claude Code event names to Gemini event names
  */
@@ -62,16 +58,19 @@ function transformMatcher(matcher: string | undefined): string | undefined {
   return transformed;
 }
 
+function isRecord(obj: unknown): obj is Record<string, unknown> {
+  return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
+}
+
 /**
  * Migrate a Claude Code hook configuration to Gemini format
  */
 function migrateClaudeHook(claudeHook: unknown): unknown {
-  if (!claudeHook || typeof claudeHook !== 'object') {
+  if (!isRecord(claudeHook)) {
     return claudeHook;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const hook = claudeHook as Record<string, unknown>;
+  const hook = claudeHook;
   const migrated: Record<string, unknown> = {};
 
   // Map command field
@@ -104,18 +103,15 @@ function migrateClaudeHook(claudeHook: unknown): unknown {
  * Migrate Claude Code hooks configuration to Gemini format
  */
 function migrateClaudeHooks(claudeConfig: unknown): Record<string, unknown> {
-  if (!claudeConfig || typeof claudeConfig !== 'object') {
+  if (!isRecord(claudeConfig)) {
     return {};
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const config = claudeConfig as Record<string, unknown>;
   const geminiHooks: Record<string, unknown> = {};
 
   // Check if there's a hooks section
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const hooksSection = config['hooks'] as Record<string, unknown> | undefined;
-  if (!hooksSection || typeof hooksSection !== 'object') {
+  const hooksSection = claudeConfig['hooks'];
+  if (!isRecord(hooksSection)) {
     return {};
   }
 
@@ -129,30 +125,25 @@ function migrateClaudeHooks(claudeConfig: unknown): Record<string, unknown> {
 
     // Migrate each hook definition
     const migratedDefinitions = eventConfig.map((def: unknown) => {
-      if (!def || typeof def !== 'object') {
+      if (!isRecord(def)) {
         return def;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const definition = def as Record<string, unknown>;
       const migratedDef: Record<string, unknown> = {};
 
       // Transform matcher
-      if (
-        'matcher' in definition &&
-        typeof definition['matcher'] === 'string'
-      ) {
-        migratedDef['matcher'] = transformMatcher(definition['matcher']);
+      if ('matcher' in def && typeof def['matcher'] === 'string') {
+        migratedDef['matcher'] = transformMatcher(def['matcher']);
       }
 
       // Copy sequential flag
-      if ('sequential' in definition) {
-        migratedDef['sequential'] = definition['sequential'];
+      if ('sequential' in def) {
+        migratedDef['sequential'] = def['sequential'];
       }
 
       // Migrate hooks array
-      if ('hooks' in definition && Array.isArray(definition['hooks'])) {
-        migratedDef['hooks'] = definition['hooks'].map(migrateClaudeHook);
+      if ('hooks' in def && Array.isArray(def['hooks'])) {
+        migratedDef['hooks'] = def['hooks'].map(migrateClaudeHook);
       }
 
       return migratedDef;
@@ -183,11 +174,11 @@ export async function handleMigrateFromClaude() {
     sourceFile = claudeLocalSettingsPath;
     try {
       const content = fs.readFileSync(claudeLocalSettingsPath, 'utf-8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      claudeSettings = JSON.parse(stripJsonComments(content)) as Record<
-        string,
-        unknown
-      >;
+      const parsed = JSON.parse(stripJsonComments(content));
+      if (isRecord(parsed)) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+        claudeSettings = parsed as any;
+      }
     } catch (error) {
       debugLogger.error(
         `Error reading ${claudeLocalSettingsPath}: ${getErrorMessage(error)}`,
@@ -197,11 +188,11 @@ export async function handleMigrateFromClaude() {
     sourceFile = claudeSettingsPath;
     try {
       const content = fs.readFileSync(claudeSettingsPath, 'utf-8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      claudeSettings = JSON.parse(stripJsonComments(content)) as Record<
-        string,
-        unknown
-      >;
+      const parsed = JSON.parse(stripJsonComments(content));
+      if (isRecord(parsed)) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+        claudeSettings = parsed as any;
+      }
     } catch (error) {
       debugLogger.error(
         `Error reading ${claudeSettingsPath}: ${getErrorMessage(error)}`,
@@ -265,9 +256,8 @@ export const migrateCommand: CommandModule = {
       default: false,
     }),
   handler: async (argv) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const args = argv as unknown as MigrateArgs;
-    if (args.fromClaude) {
+    const fromClaude = argv['from-claude'];
+    if (typeof fromClaude === 'boolean' && fromClaude) {
       await handleMigrateFromClaude();
     } else {
       debugLogger.log(

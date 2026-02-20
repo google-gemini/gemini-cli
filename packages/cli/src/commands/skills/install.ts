@@ -101,15 +101,16 @@ export const installCommand: CommandModule = {
         return true;
       }),
   handler: async (argv) => {
+    const source = argv['source'];
+    const scope = argv['scope'];
+    const path = argv['path'];
+    const consent = argv['consent'];
+
     await handleInstall({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      source: argv['source'] as string,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      scope: argv['scope'] as 'user' | 'workspace',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      path: argv['path'] as string | undefined,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      consent: argv['consent'] as boolean | undefined,
+      source: typeof source === 'string' ? source : '',
+      scope: scope === 'user' || scope === 'workspace' ? scope : undefined,
+      path: typeof path === 'string' ? path : undefined,
+      consent: typeof consent === 'boolean' ? consent : undefined,
     });
     await exitCli();
   },
