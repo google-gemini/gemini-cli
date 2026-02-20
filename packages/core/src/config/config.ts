@@ -126,6 +126,7 @@ import {
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath } from '../utils/paths.js';
 import { UserHintService } from './userHintService.js';
+import { ReviewTrackerService } from '../services/reviewTrackerService.js';
 
 export interface AccessibilitySettings {
   enableLoadingPhrases?: boolean;
@@ -679,6 +680,7 @@ export class Config {
   private latestApiRequest: GenerateContentParameters | undefined;
   private lastModeSwitchTime: number = Date.now();
   readonly userHintService: UserHintService;
+  private readonly reviewTrackerService: ReviewTrackerService;
   private approvedPlanPath: string | undefined;
 
   constructor(params: ConfigParameters) {
@@ -918,6 +920,7 @@ export class Config {
     this.modelConfigService = new ModelConfigService(
       modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
     );
+    this.reviewTrackerService = new ReviewTrackerService();
   }
 
   isInitialized(): boolean {
@@ -1411,6 +1414,10 @@ export class Config {
   }
   getQuestion(): string | undefined {
     return this.question;
+  }
+
+  getReviewTrackerService(): ReviewTrackerService {
+    return this.reviewTrackerService;
   }
 
   getHasAccessToPreviewModel(): boolean {

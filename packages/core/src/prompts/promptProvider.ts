@@ -196,6 +196,9 @@ export class PromptProvider {
           () => ({ interactive: interactiveMode }),
           isGitRepository(process.cwd()) ? true : false,
         ),
+        reviewedResources: config
+          .getReviewTrackerService()
+          .getReviewedResources(),
         finalReminder: isModernModel
           ? undefined
           : this.withSection('finalReminder', () => ({

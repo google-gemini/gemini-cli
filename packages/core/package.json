@@ -54,7 +54,7 @@
     "chardet": "^2.1.0",
     "diff": "^8.0.3",
     "fast-levenshtein": "^2.0.6",
-    "fdir": "^6.4.6",
+    "fdir": "^6.5.0",
     "fzf": "^0.5.2",
     "glob": "^12.0.0",
     "google-auth-library": "^9.11.0",
@@ -94,7 +94,9 @@
     "@google/gemini-cli-test-utils": "file:../test-utils",
     "@types/fast-levenshtein": "^0.0.4",
     "@types/js-yaml": "^4.0.9",
+    "@types/proper-lockfile": "^4.1.4",
     "@types/picomatch": "^4.0.1",
+    "@types/uuid": "^10.0.0",
     "msw": "^2.3.4",
     "typescript": "^5.3.3",
     "vitest": "^3.1.1"

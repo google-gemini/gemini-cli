@@ -1024,4 +1024,88 @@ describe('WriteFileTool', () => {
       expect(result.fileExists).toBe(true);
     });
   });
+
+  describe('overwrite warning for large existing files', () => {
+    const abortSignal = new AbortController().signal;
+
+    it('should include overwrite warning when overwriting a large existing file (>=50 lines)', async () => {
+      const filePath = path.join(rootDir, 'large_existing_file.txt');
+      // Create a file with 60 lines
+      const originalContent = Array.from(
+        { length: 60 },
+        (_, i) => `Line ${i + 1}`,
+      ).join('\n');
+      const proposedContent = 'Completely new content.';
+      fs.writeFileSync(filePath, originalContent, 'utf8');
+
+      mockEnsureCorrectEdit.mockResolvedValue({
+        params: {
+          file_path: filePath,
+          old_string: originalContent,
+          new_string: proposedContent,
+        },
+        occurrences: 1,
+      });
+
+      const params = { file_path: filePath, content: proposedContent };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('Successfully overwrote file');
+      expect(result.llmContent).toContain('WARNING');
+      expect(result.llmContent).toContain('60 lines');
+      expect(result.llmContent).toContain('edit');
+      expect(result.error).toBeDefined();
+      expect(result.error!.type).toBe(
+        ToolErrorType.WRITE_FILE_OVERWROTE_EXISTING,
+      );
+    });
+
+    it('should not include overwrite warning when creating a new file', async () => {
+      const filePath = path.join(rootDir, 'brand_new_file.txt');
+      const content = Array.from(
+        { length: 100 },
+        (_, i) => `Line ${i + 1}`,
+      ).join('\n');
+      mockEnsureCorrectFileContent.mockResolvedValue(content);
+
+      const params = { file_path: filePath, content };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain(
+        'Successfully created and wrote to new file',
+      );
+      expect(result.llmContent).not.toContain('WARNING');
+      expect(result.error).toBeUndefined();
+    });
+
+    it('should not include overwrite warning for small existing files (<50 lines)', async () => {
+      const filePath = path.join(rootDir, 'small_existing_file.txt');
+      // Create a file with only 10 lines
+      const originalContent = Array.from(
+        { length: 10 },
+        (_, i) => `Line ${i + 1}`,
+      ).join('\n');
+      const proposedContent = 'Replacement content.';
+      fs.writeFileSync(filePath, originalContent, 'utf8');
+
+      mockEnsureCorrectEdit.mockResolvedValue({
+        params: {
+          file_path: filePath,
+          old_string: originalContent,
+          new_string: proposedContent,
+        },
+        occurrences: 1,
+      });
+
+      const params = { file_path: filePath, content: proposedContent };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('Successfully overwrote file');
+      expect(result.llmContent).not.toContain('WARNING');
+      expect(result.error).toBeUndefined();
+    });
+  });
 });

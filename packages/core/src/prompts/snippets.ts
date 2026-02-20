@@ -35,6 +35,7 @@ export interface SystemPromptOptions {
   sandbox?: SandboxMode;
   interactiveYoloMode?: boolean;
   gitRepo?: GitRepoOptions;
+  reviewedResources?: string[];
 }
 
 export interface PreambleOptions {
@@ -114,9 +115,8 @@ ${renderOperationalGuidelines(options.operationalGuidelines)}
 
 ${renderInteractiveYoloMode(options.interactiveYoloMode)}
 
-${renderSandbox(options.sandbox)}
-
 ${renderGitRepo(options.gitRepo)}
+${renderObservationLog(options.reviewedResources)}
 `.trim();
 }
 
@@ -209,6 +209,7 @@ Use the following guidelines to optimize your search and read patterns.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}
 - **Explain Before Acting:** Never call tools in silence. You MUST provide a concise, one-sentence explanation of your intent or strategy immediately before executing tool calls. This is essential for transparency, especially when confirming a request or answering a question. Silence is only acceptable for repetitive, low-level discovery operations (e.g., sequential file reads) where narration would be noisy.${mandateContinueWork(options.interactive)}
+- **Observation Log & Verification:** You MUST NOT claim to have reviewed, read, or examined any file, directory, image, or website unless it is explicitly listed in your "Observation Log" at the end of this prompt. If you need to verify the state of a resource, you MUST call the appropriate tool (e.g., \`read_file\`, \`ls\`, \`grep\`) first. False confirmations of tool usage are considered a severe breach of integrity.
 `.trim();
 }
 
@@ -391,6 +392,28 @@ export function renderGitRepo(options?: GitRepoOptions): string {
 - After each commit, confirm that it was successful by running \`git status\`.
 - If a commit fails, never attempt to work around the issues without being asked to do so.
 - Never push changes to a remote repository without being asked explicitly by the user.`.trim();
+}
+
+export function renderObservationLog(resources?: string[]): string {
+  if (!resources || resources.length === 0) {
+    return `
+# Observation Log
+Your Observation Log is currently empty. You have not witnessed any resources in this session yet.
+
+**Important:** You MUST NOT claim to have reviewed, read, checked, or seen any resources that are not explicitly listed in your Observation Log above.
+`.trim();
+  }
+
+  const list = resources.map((r) => `- ${r}`).join('\n');
+  return `
+# Observation Log
+The following resources have been explicitly witnessed by you via tool calls in this session. You may only claim to have "reviewed", "read", "checked", or "seen" these resources:
+<observed_resources>
+${list}
+</observed_resources>
+
+**Important:** You MUST NOT claim to have reviewed, read, checked, or seen any resources that are not explicitly listed in your Observation Log above.
+`.trim();
 }
 
 export function renderUserMemory(

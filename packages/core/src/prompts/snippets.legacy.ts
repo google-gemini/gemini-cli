@@ -34,6 +34,7 @@ export interface SystemPromptOptions {
   sandbox?: SandboxMode;
   interactiveYoloMode?: boolean;
   gitRepo?: GitRepoOptions;
+  reviewedResources?: string[];
   finalReminder?: FinalReminderOptions;
 }
 
@@ -120,6 +121,7 @@ ${renderInteractiveYoloMode(options.interactiveYoloMode)}
 ${renderSandbox(options.sandbox)}
 
 ${renderGitRepo(options.gitRepo)}
+${renderObservationLog(options.reviewedResources)}
 
 ${renderFinalReminder(options.finalReminder)}
 `.trim();
@@ -136,6 +138,19 @@ export function renderFinalShell(
 ${basePrompt.trim()}
 
 ${renderUserMemory(userMemory)}
+`.trim();
+}
+
+export function renderObservationLog(resources?: string[]): string {
+  if (!resources || resources.length === 0) {
+    return '';
+  }
+  return `
+# Observation Log
+The following resources have been reviewed and confirmed by you in this session:
+${resources.map((r) => `- ${r}`).join('\n')}
+
+**Important:** You MUST NOT claim to have reviewed, read, checked, or seen any resources that are not explicitly listed in your Observation Log above.
 `.trim();
 }
 
