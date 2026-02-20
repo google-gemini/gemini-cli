@@ -18,7 +18,7 @@ implementation. With Plan Mode, you can:
 
 ## How to enable Plan Mode
 
-Enable Plan Mode either in **Settings** or by editing your configuration file.
+Enable Plan Mode in **Settings** or by editing your configuration file.
 
 - **Settings:** Use the `/settings` command and set **Plan** to `true`.
 - **Configuration:** Add the following to your `settings.json`:
@@ -62,8 +62,8 @@ To start Plan Mode while using Gemini CLI:
 
 - **Command:** Type `/plan` in the input box.
 
-- **Natural Language:** Ask Gemini CLI to "start a plan for...". Gemini CLI will
-  call the [`enter_plan_mode`] tool to switch modes.
+- **Natural Language:** Ask Gemini CLI to "start a plan for...". Gemini CLI
+  calls the [`enter_plan_mode`] tool to switch modes.
 
 ## How to use Plan Mode
 
