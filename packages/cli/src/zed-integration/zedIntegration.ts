@@ -732,6 +732,7 @@ export class Session {
           },
         };
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const output = await this.connection.requestPermission(params);
         const outcome =
           output.outcome.outcome === CoreToolCallStatus.Cancelled
