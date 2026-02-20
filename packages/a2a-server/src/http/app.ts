@@ -206,6 +206,29 @@ export async function createApp() {
       requestStorage.run({ req }, next);
     });
 
+    // SSE keepalive — sends periodic comment lines to prevent Cloud Run's
+    // load balancer from closing idle SSE connections during long tool
+    // executions (npm install, tsc builds, etc.). SSE comments (`: ...`)
+    // are ignored by conformant parsers per the spec.
+    expressApp.use((req, res, next) => {
+      const origFlush = res.flushHeaders;
+      res.flushHeaders = function (this: express.Response) {
+        origFlush.call(this);
+        const ct = this.getHeader('content-type');
+        if (ct && String(ct).includes('text/event-stream')) {
+          const timer = setInterval(() => {
+            if (!res.writableEnded) {
+              res.write(': keepalive\n\n');
+            } else {
+              clearInterval(timer);
+            }
+          }, 15_000);
+          res.on('close', () => clearInterval(timer));
+        }
+      };
+      next();
+    });
+
     // Google Chat bridge runs as a separate service (src/chat-bridge/server.ts).
     // It connects to this A2A server over HTTP.
     const appBuilder = new A2AExpressApp(requestHandler);

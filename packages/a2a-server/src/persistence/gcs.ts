@@ -345,6 +345,8 @@ export class GCSTaskStore implements TaskStore {
 }
 
 export class NoOpTaskStore implements TaskStore {
+  private cache = new Map<string, SDKTask>();
+
   constructor(private realStore: TaskStore) {}
 
   async save(task: SDKTask): Promise<void> {
@@ -353,9 +355,20 @@ export class NoOpTaskStore implements TaskStore {
   }
 
   async load(taskId: string): Promise<SDKTask | undefined> {
+    const cached = this.cache.get(taskId);
+    if (cached) {
+      logger.info(
+        `[NoOpTaskStore] load called for task ${taskId}, returning cached.`,
+      );
+      return cached;
+    }
     logger.info(
       `[NoOpTaskStore] load called for task ${taskId}, delegating to real store.`,
     );
-    return this.realStore.load(taskId);
+    const result = await this.realStore.load(taskId);
+    if (result) {
+      this.cache.set(taskId, result);
+    }
+    return result;
   }
 }

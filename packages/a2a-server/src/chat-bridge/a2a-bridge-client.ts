@@ -28,8 +28,20 @@ import {
   JsonRpcTransportFactory,
 } from '@a2a-js/sdk/client';
 import { GoogleAuth } from 'google-auth-library';
+import { Agent } from 'undici';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
+
+/**
+ * Undici agent with long timeouts for SSE streaming.
+ * Default body/headers timeouts are ~30s which kills idle SSE connections
+ * when the agent runs long tools (npm install, tsc builds, etc.).
+ */
+const sseDispatcher = new Agent({
+  bodyTimeout: 10 * 60 * 1000, // 10 minutes
+  headersTimeout: 10 * 60 * 1000,
+  keepAliveTimeout: 10 * 60 * 1000,
+});
 
 // Inline A2UI constants so the chat bridge has no dependency on ../a2ui/
 const A2UI_EXTENSION_URI = 'https://a2ui.org/a2a-extension/a2ui/v0.10';
@@ -169,8 +181,13 @@ export class A2ABridgeClient {
   async initialize(): Promise<void> {
     if (this.client) return;
 
-    // On Cloud Run, create an authenticated fetch that adds identity tokens
-    let fetchImpl: typeof fetch = fetch;
+    // Create fetch wrapper with long SSE timeouts.
+    // On Cloud Run, also add identity tokens for service-to-service auth.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const baseFetch = (input: any, init?: any) =>
+      fetch(input, { ...init, dispatcher: sseDispatcher });
+
+    let fetchImpl: typeof fetch = baseFetch;
     if (process.env['K_SERVICE']) {
       const auth = new GoogleAuth();
       const idTokenClient = await auth.getIdTokenClient(this.agentUrl);
@@ -180,7 +197,7 @@ export class A2ABridgeClient {
         for (const [key, value] of Object.entries(authHeaders)) {
           merged.set(key, value);
         }
-        return fetch(input, { ...init, headers: merged });
+        return baseFetch(input, { ...init, headers: merged });
       };
       logger.info(
         '[ChatBridge] Using Cloud Run identity token for A2A server auth',

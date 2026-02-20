@@ -3,7 +3,16 @@
 FROM docker.io/library/node:20-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  python3 curl git jq ripgrep ca-certificates \
+  python3 curl git jq ripgrep ca-certificates gpg apt-transport-https \
+  && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+     | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
+  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+     > /etc/apt/sources.list.d/github-cli.list \
+  && curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+     | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
+  && echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
+     > /etc/apt/sources.list.d/google-cloud-sdk.list \
+  && apt-get update && apt-get install -y --no-install-recommends gh google-cloud-cli \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
