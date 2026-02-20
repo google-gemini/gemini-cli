@@ -23,6 +23,7 @@ import { StatsDisplay } from './StatsDisplay.js';
 import { ModelStatsDisplay } from './ModelStatsDisplay.js';
 import { ToolStatsDisplay } from './ToolStatsDisplay.js';
 import { StartupStatsDisplay } from './StartupStatsDisplay.js';
+import { MemoryStatsDisplay } from './MemoryStatsDisplay.js';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
 import { Help } from './Help.js';
 import type { SlashCommand } from '../commands/types.js';
@@ -168,6 +169,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'tool_stats' && <ToolStatsDisplay />}
       {itemForDisplay.type === 'startup_stats' && <StartupStatsDisplay />}
+      {itemForDisplay.type === 'memory_stats' && <MemoryStatsDisplay />}
       {itemForDisplay.type === 'model' && (
         <ModelMessage model={itemForDisplay.model} />
       )}

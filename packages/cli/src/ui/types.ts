@@ -213,6 +213,10 @@ export type HistoryItemStartupStats = HistoryItemBase & {
   type: 'startup_stats';
 };
 
+export type HistoryItemMemoryStats = HistoryItemBase & {
+  type: 'memory_stats';
+};
+
 export type HistoryItemModel = HistoryItemBase & {
   type: 'model';
   model: string;
@@ -377,6 +381,7 @@ export type HistoryItemWithoutId =
   | HistoryItemModelStats
   | HistoryItemToolStats
   | HistoryItemStartupStats
+  | HistoryItemMemoryStats
   | HistoryItemModel
   | HistoryItemQuit
   | HistoryItemCompression
@@ -404,6 +409,7 @@ export enum MessageType {
   MODEL_STATS = 'model_stats',
   TOOL_STATS = 'tool_stats',
   STARTUP_STATS = 'startup_stats',
+  MEMORY_STATS = 'memory_stats',
   QUIT = 'quit',
   GEMINI = 'gemini',
   COMPRESSION = 'compression',

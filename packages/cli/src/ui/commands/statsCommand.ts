@@ -9,15 +9,22 @@ import type {
   HistoryItemModelStats,
   HistoryItemToolStats,
   HistoryItemStartupStats,
+  HistoryItemMemoryStats,
 } from '../types.js';
 import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
-import { UserAccountManager } from '@google/gemini-cli-core';
+import {
+  UserAccountManager,
+  startupProfiler,
+  getMemoryMonitor,
+} from '@google/gemini-cli-core';
 import {
   type CommandContext,
   type SlashCommand,
   CommandKind,
 } from './types.js';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 function getUserIdentity(context: CommandContext) {
   const selectedAuthType =
@@ -69,11 +76,48 @@ async function defaultSessionView(context: CommandContext) {
   context.ui.addItem(statsItem);
 }
 
+function exportStats(context: CommandContext): void {
+  const { sessionStartTime, metrics } = context.session.stats;
+  const memoryMonitor = getMemoryMonitor();
+  const startupStats = startupProfiler.getStartupStats();
+  const memorySnapshot = memoryMonitor?.getCurrentMemoryUsage();
+
+  const exportData = {
+    timestamp: new Date().toISOString(),
+    session: {
+      id: context.session.stats.sessionId,
+      startTime: sessionStartTime?.toISOString(),
+      promptCount: context.session.stats.promptCount,
+    },
+    metrics: {
+      tools: metrics.tools,
+      models: metrics.models,
+      files: metrics.files,
+    },
+    startup: startupStats,
+    memory: memorySnapshot,
+  };
+
+  const exportDir = path.join(process.cwd(), '.gemini');
+  if (!fs.existsSync(exportDir)) {
+    fs.mkdirSync(exportDir, { recursive: true });
+  }
+
+  const filename = `stats-export-${Date.now()}.json`;
+  const filepath = path.join(exportDir, filename);
+  fs.writeFileSync(filepath, JSON.stringify(exportData, null, 2));
+
+  context.ui.addItem({
+    type: MessageType.INFO,
+    text: `Stats exported to ${filepath}`,
+  });
+}
+
 export const statsCommand: SlashCommand = {
   name: 'stats',
   altNames: ['usage'],
   description:
-    'Check session stats. Usage: /stats [session|model|tools|startup]',
+    'Check session stats. Usage: /stats [session|model|tools|startup|memory|export]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: async (context: CommandContext) => {
@@ -132,6 +176,26 @@ export const statsCommand: SlashCommand = {
         context.ui.addItem({
           type: MessageType.STARTUP_STATS,
         } as HistoryItemStartupStats);
+      },
+    },
+    {
+      name: 'memory',
+      description: 'Show memory usage statistics',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      action: (context: CommandContext) => {
+        context.ui.addItem({
+          type: MessageType.MEMORY_STATS,
+        } as HistoryItemMemoryStats);
+      },
+    },
+    {
+      name: 'export',
+      description: 'Export stats to JSON file',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      action: (context: CommandContext) => {
+        exportStats(context);
       },
     },
   ],
