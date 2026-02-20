@@ -31,7 +31,7 @@
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.12.0",
     "@google/gemini-cli-core": "file:../core",
-    "@google/genai": "1.30.0",
+    "@google/genai": "1.41.0",
     "@iarna/toml": "^2.2.5",
     "@modelcontextprotocol/sdk": "^1.23.0",
     "ansi-escapes": "^7.3.0",
