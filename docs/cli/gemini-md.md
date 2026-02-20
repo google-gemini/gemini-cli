@@ -88,7 +88,7 @@ More content here.
 @../shared/style-guide.md
 ```
 
-For more details, see the [Memory Import Processor](../core/memport.md)
+For more details, see the [Memory Import Processor](../reference/memport.md)
 documentation.
 
 ## Customize the context file name

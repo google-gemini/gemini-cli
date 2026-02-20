@@ -225,7 +225,7 @@ Guide].
 [MCP tools]: /docs/tools/mcp-server.md
 [`activate_skill`]: /docs/cli/skills.md
 [experimental research sub-agents]: /docs/core/subagents.md
-[Policy Engine Guide]: /docs/core/policy-engine.md
+[Policy Engine Guide]: /docs/reference/policy-engine.md
 [`enter_plan_mode`]: /docs/tools/planning.md#1-enter_plan_mode-enterplanmode
 [`exit_plan_mode`]: /docs/tools/planning.md#2-exit_plan_mode-exitplanmode
 [`ask_user`]: /docs/tools/ask-user.md

@@ -63,13 +63,13 @@
         "slug": "docs/extensions/index"
       },
       { "label": "Headless mode", "slug": "docs/cli/headless" },
-      { "label": "Help", "link": "/docs/cli/commands/#help-or" },
+      { "label": "Help", "link": "/docs/reference/commands/#help-or" },
       { "label": "Hooks", "slug": "docs/hooks" },
       { "label": "IDE integration", "slug": "docs/ide-integration" },
       { "label": "MCP servers", "slug": "docs/tools/mcp-server" },
       {
         "label": "Memory management",
-        "link": "/docs/cli/commands/#memory"
+        "link": "/docs/reference/commands/#memory"
       },
       { "label": "Model routing", "slug": "docs/cli/model-routing" },
       { "label": "Model selection", "slug": "docs/cli/model" },
@@ -85,15 +85,15 @@
       { "label": "Settings", "slug": "docs/cli/settings" },
       {
         "label": "Shell",
-        "link": "/docs/cli/commands/#shells-or-bashes"
+        "link": "/docs/reference/commands/#shells-or-bashes"
       },
       {
         "label": "Stats",
-        "link": "/docs/cli/commands/#stats"
+        "link": "/docs/reference/commands/#stats"
       },
       { "label": "Telemetry", "slug": "docs/cli/telemetry" },
       { "label": "Token caching", "slug": "docs/cli/token-caching" },
-      { "label": "Tools", "link": "/docs/cli/commands/#tools" }
+      { "label": "Tools", "link": "/docs/reference/commands/#tools" }
     ]
   },
   {
@@ -148,25 +148,31 @@
   {
     "label": "Reference",
     "items": [
-      { "label": "Command reference", "slug": "docs/cli/commands" },
+      { "label": "Command reference", "slug": "docs/reference/commands" },
       {
         "label": "Configuration reference",
-        "slug": "docs/get-started/configuration"
+        "slug": "docs/reference/configuration"
       },
-      { "label": "Keyboard shortcuts", "slug": "docs/cli/keyboard-shortcuts" },
-      { "label": "Memory import processor", "slug": "docs/core/memport" },
-      { "label": "Policy engine", "slug": "docs/core/policy-engine" },
-      { "label": "Tools API", "slug": "docs/core/tools-api" }
+      {
+        "label": "Keyboard shortcuts",
+        "slug": "docs/reference/keyboard-shortcuts"
+      },
+      { "label": "Memory import processor", "slug": "docs/reference/memport" },
+      { "label": "Policy engine", "slug": "docs/reference/policy-engine" },
+      { "label": "Tools API", "slug": "docs/reference/tools-api" }
     ]
   },
   {
     "label": "Resources",
     "items": [
-      { "label": "FAQ", "slug": "docs/faq" },
-      { "label": "Quota and pricing", "slug": "docs/quota-and-pricing" },
-      { "label": "Terms and privacy", "slug": "docs/tos-privacy" },
-      { "label": "Troubleshooting", "slug": "docs/troubleshooting" },
-      { "label": "Uninstall", "slug": "docs/cli/uninstall" }
+      { "label": "FAQ", "slug": "docs/resources/faq" },
+      {
+        "label": "Quota and pricing",
+        "slug": "docs/resources/quota-and-pricing"
+      },
+      { "label": "Terms and privacy", "slug": "docs/resources/tos-privacy" },
+      { "label": "Troubleshooting", "slug": "docs/resources/troubleshooting" },
+      { "label": "Uninstall", "slug": "docs/resources/uninstall" }
     ]
   },
   {

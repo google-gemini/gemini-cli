@@ -41,8 +41,8 @@ can change the theme using the `/theme` command.
 ### Theme persistence
 
 Selected themes are saved in Gemini CLI's
-[configuration](../get-started/configuration.md) so your preference is
-remembered across sessions.
+[configuration](../reference/configuration.md) so your preference is remembered
+across sessions.
 
 ---
 
@@ -194,7 +194,7 @@ untrusted sources.
 - Or, set it as the default by adding `"theme": "MyCustomTheme"` to the `ui`
   object in your `settings.json`.
 - Custom themes can be set at the user, project, or system level, and follow the
-  same [configuration precedence](../get-started/configuration.md) as other
+  same [configuration precedence](../reference/configuration.md) as other
   settings.
 
 ### Themes from extensions
