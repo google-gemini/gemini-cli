@@ -263,14 +263,18 @@ telemetry.
 
 ### `Notification`
 
-Fires when the CLI emits a system alert (e.g., Tool Permissions). Used for
-external logging or cross-platform alerts.
+Fires when the CLI emits a system alert (e.g., Tool Permissions, interactive
+shell waiting for input). Used for external logging or cross-platform alerts.
 
 - **Input Fields**:
-  - `notification_type`: (`"ToolPermission"`)
+  - `notification_type`: (`"ToolPermission"` | `"ShellInteraction"`)
+    - `ToolPermission`: Tool permission/confirmation prompt is being shown.
+    - `ShellInteraction`: An interactive shell session is active and waiting for
+      user input (e.g. vim, htop). Use matcher `"ShellInteraction"` to receive
+      only these notifications.
   - `message`: Summary of the alert.
   - `details`: JSON object with alert-specific metadata (e.g., tool name, file
-    path).
+    path; for `ShellInteraction`, `pid` and `source: "interactive_shell"`).
 - **Relevant Output Fields**:
   - `systemMessage`: Displayed alongside the system alert.
 - **Observability Only**: This hook **cannot** block alerts or grant permissions

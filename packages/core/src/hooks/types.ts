@@ -484,6 +484,8 @@ export interface BeforeAgentOutput extends HookOutput {
  */
 export enum NotificationType {
   ToolPermission = 'ToolPermission',
+  /** Fires when an interactive shell session is active and waiting for user input. */
+  ShellInteraction = 'ShellInteraction',
 }
 
 /**

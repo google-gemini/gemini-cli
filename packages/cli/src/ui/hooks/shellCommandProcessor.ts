@@ -419,6 +419,15 @@ export const useShellCommandProcessor = (
           executionPid = pid;
           if (pid) {
             dispatch({ type: 'SET_ACTIVE_PTY', pid });
+            // Notify hooks when interactive shell is waiting for user input (Fixes #19527)
+            if (config.getEnableInteractiveShell()) {
+              void config
+                .getHookSystem()
+                ?.fireShellInteractionNotificationEvent(
+                  'Interactive shell waiting for user input',
+                  { pid },
+                );
+            }
             setPendingHistoryItem((prevItem) => {
               if (prevItem?.type === 'tool_group') {
                 return {
