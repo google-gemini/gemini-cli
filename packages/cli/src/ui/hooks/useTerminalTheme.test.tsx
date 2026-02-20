@@ -58,16 +58,15 @@ vi.mock('../themes/theme-manager.js', async (importOriginal) => {
     ...actual,
     themeManager: {
       isDefaultTheme: (name: string) =>
-        name.toLowerCase() === 'default' ||
-        name.toLowerCase() === 'default-light',
+        name === 'default' || name === 'default-light',
       setTerminalBackground: vi.fn(),
     },
-    DEFAULT_THEME: { name: 'Default' },
+    DEFAULT_THEME: { name: 'default' },
   };
 });
 
 vi.mock('../themes/builtin/light/default-light.js', () => ({
-  DefaultLight: { name: 'Default Light' },
+  DefaultLight: { name: 'default-light' },
 }));
 
 describe('useTerminalTheme', () => {
@@ -88,7 +87,7 @@ describe('useTerminalTheme', () => {
     mockQueryTerminalBackground.mockClear();
     vi.mocked(themeManager.setTerminalBackground).mockClear();
     mockSettings.merged.ui.autoThemeSwitching = true;
-    mockSettings.merged.ui.theme = 'Default';
+    mockSettings.merged.ui.theme = 'default';
   });
 
   afterEach(() => {
@@ -148,15 +147,14 @@ describe('useTerminalTheme', () => {
     expect(themeManager.setTerminalBackground).toHaveBeenCalledWith('#ffffff');
     expect(refreshStatic).not.toHaveBeenCalled();
     expect(mockHandleThemeSelect).toHaveBeenCalledWith(
-      'Default Light',
+      'default-light',
       expect.anything(),
     );
     unmount();
   });
 
   it('should switch to dark theme when background is dark', () => {
-    // Start with light theme
-    mockSettings.merged.ui.theme = 'Default Light';
+    mockSettings.merged.ui.theme = 'default-light';
 
     config.setTerminalBackground('#ffffff');
 
@@ -173,12 +171,12 @@ describe('useTerminalTheme', () => {
     expect(themeManager.setTerminalBackground).toHaveBeenCalledWith('#000000');
     expect(refreshStatic).not.toHaveBeenCalled();
     expect(mockHandleThemeSelect).toHaveBeenCalledWith(
-      'Default',
+      'default',
       expect.anything(),
     );
 
-    // Reset theme
-    mockSettings.merged.ui.theme = 'Default';
+    mockSettings.merged.ui.theme = 'default';
+    unmount();
   });
 
   it('should not update config or call refreshStatic on repeated identical background reports', () => {

@@ -730,26 +730,14 @@ export function loadSettings(
   workspaceSettings = resolveEnvVarsInObject(workspaceResult.settings);
 
   // Support legacy theme names
-  if (
-    userSettings.ui?.theme === 'VS' ||
-    userSettings.ui?.theme === 'default-light'
-  ) {
+  if (userSettings.ui?.theme === 'VS') {
     userSettings.ui.theme = DefaultLight.name;
-  } else if (
-    userSettings.ui?.theme === 'VS2015' ||
-    userSettings.ui?.theme === 'default'
-  ) {
+  } else if (userSettings.ui?.theme === 'VS2015') {
     userSettings.ui.theme = DefaultDark.name;
   }
-  if (
-    workspaceSettings.ui?.theme === 'VS' ||
-    workspaceSettings.ui?.theme === 'default-light'
-  ) {
+  if (workspaceSettings.ui?.theme === 'VS') {
     workspaceSettings.ui.theme = DefaultLight.name;
-  } else if (
-    workspaceSettings.ui?.theme === 'VS2015' ||
-    workspaceSettings.ui?.theme === 'default'
-  ) {
+  } else if (workspaceSettings.ui?.theme === 'VS2015') {
     workspaceSettings.ui.theme = DefaultDark.name;
   }
 
