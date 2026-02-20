@@ -169,12 +169,8 @@ export function SearchableList<T extends GenericListItem>({
       1,
       availableTerminalHeight - reservedRows,
     );
-
-    // Each item currently renders with marginBottom={1} -> ~2 rows per item.
     const approxRowsPerItem = 2;
     const fit = Math.max(1, Math.floor(availableForList / approxRowsPerItem));
-
-    // Cap so we don't accidentally try to render huge lists in extremely tall terminals.
     return Math.min(30, fit);
   }, [
     availableTerminalHeight,
@@ -185,28 +181,45 @@ export function SearchableList<T extends GenericListItem>({
     title,
   ]);
 
-  const scrollOffset = useMemo(() => {
+  const [scrollOffset, setScrollOffset] = React.useState(0);
+  const scrollOffsetRef = React.useRef(0);
+  React.useEffect(() => {
+    scrollOffsetRef.current = scrollOffset;
+  }, [scrollOffset]);
+
+  React.useEffect(() => {
     const windowSize = computedMaxItemsToShow;
     const maxScroll = Math.max(0, filteredItems.length - windowSize);
 
     if (scrollMode === 'keep-visible') {
-      // Scroll only when selection would go out of view.
-      // We keep a small top/bottom padding of 1 item.
       const padding = Math.min(1, Math.floor(windowSize / 4));
-      const desiredMin = Math.max(0, activeIndex - (windowSize - 1) + padding);
-      const desiredMax = Math.max(0, activeIndex - padding);
-      // Clamp previous-centered behavior into a keep-visible range.
-      return Math.max(0, Math.min(desiredMin, Math.min(desiredMax, maxScroll)));
+      const minVisible = scrollOffsetRef.current + padding;
+      const maxVisible = scrollOffsetRef.current + (windowSize - 1) - padding;
+
+      let next = scrollOffsetRef.current;
+      if (activeIndex < minVisible) {
+        next = activeIndex - padding;
+      } else if (activeIndex > maxVisible) {
+        next = activeIndex - (windowSize - 1) + padding;
+      }
+
+      next = Math.max(0, Math.min(next, maxScroll));
+      if (next !== scrollOffsetRef.current) {
+        setScrollOffset(next);
+      }
+      return;
     }
 
-    // Default: keep selection near the middle.
-    return Math.max(
+    const centered = Math.max(
       0,
       Math.min(
         activeIndex - Math.floor(windowSize / 2),
         Math.max(0, filteredItems.length - windowSize),
       ),
     );
+    if (centered !== scrollOffsetRef.current) {
+      setScrollOffset(centered);
+    }
   }, [activeIndex, computedMaxItemsToShow, filteredItems.length, scrollMode]);
 
   const visibleItems = filteredItems.slice(
