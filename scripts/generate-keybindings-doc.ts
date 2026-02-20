@@ -22,11 +22,12 @@ import {
 
 const START_MARKER = '<!-- KEYBINDINGS-AUTOGEN:START -->';
 const END_MARKER = '<!-- KEYBINDINGS-AUTOGEN:END -->';
-const OUTPUT_RELATIVE_PATH = ['docs', 'cli', 'keyboard-shortcuts.md'];
+const OUTPUT_RELATIVE_PATH = ['docs', 'reference', 'keyboard-shortcuts.md'];
 
 const KEY_NAME_OVERRIDES: Record<string, string> = {
   return: 'Enter',
   escape: 'Esc',
+  'double escape': 'Double Esc',
   tab: 'Tab',
   backspace: 'Backspace',
   delete: 'Delete',

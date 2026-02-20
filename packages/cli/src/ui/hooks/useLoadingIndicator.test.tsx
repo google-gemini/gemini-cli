@@ -16,6 +16,7 @@ import {
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
 import { INFORMATIVE_TIPS } from '../constants/tips.js';
 import type { RetryAttemptPayload } from '@google/gemini-cli-core';
+import type { LoadingPhrasesMode } from '../../config/settings.js';
 
 describe('useLoadingIndicator', () => {
   beforeEach(() => {
@@ -31,37 +32,36 @@ describe('useLoadingIndicator', () => {
 
   const renderLoadingIndicatorHook = (
     initialStreamingState: StreamingState,
-    initialIsInteractiveShellWaiting: boolean = false,
-    initialLastOutputTime: number = 0,
+    initialShouldShowFocusHint: boolean = false,
     initialRetryStatus: RetryAttemptPayload | null = null,
+    loadingPhrasesMode: LoadingPhrasesMode = 'all',
   ) => {
     let hookResult: ReturnType<typeof useLoadingIndicator>;
     function TestComponent({
       streamingState,
-      isInteractiveShellWaiting,
-      lastOutputTime,
+      shouldShowFocusHint,
       retryStatus,
+      mode,
     }: {
       streamingState: StreamingState;
-      isInteractiveShellWaiting?: boolean;
-      lastOutputTime?: number;
+      shouldShowFocusHint?: boolean;
       retryStatus?: RetryAttemptPayload | null;
+      mode?: LoadingPhrasesMode;
     }) {
-      hookResult = useLoadingIndicator(
+      hookResult = useLoadingIndicator({
         streamingState,
-        undefined,
-        isInteractiveShellWaiting,
-        lastOutputTime,
-        retryStatus,
-      );
+        shouldShowFocusHint: !!shouldShowFocusHint,
+        retryStatus: retryStatus || null,
+        loadingPhrasesMode: mode,
+      });
       return null;
     }
     const { rerender } = render(
       <TestComponent
         streamingState={initialStreamingState}
-        isInteractiveShellWaiting={initialIsInteractiveShellWaiting}
-        lastOutputTime={initialLastOutputTime}
+        shouldShowFocusHint={initialShouldShowFocusHint}
         retryStatus={initialRetryStatus}
+        mode={loadingPhrasesMode}
       />,
     );
     return {
@@ -72,10 +72,10 @@ describe('useLoadingIndicator', () => {
       },
       rerender: (newProps: {
         streamingState: StreamingState;
-        isInteractiveShellWaiting?: boolean;
-        lastOutputTime?: number;
+        shouldShowFocusHint?: boolean;
         retryStatus?: RetryAttemptPayload | null;
-      }) => rerender(<TestComponent {...newProps} />),
+        mode?: LoadingPhrasesMode;
+      }) => rerender(<TestComponent mode={loadingPhrasesMode} {...newProps} />),
     };
   };
 
@@ -83,17 +83,14 @@ describe('useLoadingIndicator', () => {
     vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { result } = renderLoadingIndicatorHook(StreamingState.Idle);
     expect(result.current.elapsedTime).toBe(0);
-    expect(WITTY_LOADING_PHRASES).toContain(
-      result.current.currentLoadingPhrase,
-    );
+    expect(result.current.currentLoadingPhrase).toBeUndefined();
   });
 
-  it('should show interactive shell waiting phrase when isInteractiveShellWaiting is true after 5s', async () => {
+  it('should show interactive shell waiting phrase when shouldShowFocusHint is true', async () => {
     vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
-    const { result } = renderLoadingIndicatorHook(
+    const { result, rerender } = renderLoadingIndicatorHook(
       StreamingState.Responding,
-      true,
-      1,
+      false,
     );
 
     // Initially should be witty phrase or tip
@@ -102,7 +99,10 @@ describe('useLoadingIndicator', () => {
     );
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(5000);
+      rerender({
+        streamingState: StreamingState.Responding,
+        shouldShowFocusHint: true,
+      });
     });
 
     expect(result.current.currentLoadingPhrase).toBe(
@@ -203,9 +203,7 @@ describe('useLoadingIndicator', () => {
     });
 
     expect(result.current.elapsedTime).toBe(0);
-    expect(WITTY_LOADING_PHRASES).toContain(
-      result.current.currentLoadingPhrase,
-    );
+    expect(result.current.currentLoadingPhrase).toBeUndefined();
 
     // Timer should not advance
     await act(async () => {
@@ -224,12 +222,21 @@ describe('useLoadingIndicator', () => {
     const { result } = renderLoadingIndicatorHook(
       StreamingState.Responding,
       false,
-      0,
       retryStatus,
     );
 
-    expect(result.current.currentLoadingPhrase).toBe(
-      'Trying to reach gemini-pro (Retry 2/2)',
+    expect(result.current.currentLoadingPhrase).toContain('Trying to reach');
+    expect(result.current.currentLoadingPhrase).toContain('Attempt 3/3');
+  });
+
+  it('should show no phrases when loadingPhrasesMode is "off"', () => {
+    const { result } = renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      false,
+      null,
+      'off',
     );
+
+    expect(result.current.currentLoadingPhrase).toBeUndefined();
   });
 });

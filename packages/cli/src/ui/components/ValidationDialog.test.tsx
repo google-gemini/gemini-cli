@@ -17,6 +17,7 @@ import {
 } from 'vitest';
 import { ValidationDialog } from './ValidationDialog.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import type { Key } from '../hooks/useKeypress.js';
 
 // Mock the child components and utilities
 vi.mock('./shared/RadioButtonSelect.js', () => ({
@@ -41,8 +42,15 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
+// Capture keypress handler to test it
+let mockKeypressHandler: (key: Key) => void;
+let mockKeypressOptions: { isActive: boolean };
+
 vi.mock('../hooks/useKeypress.js', () => ({
-  useKeypress: vi.fn(),
+  useKeypress: vi.fn((handler, options) => {
+    mockKeypressHandler = handler;
+    mockKeypressOptions = options;
+  }),
 }));
 
 describe('ValidationDialog', () => {
@@ -59,10 +67,11 @@ describe('ValidationDialog', () => {
   });
 
   describe('initial render (choosing state)', () => {
-    it('should render the main message and two options', () => {
-      const { lastFrame, unmount } = render(
+    it('should render the main message and two options', async () => {
+      const { lastFrame, waitUntilReady, unmount } = render(
         <ValidationDialog onChoice={mockOnChoice} />,
       );
+      await waitUntilReady();
 
       expect(lastFrame()).toContain(
         'Further action is required to use this service.',
@@ -87,57 +96,98 @@ describe('ValidationDialog', () => {
       unmount();
     });
 
-    it('should render learn more URL when provided', () => {
-      const { lastFrame, unmount } = render(
+    it('should render learn more URL when provided', async () => {
+      const { lastFrame, waitUntilReady, unmount } = render(
         <ValidationDialog
           learnMoreUrl="https://example.com/help"
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
 
       expect(lastFrame()).toContain('Learn more:');
       expect(lastFrame()).toContain('https://example.com/help');
       unmount();
     });
+
+    it('should call onChoice with cancel when ESCAPE is pressed', async () => {
+      const { waitUntilReady, unmount } = render(
+        <ValidationDialog onChoice={mockOnChoice} />,
+      );
+      await waitUntilReady();
+
+      // Verify the keypress hook is active
+      expect(mockKeypressOptions.isActive).toBe(true);
+
+      // Simulate ESCAPE key press
+      await act(async () => {
+        mockKeypressHandler({
+          name: 'escape',
+          ctrl: false,
+          shift: false,
+          alt: false,
+          cmd: false,
+          insertable: false,
+          sequence: '\x1b',
+        });
+      });
+      // Escape key has a 50ms timeout in KeypressContext, so we need to wrap waitUntilReady in act
+      await act(async () => {
+        await waitUntilReady();
+      });
+
+      expect(mockOnChoice).toHaveBeenCalledWith('cancel');
+      unmount();
+    });
   });
 
   describe('onChoice handling', () => {
-    it('should call onChoice with change_auth when that option is selected', () => {
-      const { unmount } = render(<ValidationDialog onChoice={mockOnChoice} />);
+    it('should call onChoice with change_auth when that option is selected', async () => {
+      const { waitUntilReady, unmount } = render(
+        <ValidationDialog onChoice={mockOnChoice} />,
+      );
+      await waitUntilReady();
 
       const onSelect = (RadioButtonSelect as Mock).mock.calls[0][0].onSelect;
-      act(() => {
+      await act(async () => {
         onSelect('change_auth');
       });
+      await waitUntilReady();
 
       expect(mockOnChoice).toHaveBeenCalledWith('change_auth');
       unmount();
     });
 
-    it('should call onChoice with verify when no validation link is provided', () => {
-      const { unmount } = render(<ValidationDialog onChoice={mockOnChoice} />);
+    it('should call onChoice with verify when no validation link is provided', async () => {
+      const { waitUntilReady, unmount } = render(
+        <ValidationDialog onChoice={mockOnChoice} />,
+      );
+      await waitUntilReady();
 
       const onSelect = (RadioButtonSelect as Mock).mock.calls[0][0].onSelect;
-      act(() => {
+      await act(async () => {
         onSelect('verify');
       });
+      await waitUntilReady();
 
       expect(mockOnChoice).toHaveBeenCalledWith('verify');
       unmount();
     });
 
     it('should open browser and transition to waiting state when verify is selected with a link', async () => {
-      const { lastFrame, unmount } = render(
+      const { lastFrame, waitUntilReady, unmount } = render(
         <ValidationDialog
           validationLink="https://accounts.google.com/verify"
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
 
       const onSelect = (RadioButtonSelect as Mock).mock.calls[0][0].onSelect;
       await act(async () => {
         await onSelect('verify');
       });
+      await waitUntilReady();
 
       expect(mockOpenBrowserSecurely).toHaveBeenCalledWith(
         'https://accounts.google.com/verify',
@@ -151,17 +201,19 @@ describe('ValidationDialog', () => {
     it('should show URL in message when browser cannot be launched', async () => {
       mockShouldLaunchBrowser.mockReturnValue(false);
 
-      const { lastFrame, unmount } = render(
+      const { lastFrame, waitUntilReady, unmount } = render(
         <ValidationDialog
           validationLink="https://accounts.google.com/verify"
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
 
       const onSelect = (RadioButtonSelect as Mock).mock.calls[0][0].onSelect;
       await act(async () => {
         await onSelect('verify');
       });
+      await waitUntilReady();
 
       expect(mockOpenBrowserSecurely).not.toHaveBeenCalled();
       expect(lastFrame()).toContain('Please open this URL in a browser:');
@@ -174,17 +226,19 @@ describe('ValidationDialog', () => {
     it('should show error and options when browser fails to open', async () => {
       mockOpenBrowserSecurely.mockRejectedValue(new Error('Browser not found'));
 
-      const { lastFrame, unmount } = render(
+      const { lastFrame, waitUntilReady, unmount } = render(
         <ValidationDialog
           validationLink="https://accounts.google.com/verify"
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
 
       const onSelect = (RadioButtonSelect as Mock).mock.calls[0][0].onSelect;
       await act(async () => {
         await onSelect('verify');
       });
+      await waitUntilReady();
 
       expect(lastFrame()).toContain('Browser not found');
       // RadioButtonSelect should be rendered again with options in error state

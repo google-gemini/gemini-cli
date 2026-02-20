@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
+import { render, persistentStateMock } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { Notifications } from './Notifications.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useAppContext, type AppState } from '../contexts/AppContext.js';
@@ -30,13 +31,20 @@ vi.mock('node:fs/promises', async () => {
     access: vi.fn(),
     writeFile: vi.fn(),
     mkdir: vi.fn().mockResolvedValue(undefined),
+    unlink: vi.fn().mockResolvedValue(undefined),
   };
 });
-vi.mock('node:os', () => ({
-  default: {
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return {
+    ...actual,
+    default: {
+      ...actual,
+      homedir: () => '/mock/home',
+    },
     homedir: () => '/mock/home',
-  },
-}));
+  };
+});
 
 vi.mock('node:path', async () => {
   const actual = await vi.importActual<typeof import('node:path')>('node:path');
@@ -46,13 +54,19 @@ vi.mock('node:path', async () => {
   };
 });
 
-vi.mock('@google/gemini-cli-core', () => ({
-  GEMINI_DIR: '.gemini',
-  homedir: () => '/mock/home',
-  Storage: {
-    getGlobalTempDir: () => '/mock/temp',
-  },
-}));
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    GEMINI_DIR: '.gemini',
+    homedir: () => '/mock/home',
+    Storage: {
+      ...actual.Storage,
+      getGlobalTempDir: () => '/mock/temp',
+    },
+  };
+});
 
 vi.mock('../../config/settings.js', () => ({
   DEFAULT_MODEL_CONFIGS: {},
@@ -68,10 +82,11 @@ describe('Notifications', () => {
   const mockUseUIState = vi.mocked(useUIState);
   const mockUseIsScreenReaderEnabled = vi.mocked(useIsScreenReaderEnabled);
   const mockFsAccess = vi.mocked(fs.access);
-  const mockFsWriteFile = vi.mocked(fs.writeFile);
+  const mockFsUnlink = vi.mocked(fs.unlink);
 
   beforeEach(() => {
     vi.clearAllMocks();
+    persistentStateMock.reset();
     mockUseAppContext.mockReturnValue({
       startupWarnings: [],
       version: '1.0.0',
@@ -84,101 +99,113 @@ describe('Notifications', () => {
     mockUseIsScreenReaderEnabled.mockReturnValue(false);
   });
 
-  it('renders nothing when no notifications', () => {
-    const { lastFrame } = render(<Notifications />);
-    expect(lastFrame()).toBe('');
+  it('renders nothing when no notifications', async () => {
+    const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
+    await waitUntilReady();
+    expect(lastFrame({ allowEmpty: true })).toBe('');
+    unmount();
   });
 
   it.each([[['Warning 1']], [['Warning 1', 'Warning 2']]])(
     'renders startup warnings: %s',
-    (warnings) => {
+    async (warnings) => {
       mockUseAppContext.mockReturnValue({
         startupWarnings: warnings,
         version: '1.0.0',
       } as AppState);
-      const { lastFrame } = render(<Notifications />);
+      const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
+      await waitUntilReady();
       const output = lastFrame();
       warnings.forEach((warning) => {
         expect(output).toContain(warning);
       });
+      unmount();
     },
   );
 
-  it('renders init error', () => {
+  it('renders init error', async () => {
     mockUseUIState.mockReturnValue({
       initError: 'Something went wrong',
       streamingState: 'idle',
       updateInfo: null,
     } as unknown as UIState);
-    const { lastFrame } = render(<Notifications />);
+    const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('does not render init error when streaming', () => {
+  it('does not render init error when streaming', async () => {
     mockUseUIState.mockReturnValue({
       initError: 'Something went wrong',
       streamingState: 'responding',
       updateInfo: null,
     } as unknown as UIState);
-    const { lastFrame } = render(<Notifications />);
-    expect(lastFrame()).toBe('');
+    const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
+    await waitUntilReady();
+    expect(lastFrame({ allowEmpty: true })).toBe('');
+    unmount();
   });
 
-  it('renders update notification', () => {
+  it('renders update notification', async () => {
     mockUseUIState.mockReturnValue({
       initError: null,
       streamingState: 'idle',
       updateInfo: { message: 'Update available' },
     } as unknown as UIState);
-    const { lastFrame } = render(<Notifications />);
+    const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('renders screen reader nudge when enabled and not seen', async () => {
+  it('renders screen reader nudge when enabled and not seen (no legacy file)', async () => {
     mockUseIsScreenReaderEnabled.mockReturnValue(true);
+    persistentStateMock.setData({ hasSeenScreenReaderNudge: false });
+    mockFsAccess.mockRejectedValue(new Error('No legacy file'));
 
-    let rejectAccess: (err: Error) => void;
-    mockFsAccess.mockImplementation(
-      () =>
-        new Promise((_, reject) => {
-          rejectAccess = reject;
-        }),
+    const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
+    await waitUntilReady();
+
+    expect(lastFrame()).toContain('screen reader-friendly view');
+    expect(persistentStateMock.set).toHaveBeenCalledWith(
+      'hasSeenScreenReaderNudge',
+      true,
     );
-
-    const { lastFrame } = render(<Notifications />);
-
-    // Trigger rejection inside act
-    await act(async () => {
-      rejectAccess(new Error('File not found'));
-    });
-
-    // Wait for effect to propagate
-    await vi.waitFor(() => {
-      expect(mockFsWriteFile).toHaveBeenCalled();
-    });
 
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('does not render screen reader nudge when already seen', async () => {
+  it('migrates legacy screen reader nudge file', async () => {
     mockUseIsScreenReaderEnabled.mockReturnValue(true);
+    persistentStateMock.setData({ hasSeenScreenReaderNudge: undefined });
+    mockFsAccess.mockResolvedValue(undefined);
 
-    let resolveAccess: (val: undefined) => void;
-    mockFsAccess.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          resolveAccess = resolve;
-        }),
-    );
+    const { waitUntilReady, unmount } = render(<Notifications />);
 
-    const { lastFrame } = render(<Notifications />);
-
-    // Trigger resolution inside act
     await act(async () => {
-      resolveAccess(undefined);
+      await waitUntilReady();
+      await waitFor(() => {
+        expect(persistentStateMock.set).toHaveBeenCalledWith(
+          'hasSeenScreenReaderNudge',
+          true,
+        );
+        expect(mockFsUnlink).toHaveBeenCalled();
+      });
     });
+    unmount();
+  });
 
-    expect(lastFrame()).toBe('');
-    expect(mockFsWriteFile).not.toHaveBeenCalled();
+  it('does not render screen reader nudge when already seen in persistent state', async () => {
+    mockUseIsScreenReaderEnabled.mockReturnValue(true);
+    persistentStateMock.setData({ hasSeenScreenReaderNudge: true });
+
+    const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
+    await waitUntilReady();
+
+    expect(lastFrame({ allowEmpty: true })).toBe('');
+    expect(persistentStateMock.set).not.toHaveBeenCalled();
+    unmount();
   });
 });

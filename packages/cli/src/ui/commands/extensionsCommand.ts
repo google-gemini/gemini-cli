@@ -29,8 +29,13 @@ import {
   inferInstallMetadata,
 } from '../../config/extension-manager.js';
 import { SettingScope } from '../../config/settings.js';
+import { McpServerEnablementManager } from '../../config/mcp/mcpServerEnablement.js';
 import { theme } from '../semantic-colors.js';
 import { stat } from 'node:fs/promises';
+import { ExtensionSettingScope } from '../../config/extensions/extensionSettings.js';
+import { type ConfigLogger } from '../../commands/extensions/utils.js';
+import { ConfigExtensionDialog } from '../components/ConfigExtensionDialog.js';
+import React from 'react';
 
 function showMessageIfNoExtensions(
   context: CommandContext,
@@ -226,6 +231,18 @@ async function restartAction(
     (result): result is PromiseRejectedResult => result.status === 'rejected',
   );
 
+  if (failures.length < extensionsToRestart.length) {
+    try {
+      await context.services.config?.reloadSkills();
+      await context.services.config?.getAgentRegistry()?.reload();
+    } catch (error) {
+      context.ui.addItem({
+        type: MessageType.ERROR,
+        text: `Failed to reload skills or agents: ${getErrorMessage(error)}`,
+      });
+    }
+  }
+
   if (failures.length > 0) {
     const errorMessages = failures
       .map((failure, index) => {
@@ -381,6 +398,38 @@ async function enableAction(context: CommandContext, args: string) {
       type: MessageType.INFO,
       text: `Extension "${name}" enabled for the scope "${scope}"`,
     });
+
+    // Auto-enable any disabled MCP servers for this extension
+    const extension = extensionManager
+      .getExtensions()
+      .find((e) => e.name === name);
+
+    if (extension?.mcpServers) {
+      const mcpEnablementManager = McpServerEnablementManager.getInstance();
+      const mcpClientManager = context.services.config?.getMcpClientManager();
+      const enabledServers = await mcpEnablementManager.autoEnableServers(
+        Object.keys(extension.mcpServers ?? {}),
+      );
+
+      if (mcpClientManager && enabledServers.length > 0) {
+        const restartPromises = enabledServers.map((serverName) =>
+          mcpClientManager.restartServer(serverName).catch((error) => {
+            context.ui.addItem({
+              type: MessageType.WARNING,
+              text: `Failed to restart MCP server '${serverName}': ${getErrorMessage(error)}`,
+            });
+          }),
+        );
+        await Promise.all(restartPromises);
+      }
+
+      if (enabledServers.length > 0) {
+        context.ui.addItem({
+          type: MessageType.INFO,
+          text: `Re-enabled MCP servers: ${enabledServers.join(', ')}`,
+        });
+      }
+    }
   }
 }
 
@@ -550,6 +599,77 @@ async function uninstallAction(context: CommandContext, args: string) {
   }
 }
 
+async function configAction(context: CommandContext, args: string) {
+  const parts = args.trim().split(/\s+/).filter(Boolean);
+  let scope = ExtensionSettingScope.USER;
+
+  const scopeEqIndex = parts.findIndex((p) => p.startsWith('--scope='));
+  if (scopeEqIndex > -1) {
+    const scopeVal = parts[scopeEqIndex].split('=')[1];
+    if (scopeVal === 'workspace') {
+      scope = ExtensionSettingScope.WORKSPACE;
+    } else if (scopeVal === 'user') {
+      scope = ExtensionSettingScope.USER;
+    }
+    parts.splice(scopeEqIndex, 1);
+  } else {
+    const scopeIndex = parts.indexOf('--scope');
+    if (scopeIndex > -1) {
+      const scopeVal = parts[scopeIndex + 1];
+      if (scopeVal === 'workspace' || scopeVal === 'user') {
+        scope =
+          scopeVal === 'workspace'
+            ? ExtensionSettingScope.WORKSPACE
+            : ExtensionSettingScope.USER;
+        parts.splice(scopeIndex, 2);
+      }
+    }
+  }
+
+  const otherArgs = parts;
+  const name = otherArgs[0];
+  const setting = otherArgs[1];
+
+  if (name) {
+    if (name.includes('/') || name.includes('\\') || name.includes('..')) {
+      context.ui.addItem({
+        type: MessageType.ERROR,
+        text: 'Invalid extension name. Names cannot contain path separators or "..".',
+      });
+      return;
+    }
+  }
+
+  const extensionManager = context.services.config?.getExtensionLoader();
+  if (!(extensionManager instanceof ExtensionManager)) {
+    debugLogger.error(
+      `Cannot ${context.invocation?.name} extensions in this environment`,
+    );
+    return;
+  }
+
+  const logger: ConfigLogger = {
+    log: (message: string) => {
+      context.ui.addItem({ type: MessageType.INFO, text: message.trim() });
+    },
+    error: (message: string) =>
+      context.ui.addItem({ type: MessageType.ERROR, text: message }),
+  };
+
+  return {
+    type: 'custom_dialog' as const,
+    component: React.createElement(ConfigExtensionDialog, {
+      extensionManager,
+      onClose: () => context.ui.removeComponent(),
+      extensionName: name,
+      settingKey: setting,
+      scope,
+      configureAll: !name && !setting,
+      loggerAdapter: logger,
+    }),
+  };
+}
+
 /**
  * Exported for testing.
  */
@@ -668,6 +788,14 @@ const restartCommand: SlashCommand = {
   completion: completeExtensions,
 };
 
+const configCommand: SlashCommand = {
+  name: 'config',
+  description: 'Configure extension settings',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: false,
+  action: configAction,
+};
+
 export function extensionsCommand(
   enableExtensionReloading?: boolean,
 ): SlashCommand {
@@ -678,6 +806,7 @@ export function extensionsCommand(
         installCommand,
         uninstallCommand,
         linkCommand,
+        configCommand,
       ]
     : [];
   return {

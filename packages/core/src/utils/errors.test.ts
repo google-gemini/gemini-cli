@@ -11,7 +11,41 @@ import {
   toFriendlyError,
   BadRequestError,
   ForbiddenError,
+  getErrorMessage,
+  getErrorType,
+  FatalAuthenticationError,
+  FatalCancellationError,
+  FatalInputError,
+  FatalSandboxError,
+  FatalConfigError,
+  FatalTurnLimitedError,
+  FatalToolExecutionError,
 } from './errors.js';
+
+describe('getErrorMessage', () => {
+  it('should return plain error message', () => {
+    expect(getErrorMessage(new Error('plain error'))).toBe('plain error');
+  });
+
+  it('should handle non-Error inputs', () => {
+    expect(getErrorMessage('string error')).toBe('string error');
+    expect(getErrorMessage(123)).toBe('123');
+  });
+
+  it('should handle structured HTTP errors via toFriendlyError', () => {
+    const error = {
+      response: {
+        data: {
+          error: {
+            code: 400,
+            message: 'Bad Request Message',
+          },
+        },
+      },
+    };
+    expect(getErrorMessage(error)).toBe('Bad Request Message');
+  });
+});
 
 describe('isAuthenticationError', () => {
   it('should detect error with code: 401 property (MCP SDK style)', () => {
@@ -173,5 +207,46 @@ describe('toFriendlyError', () => {
   it('should return original error if not a Gaxios error object', () => {
     const error = new Error('Regular Error');
     expect(toFriendlyError(error)).toBe(error);
+  });
+});
+
+describe('getErrorType', () => {
+  it('should return error name for standard errors', () => {
+    expect(getErrorType(new Error('test'))).toBe('Error');
+    expect(getErrorType(new TypeError('test'))).toBe('TypeError');
+    expect(getErrorType(new SyntaxError('test'))).toBe('SyntaxError');
+  });
+
+  it('should return constructor name for custom errors', () => {
+    expect(getErrorType(new FatalAuthenticationError('test'))).toBe(
+      'FatalAuthenticationError',
+    );
+    expect(getErrorType(new FatalInputError('test'))).toBe('FatalInputError');
+    expect(getErrorType(new FatalSandboxError('test'))).toBe(
+      'FatalSandboxError',
+    );
+    expect(getErrorType(new FatalConfigError('test'))).toBe('FatalConfigError');
+    expect(getErrorType(new FatalTurnLimitedError('test'))).toBe(
+      'FatalTurnLimitedError',
+    );
+    expect(getErrorType(new FatalToolExecutionError('test'))).toBe(
+      'FatalToolExecutionError',
+    );
+    expect(getErrorType(new FatalCancellationError('test'))).toBe(
+      'FatalCancellationError',
+    );
+    expect(getErrorType(new ForbiddenError('test'))).toBe('ForbiddenError');
+    expect(getErrorType(new UnauthorizedError('test'))).toBe(
+      'UnauthorizedError',
+    );
+    expect(getErrorType(new BadRequestError('test'))).toBe('BadRequestError');
+  });
+
+  it('should return "unknown" for non-Error objects', () => {
+    expect(getErrorType('string error')).toBe('unknown');
+    expect(getErrorType(123)).toBe('unknown');
+    expect(getErrorType({})).toBe('unknown');
+    expect(getErrorType(null)).toBe('unknown');
+    expect(getErrorType(undefined)).toBe('unknown');
   });
 });

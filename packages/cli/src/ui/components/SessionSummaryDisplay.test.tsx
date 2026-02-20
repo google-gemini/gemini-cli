@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
 import { describe, it, expect, vi } from 'vitest';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
@@ -21,7 +21,7 @@ vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
 
 const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
 
-const renderWithMockedStats = (metrics: SessionMetrics) => {
+const renderWithMockedStats = async (metrics: SessionMetrics) => {
   useSessionStatsMock.mockReturnValue({
     stats: {
       sessionId: 'test-session',
@@ -35,11 +35,18 @@ const renderWithMockedStats = (metrics: SessionMetrics) => {
     startNewPrompt: vi.fn(),
   });
 
-  return render(<SessionSummaryDisplay duration="1h 23m 45s" />);
+  const result = renderWithProviders(
+    <SessionSummaryDisplay duration="1h 23m 45s" />,
+    {
+      width: 100,
+    },
+  );
+  await result.waitUntilReady();
+  return result;
 };
 
 describe('<SessionSummaryDisplay />', () => {
-  it('renders the summary display with a title', () => {
+  it('renders the summary display with a title', async () => {
     const metrics: SessionMetrics = {
       models: {
         'gemini-2.5-pro': {
@@ -53,6 +60,7 @@ describe('<SessionSummaryDisplay />', () => {
             thoughts: 300,
             tool: 200,
           },
+          roles: {},
         },
       },
       tools: {
@@ -74,10 +82,11 @@ describe('<SessionSummaryDisplay />', () => {
       },
     };
 
-    const { lastFrame } = renderWithMockedStats(metrics);
+    const { lastFrame, unmount } = await renderWithMockedStats(metrics);
     const output = lastFrame();
 
     expect(output).toContain('Agent powering down. Goodbye!');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 });

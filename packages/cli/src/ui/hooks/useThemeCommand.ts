@@ -13,12 +13,16 @@ import type {
 import { MessageType } from '../types.js';
 import process from 'node:process';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
+import { useTerminalContext } from '../contexts/TerminalContext.js';
 
 interface UseThemeCommandReturn {
   isThemeDialogOpen: boolean;
   openThemeDialog: () => void;
   closeThemeDialog: () => void;
-  handleThemeSelect: (themeName: string, scope: LoadableSettingScope) => void;
+  handleThemeSelect: (
+    themeName: string,
+    scope: LoadableSettingScope,
+  ) => Promise<void>;
   handleThemeHighlight: (themeName: string | undefined) => void;
 }
 
@@ -27,11 +31,13 @@ export const useThemeCommand = (
   setThemeError: (error: string | null) => void,
   addItem: UseHistoryManagerReturn['addItem'],
   initialThemeError: string | null,
+  refreshStatic: () => void,
 ): UseThemeCommandReturn => {
   const [isThemeDialogOpen, setIsThemeDialogOpen] =
     useState(!!initialThemeError);
+  const { queryTerminalBackground } = useTerminalContext();
 
-  const openThemeDialog = useCallback(() => {
+  const openThemeDialog = useCallback(async () => {
     if (process.env['NO_COLOR']) {
       addItem(
         {
@@ -42,8 +48,14 @@ export const useThemeCommand = (
       );
       return;
     }
+
+    // Ensure we have an up to date terminal background color when opening the
+    // theme dialog as the user may have just changed it before opening the
+    // dialog.
+    await queryTerminalBackground();
+
     setIsThemeDialogOpen(true);
-  }, [addItem]);
+  }, [addItem, queryTerminalBackground]);
 
   const applyTheme = useCallback(
     (themeName: string | undefined) => {
@@ -72,9 +84,8 @@ export const useThemeCommand = (
   }, [applyTheme, loadedSettings]);
 
   const handleThemeSelect = useCallback(
-    (themeName: string, scope: LoadableSettingScope) => {
+    async (themeName: string, scope: LoadableSettingScope) => {
       try {
-        // Merge user and workspace custom themes (workspace takes precedence)
         const mergedCustomThemes = {
           ...(loadedSettings.user.settings.ui?.customThemes || {}),
           ...(loadedSettings.workspace.settings.ui?.customThemes || {}),
@@ -92,12 +103,13 @@ export const useThemeCommand = (
           themeManager.loadCustomThemes(loadedSettings.merged.ui.customThemes);
         }
         applyTheme(loadedSettings.merged.ui.theme); // Apply the current theme
+        refreshStatic();
         setThemeError(null);
       } finally {
         setIsThemeDialogOpen(false); // Close the dialog
       }
     },
-    [applyTheme, loadedSettings, setThemeError],
+    [applyTheme, loadedSettings, refreshStatic, setThemeError],
   );
 
   return {

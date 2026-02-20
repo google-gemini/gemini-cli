@@ -11,6 +11,7 @@ import { getResponseText, partToString } from './partUtils.js';
 import { debugLogger } from './debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import type { Config } from '../config/config.js';
+import { LlmRole } from '../telemetry/llmRole.js';
 
 /**
  * A function that summarizes the result of a tool execution.
@@ -94,6 +95,7 @@ export async function summarizeToolOutput(
       modelConfigKey,
       contents,
       abortSignal,
+      LlmRole.UTILITY_SUMMARIZER,
     );
     return getResponseText(parsedResponse) || textToSummarize;
   } catch (error) {

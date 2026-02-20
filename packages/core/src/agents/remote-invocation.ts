@@ -10,6 +10,7 @@ import {
   type ToolResult,
   type ToolCallConfirmationDetails,
 } from '../tools/tools.js';
+import { DEFAULT_QUERY_STRING } from './types.js';
 import type {
   RemoteAgentInputs,
   RemoteAgentDefinition,
@@ -89,7 +90,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
-    const query = params['query'];
+    const query = params['query'] ?? DEFAULT_QUERY_STRING;
     if (typeof query !== 'string') {
       throw new Error(
         `Remote agent '${definition.name}' requires a string 'query' input.`,
@@ -116,8 +117,8 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       type: 'info',
       title: `Call Remote Agent: ${this.definition.displayName ?? this.definition.name}`,
       prompt: `Calling remote agent: "${this.params.query}"`,
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        await this.publishPolicyUpdate(outcome);
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // Policy updates are now handled centrally by the scheduler
       },
     };
   }

@@ -5,12 +5,14 @@
  */
 
 import type {
+  AnyDeclarativeTool,
   AnyToolInvocation,
   CompletedToolCall,
   ContentGeneratorConfig,
   ErroredToolCall,
 } from '../index.js';
 import {
+  CoreToolCallStatus,
   AuthType,
   EditTool,
   GeminiClient,
@@ -91,6 +93,7 @@ import {
   EVENT_EXTENSION_UPDATE,
   HookCallEvent,
   EVENT_HOOK_CALL,
+  LlmRole,
 } from './types.js';
 import * as metrics from './metrics.js';
 import { FileOperation } from './metrics.js';
@@ -187,7 +190,7 @@ describe('loggers', () => {
   });
 
   describe('logCliConfiguration', () => {
-    it('should log the cli configuration', () => {
+    it('should log the cli configuration', async () => {
       const mockConfig = {
         getSessionId: () => 'test-session-id',
         getModel: () => 'test-model',
@@ -226,11 +229,14 @@ describe('loggers', () => {
           }),
         }),
         isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
       } as unknown as Config;
 
       const startSessionEvent = new StartSessionEvent(mockConfig);
       logCliConfiguration(mockConfig, startSessionEvent);
 
+      await new Promise(process.nextTick);
       expect(mockLogger.emit).toHaveBeenCalledWith({
         body: 'CLI configuration loaded.',
         attributes: {
@@ -271,6 +277,8 @@ describe('loggers', () => {
       getTelemetryLogPromptsEnabled: () => true,
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     it('should log a user prompt', () => {
@@ -308,6 +316,8 @@ describe('loggers', () => {
         getTargetDir: () => 'target-dir',
         getUsageStatisticsEnabled: () => true,
         isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
       } as unknown as Config;
       const event = new UserPromptEvent(
         11,
@@ -343,6 +353,8 @@ describe('loggers', () => {
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as Config;
 
     const mockMetrics = {
@@ -509,6 +521,30 @@ describe('loggers', () => {
         'event.timestamp': '2025-01-01T00:00:00.000Z',
       });
     });
+
+    it('should log an API response with a role', () => {
+      const event = new ApiResponseEvent(
+        'test-model',
+        100,
+        { prompt_id: 'prompt-id-role', contents: [] },
+        { candidates: [] },
+        AuthType.LOGIN_WITH_GOOGLE,
+        {},
+        'test-response',
+        LlmRole.SUBAGENT,
+      );
+
+      logApiResponse(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'API response from test-model. Status: 200. Duration: 100ms.',
+        attributes: expect.objectContaining({
+          'event.name': EVENT_API_RESPONSE,
+          prompt_id: 'prompt-id-role',
+          role: 'subagent',
+        }),
+      });
+    });
   });
 
   describe('logApiError', () => {
@@ -519,6 +555,8 @@ describe('loggers', () => {
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as Config;
 
     const mockMetrics = {
@@ -641,6 +679,30 @@ describe('loggers', () => {
         'event.timestamp': '2025-01-01T00:00:00.000Z',
       });
     });
+
+    it('should log an API error with a role', () => {
+      const event = new ApiErrorEvent(
+        'test-model',
+        'error',
+        100,
+        { prompt_id: 'prompt-id-role', contents: [] },
+        AuthType.LOGIN_WITH_GOOGLE,
+        'ApiError',
+        503,
+        LlmRole.SUBAGENT,
+      );
+
+      logApiError(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'API error for test-model. Error: error. Duration: 100ms.',
+        attributes: expect.objectContaining({
+          'event.name': EVENT_API_ERROR,
+          prompt_id: 'prompt-id-role',
+          role: 'subagent',
+        }),
+      });
+    });
   });
 
   describe('logApiRequest', () => {
@@ -651,6 +713,8 @@ describe('loggers', () => {
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
       getContentGeneratorConfig: () => ({
         authType: AuthType.LOGIN_WITH_GOOGLE,
       }),
@@ -727,6 +791,8 @@ describe('loggers', () => {
         getTelemetryEnabled: () => true,
         getTelemetryLogPromptsEnabled: () => true, // Enabled
         isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
         getContentGeneratorConfig: () => ({
           authType: AuthType.USE_GEMINI,
         }),
@@ -814,6 +880,8 @@ describe('loggers', () => {
         getTelemetryEnabled: () => true,
         getTelemetryLogPromptsEnabled: () => false, // Disabled
         isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
         getContentGeneratorConfig: () => ({
           authType: AuthType.USE_VERTEX_AI,
         }),
@@ -867,6 +935,8 @@ describe('loggers', () => {
         getTelemetryEnabled: () => true,
         getTelemetryLogPromptsEnabled: () => true,
         isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
         getUsageStatisticsEnabled: () => true,
         getContentGeneratorConfig: () => ({
           authType: AuthType.USE_GEMINI,
@@ -896,6 +966,26 @@ describe('loggers', () => {
         }),
       });
     });
+
+    it('should log an API request with a role', () => {
+      const event = new ApiRequestEvent(
+        'test-model',
+        { prompt_id: 'prompt-id-role', contents: [] },
+        'request text',
+        LlmRole.SUBAGENT,
+      );
+
+      logApiRequest(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'API request to test-model.',
+        attributes: expect.objectContaining({
+          'event.name': EVENT_API_REQUEST,
+          prompt_id: 'prompt-id-role',
+          role: 'subagent',
+        }),
+      });
+    });
   });
 
   describe('logFlashFallback', () => {
@@ -903,6 +993,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     it('should log flash fallback event', () => {
@@ -930,6 +1022,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1024,6 +1118,8 @@ describe('loggers', () => {
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as Config;
 
     const mockMetrics = {
@@ -1044,7 +1140,7 @@ describe('loggers', () => {
     it('should log a tool call with all fields', () => {
       const tool = new EditTool(mockConfig, createMockMessageBus());
       const call: CompletedToolCall = {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: {
           name: 'test-function',
           args: {
@@ -1159,9 +1255,56 @@ describe('loggers', () => {
         { function_name: 'test-function' },
       );
     });
+
+    it('should merge data from response into metadata', () => {
+      const call: CompletedToolCall = {
+        status: CoreToolCallStatus.Success,
+        request: {
+          name: 'ask_user',
+          args: { questions: [] },
+          callId: 'test-call-id',
+          isClientInitiated: true,
+          prompt_id: 'prompt-id-1',
+        },
+        response: {
+          callId: 'test-call-id',
+          responseParts: [{ text: 'test-response' }],
+          resultDisplay: 'User answered: ...',
+          error: undefined,
+          errorType: undefined,
+          data: {
+            ask_user: {
+              question_types: ['choice'],
+              dismissed: false,
+            },
+          },
+        },
+        tool: undefined as unknown as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        durationMs: 100,
+        outcome: ToolConfirmationOutcome.ProceedOnce,
+      };
+      const event = new ToolCallEvent(call);
+
+      logToolCall(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Tool call: ask_user. Decision: accept. Success: true. Duration: 100ms.',
+        attributes: expect.objectContaining({
+          function_name: 'ask_user',
+          metadata: expect.objectContaining({
+            ask_user: {
+              question_types: ['choice'],
+              dismissed: false,
+            },
+          }),
+        }),
+      });
+    });
+
     it('should log a tool call with a reject decision', () => {
       const call: ErroredToolCall = {
-        status: 'error',
+        status: CoreToolCallStatus.Error,
         request: {
           name: 'test-function',
           args: {
@@ -1239,7 +1382,7 @@ describe('loggers', () => {
 
     it('should log a tool call with a modify decision', () => {
       const call: CompletedToolCall = {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: {
           name: 'test-function',
           args: {
@@ -1319,7 +1462,7 @@ describe('loggers', () => {
 
     it('should log a tool call without a decision', () => {
       const call: CompletedToolCall = {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: {
           name: 'test-function',
           args: {
@@ -1399,7 +1542,7 @@ describe('loggers', () => {
     it('should log a failed tool call with an error', () => {
       const errorMessage = 'test-error';
       const call: ErroredToolCall = {
-        status: 'error',
+        status: CoreToolCallStatus.Error,
         request: {
           name: 'test-function',
           args: {
@@ -1494,12 +1637,13 @@ describe('loggers', () => {
         false,
         undefined,
         undefined,
+        undefined,
         'test-extension',
         'test-extension-id',
       );
 
       const call: CompletedToolCall = {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: {
           name: 'mock_mcp_tool',
           args: { arg1: 'value1', arg2: 2 },
@@ -1594,6 +1738,8 @@ describe('loggers', () => {
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as Config;
 
     const mockMetrics = {
@@ -1654,6 +1800,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     it('should log a tool output truncated event', () => {
@@ -1662,7 +1810,6 @@ describe('loggers', () => {
         originalContentLength: 1000,
         truncatedContentLength: 100,
         threshold: 500,
-        lines: 10,
       });
 
       logToolOutputTruncated(mockConfig, event);
@@ -1682,7 +1829,6 @@ describe('loggers', () => {
           original_content_length: 1000,
           truncated_content_length: 100,
           threshold: 500,
-          lines: 10,
         },
       });
     });
@@ -1693,6 +1839,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1734,6 +1882,37 @@ describe('loggers', () => {
       );
     });
 
+    it('should log the event with numerical routing fields', () => {
+      const event = new ModelRoutingEvent(
+        'gemini-pro',
+        'NumericalClassifier (Strict)',
+        150,
+        '[Score: 90 / Threshold: 80] reasoning',
+        false,
+        undefined,
+        true,
+        '80',
+      );
+
+      logModelRouting(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logModelRoutingEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Model routing decision. Model: gemini-pro, Source: NumericalClassifier (Strict)',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
+          ...event,
+          'event.name': EVENT_MODEL_ROUTING,
+          interactive: false,
+        },
+      });
+    });
+
     it('should only log to Clearcut if OTEL SDK is not initialized', () => {
       vi.spyOn(sdk, 'isTelemetrySdkInitialized').mockReturnValue(false);
       vi.spyOn(sdk, 'bufferTelemetryEvent').mockImplementation(() => {});
@@ -1762,6 +1941,8 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1779,7 +1960,7 @@ describe('loggers', () => {
         'testing-id',
         '0.1.0',
         'git',
-        'success',
+        CoreToolCallStatus.Success,
       );
 
       await logExtensionInstallEvent(mockConfig, event);
@@ -1800,7 +1981,7 @@ describe('loggers', () => {
           extension_name: 'testing',
           extension_version: '0.1.0',
           extension_source: 'git',
-          status: 'success',
+          status: CoreToolCallStatus.Success,
         },
       });
     });
@@ -1812,6 +1993,8 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1830,7 +2013,7 @@ describe('loggers', () => {
         '0.1.0',
         '0.1.1',
         'git',
-        'success',
+        CoreToolCallStatus.Success,
       );
 
       await logExtensionUpdateEvent(mockConfig, event);
@@ -1852,7 +2035,7 @@ describe('loggers', () => {
           extension_version: '0.1.0',
           extension_previous_version: '0.1.1',
           extension_source: 'git',
-          status: 'success',
+          status: CoreToolCallStatus.Success,
         },
       });
     });
@@ -1864,6 +2047,8 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1878,7 +2063,7 @@ describe('loggers', () => {
         'testing',
         'testing-hash',
         'testing-id',
-        'success',
+        CoreToolCallStatus.Success,
       );
 
       await logExtensionUninstall(mockConfig, event);
@@ -1897,7 +2082,7 @@ describe('loggers', () => {
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           interactive: false,
           extension_name: 'testing',
-          status: 'success',
+          status: CoreToolCallStatus.Success,
         },
       });
     });
@@ -1908,6 +2093,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1953,6 +2140,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1998,6 +2187,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2034,6 +2225,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2085,6 +2278,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2120,6 +2315,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
       getTelemetryLogPromptsEnabled: () => false,
     } as unknown as Config;
 
@@ -2175,7 +2372,7 @@ describe('loggers', () => {
   });
 
   describe('Telemetry Buffering', () => {
-    it('should buffer events when SDK is not initialized', () => {
+    it('should buffer events when SDK is not initialized', async () => {
       vi.spyOn(sdk, 'isTelemetrySdkInitialized').mockReturnValue(false);
       const bufferSpy = vi
         .spyOn(sdk, 'bufferTelemetryEvent')

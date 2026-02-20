@@ -1,22 +1,24 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render as inkRender } from 'ink-testing-library';
+import { render as inkRenderDirect, type Instance as InkInstance } from 'ink';
+import { EventEmitter } from 'node:events';
 import { Box } from 'ink';
 import type React from 'react';
+import { Terminal } from '@xterm/headless';
 import { vi } from 'vitest';
+import stripAnsi from 'strip-ansi';
 import { act, useState } from 'react';
-import { LoadedSettings, type Settings } from '../config/settings.js';
+import os from 'node:os';
+import { LoadedSettings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
 import { ShellFocusContext } from '../ui/contexts/ShellFocusContext.js';
 import { UIStateContext, type UIState } from '../ui/contexts/UIStateContext.js';
-import { StreamingState } from '../ui/types.js';
 import { ConfigContext } from '../ui/contexts/ConfigContext.js';
-import { calculateMainAreaWidth } from '../ui/utils/ui-sizing.js';
 import { VimModeProvider } from '../ui/contexts/VimModeContext.js';
 import { MouseProvider } from '../ui/contexts/MouseContext.js';
 import { ScrollProvider } from '../ui/contexts/ScrollProvider.js';
@@ -25,53 +27,381 @@ import {
   type UIActions,
   UIActionsContext,
 } from '../ui/contexts/UIActionsContext.js';
+import { type HistoryItemToolGroup, StreamingState } from '../ui/types.js';
+import { ToolActionsProvider } from '../ui/contexts/ToolActionsContext.js';
+import { AskUserActionsProvider } from '../ui/contexts/AskUserActionsContext.js';
+import { TerminalProvider } from '../ui/contexts/TerminalContext.js';
 
-import { type Config } from '@google/gemini-cli-core';
+import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
+import { FakePersistentState } from './persistentStateFake.js';
+import { AppContext, type AppState } from '../ui/contexts/AppContext.js';
+import { createMockSettings } from './settings.js';
+import { SessionStatsProvider } from '../ui/contexts/SessionContext.js';
+import { themeManager, DEFAULT_THEME } from '../ui/themes/theme-manager.js';
+import { DefaultLight } from '../ui/themes/default-light.js';
+import { pickDefaultThemeName } from '../ui/themes/theme.js';
 
-// Wrapper around ink-testing-library's render that ensures act() is called
+export const persistentStateMock = new FakePersistentState();
+
+if (process.env['NODE_ENV'] === 'test') {
+  // We mock NODE_ENV to development during tests that use render.tsx
+  // so that animations (which check process.env.NODE_ENV !== 'test')
+  // are actually tested. We mutate process.env directly here because
+  // vi.stubEnv() is cleared by vi.unstubAllEnvs() in test-setup.ts
+  // after each test.
+  process.env['NODE_ENV'] = 'development';
+}
+
+vi.mock('../utils/persistentState.js', () => ({
+  persistentState: persistentStateMock,
+}));
+
+vi.mock('../ui/utils/terminalUtils.js', () => ({
+  isLowColorDepth: vi.fn(() => false),
+  getColorDepth: vi.fn(() => 24),
+  isITerm2: vi.fn(() => false),
+}));
+
+type TerminalState = {
+  terminal: Terminal;
+  cols: number;
+  rows: number;
+};
+
+class XtermStdout extends EventEmitter {
+  private state: TerminalState;
+  private pendingWrites = 0;
+  private renderCount = 0;
+  private queue: { promise: Promise<void> };
+  isTTY = true;
+
+  private lastRenderOutput: string | undefined = undefined;
+
+  constructor(state: TerminalState, queue: { promise: Promise<void> }) {
+    super();
+    this.state = state;
+    this.queue = queue;
+  }
+
+  get columns() {
+    return this.state.terminal.cols;
+  }
+
+  get rows() {
+    return this.state.terminal.rows;
+  }
+
+  get frames(): string[] {
+    return [];
+  }
+
+  write = (data: string) => {
+    this.pendingWrites++;
+    this.queue.promise = this.queue.promise.then(async () => {
+      await new Promise<void>((resolve) =>
+        this.state.terminal.write(data, resolve),
+      );
+      this.pendingWrites--;
+    });
+  };
+
+  clear = () => {
+    this.state.terminal.reset();
+    this.lastRenderOutput = undefined;
+  };
+
+  dispose = () => {
+    this.state.terminal.dispose();
+  };
+
+  onRender = (staticContent: string, output: string) => {
+    this.renderCount++;
+    this.lastRenderOutput = output;
+    this.emit('render');
+  };
+
+  lastFrame = (options: { allowEmpty?: boolean } = {}) => {
+    const buffer = this.state.terminal.buffer.active;
+    const allLines: string[] = [];
+    for (let i = 0; i < buffer.length; i++) {
+      allLines.push(buffer.getLine(i)?.translateToString(true) ?? '');
+    }
+
+    const trimmed = [...allLines];
+    while (trimmed.length > 0 && trimmed[trimmed.length - 1] === '') {
+      trimmed.pop();
+    }
+    const result = trimmed.join('\n');
+
+    // Normalize for cross-platform snapshot stability:
+    // Normalize any \r\n to \n
+    const normalized = result.replace(/\r\n/g, '\n');
+
+    if (normalized === '' && !options.allowEmpty) {
+      throw new Error(
+        'lastFrame() returned an empty string. If this is intentional, use lastFrame({ allowEmpty: true }). ' +
+          'Otherwise, ensure you are calling await waitUntilReady() and that the component is rendering correctly.',
+      );
+    }
+    return normalized === '' ? normalized : normalized + '\n';
+  };
+
+  async waitUntilReady() {
+    const startRenderCount = this.renderCount;
+    if (!vi.isFakeTimers()) {
+      // Give Ink a chance to start its rendering loop
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    await act(async () => {
+      if (vi.isFakeTimers()) {
+        await vi.advanceTimersByTimeAsync(50);
+      } else {
+        // Wait for at least one render to be called if we haven't rendered yet or since start of this call,
+        // but don't wait forever as some renders might be synchronous or skipped.
+        if (this.renderCount === startRenderCount) {
+          const renderPromise = new Promise((resolve) =>
+            this.once('render', resolve),
+          );
+          const timeoutPromise = new Promise((resolve) =>
+            setTimeout(resolve, 50),
+          );
+          await Promise.race([renderPromise, timeoutPromise]);
+        }
+      }
+    });
+
+    let attempts = 0;
+    const maxAttempts = 50;
+
+    let lastCurrent = '';
+    let lastExpected = '';
+
+    while (attempts < maxAttempts) {
+      // Ensure all pending writes to the terminal are processed.
+      await this.queue.promise;
+
+      const currentFrame = stripAnsi(
+        this.lastFrame({ allowEmpty: true }),
+      ).trim();
+      const expectedFrame = stripAnsi(this.lastRenderOutput ?? '')
+        .trim()
+        .replace(/\r\n/g, '\n');
+
+      lastCurrent = currentFrame;
+      lastExpected = expectedFrame;
+
+      const isMatch = () => {
+        if (expectedFrame === '...') {
+          return currentFrame !== '';
+        }
+
+        // If both are empty, it's a match.
+        // We consider undefined lastRenderOutput as effectively empty for this check
+        // to support hook testing where Ink may skip rendering completely.
+        if (
+          (this.lastRenderOutput === undefined || expectedFrame === '') &&
+          currentFrame === ''
+        ) {
+          return true;
+        }
+
+        if (this.lastRenderOutput === undefined) {
+          return false;
+        }
+
+        // If Ink expects nothing but terminal has content, or vice-versa, it's NOT a match.
+        if (expectedFrame === '' || currentFrame === '') {
+          return false;
+        }
+
+        // Check if the current frame contains the expected content.
+        // We use includes because xterm might have some formatting or
+        // extra whitespace that Ink doesn't account for in its raw output metrics.
+        return currentFrame.includes(expectedFrame);
+      };
+
+      if (this.pendingWrites === 0 && isMatch()) {
+        return;
+      }
+
+      attempts++;
+      await act(async () => {
+        if (vi.isFakeTimers()) {
+          await vi.advanceTimersByTimeAsync(10);
+        } else {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+      });
+    }
+
+    throw new Error(
+      `waitUntilReady() timed out after ${maxAttempts} attempts.\n` +
+        `Expected content (stripped ANSI):\n"${lastExpected}"\n` +
+        `Actual content (stripped ANSI):\n"${lastCurrent}"\n` +
+        `Pending writes: ${this.pendingWrites}\n` +
+        `Render count: ${this.renderCount}`,
+    );
+  }
+}
+
+class XtermStderr extends EventEmitter {
+  private state: TerminalState;
+  private pendingWrites = 0;
+  private queue: { promise: Promise<void> };
+  isTTY = true;
+
+  constructor(state: TerminalState, queue: { promise: Promise<void> }) {
+    super();
+    this.state = state;
+    this.queue = queue;
+  }
+
+  write = (data: string) => {
+    this.pendingWrites++;
+    this.queue.promise = this.queue.promise.then(async () => {
+      await new Promise<void>((resolve) =>
+        this.state.terminal.write(data, resolve),
+      );
+      this.pendingWrites--;
+    });
+  };
+
+  dispose = () => {
+    this.state.terminal.dispose();
+  };
+
+  lastFrame = () => '';
+}
+
+class XtermStdin extends EventEmitter {
+  isTTY = true;
+  data: string | null = null;
+  constructor(options: { isTTY?: boolean } = {}) {
+    super();
+    this.isTTY = options.isTTY ?? true;
+  }
+
+  write = (data: string) => {
+    this.data = data;
+    this.emit('readable');
+    this.emit('data', data);
+  };
+
+  setEncoding() {}
+  setRawMode() {}
+  resume() {}
+  pause() {}
+  ref() {}
+  unref() {}
+
+  read = () => {
+    const { data } = this;
+    this.data = null;
+    return data;
+  };
+}
+
+export type RenderInstance = {
+  rerender: (tree: React.ReactElement) => void;
+  unmount: () => void;
+  cleanup: () => void;
+  stdout: XtermStdout;
+  stderr: XtermStderr;
+  stdin: XtermStdin;
+  frames: string[];
+  lastFrame: (options?: { allowEmpty?: boolean }) => string;
+  terminal: Terminal;
+  waitUntilReady: () => Promise<void>;
+};
+
+const instances: InkInstance[] = [];
+
+// Wrapper around ink's render that ensures act() is called and uses Xterm for output
 export const render = (
   tree: React.ReactElement,
   terminalWidth?: number,
-): ReturnType<typeof inkRender> => {
-  let renderResult: ReturnType<typeof inkRender> =
-    undefined as unknown as ReturnType<typeof inkRender>;
-  act(() => {
-    renderResult = inkRender(tree);
+): RenderInstance => {
+  const cols = terminalWidth ?? 100;
+  // We use 1000 rows to avoid windows with incorrect snapshots if a correct
+  // value was used (e.g. 40 rows). The alternatives to make things worse are
+  // windows unfortunately with odd duplicate content in the backbuffer
+  // which does not match actual behavior in xterm.js on windows.
+  const rows = 1000;
+  const terminal = new Terminal({
+    cols,
+    rows,
+    allowProposedApi: true,
+    convertEol: true,
   });
 
-  if (terminalWidth !== undefined && renderResult?.stdout) {
-    // Override the columns getter on the stdout instance provided by ink-testing-library
-    Object.defineProperty(renderResult.stdout, 'columns', {
-      get: () => terminalWidth,
-      configurable: true,
-    });
+  const state: TerminalState = {
+    terminal,
+    cols,
+    rows,
+  };
+  const writeQueue = { promise: Promise.resolve() };
+  const stdout = new XtermStdout(state, writeQueue);
+  const stderr = new XtermStderr(state, writeQueue);
+  const stdin = new XtermStdin();
 
-    // Trigger a rerender so Ink can pick up the new terminal width
-    act(() => {
-      renderResult.rerender(tree);
+  let instance!: InkInstance;
+  stdout.clear();
+  act(() => {
+    instance = inkRenderDirect(tree, {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      stderr: stderr as unknown as NodeJS.WriteStream,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      stdin: stdin as unknown as NodeJS.ReadStream,
+      debug: false,
+      exitOnCtrlC: false,
+      patchConsole: false,
+      onRender: (metrics: { output: string; staticOutput?: string }) => {
+        stdout.onRender(metrics.staticOutput ?? '', metrics.output);
+      },
     });
-  }
+  });
 
-  const originalUnmount = renderResult.unmount;
-  const originalRerender = renderResult.rerender;
+  instances.push(instance);
 
   return {
-    ...renderResult,
-    unmount: () => {
-      act(() => {
-        originalUnmount();
-      });
-    },
     rerender: (newTree: React.ReactElement) => {
       act(() => {
-        originalRerender(newTree);
+        stdout.clear();
+        instance.rerender(newTree);
       });
     },
+    unmount: () => {
+      act(() => {
+        instance.unmount();
+      });
+      stdout.dispose();
+      stderr.dispose();
+    },
+    cleanup: instance.cleanup,
+    stdout,
+    stderr,
+    stdin,
+    frames: stdout.frames,
+    lastFrame: stdout.lastFrame,
+    terminal: state.terminal,
+    waitUntilReady: () => stdout.waitUntilReady(),
   };
 };
 
+export const cleanup = () => {
+  for (const instance of instances) {
+    act(() => {
+      instance.unmount();
+    });
+    instance.cleanup();
+  }
+  instances.length = 0;
+};
+
 export const simulateClick = async (
-  stdin: ReturnType<typeof inkRender>['stdin'],
+  stdin: XtermStdin,
   col: number,
   row: number,
   button: 0 | 1 | 2 = 0, // 0 for left, 1 for middle, 2 for right
@@ -83,21 +413,32 @@ export const simulateClick = async (
   });
 };
 
-const mockConfig = {
-  getModel: () => 'gemini-pro',
-  getTargetDir: () =>
-    '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long',
-  getDebugMode: () => false,
-  isTrustedFolder: () => true,
-  getIdeMode: () => false,
-  getEnableInteractiveShell: () => true,
-  getPreviewFeatures: () => false,
+let mockConfigInternal: Config | undefined;
+
+const getMockConfigInternal = (): Config => {
+  if (!mockConfigInternal) {
+    mockConfigInternal = makeFakeConfig({
+      targetDir: os.tmpdir(),
+      enableEventDrivenScheduler: true,
+    });
+  }
+  return mockConfigInternal;
 };
 
-const configProxy = new Proxy(mockConfig, {
-  get(target, prop) {
-    if (prop in target) {
-      return target[prop as keyof typeof target];
+// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+const configProxy = new Proxy({} as Config, {
+  get(_target, prop) {
+    if (prop === 'getTargetDir') {
+      return () =>
+        '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long';
+    }
+    if (prop === 'getUseBackgroundColor') {
+      return () => true;
+    }
+    const internal = getMockConfigInternal();
+    if (prop in internal) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return internal[prop as keyof typeof internal];
     }
     throw new Error(`mockConfig does not have property ${String(prop)}`);
   },
@@ -112,30 +453,33 @@ export const mockSettings = new LoadedSettings(
   [],
 );
 
-export const createMockSettings = (
-  overrides: Partial<Settings>,
-): LoadedSettings => {
-  const settings = overrides as Settings;
-  return new LoadedSettings(
-    { path: '', settings: {}, originalSettings: {} },
-    { path: '', settings: {}, originalSettings: {} },
-    { path: '', settings, originalSettings: settings },
-    { path: '', settings: {}, originalSettings: {} },
-    true,
-    [],
-  );
-};
-
 // A minimal mock UIState to satisfy the context provider.
 // Tests that need specific UIState values should provide their own.
 const baseMockUiState = {
   renderMarkdown: true,
   streamingState: StreamingState.Idle,
-  mainAreaWidth: 100,
-  terminalWidth: 120,
+  terminalWidth: 100,
   terminalHeight: 40,
   currentModel: 'gemini-pro',
-  terminalBackgroundColor: undefined,
+  terminalBackgroundColor: 'black',
+  cleanUiDetailsVisible: false,
+  allowPlanMode: true,
+  activePtyId: undefined,
+  backgroundShells: new Map(),
+  backgroundShellHeight: 0,
+  quota: {
+    userTier: undefined,
+    stats: undefined,
+    proQuotaRequest: null,
+    validationRequest: null,
+  },
+  hintMode: false,
+  hintBuffer: '',
+};
+
+export const mockAppState: AppState = {
+  version: '1.2.3',
+  startupWarnings: [],
 };
 
 const mockUIActions: UIActions = {
@@ -150,6 +494,8 @@ const mockUIActions: UIActions = {
   exitPrivacyNotice: vi.fn(),
   closeSettingsDialog: vi.fn(),
   closeModelDialog: vi.fn(),
+  openAgentConfigDialog: vi.fn(),
+  closeAgentConfigDialog: vi.fn(),
   openPermissionsDialog: vi.fn(),
   openSessionBrowser: vi.fn(),
   closeSessionBrowser: vi.fn(),
@@ -160,6 +506,7 @@ const mockUIActions: UIActions = {
   vimHandleInput: vi.fn(),
   handleIdePromptComplete: vi.fn(),
   handleFolderTrustSelect: vi.fn(),
+  setIsPolicyUpdateDialogOpen: vi.fn(),
   setConstrainHeight: vi.fn(),
   onEscapePromptChange: vi.fn(),
   refreshStatic: vi.fn(),
@@ -172,9 +519,22 @@ const mockUIActions: UIActions = {
   handleApiKeySubmit: vi.fn(),
   handleApiKeyCancel: vi.fn(),
   setBannerVisible: vi.fn(),
+  setShortcutsHelpVisible: vi.fn(),
+  setCleanUiDetailsVisible: vi.fn(),
+  toggleCleanUiDetailsVisible: vi.fn(),
+  revealCleanUiDetailsTemporarily: vi.fn(),
+  handleWarning: vi.fn(),
   setEmbeddedShellFocused: vi.fn(),
+  dismissBackgroundShell: vi.fn(),
+  setActiveBackgroundShellPid: vi.fn(),
+  setIsBackgroundShellListOpen: vi.fn(),
   setAuthContext: vi.fn(),
+  onHintInput: vi.fn(),
+  onHintBackspace: vi.fn(),
+  onHintClear: vi.fn(),
+  onHintSubmit: vi.fn(),
   handleRestart: vi.fn(),
+  handleNewAgentsSelect: vi.fn(),
 };
 
 export const renderWithProviders = (
@@ -185,9 +545,12 @@ export const renderWithProviders = (
     uiState: providedUiState,
     width,
     mouseEventsEnabled = false,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     config = configProxy as unknown as Config,
     useAlternateBuffer = true,
     uiActions,
+    persistentState,
+    appState = mockAppState,
   }: {
     shellFocus?: boolean;
     settings?: LoadedSettings;
@@ -197,25 +560,48 @@ export const renderWithProviders = (
     config?: Config;
     useAlternateBuffer?: boolean;
     uiActions?: Partial<UIActions>;
+    persistentState?: {
+      get?: typeof persistentStateMock.get;
+      set?: typeof persistentStateMock.set;
+    };
+    appState?: AppState;
   } = {},
-): ReturnType<typeof render> & { simulateClick: typeof simulateClick } => {
+): RenderInstance & {
+  simulateClick: (
+    col: number,
+    row: number,
+    button?: 0 | 1 | 2,
+  ) => Promise<void>;
+} => {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const baseState: UIState = new Proxy(
     { ...baseMockUiState, ...providedUiState },
     {
       get(target, prop) {
         if (prop in target) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           return target[prop as keyof typeof target];
         }
         // For properties not in the base mock or provided state,
         // we'll check the original proxy to see if it's a defined but
         // unprovided property, and if not, throw.
         if (prop in baseMockUiState) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           return baseMockUiState[prop as keyof typeof baseMockUiState];
         }
         throw new Error(`mockUiState does not have property ${String(prop)}`);
       },
     },
   ) as UIState;
+
+  if (persistentState?.get) {
+    persistentStateMock.get.mockImplementation(persistentState.get);
+  }
+  if (persistentState?.set) {
+    persistentStateMock.set.mockImplementation(persistentState.set);
+  }
+
+  persistentStateMock.mockClear();
 
   const terminalWidth = width ?? baseState.terminalWidth;
   let finalSettings = settings;
@@ -229,7 +615,7 @@ export const renderWithProviders = (
     });
   }
 
-  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, finalSettings);
+  const mainAreaWidth = terminalWidth;
 
   const finalUiState = {
     ...baseState,
@@ -237,41 +623,79 @@ export const renderWithProviders = (
     mainAreaWidth,
   };
 
+  themeManager.setTerminalBackground(baseState.terminalBackgroundColor);
+  const themeName = pickDefaultThemeName(
+    baseState.terminalBackgroundColor,
+    themeManager.getAllThemes(),
+    DEFAULT_THEME.name,
+    DefaultLight.name,
+  );
+  themeManager.setActiveTheme(themeName);
+
   const finalUIActions = { ...mockUIActions, ...uiActions };
 
+  const allToolCalls = (finalUiState.pendingHistoryItems || [])
+    .filter((item): item is HistoryItemToolGroup => item.type === 'tool_group')
+    .flatMap((item) => item.tools);
+
   const renderResult = render(
-    <ConfigContext.Provider value={config}>
-      <SettingsContext.Provider value={finalSettings}>
-        <UIStateContext.Provider value={finalUiState}>
-          <VimModeProvider settings={finalSettings}>
-            <ShellFocusContext.Provider value={shellFocus}>
-              <StreamingContext.Provider value={finalUiState.streamingState}>
-                <UIActionsContext.Provider value={finalUIActions}>
-                  <KeypressProvider>
-                    <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
-                      <ScrollProvider>
-                        <Box
-                          width={terminalWidth}
-                          flexShrink={0}
-                          flexGrow={0}
-                          flexDirection="column"
+    <AppContext.Provider value={appState}>
+      <ConfigContext.Provider value={config}>
+        <SettingsContext.Provider value={finalSettings}>
+          <UIStateContext.Provider value={finalUiState}>
+            <VimModeProvider settings={finalSettings}>
+              <ShellFocusContext.Provider value={shellFocus}>
+                <SessionStatsProvider>
+                  <StreamingContext.Provider
+                    value={finalUiState.streamingState}
+                  >
+                    <UIActionsContext.Provider value={finalUIActions}>
+                      <ToolActionsProvider
+                        config={config}
+                        toolCalls={allToolCalls}
+                      >
+                        <AskUserActionsProvider
+                          request={null}
+                          onSubmit={vi.fn()}
+                          onCancel={vi.fn()}
                         >
-                          {component}
-                        </Box>
-                      </ScrollProvider>
-                    </MouseProvider>
-                  </KeypressProvider>
-                </UIActionsContext.Provider>
-              </StreamingContext.Provider>
-            </ShellFocusContext.Provider>
-          </VimModeProvider>
-        </UIStateContext.Provider>
-      </SettingsContext.Provider>
-    </ConfigContext.Provider>,
+                          <KeypressProvider>
+                            <MouseProvider
+                              mouseEventsEnabled={mouseEventsEnabled}
+                            >
+                              <TerminalProvider>
+                                <ScrollProvider>
+                                  <Box
+                                    width={terminalWidth}
+                                    flexShrink={0}
+                                    flexGrow={0}
+                                    flexDirection="column"
+                                  >
+                                    {component}
+                                  </Box>
+                                </ScrollProvider>
+                              </TerminalProvider>
+                            </MouseProvider>
+                          </KeypressProvider>
+                        </AskUserActionsProvider>
+                      </ToolActionsProvider>
+                    </UIActionsContext.Provider>
+                  </StreamingContext.Provider>
+                </SessionStatsProvider>
+              </ShellFocusContext.Provider>
+            </VimModeProvider>
+          </UIStateContext.Provider>
+        </SettingsContext.Provider>
+      </ConfigContext.Provider>
+    </AppContext.Provider>,
     terminalWidth,
   );
 
-  return { ...renderResult, simulateClick };
+  return {
+    ...renderResult,
+    simulateClick: (col: number, row: number, button?: 0 | 1 | 2) =>
+      simulateClick(renderResult.stdin, col, row, button),
+  };
 };
 
 export function renderHook<Result, Props>(
@@ -284,8 +708,11 @@ export function renderHook<Result, Props>(
   result: { current: Result };
   rerender: (props?: Props) => void;
   unmount: () => void;
+  waitUntilReady: () => Promise<void>;
 } {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const result = { current: undefined as unknown as Result };
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   let currentProps = options?.initialProps as Props;
 
   function TestComponent({
@@ -303,6 +730,7 @@ export function renderHook<Result, Props>(
 
   let inkRerender: (tree: React.ReactElement) => void = () => {};
   let unmount: () => void = () => {};
+  let waitUntilReady: () => Promise<void> = async () => {};
 
   act(() => {
     const renderResult = render(
@@ -312,10 +740,12 @@ export function renderHook<Result, Props>(
     );
     inkRerender = renderResult.rerender;
     unmount = renderResult.unmount;
+    waitUntilReady = renderResult.waitUntilReady;
   });
 
   function rerender(props?: Props) {
     if (arguments.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       currentProps = props as Props;
     }
     act(() => {
@@ -327,7 +757,7 @@ export function renderHook<Result, Props>(
     });
   }
 
-  return { result, rerender, unmount };
+  return { result, rerender, unmount, waitUntilReady };
 }
 
 export function renderHookWithProviders<Result, Props>(
@@ -348,14 +778,19 @@ export function renderHookWithProviders<Result, Props>(
   result: { current: Result };
   rerender: (props?: Props) => void;
   unmount: () => void;
+  waitUntilReady: () => Promise<void>;
 } {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const result = { current: undefined as unknown as Result };
 
   let setPropsFn: ((props: Props) => void) | undefined;
+  let forceUpdateFn: (() => void) | undefined;
 
   function TestComponent({ initialProps }: { initialProps: Props }) {
     const [props, setProps] = useState(initialProps);
+    const [, forceUpdate] = useState(0);
     setPropsFn = setProps;
+    forceUpdateFn = () => forceUpdate((n) => n + 1);
     result.current = renderCallback(props);
     return null;
   }
@@ -367,6 +802,7 @@ export function renderHookWithProviders<Result, Props>(
   act(() => {
     renderResult = renderWithProviders(
       <Wrapper>
+        {/* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */}
         <TestComponent initialProps={options.initialProps as Props} />
       </Wrapper>,
       options,
@@ -375,8 +811,11 @@ export function renderHookWithProviders<Result, Props>(
 
   function rerender(newProps?: Props) {
     act(() => {
-      if (setPropsFn && newProps) {
-        setPropsFn(newProps);
+      if (arguments.length > 0 && setPropsFn) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        setPropsFn(newProps as Props);
+      } else if (forceUpdateFn) {
+        forceUpdateFn();
       }
     });
   }
@@ -389,5 +828,6 @@ export function renderHookWithProviders<Result, Props>(
         renderResult.unmount();
       });
     },
+    waitUntilReady: () => renderResult.waitUntilReady(),
   };
 }

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import os, { EOL } from 'node:os';
 import crypto from 'node:crypto';
@@ -32,7 +32,7 @@ import type {
   ShellOutputEvent,
 } from '../services/shellExecutionService.js';
 import { ShellExecutionService } from '../services/shellExecutionService.js';
-import { formatMemoryUsage } from '../utils/formatters.js';
+import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
@@ -43,13 +43,19 @@ import {
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { getShellDefinition } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
+
+// Delay so user does not see the output of the process before the process is moved to the background.
+const BACKGROUND_DELAY_MS = 200;
 
 export interface ShellToolParams {
   command: string;
   description?: string;
   dir_path?: string;
+  is_background?: boolean;
 }
 
 export class ShellToolInvocation extends BaseToolInvocation<
@@ -78,6 +84,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
     // append optional (description), replacing any line breaks with spaces
     if (this.params.description) {
       description += ` (${this.params.description.replace(/\n/g, ' ')})`;
+    }
+    if (this.params.is_background) {
+      description += ' [background]';
     }
     return description;
   }
@@ -131,8 +140,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
       command: this.params.command,
       rootCommand: rootCommandDisplay,
       rootCommands,
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        await this.publishPolicyUpdate(outcome);
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // Policy updates are now handled centrally by the scheduler
       },
     };
     return confirmationDetails;
@@ -183,6 +192,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
         ? path.resolve(this.config.getTargetDir(), this.params.dir_path)
         : this.config.getTargetDir();
 
+      const validationError = this.config.validatePathAccess(cwd);
+      if (validationError) {
+        return {
+          llmContent: validationError,
+          returnDisplay: 'Path not in workspace.',
+          error: {
+            message: validationError,
+            type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+          },
+        };
+      }
       let cumulativeOutput: string | AnsiOutput = '';
       let lastUpdateTime = Date.now();
       let isBinaryStream = false;
@@ -231,19 +251,21 @@ export class ShellToolInvocation extends BaseToolInvocation<
                 break;
               case 'binary_progress':
                 isBinaryStream = true;
-                cumulativeOutput = `[Receiving binary output... ${formatMemoryUsage(
+                cumulativeOutput = `[Receiving binary output... ${formatBytes(
                   event.bytesReceived,
                 )} received]`;
                 if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
                   shouldUpdate = true;
                 }
                 break;
+              case 'exit':
+                break;
               default: {
                 throw new Error('An unhandled ShellOutputEvent was found.');
               }
             }
 
-            if (shouldUpdate) {
+            if (shouldUpdate && !this.params.is_background) {
               updateOutput(cumulativeOutput);
               lastUpdateTime = Date.now();
             }
@@ -259,19 +281,34 @@ export class ShellToolInvocation extends BaseToolInvocation<
           },
         );
 
-      if (pid && setPidCallback) {
-        setPidCallback(pid);
+      if (pid) {
+        if (setPidCallback) {
+          setPidCallback(pid);
+        }
+
+        // If the model requested to run in the background, do so after a short delay.
+        if (this.params.is_background) {
+          setTimeout(() => {
+            ShellExecutionService.background(pid);
+          }, BACKGROUND_DELAY_MS);
+        }
       }
 
       const result = await resultPromise;
 
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {
-        if (fs.existsSync(tempFilePath)) {
-          const pgrepLines = fs
-            .readFileSync(tempFilePath, 'utf8')
-            .split(EOL)
-            .filter(Boolean);
+        let tempFileExists = false;
+        try {
+          await fsPromises.access(tempFilePath);
+          tempFileExists = true;
+        } catch {
+          tempFileExists = false;
+        }
+
+        if (tempFileExists) {
+          const pgrepContent = await fsPromises.readFile(tempFilePath, 'utf8');
+          const pgrepLines = pgrepContent.split(EOL).filter(Boolean);
           for (const line of pgrepLines) {
             if (!/^\d+$/.test(line)) {
               debugLogger.error(`pgrep: ${line}`);
@@ -282,11 +319,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
             }
           }
         } else {
-          if (!signal.aborted) {
+          if (!signal.aborted && !result.backgrounded) {
             debugLogger.error('missing pgrep output');
           }
         }
       }
+
+      let data: Record<string, unknown> | undefined;
 
       let llmContent = '';
       let timeoutMessage = '';
@@ -305,32 +344,50 @@ export class ShellToolInvocation extends BaseToolInvocation<
         } else {
           llmContent += ' There was no output before it was cancelled.';
         }
+      } else if (this.params.is_background || result.backgrounded) {
+        llmContent = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
+        data = {
+          pid: result.pid,
+          command: this.params.command,
+          initialOutput: result.output,
+        };
       } else {
         // Create a formatted error string for display, replacing the wrapper command
         // with the user-facing command.
-        const finalError = result.error
-          ? result.error.message.replace(commandToExecute, this.params.command)
-          : '(none)';
+        const llmContentParts = [`Output: ${result.output || '(empty)'}`];
 
-        llmContent = [
-          `Command: ${this.params.command}`,
-          `Directory: ${this.params.dir_path || '(root)'}`,
-          `Output: ${result.output || '(empty)'}`,
-          `Error: ${finalError}`,
-          `Exit Code: ${result.exitCode ?? '(none)'}`,
-          `Signal: ${result.signal ?? '(none)'}`,
-          `Background PIDs: ${
-            backgroundPIDs.length ? backgroundPIDs.join(', ') : '(none)'
-          }`,
-          `Process Group PGID: ${result.pid ?? '(none)'}`,
-        ].join('\n');
+        if (result.error) {
+          const finalError = result.error.message.replaceAll(
+            commandToExecute,
+            this.params.command,
+          );
+          llmContentParts.push(`Error: ${finalError}`);
+        }
+
+        if (result.exitCode !== null && result.exitCode !== 0) {
+          llmContentParts.push(`Exit Code: ${result.exitCode}`);
+        }
+
+        if (result.signal) {
+          llmContentParts.push(`Signal: ${result.signal}`);
+        }
+        if (backgroundPIDs.length) {
+          llmContentParts.push(`Background PIDs: ${backgroundPIDs.join(', ')}`);
+        }
+        if (result.pid) {
+          llmContentParts.push(`Process Group PGID: ${result.pid}`);
+        }
+
+        llmContent = llmContentParts.join('\n');
       }
 
       let returnDisplayMessage = '';
       if (this.config.getDebugMode()) {
         returnDisplayMessage = llmContent;
       } else {
-        if (result.output.trim()) {
+        if (this.params.is_background || result.backgrounded) {
+          returnDisplayMessage = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
+        } else if (result.output.trim()) {
           returnDisplayMessage = result.output;
         } else {
           if (result.aborted) {
@@ -380,46 +437,19 @@ export class ShellToolInvocation extends BaseToolInvocation<
       return {
         llmContent,
         returnDisplay: returnDisplayMessage,
+        data,
         ...executionError,
       };
     } finally {
       if (timeoutTimer) clearTimeout(timeoutTimer);
       signal.removeEventListener('abort', onAbort);
       timeoutController.signal.removeEventListener('abort', onAbort);
-      if (fs.existsSync(tempFilePath)) {
-        fs.unlinkSync(tempFilePath);
+      try {
+        await fsPromises.unlink(tempFilePath);
+      } catch {
+        // Ignore errors during unlink
       }
     }
-  }
-}
-
-function getShellToolDescription(): string {
-  const returnedInfo = `
-
-      The following information is returned:
-
-      Command: Executed command.
-      Directory: Directory where command was executed, or \`(root)\`.
-      Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Error: Error or \`(none)\` if no error was reported for the subprocess.
-      Exit Code: Exit code or \`(none)\` if terminated by signal.
-      Signal: Signal number or \`(none)\` if no signal was received.
-      Background PIDs: List of background processes started or \`(none)\`.
-      Process Group PGID: Process group started or \`(none)\``;
-
-  if (os.platform() === 'win32') {
-    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.${returnedInfo}`;
-  } else {
-    return `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${returnedInfo}`;
-  }
-}
-
-function getCommandDescription(): string {
-  if (os.platform() === 'win32') {
-    return 'Exact command to execute as `powershell.exe -NoProfile -Command <command>`';
-  } else {
-    return 'Exact bash command to execute as `bash -c <command>`';
   }
 }
 
@@ -436,31 +466,16 @@ export class ShellTool extends BaseDeclarativeTool<
     void initializeShellParsers().catch(() => {
       // Errors are surfaced when parsing commands.
     });
+    const definition = getShellDefinition(
+      config.getEnableInteractiveShell(),
+      config.getEnableShellOutputEfficiency(),
+    );
     super(
       ShellTool.Name,
       'Shell',
-      getShellToolDescription(),
+      definition.base.description!,
       Kind.Execute,
-      {
-        type: 'object',
-        properties: {
-          command: {
-            type: 'string',
-            description: getCommandDescription(),
-          },
-          description: {
-            type: 'string',
-            description:
-              'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.',
-          },
-          dir_path: {
-            type: 'string',
-            description:
-              '(OPTIONAL) The path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
-          },
-        },
-        required: ['command'],
-      },
+      definition.base.parametersJsonSchema,
       messageBus,
       false, // output is not markdown
       true, // output can be updated
@@ -479,10 +494,7 @@ export class ShellTool extends BaseDeclarativeTool<
         this.config.getTargetDir(),
         params.dir_path,
       );
-      const workspaceContext = this.config.getWorkspaceContext();
-      if (!workspaceContext.isPathWithinWorkspace(resolvedPath)) {
-        return `Directory '${resolvedPath}' is not within any of the registered workspace directories.`;
-      }
+      return this.config.validatePathAccess(resolvedPath);
     }
     return null;
   }
@@ -500,5 +512,13 @@ export class ShellTool extends BaseDeclarativeTool<
       _toolName,
       _toolDisplayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    const definition = getShellDefinition(
+      this.config.getEnableInteractiveShell(),
+      this.config.getEnableShellOutputEfficiency(),
+    );
+    return resolveToolDeclaration(definition, modelId);
   }
 }

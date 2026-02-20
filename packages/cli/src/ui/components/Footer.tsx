@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -14,9 +14,9 @@ import {
 } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
-import { ThemedGradient } from './ThemedGradient.js';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
+import { QuotaDisplay } from './QuotaDisplay.js';
 import { DebugProfiler } from './DebugProfiler.js';
 import { isDevelopment } from '../../utils/installationInfo.js';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -40,9 +40,9 @@ export const Footer: React.FC = () => {
     errorCount,
     showErrorDetails,
     promptTokenCount,
-    nightly,
     isTrustedFolder,
-    mainAreaWidth,
+    terminalWidth,
+    quotaStats,
   } = {
     model: uiState.currentModel,
     targetDir: config.getTargetDir(),
@@ -53,9 +53,9 @@ export const Footer: React.FC = () => {
     errorCount: uiState.errorCount,
     showErrorDetails: uiState.showErrorDetails,
     promptTokenCount: uiState.sessionStats.lastPromptTokenCount,
-    nightly: uiState.nightly,
     isTrustedFolder: uiState.isTrustedFolder,
-    mainAreaWidth: uiState.mainAreaWidth,
+    terminalWidth: uiState.terminalWidth,
+    quotaStats: uiState.quota.stats,
   };
 
   const showMemoryUsage =
@@ -65,7 +65,7 @@ export const Footer: React.FC = () => {
   const hideModelInfo = settings.merged.ui.footer.hideModelInfo;
   const hideContextPercentage = settings.merged.ui.footer.hideContextPercentage;
 
-  const pathLength = Math.max(20, Math.floor(mainAreaWidth * 0.25));
+  const pathLength = Math.max(20, Math.floor(terminalWidth * 0.25));
   const displayPath = shortenPath(tildeifyPath(targetDir), pathLength);
 
   const justifyContent = hideCWD && hideModelInfo ? 'center' : 'space-between';
@@ -76,7 +76,7 @@ export const Footer: React.FC = () => {
   return (
     <Box
       justifyContent={justifyContent}
-      width={mainAreaWidth}
+      width={terminalWidth}
       flexDirection="row"
       alignItems="center"
       paddingX={1}
@@ -87,20 +87,14 @@ export const Footer: React.FC = () => {
           {displayVimMode && (
             <Text color={theme.text.secondary}>[{displayVimMode}] </Text>
           )}
-          {!hideCWD &&
-            (nightly ? (
-              <ThemedGradient>
-                {displayPath}
-                {branchName && <Text> ({branchName}*)</Text>}
-              </ThemedGradient>
-            ) : (
-              <Text color={theme.text.link}>
-                {displayPath}
-                {branchName && (
-                  <Text color={theme.text.secondary}> ({branchName}*)</Text>
-                )}
-              </Text>
-            ))}
+          {!hideCWD && (
+            <Text color={theme.text.primary}>
+              {displayPath}
+              {branchName && (
+                <Text color={theme.text.secondary}> ({branchName}*)</Text>
+              )}
+            </Text>
+          )}
           {debugMode && (
             <Text color={theme.status.error}>
               {' ' + (debugMessage || '--debug')}
@@ -134,7 +128,7 @@ export const Footer: React.FC = () => {
           ) : (
             <Text color={theme.status.error}>
               no sandbox
-              {mainAreaWidth >= 100 && (
+              {terminalWidth >= 100 && (
                 <Text color={theme.text.secondary}> (see /docs)</Text>
               )}
             </Text>
@@ -146,16 +140,27 @@ export const Footer: React.FC = () => {
       {!hideModelInfo && (
         <Box alignItems="center" justifyContent="flex-end">
           <Box alignItems="center">
-            <Text color={theme.text.accent}>
-              {getDisplayString(model, config.getPreviewFeatures())}
-              <Text color={theme.text.secondary}> /model</Text>
+            <Text color={theme.text.primary}>
+              <Text color={theme.text.secondary}>/model </Text>
+              {getDisplayString(model)}
               {!hideContextPercentage && (
                 <>
                   {' '}
                   <ContextUsageDisplay
                     promptTokenCount={promptTokenCount}
                     model={model}
-                    terminalWidth={mainAreaWidth}
+                    terminalWidth={terminalWidth}
+                  />
+                </>
+              )}
+              {quotaStats && (
+                <>
+                  {' '}
+                  <QuotaDisplay
+                    remaining={quotaStats.remaining}
+                    limit={quotaStats.limit}
+                    resetTime={quotaStats.resetTime}
+                    terse={true}
                   />
                 </>
               )}

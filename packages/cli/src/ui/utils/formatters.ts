@@ -1,10 +1,15 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export const formatMemoryUsage = (bytes: number): string => {
+import {
+  REFERENCE_CONTENT_START,
+  REFERENCE_CONTENT_END,
+} from '@google/gemini-cli-core';
+
+export const formatBytes = (bytes: number): string => {
   const gb = bytes / (1024 * 1024 * 1024);
   if (bytes < 1024 * 1024) {
     return `${(bytes / 1024).toFixed(1)} KB`;
@@ -76,12 +81,9 @@ export const formatTimeAgo = (date: string | number | Date): string => {
   return `${formatDuration(diffMs)} ago`;
 };
 
-const REFERENCE_CONTENT_START = '--- Content from referenced files ---';
-const REFERENCE_CONTENT_END = '--- End of content ---';
-
 /**
  * Removes content bounded by reference content markers from the given text.
- * The markers are "--- Content from referenced files ---" and "--- End of content ---".
+ * The markers are "${REFERENCE_CONTENT_START}" and "${REFERENCE_CONTENT_END}".
  *
  * @param text The input text containing potential reference blocks.
  * @returns The text with reference blocks removed and trimmed.
@@ -95,3 +97,27 @@ export function stripReferenceContent(text: string): string {
 
   return text.replace(pattern, '').trim();
 }
+
+export const formatResetTime = (resetTime: string): string => {
+  const diff = new Date(resetTime).getTime() - Date.now();
+  if (diff <= 0) return '';
+
+  const totalMinutes = Math.ceil(diff / (1000 * 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  const fmt = (val: number, unit: 'hour' | 'minute') =>
+    new Intl.NumberFormat('en', {
+      style: 'unit',
+      unit,
+      unitDisplay: 'narrow',
+    }).format(val);
+
+  if (hours > 0 && minutes > 0) {
+    return `resets in ${fmt(hours, 'hour')} ${fmt(minutes, 'minute')}`;
+  } else if (hours > 0) {
+    return `resets in ${fmt(hours, 'hour')}`;
+  }
+
+  return `resets in ${fmt(minutes, 'minute')}`;
+};

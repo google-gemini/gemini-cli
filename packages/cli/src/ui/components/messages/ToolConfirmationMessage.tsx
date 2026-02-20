@@ -5,34 +5,39 @@
  */
 
 import type React from 'react';
-import { useEffect, useState, useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
-import type {
-  ToolCallConfirmationDetails,
-  Config,
-} from '@google/gemini-cli-core';
 import {
-  IdeClient,
+  type SerializableConfirmationDetails,
+  type Config,
+  type ToolConfirmationPayload,
   ToolConfirmationOutcome,
   hasRedirection,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
+import { useToolActions } from '../../contexts/ToolActionsContext.js';
 import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
 import { MaxSizedBox, MINIMUM_MAX_HEIGHT } from '../shared/MaxSizedBox.js';
+import { sanitizeForDisplay } from '../../utils/textUtils.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
+import { keyMatchers, Command } from '../../keyMatchers.js';
 import {
   REDIRECTION_WARNING_NOTE_LABEL,
   REDIRECTION_WARNING_NOTE_TEXT,
   REDIRECTION_WARNING_TIP_LABEL,
   REDIRECTION_WARNING_TIP_TEXT,
 } from '../../textConstants.js';
+import { AskUserDialog } from '../AskUserDialog.js';
+import { ExitPlanModeDialog } from '../ExitPlanModeDialog.js';
 
 export interface ToolConfirmationMessageProps {
-  confirmationDetails: ToolCallConfirmationDetails;
+  callId: string;
+  confirmationDetails: SerializableConfirmationDetails;
   config: Config;
   isFocused?: boolean;
   availableTerminalHeight?: number;
@@ -42,77 +47,63 @@ export interface ToolConfirmationMessageProps {
 export const ToolConfirmationMessage: React.FC<
   ToolConfirmationMessageProps
 > = ({
+  callId,
   confirmationDetails,
   config,
   isFocused = true,
   availableTerminalHeight,
   terminalWidth,
 }) => {
-  const { onConfirm } = confirmationDetails;
+  const { confirm, isDiffingEnabled } = useToolActions();
 
   const settings = useSettings();
   const allowPermanentApproval =
     settings.merged.security.enablePermanentToolApproval;
 
-  const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
-  const [isDiffingEnabled, setIsDiffingEnabled] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-    if (config.getIdeMode()) {
-      const getIdeClient = async () => {
-        const client = await IdeClient.getInstance();
-        if (isMounted) {
-          setIdeClient(client);
-          setIsDiffingEnabled(client?.isDiffingEnabled() ?? false);
-        }
-      };
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      getIdeClient();
-    }
-    return () => {
-      isMounted = false;
-    };
-  }, [config]);
-
-  const handleConfirm = async (outcome: ToolConfirmationOutcome) => {
-    if (confirmationDetails.type === 'edit') {
-      if (config.getIdeMode() && isDiffingEnabled) {
-        const cliOutcome =
-          outcome === ToolConfirmationOutcome.Cancel ? 'rejected' : 'accepted';
-        await ideClient?.resolveDiffFromCli(
-          confirmationDetails.filePath,
-          cliOutcome,
-        );
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    onConfirm(outcome);
-  };
-
+  const handlesOwnUI =
+    confirmationDetails.type === 'ask_user' ||
+    confirmationDetails.type === 'exit_plan_mode';
   const isTrustedFolder = config.isTrustedFolder();
+
+  const handleConfirm = useCallback(
+    (outcome: ToolConfirmationOutcome, payload?: ToolConfirmationPayload) => {
+      void confirm(callId, outcome, payload).catch((error: unknown) => {
+        debugLogger.error(
+          `Failed to handle tool confirmation for ${callId}:`,
+          error,
+        );
+      });
+    },
+    [confirm, callId],
+  );
 
   useKeypress(
     (key) => {
-      if (!isFocused) return;
-      if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      if (!isFocused) return false;
+      if (keyMatchers[Command.ESCAPE](key)) {
         handleConfirm(ToolConfirmationOutcome.Cancel);
+        return true;
       }
+      if (keyMatchers[Command.QUIT](key)) {
+        // Return false to let ctrl-C bubble up to AppContainer for exit flow.
+        // AppContainer will call cancelOngoingRequest which will cancel the tool.
+        return false;
+      }
+      return false;
     },
     { isActive: isFocused },
   );
 
-  const handleSelect = (item: ToolConfirmationOutcome) => handleConfirm(item);
+  const handleSelect = useCallback(
+    (item: ToolConfirmationOutcome) => handleConfirm(item),
+    [handleConfirm],
+  );
 
-  const { question, bodyContent, options } = useMemo(() => {
-    let bodyContent: React.ReactNode | null = null;
-    let question = '';
+  const getOptions = useCallback(() => {
     const options: Array<RadioSelectItem<ToolConfirmationOutcome>> = [];
 
     if (confirmationDetails.type === 'edit') {
       if (!confirmationDetails.isModifying) {
-        question = `Apply this change?`;
         options.push({
           label: 'Allow once',
           value: ToolConfirmationOutcome.ProceedOnce,
@@ -132,6 +123,8 @@ export const ToolConfirmationMessage: React.FC<
             });
           }
         }
+        // We hide "Modify with external editor" if IDE mode is active AND
+        // the IDE is actually capable of showing a diff (connected).
         if (!config.getIdeMode() || !isDiffingEnabled) {
           options.push({
             label: 'Modify with external editor',
@@ -147,13 +140,6 @@ export const ToolConfirmationMessage: React.FC<
         });
       }
     } else if (confirmationDetails.type === 'exec') {
-      const executionProps = confirmationDetails;
-
-      if (executionProps.commands && executionProps.commands.length > 1) {
-        question = `Allow execution of ${executionProps.commands.length} commands?`;
-      } else {
-        question = `Allow execution of: '${executionProps.rootCommand}'?`;
-      }
       options.push({
         label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
@@ -179,7 +165,6 @@ export const ToolConfirmationMessage: React.FC<
         key: 'No, suggest changes (esc)',
       });
     } else if (confirmationDetails.type === 'info') {
-      question = `Do you want to proceed?`;
       options.push({
         label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
@@ -204,10 +189,8 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.Cancel,
         key: 'No, suggest changes (esc)',
       });
-    } else {
+    } else if (confirmationDetails.type === 'mcp') {
       // mcp tool confirmation
-      const mcpProps = confirmationDetails;
-      question = `Allow execution of MCP tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"?`;
       options.push({
         label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
@@ -238,33 +221,110 @@ export const ToolConfirmationMessage: React.FC<
         key: 'No, suggest changes (esc)',
       });
     }
+    return options;
+  }, [
+    confirmationDetails,
+    isTrustedFolder,
+    allowPermanentApproval,
+    config,
+    isDiffingEnabled,
+  ]);
 
-    function availableBodyContentHeight() {
-      if (options.length === 0) {
-        // Should not happen if we populated options correctly above for all types
-        // except when isModifying is true, but in that case we don't call this because we don't enter the if block for it.
-        return undefined;
+  const availableBodyContentHeight = useCallback(() => {
+    if (availableTerminalHeight === undefined) {
+      return undefined;
+    }
+
+    if (handlesOwnUI) {
+      return availableTerminalHeight;
+    }
+
+    // Calculate the vertical space (in lines) consumed by UI elements
+    // surrounding the main body content.
+    const PADDING_OUTER_Y = 2; // Main container has `padding={1}` (top & bottom).
+    const MARGIN_BODY_BOTTOM = 1; // margin on the body container.
+    const HEIGHT_QUESTION = 1; // The question text is one line.
+    const MARGIN_QUESTION_BOTTOM = 1; // Margin on the question container.
+
+    const optionsCount = getOptions().length;
+
+    const surroundingElementsHeight =
+      PADDING_OUTER_Y +
+      MARGIN_BODY_BOTTOM +
+      HEIGHT_QUESTION +
+      MARGIN_QUESTION_BOTTOM +
+      optionsCount +
+      1; // Reserve one line for 'ShowMoreLines' hint
+
+    return Math.max(availableTerminalHeight - surroundingElementsHeight, 1);
+  }, [availableTerminalHeight, getOptions, handlesOwnUI]);
+
+  const { question, bodyContent, options } = useMemo(() => {
+    let bodyContent: React.ReactNode | null = null;
+    let question = '';
+    const options = getOptions();
+
+    if (confirmationDetails.type === 'ask_user') {
+      bodyContent = (
+        <AskUserDialog
+          questions={confirmationDetails.questions}
+          onSubmit={(answers) => {
+            handleConfirm(ToolConfirmationOutcome.ProceedOnce, { answers });
+          }}
+          onCancel={() => {
+            handleConfirm(ToolConfirmationOutcome.Cancel);
+          }}
+          width={terminalWidth}
+          availableHeight={availableBodyContentHeight()}
+        />
+      );
+      return { question: '', bodyContent, options: [] };
+    }
+
+    if (confirmationDetails.type === 'exit_plan_mode') {
+      bodyContent = (
+        <ExitPlanModeDialog
+          planPath={confirmationDetails.planPath}
+          onApprove={(approvalMode) => {
+            handleConfirm(ToolConfirmationOutcome.ProceedOnce, {
+              approved: true,
+              approvalMode,
+            });
+          }}
+          onFeedback={(feedback) => {
+            handleConfirm(ToolConfirmationOutcome.ProceedOnce, {
+              approved: false,
+              feedback,
+            });
+          }}
+          onCancel={() => {
+            handleConfirm(ToolConfirmationOutcome.Cancel);
+          }}
+          width={terminalWidth}
+          availableHeight={availableBodyContentHeight()}
+        />
+      );
+      return { question: '', bodyContent, options: [] };
+    }
+
+    if (confirmationDetails.type === 'edit') {
+      if (!confirmationDetails.isModifying) {
+        question = `Apply this change?`;
       }
+    } else if (confirmationDetails.type === 'exec') {
+      const executionProps = confirmationDetails;
 
-      if (availableTerminalHeight === undefined) {
-        return undefined;
+      if (executionProps.commands && executionProps.commands.length > 1) {
+        question = `Allow execution of ${executionProps.commands.length} commands?`;
+      } else {
+        question = `Allow execution of: '${sanitizeForDisplay(executionProps.rootCommand)}'?`;
       }
-
-      // Calculate the vertical space (in lines) consumed by UI elements
-      // surrounding the main body content.
-      const PADDING_OUTER_Y = 2; // Main container has `padding={1}` (top & bottom).
-      const MARGIN_BODY_BOTTOM = 1; // margin on the body container.
-      const HEIGHT_QUESTION = 1; // The question text is one line.
-      const MARGIN_QUESTION_BOTTOM = 1; // Margin on the question container.
-      const HEIGHT_OPTIONS = options.length; // Each option in the radio select takes one line.
-
-      const surroundingElementsHeight =
-        PADDING_OUTER_Y +
-        MARGIN_BODY_BOTTOM +
-        HEIGHT_QUESTION +
-        MARGIN_QUESTION_BOTTOM +
-        HEIGHT_OPTIONS;
-      return Math.max(availableTerminalHeight - surroundingElementsHeight, 1);
+    } else if (confirmationDetails.type === 'info') {
+      question = `Do you want to proceed?`;
+    } else if (confirmationDetails.type === 'mcp') {
+      // mcp tool confirmation
+      const mcpProps = confirmationDetails;
+      question = `Allow execution of MCP tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"?`;
     }
 
     if (confirmationDetails.type === 'edit') {
@@ -346,7 +406,7 @@ export const ToolConfirmationMessage: React.FC<
             <Box flexDirection="column">
               {commandsToDisplay.map((cmd, idx) => (
                 <Text key={idx} color={theme.text.link}>
-                  {cmd}
+                  {sanitizeForDisplay(cmd)}
                 </Text>
               ))}
             </Box>
@@ -383,7 +443,7 @@ export const ToolConfirmationMessage: React.FC<
           )}
         </Box>
       );
-    } else {
+    } else if (confirmationDetails.type === 'mcp') {
       // mcp tool confirmation
       const mcpProps = confirmationDetails;
 
@@ -398,12 +458,10 @@ export const ToolConfirmationMessage: React.FC<
     return { question, bodyContent, options };
   }, [
     confirmationDetails,
-    isTrustedFolder,
-    config,
-    isDiffingEnabled,
-    availableTerminalHeight,
+    getOptions,
+    availableBodyContentHeight,
     terminalWidth,
-    allowPermanentApproval,
+    handleConfirm,
   ]);
 
   if (confirmationDetails.type === 'edit') {
@@ -428,26 +486,38 @@ export const ToolConfirmationMessage: React.FC<
   }
 
   return (
-    <Box flexDirection="column" paddingTop={0} paddingBottom={1}>
-      {/* Body Content (Diff Renderer or Command Info) */}
-      {/* No separate context display here anymore for edits */}
-      <Box flexGrow={1} flexShrink={1} overflow="hidden" marginBottom={1}>
-        {bodyContent}
-      </Box>
+    <Box
+      flexDirection="column"
+      paddingTop={0}
+      paddingBottom={handlesOwnUI ? 0 : 1}
+    >
+      {handlesOwnUI ? (
+        bodyContent
+      ) : (
+        <>
+          <Box flexGrow={1} flexShrink={1} overflow="hidden">
+            <MaxSizedBox
+              maxHeight={availableBodyContentHeight()}
+              maxWidth={terminalWidth}
+              overflowDirection="top"
+            >
+              {bodyContent}
+            </MaxSizedBox>
+          </Box>
 
-      {/* Confirmation Question */}
-      <Box marginBottom={1} flexShrink={0}>
-        <Text color={theme.text.primary}>{question}</Text>
-      </Box>
+          <Box marginBottom={1} flexShrink={0}>
+            <Text color={theme.text.primary}>{question}</Text>
+          </Box>
 
-      {/* Select Input for Options */}
-      <Box flexShrink={0}>
-        <RadioButtonSelect
-          items={options}
-          onSelect={handleSelect}
-          isFocused={isFocused}
-        />
-      </Box>
+          <Box flexShrink={0}>
+            <RadioButtonSelect
+              items={options}
+              onSelect={handleSelect}
+              isFocused={isFocused}
+            />
+          </Box>
+        </>
+      )}
     </Box>
   );
 };

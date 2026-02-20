@@ -19,18 +19,18 @@ order:
     - **Location:** `~/.gemini/GEMINI.md` (in your user home directory).
     - **Scope:** Provides default instructions for all your projects.
 
-2.  **Project root and ancestor context files:**
-    - **Location:** The CLI searches for a `GEMINI.md` file in your current
-      working directory and then in each parent directory up to the project root
-      (identified by a `.git` folder).
-    - **Scope:** Provides context relevant to the entire project.
+2.  **Environment and workspace context files:**
+    - **Location:** The CLI searches for `GEMINI.md` files in your configured
+      workspace directories and their parent directories.
+    - **Scope:** Provides context relevant to the projects you are currently
+      working on.
 
-3.  **Sub-directory context files:**
-    - **Location:** The CLI also scans for `GEMINI.md` files in subdirectories
-      below your current working directory. It respects rules in `.gitignore`
-      and `.geminiignore`.
-    - **Scope:** Lets you write highly specific instructions for a particular
-      component or module.
+3.  **Just-in-time (JIT) context files:**
+    - **Location:** When a tool accesses a file or directory, the CLI
+      automatically scans for `GEMINI.md` files in that directory and its
+      ancestors up to a trusted root.
+    - **Scope:** Lets the model discover highly specific instructions for
+      particular components only when they are needed.
 
 The CLI footer displays the number of loaded context files, which gives you a
 quick visual cue of the active instructional context.
@@ -88,7 +88,7 @@ More content here.
 @../shared/style-guide.md
 ```
 
-For more details, see the [Memory Import Processor](../core/memport.md)
+For more details, see the [Memory Import Processor](../reference/memport.md)
 documentation.
 
 ## Customize the context file name
@@ -106,3 +106,11 @@ While `GEMINI.md` is the default filename, you can configure this in your
   }
 }
 ```
+
+## Next steps
+
+- Learn about [Ignoring files](./gemini-ignore.md) to exclude content from the
+  context system.
+- Explore the [Memory tool](../tools/memory.md) to save persistent memories.
+- See how to use [Custom commands](./custom-commands.md) to automate common
+  prompts.

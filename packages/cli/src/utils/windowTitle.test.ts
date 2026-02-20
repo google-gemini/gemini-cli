@@ -5,7 +5,10 @@
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { computeTerminalTitle } from './windowTitle.js';
+import {
+  computeTerminalTitle,
+  type TerminalTitleOptions,
+} from './windowTitle.js';
 import { StreamingState } from '../ui/types.js';
 
 describe('computeTerminalTitle', () => {
@@ -19,10 +22,11 @@ describe('computeTerminalTitle', () => {
       args: {
         streamingState: StreamingState.Idle,
         isConfirming: false,
+        isSilentWorking: false,
         folderName: 'my-project',
         showThoughts: false,
         useDynamicTitle: true,
-      },
+      } as TerminalTitleOptions,
       expected: '◇  Ready (my-project)',
     },
     {
@@ -30,10 +34,11 @@ describe('computeTerminalTitle', () => {
       args: {
         streamingState: StreamingState.Responding,
         isConfirming: false,
+        isSilentWorking: false,
         folderName: 'my-project',
         showThoughts: true,
         useDynamicTitle: false,
-      },
+      } as TerminalTitleOptions,
       expected: 'Gemini CLI (my-project)'.padEnd(80, ' '),
       exact: true,
     },
@@ -44,10 +49,11 @@ describe('computeTerminalTitle', () => {
         streamingState: StreamingState.Responding,
         thoughtSubject: 'Reading files',
         isConfirming: false,
+        isSilentWorking: false,
         folderName: 'my-project',
         showThoughts: false,
         useDynamicTitle: true,
-      },
+      } as TerminalTitleOptions,
       expected: '✦  Working… (my-project)',
     },
     {
@@ -57,10 +63,11 @@ describe('computeTerminalTitle', () => {
         streamingState: StreamingState.Responding,
         thoughtSubject: 'Short thought',
         isConfirming: false,
+        isSilentWorking: false,
         folderName: 'my-project',
         showThoughts: true,
         useDynamicTitle: true,
-      },
+      } as TerminalTitleOptions,
       expected: '✦  Short thought (my-project)',
     },
     {
@@ -70,10 +77,11 @@ describe('computeTerminalTitle', () => {
         streamingState: StreamingState.Responding,
         thoughtSubject: undefined,
         isConfirming: false,
+        isSilentWorking: false,
         folderName: 'my-project',
         showThoughts: true,
         useDynamicTitle: true,
-      },
+      } as TerminalTitleOptions,
       expected: '✦  Working… (my-project)'.padEnd(80, ' '),
       exact: true,
     },
@@ -82,11 +90,24 @@ describe('computeTerminalTitle', () => {
       args: {
         streamingState: StreamingState.Idle,
         isConfirming: true,
+        isSilentWorking: false,
         folderName: 'my-project',
         showThoughts: false,
         useDynamicTitle: true,
-      },
+      } as TerminalTitleOptions,
       expected: '✋  Action Required (my-project)',
+    },
+    {
+      description: 'silent working state',
+      args: {
+        streamingState: StreamingState.Responding,
+        isConfirming: false,
+        isSilentWorking: true,
+        folderName: 'my-project',
+        showThoughts: false,
+        useDynamicTitle: true,
+      } as TerminalTitleOptions,
+      expected: '⏲  Working… (my-project)',
     },
   ])('should return $description', ({ args, expected, exact }) => {
     const title = computeTerminalTitle(args);
@@ -104,6 +125,7 @@ describe('computeTerminalTitle', () => {
       streamingState: StreamingState.Responding,
       thoughtSubject: longThought,
       isConfirming: false,
+      isSilentWorking: false,
       folderName: 'my-project',
       showThoughts: true,
       useDynamicTitle: true,
@@ -120,6 +142,7 @@ describe('computeTerminalTitle', () => {
       streamingState: StreamingState.Responding,
       thoughtSubject: longThought,
       isConfirming: false,
+      isSilentWorking: false,
       folderName: 'my-project',
       showThoughts: true,
       useDynamicTitle: true,
@@ -135,6 +158,7 @@ describe('computeTerminalTitle', () => {
       streamingState: StreamingState.Responding,
       thoughtSubject: 'BadTitle\x00 With\x07Control\x1BChars',
       isConfirming: false,
+      isSilentWorking: false,
       folderName: 'my-project',
       showThoughts: true,
       useDynamicTitle: true,
@@ -153,6 +177,7 @@ describe('computeTerminalTitle', () => {
     const title = computeTerminalTitle({
       streamingState: StreamingState.Idle,
       isConfirming: false,
+      isSilentWorking: false,
       folderName: 'my-project',
       showThoughts: false,
       useDynamicTitle: true,
@@ -185,6 +210,7 @@ describe('computeTerminalTitle', () => {
       const title = computeTerminalTitle({
         streamingState: StreamingState.Idle,
         isConfirming: false,
+        isSilentWorking: false,
         folderName,
         showThoughts: false,
         useDynamicTitle: true,
@@ -201,6 +227,7 @@ describe('computeTerminalTitle', () => {
     const title = computeTerminalTitle({
       streamingState: StreamingState.Responding,
       isConfirming: false,
+      isSilentWorking: false,
       folderName: longFolderName,
       showThoughts: true,
       useDynamicTitle: false,

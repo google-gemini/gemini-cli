@@ -16,6 +16,7 @@ import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { Config } from '../config/config.js';
 import path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs';
 import os from 'node:os';
 
@@ -64,12 +65,33 @@ describe('Tool Confirmation Policy Updates', () => {
       getFileFilteringOptions: () => ({}),
       getGeminiClient: () => ({}),
       getBaseLlmClient: () => ({}),
-      getDisableLLMCorrection: () => false,
+      getDisableLLMCorrection: () => true,
       getIdeMode: () => false,
       getWorkspaceContext: () => ({
         isPathWithinWorkspace: () => true,
         getDirectories: () => [rootDir],
       }),
+      storage: {
+        getProjectTempDir: () => path.join(os.tmpdir(), 'gemini-cli-temp'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
     };
   });
 
@@ -114,17 +136,17 @@ describe('Tool Confirmation Policy Updates', () => {
     it.each([
       {
         outcome: ToolConfirmationOutcome.ProceedAlways,
-        shouldPublish: false,
+        _shouldPublish: false,
         expectedApprovalMode: ApprovalMode.AUTO_EDIT,
       },
       {
         outcome: ToolConfirmationOutcome.ProceedAlwaysAndSave,
-        shouldPublish: true,
-        persist: true,
+        _shouldPublish: true,
+        _persist: true,
       },
     ])(
       'should handle $outcome correctly',
-      async ({ outcome, shouldPublish, persist, expectedApprovalMode }) => {
+      async ({ outcome, expectedApprovalMode }) => {
         const tool = create(mockConfig, mockMessageBus);
 
         // For file-based tools, ensure the file exists if needed
@@ -150,26 +172,19 @@ describe('Tool Confirmation Policy Updates', () => {
         if (confirmation) {
           await confirmation.onConfirm(outcome);
 
-          if (shouldPublish) {
-            expect(mockMessageBus.publish).toHaveBeenCalledWith(
-              expect.objectContaining({
-                type: MessageBusType.UPDATE_POLICY,
-                persist,
-              }),
-            );
-          } else {
-            // Should not publish UPDATE_POLICY message for ProceedAlways
-            const publishCalls = (mockMessageBus.publish as any).mock.calls;
-            const hasUpdatePolicy = publishCalls.some(
-              (call: any) => call[0].type === MessageBusType.UPDATE_POLICY,
-            );
-            expect(hasUpdatePolicy).toBe(false);
-          }
+          // Policy updates are no longer published by onConfirm; they are
+          // handled centrally by the schedulers.
+          const publishCalls = (mockMessageBus.publish as any).mock.calls;
+          const hasUpdatePolicy = publishCalls.some(
+            (call: any) => call[0].type === MessageBusType.UPDATE_POLICY,
+          );
+          expect(hasUpdatePolicy).toBe(false);
 
           if (expectedApprovalMode !== undefined) {
-            expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
-              expectedApprovalMode,
-            );
+            // expectedApprovalMode in this test (AUTO_EDIT) is now handled
+            // by updatePolicy in the scheduler, so it should not be called
+            // here either.
+            expect(mockConfig.setApprovalMode).not.toHaveBeenCalled();
           }
         }
       },

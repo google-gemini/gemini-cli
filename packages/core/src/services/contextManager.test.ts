@@ -16,8 +16,10 @@ vi.mock('../utils/memoryDiscovery.js', async (importOriginal) => {
     await importOriginal<typeof import('../utils/memoryDiscovery.js')>();
   return {
     ...actual,
-    loadGlobalMemory: vi.fn(),
-    loadEnvironmentMemory: vi.fn(),
+    getGlobalMemoryPaths: vi.fn(),
+    getExtensionMemoryPaths: vi.fn(),
+    getEnvironmentMemoryPaths: vi.fn(),
+    readGeminiMdFiles: vi.fn(),
     loadJitSubdirectoryMemory: vi.fn(),
     concatenateInstructions: vi
       .fn()
@@ -33,84 +35,98 @@ describe('ContextManager', () => {
     mockConfig = {
       getDebugMode: vi.fn().mockReturnValue(false),
       getWorkingDir: vi.fn().mockReturnValue('/app'),
+      getImportFormat: vi.fn().mockReturnValue('tree'),
       getWorkspaceContext: vi.fn().mockReturnValue({
         getDirectories: vi.fn().mockReturnValue(['/app']),
       }),
-      getExtensionLoader: vi.fn().mockReturnValue({}),
+      getExtensionLoader: vi.fn().mockReturnValue({
+        getExtensions: vi.fn().mockReturnValue([]),
+      }),
       getMcpClientManager: vi.fn().mockReturnValue({
         getMcpInstructions: vi.fn().mockReturnValue('MCP Instructions'),
       }),
+      isTrustedFolder: vi.fn().mockReturnValue(true),
     } as unknown as Config;
 
     contextManager = new ContextManager(mockConfig);
     vi.clearAllMocks();
     vi.spyOn(coreEvents, 'emit');
+    vi.mocked(memoryDiscovery.getExtensionMemoryPaths).mockReturnValue([]);
   });
 
   describe('refresh', () => {
     it('should load and format global and environment memory', async () => {
-      const mockGlobalResult: memoryDiscovery.MemoryLoadResult = {
-        files: [
-          { path: '/home/user/.gemini/GEMINI.md', content: 'Global Content' },
-        ],
-      };
-      vi.mocked(memoryDiscovery.loadGlobalMemory).mockResolvedValue(
-        mockGlobalResult,
+      const globalPaths = ['/home/user/.gemini/GEMINI.md'];
+      const envPaths = ['/app/GEMINI.md'];
+
+      vi.mocked(memoryDiscovery.getGlobalMemoryPaths).mockResolvedValue(
+        globalPaths,
+      );
+      vi.mocked(memoryDiscovery.getEnvironmentMemoryPaths).mockResolvedValue(
+        envPaths,
       );
 
-      const mockEnvResult: memoryDiscovery.MemoryLoadResult = {
-        files: [{ path: '/app/GEMINI.md', content: 'Env Content' }],
-      };
-      vi.mocked(memoryDiscovery.loadEnvironmentMemory).mockResolvedValue(
-        mockEnvResult,
-      );
+      vi.mocked(memoryDiscovery.readGeminiMdFiles).mockResolvedValue([
+        { filePath: globalPaths[0], content: 'Global Content' },
+        { filePath: envPaths[0], content: 'Env Content' },
+      ]);
 
       await contextManager.refresh();
 
-      expect(memoryDiscovery.loadGlobalMemory).toHaveBeenCalledWith(false);
-      expect(contextManager.getGlobalMemory()).toMatch(
-        /--- Context from: .*GEMINI.md ---/,
-      );
-      expect(contextManager.getGlobalMemory()).toContain('Global Content');
-
-      expect(memoryDiscovery.loadEnvironmentMemory).toHaveBeenCalledWith(
+      expect(memoryDiscovery.getGlobalMemoryPaths).toHaveBeenCalled();
+      expect(memoryDiscovery.getEnvironmentMemoryPaths).toHaveBeenCalledWith(
         ['/app'],
-        expect.anything(),
         false,
       );
-      expect(contextManager.getEnvironmentMemory()).toContain(
-        '--- Context from: GEMINI.md ---',
+      expect(memoryDiscovery.readGeminiMdFiles).toHaveBeenCalledWith(
+        expect.arrayContaining([...globalPaths, ...envPaths]),
+        false,
+        'tree',
       );
+
+      expect(contextManager.getGlobalMemory()).toContain('Global Content');
       expect(contextManager.getEnvironmentMemory()).toContain('Env Content');
       expect(contextManager.getEnvironmentMemory()).toContain(
         'MCP Instructions',
       );
 
-      expect(contextManager.getLoadedPaths()).toContain(
-        '/home/user/.gemini/GEMINI.md',
-      );
-      expect(contextManager.getLoadedPaths()).toContain('/app/GEMINI.md');
+      expect(contextManager.getLoadedPaths()).toContain(globalPaths[0]);
+      expect(contextManager.getLoadedPaths()).toContain(envPaths[0]);
     });
 
     it('should emit MemoryChanged event when memory is refreshed', async () => {
-      const mockGlobalResult = {
-        files: [{ path: '/app/GEMINI.md', content: 'content' }],
-      };
-      const mockEnvResult = {
-        files: [{ path: '/app/src/GEMINI.md', content: 'env content' }],
-      };
-      vi.mocked(memoryDiscovery.loadGlobalMemory).mockResolvedValue(
-        mockGlobalResult,
-      );
-      vi.mocked(memoryDiscovery.loadEnvironmentMemory).mockResolvedValue(
-        mockEnvResult,
-      );
+      vi.mocked(memoryDiscovery.getGlobalMemoryPaths).mockResolvedValue([
+        '/app/GEMINI.md',
+      ]);
+      vi.mocked(memoryDiscovery.getEnvironmentMemoryPaths).mockResolvedValue([
+        '/app/src/GEMINI.md',
+      ]);
+      vi.mocked(memoryDiscovery.readGeminiMdFiles).mockResolvedValue([
+        { filePath: '/app/GEMINI.md', content: 'content' },
+        { filePath: '/app/src/GEMINI.md', content: 'env content' },
+      ]);
 
       await contextManager.refresh();
 
       expect(coreEvents.emit).toHaveBeenCalledWith(CoreEvent.MemoryChanged, {
         fileCount: 2,
       });
+    });
+
+    it('should not load environment memory if folder is not trusted', async () => {
+      vi.mocked(mockConfig.isTrustedFolder).mockReturnValue(false);
+      vi.mocked(memoryDiscovery.getGlobalMemoryPaths).mockResolvedValue([
+        '/home/user/.gemini/GEMINI.md',
+      ]);
+      vi.mocked(memoryDiscovery.readGeminiMdFiles).mockResolvedValue([
+        { filePath: '/home/user/.gemini/GEMINI.md', content: 'Global Content' },
+      ]);
+
+      await contextManager.refresh();
+
+      expect(memoryDiscovery.getEnvironmentMemoryPaths).not.toHaveBeenCalled();
+      expect(contextManager.getEnvironmentMemory()).toBe('');
+      expect(contextManager.getGlobalMemory()).toContain('Global Content');
     });
   });
 
@@ -148,6 +164,17 @@ describe('ContextManager', () => {
         '/app',
       ]);
 
+      expect(result).toBe('');
+    });
+
+    it('should return empty string if folder is not trusted', async () => {
+      vi.mocked(mockConfig.isTrustedFolder).mockReturnValue(false);
+
+      const result = await contextManager.discoverContext('/app/src/file.ts', [
+        '/app',
+      ]);
+
+      expect(memoryDiscovery.loadJitSubdirectoryMemory).not.toHaveBeenCalled();
       expect(result).toBe('');
     });
   });

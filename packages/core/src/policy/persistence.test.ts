@@ -52,7 +52,12 @@ describe('createPolicyUpdater', () => {
     (fs.readFile as unknown as Mock).mockRejectedValue(
       new Error('File not found'),
     ); // Simulate new file
-    (fs.writeFile as unknown as Mock).mockResolvedValue(undefined);
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    (fs.open as unknown as Mock).mockResolvedValue(mockFileHandle);
     (fs.rename as unknown as Mock).mockResolvedValue(undefined);
 
     const toolName = 'test_tool';
@@ -70,10 +75,11 @@ describe('createPolicyUpdater', () => {
       recursive: true,
     });
 
+    expect(fs.open).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/), 'wx');
+
     // Check written content
     const expectedContent = expect.stringContaining(`toolName = "test_tool"`);
-    expect(fs.writeFile).toHaveBeenCalledWith(
-      expect.stringMatching(/\.tmp$/),
+    expect(mockFileHandle.writeFile).toHaveBeenCalledWith(
       expectedContent,
       'utf-8',
     );
@@ -106,7 +112,12 @@ describe('createPolicyUpdater', () => {
     (fs.readFile as unknown as Mock).mockRejectedValue(
       new Error('File not found'),
     );
-    (fs.writeFile as unknown as Mock).mockResolvedValue(undefined);
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    (fs.open as unknown as Mock).mockResolvedValue(mockFileHandle);
     (fs.rename as unknown as Mock).mockResolvedValue(undefined);
 
     const toolName = 'run_shell_command';
@@ -125,14 +136,14 @@ describe('createPolicyUpdater', () => {
     const rules = policyEngine.getRules();
     const addedRule = rules.find((r) => r.toolName === toolName);
     expect(addedRule).toBeDefined();
-    expect(addedRule?.priority).toBe(2.95);
+    expect(addedRule?.priority).toBe(3.95);
     expect(addedRule?.argsPattern).toEqual(
       new RegExp(`"command":"git\\ status(?:[\\s"]|\\\\")`),
     );
 
     // Verify file written
-    expect(fs.writeFile).toHaveBeenCalledWith(
-      expect.stringMatching(/\.tmp$/),
+    expect(fs.open).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/), 'wx');
+    expect(mockFileHandle.writeFile).toHaveBeenCalledWith(
       expect.stringContaining(`commandPrefix = "git status"`),
       'utf-8',
     );
@@ -147,7 +158,12 @@ describe('createPolicyUpdater', () => {
     (fs.readFile as unknown as Mock).mockRejectedValue(
       new Error('File not found'),
     );
-    (fs.writeFile as unknown as Mock).mockResolvedValue(undefined);
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    (fs.open as unknown as Mock).mockResolvedValue(mockFileHandle);
     (fs.rename as unknown as Mock).mockResolvedValue(undefined);
 
     const mcpName = 'my-jira-server';
@@ -164,8 +180,9 @@ describe('createPolicyUpdater', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     // Verify file written
-    const writeCall = (fs.writeFile as unknown as Mock).mock.calls[0];
-    const writtenContent = writeCall[1] as string;
+    expect(fs.open).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/), 'wx');
+    const writeCall = mockFileHandle.writeFile.mock.calls[0];
+    const writtenContent = writeCall[0] as string;
     expect(writtenContent).toContain(`mcpName = "${mcpName}"`);
     expect(writtenContent).toContain(`toolName = "${simpleToolName}"`);
     expect(writtenContent).toContain('priority = 200');
@@ -180,7 +197,12 @@ describe('createPolicyUpdater', () => {
     (fs.readFile as unknown as Mock).mockRejectedValue(
       new Error('File not found'),
     );
-    (fs.writeFile as unknown as Mock).mockResolvedValue(undefined);
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    (fs.open as unknown as Mock).mockResolvedValue(mockFileHandle);
     (fs.rename as unknown as Mock).mockResolvedValue(undefined);
 
     const mcpName = 'my"jira"server';
@@ -195,8 +217,9 @@ describe('createPolicyUpdater', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    const writeCall = (fs.writeFile as unknown as Mock).mock.calls[0];
-    const writtenContent = writeCall[1] as string;
+    expect(fs.open).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/), 'wx');
+    const writeCall = mockFileHandle.writeFile.mock.calls[0];
+    const writtenContent = writeCall[0] as string;
 
     // Verify escaping - should be valid TOML
     // Note: @iarna/toml optimizes for shortest representation, so it may use single quotes 'foo"bar'

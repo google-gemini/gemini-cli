@@ -7,12 +7,8 @@
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import type { PolicyEngine } from '../policy/policy-engine.js';
-import { PolicyDecision, getHookSource } from '../policy/types.js';
-import {
-  MessageBusType,
-  type Message,
-  type HookPolicyDecision,
-} from './types.js';
+import { PolicyDecision } from '../policy/types.js';
+import { MessageBusType, type Message } from './types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
@@ -83,44 +79,24 @@ export class MessageBus extends EventEmitter {
             });
             break;
           case PolicyDecision.ASK_USER:
-            // Pass through to UI for user confirmation
-            this.emitMessage(message);
+            // Pass through to UI for user confirmation if any listeners exist.
+            // If no listeners are registered (e.g., headless/ACP flows),
+            // immediately request user confirmation to avoid long timeouts.
+            if (
+              this.listenerCount(MessageBusType.TOOL_CONFIRMATION_REQUEST) > 0
+            ) {
+              this.emitMessage(message);
+            } else {
+              this.emitMessage({
+                type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+                correlationId: message.correlationId,
+                confirmed: false,
+                requiresUserConfirmation: true,
+              });
+            }
             break;
           default:
             throw new Error(`Unknown policy decision: ${decision}`);
-        }
-      } else if (message.type === MessageBusType.HOOK_EXECUTION_REQUEST) {
-        // Handle hook execution requests through policy evaluation
-        const hookRequest = message;
-        const decision = await this.policyEngine.checkHook(hookRequest);
-
-        // Map decision to allow/deny for observability (ASK_USER treated as deny for hooks)
-        const effectiveDecision =
-          decision === PolicyDecision.ALLOW ? 'allow' : 'deny';
-
-        // Emit policy decision for observability
-        this.emitMessage({
-          type: MessageBusType.HOOK_POLICY_DECISION,
-          eventName: hookRequest.eventName,
-          hookSource: getHookSource(hookRequest.input),
-          decision: effectiveDecision,
-          reason:
-            decision !== PolicyDecision.ALLOW
-              ? 'Hook execution denied by policy'
-              : undefined,
-        } as HookPolicyDecision);
-
-        // If allowed, emit the request for hook system to handle
-        if (decision === PolicyDecision.ALLOW) {
-          this.emitMessage(message);
-        } else {
-          // If denied or ASK_USER, emit error response (hooks don't support interactive confirmation)
-          this.emitMessage({
-            type: MessageBusType.HOOK_EXECUTION_RESPONSE,
-            correlationId: hookRequest.correlationId,
-            success: false,
-            error: new Error('Hook execution denied by policy'),
-          });
         }
       } else {
         // For all other message types, just emit them
@@ -183,7 +159,7 @@ export class MessageBus extends EventEmitter {
       this.subscribe<TResponse>(responseType, responseHandler);
 
       // Publish the request with correlation ID
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises, @typescript-eslint/no-unsafe-type-assertion
       this.publish({ ...request, correlationId } as TRequest);
     });
   }

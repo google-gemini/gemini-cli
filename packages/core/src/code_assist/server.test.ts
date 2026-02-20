@@ -9,6 +9,7 @@ import { CodeAssistServer } from './server.js';
 import { OAuth2Client } from 'google-auth-library';
 import { UserTierId, ActionStatus } from './types.js';
 import { FinishReason } from '@google/genai';
+import { LlmRole } from '../telemetry/types.js';
 
 vi.mock('google-auth-library');
 
@@ -69,6 +70,7 @@ describe('CodeAssistServer', () => {
         contents: [{ role: 'user', parts: [{ text: 'request' }] }],
       },
       'user-prompt-id',
+      LlmRole.MAIN,
     );
 
     expect(mockRequest).toHaveBeenCalledWith({
@@ -126,6 +128,7 @@ describe('CodeAssistServer', () => {
         contents: [{ role: 'user', parts: [{ text: 'request' }] }],
       },
       'user-prompt-id',
+      LlmRole.MAIN,
     );
 
     expect(recordConversationOfferedSpy).toHaveBeenCalledWith(
@@ -170,6 +173,7 @@ describe('CodeAssistServer', () => {
         contents: [{ role: 'user', parts: [{ text: 'request' }] }],
       },
       'user-prompt-id',
+      LlmRole.MAIN,
     );
 
     expect(server.recordCodeAssistMetrics).toHaveBeenCalledWith(
@@ -208,6 +212,7 @@ describe('CodeAssistServer', () => {
         contents: [{ role: 'user', parts: [{ text: 'request' }] }],
       },
       'user-prompt-id',
+      LlmRole.MAIN,
     );
 
     const mockResponseData = {
@@ -327,6 +332,22 @@ describe('CodeAssistServer', () => {
       const url = server.getMethodUrl('testMethod');
       expect(url).toBe('https://custom-endpoint.com/v1internal:testMethod');
     });
+
+    it('should use the CODE_ASSIST_API_VERSION environment variable if set', () => {
+      process.env['CODE_ASSIST_API_VERSION'] = 'v2beta';
+      const server = new CodeAssistServer({} as never);
+      const url = server.getMethodUrl('testMethod');
+      expect(url).toBe('https://cloudcode-pa.googleapis.com/v2beta:testMethod');
+    });
+
+    it('should use default value if CODE_ASSIST_API_VERSION env var is empty', () => {
+      process.env['CODE_ASSIST_API_VERSION'] = '';
+      const server = new CodeAssistServer({} as never);
+      const url = server.getMethodUrl('testMethod');
+      expect(url).toBe(
+        'https://cloudcode-pa.googleapis.com/v1internal:testMethod',
+      );
+    });
   });
 
   it('should call the generateContentStream endpoint and parse SSE', async () => {
@@ -353,6 +374,7 @@ describe('CodeAssistServer', () => {
         contents: [{ role: 'user', parts: [{ text: 'request' }] }],
       },
       'user-prompt-id',
+      LlmRole.MAIN,
     );
 
     // Push SSE data to the stream

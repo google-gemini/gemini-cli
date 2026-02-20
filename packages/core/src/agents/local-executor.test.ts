@@ -17,6 +17,10 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { LocalAgentExecutor, type ActivityCallback } from './local-executor.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
+import {
+  DiscoveredMCPTool,
+  MCP_QUALIFIED_NAME_SEPARATOR,
+} from '../tools/mcp-tool.js';
 import { LSTool } from '../tools/ls.js';
 import { LS_TOOL_NAME, READ_FILE_TOOL_NAME } from '../tools/tool-names.js';
 import {
@@ -31,6 +35,7 @@ import {
   type Content,
   type PartListUnion,
   type Tool,
+  type CallableTool,
 } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
@@ -42,6 +47,7 @@ import {
   logAgentFinish,
   logRecoveryAttempt,
 } from '../telemetry/loggers.js';
+import { LlmRole } from '../telemetry/types.js';
 import {
   AgentStartEvent,
   AgentFinishEvent,
@@ -55,23 +61,25 @@ import type {
 } from './types.js';
 import { AgentTerminateMode } from './types.js';
 import type { AnyDeclarativeTool, AnyToolInvocation } from '../tools/tools.js';
+import type { ToolCallRequestInfo } from '../scheduler/types.js';
 import { CompressionStatus } from '../core/turn.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import type {
   ModelConfigKey,
   ResolvedModelConfig,
 } from '../services/modelConfigService.js';
+import type { AgentRegistry } from './registry.js';
 import { getModelConfigAlias } from './registry.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 
 const {
   mockSendMessageStream,
-  mockExecuteToolCall,
+  mockScheduleAgentTools,
   mockSetSystemInstruction,
   mockCompress,
 } = vi.hoisted(() => ({
   mockSendMessageStream: vi.fn(),
-  mockExecuteToolCall: vi.fn(),
+  mockScheduleAgentTools: vi.fn(),
   mockSetSystemInstruction: vi.fn(),
   mockCompress: vi.fn(),
 }));
@@ -100,8 +108,8 @@ vi.mock('../core/geminiChat.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../core/nonInteractiveToolExecutor.js', () => ({
-  executeToolCall: mockExecuteToolCall,
+vi.mock('./agent-scheduler.js', () => ({
+  scheduleAgentTools: mockScheduleAgentTools,
 }));
 
 vi.mock('../utils/version.js', () => ({
@@ -114,6 +122,23 @@ vi.mock('../telemetry/loggers.js', () => ({
   logAgentStart: vi.fn(),
   logAgentFinish: vi.fn(),
   logRecoveryAttempt: vi.fn(),
+}));
+
+vi.mock('../utils/schemaValidator.js', () => ({
+  SchemaValidator: {
+    validate: vi.fn().mockReturnValue(null),
+    validateSchema: vi.fn().mockReturnValue(null),
+  },
+}));
+
+vi.mock('../utils/filesearch/crawler.js', () => ({
+  crawl: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock('../telemetry/clearcut-logger/clearcut-logger.js', () => ({
+  ClearcutLogger: class {
+    log() {}
+  },
 }));
 
 vi.mock('../utils/promptIdContext.js', async (importOriginal) => {
@@ -223,7 +248,13 @@ const createTestDefinition = <TOutput extends z.ZodTypeAny = z.ZodUnknown>(
     name: 'TestAgent',
     description: 'An agent for testing.',
     inputConfig: {
-      inputs: { goal: { type: 'string', required: true, description: 'goal' } },
+      inputSchema: {
+        type: 'object',
+        properties: {
+          goal: { type: 'string', description: 'goal' },
+        },
+        required: ['goal'],
+      },
     },
     modelConfig: {
       model: 'gemini-test-model',
@@ -251,7 +282,7 @@ describe('LocalAgentExecutor', () => {
     mockSetHistory.mockClear();
     mockSendMessageStream.mockReset();
     mockSetSystemInstruction.mockReset();
-    mockExecuteToolCall.mockReset();
+    mockScheduleAgentTools.mockReset();
     mockedLogAgentStart.mockReset();
     mockedLogAgentFinish.mockReset();
     mockedPromptIdContext.getStore.mockReset();
@@ -292,6 +323,9 @@ describe('LocalAgentExecutor', () => {
     parentToolRegistry.registerTool(MOCK_TOOL_NOT_ALLOWED);
 
     vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(parentToolRegistry);
+    vi.spyOn(mockConfig, 'getAgentRegistry').mockReturnValue({
+      getAllAgentNames: () => [],
+    } as unknown as AgentRegistry);
 
     mockedGetDirectoryContextString.mockResolvedValue(
       'Mocked Environment Context',
@@ -405,14 +439,128 @@ describe('LocalAgentExecutor', () => {
       const secondPart = startHistory?.[1]?.parts?.[0];
       expect(secondPart?.text).toBe('OK, starting on TestGoal.');
     });
+
+    it('should filter out subagent tools to prevent recursion', async () => {
+      const subAgentName = 'recursive-agent';
+      // Register a mock tool that simulates a subagent
+      parentToolRegistry.registerTool(new MockTool({ name: subAgentName }));
+
+      // Mock the agent registry to return the subagent name
+      vi.spyOn(
+        mockConfig.getAgentRegistry(),
+        'getAllAgentNames',
+      ).mockReturnValue([subAgentName]);
+
+      const definition = createTestDefinition([LS_TOOL_NAME, subAgentName]);
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      const agentRegistry = executor['toolRegistry'];
+
+      // LS should be present
+      expect(agentRegistry.getTool(LS_TOOL_NAME)).toBeDefined();
+      // Subagent should be filtered out
+      expect(agentRegistry.getTool(subAgentName)).toBeUndefined();
+    });
+
+    it('should default to ALL tools (except subagents) when toolConfig is undefined', async () => {
+      const subAgentName = 'recursive-agent';
+      // Register tools in parent registry
+      // LS_TOOL_NAME is already registered in beforeEach
+      const otherTool = new MockTool({ name: 'other-tool' });
+      parentToolRegistry.registerTool(otherTool);
+      parentToolRegistry.registerTool(new MockTool({ name: subAgentName }));
+
+      // Mock the agent registry to return the subagent name
+      vi.spyOn(
+        mockConfig.getAgentRegistry(),
+        'getAllAgentNames',
+      ).mockReturnValue([subAgentName]);
+
+      // Create definition and force toolConfig to be undefined
+      const definition = createTestDefinition();
+      definition.toolConfig = undefined;
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      const agentRegistry = executor['toolRegistry'];
+
+      // Should include standard tools
+      expect(agentRegistry.getTool(LS_TOOL_NAME)).toBeDefined();
+      expect(agentRegistry.getTool('other-tool')).toBeDefined();
+
+      // Should exclude subagent
+      expect(agentRegistry.getTool(subAgentName)).toBeUndefined();
+    });
+
+    it('should enforce qualified names for MCP tools in agent definitions', async () => {
+      const serverName = 'mcp-server';
+      const toolName = 'mcp-tool';
+      const qualifiedName = `${serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${toolName}`;
+
+      const mockMcpTool = {
+        tool: vi.fn(),
+        callTool: vi.fn(),
+      } as unknown as CallableTool;
+
+      const mcpTool = new DiscoveredMCPTool(
+        mockMcpTool,
+        serverName,
+        toolName,
+        'description',
+        {},
+        mockConfig.getMessageBus(),
+      );
+
+      // Mock getTool to return our real DiscoveredMCPTool instance
+      const getToolSpy = vi
+        .spyOn(parentToolRegistry, 'getTool')
+        .mockImplementation((name) => {
+          if (name === toolName || name === qualifiedName) {
+            return mcpTool;
+          }
+          return undefined;
+        });
+
+      // 1. Qualified name works and registers the tool (using short name per status quo)
+      const definition = createTestDefinition([qualifiedName]);
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      const agentRegistry = executor['toolRegistry'];
+      // Registry shortening logic means it's registered as 'mcp-tool' internally
+      expect(agentRegistry.getTool(toolName)).toBeDefined();
+
+      // 2. Unqualified name for MCP tool THROWS
+      const badDefinition = createTestDefinition([toolName]);
+      await expect(
+        LocalAgentExecutor.create(badDefinition, mockConfig, onActivity),
+      ).rejects.toThrow(/must be requested with its server prefix/);
+
+      getToolSpy.mockRestore();
+    });
   });
 
   describe('run (Execution Loop and Logic)', () => {
     it('should log AgentFinish with error if run throws', async () => {
       const definition = createTestDefinition();
       // Make the definition invalid to cause an error during run
-      definition.inputConfig.inputs = {
-        goal: { type: 'string', required: true, description: 'goal' },
+      definition.inputConfig.inputSchema = {
+        type: 'object',
+        properties: {
+          goal: { type: 'string', description: 'goal' },
+        },
+        required: ['goal'],
       };
       const executor = await LocalAgentExecutor.create(
         definition,
@@ -449,34 +597,36 @@ describe('LocalAgentExecutor', () => {
         [{ name: LS_TOOL_NAME, args: { path: '.' }, id: 'call1' }],
         'T1: Listing',
       );
-      mockExecuteToolCall.mockResolvedValueOnce({
-        status: 'success',
-        request: {
-          callId: 'call1',
-          name: LS_TOOL_NAME,
-          args: { path: '.' },
-          isClientInitiated: false,
-          prompt_id: 'test-prompt',
-        },
-        tool: {} as AnyDeclarativeTool,
-        invocation: {} as AnyToolInvocation,
-        response: {
-          callId: 'call1',
-          resultDisplay: 'file1.txt',
-          responseParts: [
-            {
-              functionResponse: {
-                name: LS_TOOL_NAME,
-                response: { result: 'file1.txt' },
-                id: 'call1',
+      mockScheduleAgentTools.mockResolvedValueOnce([
+        {
+          status: 'success',
+          request: {
+            callId: 'call1',
+            name: LS_TOOL_NAME,
+            args: { path: '.' },
+            isClientInitiated: false,
+            prompt_id: 'test-prompt',
+          },
+          tool: {} as AnyDeclarativeTool,
+          invocation: {} as AnyToolInvocation,
+          response: {
+            callId: 'call1',
+            resultDisplay: 'file1.txt',
+            responseParts: [
+              {
+                functionResponse: {
+                  name: LS_TOOL_NAME,
+                  response: { result: 'file1.txt' },
+                  id: 'call1',
+                },
               },
-            },
-          ],
-          error: undefined,
-          errorType: undefined,
-          contentLength: undefined,
+            ],
+            error: undefined,
+            errorType: undefined,
+            contentLength: undefined,
+          },
         },
-      });
+      ]);
 
       // Turn 2: Model calls complete_task with required output
       mockModelResponse(
@@ -595,34 +745,36 @@ describe('LocalAgentExecutor', () => {
       mockModelResponse([
         { name: LS_TOOL_NAME, args: { path: '.' }, id: 'call1' },
       ]);
-      mockExecuteToolCall.mockResolvedValueOnce({
-        status: 'success',
-        request: {
-          callId: 'call1',
-          name: LS_TOOL_NAME,
-          args: { path: '.' },
-          isClientInitiated: false,
-          prompt_id: 'test-prompt',
-        },
-        tool: {} as AnyDeclarativeTool,
-        invocation: {} as AnyToolInvocation,
-        response: {
-          callId: 'call1',
-          resultDisplay: 'ok',
-          responseParts: [
-            {
-              functionResponse: {
-                name: LS_TOOL_NAME,
-                response: {},
-                id: 'call1',
+      mockScheduleAgentTools.mockResolvedValueOnce([
+        {
+          status: 'success',
+          request: {
+            callId: 'call1',
+            name: LS_TOOL_NAME,
+            args: { path: '.' },
+            isClientInitiated: false,
+            prompt_id: 'test-prompt',
+          },
+          tool: {} as AnyDeclarativeTool,
+          invocation: {} as AnyToolInvocation,
+          response: {
+            callId: 'call1',
+            resultDisplay: 'ok',
+            responseParts: [
+              {
+                functionResponse: {
+                  name: LS_TOOL_NAME,
+                  response: {},
+                  id: 'call1',
+                },
               },
-            },
-          ],
-          error: undefined,
-          errorType: undefined,
-          contentLength: undefined,
+            ],
+            error: undefined,
+            errorType: undefined,
+            contentLength: undefined,
+          },
         },
-      });
+      ]);
 
       mockModelResponse(
         [
@@ -668,34 +820,36 @@ describe('LocalAgentExecutor', () => {
       mockModelResponse([
         { name: LS_TOOL_NAME, args: { path: '.' }, id: 'call1' },
       ]);
-      mockExecuteToolCall.mockResolvedValueOnce({
-        status: 'success',
-        request: {
-          callId: 'call1',
-          name: LS_TOOL_NAME,
-          args: { path: '.' },
-          isClientInitiated: false,
-          prompt_id: 'test-prompt',
-        },
-        tool: {} as AnyDeclarativeTool,
-        invocation: {} as AnyToolInvocation,
-        response: {
-          callId: 'call1',
-          resultDisplay: 'ok',
-          responseParts: [
-            {
-              functionResponse: {
-                name: LS_TOOL_NAME,
-                response: {},
-                id: 'call1',
+      mockScheduleAgentTools.mockResolvedValueOnce([
+        {
+          status: 'success',
+          request: {
+            callId: 'call1',
+            name: LS_TOOL_NAME,
+            args: { path: '.' },
+            isClientInitiated: false,
+            prompt_id: 'test-prompt',
+          },
+          tool: {} as AnyDeclarativeTool,
+          invocation: {} as AnyToolInvocation,
+          response: {
+            callId: 'call1',
+            resultDisplay: 'ok',
+            responseParts: [
+              {
+                functionResponse: {
+                  name: LS_TOOL_NAME,
+                  response: {},
+                  id: 'call1',
+                },
               },
-            },
-          ],
-          error: undefined,
-          errorType: undefined,
-          contentLength: undefined,
+            ],
+            error: undefined,
+            errorType: undefined,
+            contentLength: undefined,
+          },
         },
-      });
+      ]);
 
       // Turn 2 (protocol violation)
       mockModelResponse([], 'I think I am done.');
@@ -868,33 +1022,40 @@ describe('LocalAgentExecutor', () => {
         resolveCalls = r;
       });
 
-      mockExecuteToolCall.mockImplementation(async (_ctx, reqInfo) => {
-        callsStarted++;
-        if (callsStarted === 2) resolveCalls();
-        await vi.advanceTimersByTimeAsync(100);
-        return {
-          status: 'success',
-          request: reqInfo,
-          tool: {} as AnyDeclarativeTool,
-          invocation: {} as AnyToolInvocation,
-          response: {
-            callId: reqInfo.callId,
-            resultDisplay: 'ok',
-            responseParts: [
-              {
-                functionResponse: {
-                  name: reqInfo.name,
-                  response: {},
-                  id: reqInfo.callId,
+      mockScheduleAgentTools.mockImplementation(
+        async (_ctx, requests: ToolCallRequestInfo[]) => {
+          const results = await Promise.all(
+            requests.map(async (reqInfo) => {
+              callsStarted++;
+              if (callsStarted === 2) resolveCalls();
+              await vi.advanceTimersByTimeAsync(100);
+              return {
+                status: 'success',
+                request: reqInfo,
+                tool: {} as AnyDeclarativeTool,
+                invocation: {} as AnyToolInvocation,
+                response: {
+                  callId: reqInfo.callId,
+                  resultDisplay: 'ok',
+                  responseParts: [
+                    {
+                      functionResponse: {
+                        name: reqInfo.name,
+                        response: {},
+                        id: reqInfo.callId,
+                      },
+                    },
+                  ],
+                  error: undefined,
+                  errorType: undefined,
+                  contentLength: undefined,
                 },
-              },
-            ],
-            error: undefined,
-            errorType: undefined,
-            contentLength: undefined,
-          },
-        };
-      });
+              };
+            }),
+          );
+          return results;
+        },
+      );
 
       // Turn 2: Completion
       mockModelResponse([
@@ -914,7 +1075,7 @@ describe('LocalAgentExecutor', () => {
 
       const output = await runPromise;
 
-      expect(mockExecuteToolCall).toHaveBeenCalledTimes(2);
+      expect(mockScheduleAgentTools).toHaveBeenCalledTimes(1);
       expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
 
       // Safe access to message parts
@@ -968,7 +1129,7 @@ describe('LocalAgentExecutor', () => {
       await executor.run({ goal: 'Sec test' }, signal);
 
       // Verify external executor was not called (Security held)
-      expect(mockExecuteToolCall).not.toHaveBeenCalled();
+      expect(mockScheduleAgentTools).not.toHaveBeenCalled();
 
       // 2. Verify console warning
       expect(consoleWarnSpy).toHaveBeenCalledWith(
@@ -1124,37 +1285,36 @@ describe('LocalAgentExecutor', () => {
       mockModelResponse([
         { name: LS_TOOL_NAME, args: { path: '/fake' }, id: 'call1' },
       ]);
-      mockExecuteToolCall.mockResolvedValueOnce({
-        status: 'error',
-        request: {
-          callId: 'call1',
-          name: LS_TOOL_NAME,
-          args: { path: '/fake' },
-          isClientInitiated: false,
-          prompt_id: 'test-prompt',
-        },
-        tool: {} as AnyDeclarativeTool,
-        invocation: {} as AnyToolInvocation,
-        response: {
-          callId: 'call1',
-          resultDisplay: '',
-          responseParts: [
-            {
-              functionResponse: {
-                name: LS_TOOL_NAME,
-                response: { error: toolErrorMessage },
-                id: 'call1',
-              },
-            },
-          ],
-          error: {
-            type: 'ToolError',
-            message: toolErrorMessage,
+      mockScheduleAgentTools.mockResolvedValueOnce([
+        {
+          status: 'error',
+          request: {
+            callId: 'call1',
+            name: LS_TOOL_NAME,
+            args: { path: '/fake' },
+            isClientInitiated: false,
+            prompt_id: 'test-prompt',
           },
-          errorType: 'ToolError',
-          contentLength: 0,
+          tool: {} as AnyDeclarativeTool,
+          invocation: {} as AnyToolInvocation,
+          response: {
+            callId: 'call1',
+            resultDisplay: '',
+            responseParts: [
+              {
+                functionResponse: {
+                  name: LS_TOOL_NAME,
+                  response: { error: toolErrorMessage },
+                  id: 'call1',
+                },
+              },
+            ],
+            error: new Error(toolErrorMessage),
+            errorType: 'ToolError',
+            contentLength: 0,
+          },
         },
-      });
+      ]);
 
       // Turn 2: Model sees the error and completes
       mockModelResponse([
@@ -1167,7 +1327,7 @@ describe('LocalAgentExecutor', () => {
 
       const output = await executor.run({ goal: 'Tool failure test' }, signal);
 
-      expect(mockExecuteToolCall).toHaveBeenCalledTimes(1);
+      expect(mockScheduleAgentTools).toHaveBeenCalledTimes(1);
       expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
 
       // Verify the error was reported in the activity stream
@@ -1248,6 +1408,7 @@ describe('LocalAgentExecutor', () => {
         expect.any(Array),
         expect.any(String),
         expect.any(AbortSignal),
+        LlmRole.SUBAGENT,
       );
     });
 
@@ -1293,6 +1454,7 @@ describe('LocalAgentExecutor', () => {
         expect.any(Array),
         expect.any(String),
         expect.any(AbortSignal),
+        LlmRole.SUBAGENT,
       );
     });
   });
@@ -1300,28 +1462,30 @@ describe('LocalAgentExecutor', () => {
   describe('run (Termination Conditions)', () => {
     const mockWorkResponse = (id: string) => {
       mockModelResponse([{ name: LS_TOOL_NAME, args: { path: '.' }, id }]);
-      mockExecuteToolCall.mockResolvedValueOnce({
-        status: 'success',
-        request: {
-          callId: id,
-          name: LS_TOOL_NAME,
-          args: { path: '.' },
-          isClientInitiated: false,
-          prompt_id: 'test-prompt',
+      mockScheduleAgentTools.mockResolvedValueOnce([
+        {
+          status: 'success',
+          request: {
+            callId: id,
+            name: LS_TOOL_NAME,
+            args: { path: '.' },
+            isClientInitiated: false,
+            prompt_id: 'test-prompt',
+          },
+          tool: {} as AnyDeclarativeTool,
+          invocation: {} as AnyToolInvocation,
+          response: {
+            callId: id,
+            resultDisplay: 'ok',
+            responseParts: [
+              { functionResponse: { name: LS_TOOL_NAME, response: {}, id } },
+            ],
+            error: undefined,
+            errorType: undefined,
+            contentLength: undefined,
+          },
         },
-        tool: {} as AnyDeclarativeTool,
-        invocation: {} as AnyToolInvocation,
-        response: {
-          callId: id,
-          resultDisplay: 'ok',
-          responseParts: [
-            { functionResponse: { name: LS_TOOL_NAME, response: {}, id } },
-          ],
-          error: undefined,
-          errorType: undefined,
-          contentLength: undefined,
-        },
-      });
+      ]);
     };
 
     it('should terminate when max_turns is reached', async () => {
@@ -1359,9 +1523,13 @@ describe('LocalAgentExecutor', () => {
           (async function* () {
             await new Promise<void>((resolve) => {
               // This promise resolves when aborted, ending the generator.
-              signal?.addEventListener('abort', () => {
-                resolve();
-              });
+              signal?.addEventListener(
+                'abort',
+                () => {
+                  resolve();
+                },
+                { once: true },
+              );
             });
           })(),
       );
@@ -1410,23 +1578,27 @@ describe('LocalAgentExecutor', () => {
       ]);
 
       // Long running tool
-      mockExecuteToolCall.mockImplementationOnce(async (_ctx, reqInfo) => {
-        await vi.advanceTimersByTimeAsync(61 * 1000);
-        return {
-          status: 'success',
-          request: reqInfo,
-          tool: {} as AnyDeclarativeTool,
-          invocation: {} as AnyToolInvocation,
-          response: {
-            callId: 't1',
-            resultDisplay: 'ok',
-            responseParts: [],
-            error: undefined,
-            errorType: undefined,
-            contentLength: undefined,
-          },
-        };
-      });
+      mockScheduleAgentTools.mockImplementationOnce(
+        async (_ctx, requests: ToolCallRequestInfo[]) => {
+          await vi.advanceTimersByTimeAsync(61 * 1000);
+          return [
+            {
+              status: 'success',
+              request: requests[0],
+              tool: {} as AnyDeclarativeTool,
+              invocation: {} as AnyToolInvocation,
+              response: {
+                callId: 't1',
+                resultDisplay: 'ok',
+                responseParts: [],
+                error: undefined,
+                errorType: undefined,
+                contentLength: undefined,
+              },
+            },
+          ];
+        },
+      );
 
       // Recovery turn
       mockModelResponse([], 'I give up');
@@ -1462,28 +1634,30 @@ describe('LocalAgentExecutor', () => {
   describe('run (Recovery Turns)', () => {
     const mockWorkResponse = (id: string) => {
       mockModelResponse([{ name: LS_TOOL_NAME, args: { path: '.' }, id }]);
-      mockExecuteToolCall.mockResolvedValueOnce({
-        status: 'success',
-        request: {
-          callId: id,
-          name: LS_TOOL_NAME,
-          args: { path: '.' },
-          isClientInitiated: false,
-          prompt_id: 'test-prompt',
+      mockScheduleAgentTools.mockResolvedValueOnce([
+        {
+          status: 'success',
+          request: {
+            callId: id,
+            name: LS_TOOL_NAME,
+            args: { path: '.' },
+            isClientInitiated: false,
+            prompt_id: 'test-prompt',
+          },
+          tool: {} as AnyDeclarativeTool,
+          invocation: {} as AnyToolInvocation,
+          response: {
+            callId: id,
+            resultDisplay: 'ok',
+            responseParts: [
+              { functionResponse: { name: LS_TOOL_NAME, response: {}, id } },
+            ],
+            error: undefined,
+            errorType: undefined,
+            contentLength: undefined,
+          },
         },
-        tool: {} as AnyDeclarativeTool,
-        invocation: {} as AnyToolInvocation,
-        response: {
-          callId: id,
-          resultDisplay: 'ok',
-          responseParts: [
-            { functionResponse: { name: LS_TOOL_NAME, response: {}, id } },
-          ],
-          error: undefined,
-          errorType: undefined,
-          contentLength: undefined,
-        },
-      });
+      ]);
     };
 
     it('should recover successfully if complete_task is called during the grace turn after MAX_TURNS', async () => {
@@ -1671,7 +1845,9 @@ describe('LocalAgentExecutor', () => {
           (async function* () {
             // This promise never resolves, it waits for abort.
             await new Promise<void>((resolve) => {
-              signal?.addEventListener('abort', () => resolve());
+              signal?.addEventListener('abort', () => resolve(), {
+                once: true,
+              });
             });
           })(),
       );
@@ -1724,7 +1900,9 @@ describe('LocalAgentExecutor', () => {
           // eslint-disable-next-line require-yield
           (async function* () {
             await new Promise<void>((resolve) =>
-              signal?.addEventListener('abort', () => resolve()),
+              signal?.addEventListener('abort', () => resolve(), {
+                once: true,
+              }),
             );
           })(),
       );
@@ -1735,7 +1913,9 @@ describe('LocalAgentExecutor', () => {
           // eslint-disable-next-line require-yield
           (async function* () {
             await new Promise<void>((resolve) =>
-              signal?.addEventListener('abort', () => resolve()),
+              signal?.addEventListener('abort', () => resolve(), {
+                once: true,
+              }),
             );
           })(),
       );
@@ -1772,28 +1952,30 @@ describe('LocalAgentExecutor', () => {
   describe('Telemetry and Logging', () => {
     const mockWorkResponse = (id: string) => {
       mockModelResponse([{ name: LS_TOOL_NAME, args: { path: '.' }, id }]);
-      mockExecuteToolCall.mockResolvedValueOnce({
-        status: 'success',
-        request: {
-          callId: id,
-          name: LS_TOOL_NAME,
-          args: { path: '.' },
-          isClientInitiated: false,
-          prompt_id: 'test-prompt',
+      mockScheduleAgentTools.mockResolvedValueOnce([
+        {
+          status: 'success',
+          request: {
+            callId: id,
+            name: LS_TOOL_NAME,
+            args: { path: '.' },
+            isClientInitiated: false,
+            prompt_id: 'test-prompt',
+          },
+          tool: {} as AnyDeclarativeTool,
+          invocation: {} as AnyToolInvocation,
+          response: {
+            callId: id,
+            resultDisplay: 'ok',
+            responseParts: [
+              { functionResponse: { name: LS_TOOL_NAME, response: {}, id } },
+            ],
+            error: undefined,
+            errorType: undefined,
+            contentLength: undefined,
+          },
         },
-        tool: {} as AnyDeclarativeTool,
-        invocation: {} as AnyToolInvocation,
-        response: {
-          callId: id,
-          resultDisplay: 'ok',
-          responseParts: [
-            { functionResponse: { name: LS_TOOL_NAME, response: {}, id } },
-          ],
-          error: undefined,
-          errorType: undefined,
-          contentLength: undefined,
-        },
-      });
+      ]);
     };
 
     beforeEach(() => {
@@ -1855,32 +2037,243 @@ describe('LocalAgentExecutor', () => {
       expect(recoveryEvent.success).toBe(true);
       expect(recoveryEvent.reason).toBe(AgentTerminateMode.MAX_TURNS);
     });
+
+    describe('Model Steering', () => {
+      let configWithHints: Config;
+
+      beforeEach(() => {
+        configWithHints = makeFakeConfig({ modelSteering: true });
+        vi.spyOn(configWithHints, 'getAgentRegistry').mockReturnValue({
+          getAllAgentNames: () => [],
+        } as unknown as AgentRegistry);
+        vi.spyOn(configWithHints, 'getToolRegistry').mockReturnValue(
+          parentToolRegistry,
+        );
+      });
+
+      it('should inject user hints into the next turn after they are added', async () => {
+        const definition = createTestDefinition();
+
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          configWithHints,
+        );
+
+        // Turn 1: Model calls LS
+        mockModelResponse(
+          [{ name: LS_TOOL_NAME, args: { path: '.' }, id: 'call1' }],
+          'T1: Listing',
+        );
+
+        // We use a manual promise to ensure the hint is added WHILE Turn 1 is "running"
+        let resolveToolCall: (value: unknown) => void;
+        const toolCallPromise = new Promise((resolve) => {
+          resolveToolCall = resolve;
+        });
+        mockScheduleAgentTools.mockReturnValueOnce(toolCallPromise);
+
+        // Turn 2: Model calls complete_task
+        mockModelResponse(
+          [
+            {
+              name: TASK_COMPLETE_TOOL_NAME,
+              args: { finalResult: 'Done' },
+              id: 'call2',
+            },
+          ],
+          'T2: Done',
+        );
+
+        const runPromise = executor.run({ goal: 'Hint test' }, signal);
+
+        // Give the loop a chance to start and register the listener
+        await vi.advanceTimersByTimeAsync(1);
+
+        configWithHints.userHintService.addUserHint('Initial Hint');
+
+        // Resolve the tool call to complete Turn 1
+        resolveToolCall!([
+          {
+            status: 'success',
+            request: {
+              callId: 'call1',
+              name: LS_TOOL_NAME,
+              args: { path: '.' },
+              isClientInitiated: false,
+              prompt_id: 'p1',
+            },
+            tool: {} as AnyDeclarativeTool,
+            invocation: {} as AnyToolInvocation,
+            response: {
+              callId: 'call1',
+              resultDisplay: 'file1.txt',
+              responseParts: [
+                {
+                  functionResponse: {
+                    name: LS_TOOL_NAME,
+                    response: { result: 'file1.txt' },
+                    id: 'call1',
+                  },
+                },
+              ],
+            },
+          },
+        ]);
+
+        await runPromise;
+
+        // The first call to sendMessageStream should NOT contain the hint (it was added after start)
+        // The SECOND call to sendMessageStream SHOULD contain the hint
+        expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+        const secondTurnMessageParts = mockSendMessageStream.mock.calls[1][1];
+        expect(secondTurnMessageParts).toContainEqual(
+          expect.objectContaining({
+            text: expect.stringContaining('Initial Hint'),
+          }),
+        );
+      });
+
+      it('should NOT inject legacy hints added before executor was created', async () => {
+        const definition = createTestDefinition();
+        configWithHints.userHintService.addUserHint('Legacy Hint');
+
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          configWithHints,
+        );
+
+        mockModelResponse([
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'Done' },
+            id: 'call1',
+          },
+        ]);
+
+        await executor.run({ goal: 'Isolation test' }, signal);
+
+        // The first call to sendMessageStream should NOT contain the legacy hint
+        expect(mockSendMessageStream).toHaveBeenCalled();
+        const firstTurnMessageParts = mockSendMessageStream.mock.calls[0][1];
+        // We expect only the goal, no hints injected at turn start
+        for (const part of firstTurnMessageParts) {
+          if (part.text) {
+            expect(part.text).not.toContain('Legacy Hint');
+          }
+        }
+      });
+
+      it('should inject mid-execution hints into subsequent turns', async () => {
+        const definition = createTestDefinition();
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          configWithHints,
+        );
+
+        // Turn 1: Model calls LS
+        mockModelResponse(
+          [{ name: LS_TOOL_NAME, args: { path: '.' }, id: 'call1' }],
+          'T1: Listing',
+        );
+
+        // We use a manual promise to ensure the hint is added WHILE Turn 1 is "running"
+        let resolveToolCall: (value: unknown) => void;
+        const toolCallPromise = new Promise((resolve) => {
+          resolveToolCall = resolve;
+        });
+        mockScheduleAgentTools.mockReturnValueOnce(toolCallPromise);
+
+        // Turn 2: Model calls complete_task
+        mockModelResponse(
+          [
+            {
+              name: TASK_COMPLETE_TOOL_NAME,
+              args: { finalResult: 'Done' },
+              id: 'call2',
+            },
+          ],
+          'T2: Done',
+        );
+
+        // Start execution
+        const runPromise = executor.run({ goal: 'Mid-turn hint test' }, signal);
+
+        // Small delay to ensure the run loop has reached the await and registered listener
+        await vi.advanceTimersByTimeAsync(1);
+
+        // Add the hint while the tool call is pending
+        configWithHints.userHintService.addUserHint('Corrective Hint');
+
+        // Now resolve the tool call to complete Turn 1
+        resolveToolCall!([
+          {
+            status: 'success',
+            request: {
+              callId: 'call1',
+              name: LS_TOOL_NAME,
+              args: { path: '.' },
+              isClientInitiated: false,
+              prompt_id: 'p1',
+            },
+            tool: {} as AnyDeclarativeTool,
+            invocation: {} as AnyToolInvocation,
+            response: {
+              callId: 'call1',
+              resultDisplay: 'file1.txt',
+              responseParts: [
+                {
+                  functionResponse: {
+                    name: LS_TOOL_NAME,
+                    response: { result: 'file1.txt' },
+                    id: 'call1',
+                  },
+                },
+              ],
+            },
+          },
+        ]);
+
+        await runPromise;
+
+        expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+
+        // The second turn (turn 1) should contain the corrective hint.
+        const secondTurnMessageParts = mockSendMessageStream.mock.calls[1][1];
+        expect(secondTurnMessageParts).toContainEqual(
+          expect.objectContaining({
+            text: expect.stringContaining('Corrective Hint'),
+          }),
+        );
+      });
+    });
   });
   describe('Chat Compression', () => {
     const mockWorkResponse = (id: string) => {
       mockModelResponse([{ name: LS_TOOL_NAME, args: { path: '.' }, id }]);
-      mockExecuteToolCall.mockResolvedValueOnce({
-        status: 'success',
-        request: {
-          callId: id,
-          name: LS_TOOL_NAME,
-          args: { path: '.' },
-          isClientInitiated: false,
-          prompt_id: 'test-prompt',
+      mockScheduleAgentTools.mockResolvedValueOnce([
+        {
+          status: 'success',
+          request: {
+            callId: id,
+            name: LS_TOOL_NAME,
+            args: { path: '.' },
+            isClientInitiated: false,
+            prompt_id: 'test-prompt',
+          },
+          tool: {} as AnyDeclarativeTool,
+          invocation: {} as AnyToolInvocation,
+          response: {
+            callId: id,
+            resultDisplay: 'ok',
+            responseParts: [
+              { functionResponse: { name: LS_TOOL_NAME, response: {}, id } },
+            ],
+            error: undefined,
+            errorType: undefined,
+            contentLength: undefined,
+          },
         },
-        tool: {} as AnyDeclarativeTool,
-        invocation: {} as AnyToolInvocation,
-        response: {
-          callId: id,
-          resultDisplay: 'ok',
-          responseParts: [
-            { functionResponse: { name: LS_TOOL_NAME, response: {}, id } },
-          ],
-          error: undefined,
-          errorType: undefined,
-          contentLength: undefined,
-        },
-      });
+      ]);
     };
 
     it('should attempt to compress chat history on each turn', async () => {

@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -35,11 +35,15 @@ describe('codeAssist', () => {
 
   describe('createCodeAssistContentGenerator', () => {
     const httpOptions = {};
-    const mockConfig = {} as Config;
+    const mockValidationHandler = vi.fn();
+    const mockConfig = {
+      getValidationHandler: () => mockValidationHandler,
+    } as unknown as Config;
     const mockAuthClient = { a: 'client' };
     const mockUserData = {
       projectId: 'test-project',
       userTier: UserTierId.FREE,
+      userTierName: 'free-tier-name',
     };
 
     it('should create a server for LOGIN_WITH_GOOGLE', async () => {
@@ -57,13 +61,18 @@ describe('codeAssist', () => {
         AuthType.LOGIN_WITH_GOOGLE,
         mockConfig,
       );
-      expect(setupUser).toHaveBeenCalledWith(mockAuthClient);
+      expect(setupUser).toHaveBeenCalledWith(
+        mockAuthClient,
+        mockValidationHandler,
+        httpOptions,
+      );
       expect(MockedCodeAssistServer).toHaveBeenCalledWith(
         mockAuthClient,
         'test-project',
         httpOptions,
         'session-123',
         'free-tier',
+        'free-tier-name',
       );
       expect(generator).toBeInstanceOf(MockedCodeAssistServer);
     });
@@ -82,13 +91,18 @@ describe('codeAssist', () => {
         AuthType.COMPUTE_ADC,
         mockConfig,
       );
-      expect(setupUser).toHaveBeenCalledWith(mockAuthClient);
+      expect(setupUser).toHaveBeenCalledWith(
+        mockAuthClient,
+        mockValidationHandler,
+        httpOptions,
+      );
       expect(MockedCodeAssistServer).toHaveBeenCalledWith(
         mockAuthClient,
         'test-project',
         httpOptions,
         undefined, // No session ID
         'free-tier',
+        'free-tier-name',
       );
       expect(generator).toBeInstanceOf(MockedCodeAssistServer);
     });

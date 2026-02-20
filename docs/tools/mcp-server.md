@@ -101,8 +101,8 @@ execution.
 
 #### Global MCP settings (`mcp`)
 
-The `mcp` object in your `settings.json` allows you to define global rules for
-all MCP servers.
+The `mcp` object in your `settings.json` lets you define global rules for all
+MCP servers.
 
 - **`mcp.serverCommand`** (string): A global command to start an MCP server.
 - **`mcp.allowed`** (array of strings): A list of MCP server names to allow. If
@@ -733,7 +733,7 @@ The MCP integration tracks several states:
 
 ## Important notes
 
-### Security sonsiderations
+### Security considerations
 
 - **Trust settings:** The `trust` option bypasses all confirmation dialogs. Use
   cautiously and only for servers you completely control
@@ -742,7 +742,7 @@ The MCP integration tracks several states:
 - **Sandbox compatibility:** When using sandboxing, ensure MCP servers are
   available within the sandbox environment
 - **Private data:** Using broadly scoped personal access tokens can lead to
-  information leakage between repositories
+  information leakage between repositories.
 
 ### Performance and resource management
 
@@ -1037,6 +1037,29 @@ gemini mcp remove my-server
 
 This will find and delete the "my-server" entry from the `mcpServers` object in
 the appropriate `settings.json` file based on the scope (`-s, --scope`).
+
+### Enabling/disabling a server (`gemini mcp enable`, `gemini mcp disable`)
+
+Temporarily disable an MCP server without removing its configuration, or
+re-enable a previously disabled server.
+
+**Commands:**
+
+```bash
+gemini mcp enable <name> [--session]
+gemini mcp disable <name> [--session]
+```
+
+**Options (flags):**
+
+- `--session`: Apply change only for this session (not persisted to file).
+
+Disabled servers appear in `/mcp` status as "Disabled" but won't connect or
+provide tools. Enablement state is stored in
+`~/.gemini/mcp-server-enablement.json`.
+
+The same commands are available as slash commands during an active session:
+`/mcp enable <name>` and `/mcp disable <name>`.
 
 ## Instructions
 
