@@ -441,6 +441,22 @@ export class SessionSelector {
       return sortedSessions[index - 1];
     }
 
+    // Check if this session was deleted as corrupted
+    const { wasSessionDeletedAsCorrupted } = await import(
+      './sessionCleanup.js'
+    );
+    const wasDeleted = await wasSessionDeletedAsCorrupted(
+      this.config.storage.getProjectTempDir(),
+      identifier,
+    );
+
+    if (wasDeleted) {
+      throw new SessionError(
+        'INVALID_SESSION_IDENTIFIER',
+        `Session "${identifier}" was previously deleted because it was corrupted.\n  Use --list-sessions to see available sessions.`,
+      );
+    }
+
     throw SessionError.invalidSessionIdentifier(identifier);
   }
 
