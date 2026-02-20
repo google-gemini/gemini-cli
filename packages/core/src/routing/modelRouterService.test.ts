@@ -43,7 +43,7 @@ describe('ModelRouterService', () => {
     mockConfig = new Config({} as never);
     mockBaseLlmClient = {} as BaseLlmClient;
     vi.spyOn(mockConfig, 'getBaseLlmClient').mockReturnValue(mockBaseLlmClient);
-    vi.spyOn(mockConfig, 'getNumericalRoutingEnabled').mockResolvedValue(false);
+    vi.spyOn(mockConfig, 'isNumericalRoutingEnabled').mockReturnValue(false);
     vi.spyOn(mockConfig, 'getClassifierThreshold').mockResolvedValue(undefined);
 
     mockCompositeStrategy = new CompositeStrategy(

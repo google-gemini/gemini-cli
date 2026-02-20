@@ -50,7 +50,7 @@ describe('NumericalClassifierStrategy', () => {
       },
       getModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO),
       getSessionId: vi.fn().mockReturnValue('control-group-id'), // Default to Control Group (Hash 71 >= 50)
-      getNumericalRoutingEnabled: vi.fn().mockResolvedValue(true),
+      isNumericalRoutingEnabled: vi.fn().mockReturnValue(true),
       getClassifierThreshold: vi.fn().mockResolvedValue(undefined),
     } as unknown as Config;
     mockBaseLlmClient = {
@@ -65,7 +65,7 @@ describe('NumericalClassifierStrategy', () => {
   });
 
   it('should return null if numerical routing is disabled', async () => {
-    vi.mocked(mockConfig.getNumericalRoutingEnabled).mockResolvedValue(false);
+    vi.mocked(mockConfig.isNumericalRoutingEnabled).mockReturnValue(false);
 
     const decision = await strategy.route(
       mockContext,

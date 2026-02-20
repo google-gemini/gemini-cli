@@ -136,7 +136,7 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
     const startTime = Date.now();
     try {
       const model = context.requestedModel ?? config.getModel();
-      if (!(await config.getNumericalRoutingEnabled())) {
+      if (!config.isNumericalRoutingEnabled()) {
         return null;
       }
 
@@ -213,7 +213,7 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
     let threshold: number;
     let groupLabel: string;
 
-    const remoteThresholdValue = await config.getClassifierThreshold();
+    const remoteThresholdValue = config.getClassifierThreshold();
 
     if (
       remoteThresholdValue !== undefined &&

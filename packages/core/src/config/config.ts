@@ -671,7 +671,7 @@ export class Config {
 
   private readonly enableAgents: boolean;
   private agents: AgentSettings;
-  private readonly experimentalSettings: Record<string, unknown>;
+  private experimentalSettings: Record<string, unknown>;
   private readonly experimentalCliArgs: Record<string, unknown>;
   private readonly enableEventDrivenScheduler: boolean;
   private readonly skillsSupport: boolean;
@@ -2159,11 +2159,11 @@ export class Config {
     return remoteThreshold;
   }
 
-  async getUserCaching(): Promise<boolean | undefined> {
+  getUserCaching(): boolean | undefined {
     return this.getExperimentValue<boolean>(ExperimentFlags.USER_CACHING);
   }
 
-  async getNumericalRoutingEnabled(): Promise<boolean> {
+  isNumericalRoutingEnabled(): boolean {
     return (
       this.getExperimentValue<boolean>(
         ExperimentFlags.ENABLE_NUMERICAL_ROUTING,
@@ -2171,13 +2171,13 @@ export class Config {
     );
   }
 
-  async getClassifierThreshold(): Promise<number | undefined> {
+  getClassifierThreshold(): number | undefined {
     return this.getExperimentValue<number>(
       ExperimentFlags.CLASSIFIER_THRESHOLD,
     );
   }
 
-  async getBannerTextNoCapacityIssues(): Promise<string> {
+  getBannerTextNoCapacityIssues(): string {
     return (
       this.getExperimentValue<string>(
         ExperimentFlags.BANNER_TEXT_NO_CAPACITY_ISSUES,
@@ -2185,7 +2185,7 @@ export class Config {
     );
   }
 
-  async getBannerTextCapacityIssues(): Promise<string> {
+  getBannerTextCapacityIssues(): string {
     return (
       this.getExperimentValue<string>(
         ExperimentFlags.BANNER_TEXT_CAPACITY_ISSUES,
@@ -2615,6 +2615,18 @@ export class Config {
     // 4. Default value from metadata
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return ExperimentMetadata[flagId]?.defaultValue as unknown as T;
+  }
+
+  /**
+   * Updates experimental settings.
+   */
+  updateExperimentalSettings(settings: Record<string, unknown>): void {
+    // Only update if settings have actually changed to avoid unnecessary re-initialization logic
+    // if we add any in the future.
+    this.experimentalSettings = {
+      ...this.experimentalSettings,
+      ...settings,
+    };
   }
 
   /**

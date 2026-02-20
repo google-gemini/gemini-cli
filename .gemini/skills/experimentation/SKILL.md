@@ -23,8 +23,17 @@ When a user asks to add a new experiment, follow these steps sequentially:
 - **Note:** The key in `ExperimentFlags` (converted to kebab-case) will be the name used for CLI flags and Settings. For example, `MY_NEW_FEATURE` becomes `my-new-feature`.
 
 ### 2. Usage in Code
-- **Method:** `config.getExperimentValue<Type>(ExperimentFlags.YOUR_FLAG_ID)`
-- This method is dynamic. You do **not** need to update the `Config` class or Yargs for every new flag.
+- **Generic Method:** `config.getExperimentValue<Type>(ExperimentFlags.YOUR_FLAG_ID)`
+- **Preferred Pattern (Strongly Typed Wrappers):** To maintain a clean and discoverable interface, you should add a strongly typed wrapper method in `packages/core/src/config/config.ts`. This allows other developers to easily find and use your experiment with proper type safety.
+  
+  Example in `Config` class:
+  ```typescript
+  isNewFeatureEnabled(): boolean {
+    return this.getExperimentValue<boolean>(ExperimentFlags.MY_NEW_FEATURE) ?? false;
+  }
+  ```
+
+- **Dynamic Nature:** While `getExperimentValue` is dynamic and doesn't *require* a `Config` update for every flag, the wrapper pattern is highly encouraged for long-term maintainability.
 - **CLI Override:** Users can override via `--experiment your-flag-name=value`.
 - **Settings Override:** Users can override in their `settings.json`:
   ```json

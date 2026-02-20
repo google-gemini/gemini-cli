@@ -107,13 +107,16 @@ const setExperimentCommand: SlashCommand = {
       value = rawValue;
     }
 
-    const { settings } = context.services;
+    const { settings, config } = context.services;
+    if (!config) return;
+
     const currentExperimental = {
       ...((settings.merged.experimental as Record<string, unknown>) || {}),
     };
     currentExperimental[name] = value;
 
     settings.setValue(SettingScope.User, 'experimental', currentExperimental);
+    config.updateExperimentalSettings(currentExperimental);
 
     context.ui.addItem({
       type: MessageType.INFO,
@@ -138,7 +141,9 @@ const unsetExperimentCommand: SlashCommand = {
       return;
     }
 
-    const { settings } = context.services;
+    const { settings, config } = context.services;
+    if (!config) return;
+
     const currentExperimental = {
       ...((settings.merged.experimental as Record<string, unknown>) || {}),
     };
@@ -153,6 +158,7 @@ const unsetExperimentCommand: SlashCommand = {
 
     delete currentExperimental[name];
     settings.setValue(SettingScope.User, 'experimental', currentExperimental);
+    config.updateExperimentalSettings(currentExperimental);
 
     context.ui.addItem({
       type: MessageType.INFO,

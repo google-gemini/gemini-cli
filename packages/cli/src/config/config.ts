@@ -758,14 +758,24 @@ export async function loadCliConfig(
       const [key, ...valueParts] = entry.split('=');
       const value = valueParts.join('=');
       if (key && value !== undefined) {
+        // Normalize key to kebab-case (e.g., enableNumericalRouting -> enable-numerical-routing)
+        const normalizedKey = key
+          .replace(/([a-z])([A-Z])/g, '$1-$2')
+          .toLowerCase()
+          .replace(/_/g, '-');
+
         // Simple type inference for CLI args
-        if (value === 'true') experimentalCliArgs[key] = true;
-        else if (value === 'false') experimentalCliArgs[key] = false;
+        if (value === 'true') experimentalCliArgs[normalizedKey] = true;
+        else if (value === 'false') experimentalCliArgs[normalizedKey] = false;
         else if (!isNaN(Number(value)))
-          experimentalCliArgs[key] = Number(value);
-        else experimentalCliArgs[key] = value;
+          experimentalCliArgs[normalizedKey] = Number(value);
+        else experimentalCliArgs[normalizedKey] = value;
       }
     }
+  }
+
+  if (debugMode && Object.keys(experimentalCliArgs).length > 0) {
+    debugLogger.debug('Experimental CLI args:', experimentalCliArgs);
   }
 
   return new Config({

@@ -111,7 +111,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     isTrustedFolder: vi.fn().mockReturnValue(true),
     getCompressionThreshold: vi.fn().mockResolvedValue(undefined),
     getUserCaching: vi.fn().mockResolvedValue(false),
-    getNumericalRoutingEnabled: vi.fn().mockResolvedValue(false),
+    isNumericalRoutingEnabled: vi.fn().mockReturnValue(false),
     getClassifierThreshold: vi.fn().mockResolvedValue(undefined),
     getBannerTextNoCapacityIssues: vi.fn().mockResolvedValue(''),
     getBannerTextCapacityIssues: vi.fn().mockResolvedValue(''),

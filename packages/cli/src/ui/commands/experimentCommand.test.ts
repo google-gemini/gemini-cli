@@ -18,6 +18,7 @@ describe('experimentCommand', () => {
       services: {
         config: {
           getExperimentValue: vi.fn(),
+          updateExperimentalSettings: vi.fn(),
         },
         settings: {
           merged: {

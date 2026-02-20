@@ -98,9 +98,13 @@ export function getExperimentFlagName(flagId: number): string | undefined {
 }
 
 /**
- * Gets the ID of an experiment flag from its kebab-case name.
+ * Gets the ID of an experiment flag from its name (supports kebab-case or camelCase).
  */
 export function getExperimentFlagIdFromName(name: string): number | undefined {
-  const constantName = name.toUpperCase().replace(/-/g, '_');
+  // Convert enableNumericalRouting or enable-numerical-routing to ENABLE_NUMERICAL_ROUTING
+  const constantName = name
+    .replace(/([a-z])([A-Z])/g, '$1_$2') // camelCase to snake_case
+    .toUpperCase()
+    .replace(/-/g, '_'); // kebab-case to snake_case
   return (ExperimentFlags as Record<string, number>)[constantName];
 }
