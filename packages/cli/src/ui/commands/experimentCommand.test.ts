@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// Trigger CI run for latest changes.
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { experimentCommand } from './experimentCommand.js';
 import { CommandKind, type CommandContext } from './types.js';
