@@ -883,12 +883,6 @@ export async function loadCliConfig(
     }
   }
 
-  const experimentalCliArgs: Record<string, unknown> = {};
-  if (argv['experiment'] && Array.isArray(argv['experiment'])) {
-    for (const entry of argv['experiment']) {
-      const [key, ...valueParts] = entry.split('=');
-      const value = valueParts.join('=');
-      if (key && value !== undefined) {
   const experimentalCliArgs: Record<string, unknown> = Object.create(null);
   if (argv['experiment'] && Array.isArray(argv['experiment'])) {
     for (const entry of argv['experiment']) {
@@ -903,7 +897,6 @@ export async function loadCliConfig(
         else experimentalCliArgs[key] = value;
       }
     }
-  }
   }
 
 let clientName: string | undefined = undefined;
