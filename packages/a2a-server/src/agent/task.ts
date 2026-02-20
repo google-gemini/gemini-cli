@@ -511,7 +511,6 @@ export class Task {
     );
 
     if (tc.tool) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       serializableToolCall.tool = this._pickFields(
         tc.tool,
         'name',
@@ -522,7 +521,7 @@ export class Task {
         'canUpdateOutput',
         'schema',
         'parameterSchema',
-      ) as AnyDeclarativeTool;
+      );
     }
 
     messageParts.push({
@@ -746,18 +745,26 @@ export class Task {
         break;
       case GeminiEventType.Error:
       default: {
-        // Block scope for lexical declaration
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const errorEvent = event as ServerGeminiErrorEvent; // Type assertion
+        let errorEvent: ServerGeminiErrorEvent | undefined;
+        if (
+          'type' in event &&
+          event.type === GeminiEventType.Error &&
+          'value' in event &&
+          event.value &&
+          typeof event.value === 'object' &&
+          'error' in event.value
+        ) {
+          errorEvent = event;
+        }
         const errorMessage =
-          errorEvent.value?.error.message ?? 'Unknown error from LLM stream';
+          errorEvent?.value?.error.message ?? 'Unknown error from LLM stream';
         logger.error(
           '[Task] Received error event from LLM stream:',
           errorMessage,
         );
 
         let errMessage = `Unknown error from LLM stream: ${JSON.stringify(event)}`;
-        if (errorEvent.value) {
+        if (errorEvent?.value) {
           errMessage = parseAndFormatApiError(errorEvent.value);
         }
         this.cancelPendingTools(`LLM stream error: ${errorMessage}`);
@@ -834,12 +841,11 @@ export class Task {
 
         // If `edit` tool call, pass updated payload if presesent
         if (confirmationDetails.type === 'edit') {
-          const payload = part.data['newContent']
-            ? ({
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-                newContent: part.data['newContent'] as string,
-              } as ToolConfirmationPayload)
-            : undefined;
+          const newContent = part.data['newContent'];
+          const payload =
+            typeof newContent === 'string'
+              ? ({ newContent } as ToolConfirmationPayload)
+              : undefined;
           this.skipFinalTrueAfterInlineEdit = !!payload;
           try {
             await confirmationDetails.onConfirm(confirmationOutcome, payload);
