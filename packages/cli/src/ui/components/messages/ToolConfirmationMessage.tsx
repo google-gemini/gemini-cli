@@ -326,7 +326,7 @@ export const ToolConfirmationMessage: React.FC<
     } else if (confirmationDetails.type === 'mcp') {
       // mcp tool confirmation
       const mcpProps = confirmationDetails;
-      question = `Allow execution of MCP tool "${stripUnsafeCharacters(mcpProps.toolName)}" from server "${stripUnsafeCharacters(mcpProps.serverName)}"?`;
+      question = `Allow execution of MCP tool "${sanitizeForDisplay(mcpProps.toolName)}" from server "${sanitizeForDisplay(mcpProps.serverName)}"?`;
     }
 
     if (confirmationDetails.type === 'edit') {
@@ -334,7 +334,7 @@ export const ToolConfirmationMessage: React.FC<
         bodyContent = (
           <DiffRenderer
             diffContent={stripUnsafeCharacters(confirmationDetails.fileDiff)}
-            filename={stripUnsafeCharacters(confirmationDetails.fileName)}
+            filename={sanitizeForDisplay(confirmationDetails.fileName)}
             availableTerminalHeight={availableBodyContentHeight()}
             terminalWidth={terminalWidth}
           />
@@ -452,10 +452,10 @@ export const ToolConfirmationMessage: React.FC<
       bodyContent = (
         <Box flexDirection="column">
           <Text color={theme.text.link}>
-            MCP Server: {stripUnsafeCharacters(mcpProps.serverName)}
+            MCP Server: {sanitizeForDisplay(mcpProps.serverName)}
           </Text>
           <Text color={theme.text.link}>
-            Tool: {stripUnsafeCharacters(mcpProps.toolName)}
+            Tool: {sanitizeForDisplay(mcpProps.toolName)}
           </Text>
         </Box>
       );

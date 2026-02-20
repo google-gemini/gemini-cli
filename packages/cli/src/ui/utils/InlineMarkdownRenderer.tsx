@@ -179,7 +179,8 @@ export const RenderInline = React.memo(RenderInlineInternal);
  * This is useful for calculating column widths in tables
  */
 export const getPlainTextLength = (text: string): number => {
-  const cleanText = text
+  const strippedText = stripUnsafeCharacters(text);
+  const cleanText = strippedText
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/\*(.+?)\*/g, '$1')
     .replace(/_(.*?)_/g, '$1')

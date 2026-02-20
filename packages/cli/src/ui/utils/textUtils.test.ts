@@ -345,14 +345,19 @@ describe('textUtils', () => {
         expect(stripUnsafeCharacters('a' + bidiChars + 'b')).toBe('ab');
       });
 
-      it('should strip zero-width characters (U+200B, U+200C, U+FEFF)', () => {
-        const zeroWidthChars = '\u200B\u200C\uFEFF';
+      it('should strip zero-width characters (U+200B, U+FEFF)', () => {
+        const zeroWidthChars = '\u200B\uFEFF';
         expect(stripUnsafeCharacters('a' + zeroWidthChars + 'b')).toBe('ab');
       });
 
       it('should preserve ZWJ (U+200D) for complex emojis', () => {
         const input = 'Family: 👨‍👩‍👧‍👦';
         expect(stripUnsafeCharacters(input)).toBe('Family: 👨‍👩‍👧‍👦');
+      });
+
+      it('should preserve ZWNJ (U+200C)', () => {
+        const input = 'hello\u200Cworld';
+        expect(stripUnsafeCharacters(input)).toBe('hello\u200Cworld');
       });
     });
 

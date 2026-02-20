@@ -16,6 +16,9 @@ describe('getPlainTextLength', () => {
     ['**', 2],
     ['*', 1],
     ['compile-time**', 14],
+    ['hello\u200Eworld', 10],
+    ['**hello\u200Eworld**', 10],
+    ['a\u200Cb', 2],
   ])(
     'should measure markdown text length correctly for "%s"',
     (input, expected) => {

@@ -361,4 +361,33 @@ describe('ToolConfirmationMessage', () => {
       expect(lastFrame()).not.toContain('Modify with external editor');
     });
   });
+
+  it('should strip BiDi characters from MCP tool and server names', () => {
+    const confirmationDetails: ToolCallConfirmationDetails = {
+      type: 'mcp',
+      title: 'Confirm MCP Tool',
+      serverName: 'test\u202Eserver',
+      toolName: 'test\u202Dtool',
+      toolDisplayName: 'Test Tool',
+      onConfirm: vi.fn(),
+    };
+
+    const { lastFrame } = renderWithProviders(
+      <ToolConfirmationMessage
+        callId="test-call-id"
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
+    );
+
+    const output = lastFrame();
+    // BiDi characters \u202E and \u202D should be stripped
+    expect(output).toContain('MCP Server: testserver');
+    expect(output).toContain('Tool: testtool');
+    expect(output).toContain('Allow execution of MCP tool "testtool"');
+    expect(output).toContain('from server "testserver"?');
+    expect(output).toMatchSnapshot();
+  });
 });
