@@ -191,7 +191,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
       {showUiDetails && <TodoTray />}
 
-      <Box marginTop={1} width="100%" flexDirection="column">
+      <Box width="100%" flexDirection="column">
         <Box
           width="100%"
           flexDirection={isNarrow ? 'column' : 'row'}
