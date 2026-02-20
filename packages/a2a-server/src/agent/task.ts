@@ -58,6 +58,16 @@ import type { PartUnion, Part as genAiPart } from '@google/genai';
 
 type UnionKeys<T> = T extends T ? keyof T : never;
 
+/** Valid confirmation detail types; single source of truth (must match ToolCallConfirmationDetails in core). */
+const TOOL_CONFIRMATION_DETAILS_TYPES = [
+  'edit',
+  'exec',
+  'mcp',
+  'info',
+  'ask_user',
+  'exit_plan_mode',
+] as const;
+
 function isToolCallConfirmationDetails(
   value: unknown,
 ): value is ToolCallConfirmationDetails {
@@ -71,15 +81,9 @@ function isToolCallConfirmationDetails(
   ) {
     return false;
   }
-  const validTypes = [
-    'edit',
-    'exec',
-    'mcp',
-    'info',
-    'ask_user',
-    'exit_plan_mode',
-  ];
-  return validTypes.includes(value.type);
+  return (TOOL_CONFIRMATION_DETAILS_TYPES as readonly string[]).includes(
+    value.type,
+  );
 }
 
 export class Task {
@@ -491,7 +495,7 @@ export class Task {
   >(from: T, ...fields: K[]): Partial<T> {
     const ret: Partial<T> = {};
     for (const field of fields) {
-      if (field in from) {
+      if (field in from && from[field] !== undefined) {
         ret[field] = from[field];
       }
     }
@@ -506,8 +510,11 @@ export class Task {
     const messageParts: Part[] = [];
 
     // Create a serializable version of the ToolCall (pick necessary
-    // properties/avoid methods causing circular reference errors)
-    const serializableToolCall: Partial<ToolCall> = this._pickFields(
+    // properties/avoid methods causing circular reference errors).
+    // Type allows tool to be Partial<AnyDeclarativeTool> for serialization.
+    const serializableToolCall: Partial<Omit<ToolCall, 'tool'>> & {
+      tool?: Partial<AnyDeclarativeTool>;
+    } = this._pickFields(
       tc,
       'request',
       'status',
@@ -528,7 +535,7 @@ export class Task {
         'schema',
         'parameterSchema',
       );
-      (serializableToolCall as { tool?: unknown }).tool = toolFields;
+      serializableToolCall.tool = toolFields;
     }
 
     messageParts.push({
@@ -654,12 +661,23 @@ export class Task {
             typeof oldString === 'string' &&
             typeof newString === 'string'
           ) {
-            const newContent = await this.getProposedContent(
+            // Resolve and validate path to prevent path traversal (user-controlled file_path).
+            const resolvedPath = path.resolve(
+              this.config.getTargetDir(),
               filePath,
-              oldString,
-              newString,
             );
-            return { ...request, args: { ...request.args, newContent } };
+            const pathError = this.config.validatePathAccess(
+              resolvedPath,
+              'read',
+            );
+            if (!pathError) {
+              const newContent = await this.getProposedContent(
+                resolvedPath,
+                oldString,
+                newString,
+              );
+              return { ...request, args: { ...request.args, newContent } };
+            }
           }
         }
         return request;
@@ -754,9 +772,7 @@ export class Task {
       default: {
         let errorEvent: ServerGeminiErrorEvent | undefined;
         if (
-          'type' in event &&
           event.type === GeminiEventType.Error &&
-          'value' in event &&
           event.value &&
           typeof event.value === 'object' &&
           'error' in event.value
