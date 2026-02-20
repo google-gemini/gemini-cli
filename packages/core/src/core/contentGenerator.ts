@@ -200,6 +200,9 @@ export async function createContentGenerator(
       const baseUrl = config.vertexai
         ? process.env['GOOGLE_VERTEX_BASE_URL']
         : process.env['GOOGLE_GEMINI_BASE_URL'];
+      if (baseUrl) {
+        validateBaseUrl(baseUrl);
+      }
       const httpOptions = { headers, ...(baseUrl && { baseUrl }) };
 
       const googleGenAI = new GoogleGenAI({
@@ -220,4 +223,18 @@ export async function createContentGenerator(
   }
 
   return generator;
+}
+
+const LOCAL_HOSTNAMES = ['localhost', '127.0.0.1', '[::1]'];
+
+export function validateBaseUrl(baseUrl: string): void {
+  let url: URL;
+  try {
+    url = new URL(baseUrl);
+  } catch {
+    throw new Error(`Invalid custom base URL: ${baseUrl}`);
+  }
+  if (url.protocol !== 'https:' && !LOCAL_HOSTNAMES.includes(url.hostname)) {
+    throw new Error('Custom base URL must use HTTPS unless it is localhost.');
+  }
 }

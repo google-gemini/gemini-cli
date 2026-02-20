@@ -10,6 +10,7 @@ import {
   createContentGenerator,
   AuthType,
   createContentGeneratorConfig,
+  validateBaseUrl,
 } from './contentGenerator.js';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { GoogleGenAI } from '@google/genai';
@@ -532,6 +533,26 @@ describe('createContentGenerator', () => {
     );
   });
 
+  it('should reject an insecure GOOGLE_GEMINI_BASE_URL for non-local hosts', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+    } as unknown as Config;
+
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', 'http://evil-proxy.example.com');
+
+    await expect(
+      createContentGenerator(
+        {
+          apiKey: 'test-api-key',
+          authType: AuthType.USE_GEMINI,
+        },
+        mockConfig,
+      ),
+    ).rejects.toThrow('Custom base URL must use HTTPS unless it is localhost.');
+  });
+
   it('should pass apiVersion for Vertex AI when GOOGLE_GENAI_API_VERSION is set', async () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
@@ -648,5 +669,35 @@ describe('createContentGeneratorConfig', () => {
     );
     expect(config.apiKey).toBeUndefined();
     expect(config.vertexai).toBeUndefined();
+  });
+});
+
+describe('validateBaseUrl', () => {
+  it('should accept a valid HTTPS URL', () => {
+    expect(() => validateBaseUrl('https://my-proxy.example.com')).not.toThrow();
+  });
+
+  it('should accept HTTP for localhost', () => {
+    expect(() => validateBaseUrl('http://localhost:8080')).not.toThrow();
+  });
+
+  it('should accept HTTP for 127.0.0.1', () => {
+    expect(() => validateBaseUrl('http://127.0.0.1:3000')).not.toThrow();
+  });
+
+  it('should accept HTTP for ::1', () => {
+    expect(() => validateBaseUrl('http://[::1]:8080')).not.toThrow();
+  });
+
+  it('should reject HTTP for non-local hosts', () => {
+    expect(() => validateBaseUrl('http://my-proxy.example.com')).toThrow(
+      'Custom base URL must use HTTPS unless it is localhost.',
+    );
+  });
+
+  it('should reject an invalid URL', () => {
+    expect(() => validateBaseUrl('not-a-url')).toThrow(
+      'Invalid custom base URL: not-a-url',
+    );
   });
 });
