@@ -21,6 +21,7 @@ import { useExtensionUpdates } from '../../hooks/useExtensionUpdates.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
 import type { ExtensionManager } from '../../../config/extension-manager.js';
 import { useRegistrySearch } from '../../hooks/useRegistrySearch.js';
+import { useUIState } from '../../contexts/UIStateContext.js';
 
 interface ExtensionRegistryViewProps {
   onSelect?: (extension: RegistryExtension) => void;
@@ -39,6 +40,7 @@ export function ExtensionRegistryView({
 }: ExtensionRegistryViewProps): React.JSX.Element {
   const { extensions, loading, error, search } = useExtensionRegistry();
   const config = useConfig();
+  const uiState = useUIState();
 
   const { extensionsUpdateState } = useExtensionUpdates(
     extensionManager,
@@ -83,7 +85,7 @@ export function ExtensionRegistryView({
               <Text
                 color={isActive ? theme.status.success : theme.text.secondary}
               >
-                {isActive ? '> ' : '  '}
+                {isActive ? '>' : ' '}
               </Text>
             </Box>
             <Box flexShrink={0}>
@@ -192,6 +194,8 @@ export function ExtensionRegistryView({
       header={header}
       footer={footer}
       maxItemsToShow={8}
+      availableTerminalHeight={uiState.availableTerminalHeight}
+      scrollMode="keep-visible"
       useSearch={useRegistrySearch}
       onSearch={search}
       resetSelectionOnItemsChange={true}

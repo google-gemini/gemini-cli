@@ -58,6 +58,17 @@ export interface SearchableListProps<T extends GenericListItem> {
     totalVisible: number;
   }) => React.ReactNode;
   maxItemsToShow?: number;
+  /**
+   * When provided, the component will size the list to the available terminal height
+   * rather than using a fixed maxItemsToShow.
+   */
+  availableTerminalHeight?: number;
+  /**
+   * Scrolling behavior:
+   * - 'center': keep selection roughly centered (previous behavior)
+   * - 'keep-visible': only scroll when needed to keep selection visible
+   */
+  scrollMode?: 'center' | 'keep-visible';
   /** Hook to handle search logic */
   useSearch: (props: {
     items: T[];
@@ -81,6 +92,8 @@ export function SearchableList<T extends GenericListItem>({
   header,
   footer,
   maxItemsToShow = 10,
+  availableTerminalHeight,
+  scrollMode = 'center',
   useSearch,
   onSearch,
   resetSelectionOnItemsChange = false,
@@ -135,17 +148,70 @@ export function SearchableList<T extends GenericListItem>({
     { isActive: true },
   );
 
-  const scrollOffset = Math.max(
-    0,
-    Math.min(
-      activeIndex - Math.floor(maxItemsToShow / 2),
-      Math.max(0, filteredItems.length - maxItemsToShow),
-    ),
-  );
+  const computedMaxItemsToShow = useMemo(() => {
+    if (availableTerminalHeight === undefined) {
+      return maxItemsToShow;
+    }
+
+    // Estimate rows taken by chrome. Keep conservative to avoid flicker.
+    // - title (optional): 2
+    // - search input (optional): 3
+    // - header (optional): 2
+    // - footer (optional): 2
+    const reservedRows =
+      (title ? 2 : 0) +
+      (searchBuffer ? 3 : 0) +
+      (header ? 2 : 0) +
+      (footer ? 2 : 0) +
+      2; // padding / safety
+
+    const availableForList = Math.max(
+      1,
+      availableTerminalHeight - reservedRows,
+    );
+
+    // Each item currently renders with marginBottom={1} -> ~2 rows per item.
+    const approxRowsPerItem = 2;
+    const fit = Math.max(1, Math.floor(availableForList / approxRowsPerItem));
+
+    // Cap so we don't accidentally try to render huge lists in extremely tall terminals.
+    return Math.min(30, fit);
+  }, [
+    availableTerminalHeight,
+    footer,
+    header,
+    maxItemsToShow,
+    searchBuffer,
+    title,
+  ]);
+
+  const scrollOffset = useMemo(() => {
+    const windowSize = computedMaxItemsToShow;
+    const maxScroll = Math.max(0, filteredItems.length - windowSize);
+
+    if (scrollMode === 'keep-visible') {
+      // Scroll only when selection would go out of view.
+      // We keep a small top/bottom padding of 1 item.
+      const padding = Math.min(1, Math.floor(windowSize / 4));
+      const desiredMin = Math.max(0, activeIndex - (windowSize - 1) + padding);
+      const desiredMax = Math.max(0, activeIndex - padding);
+      // Clamp previous-centered behavior into a keep-visible range.
+      return Math.max(0, Math.min(desiredMin, Math.min(desiredMax, maxScroll)));
+    }
+
+    // Default: keep selection near the middle.
+    return Math.max(
+      0,
+      Math.min(
+        activeIndex - Math.floor(windowSize / 2),
+        Math.max(0, filteredItems.length - windowSize),
+      ),
+    );
+  }, [activeIndex, computedMaxItemsToShow, filteredItems.length, scrollMode]);
 
   const visibleItems = filteredItems.slice(
     scrollOffset,
-    scrollOffset + maxItemsToShow,
+    scrollOffset + computedMaxItemsToShow,
   );
 
   const defaultRenderItem = (
