@@ -15,7 +15,7 @@ import {
   DEFAULT_MODEL_CHAINS,
   type MCPServerConfig,
   type BugCommandSettings,
-  // type ModelPolicyChain,
+  type ModelPolicyChain,
   type TelemetrySettings,
   type AuthType,
   type AgentOverride,
