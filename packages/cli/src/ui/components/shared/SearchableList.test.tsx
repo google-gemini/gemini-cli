@@ -131,8 +131,9 @@ describe('SearchableList', () => {
 
     await waitFor(() => {
       const frame = lastFrame();
-      expect(frame).toContain('> Item Two');
+      expect(frame).toContain('● Item Two');
     });
+    expect(lastFrame()).toMatchSnapshot();
 
     await React.act(async () => {
       stdin.write('One');
@@ -143,6 +144,7 @@ describe('SearchableList', () => {
       expect(frame).toContain('Item One');
       expect(frame).not.toContain('Item Two');
     });
+    expect(lastFrame()).toMatchSnapshot();
 
     await React.act(async () => {
       // Backspace "One" (3 chars)
@@ -152,9 +154,10 @@ describe('SearchableList', () => {
     await waitFor(() => {
       const frame = lastFrame();
       expect(frame).toContain('Item Two');
-      expect(frame).toContain('> Item One');
-      expect(frame).not.toContain('> Item Two');
+      expect(frame).toContain('● Item One');
+      expect(frame).not.toContain('● Item Two');
     });
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('should filter items based on search query', async () => {
