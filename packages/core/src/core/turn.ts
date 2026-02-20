@@ -302,6 +302,7 @@ export class Turn {
         if (!resp) continue; // Skip if there's no response body
 
         this.debugResponses.push(resp);
+        this.cachedResponseText = null; // Invalidate cache on new response
 
         const traceId = resp.responseId;
 
@@ -426,6 +427,7 @@ export class Turn {
     return { type: GeminiEventType.ToolCallRequest, value: toolCallRequest };
   }
 
+  private cachedResponseText: string | null = null;
   getDebugResponses(): GenerateContentResponse[] {
     return this.debugResponses;
   }
@@ -433,11 +435,18 @@ export class Turn {
   /**
    * Get the concatenated response text from all responses in this turn.
    * This extracts and joins all text content from the model's responses.
+   * Uses a cache to avoid O(n) recomputation bottlenecks in long sessions.
    */
   getResponseText(): string {
-    return this.debugResponses
+    if (this.cachedResponseText !== null) {
+      return this.cachedResponseText;
+    }
+
+    this.cachedResponseText = this.debugResponses
       .map((response) => getResponseText(response))
       .filter((text): text is string => text !== null)
       .join(' ');
+
+    return this.cachedResponseText;
   }
 }
