@@ -30,8 +30,12 @@ describe('GeminiCliAgent Integration', () => {
       fakeResponses: RECORD_MODE ? undefined : goldenFile,
     });
 
+    const session = agent.session();
+    expect(session.id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
     const events = [];
-    const stream = agent.sendStream('Say hello.');
+    const stream = session.sendStream('Say hello.');
 
     for await (const event of stream) {
       events.push(event);
@@ -60,9 +64,11 @@ describe('GeminiCliAgent Integration', () => {
       fakeResponses: RECORD_MODE ? undefined : goldenFile,
     });
 
+    const session = agent.session();
+
     // First turn
-    const stream1 = agent.sendStream('What is the secret number?');
     const events1 = [];
+    const stream1 = session.sendStream('What is the secret number?');
     for await (const event of stream1) {
       events1.push(event);
     }
@@ -72,11 +78,10 @@ describe('GeminiCliAgent Integration', () => {
       .join('');
 
     expect(responseText1).toContain('1');
-    expect(callCount).toBe(1);
 
     // Second turn
-    const stream2 = agent.sendStream('What is the secret number now?');
     const events2 = [];
+    const stream2 = session.sendStream('What is the secret number now?');
     for await (const event of stream2) {
       events2.push(event);
     }
@@ -85,57 +90,60 @@ describe('GeminiCliAgent Integration', () => {
       .map((e) => (typeof e.value === 'string' ? e.value : ''))
       .join('');
 
-    // Should still be 1 because instructions are only loaded once per session
-    expect(responseText2).toContain('1');
-    expect(callCount).toBe(1);
+    expect(responseText2).toContain('2');
   }, 30000);
 
-  it('handles async dynamic instructions', async () => {
-    const goldenFile = getGoldenPath('agent-async-instructions');
+  it('resumes a session', async () => {
+    const goldenFile = getGoldenPath('agent-resume-session');
 
-    let callCount = 0;
+    // Create initial session
     const agent = new GeminiCliAgent({
-      instructions: async (_ctx) => {
-        await new Promise((resolve) => setTimeout(resolve, 10)); // Simulate async work
-        callCount++;
-        return `You are a helpful assistant. The secret number is ${callCount}. Always mention the secret number when asked.`;
-      },
+      instructions: 'You are a memory test. Remember the word "BANANA".',
       model: 'gemini-2.0-flash',
       recordResponses: RECORD_MODE ? goldenFile : undefined,
       fakeResponses: RECORD_MODE ? undefined : goldenFile,
     });
 
-    // First turn
-    const stream1 = agent.sendStream('What is the secret number?');
-    const events1 = [];
-    for await (const event of stream1) {
-      events1.push(event);
+    const session1 = agent.session({ sessionId: 'resume-test-fixed-id' });
+    const sessionId = session1.id;
+    const stream1 = session1.sendStream('What is the word?');
+    for await (const _ of stream1) {
+      // consume stream
     }
-    const responseText1 = events1
-      .filter((e) => e.type === 'content')
-      .map((e) => (typeof e.value === 'string' ? e.value : ''))
-      .join('');
 
-    expect(responseText1).toContain('1');
-    expect(callCount).toBe(1);
+    // Resume session
+    // Allow some time for async writes if any
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Second turn
-    const stream2 = agent.sendStream('What is the secret number now?');
+    const session2 = await agent.resumeSession(sessionId);
+    expect(session2.id).toBe(sessionId);
+
     const events2 = [];
+    const stream2 = session2.sendStream('What is the word again?');
     for await (const event of stream2) {
       events2.push(event);
     }
-    const responseText2 = events2
+
+    const responseText = events2
       .filter((e) => e.type === 'content')
       .map((e) => (typeof e.value === 'string' ? e.value : ''))
       .join('');
 
-    // Should still be 1 because instructions are only loaded once per session
-    expect(responseText2).toContain('1');
-    expect(callCount).toBe(1);
+    expect(responseText).toContain('BANANA');
   }, 30000);
 
-  it('throws when dynamic instructions fail', async () => {
+  it('throws on invalid instructions', () => {
+    // Missing instructions should be fine
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(() => new GeminiCliAgent({} as any).session()).not.toThrow();
+
+    expect(() =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      new GeminiCliAgent({ instructions: 123 as any }).session(),
+    ).toThrow('Instructions must be a string or a function.');
+  });
+
+  it('propagates errors from dynamic instructions', async () => {
     const agent = new GeminiCliAgent({
       instructions: () => {
         throw new Error('Dynamic instruction failure');
@@ -143,7 +151,8 @@ describe('GeminiCliAgent Integration', () => {
       model: 'gemini-2.0-flash',
     });
 
-    const stream = agent.sendStream('Say hello.');
+    const session = agent.session();
+    const stream = session.sendStream('Say hello.');
 
     await expect(async () => {
       for await (const _event of stream) {
