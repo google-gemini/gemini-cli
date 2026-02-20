@@ -1438,6 +1438,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
     useFolderTrust(settings, setIsTrustedFolder, historyManager.addItem);
+
+  const policyUpdateConfirmationRequest =
+    config.getPolicyUpdateConfirmationRequest();
+  const [isPolicyUpdateDialogOpen, setIsPolicyUpdateDialogOpen] = useState(
+    !!policyUpdateConfirmationRequest,
+  );
+
   const {
     needsRestart: ideNeedsRestart,
     restartReason: ideTrustRestartReason,
@@ -1910,6 +1917,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     (shouldShowRetentionWarning && retentionCheckComplete) ||
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
+    isPolicyUpdateDialogOpen ||
     adminSettingsChanged ||
     !!commandConfirmationRequest ||
     !!authConsentRequest ||
@@ -2137,6 +2145,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isResuming,
       shouldShowIdePrompt,
       isFolderTrustDialogOpen: isFolderTrustDialogOpen ?? false,
+      isPolicyUpdateDialogOpen,
+      policyUpdateConfirmationRequest,
       isTrustedFolder,
       constrainHeight,
       showErrorDetails,
@@ -2259,6 +2269,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isResuming,
       shouldShowIdePrompt,
       isFolderTrustDialogOpen,
+      isPolicyUpdateDialogOpen,
+      policyUpdateConfirmationRequest,
       isTrustedFolder,
       constrainHeight,
       showErrorDetails,
@@ -2356,6 +2368,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       vimHandleInput,
       handleIdePromptComplete,
       handleFolderTrustSelect,
+      setIsPolicyUpdateDialogOpen,
       setConstrainHeight,
       onEscapePromptChange: handleEscapePromptChange,
       refreshStatic,
@@ -2440,6 +2453,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       vimHandleInput,
       handleIdePromptComplete,
       handleFolderTrustSelect,
+      setIsPolicyUpdateDialogOpen,
       setConstrainHeight,
       handleEscapePromptChange,
       refreshStatic,
