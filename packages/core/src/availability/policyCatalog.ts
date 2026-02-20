@@ -56,11 +56,17 @@ const DEFAULT_CHAIN: ModelPolicyChain = [
   definePolicy({ model: DEFAULT_GEMINI_FLASH_MODEL, isLastResort: true }),
 ];
 
+// PREVIEW_CHAIN prepends preview-specific models and falls through to
+// DEFAULT_CHAIN, so any future changes to the default fallback logic are
+// automatically reflected for preview users as well (DRY).
 const PREVIEW_CHAIN: ModelPolicyChain = [
   definePolicy({ model: PREVIEW_GEMINI_MODEL }),
   definePolicy({ model: PREVIEW_GEMINI_FLASH_MODEL }),
-  definePolicy({ model: DEFAULT_GEMINI_MODEL }),
-  definePolicy({ model: DEFAULT_GEMINI_FLASH_MODEL, isLastResort: true }),
+  ...DEFAULT_CHAIN.map((policy, index, arr) => ({
+    ...policy,
+    // Preserve isLastResort only on the final entry of DEFAULT_CHAIN
+    isLastResort: index === arr.length - 1 ? true : false,
+  })),
 ];
 
 const FLASH_LITE_CHAIN: ModelPolicyChain = [
