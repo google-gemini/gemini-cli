@@ -137,7 +137,10 @@ Implement a comprehensive authentication system with multiple providers.
     vi.restoreAllMocks();
   });
 
-  const renderDialog = (options?: { useAlternateBuffer?: boolean }) =>
+  const renderDialog = (options?: {
+    useAlternateBuffer?: boolean;
+    prePlanApprovalMode?: import('@google/gemini-cli-core').ApprovalMode | null;
+  }) =>
     renderWithProviders(
       <ExitPlanModeDialog
         planPath={mockPlanFullPath}
@@ -160,6 +163,7 @@ Implement a comprehensive authentication system with multiple providers.
             readTextFile: vi.fn(),
             writeTextFile: vi.fn(),
           }),
+          getPrePlanApprovalMode: () => options?.prePlanApprovalMode ?? null,
         } as unknown as import('@google/gemini-cli-core').Config,
       },
     );
@@ -205,6 +209,27 @@ Implement a comprehensive authentication system with multiple providers.
 
         await waitFor(() => {
           expect(onApprove).toHaveBeenCalledWith(ApprovalMode.AUTO_EDIT);
+        });
+      });
+
+      it('calls onApprove with YOLO when first option is selected and pre-plan mode was YOLO', async () => {
+        const { stdin, lastFrame } = renderDialog({
+          useAlternateBuffer,
+          prePlanApprovalMode: ApprovalMode.YOLO,
+        });
+
+        await act(async () => {
+          vi.runAllTimers();
+        });
+
+        await waitFor(() => {
+          expect(lastFrame()).toContain('Add user authentication');
+        });
+
+        writeKey(stdin, '\r');
+
+        await waitFor(() => {
+          expect(onApprove).toHaveBeenCalledWith(ApprovalMode.YOLO);
         });
       });
 
@@ -435,6 +460,7 @@ Implement a comprehensive authentication system with multiple providers.
                 readTextFile: vi.fn(),
                 writeTextFile: vi.fn(),
               }),
+              getPrePlanApprovalMode: () => null,
             } as unknown as import('@google/gemini-cli-core').Config,
           },
         );

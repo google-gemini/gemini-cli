@@ -20,7 +20,7 @@ import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryT
 import {
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
-} from '../telemetry/index.js';
+ uiTelemetryService } from '../telemetry/index.js';
 import type { ContentGeneratorConfig } from '../core/contentGenerator.js';
 import {
   AuthType,
@@ -201,14 +201,12 @@ vi.mock('../services/contextManager.js', () => ({
 
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { tokenLimit } from '../core/tokenLimits.js';
-import { uiTelemetryService } from '../telemetry/index.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import type { CodeAssistServer } from '../code_assist/server.js';
 import { ContextManager } from '../services/contextManager.js';
 import { UserTierId } from '../code_assist/types.js';
-import type { ModelConfigService } from '../services/modelConfigService.js';
-import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
+import type { ModelConfigService , ModelConfigServiceConfig } from '../services/modelConfigService.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 
@@ -1415,6 +1413,44 @@ describe('setApprovalMode with folder trust', () => {
     config.setApprovalMode(ApprovalMode.AUTO_EDIT);
 
     expect(updateSpy).not.toHaveBeenCalled();
+  });
+
+  it('should save the pre-plan approval mode when entering Plan mode from YOLO', () => {
+    const config = new Config({
+      ...baseParams,
+      approvalMode: ApprovalMode.YOLO,
+    });
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue({
+      getTool: vi.fn().mockReturnValue(undefined),
+      unregisterTool: vi.fn(),
+      registerTool: vi.fn(),
+    } as Partial<ToolRegistry> as ToolRegistry);
+
+    config.setApprovalMode(ApprovalMode.PLAN);
+
+    expect(config.getPrePlanApprovalMode()).toBe(ApprovalMode.YOLO);
+  });
+
+  it('should save the pre-plan approval mode when entering Plan mode from DEFAULT', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue({
+      getTool: vi.fn().mockReturnValue(undefined),
+      unregisterTool: vi.fn(),
+      registerTool: vi.fn(),
+    } as Partial<ToolRegistry> as ToolRegistry);
+
+    config.setApprovalMode(ApprovalMode.PLAN);
+
+    expect(config.getPrePlanApprovalMode()).toBe(ApprovalMode.DEFAULT);
+  });
+
+  it('should return null for getPrePlanApprovalMode when Plan mode was never entered', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+
+    expect(config.getPrePlanApprovalMode()).toBeNull();
   });
 
   describe('registerCoreTools', () => {

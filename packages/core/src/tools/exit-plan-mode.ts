@@ -37,8 +37,9 @@ function getApprovalModeDescription(mode: ApprovalMode): string {
     case ApprovalMode.DEFAULT:
       return 'Default mode (edits will require confirmation)';
     case ApprovalMode.YOLO:
+      return 'YOLO mode (all tools will run automatically)';
     case ApprovalMode.PLAN:
-      // YOLO and PLAN are not valid modes to enter when exiting plan mode
+      // PLAN is not a valid mode to enter when exiting plan mode
       throw new Error(`Unexpected approval mode: ${mode}`);
     default:
       checkExhaustive(mode);
