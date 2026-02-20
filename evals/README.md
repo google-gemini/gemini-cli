@@ -114,6 +114,27 @@ npm run test:all_evals
 This command sets the `RUN_EVALS` environment variable to `1`, which enables the
 `USUALLY_PASSES` tests.
 
+### All Evals (All Models)
+
+To run the full evaluation suite across all supported models and generate a
+local markdown report (mirroring the nightly CI workflow):
+
+```bash
+npm run test:all_evals_all_models
+```
+
+This script will:
+1. Build the project.
+2. Run `test:all_evals` for each model in the nightly rotation.
+3. Collect logs and aggregate them using `scripts/aggregate_evals.js`.
+4. Generate a `local_evals_summary.md` file with the results.
+
+You can also filter by test name and specify the number of attempts:
+
+```bash
+npm run test:all_evals_all_models -- "my-test-pattern" --attempts 3
+```
+
 ## Reporting
 
 Results for evaluations are available on GitHub Actions:
