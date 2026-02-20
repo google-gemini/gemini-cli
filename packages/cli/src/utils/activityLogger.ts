@@ -22,11 +22,142 @@ import WebSocket from 'ws';
 const ACTIVITY_ID_HEADER = 'x-activity-request-id';
 const MAX_BUFFER_SIZE = 100;
 
-/** Type guard: Array.isArray doesn't narrow readonly arrays in TS 5.8 */
 function isHeaderRecord(
   h: http.OutgoingHttpHeaders | readonly string[],
 ): h is http.OutgoingHttpHeaders {
   return !Array.isArray(h);
+}
+
+function isBufferEncoding(value: unknown): value is BufferEncoding {
+  if (typeof value !== 'string') return false;
+  const normalized = value.toLowerCase();
+  return (
+    normalized === 'ascii' ||
+    normalized === 'utf8' ||
+    normalized === 'utf-8' ||
+    normalized === 'utf16le' ||
+    normalized === 'ucs2' ||
+    normalized === 'ucs-2' ||
+    normalized === 'base64' ||
+    normalized === 'base64url' ||
+    normalized === 'latin1' ||
+    normalized === 'binary' ||
+    normalized === 'hex'
+  );
+}
+
+type HttpRequestArgs =
+  | [http.RequestOptions | string | URL]
+  | [http.RequestOptions | string | URL, (res: http.IncomingMessage) => void]
+  | [string | URL, http.RequestOptions]
+  | [string | URL, http.RequestOptions, (res: http.IncomingMessage) => void];
+
+function isHttpRequestArgs(args: unknown[]): args is HttpRequestArgs {
+  if (args.length === 0 || args.length > 3) return false;
+  const first = args[0];
+  if (args.length === 1) {
+    return (
+      typeof first === 'string' ||
+      first instanceof URL ||
+      (typeof first === 'object' && first !== null)
+    );
+  }
+  if (args.length === 2) {
+    const second = args[1];
+    return (
+      (typeof first === 'string' || first instanceof URL) &&
+      (typeof second === 'object' || typeof second === 'function')
+    );
+  }
+  return (
+    (typeof first === 'string' || first instanceof URL) &&
+    typeof args[1] === 'object' &&
+    typeof args[2] === 'function'
+  );
+}
+
+function callHttpRequest(
+  originalFn: typeof http.request,
+  args: unknown[],
+): http.ClientRequest {
+  if (isHttpRequestArgs(args)) {
+    return originalFn.apply(http, args);
+  }
+  if (args.length === 0) {
+    return originalFn({});
+  }
+  if (args.length === 1) {
+    const first = args[0];
+    if (typeof first === 'string' || first instanceof URL) {
+      return originalFn(first);
+    }
+    if (first && typeof first === 'object') {
+      return originalFn(first as http.RequestOptions);
+    }
+    return originalFn({});
+  }
+  if (args.length === 2) {
+    const first = args[0];
+    const second = args[1];
+    if ((typeof first === 'string' || first instanceof URL) && second) {
+      if (typeof second === 'function') {
+        return originalFn(first, second);
+      }
+      if (typeof second === 'object') {
+        return originalFn(first, second as http.RequestOptions);
+      }
+    }
+    if (first && typeof first === 'object' && typeof second === 'function') {
+      return originalFn(first as http.RequestOptions, second);
+    }
+  }
+  if (args.length === 3) {
+    const first = args[0];
+    const second = args[1];
+    const third = args[2];
+    if (
+      (typeof first === 'string' || first instanceof URL) &&
+      second &&
+      typeof second === 'object' &&
+      typeof third === 'function'
+    ) {
+      return originalFn(first, second as http.RequestOptions, third);
+    }
+  }
+  return originalFn({});
+}
+
+type HttpRequestArgs =
+  | [http.RequestOptions | string | URL]
+  | [http.RequestOptions | string | URL, (res: http.IncomingMessage) => void]
+  | [string | URL, http.RequestOptions]
+  | [string | URL, http.RequestOptions, (res: http.IncomingMessage) => void];
+
+function isHttpRequestArgs(args: unknown[]): args is HttpRequestArgs {
+  if (args.length === 0) return false;
+  const first = args[0];
+  if (args.length === 1) {
+    return (
+      typeof first === 'string' ||
+      first instanceof URL ||
+      (typeof first === 'object' && first !== null)
+    );
+  }
+  if (args.length === 2) {
+    const second = args[1];
+    return (
+      (typeof first === 'string' || first instanceof URL) &&
+      (typeof second === 'object' || typeof second === 'function')
+    );
+  }
+  if (args.length === 3) {
+    return (
+      (typeof first === 'string' || first instanceof URL) &&
+      typeof args[1] === 'object' &&
+      typeof args[2] === 'function'
+    );
+  }
+  return false;
 }
 
 export interface NetworkLog {
@@ -393,9 +524,9 @@ export class ActivityLogger extends EventEmitter {
           `${protocol}//${options.hostname || options.host || 'localhost'}${options.path || '/'}`;
       }
 
-      if (url.includes('127.0.0.1') || url.includes('localhost'))
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-        return originalFn.apply(http, args as any);
+      if (url.includes('127.0.0.1') || url.includes('localhost')) {
+        return callHttpRequest(originalFn, args);
+      }
 
       const rawHeaders =
         typeof options === 'object' &&
@@ -410,14 +541,12 @@ export class ActivityLogger extends EventEmitter {
 
       if (headers[ACTIVITY_ID_HEADER]) {
         delete headers[ACTIVITY_ID_HEADER];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-        return originalFn.apply(http, args as any);
+        return callHttpRequest(originalFn, args);
       }
 
       const id = Math.random().toString(36).substring(7);
       this.requestStartTimes.set(id, Date.now());
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-      const req = originalFn.apply(http, args as any);
+      const req = callHttpRequest(originalFn, args);
       const requestChunks: Buffer[] = [];
 
       const oldWrite = req.write;
@@ -425,9 +554,7 @@ export class ActivityLogger extends EventEmitter {
 
       req.write = function (chunk: unknown, ...etc: unknown[]) {
         if (chunk) {
-          const encoding =
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            typeof etc[0] === 'string' ? (etc[0] as BufferEncoding) : undefined;
+          const encoding = isBufferEncoding(etc[0]) ? etc[0] : undefined;
           requestChunks.push(
             Buffer.isBuffer(chunk)
               ? chunk
@@ -438,8 +565,7 @@ export class ActivityLogger extends EventEmitter {
                   ),
           );
         }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-        return oldWrite.apply(this, [chunk, ...etc] as any);
+        return oldWrite.call(this, chunk, ...etc);
       };
 
       req.end = function (
@@ -448,9 +574,7 @@ export class ActivityLogger extends EventEmitter {
         ...etc: unknown[]
       ) {
         if (chunk && typeof chunk !== 'function') {
-          const encoding =
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            typeof etc[0] === 'string' ? (etc[0] as BufferEncoding) : undefined;
+          const encoding = isBufferEncoding(etc[0]) ? etc[0] : undefined;
           requestChunks.push(
             Buffer.isBuffer(chunk)
               ? chunk
@@ -472,8 +596,7 @@ export class ActivityLogger extends EventEmitter {
           body,
           pending: true,
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-        return (oldEnd as any).apply(this, [chunk, ...etc]);
+        return oldEnd.call(this, chunk, ...etc);
       };
 
       req.on('response', (res: http.IncomingMessage) => {
