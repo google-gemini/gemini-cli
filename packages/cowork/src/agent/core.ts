@@ -3,9 +3,10 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  *
- * Core agentic loop for Gemini Cowork.
+ * Core agentic loop for Gemini Cowork — Phase 2 (Multimodal + Long Context).
  *
- * Architecture — ReAct (Reasoning + Acting) cycle:
+ * ReAct (Reasoning + Acting) cycle
+ * ─────────────────────────────────
  *
  *   ┌──────────┐    ┌─────────┐    ┌─────────────┐
  *   │  [Think] │───▶│  [Act]  │───▶│  [Observe]  │
@@ -15,12 +16,16 @@
  *   └──────────┘    └─────────┘    └──────┬──────┘
  *        ▲                                │
  *        └────────────────────────────────┘
- *                  (next iteration)
+ *                   (next iteration)
  *
- * In Phase 1 the Think step uses heuristic reasoning.
- * It is deliberately structured so the heuristic can be swapped for a
- * live Gemini model call (via @google/gemini-cli-core) in Phase 2 without
- * changing the Act / Observe contract.
+ * Phase 2 additions
+ * ─────────────────
+ *   • ProjectIndexer  : feeds the full codebase into Gemini's 2M context window.
+ *   • Vision          : `screenshot_and_analyze` for UI / CSS debugging.
+ *   • Google Search   : grounded web lookup for docs / library updates.
+ *   • LogMonitor      : streams live process output to the agent.
+ *   • Dynamic routing : Think() inspects the goal for UI / search / monitoring
+ *                       keywords and selects the appropriate tool automatically.
  */
 
 import { readdir, readFile } from 'node:fs/promises';
@@ -34,12 +39,22 @@ import {
   executeWriteFile,
   type ToolResult,
 } from '../tools/executor.js';
+import { executeScreenshotAndAnalyze } from '../tools/vision.js';
+import { executeSearch } from '../tools/search.js';
+import { executeLogMonitor } from '../tools/log-monitor.js';
+import { ProjectIndexer } from './context-manager.js';
 import {
   ReadFileInputSchema,
+  ScreenshotAnalyzeInputSchema,
+  SearchInputSchema,
   ShellRunInputSchema,
+  LogMonitorInputSchema,
   WriteFileInputSchema,
   type ReadFileInput,
+  type ScreenshotAnalyzeInput,
+  type SearchInput,
   type ShellRunInput,
+  type LogMonitorInput,
   type WriteFileInput,
 } from '../tools/definitions.js';
 
@@ -47,7 +62,7 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-/** A single step in the agent's reasoning history. */
+/** A single step recorded in the agent's history. */
 export interface AgentStep {
   phase: 'think' | 'act' | 'observe';
   content: string;
@@ -56,25 +71,40 @@ export interface AgentStep {
 
 /**
  * The agent's working memory.
- * This is intentionally kept as a plain object so it can be serialised to
- * disk / sent over the wire in later phases.
+ *
+ * Kept as a plain serialisable object so it can be persisted to disk or
+ * transmitted over the wire in future phases.
  */
 export interface AgentMemory {
   goal: string;
   projectRoot: string;
-  /** Parsed package.json, or null if not found. */
+  /** Parsed package.json, or null when not present. */
   packageJson: Record<string, unknown> | null;
-  /** Top-level file/directory names (node_modules and dotfiles excluded). */
+  /** Top-level entries (node_modules and dotfiles excluded). */
   fileTree: string[];
-  /** Ordered history of all Think / Act / Observe steps. */
+  /** Ordered log of every Think / Act / Observe step. */
   history: AgentStep[];
+  /**
+   * Compact context document built by ProjectIndexer.
+   * Ready for injection into a Gemini system prompt.
+   * Null until scanEnvironment() completes.
+   */
+  contextSummary: string | null;
+  /**
+   * True when the current goal involves UI, CSS, layout, or visual debugging.
+   * Set by Think() on first detection; triggers vision tool routing.
+   */
+  visionEnabled: boolean;
 }
 
-/** A discriminated union of every tool call the agent can emit. */
+/** Discriminated union of every tool call the agent can emit. */
 export type ToolCall =
   | { tool: 'read_file'; input: ReadFileInput }
   | { tool: 'write_file'; input: WriteFileInput }
-  | { tool: 'shell_run'; input: ShellRunInput };
+  | { tool: 'shell_run'; input: ShellRunInput }
+  | { tool: 'screenshot_and_analyze'; input: ScreenshotAnalyzeInput }
+  | { tool: 'search'; input: SearchInput }
+  | { tool: 'log_monitor'; input: LogMonitorInput };
 
 // ---------------------------------------------------------------------------
 // Visual helpers
@@ -87,21 +117,38 @@ const PHASE_LABEL: Record<AgentStep['phase'], string> = {
 };
 
 const BANNER = [
-  chalk.cyan('╔══════════════════════════════════════════════╗'),
-  chalk.cyan('║       Gemini Cowork  —  Agentic Loop  v0.1  ║'),
-  chalk.cyan('╚══════════════════════════════════════════════╝'),
+  chalk.cyan('╔══════════════════════════════════════════════════╗'),
+  chalk.cyan('║   Gemini Cowork  ─  Agentic Loop  v0.2           ║'),
+  chalk.cyan('║   Multimodal · 2M Context · Live Search          ║'),
+  chalk.cyan('╚══════════════════════════════════════════════════╝'),
 ].join('\n');
+
+// ---------------------------------------------------------------------------
+// Goal-classification helpers
+// ---------------------------------------------------------------------------
+
+/** Patterns that indicate a goal requiring the vision tool. */
+const UI_KEYWORDS =
+  /\b(ui|css|layout|style|visual|render|screenshot|design|component|front.?end|tailwind|sass|responsive|animation)\b/i;
+
+/** Patterns that indicate a goal requiring web search. */
+const SEARCH_KEYWORDS =
+  /\b(find|look.?up|search|latest|version|docs?|documentation|release|changelog|npm|package)\b/i;
+
+/** Patterns that indicate a goal requiring log monitoring. */
+const MONITOR_KEYWORDS =
+  /\b(monitor|watch|stream|log|dev.?server|start\s+server|run|tail|output)\b/i;
 
 // ---------------------------------------------------------------------------
 // Coworker class
 // ---------------------------------------------------------------------------
 
 /**
- * `Coworker` orchestrates the ReAct loop.
+ * `Coworker` orchestrates the ReAct loop with multimodal capabilities.
  *
  * ```ts
  * const agent = new Coworker(process.cwd());
- * await agent.runLoop('Audit dependencies and suggest upgrades');
+ * await agent.runLoop('Fix the broken hero section CSS and verify visually');
  * ```
  */
 export class Coworker {
@@ -116,6 +163,8 @@ export class Coworker {
       packageJson: null,
       fileTree: [],
       history: [],
+      contextSummary: null,
+      visionEnabled: false,
     };
   }
 
@@ -123,13 +172,15 @@ export class Coworker {
   // Internal utilities
   // -------------------------------------------------------------------------
 
-  /** Append a step to history and pretty-print it. */
   private record(phase: AgentStep['phase'], content: string): void {
     this.memory.history.push({ phase, content, timestamp: new Date() });
     console.log(`\n${PHASE_LABEL[phase]}${content}`);
   }
 
-  /** Build a compact context string the Think step can reason over. */
+  /**
+   * Build a compact reasoning context block from the agent's current memory.
+   * Includes a preview of the ProjectIndexer output when available.
+   */
   private buildContext(): string {
     const pkg = this.memory.packageJson;
     const name = (pkg?.['name'] as string | undefined) ?? 'unknown';
@@ -141,32 +192,44 @@ export class Coworker {
       ? Object.keys(pkg['dependencies'] as Record<string, string>).join(', ')
       : 'none';
 
-    return [
-      `Project : ${name} v${version}`,
-      `Root    : ${this.memory.projectRoot}`,
-      `Files   : ${this.memory.fileTree.join(', ')}`,
-      `Scripts : ${scripts}`,
-      `Deps    : ${deps}`,
-      `Goal    : ${this.memory.goal}`,
-    ].join('\n          ');
+    const lines = [
+      `Project  : ${name} v${version}`,
+      `Root     : ${this.memory.projectRoot}`,
+      `Files    : ${this.memory.fileTree.join(', ')}`,
+      `Scripts  : ${scripts}`,
+      `Deps     : ${deps}`,
+      `Goal     : ${this.memory.goal}`,
+      `Vision   : ${this.memory.visionEnabled ? chalk.green('enabled') : chalk.dim('disabled')}`,
+    ];
+
+    if (this.memory.contextSummary) {
+      const preview = this.memory.contextSummary.slice(0, 280).replace(/\n/g, ' ');
+      lines.push(`Context  : ${preview}…`);
+    }
+
+    return lines.join('\n          ');
   }
 
   // -------------------------------------------------------------------------
-  // Environment awareness — runs once at startup
+  // Environment awareness
   // -------------------------------------------------------------------------
 
   /**
-   * Scan the project root: read package.json + top-level directory listing.
-   * Results are stored in `this.memory` so the Think step can reference them.
+   * Scan the project root before the first ReAct iteration:
+   *
+   *   1. Parse package.json.
+   *   2. List the top-level directory (fast).
+   *   3. Run ProjectIndexer to build the 2M-context document (may be slow for
+   *      large repos but completes before the first Think step).
    */
   private async scanEnvironment(): Promise<void> {
-    const spinner: Ora = ora({
+    const basicSpinner: Ora = ora({
       text: chalk.dim('Scanning project environment…'),
       color: 'cyan',
     }).start();
 
     try {
-      // 1. Parse package.json if present.
+      // ── package.json ──────────────────────────────────────────────────────
       try {
         const raw = await readFile(
           join(this.memory.projectRoot, 'package.json'),
@@ -177,20 +240,37 @@ export class Coworker {
         this.memory.packageJson = null;
       }
 
-      // 2. List top-level entries, excluding hidden files and node_modules.
+      // ── Top-level directory listing ───────────────────────────────────────
       const entries = await readdir(this.memory.projectRoot, {
         withFileTypes: true,
       });
       this.memory.fileTree = entries
-        .filter(
-          (e) => !e.name.startsWith('.') && e.name !== 'node_modules',
-        )
+        .filter((e) => !e.name.startsWith('.') && e.name !== 'node_modules')
         .map((e) => (e.isDirectory() ? `${e.name}/` : e.name));
 
-      spinner.succeed(chalk.dim('Environment ready.'));
+      basicSpinner.succeed(chalk.dim('Project environment scanned.'));
     } catch (err) {
-      spinner.fail(chalk.red('Failed to scan environment.'));
+      basicSpinner.fail(chalk.red('Failed to scan environment.'));
       throw err;
+    }
+
+    // ── ProjectIndexer — long-context document ────────────────────────────
+    const indexSpinner: Ora = ora({
+      text: chalk.dim('Indexing codebase for 2M-token context window…'),
+      color: 'cyan',
+    }).start();
+
+    try {
+      const ctx = await new ProjectIndexer(this.memory.projectRoot).index();
+      this.memory.contextSummary = ctx.document;
+      indexSpinner.succeed(
+        chalk.dim(
+          `Codebase indexed: ${ctx.files.filter((f) => !f.skipped).length} files · ` +
+            `~${ctx.totalTokens.toLocaleString()} tokens`,
+        ),
+      );
+    } catch {
+      indexSpinner.warn(chalk.yellow('Codebase indexing skipped (non-fatal).'));
     }
   }
 
@@ -199,14 +279,21 @@ export class Coworker {
   // -------------------------------------------------------------------------
 
   /**
-   * Decide what to do next based on the current memory state.
+   * Decide the next action given the current memory state.
    *
-   * Phase 1: heuristic planner.
-   * Phase 2 (TODO): replace heuristic with a Gemini model call via
-   *   `@google/gemini-cli-core` `GeminiClient`, passing the current memory
-   *   as context and receiving a structured `ToolCall` back.
+   * Phase 2 behaviour:
+   *   • Classifies the goal using keyword regexes to enable vision / search /
+   *     log-monitoring modes automatically (dynamic tool switching).
+   *   • Includes the ProjectIndexer context summary in every reasoning step
+   *     so the agent has codebase-wide awareness.
    *
    * Returns `null` to signal that the loop should terminate.
+   *
+   * TODO (Phase 3): Replace the heuristic planner below with a live Gemini
+   *   model call via `@google/gemini-cli-core`'s `GeminiClient`, passing
+   *   `this.memory.contextSummary` as the system prompt, the history as
+   *   conversation turns, and receiving a structured `ToolCall` back from
+   *   the model's function-calling response.
    */
   private async think(iteration: number): Promise<ToolCall | null> {
     const spinner: Ora = ora({
@@ -214,30 +301,38 @@ export class Coworker {
       color: 'blue',
     }).start();
 
-    // Simulate a brief reasoning delay (will be replaced by real model latency).
-    await new Promise<void>((r) => setTimeout(r, 200));
+    await new Promise<void>((r) => setTimeout(r, 200)); // model latency placeholder
     spinner.stop();
 
     const context = this.buildContext();
     const lastObservation =
-      [...this.memory.history].reverse().find((s) => s.phase === 'observe')
-        ?.content ?? 'No prior observations.';
+      [...this.memory.history]
+        .reverse()
+        .find((s) => s.phase === 'observe')?.content ?? 'No prior observations.';
 
     this.record(
       'think',
-      `Iteration ${iteration}\n          ${context}\n          Last obs : ${lastObservation.slice(0, 120)}`,
+      `Iteration ${iteration}\n          ${context}\n          Last obs : ${lastObservation.slice(0, 150)}`,
     );
 
-    // ------------------------------------------------------------------
-    // Heuristic decision tree
-    // ------------------------------------------------------------------
+    // ── Dynamic tool switching — classify goal on first iteration ──────────
 
-    // Iteration 1: always ground the agent by reading package.json.
-    if (iteration === 1 && this.memory.packageJson !== null) {
+    if (!this.memory.visionEnabled && UI_KEYWORDS.test(this.memory.goal)) {
+      this.memory.visionEnabled = true;
       this.record(
         'think',
-        'Strategy → read package.json to ground dependency understanding.',
+        chalk.blue(
+          'UI/visual keywords detected → vision mode enabled. ' +
+            'A screenshot_and_analyze step will be inserted.',
+        ),
       );
+    }
+
+    // ── Heuristic decision tree ────────────────────────────────────────────
+
+    // Iteration 1: Always read package.json first to ground the agent.
+    if (iteration === 1 && this.memory.packageJson !== null) {
+      this.record('think', 'Strategy → read package.json to ground dependency understanding.');
       return {
         tool: 'read_file',
         input: ReadFileInputSchema.parse({
@@ -246,24 +341,59 @@ export class Coworker {
       };
     }
 
-    // Iteration 2: if we have a goal containing "test", run the test suite.
-    if (
-      iteration === 2 &&
-      this.memory.goal.toLowerCase().includes('test') &&
-      this.memory.packageJson?.['scripts'] &&
-      'test' in (this.memory.packageJson['scripts'] as Record<string, string>)
-    ) {
-      this.record('think', 'Strategy → goal mentions "test"; will run npm test.');
+    // Iteration 2a: Search goal → use Google Search grounding.
+    if (iteration === 2 && SEARCH_KEYWORDS.test(this.memory.goal)) {
+      this.record('think', `Strategy → goal requires web lookup. Running search: "${this.memory.goal}"`);
       return {
-        tool: 'shell_run',
-        input: ShellRunInputSchema.parse({
-          command: 'npm test --if-present',
-          cwd: this.memory.projectRoot,
+        tool: 'search',
+        input: SearchInputSchema.parse({
+          query: this.memory.goal,
+          numResults: 5,
         }),
       };
     }
 
-    // Iteration 2 fallback: write a brief analysis summary.
+    // Iteration 2b: Monitoring goal → start a log stream.
+    if (iteration === 2 && MONITOR_KEYWORDS.test(this.memory.goal)) {
+      const scripts = this.memory.packageJson?.['scripts'] as
+        | Record<string, string>
+        | undefined;
+      const command = scripts?.['dev']
+        ? 'npm run dev'
+        : scripts?.['start']
+          ? 'npm start'
+          : 'npm run dev';
+      this.record('think', `Strategy → goal involves monitoring. Starting: "${command}"`);
+      return {
+        tool: 'log_monitor',
+        input: LogMonitorInputSchema.parse({
+          command,
+          cwd: this.memory.projectRoot,
+          timeoutMs: 8_000,
+          stopPattern: 'compiled|ready|listening|error|failed',
+        }),
+      };
+    }
+
+    // Iteration 2c: Vision goal → take a desktop screenshot for analysis.
+    if (iteration === 2 && this.memory.visionEnabled) {
+      this.record(
+        'think',
+        'Strategy → vision mode active. Capturing desktop screenshot for UI analysis.',
+      );
+      return {
+        tool: 'screenshot_and_analyze',
+        input: ScreenshotAnalyzeInputSchema.parse({
+          source: { type: 'desktop' },
+          prompt:
+            `Analyse this screenshot in the context of: "${this.memory.goal}". ` +
+            'Identify any UI, CSS, layout, or rendering issues. Be specific and actionable.',
+          model: 'gemini-2.0-flash',
+        }),
+      };
+    }
+
+    // Iteration 2d: Default — write a structured analysis summary to disk.
     if (iteration === 2) {
       const pkg = this.memory.packageJson;
       const summary = pkg
@@ -278,13 +408,10 @@ export class Coworker {
             .map(([k, v]) => `- ${k}: ${v}`)
             .join('\n') +
           '\n\n' +
-          `_Generated by Gemini Cowork on ${new Date().toISOString()}_\n`
+          `_Generated by Gemini Cowork v0.2 on ${new Date().toISOString()}_\n`
         : '# Project Analysis\n\nNo package.json found.\n';
 
-      this.record(
-        'think',
-        'Strategy → write analysis summary to .cowork/analysis.md.',
-      );
+      this.record('think', 'Strategy → write analysis summary to .cowork/analysis.md.');
       return {
         tool: 'write_file',
         input: WriteFileInputSchema.parse({
@@ -294,8 +421,8 @@ export class Coworker {
       };
     }
 
-    // No further autonomous actions — signal loop termination.
-    this.record('think', 'Goal satisfied. No further actions required.');
+    // Loop complete.
+    this.record('think', 'Goal analysis complete. No further actions required.');
     return null;
   }
 
@@ -304,10 +431,14 @@ export class Coworker {
   // -------------------------------------------------------------------------
 
   /**
-   * Execute the tool call chosen by the Think step.
-   * Wraps execution with visual feedback (ora spinner) appropriate for each
-   * tool type. The `shell_run` spinner is stopped before the human-in-the-loop
-   * confirmation prompt so the user can read and respond to it.
+   * Execute the tool call selected by Think.
+   *
+   * Routing:
+   *   read_file / write_file     → executor.ts (synchronous file I/O)
+   *   shell_run                  → executor.ts (human-in-the-loop confirmation)
+   *   screenshot_and_analyze     → vision.ts   (Puppeteer + Gemini Vision)
+   *   search                     → search.ts   (Gemini grounding)
+   *   log_monitor                → log-monitor.ts (streaming process output)
    */
   private async act(toolCall: ToolCall): Promise<ToolResult> {
     this.record(
@@ -315,14 +446,20 @@ export class Coworker {
       `Tool: ${chalk.bold(toolCall.tool)}  Input: ${JSON.stringify(toolCall.input)}`,
     );
 
-    let spinner: Ora | null = null;
+    // Suppress spinner for tools that interact with the user or write directly
+    // to stdout (shell_run human prompt, log_monitor live output, URL capture).
+    const suppressSpinner =
+      toolCall.tool === 'shell_run' ||
+      toolCall.tool === 'log_monitor' ||
+      (toolCall.tool === 'screenshot_and_analyze' &&
+        toolCall.input.source.type === 'url');
 
-    if (toolCall.tool !== 'shell_run') {
-      spinner = ora({
-        text: chalk.green.dim(`Executing ${toolCall.tool}…`),
-        color: 'green',
-      }).start();
-    }
+    const spinner: Ora | null = suppressSpinner
+      ? null
+      : ora({
+          text: chalk.green.dim(`Executing ${toolCall.tool}…`),
+          color: 'green',
+        }).start();
 
     try {
       let result: ToolResult;
@@ -335,8 +472,16 @@ export class Coworker {
           result = await executeWriteFile(toolCall.input);
           break;
         case 'shell_run':
-          // Human-in-the-loop prompt happens inside executeShellRun.
           result = await executeShellRun(toolCall.input);
+          break;
+        case 'screenshot_and_analyze':
+          result = await executeScreenshotAndAnalyze(toolCall.input);
+          break;
+        case 'search':
+          result = await executeSearch(toolCall.input);
+          break;
+        case 'log_monitor':
+          result = await executeLogMonitor(toolCall.input);
           break;
       }
 
@@ -353,12 +498,11 @@ export class Coworker {
   // -------------------------------------------------------------------------
 
   /**
-   * Summarise the tool result and record it in memory.
-   * Keeps the observation concise: the full output is available in history
-   * but only a preview is logged to the terminal.
+   * Summarise the tool result and append it to history.
+   * Keeps the terminal preview concise; full output is always in history.
    */
   private observe(result: ToolResult): void {
-    const MAX_PREVIEW = 300;
+    const MAX_PREVIEW = 400;
     const preview =
       result.output.length > MAX_PREVIEW
         ? `${result.output.slice(0, MAX_PREVIEW)}… (${result.output.length} chars total)`
@@ -376,7 +520,7 @@ export class Coworker {
   // -------------------------------------------------------------------------
 
   /**
-   * Run the ReAct loop until the agent decides it is done or `maxIterations`
+   * Run the ReAct loop until the agent signals completion or `maxIterations`
    * is reached.
    *
    * @param goal  Natural-language description of the task to accomplish.
@@ -387,21 +531,15 @@ export class Coworker {
     console.log(`\n${BANNER}\n`);
     console.log(chalk.white(`Goal: ${chalk.bold(goal)}\n`));
 
-    // ── Environment awareness ──────────────────────────────────────────────
     await this.scanEnvironment();
 
-    // ── ReAct loop ─────────────────────────────────────────────────────────
     for (let i = 1; i <= this.maxIterations; i++) {
-      console.log(chalk.dim(`\n${'─'.repeat(56)} iteration ${i}`));
+      console.log(chalk.dim(`\n${'─'.repeat(52)} iteration ${i}`));
 
-      // [Think]
       const toolCall = await this.think(i);
       if (toolCall === null) break;
 
-      // [Act]
       const result = await this.act(toolCall);
-
-      // [Observe]
       this.observe(result);
     }
 
@@ -411,7 +549,7 @@ export class Coworker {
     );
   }
 
-  /** Expose memory for inspection / testing. */
+  /** Expose memory snapshot for inspection / testing. */
   getMemory(): Readonly<AgentMemory> {
     return this.memory;
   }
