@@ -5,9 +5,12 @@
  */
 
 import type { CommandModule } from 'yargs';
-import * as path from 'node:path';
 import chalk from 'chalk';
-import { debugLogger , FolderTrustDiscoveryService } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  FolderTrustDiscoveryService,
+  getRealPath,
+} from '@google/gemini-cli-core';
 import { getErrorMessage } from '../../utils/errors.js';
 import {
   INSTALL_WARNING_MESSAGE,
@@ -48,7 +51,8 @@ export async function handleInstall(args: InstallArgs) {
     const settings = loadSettings(workspaceDir).merged;
 
     if (installMetadata.type === 'local' || installMetadata.type === 'link') {
-      const resolvedPath = path.resolve(source);
+      const resolvedPath = getRealPath(source);
+      installMetadata.source = resolvedPath;
       const trustResult = isWorkspaceTrusted(settings, resolvedPath);
       if (trustResult.isTrusted !== true) {
         const discoveryResults =

@@ -19,11 +19,12 @@ import yargs from 'yargs';
 import type {
   FolderTrustDiscoveryService,
   debugLogger,
-  type GeminiCLIExtension
+  type GeminiCLIExtension,
 } from '@google/gemini-cli-core';
 import type {
-  ExtensionManager,
-  inferInstallMetadata,
+  inferInstallMetadata} from '../../config/extension-manager.js';
+import {
+  ExtensionManager
 } from '../../config/extension-manager.js';
 import type {
   promptForConsentNonInteractive,
@@ -83,18 +84,12 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
-vi.mock('../../config/extension-manager.js', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../../config/extension-manager.js')>();
-  return {
-    ...actual,
-    ExtensionManager: vi.fn().mockImplementation(() => ({
-      installOrUpdateExtension: mockInstallOrUpdateExtension,
-      loadExtensions: vi.fn(),
-    })),
+vi.mock('../../config/extension-manager.js', async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../config/extension-manager.js')
+    >()),
     inferInstallMetadata: mockInferInstallMetadata,
-  };
-});
+  }));
 
 vi.mock('../../utils/errors.js', () => ({
   getErrorMessage: vi.fn((error: Error) => error.message),
@@ -132,6 +127,14 @@ describe('handleInstall', () => {
       .spyOn(process, 'exit')
       .mockImplementation(() => undefined as never);
 
+    vi.spyOn(ExtensionManager.prototype, 'loadExtensions').mockResolvedValue(
+      [],
+    );
+    vi.spyOn(
+      ExtensionManager.prototype,
+      'installOrUpdateExtension',
+    ).mockImplementation(mockInstallOrUpdateExtension);
+
     mockIsWorkspaceTrusted.mockReturnValue({ isTrusted: true, source: 'file' });
     mockDiscover.mockResolvedValue({
       commands: [],
@@ -168,12 +171,29 @@ describe('handleInstall', () => {
     mockStat.mockClear();
     mockInferInstallMetadata.mockClear();
     vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
+  function createMockExtension(
+    overrides: Partial<GeminiCLIExtension> = {},
+  ): GeminiCLIExtension {
+    return {
+      name: 'mock-extension',
+      version: '1.0.0',
+      isActive: true,
+      path: '/mock/path',
+      contextFiles: [],
+      id: 'mock-id',
+      ...overrides,
+    };
+  }
+
   it('should install an extension from a http source', async () => {
-    mockInstallOrUpdateExtension.mockResolvedValue({
-      name: 'http-extension',
-    } as unknown as GeminiCLIExtension);
+    mockInstallOrUpdateExtension.mockResolvedValue(
+      createMockExtension({
+        name: 'http-extension',
+      }),
+    );
 
     await handleInstall({
       source: 'http://google.com',
@@ -185,9 +205,11 @@ describe('handleInstall', () => {
   });
 
   it('should install an extension from a https source', async () => {
-    mockInstallOrUpdateExtension.mockResolvedValue({
-      name: 'https-extension',
-    } as unknown as GeminiCLIExtension);
+    mockInstallOrUpdateExtension.mockResolvedValue(
+      createMockExtension({
+        name: 'https-extension',
+      }),
+    );
 
     await handleInstall({
       source: 'https://google.com',
@@ -199,9 +221,11 @@ describe('handleInstall', () => {
   });
 
   it('should install an extension from a git source', async () => {
-    mockInstallOrUpdateExtension.mockResolvedValue({
-      name: 'git-extension',
-    } as unknown as GeminiCLIExtension);
+    mockInstallOrUpdateExtension.mockResolvedValue(
+      createMockExtension({
+        name: 'git-extension',
+      }),
+    );
 
     await handleInstall({
       source: 'git@some-url',
@@ -225,9 +249,11 @@ describe('handleInstall', () => {
   });
 
   it('should install an extension from a sso source', async () => {
-    mockInstallOrUpdateExtension.mockResolvedValue({
-      name: 'sso-extension',
-    } as unknown as GeminiCLIExtension);
+    mockInstallOrUpdateExtension.mockResolvedValue(
+      createMockExtension({
+        name: 'sso-extension',
+      }),
+    );
 
     await handleInstall({
       source: 'sso://google.com',
@@ -239,9 +265,11 @@ describe('handleInstall', () => {
   });
 
   it('should install an extension from a local path', async () => {
-    mockInstallOrUpdateExtension.mockResolvedValue({
-      name: 'local-extension',
-    } as unknown as GeminiCLIExtension);
+    mockInstallOrUpdateExtension.mockResolvedValue(
+      createMockExtension({
+        name: 'local-extension',
+      }),
+    );
     mockStat.mockResolvedValue({} as Stats);
     await handleInstall({
       source: '/some/path',
@@ -264,9 +292,11 @@ describe('handleInstall', () => {
   });
 
   it('should proceed if local path is already trusted', async () => {
-    mockInstallOrUpdateExtension.mockResolvedValue({
-      name: 'local-extension',
-    } as unknown as GeminiCLIExtension);
+    mockInstallOrUpdateExtension.mockResolvedValue(
+      createMockExtension({
+        name: 'local-extension',
+      }),
+    );
     mockStat.mockResolvedValue({} as Stats);
     mockIsWorkspaceTrusted.mockReturnValue({ isTrusted: true, source: 'file' });
 
@@ -282,9 +312,11 @@ describe('handleInstall', () => {
   });
 
   it('should prompt and proceed if user accepts trust', async () => {
-    mockInstallOrUpdateExtension.mockResolvedValue({
-      name: 'local-extension',
-    } as unknown as GeminiCLIExtension);
+    mockInstallOrUpdateExtension.mockResolvedValue(
+      createMockExtension({
+        name: 'local-extension',
+      }),
+    );
     mockStat.mockResolvedValue({} as Stats);
     mockIsWorkspaceTrusted.mockReturnValue({
       isTrusted: undefined,
@@ -336,9 +368,11 @@ describe('handleInstall', () => {
   });
 
   it('should include discovery results in trust prompt', async () => {
-    mockInstallOrUpdateExtension.mockResolvedValue({
-      name: 'local-extension',
-    } as unknown as GeminiCLIExtension);
+    mockInstallOrUpdateExtension.mockResolvedValue(
+      createMockExtension({
+        name: 'local-extension',
+      }),
+    );
     mockStat.mockResolvedValue({} as Stats);
     mockIsWorkspaceTrusted.mockReturnValue({
       isTrusted: undefined,
