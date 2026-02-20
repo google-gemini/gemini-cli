@@ -42,8 +42,9 @@ describe('ConfigInitDisplay', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders initial state', () => {
-    const { lastFrame } = render(<ConfigInitDisplay />);
+  it('renders initial state', async () => {
+    const { lastFrame, waitUntilReady } = render(<ConfigInitDisplay />);
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 

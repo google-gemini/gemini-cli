@@ -501,7 +501,7 @@ export class AppRig {
 
   get lastFrame() {
     if (!this.renderResult) return '';
-    return stripAnsi(this.renderResult.lastFrame() || '');
+    return stripAnsi(this.renderResult.lastFrame({ allowEmpty: true }) || '');
   }
 
   getStaticOutput() {

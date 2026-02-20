@@ -17,26 +17,28 @@ describe('<Checklist />', () => {
     { status: 'cancelled', label: 'Task 4' },
   ];
 
-  it('renders nothing when list is empty', () => {
-    const { lastFrame } = render(
+  it('renders nothing when list is empty', async () => {
+    const { lastFrame, waitUntilReady } = render(
       <Checklist title="Test List" items={[]} isExpanded={true} />,
     );
-    expect(lastFrame()).toBe('');
+    await waitUntilReady();
+    expect(lastFrame({ allowEmpty: true })).toBe('');
   });
 
-  it('renders nothing when collapsed and no active items', () => {
+  it('renders nothing when collapsed and no active items', async () => {
     const inactiveItems: ChecklistItemData[] = [
       { status: 'completed', label: 'Task 1' },
       { status: 'cancelled', label: 'Task 2' },
     ];
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady } = render(
       <Checklist title="Test List" items={inactiveItems} isExpanded={false} />,
     );
-    expect(lastFrame()).toBe('');
+    await waitUntilReady();
+    expect(lastFrame({ allowEmpty: true })).toBe('');
   });
 
-  it('renders summary view correctly (collapsed)', () => {
-    const { lastFrame } = render(
+  it('renders summary view correctly (collapsed)', async () => {
+    const { lastFrame, waitUntilReady } = render(
       <Checklist
         title="Test List"
         items={items}
@@ -44,11 +46,12 @@ describe('<Checklist />', () => {
         toggleHint="toggle me"
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders expanded view correctly', () => {
-    const { lastFrame } = render(
+  it('renders expanded view correctly', async () => {
+    const { lastFrame, waitUntilReady } = render(
       <Checklist
         title="Test List"
         items={items}
@@ -56,17 +59,19 @@ describe('<Checklist />', () => {
         toggleHint="toggle me"
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders summary view without in-progress item if none exists', () => {
+  it('renders summary view without in-progress item if none exists', async () => {
     const pendingItems: ChecklistItemData[] = [
       { status: 'completed', label: 'Task 1' },
       { status: 'pending', label: 'Task 2' },
     ];
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady } = render(
       <Checklist title="Test List" items={pendingItems} isExpanded={false} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 });

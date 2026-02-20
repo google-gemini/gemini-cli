@@ -617,7 +617,7 @@ let baselineComparisonHistogram: Histogram | undefined;
 let isMetricsInitialized = false;
 let isPerformanceMonitoringEnabled = false;
 
-export function getMeter(): Meter | undefined {
+function getMeter(): Meter | undefined {
   if (!cliMeter) {
     cliMeter = metrics.getMeter(SERVICE_NAME);
   }
@@ -1019,7 +1019,7 @@ function getGenAiOperationName(): GenAiOperationName {
 
 // Performance Monitoring Functions
 
-export function initializePerformanceMonitoring(config: Config): void {
+function initializePerformanceMonitoring(config: Config): void {
   const meter = getMeter();
   if (!meter) return;
 
