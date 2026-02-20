@@ -54,8 +54,7 @@ export const Scrollable: React.FC<ScrollableProps> = ({
   const childrenCountRef = useRef(0);
 
   // This effect needs to run on every render to correctly measure the container
-  // and scroll to the bottom if new children are added. The if conditions
-  // prevent infinite loops.
+  // and scroll to the bottom if new children are added.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     if (!ref.current) {
@@ -64,7 +63,8 @@ export const Scrollable: React.FC<ScrollableProps> = ({
     const innerHeight = Math.round(getInnerHeight(ref.current));
     const scrollHeight = Math.round(getScrollHeight(ref.current));
 
-    const isAtBottom = scrollTop >= size.scrollHeight - size.innerHeight - 1;
+    const isAtBottom =
+      scrollHeight > innerHeight && scrollTop >= scrollHeight - innerHeight - 1;
 
     if (
       size.innerHeight !== innerHeight ||
