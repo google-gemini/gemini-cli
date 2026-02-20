@@ -278,7 +278,13 @@ const ModelUsageTable: React.FC<{
                   </Text>
                 </Box>
                 <Box width={tokenColumnWidth} justifyContent="flex-end">
-                  <Text color={theme.text.secondary}>{row.cachedTokens}</Text>
+                  <Text
+                    color={
+                      row.isActive ? theme.text.primary : theme.text.secondary
+                    }
+                  >
+                    {row.cachedTokens}
+                  </Text>
                 </Box>
                 <Box width={tokenColumnWidth} justifyContent="flex-end">
                   <Text
@@ -294,19 +300,19 @@ const ModelUsageTable: React.FC<{
             {showQuotaColumn && (
               <Box flexGrow={1} justifyContent="flex-end">
                 {row.bucket && row.bucket.remainingFraction != null && (
-                  <Text color={theme.text.secondary}>
+                  <Text
+                    color={
+                      row.isActive ? theme.text.primary : theme.text.secondary
+                    }
+                  >
                     {(row.bucket.remainingFraction * 100).toFixed(1)}%
                     {row.bucket.resetTime && (
                       <Text color={theme.text.secondary}>
                         {' '}
                         (
-                        {(function (t) {
-                          const formatted = formatResetTime(t);
-                          return formatted === 'Resetting...' ||
-                            formatted === '< 1m'
-                            ? formatted
-                            : `Resets in ${formatted}`;
-                        })(row.bucket.resetTime)}
+                        {formatResetTime(row.bucket.resetTime, {
+                          capitalize: true,
+                        })}
                         )
                       </Text>
                     )}

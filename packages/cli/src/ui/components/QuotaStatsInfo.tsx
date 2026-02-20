@@ -85,13 +85,7 @@ export const QuotaStatsInfo: React.FC<QuotaStatsInfoProps> = ({
               : `${displayPercentage.toFixed(0)}%`}
           </Text>
           {displayPercentage !== 0 && <Text> usage remaining</Text>}
-          {displayResetTime &&
-            `, ${(function (t) {
-              const formatted = formatResetTime(t);
-              return formatted === 'Resetting...' || formatted === '< 1m'
-                ? formatted
-                : `resets in ${formatted}`;
-            })(displayResetTime)}`}
+          {displayResetTime && `, ${formatResetTime(displayResetTime)}`}
         </Text>
       )}
       {showDetails && (

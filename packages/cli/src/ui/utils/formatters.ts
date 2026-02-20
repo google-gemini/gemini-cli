@@ -97,17 +97,24 @@ export function stripReferenceContent(text: string): string {
 
   return text.replace(pattern, '').trim();
 }
+const UNIX_SECONDS_THRESHOLD = 10_000_000_000;
 
-export const formatResetTime = (resetTime: string): string => {
+export const formatResetTime = (
+  resetTime: string,
+  options: { capitalize?: boolean; includePrefix?: boolean } = {},
+): string => {
+  const { capitalize = false, includePrefix = true } = options;
   let date = new Date(resetTime);
 
   // If invalid, try parsing as a number (unix timestamp)
   if (isNaN(date.getTime())) {
     const timestamp = parseInt(resetTime, 10);
     if (!isNaN(timestamp)) {
-      // Heuristic: If the timestamp is less than 10^12, it is likely in seconds
-      // (as 10^12 ms is year 2001, while 10^12 s is far in the future).
-      date = new Date(timestamp < 10000000000 ? timestamp * 1000 : timestamp);
+      // Heuristic: If the timestamp is less than 10^10, it is likely in seconds
+      // (as 10^10 ms is year 1970, while 10^10 s is year 2286).
+      date = new Date(
+        timestamp < UNIX_SECONDS_THRESHOLD ? timestamp * 1000 : timestamp,
+      );
     }
   }
 
@@ -123,19 +130,34 @@ export const formatResetTime = (resetTime: string): string => {
   const minutes = totalMinutes % 60;
 
   const fmt = (val: number, unit: 'hour' | 'minute') =>
-    new Intl.NumberFormat('en', {
-      style: 'unit',
-      unit,
-      unitDisplay: 'narrow',
-    }).format(val);
+    new Intl.RelativeTimeFormat('en', {
+      style: 'narrow',
+      numeric: 'always',
+    })
+      .formatToParts(val, unit)
+      .filter(
+        (p) =>
+          p.type !== 'literal' || (p.value !== 'in ' && p.value !== ' ago'),
+      )
+      .map((p) => p.value)
+      .join('')
+      .trim();
 
+  let timeStr = '';
   if (hours > 0 && minutes > 0) {
-    return `${fmt(hours, 'hour')} ${fmt(minutes, 'minute')}`;
+    timeStr = `${fmt(hours, 'hour')} ${fmt(minutes, 'minute')}`;
   } else if (hours > 0) {
-    return fmt(hours, 'hour');
+    timeStr = fmt(hours, 'hour');
   } else if (minutes > 0) {
-    return fmt(minutes, 'minute');
+    timeStr = fmt(minutes, 'minute');
   } else {
-    return '< 1m';
+    timeStr = '< 1m';
   }
+
+  if (timeStr === '< 1m' || !includePrefix) {
+    return timeStr;
+  }
+
+  const prefix = capitalize ? 'Resets in ' : 'resets in ';
+  return `${prefix}${timeStr}`;
 };
