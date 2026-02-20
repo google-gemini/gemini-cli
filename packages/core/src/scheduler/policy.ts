@@ -77,7 +77,10 @@ export async function checkPolicy(
     }
   }
 
-  return { decision, rule: result.rule };
+  return {
+    decision,
+    rule: result.rule,
+  };
 }
 
 /**

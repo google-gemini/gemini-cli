@@ -86,6 +86,8 @@ export type ErroredToolCall = {
   response: ToolCallResponseInfo;
   tool?: AnyDeclarativeTool;
   durationMs?: number;
+  startTime?: number;
+  endTime?: number;
   outcome?: ToolConfirmationOutcome;
   schedulerId?: string;
   approvalMode?: ApprovalMode;
@@ -98,6 +100,8 @@ export type SuccessfulToolCall = {
   response: ToolCallResponseInfo;
   invocation: AnyToolInvocation;
   durationMs?: number;
+  startTime?: number;
+  endTime?: number;
   outcome?: ToolConfirmationOutcome;
   schedulerId?: string;
   approvalMode?: ApprovalMode;
@@ -125,6 +129,8 @@ export type CancelledToolCall = {
   tool: AnyDeclarativeTool;
   invocation: AnyToolInvocation;
   durationMs?: number;
+  startTime?: number;
+  endTime?: number;
   outcome?: ToolConfirmationOutcome;
   schedulerId?: string;
   approvalMode?: ApprovalMode;
