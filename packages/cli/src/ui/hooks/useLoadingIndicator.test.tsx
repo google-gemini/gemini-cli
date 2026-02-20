@@ -16,6 +16,7 @@ import {
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
 import { INFORMATIVE_TIPS } from '../constants/tips.js';
 import type { RetryAttemptPayload } from '@google/gemini-cli-core';
+import type { LoadingPhrasesMode } from '../../config/settings.js';
 
 describe('useLoadingIndicator', () => {
   beforeEach(() => {
@@ -33,21 +34,25 @@ describe('useLoadingIndicator', () => {
     initialStreamingState: StreamingState,
     initialShouldShowFocusHint: boolean = false,
     initialRetryStatus: RetryAttemptPayload | null = null,
+    loadingPhrasesMode: LoadingPhrasesMode = 'all',
   ) => {
     let hookResult: ReturnType<typeof useLoadingIndicator>;
     function TestComponent({
       streamingState,
       shouldShowFocusHint,
       retryStatus,
+      mode,
     }: {
       streamingState: StreamingState;
       shouldShowFocusHint?: boolean;
       retryStatus?: RetryAttemptPayload | null;
+      mode?: LoadingPhrasesMode;
     }) {
       hookResult = useLoadingIndicator({
         streamingState,
         shouldShowFocusHint: !!shouldShowFocusHint,
         retryStatus: retryStatus || null,
+        loadingPhrasesMode: mode,
       });
       return null;
     }
@@ -56,6 +61,7 @@ describe('useLoadingIndicator', () => {
         streamingState={initialStreamingState}
         shouldShowFocusHint={initialShouldShowFocusHint}
         retryStatus={initialRetryStatus}
+        mode={loadingPhrasesMode}
       />,
     );
     return {
@@ -68,7 +74,8 @@ describe('useLoadingIndicator', () => {
         streamingState: StreamingState;
         shouldShowFocusHint?: boolean;
         retryStatus?: RetryAttemptPayload | null;
-      }) => rerender(<TestComponent {...newProps} />),
+        mode?: LoadingPhrasesMode;
+      }) => rerender(<TestComponent mode={loadingPhrasesMode} {...newProps} />),
     };
   };
 
@@ -220,5 +227,16 @@ describe('useLoadingIndicator', () => {
 
     expect(result.current.currentLoadingPhrase).toContain('Trying to reach');
     expect(result.current.currentLoadingPhrase).toContain('Attempt 3/3');
+  });
+
+  it('should show no phrases when loadingPhrasesMode is "off"', () => {
+    const { result } = renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      false,
+      null,
+      'off',
+    );
+
+    expect(result.current.currentLoadingPhrase).toBeUndefined();
   });
 });

@@ -19,6 +19,7 @@ vi.mock('fs', async (importOriginal) => {
   return {
     ...actual,
     mkdirSync: vi.fn(),
+    realpathSync: vi.fn(actual.realpathSync),
   };
 });
 
@@ -62,12 +63,11 @@ describe('Storage – initialize', () => {
     ).toHaveBeenCalledWith(projectRoot);
 
     // Verify migration calls
-    const shortId = 'project-slug';
     // We can't easily get the hash here without repeating logic, but we can verify it's called twice
     expect(StorageMigration.migrateDirectory).toHaveBeenCalledTimes(2);
 
     // Verify identifier is set by checking a path
-    expect(storage.getProjectTempDir()).toContain(shortId);
+    expect(storage.getProjectTempDir()).toContain(PROJECT_SLUG);
   });
 });
 
@@ -105,6 +105,12 @@ describe('Storage - Security', () => {
 describe('Storage – additional helpers', () => {
   const projectRoot = '/tmp/project';
   const storage = new Storage(projectRoot);
+
+  beforeEach(() => {
+    ProjectRegistry.prototype.getShortId = vi
+      .fn()
+      .mockReturnValue(PROJECT_SLUG);
+  });
 
   it('getWorkspaceSettingsPath returns project/.gemini/settings.json', () => {
     const expected = path.join(projectRoot, GEMINI_DIR, 'settings.json');
@@ -251,6 +257,101 @@ describe('Storage – additional helpers', () => {
       expect(result).toBeNull();
 
       readFileSpy.mockRestore();
+    });
+  });
+
+  describe('getPlansDir', () => {
+    interface TestCase {
+      name: string;
+      customDir: string | undefined;
+      expected: string | (() => string);
+      expectedError?: string;
+      setup?: () => () => void;
+    }
+
+    const testCases: TestCase[] = [
+      {
+        name: 'custom relative path',
+        customDir: '.my-plans',
+        expected: path.resolve(projectRoot, '.my-plans'),
+      },
+      {
+        name: 'custom absolute path outside throws',
+        customDir: '/absolute/path/to/plans',
+        expected: '',
+        expectedError:
+          "Custom plans directory '/absolute/path/to/plans' resolves to '/absolute/path/to/plans', which is outside the project root '/tmp/project'.",
+      },
+      {
+        name: 'absolute path that happens to be inside project root',
+        customDir: path.join(projectRoot, 'internal-plans'),
+        expected: path.join(projectRoot, 'internal-plans'),
+      },
+      {
+        name: 'relative path that stays within project root',
+        customDir: 'subdir/../plans',
+        expected: path.resolve(projectRoot, 'plans'),
+      },
+      {
+        name: 'dot path',
+        customDir: '.',
+        expected: projectRoot,
+      },
+      {
+        name: 'default behavior when customDir is undefined',
+        customDir: undefined,
+        expected: () => storage.getProjectTempPlansDir(),
+      },
+      {
+        name: 'escaping relative path throws',
+        customDir: '../escaped-plans',
+        expected: '',
+        expectedError:
+          "Custom plans directory '../escaped-plans' resolves to '/tmp/escaped-plans', which is outside the project root '/tmp/project'.",
+      },
+      {
+        name: 'hidden directory starting with ..',
+        customDir: '..plans',
+        expected: path.resolve(projectRoot, '..plans'),
+      },
+      {
+        name: 'security escape via symbolic link throws',
+        customDir: 'symlink-to-outside',
+        setup: () => {
+          vi.mocked(fs.realpathSync).mockImplementation((p: fs.PathLike) => {
+            if (p.toString().includes('symlink-to-outside')) {
+              return '/outside/project/root';
+            }
+            return p.toString();
+          });
+          return () => vi.mocked(fs.realpathSync).mockRestore();
+        },
+        expected: '',
+        expectedError:
+          "Custom plans directory 'symlink-to-outside' resolves to '/outside/project/root', which is outside the project root '/tmp/project'.",
+      },
+    ];
+
+    testCases.forEach(({ name, customDir, expected, expectedError, setup }) => {
+      it(`should handle ${name}`, async () => {
+        const cleanup = setup?.();
+        try {
+          if (name.includes('default behavior')) {
+            await storage.initialize();
+          }
+
+          storage.setCustomPlansDir(customDir);
+          if (expectedError) {
+            expect(() => storage.getPlansDir()).toThrow(expectedError);
+          } else {
+            const expectedValue =
+              typeof expected === 'function' ? expected() : expected;
+            expect(storage.getPlansDir()).toBe(expectedValue);
+          }
+        } finally {
+          cleanup?.();
+        }
+      });
     });
   });
 });
