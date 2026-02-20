@@ -122,11 +122,60 @@ export type PersistedTaskMetadata = { [k: string]: unknown };
 
 export const METADATA_KEY = '__persistedState';
 
+function isAgentSettings(value: unknown): value is AgentSettings {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    value.kind === CoderAgentEvent.StateAgentSettingsEvent &&
+    'workspacePath' in value &&
+    typeof value.workspacePath === 'string'
+  );
+}
+
+function isPersistedStateMetadata(
+  value: unknown,
+): value is PersistedStateMetadata {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    '_agentSettings' in value &&
+    '_taskState' in value &&
+    isAgentSettings(value._agentSettings)
+  );
+}
+
 export function getPersistedState(
   metadata: PersistedTaskMetadata,
 ): PersistedStateMetadata | undefined {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  return metadata?.[METADATA_KEY] as PersistedStateMetadata | undefined;
+  const state = metadata?.[METADATA_KEY];
+  if (isPersistedStateMetadata(state)) {
+    return state;
+  }
+  return undefined;
+}
+
+export function getContextIdFromMetadata(
+  metadata: PersistedTaskMetadata | undefined,
+): string | undefined {
+  if (!metadata) {
+    return undefined;
+  }
+  const contextId = metadata['_contextId'];
+  return typeof contextId === 'string' ? contextId : undefined;
+}
+
+export function getAgentSettingsFromMetadata(
+  metadata: PersistedTaskMetadata | undefined,
+): AgentSettings | undefined {
+  if (!metadata) {
+    return undefined;
+  }
+  const coderAgent = metadata['coderAgent'];
+  if (isAgentSettings(coderAgent)) {
+    return coderAgent;
+  }
+  return undefined;
 }
 
 export function setPersistedState(
