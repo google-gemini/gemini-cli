@@ -568,6 +568,14 @@ export interface GenAIResponseDetails {
   candidates?: Candidate[];
 }
 
+export interface ContextBreakdown {
+  system_instructions: number;
+  tool_definitions: number;
+  history: number;
+  tool_calls: Record<string, number>;
+  mcp_servers: number;
+}
+
 export interface GenAIUsageDetails {
   input_token_count: number;
   output_token_count: number;
@@ -575,6 +583,7 @@ export interface GenAIUsageDetails {
   thoughts_token_count: number;
   tool_token_count: number;
   total_token_count: number;
+  context_breakdown?: ContextBreakdown;
 }
 
 export const EVENT_API_RESPONSE = 'gemini_cli.api_response';

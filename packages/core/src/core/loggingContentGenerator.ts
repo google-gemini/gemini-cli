@@ -45,6 +45,69 @@ interface StructuredError {
 /**
  * A decorator that wraps a ContentGenerator to add logging to API calls.
  */
+
+function estimateContextBreakdown(
+  contents: Content[],
+  config?: GenerateContentConfig,
+) {
+  let system_instructions = 0;
+  let tool_definitions = 0;
+  let history = 0;
+  let mcp_servers = 0;
+  const tool_calls: Record<string, number> = {};
+
+  if (config?.systemInstruction) {
+    system_instructions += Math.floor(
+      JSON.stringify(config.systemInstruction).length / 4,
+    );
+  }
+
+  if (config?.tools) {
+    for (const tool of config.tools) {
+      tool_definitions += Math.floor(JSON.stringify(tool).length / 4);
+      if (
+        tool &&
+        typeof tool === 'object' &&
+        'functionDeclarations' in tool &&
+        tool.functionDeclarations
+      ) {
+        for (const func of tool.functionDeclarations) {
+          if (func.name && func.name.includes('__')) {
+            mcp_servers += Math.floor(JSON.stringify(func).length / 4);
+          }
+        }
+      }
+    }
+  }
+
+  for (const content of contents) {
+    history += Math.floor(JSON.stringify(content).length / 4);
+    for (const part of content.parts || []) {
+      if (part.functionCall) {
+        const name = part.functionCall.name || 'unknown';
+        const tokens = Math.floor(JSON.stringify(part.functionCall).length / 4);
+        tool_calls[name] = (tool_calls[name] || 0) + tokens;
+        if (name.includes('__')) mcp_servers += tokens;
+      } else if (part.functionResponse) {
+        const name = part.functionResponse.name || 'unknown';
+        const tokens = Math.floor(
+          JSON.stringify(part.functionResponse).length / 4,
+        );
+        tool_calls[name] = (tool_calls[name] || 0) + tokens;
+        if (name.includes('__')) mcp_servers += tokens;
+      }
+    }
+  }
+
+  return {
+    system_instructions,
+    tool_definitions,
+    history,
+    tool_calls,
+    mcp_servers,
+  };
+}
+
 export class LoggingContentGenerator implements ContentGenerator {
   constructor(
     private readonly wrapped: ContentGenerator,
@@ -134,27 +197,30 @@ export class LoggingContentGenerator implements ContentGenerator {
     generationConfig?: GenerateContentConfig,
     serverDetails?: ServerDetails,
   ): void {
-    logApiResponse(
-      this.config,
-      new ApiResponseEvent(
-        model,
-        durationMs,
-        {
-          prompt_id,
-          contents: requestContents,
-          generate_content_config: generationConfig,
-          server: serverDetails,
-        },
-        {
-          candidates: responseCandidates,
-          response_id: responseId,
-        },
-        this.config.getContentGeneratorConfig()?.authType,
-        usageMetadata,
-        responseText,
-        role,
-      ),
+    const event = new ApiResponseEvent(
+      model,
+      durationMs,
+      {
+        prompt_id,
+        contents: requestContents,
+        generate_content_config: generationConfig,
+        server: serverDetails,
+      },
+      {
+        candidates: responseCandidates,
+        response_id: responseId,
+      },
+      this.config.getContentGeneratorConfig()?.authType,
+      usageMetadata,
+      responseText,
+      role,
     );
+    event.usage.context_breakdown = estimateContextBreakdown(
+      requestContents,
+      generationConfig,
+    );
+
+    logApiResponse(this.config, event);
   }
 
   private _logApiError(
