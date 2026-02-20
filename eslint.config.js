@@ -38,6 +38,7 @@ export default tseslint.config(
       'dist/**',
       'evals/**',
       'packages/test-utils/**',
+      '.gemini/skills/**',
     ],
   },
   eslint.configs.recommended,
