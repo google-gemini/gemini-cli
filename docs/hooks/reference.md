@@ -124,6 +124,8 @@ hiding sensitive output from the agent.
   - `decision`: Set to `"deny"` to hide the real tool output from the agent.
   - `reason`: Required if denied. This text **replaces** the tool result sent
     back to the model.
+  - `hookSpecificOutput.tool_output`: Text that **replaces** the tool output
+    before it is sent to the model.
   - `hookSpecificOutput.additionalContext`: Text that is **appended** to the
     tool result for the agent.
   - `continue`: Set to `false` to **kill the entire agent loop** immediately.
