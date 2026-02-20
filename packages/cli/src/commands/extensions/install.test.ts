@@ -85,11 +85,11 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 });
 
 vi.mock('../../config/extension-manager.js', async (importOriginal) => ({
-    ...(await importOriginal<
-      typeof import('../../config/extension-manager.js')
-    >()),
-    inferInstallMetadata: mockInferInstallMetadata,
-  }));
+  ...(await importOriginal<
+    typeof import('../../config/extension-manager.js')
+  >()),
+  inferInstallMetadata: mockInferInstallMetadata,
+}));
 
 vi.mock('../../utils/errors.js', () => ({
   getErrorMessage: vi.fn((error: Error) => error.message),
