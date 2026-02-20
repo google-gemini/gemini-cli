@@ -244,6 +244,8 @@ export class ToolCallEvent implements BaseTelemetryEvent {
   mcp_server_name?: string;
   extension_name?: string;
   extension_id?: string;
+  start_time?: number;
+  end_time?: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: { [key: string]: any };
 
@@ -257,6 +259,8 @@ export class ToolCallEvent implements BaseTelemetryEvent {
     prompt_id: string,
     tool_type: 'native' | 'mcp',
     error?: string,
+    start_time?: number,
+    end_time?: number,
   );
   constructor(
     call?: CompletedToolCall,
@@ -267,6 +271,8 @@ export class ToolCallEvent implements BaseTelemetryEvent {
     prompt_id?: string,
     tool_type?: 'native' | 'mcp',
     error?: string,
+    start_time?: number,
+    end_time?: number,
   ) {
     this['event.name'] = 'tool_call';
     this['event.timestamp'] = new Date().toISOString();
@@ -283,6 +289,8 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       this.error_type = call.response.errorType;
       this.prompt_id = call.request.prompt_id;
       this.content_length = call.response.contentLength;
+      this.start_time = call.startTime;
+      this.end_time = call.endTime;
       if (
         typeof call.tool !== 'undefined' &&
         call.tool instanceof DiscoveredMCPTool
@@ -333,6 +341,8 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       this.prompt_id = prompt_id!;
       this.tool_type = tool_type!;
       this.error = error;
+      this.start_time = start_time;
+      this.end_time = end_time;
     }
   }
 
@@ -352,6 +362,8 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       mcp_server_name: this.mcp_server_name,
       extension_name: this.extension_name,
       extension_id: this.extension_id,
+      start_time: this.start_time,
+      end_time: this.end_time,
       metadata: this.metadata,
     };
 
