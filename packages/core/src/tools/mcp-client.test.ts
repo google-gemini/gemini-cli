@@ -2056,6 +2056,90 @@ describe('connectToMcpServer with OAuth', () => {
       capturedTransport._requestInit?.headers?.['Authorization'];
     expect(authHeader).toBe('Bearer test-access-token-from-discovery');
   });
+
+  it('should use discoverOAuthFromWWWAuthenticate when it succeeds and skip discoverOAuthConfig', async () => {
+    const serverUrl = 'http://test-server.com/mcp';
+    const authUrl = 'http://auth.example.com/auth';
+    const tokenUrl = 'http://auth.example.com/token';
+    const wwwAuthHeader = `Bearer realm="test", resource_metadata="http://test-server.com/.well-known/oauth-protected-resource"`;
+
+    vi.mocked(mockedClient.connect).mockRejectedValueOnce(
+      new StreamableHTTPError(
+        401,
+        `Unauthorized\nwww-authenticate: ${wwwAuthHeader}`,
+      ),
+    );
+
+    vi.mocked(OAuthUtils.discoverOAuthFromWWWAuthenticate).mockResolvedValue({
+      authorizationUrl: authUrl,
+      tokenUrl,
+      scopes: ['read'],
+    });
+
+    vi.mocked(mockedClient.connect).mockResolvedValueOnce(undefined);
+
+    const client = await connectToMcpServer(
+      '0.0.1',
+      'test-server',
+      { httpUrl: serverUrl, oauth: { enabled: true } },
+      false,
+      workspaceContext,
+      EMPTY_CONFIG,
+    );
+
+    expect(client).toBe(mockedClient);
+    expect(OAuthUtils.discoverOAuthFromWWWAuthenticate).toHaveBeenCalledWith(
+      wwwAuthHeader,
+      serverUrl,
+    );
+    expect(OAuthUtils.discoverOAuthConfig).not.toHaveBeenCalled();
+    expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
+  });
+
+  it('should fall back to extractBaseUrl + discoverOAuthConfig when discoverOAuthFromWWWAuthenticate returns null', async () => {
+    const serverUrl = 'http://test-server.com/mcp';
+    const baseUrl = 'http://test-server.com';
+    const authUrl = 'http://auth.example.com/auth';
+    const tokenUrl = 'http://auth.example.com/token';
+    const wwwAuthHeader = `Bearer realm="test"`;
+
+    vi.mocked(mockedClient.connect).mockRejectedValueOnce(
+      new StreamableHTTPError(
+        401,
+        `Unauthorized\nwww-authenticate: ${wwwAuthHeader}`,
+      ),
+    );
+
+    vi.mocked(OAuthUtils.discoverOAuthFromWWWAuthenticate).mockResolvedValue(
+      null,
+    );
+    vi.mocked(OAuthUtils.extractBaseUrl).mockReturnValue(baseUrl);
+    vi.mocked(OAuthUtils.discoverOAuthConfig).mockResolvedValue({
+      authorizationUrl: authUrl,
+      tokenUrl,
+      scopes: ['read'],
+    });
+
+    vi.mocked(mockedClient.connect).mockResolvedValueOnce(undefined);
+
+    const client = await connectToMcpServer(
+      '0.0.1',
+      'test-server',
+      { httpUrl: serverUrl, oauth: { enabled: true } },
+      false,
+      workspaceContext,
+      EMPTY_CONFIG,
+    );
+
+    expect(client).toBe(mockedClient);
+    expect(OAuthUtils.discoverOAuthFromWWWAuthenticate).toHaveBeenCalledWith(
+      wwwAuthHeader,
+      serverUrl,
+    );
+    expect(OAuthUtils.extractBaseUrl).toHaveBeenCalledWith(serverUrl);
+    expect(OAuthUtils.discoverOAuthConfig).toHaveBeenCalledWith(baseUrl);
+    expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
+  });
 });
 
 describe('connectToMcpServer - HTTP→SSE fallback', () => {
