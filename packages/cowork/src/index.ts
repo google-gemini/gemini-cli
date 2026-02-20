@@ -139,18 +139,27 @@ if (isMain) {
 // Public surface: consumers can import everything they need from this package.
 // ---------------------------------------------------------------------------
 
+// ── Agent ───────────────────────────────────────────────────────────────────
 export { Coworker } from './agent/core.js';
 export type { AgentMemory, AgentStep, ToolCall } from './agent/core.js';
 
+export { ProjectIndexer } from './agent/context-manager.js';
+export type { FileEntry, ProjectContext } from './agent/context-manager.js';
+
+// ── Tool definitions (Zod schemas + registry) ───────────────────────────────
 export { TOOL_DEFINITIONS } from './tools/definitions.js';
 export type {
+  LogMonitorInput,
   ReadFileInput,
+  ScreenshotAnalyzeInput,
+  SearchInput,
   ShellRunInput,
   ToolDefinition,
   ToolName,
   WriteFileInput,
 } from './tools/definitions.js';
 
+// ── Tool executors ───────────────────────────────────────────────────────────
 export {
   executeReadFile,
   executeShellRun,
@@ -159,5 +168,9 @@ export {
 } from './tools/executor.js';
 export type { ToolResult } from './tools/executor.js';
 
-// Expose the CLI builder for testing / programmatic use.
+export { executeScreenshotAndAnalyze } from './tools/vision.js';
+export { executeSearch } from './tools/search.js';
+export { executeLogMonitor } from './tools/log-monitor.js';
+
+// ── CLI builder (for testing / programmatic use) ────────────────────────────
 export { buildCli };

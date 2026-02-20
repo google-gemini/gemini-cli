@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cowork",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Gemini Cowork — AI agentic coding tool built on gemini-cli",
   "license": "Apache-2.0",
   "repository": {
@@ -25,11 +25,15 @@
     "dist"
   ],
   "dependencies": {
+    "@google/genai": "1.30.0",
     "@google/gemini-cli-core": "file:../core",
     "chalk": "^5.4.1",
     "ora": "^8.2.0",
     "yargs": "^17.7.2",
     "zod": "^3.23.8"
+  },
+  "optionalDependencies": {
+    "puppeteer": "^22.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
