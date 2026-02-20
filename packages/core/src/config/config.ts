@@ -95,6 +95,7 @@ import { ModelConfigService } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import { ContextManager } from '../services/contextManager.js';
 import type { GenerateContentParameters } from '@google/genai';
+import { ExperimentManager } from './experimentManager.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig, AnyToolInvocation, AnyDeclarativeTool };
@@ -121,11 +122,7 @@ import { AcknowledgedAgentsService } from '../agents/acknowledgedAgents.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentTool } from '../agents/subagent-tool.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
-import {
-  ExperimentFlags,
-  ExperimentMetadata,
-  getExperimentFlagName,
-} from '../code_assist/experiments/flagNames.js';
+import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
@@ -300,12 +297,6 @@ import {
   DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
 } from './constants.js';
-import {
-  DEFAULT_TOOL_PROTECTION_THRESHOLD,
-  DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD,
-  DEFAULT_PROTECT_LATEST_TURN,
-} from '../services/toolOutputMaskingService.js';
-
 import {
   type ExtensionLoader,
   SimpleExtensionLoader,
@@ -597,7 +588,6 @@ export class Config {
   private readonly listExtensions: boolean;
   private readonly _extensionLoader: ExtensionLoader;
   private readonly _enabledExtensions: string[];
-  private readonly enableExtensionReloading: boolean;
   fallbackModelHandler?: FallbackModelHandler;
   validationHandler?: ValidationHandler;
   private quotaErrorOccurred: boolean = false;
@@ -644,7 +634,6 @@ export class Config {
   private readonly skipNextSpeakerCheck: boolean;
   private readonly useBackgroundColor: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
-  private readonly extensionManagement: boolean = true;
   private readonly enablePromptCompletion: boolean = false;
   private readonly truncateToolOutputThreshold: number;
   private compressionTruncationCounter = 0;
@@ -656,6 +645,7 @@ export class Config {
   private readonly useWriteTodos: boolean;
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
+  private readonly experimentManager: ExperimentManager;
   private policyUpdateConfirmationRequest:
     | PolicyUpdateConfirmationRequest
     | undefined;
@@ -672,13 +662,11 @@ export class Config {
   private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
   private readonly enableHooksUI: boolean;
-  private readonly toolOutputMasking: ToolOutputMaskingConfig;
   private hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
   private projectHooks:
     | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
     | undefined;
   private disabledHooks: string[];
-  private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
   private readonly onModelChange: ((model: string) => void) | undefined;
@@ -690,19 +678,12 @@ export class Config {
       }>)
     | undefined;
 
-  private readonly enableAgents: boolean;
   private agents: AgentSettings;
-  private experimentalSettings: Record<string, unknown>;
-  private readonly experimentalCliArgs: Record<string, unknown>;
   private readonly enableEventDrivenScheduler: boolean;
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
   private readonly adminSkillsEnabled: boolean;
 
-  private readonly experimentalJitContext: boolean;
-  private readonly disableLLMCorrection: boolean;
-  private readonly planEnabled: boolean;
-  private readonly modelSteering: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
@@ -787,34 +768,48 @@ export class Config {
     this.model = params.model;
     this.disableLoopDetection = params.disableLoopDetection ?? false;
     this._activeModel = params.model;
-    this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
-    this.experimentalSettings = params.experimentalSettings ?? {};
-    this.experimentalCliArgs = params.experimentalCliArgs ?? {};
-    this.disableLLMCorrection = params.disableLLMCorrection ?? true;
-    this.planEnabled = params.plan ?? false;
+
+    // Merge legacy experimental parameters into a single object for the manager
+    const experimentalSettings = {
+      ...(params.experimentalSettings ?? {}),
+    };
+    if (params.plan !== undefined) experimentalSettings['plan'] = params.plan;
+    if (params.experimentalJitContext !== undefined)
+      experimentalSettings['jitContext'] = params.experimentalJitContext;
+    if (params.enableAgents !== undefined)
+      experimentalSettings['enableAgents'] = params.enableAgents;
+    if (params.modelSteering !== undefined)
+      experimentalSettings['modelSteering'] = params.modelSteering;
+    if (params.enableExtensionReloading !== undefined)
+      experimentalSettings['extensionReloading'] =
+        params.enableExtensionReloading;
+    if (params.extensionManagement !== undefined)
+      experimentalSettings['extensionManagement'] = params.extensionManagement;
+    if (params.disableLLMCorrection !== undefined)
+      experimentalSettings['disableLLMCorrection'] =
+        params.disableLLMCorrection;
+    if (params.toolOutputMasking?.enabled !== undefined) {
+      experimentalSettings['toolOutputMasking'] = {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        ...((experimentalSettings['toolOutputMasking'] as object) ?? {}),
+        enabled: params.toolOutputMasking.enabled,
+      };
+    }
+
+    this.experimentManager = new ExperimentManager({
+      experimentalSettings,
+      experimentalCliArgs: params.experimentalCliArgs,
+      experiments: params.experiments,
+    });
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
     this.modelAvailabilityService = new ModelAvailabilityService();
-    this.experimentalJitContext = params.experimentalJitContext ?? false;
-    this.modelSteering = params.modelSteering ?? false;
     this.userHintService = new UserHintService(() =>
       this.isModelSteeringEnabled(),
     );
-    this.toolOutputMasking = {
-      enabled: params.toolOutputMasking?.enabled ?? true,
-      toolProtectionThreshold:
-        params.toolOutputMasking?.toolProtectionThreshold ??
-        DEFAULT_TOOL_PROTECTION_THRESHOLD,
-      minPrunableTokensThreshold:
-        params.toolOutputMasking?.minPrunableTokensThreshold ??
-        DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD,
-      protectLatestTurn:
-        params.toolOutputMasking?.protectLatestTurn ??
-        DEFAULT_PROTECT_LATEST_TURN,
-    };
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.experimentalZedIntegration =
       params.experimentalZedIntegration ?? false;
@@ -864,8 +859,6 @@ export class Config {
       params.enableShellOutputEfficiency ?? true;
     this.shellToolInactivityTimeout =
       (params.shellToolInactivityTimeout ?? 300) * 1000; // 5 minutes
-    this.extensionManagement = params.extensionManagement ?? true;
-    this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir, this.sessionId);
     this.storage.setCustomPlansDir(params.planSettings?.directory);
 
@@ -899,7 +892,6 @@ export class Config {
       this.projectHooks = params.projectHooks;
     }
 
-    this.experiments = params.experiments;
     this.onModelChange = params.onModelChange;
     this.onReload = params.onReload;
 
@@ -982,7 +974,7 @@ export class Config {
     }
 
     // Add plans directory to workspace context for plan file storage
-    if (this.planEnabled) {
+    if (this.isPlanEnabled()) {
       const plansDir = this.storage.getPlansDir();
       await fs.promises.mkdir(plansDir, { recursive: true });
       this.workspaceContext.addDirectory(plansDir);
@@ -1053,7 +1045,7 @@ export class Config {
       await this.hookSystem.initialize();
     }
 
-    if (this.experimentalJitContext) {
+    if (this.isJitContextEnabled()) {
       this.contextManager = new ContextManager(this);
       await this.contextManager.refresh();
     }
@@ -1127,9 +1119,9 @@ export class Config {
 
     // Fetch admin controls
     await this.ensureExperimentsLoaded();
-    const adminControlsEnabled =
-      this.experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
-        ?.boolValue ?? false;
+    const adminControlsEnabled = !!this.getExperimentValue<boolean>(
+      ExperimentFlags.ENABLE_ADMIN_CONTROLS,
+    );
     const adminControls = await fetchAdminControls(
       codeAssistServer,
       this.getRemoteAdminSettings(),
@@ -1143,8 +1135,8 @@ export class Config {
   }
 
   async getExperimentsAsync(): Promise<Experiments | undefined> {
-    if (this.experiments) {
-      return this.experiments;
+    if (this.experimentManager.getExperiments()) {
+      return this.experimentManager.getExperiments();
     }
     const codeAssistServer = getCodeAssistServer(this);
     return getExperiments(codeAssistServer);
@@ -1632,7 +1624,7 @@ export class Config {
   }
 
   getUserMemory(): string | HierarchicalMemory {
-    if (this.experimentalJitContext && this.contextManager) {
+    if (this.isJitContextEnabled() && this.contextManager) {
       return {
         global: this.contextManager.getGlobalMemory(),
         extension: this.contextManager.getExtensionMemory(),
@@ -1646,7 +1638,7 @@ export class Config {
    * Refreshes the MCP context, including memory, tools, and system instructions.
    */
   async refreshMcpContext(): Promise<void> {
-    if (this.experimentalJitContext && this.contextManager) {
+    if (this.isJitContextEnabled() && this.contextManager) {
       await this.contextManager.refresh();
     } else {
       const { refreshServerHierarchicalMemory } = await import(
@@ -1677,54 +1669,40 @@ export class Config {
   }
 
   isJitContextEnabled(): boolean {
-    return this.experimentalJitContext;
+    return this.experimentManager.isJitContextEnabled();
   }
 
   isModelSteeringEnabled(): boolean {
-    return this.modelSteering;
+    return this.experimentManager.isModelSteeringEnabled();
   }
 
   getToolOutputMaskingEnabled(): boolean {
-    return this.toolOutputMasking.enabled;
+    return this.getExperimentValue<boolean>(
+      ExperimentFlags.ENABLE_TOOL_OUTPUT_MASKING,
+    )!;
   }
 
   async getToolOutputMaskingConfig(): Promise<ToolOutputMaskingConfig> {
     await this.ensureExperimentsLoaded();
 
-    const remoteProtection =
-      this.experiments?.flags[ExperimentFlags.MASKING_PROTECTION_THRESHOLD]
-        ?.intValue;
-    const remotePrunable =
-      this.experiments?.flags[ExperimentFlags.MASKING_PRUNABLE_THRESHOLD]
-        ?.intValue;
-    const remoteProtectLatest =
-      this.experiments?.flags[ExperimentFlags.MASKING_PROTECT_LATEST_TURN]
-        ?.boolValue;
-
-    const parsedProtection = remoteProtection
-      ? parseInt(remoteProtection, 10)
-      : undefined;
-    const parsedPrunable = remotePrunable
-      ? parseInt(remotePrunable, 10)
-      : undefined;
-
     return {
-      enabled: this.toolOutputMasking.enabled,
-      toolProtectionThreshold:
-        parsedProtection !== undefined && !isNaN(parsedProtection)
-          ? parsedProtection
-          : this.toolOutputMasking.toolProtectionThreshold,
-      minPrunableTokensThreshold:
-        parsedPrunable !== undefined && !isNaN(parsedPrunable)
-          ? parsedPrunable
-          : this.toolOutputMasking.minPrunableTokensThreshold,
-      protectLatestTurn:
-        remoteProtectLatest ?? this.toolOutputMasking.protectLatestTurn,
+      enabled: this.getExperimentValue<boolean>(
+        ExperimentFlags.ENABLE_TOOL_OUTPUT_MASKING,
+      )!,
+      toolProtectionThreshold: this.getExperimentValue<number>(
+        ExperimentFlags.MASKING_PROTECTION_THRESHOLD,
+      )!,
+      minPrunableTokensThreshold: this.getExperimentValue<number>(
+        ExperimentFlags.MASKING_PRUNABLE_THRESHOLD,
+      )!,
+      protectLatestTurn: this.getExperimentValue<boolean>(
+        ExperimentFlags.MASKING_PROTECT_LATEST_TURN,
+      )!,
     };
   }
 
   getGeminiMdFileCount(): number {
-    if (this.experimentalJitContext && this.contextManager) {
+    if (this.isJitContextEnabled() && this.contextManager) {
       return this.contextManager.getLoadedPaths().size;
     }
     return this.geminiMdFileCount;
@@ -1735,7 +1713,7 @@ export class Config {
   }
 
   getGeminiMdFilePaths(): string[] {
-    if (this.experimentalJitContext && this.contextManager) {
+    if (this.isJitContextEnabled() && this.contextManager) {
       return Array.from(this.contextManager.getLoadedPaths());
     }
     return this.geminiMdFilePaths;
@@ -1839,7 +1817,7 @@ export class Config {
       if (registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
         registry.unregisterTool(EXIT_PLAN_MODE_TOOL_NAME);
       }
-      if (this.planEnabled && !isYoloMode) {
+      if (this.isPlanEnabled() && !isYoloMode) {
         if (!registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
           registry.registerTool(new EnterPlanModeTool(this, this.messageBus));
         }
@@ -2045,7 +2023,9 @@ export class Config {
   }
 
   getExtensionManagement(): boolean {
-    return this.extensionManagement;
+    return this.experimentManager.getExperimentValue<boolean>(
+      ExperimentFlags.EXTENSION_MANAGEMENT,
+    );
   }
 
   getExtensions(): GeminiCLIExtension[] {
@@ -2063,15 +2043,15 @@ export class Config {
   }
 
   getEnableExtensionReloading(): boolean {
-    return this.enableExtensionReloading;
+    return this.experimentManager.getEnableExtensionReloading();
   }
 
   getDisableLLMCorrection(): boolean {
-    return this.disableLLMCorrection;
+    return this.experimentManager.getDisableLLMCorrection();
   }
 
   isPlanEnabled(): boolean {
-    return this.planEnabled;
+    return this.experimentManager.isPlanEnabled();
   }
 
   getApprovedPlanPath(): string | undefined {
@@ -2083,7 +2063,7 @@ export class Config {
   }
 
   isAgentsEnabled(): boolean {
-    return this.enableAgents;
+    return this.experimentManager.isAgentsEnabled();
   }
 
   isEventDrivenSchedulerEnabled(): boolean {
@@ -2218,9 +2198,9 @@ export class Config {
 
     await this.ensureExperimentsLoaded();
 
-    const remoteThreshold =
-      this.experiments?.flags[ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]
-        ?.floatValue;
+    const remoteThreshold = this.getExperimentValue<number>(
+      ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD,
+    );
     if (remoteThreshold === 0) {
       return undefined;
     }
@@ -2228,37 +2208,23 @@ export class Config {
   }
 
   async getUserCaching(): Promise<boolean | undefined> {
-    return this.getExperimentValue<boolean>(ExperimentFlags.USER_CACHING);
+    return this.experimentManager.getUserCaching();
   }
 
   async getNumericalRoutingEnabled(): Promise<boolean> {
-    return (
-      this.getExperimentValue<boolean>(
-        ExperimentFlags.ENABLE_NUMERICAL_ROUTING,
-      ) ?? false
-    );
+    return this.experimentManager.isNumericalRoutingEnabled();
   }
 
   async getClassifierThreshold(): Promise<number | undefined> {
-    return this.getExperimentValue<number>(
-      ExperimentFlags.CLASSIFIER_THRESHOLD,
-    );
+    return this.experimentManager.getClassifierThreshold();
   }
 
   async getBannerTextNoCapacityIssues(): Promise<string> {
-    return (
-      this.getExperimentValue<string>(
-        ExperimentFlags.BANNER_TEXT_NO_CAPACITY_ISSUES,
-      ) ?? ''
-    );
+    return this.experimentManager.getBannerTextNoCapacityIssues();
   }
 
   async getBannerTextCapacityIssues(): Promise<string> {
-    return (
-      this.getExperimentValue<string>(
-        ExperimentFlags.BANNER_TEXT_CAPACITY_ISSUES,
-      ) ?? ''
-    );
+    return this.experimentManager.getBannerTextCapacityIssues();
   }
 
   private async ensureExperimentsLoaded(): Promise<void> {
@@ -2626,7 +2592,7 @@ export class Config {
    * Get experiments configuration
    */
   getExperiments(): Experiments | undefined {
-    return this.experiments;
+    return this.experimentManager.getExperiments();
   }
 
   /**
@@ -2639,69 +2605,21 @@ export class Config {
   getExperimentValue<T extends boolean | number | string>(
     flagId: number,
   ): T | undefined {
-    const flagName = getExperimentFlagName(flagId);
-    if (!flagName) {
-      return undefined;
-    }
-
-    // 1. Command-line argument
-    const cliValue = this.experimentalCliArgs[flagName];
-    if (cliValue !== undefined) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return cliValue as T;
-    }
-
-    // 2. Local setting
-    const settingValue = this.experimentalSettings[flagName];
-    if (settingValue !== undefined) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return settingValue as T;
-    }
-
-    // 3. Remote experiment
-    const remoteFlag = this.experiments?.flags[flagId];
-    if (remoteFlag) {
-      const val =
-        remoteFlag.boolValue ??
-        remoteFlag.floatValue ??
-        remoteFlag.intValue ??
-        remoteFlag.stringValue;
-      if (val !== undefined) {
-        // Handle string representation of numbers if necessary
-        if (typeof val === 'string' && !isNaN(Number(val))) {
-          const metadata = ExperimentMetadata[flagId];
-          if (metadata?.type === 'number') {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            return Number(val) as unknown as T;
-          }
-        }
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        return val as unknown as T;
-      }
-    }
-
-    // 4. Default value from metadata
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return ExperimentMetadata[flagId]?.defaultValue as unknown as T;
+    return this.experimentManager.getExperimentValue<T>(flagId);
   }
 
   /**
    * Updates experimental settings.
    */
   updateExperimentalSettings(settings: Record<string, unknown>): void {
-    // Only update if settings have actually changed to avoid unnecessary re-initialization logic
-    // if we add any in the future.
-    this.experimentalSettings = {
-      ...this.experimentalSettings,
-      ...settings,
-    };
+    this.experimentManager.updateExperimentalSettings(settings);
   }
 
   /**
    * Set experiments configuration
    */
   setExperiments(experiments: Experiments): void {
-    this.experiments = experiments;
+    this.experimentManager.setExperiments(experiments);
     const flagSummaries = Object.entries(experiments.flags ?? {})
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([flagId, flag]) => {
