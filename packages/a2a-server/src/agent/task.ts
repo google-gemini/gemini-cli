@@ -483,15 +483,13 @@ export class Task {
     T extends ToolCall | AnyDeclarativeTool,
     K extends UnionKeys<T>,
   >(from: T, ...fields: K[]): Partial<T> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const ret = {} as Pick<T, K>;
+    const ret: Partial<T> = {};
     for (const field of fields) {
       if (field in from) {
         ret[field] = from[field];
       }
     }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return ret as Partial<T>;
+    return ret;
   }
 
   private toolStatusMessage(
