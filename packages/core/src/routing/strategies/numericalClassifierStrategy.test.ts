@@ -237,7 +237,7 @@ describe('NumericalClassifierStrategy', () => {
 
   describe('Remote Threshold Logic', () => {
     it('should use the remote CLASSIFIER_THRESHOLD if provided (int value)', async () => {
-      vi.mocked(mockConfig.getClassifierThreshold).mockResolvedValue(70);
+      vi.mocked(mockConfig.getClassifierThreshold).mockReturnValue(70);
       const mockApiResponse = {
         complexity_reasoning: 'Test task',
         complexity_score: 60,
@@ -263,7 +263,7 @@ describe('NumericalClassifierStrategy', () => {
     });
 
     it('should use the remote CLASSIFIER_THRESHOLD if provided (float value)', async () => {
-      vi.mocked(mockConfig.getClassifierThreshold).mockResolvedValue(45.5);
+      vi.mocked(mockConfig.getClassifierThreshold).mockReturnValue(45.5);
       const mockApiResponse = {
         complexity_reasoning: 'Test task',
         complexity_score: 40,
@@ -289,7 +289,7 @@ describe('NumericalClassifierStrategy', () => {
     });
 
     it('should use PRO model if score >= remote CLASSIFIER_THRESHOLD', async () => {
-      vi.mocked(mockConfig.getClassifierThreshold).mockResolvedValue(30);
+      vi.mocked(mockConfig.getClassifierThreshold).mockReturnValue(30);
       const mockApiResponse = {
         complexity_reasoning: 'Test task',
         complexity_score: 35,

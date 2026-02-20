@@ -4,15 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import type {
   ToolCallConfirmationDetails,
   ToolInvocation,
   ToolResult,
-
-  BaseDeclarativeTool,
-  BaseToolInvocation,
-  Kind,
-  type ToolConfirmationOutcome} from './tools.js';
+  ToolConfirmationOutcome,
+} from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';

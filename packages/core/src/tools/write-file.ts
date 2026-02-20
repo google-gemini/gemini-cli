@@ -13,6 +13,7 @@ import { WRITE_FILE_TOOL_NAME, WRITE_FILE_DISPLAY_NAME } from './tool-names.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 
+import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import type {
   FileDiff,
   ToolCallConfirmationDetails,
@@ -20,11 +21,8 @@ import type {
   ToolInvocation,
   ToolLocation,
   ToolResult,
-
-  BaseDeclarativeTool,
-  BaseToolInvocation,
-  Kind,
-  type ToolConfirmationOutcome} from './tools.js';
+  ToolConfirmationOutcome,
+} from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
