@@ -5,10 +5,11 @@
  */
 
 import { createContext, useContext } from 'react';
+import type { StartupWarning } from '@google/gemini-cli-core';
 
 export interface AppState {
   version: string;
-  startupWarnings: string[];
+  startupWarnings: StartupWarning[];
 }
 
 export const AppContext = createContext<AppState | null>(null);
