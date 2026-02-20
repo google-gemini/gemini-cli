@@ -556,9 +556,12 @@ export const AppContainer = (props: AppContainerProps) => {
           (process.platform === 'win32' ? 'notepad' : 'vi');
       }
 
-      // Split command into exe + any embedded args (e.g. $EDITOR="vim -u NONE")
-      // and always use shell: false to prevent injection via $EDITOR / $VISUAL.
-      const [exe = '', ...embeddedArgs] = command.trim().split(/\s+/);
+      // Tokenize the command string respecting quoted segments so paths with
+      // spaces are preserved (e.g. $EDITOR='"C:\Program Files\ed.exe" --flag').
+      const tokens = [...command.matchAll(/[^\s"']+|"([^"]*)"|'([^']*)'/g)].map(
+        ([full, dq, sq]) => dq ?? sq ?? full,
+      );
+      const [exe = '', ...embeddedArgs] = tokens;
       const allArgs = [...embeddedArgs, ...args];
 
       // .cmd/.bat files on Windows cannot be executed directly; they need

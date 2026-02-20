@@ -3568,5 +3568,16 @@ describe('AppContainer State Management', () => {
         expect.objectContaining({ shell: false }),
       );
     });
+
+    it('handles quoted paths with spaces in $EDITOR', async () => {
+      vi.stubEnv('EDITOR', '"/path with spaces/my-editor" --arg');
+      await renderAndCall();
+
+      expect(spawnSync).toHaveBeenCalledWith(
+        '/path with spaces/my-editor',
+        expect.arrayContaining(['--arg', expect.stringContaining('chat.md')]),
+        expect.objectContaining({ shell: false }),
+      );
+    });
   });
 });
