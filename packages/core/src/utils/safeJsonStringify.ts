@@ -37,6 +37,7 @@ export function safeJsonStringify(
 function removeEmptyObjects(data: any): object {
   const cleanedObject: { [key: string]: unknown } = {};
   for (const k in data) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const v = data[k];
     if (v !== null && v !== undefined && typeof v === 'boolean') {
       cleanedObject[k] = v;
