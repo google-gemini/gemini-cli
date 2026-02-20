@@ -378,12 +378,18 @@ describe('OAuthUtils', () => {
   describe('isPrivateHost', () => {
     it('should detect localhost', () => {
       expect(OAuthUtils.isPrivateHost('localhost')).toBe(true);
-      expect(OAuthUtils.isPrivateHost('127.0.0.1')).toBe(true);
+      expect(OAuthUtils.isPrivateHost('LOCALHOST')).toBe(true);
       expect(OAuthUtils.isPrivateHost('::1')).toBe(true);
     });
 
-    it('should detect cloud metadata endpoint', () => {
+    it('should detect full loopback range', () => {
+      expect(OAuthUtils.isPrivateHost('127.0.0.1')).toBe(true);
+      expect(OAuthUtils.isPrivateHost('127.255.255.255')).toBe(true);
+    });
+
+    it('should detect link-local range', () => {
       expect(OAuthUtils.isPrivateHost('169.254.169.254')).toBe(true);
+      expect(OAuthUtils.isPrivateHost('169.254.0.1')).toBe(true);
     });
 
     it('should detect private IPv4 ranges', () => {
@@ -392,6 +398,12 @@ describe('OAuthUtils', () => {
       expect(OAuthUtils.isPrivateHost('172.31.255.255')).toBe(true);
       expect(OAuthUtils.isPrivateHost('192.168.1.1')).toBe(true);
       expect(OAuthUtils.isPrivateHost('0.0.0.0')).toBe(true);
+    });
+
+    it('should detect IPv6 private ranges', () => {
+      expect(OAuthUtils.isPrivateHost('[fc00::1]')).toBe(true);
+      expect(OAuthUtils.isPrivateHost('[fd12::1]')).toBe(true);
+      expect(OAuthUtils.isPrivateHost('[fe80::1]')).toBe(true);
     });
 
     it('should allow public hosts', () => {

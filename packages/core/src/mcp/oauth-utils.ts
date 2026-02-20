@@ -274,6 +274,17 @@ export class OAuthUtils {
       if (resourceMetadata?.authorization_servers?.length) {
         // Use the first authorization server
         const authServerUrl = resourceMetadata.authorization_servers[0];
+
+        // Block private/internal auth server hosts to prevent SSRF
+        try {
+          const authHost = new URL(authServerUrl).hostname;
+          if (this.isPrivateHost(authHost)) {
+            return null;
+          }
+        } catch {
+          return null;
+        }
+
         const authServerMetadata =
           await this.discoverAuthorizationServerMetadata(authServerUrl);
 
@@ -349,6 +360,16 @@ export class OAuthUtils {
       return null;
     }
 
+    // Always block private/internal hosts regardless of whether we have a server URL.
+    try {
+      const metadataHost = new URL(resourceMetadataUri).hostname;
+      if (this.isPrivateHost(metadataHost)) {
+        return null;
+      }
+    } catch {
+      return null;
+    }
+
     // Verify the resource_metadata URI has the same origin as the MCP server
     // to prevent SSRF via attacker-controlled WWW-Authenticate headers.
     if (mcpServerUrl) {
@@ -384,15 +405,13 @@ export class OAuthUtils {
 
     // Validate that the authorization server URL doesn't point to
     // private/internal networks to prevent SSRF via metadata poisoning.
-    if (mcpServerUrl) {
-      try {
-        const authServerHost = new URL(authServerUrl).hostname;
-        if (this.isPrivateHost(authServerHost)) {
-          return null;
-        }
-      } catch {
+    try {
+      const authServerHost = new URL(authServerUrl).hostname;
+      if (this.isPrivateHost(authServerHost)) {
         return null;
       }
+    } catch {
+      return null;
     }
 
     const authServerMetadata =
@@ -433,26 +452,37 @@ export class OAuthUtils {
    * @returns True if the hostname is a private/reserved address
    */
   static isPrivateHost(hostname: string): boolean {
+    const lower = hostname.toLowerCase();
+
     // Loopback
-    if (
-      hostname === 'localhost' ||
-      hostname === '127.0.0.1' ||
-      hostname === '::1'
-    ) {
+    if (lower === 'localhost' || lower === '::1') {
       return true;
     }
-    // Link-local metadata (cloud provider metadata endpoints)
-    if (hostname === '169.254.169.254') {
-      return true;
+
+    // IPv6 private ranges
+    if (lower.startsWith('[')) {
+      const ipv6 = lower.slice(1, -1); // strip brackets
+      if (
+        ipv6 === '::1' ||
+        ipv6.startsWith('fc') ||
+        ipv6.startsWith('fd') || // fc00::/7 unique local
+        ipv6.startsWith('fe80') // fe80::/10 link-local
+      ) {
+        return true;
+      }
     }
-    // Private IPv4 ranges
+
+    // IPv4 address checks
     const parts = hostname.split('.').map(Number);
-    if (parts.length === 4 && parts.every((p) => !isNaN(p))) {
+    if (parts.length === 4 && parts.every((p) => !isNaN(p) && p >= 0 && p <= 255)) {
+      if (parts[0] === 127) return true; // 127.0.0.0/8 loopback
       if (parts[0] === 10) return true; // 10.0.0.0/8
       if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true; // 172.16.0.0/12
       if (parts[0] === 192 && parts[1] === 168) return true; // 192.168.0.0/16
+      if (parts[0] === 169 && parts[1] === 254) return true; // 169.254.0.0/16 link-local
       if (parts[0] === 0) return true; // 0.0.0.0/8
     }
+
     return false;
   }
 
