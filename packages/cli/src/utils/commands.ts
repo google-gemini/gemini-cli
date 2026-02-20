@@ -51,6 +51,26 @@ export const parseSlashCommand = (
       );
     }
 
+    // Third pass: match by bare name, stripping the namespace prefix.
+    // Commands from FileCommandLoader are stored with namespaced names
+    // (e.g., "workspace:my_command") but users may invoke them by bare name
+    // (e.g., "/my_command") especially via the -p flag where there is no
+    // autocomplete to insert the full namespaced name. Prefer later entries
+    // so workspace-scoped commands take precedence over user-scoped ones.
+    if (!foundCommand) {
+      for (const cmd of currentCommands) {
+        if (cmd.namespace) {
+          const prefix = `${cmd.namespace}:`;
+          if (
+            cmd.name.startsWith(prefix) &&
+            cmd.name.substring(prefix.length) === part
+          ) {
+            foundCommand = cmd;
+          }
+        }
+      }
+    }
+
     if (foundCommand) {
       commandToExecute = foundCommand;
       canonicalPath.push(foundCommand.name);

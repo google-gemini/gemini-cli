@@ -8,8 +8,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
 
-import type { TelemetryTarget } from '@google/gemini-cli-core';
-import {
+import type {
+  TelemetryTarget,
   AuthType,
   Config,
   type ConfigParameters,

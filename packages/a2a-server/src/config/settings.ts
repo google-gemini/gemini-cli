@@ -7,8 +7,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import type { MCPServerConfig } from '@google/gemini-cli-core';
-import {
+import type {
+  MCPServerConfig,
   debugLogger,
   GEMINI_DIR,
   getErrorMessage,

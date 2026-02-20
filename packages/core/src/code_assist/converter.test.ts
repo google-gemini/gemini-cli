@@ -14,8 +14,6 @@ import {
 import type {
   ContentListUnion,
   GenerateContentParameters,
-} from '@google/genai';
-import {
   GenerateContentResponse,
   FinishReason,
   BlockedReason,

@@ -10,8 +10,6 @@ import type {
   ToolInvocation,
   ToolMcpConfirmationDetails,
   ToolResult,
-} from './tools.js';
-import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,

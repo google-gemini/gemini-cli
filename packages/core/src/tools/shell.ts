@@ -16,8 +16,6 @@ import type {
   ToolResult,
   ToolCallConfirmationDetails,
   ToolExecuteConfirmationDetails,
-} from './tools.js';
-import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   ToolConfirmationOutcome,

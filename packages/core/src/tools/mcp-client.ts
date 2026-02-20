@@ -22,8 +22,6 @@ import type {
   Prompt,
   ReadResourceResult,
   Resource,
-} from '@modelcontextprotocol/sdk/types.js';
-import {
   ListResourcesResultSchema,
   ListRootsRequestSchema,
   ReadResourceResultSchema,
