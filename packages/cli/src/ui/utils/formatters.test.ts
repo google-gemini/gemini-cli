@@ -10,9 +10,60 @@ import {
   formatBytes,
   formatTimeAgo,
   stripReferenceContent,
+  formatResetTime,
 } from './formatters.js';
 
 describe('formatters', () => {
+  describe('formatResetTime', () => {
+    const NOW = new Date('2026-02-20T12:00:00Z');
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should format ISO date strings', () => {
+      const resetTime = '2026-02-20T13:30:00Z'; // 1h 30m from now
+      expect(formatResetTime(resetTime)).toBe('resets in 1h 30m');
+    });
+
+    it('should format unix timestamps (milliseconds)', () => {
+      const resetTime = (NOW.getTime() + 65 * 60 * 1000).toString(); // 1h 5m
+      expect(formatResetTime(resetTime)).toBe('resets in 1h 5m');
+    });
+
+    it('should format unix timestamps (seconds)', () => {
+      const resetTime = (Math.floor(NOW.getTime() / 1000) + 120).toString(); // 2m
+      expect(formatResetTime(resetTime)).toBe('resets in 2m');
+    });
+
+    it('should return "Resetting..." for past times', () => {
+      const resetTime = '2026-02-20T11:59:59Z';
+      expect(formatResetTime(resetTime)).toBe('Resetting...');
+    });
+
+    it('should return "< 1m" for imminent resets', () => {
+      const resetTime = new Date(NOW.getTime() + 30 * 1000).toISOString();
+      expect(formatResetTime(resetTime)).toBe('< 1m');
+    });
+
+    it('should support capitalization and prefix options', () => {
+      const resetTime = '2026-02-20T14:00:00Z'; // 2h
+      expect(
+        formatResetTime(resetTime, { capitalize: true, includePrefix: true }),
+      ).toBe('Resets in 2h');
+      expect(formatResetTime(resetTime, { includePrefix: false })).toBe('2h');
+    });
+
+    it('should return empty string for invalid dates', () => {
+      expect(formatResetTime('not-a-date')).toBe('');
+    });
+  });
+
   describe('formatBytes', () => {
     it('should format bytes into KB', () => {
       expect(formatBytes(12345)).toBe('12.1 KB');

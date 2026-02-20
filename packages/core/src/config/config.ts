@@ -68,7 +68,9 @@ import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
-import { logRipgrepFallback, logFlashFallback ,
+import {
+  logRipgrepFallback,
+  logFlashFallback,
   logApprovalModeSwitch,
   logApprovalModeDuration,
 } from '../telemetry/loggers.js';
@@ -106,7 +108,11 @@ import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
-import type { UserTierId , RetrieveUserQuotaResponse , AdminControlsSettings } from '../code_assist/types.js';
+import type {
+  UserTierId,
+  RetrieveUserQuotaResponse,
+  AdminControlsSettings,
+} from '../code_assist/types.js';
 import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
@@ -1335,8 +1341,8 @@ export class Config {
       // For reset time, take the one that is furthest in the future (most conservative)
       const resetTime = [proQuota?.resetTime, flashQuota?.resetTime]
         .filter((t): t is string => !!t)
-        .sort()
-        .reverse()[0];
+        .map((t) => ({ original: t, date: new Date(t) }))
+        .sort((a, b) => b.date.getTime() - a.date.getTime())[0]?.original;
 
       return {
         remaining: (proQuota?.remaining ?? 0) + (flashQuota?.remaining ?? 0),

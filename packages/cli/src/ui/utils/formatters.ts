@@ -125,23 +125,16 @@ export const formatResetTime = (
   const diff = date.getTime() - Date.now();
   if (diff <= 0) return 'Resetting...';
 
-  const totalMinutes = Math.ceil(diff / (1000 * 60));
+  const totalMinutes = Math.floor(diff / (1000 * 60));
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
 
   const fmt = (val: number, unit: 'hour' | 'minute') =>
-    new Intl.RelativeTimeFormat('en', {
-      style: 'narrow',
-      numeric: 'always',
-    })
-      .formatToParts(val, unit)
-      .filter(
-        (p) =>
-          p.type !== 'literal' || (p.value !== 'in ' && p.value !== ' ago'),
-      )
-      .map((p) => p.value)
-      .join('')
-      .trim();
+    new Intl.NumberFormat('en', {
+      style: 'unit',
+      unit,
+      unitDisplay: 'narrow',
+    }).format(val);
 
   let timeStr = '';
   if (hours > 0 && minutes > 0) {
