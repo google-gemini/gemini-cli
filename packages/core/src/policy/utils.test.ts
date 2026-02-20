@@ -125,7 +125,6 @@ describe('policy/utils', () => {
       const validJsonArgs = '{"command":"echo \\"foo\\""}';
       expect(regex.test(validJsonArgs)).toBe(true);
     });
-
     it('should NOT match prefixes followed by raw backslashes (security check)', () => {
       // Testing that we blocked the hole: "echo\foo"
       const prefix = 'echo ';
@@ -143,6 +142,56 @@ describe('policy/utils', () => {
       // git\status -> {"command":"git\\status"}
       const gitAttack = '{"command":"git\\\\status"}';
       expect(gitRegex.test(gitAttack)).toBe(false);
+    });
+
+    describe('commandRegex anchors', () => {
+      it('should transform ^ anchor correctly (TDD: currently failing to match)', () => {
+        const patterns = buildArgsPatterns(undefined, undefined, '^git status');
+        const regex = new RegExp(patterns[0]!);
+        // JSON stringified command: {"command":"git status"}
+        const json = '{"command":"git status"}';
+        // This CURRENTLY fails because the pattern is "command":"^git status
+        expect(regex.test(json)).toBe(true);
+      });
+
+      it('should transform $ anchor correctly (TDD: currently failing to match)', () => {
+        const patterns = buildArgsPatterns(
+          undefined,
+          undefined,
+          'tmux send-keys -t [a-z0-9:]+ (C-c|Up|Enter|Up Enter)$',
+        );
+        const regex = new RegExp(patterns[0]!);
+        const json = '{"command":"tmux send-keys -t superpowers:6 C-c"}';
+        // This CURRENTLY fails because $ matches end of JSON string, not end of command value
+        expect(regex.test(json)).toBe(true);
+      });
+
+      it('should handle $ anchor when other fields follow (TDD: currently failing)', () => {
+        const patterns = buildArgsPatterns(undefined, undefined, 'git status$');
+        const regex = new RegExp(patterns[0]!);
+        const json = '{"command":"git status","dir_path":"/tmp"}';
+        expect(regex.test(json)).toBe(true);
+      });
+
+      it('should NOT match if $ anchor is used and more text follows in command', () => {
+        const patterns = buildArgsPatterns(undefined, undefined, 'git status$');
+        const regex = new RegExp(patterns[0]!);
+        const json = '{"command":"git status --porcelain"}';
+        expect(regex.test(json)).toBe(false);
+      });
+
+      it('should handle escaped anchors as literals', () => {
+        const patterns = buildArgsPatterns(
+          undefined,
+          undefined,
+          'git status\\$',
+        );
+        const regex = new RegExp(patterns[0]!);
+        // Literal $ in command: git status$
+        // JSON: {"command":"git status$"}
+        const json = '{"command":"git status$"}';
+        expect(regex.test(json)).toBe(true);
+      });
     });
   });
 });

@@ -1482,6 +1482,58 @@ describe('PolicyEngine', () => {
     });
   });
 
+  describe('commandRegex anchors', () => {
+    it('should ALLOW tmux command with $ anchor', async () => {
+      const patterns = buildArgsPatterns(
+        undefined,
+        undefined,
+        'tmux send-keys -t [a-z0-9:]+ (C-c|Up|Enter|Up Enter)$',
+      );
+      const regex = new RegExp(patterns[0]!);
+
+      engine.addRule({
+        toolName: 'run_shell_command',
+        decision: PolicyDecision.ALLOW,
+        priority: 100,
+        argsPattern: regex,
+      });
+
+      const toolCall = {
+        name: 'run_shell_command',
+        args: {
+          command: 'tmux send-keys -t superpowers:6 C-c',
+        },
+      };
+
+      const result = await engine.check(toolCall, undefined);
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should ALLOW git status with ^ anchor', async () => {
+      const patterns = buildArgsPatterns(undefined, undefined, '^git status');
+      const regex = new RegExp(patterns[0]!);
+
+      engine.addRule({
+        toolName: 'run_shell_command',
+        decision: PolicyDecision.ALLOW,
+        priority: 100,
+        argsPattern: regex,
+      });
+
+      const toolCall = {
+        name: 'run_shell_command',
+        args: {
+          command: 'git status',
+        },
+      };
+
+      const result = await engine.check(toolCall, undefined);
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+  });
+
   describe('Plan Mode vs Subagent Priority (Regression)', () => {
     it('should DENY subagents in Plan Mode despite dynamic allow rules', async () => {
       // Plan Mode Deny (1.06) > Subagent Allow (1.05)
