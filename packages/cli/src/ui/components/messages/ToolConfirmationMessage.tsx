@@ -16,6 +16,7 @@ import {
   ToolConfirmationOutcome,
   hasRedirection,
   debugLogger,
+  safeJsonStringify,
 } from '@google/gemini-cli-core';
 import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
@@ -446,11 +447,23 @@ export const ToolConfirmationMessage: React.FC<
     } else if (confirmationDetails.type === 'mcp') {
       // mcp tool confirmation
       const mcpProps = confirmationDetails;
+      const hasArgs =
+        mcpProps.args !== undefined && Object.keys(mcpProps.args).length > 0;
 
       bodyContent = (
         <Box flexDirection="column">
           <Text color={theme.text.link}>MCP Server: {mcpProps.serverName}</Text>
           <Text color={theme.text.link}>Tool: {mcpProps.toolName}</Text>
+          {hasArgs && (
+            <MaxSizedBox
+              maxHeight={availableBodyContentHeight()}
+              maxWidth={Math.max(terminalWidth, 1)}
+            >
+              <Text color={theme.text.secondary}>
+                {safeJsonStringify(mcpProps.args, 2)}
+              </Text>
+            </MaxSizedBox>
+          )}
         </Box>
       );
     }
