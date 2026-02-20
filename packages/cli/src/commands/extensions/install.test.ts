@@ -21,11 +21,8 @@ import type {
   debugLogger,
   type GeminiCLIExtension,
 } from '@google/gemini-cli-core';
-import type {
-  inferInstallMetadata} from '../../config/extension-manager.js';
-import {
-  ExtensionManager
-} from '../../config/extension-manager.js';
+import type { inferInstallMetadata } from '../../config/extension-manager.js';
+import { ExtensionManager } from '../../config/extension-manager.js';
 import type {
   promptForConsentNonInteractive,
   requestConsentNonInteractive,
