@@ -193,6 +193,7 @@ export async function start_sandbox(
       process.stdin.pause();
       sandboxProcess = spawn(config.command, args, {
         stdio: 'inherit',
+        env: sandboxEnv,
       });
       return await new Promise((resolve, reject) => {
         sandboxProcess?.on('error', reject);
