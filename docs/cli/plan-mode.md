@@ -61,7 +61,11 @@ Other ways to start in Plan Mode:
 You can enter Plan Mode in three ways:
 
 1.  **Keyboard Shortcut:** Press `Shift+Tab` to cycle through approval modes
-    (`Default` -> `Plan` -> `Auto-Edit`).
+    (`Default` -> `Auto-Edit` -> `Plan`).
+
+    > **Note:** Plan Mode is automatically removed from the rotation when the
+    > agent is actively processing or showing confirmation dialogs.
+
 2.  **Command:** Type `/plan` in the input box.
 3.  **Natural Language:** Ask the agent to "start a plan for...". The agent will
     then call the [`enter_plan_mode`] tool to switch modes.
@@ -123,6 +127,47 @@ To use a skill in Plan Mode, you can explicitly ask the agent to "use the
 [skill-name] skill to plan..." or the agent may autonomously activate it based
 on the task description.
 
+### Custom Plan Directory and Policies
+
+By default, planning artifacts are stored in a managed temporary directory
+outside your project: `~/.gemini/tmp/<project>/<session-id>/plans/`.
+
+You can configure a custom directory for plans in your `settings.json`. For
+example, to store plans in a `.gemini/plans` directory within your project:
+
+```json
+{
+  "general": {
+    "plan": {
+      "directory": ".gemini/plans"
+    }
+  }
+}
+```
+
+To maintain the safety of Plan Mode, user-configured paths for the plans
+directory are restricted to the project root. This ensures that custom planning
+locations defined within a project's workspace cannot be used to escape and
+overwrite sensitive files elsewhere. Any user-configured directory must reside
+within the project boundary.
+
+Because Plan Mode is read-only by default, using a custom directory requires
+updating your [Policy Engine] configurations to allow `write_file` and `replace`
+in that specific location. For example, to allow writing to the `.gemini/plans`
+directory within your project, create a policy file at
+`~/.gemini/policies/plan-custom-directory.toml`:
+
+```toml
+[[rule]]
+toolName = ["write_file", "replace"]
+decision = "allow"
+priority = 100
+modes = ["plan"]
+# Adjust the pattern to match your custom directory.
+# This example matches any .md file in a .gemini/plans directory within the project.
+argsPattern = "\"file_path\":\".*\\\\.gemini/plans/.*\\\\.md\""
+```
+
 ### Customizing Policies
 
 Plan Mode is designed to be read-only by default to ensure safety during the
@@ -180,7 +225,7 @@ Guide].
 [MCP tools]: /docs/tools/mcp-server.md
 [`activate_skill`]: /docs/cli/skills.md
 [experimental research sub-agents]: /docs/core/subagents.md
-[Policy Engine Guide]: /docs/core/policy-engine.md
+[Policy Engine Guide]: /docs/reference/policy-engine.md
 [`enter_plan_mode`]: /docs/tools/planning.md#1-enter_plan_mode-enterplanmode
 [`exit_plan_mode`]: /docs/tools/planning.md#2-exit_plan_mode-exitplanmode
 [`ask_user`]: /docs/tools/ask-user.md

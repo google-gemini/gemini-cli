@@ -64,6 +64,7 @@ export const memoryCommand: SlashCommand = {
     },
     {
       name: 'refresh',
+      altNames: ['reload'],
       description: 'Refresh the memory from the source',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,

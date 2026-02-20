@@ -14,6 +14,7 @@ import {
   type RetrieveUserQuotaResponse,
   type SkillDefinition,
   type AgentDefinition,
+  type ApprovalMode,
   CoreToolCallStatus,
   checkExhaustive,
 } from '@google/gemini-cli-core';
@@ -106,6 +107,9 @@ export interface IndividualToolCallDisplay {
   ptyId?: number;
   outputFile?: string;
   correlationId?: string;
+  approvalMode?: ApprovalMode;
+  progressMessage?: string;
+  progressPercent?: number;
 }
 
 export interface CompressionProps {
@@ -144,6 +148,7 @@ export type HistoryItemInfo = HistoryItemBase & {
   text: string;
   icon?: string;
   color?: string;
+  marginBottom?: number;
 };
 
 export type HistoryItemError = HistoryItemBase & {
@@ -219,6 +224,8 @@ export type HistoryItemToolGroup = HistoryItemBase & {
   tools: IndividualToolCallDisplay[];
   borderTop?: boolean;
   borderBottom?: boolean;
+  borderColor?: string;
+  borderDimColor?: boolean;
 };
 
 export type HistoryItemUserShell = HistoryItemBase & {
@@ -244,6 +251,11 @@ export interface ChatDetail {
 export type HistoryItemThinking = HistoryItemBase & {
   type: 'thinking';
   thought: ThoughtSummary;
+};
+
+export type HistoryItemHint = HistoryItemBase & {
+  type: 'hint';
+  text: string;
 };
 
 export type HistoryItemChatList = HistoryItemBase & {
@@ -370,6 +382,7 @@ export type HistoryItemWithoutId =
   | HistoryItemMcpStatus
   | HistoryItemChatList
   | HistoryItemThinking
+  | HistoryItemHint
   | HistoryItemHooksList;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
@@ -395,6 +408,7 @@ export enum MessageType {
   MCP_STATUS = 'mcp_status',
   CHAT_LIST = 'chat_list',
   HOOKS_LIST = 'hooks_list',
+  HINT = 'hint',
 }
 
 // Simplified message structure for internal feedback

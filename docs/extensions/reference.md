@@ -1,134 +1,113 @@
-# Extensions reference
+# Extension reference
 
 This guide covers the `gemini extensions` commands and the structure of the
 `gemini-extension.json` configuration file.
 
-## Extension management
+## Manage extensions
 
-We offer a suite of extension management tools using `gemini extensions`
-commands.
+Use the `gemini extensions` command group to manage your extensions from the
+terminal.
 
-Note that these commands (e.g. `gemini extensions install`) are not supported
-from within the CLI's **interactive mode**, although you can list installed
-extensions using the `/extensions list` slash command.
+Note that commands like `gemini extensions install` are not supported within the
+CLI's interactive mode. However, you can use the `/extensions list` command to
+view installed extensions. All management operations, including updates to slash
+commands, take effect only after you restart the CLI session.
 
-Note that all of these management operations (including updates to slash
-commands) will only be reflected in active CLI sessions on **restart**.
+### Install an extension
 
-### Installing an extension
+Install an extension by providing its GitHub repository URL or a local file
+path.
 
-You can install an extension using `gemini extensions install` with either a
-GitHub URL or a local path.
+Gemini CLI creates a copy of the extension during installation. You must run
+`gemini extensions update` to pull changes from the source. To install from
+GitHub, you must have `git` installed on your machine.
 
-Note that we create a copy of the installed extension, so you will need to run
-`gemini extensions update` to pull in changes from both locally-defined
-extensions and those on GitHub.
-
-NOTE: If you are installing an extension from GitHub, you'll need to have `git`
-installed on your machine. See
-[git installation instructions](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
-for help.
-
-```
+```bash
 gemini extensions install <source> [--ref <ref>] [--auto-update] [--pre-release] [--consent]
 ```
 
-- `<source>`: The github URL or local path of the extension to install.
-- `--ref`: The git ref to install from.
-- `--auto-update`: Enable auto-update for this extension.
-- `--pre-release`: Enable pre-release versions for this extension.
-- `--consent`: Acknowledge the security risks of installing an extension and
-  skip the confirmation prompt.
+- `<source>`: The GitHub URL or local path of the extension.
+- `--ref`: The git ref (branch, tag, or commit) to install.
+- `--auto-update`: Enable automatic updates for this extension.
+- `--pre-release`: Enable installation of pre-release versions.
+- `--consent`: Acknowledge security risks and skip the confirmation prompt.
 
-### Uninstalling an extension
+### Uninstall an extension
 
-To uninstall one or more extensions, run
-`gemini extensions uninstall <name...>`:
+To uninstall one or more extensions, use the `uninstall` command:
 
-```
-gemini extensions uninstall gemini-cli-security gemini-cli-another-extension
+```bash
+gemini extensions uninstall <name...>
 ```
 
-### Disabling an extension
+### Disable an extension
 
-Extensions are, by default, enabled across all workspaces. You can disable an
-extension entirely or for specific workspace.
+Extensions are enabled globally by default. You can disable an extension
+entirely or for a specific workspace.
 
-```
+```bash
 gemini extensions disable <name> [--scope <scope>]
 ```
 
 - `<name>`: The name of the extension to disable.
 - `--scope`: The scope to disable the extension in (`user` or `workspace`).
 
-### Enabling an extension
+### Enable an extension
 
-You can enable extensions using `gemini extensions enable <name>`. You can also
-enable an extension for a specific workspace using
-`gemini extensions enable <name> --scope=workspace` from within that workspace.
+Re-enable a disabled extension using the `enable` command:
 
-```
+```bash
 gemini extensions enable <name> [--scope <scope>]
 ```
 
 - `<name>`: The name of the extension to enable.
 - `--scope`: The scope to enable the extension in (`user` or `workspace`).
 
-### Updating an extension
+### Update an extension
 
-For extensions installed from a local path or a git repository, you can
-explicitly update to the latest version (as reflected in the
-`gemini-extension.json` `version` field) with `gemini extensions update <name>`.
+Update an extension to the version specified in its `gemini-extension.json`
+file.
 
-You can update all extensions with:
-
+```bash
+gemini extensions update <name>
 ```
+
+To update all installed extensions at once:
+
+```bash
 gemini extensions update --all
 ```
 
-### Create a boilerplate extension
+### Create an extension from a template
 
-We offer several example extensions `context`, `custom-commands`,
-`exclude-tools` and `mcp-server`. You can view these examples
-[here](https://github.com/google-gemini/gemini-cli/tree/main/packages/cli/src/commands/extensions/examples).
+Create a new extension directory using a built-in template.
 
-To copy one of these examples into a development directory using the type of
-your choosing, run:
-
-```
+```bash
 gemini extensions new <path> [template]
 ```
 
-- `<path>`: The path to create the extension in.
-- `[template]`: The boilerplate template to use.
+- `<path>`: The directory to create.
+- `[template]`: The template to use (e.g., `mcp-server`, `context`,
+  `custom-commands`).
 
 ### Link a local extension
 
-The `gemini extensions link` command will create a symbolic link from the
-extension installation directory to the development path.
+Create a symbolic link between your development directory and the Gemini CLI
+extensions directory. This lets you test changes immediately without
+reinstalling.
 
-This is useful so you don't have to run `gemini extensions update` every time
-you make changes you'd like to test.
-
-```
+```bash
 gemini extensions link <path>
 ```
 
-- `<path>`: The path of the extension to link.
-
 ## Extension format
 
-On startup, Gemini CLI looks for extensions in `<home>/.gemini/extensions`
-
-Extensions exist as a directory that contains a `gemini-extension.json` file.
-For example:
-
-`<home>/.gemini/extensions/my-extension/gemini-extension.json`
+Gemini CLI loads extensions from `<home>/.gemini/extensions`. Each extension
+must have a `gemini-extension.json` file in its root directory.
 
 ### `gemini-extension.json`
 
-The `gemini-extension.json` file contains the configuration for the extension.
-The file has the following structure:
+The manifest file defines the extension's behavior and configuration.
 
 ```json
 {
@@ -145,53 +124,27 @@ The file has the following structure:
 }
 ```
 
-- `name`: The name of the extension. This is used to uniquely identify the
-  extension and for conflict resolution when extension commands have the same
-  name as user or project commands. The name should be lowercase or numbers and
-  use dashes instead of underscores or spaces. This is how users will refer to
-  your extension in the CLI. Note that we expect this name to match the
-  extension directory name.
-- `version`: The version of the extension.
-- `description`: A short description of the extension. This will be displayed on
-  [geminicli.com/extensions](https://geminicli.com/extensions).
-- `mcpServers`: A map of MCP servers to settings. The key is the name of the
-  server, and the value is the server configuration. These servers will be
-  loaded on startup just like MCP servers settingsd in a
-  [`settings.json` file](../get-started/configuration.md). If both an extension
-  and a `settings.json` file settings an MCP server with the same name, the
-  server defined in the `settings.json` file takes precedence.
-  - Note that all MCP server configuration options are supported except for
-    `trust`.
-- `contextFileName`: The name of the file that contains the context for the
-  extension. This will be used to load the context from the extension directory.
-  If this property is not used but a `GEMINI.md` file is present in your
-  extension directory, then that file will be loaded.
-- `excludeTools`: An array of tool names to exclude from the model. You can also
-  specify command-specific restrictions for tools that support it, like the
-  `run_shell_command` tool. For example,
-  `"excludeTools": ["run_shell_command(rm -rf)"]` will block the `rm -rf`
-  command. Note that this differs from the MCP server `excludeTools`
-  functionality, which can be listed in the MCP server config.
+- `name`: A unique identifier for the extension. Use lowercase letters, numbers,
+  and dashes. This name must match the extension's directory name.
+- `version`: The current version of the extension.
+- `description`: A short summary shown in the extension gallery.
+- <a id="mcp-servers"></a>`mcpServers`: A map of Model Context Protocol (MCP)
+  servers. Extension servers follow the same format as standard
+  [CLI configuration](../reference/configuration.md).
+- `contextFileName`: The name of the context file (defaults to `GEMINI.md`). Can
+  also be an array of strings to load multiple context files.
+- `excludeTools`: An array of tools to block from the model. You can restrict
+  specific arguments, such as `run_shell_command(rm -rf)`.
+- `themes`: An optional list of themes provided by the extension. See
+  [Themes](../cli/themes.md) for more information.
 
-When Gemini CLI starts, it loads all the extensions and merges their
-configurations. If there are any conflicts, the workspace configuration takes
-precedence.
+### Extension settings
 
-### Settings
+Extensions can define settings that users provide during installation, such as
+API keys or URLs. These values are stored in a `.env` file within the extension
+directory.
 
-Extensions can define settings that the user will be prompted to provide upon
-installation. This is useful for things like API keys, URLs, or other
-configuration that the extension needs to function.
-
-To define settings, add a `settings` array to your `gemini-extension.json` file.
-Each object in the array should have the following properties:
-
-- `name`: A user-friendly name for the setting.
-- `description`: A description of the setting and what it's used for.
-- `envVar`: The name of the environment variable that the setting will be stored
-  as.
-- `sensitive`: Optional boolean. If true, obfuscates the input the user provides
-  and stores the secret in keychain storage. **Example**
+To define settings, add a `settings` array to your manifest:
 
 ```json
 {
@@ -201,133 +154,112 @@ Each object in the array should have the following properties:
     {
       "name": "API Key",
       "description": "Your API key for the service.",
-      "envVar": "MY_API_KEY"
+      "envVar": "MY_API_KEY",
+      "sensitive": true
     }
   ]
 }
 ```
 
-When a user installs this extension, they will be prompted to enter their API
-key. The value will be saved to a `.env` file in the extension's directory
-(e.g., `<home>/.gemini/extensions/my-api-extension/.env`).
+- `name`: The setting's display name.
+- `description`: A clear explanation of the setting.
+- `envVar`: The environment variable name where the value is stored.
+- `sensitive`: If `true`, the value is stored in the system keychain and
+  obfuscated in the UI.
 
-You can view a list of an extension's settings by running:
+To update an extension's settings:
 
+```bash
+gemini extensions config <name> [setting] [--scope <scope>]
 ```
-gemini extensions list
-```
-
-and you can update a given setting using:
-
-```
-gemini extensions config <extension name> [setting name] [--scope <scope>]
-```
-
-- `--scope`: The scope to set the setting in (`user` or `workspace`). This is
-  optional and will default to `user`.
 
 ### Custom commands
 
-Extensions can provide [custom commands](../cli/custom-commands.md) by placing
-TOML files in a `commands/` subdirectory within the extension directory. These
-commands follow the same format as user and project custom commands and use
-standard naming conventions.
+Provide [custom commands](../cli/custom-commands.md) by placing TOML files in a
+`commands/` subdirectory. Gemini CLI uses the directory structure to determine
+the command name.
 
-**Example**
+For an extension named `gcp`:
 
-An extension named `gcp` with the following structure:
-
-```
-.gemini/extensions/gcp/
-├── gemini-extension.json
-└── commands/
-    ├── deploy.toml
-    └── gcs/
-        └── sync.toml
-```
-
-Would provide these commands:
-
-- `/deploy` - Shows as `[gcp] Custom command from deploy.toml` in help
-- `/gcs:sync` - Shows as `[gcp] Custom command from sync.toml` in help
+- `commands/deploy.toml` becomes `/deploy`
+- `commands/gcs/sync.toml` becomes `/gcs:sync` (namespaced with a colon)
 
 ### Hooks
 
-Extensions can provide [hooks](../hooks/index.md) to intercept and customize
-Gemini CLI behavior at specific lifecycle events. Hooks provided by an extension
-must be defined in a `hooks/hooks.json` file within the extension directory.
+Intercept and customize CLI behavior using [hooks](../hooks/index.md). Define
+hooks in a `hooks/hooks.json` file within your extension directory. Note that
+hooks are not defined in the `gemini-extension.json` manifest.
 
-> [!IMPORTANT] Hooks are not defined directly in `gemini-extension.json`. The
-> CLI specifically looks for the `hooks/hooks.json` file.
+### Agent skills
 
-### Agent Skills
-
-Extensions can bundle [Agent Skills](../cli/skills.md) to provide specialized
-workflows. Skills must be placed in a `skills/` directory within the extension.
-
-**Example**
-
-An extension with the following structure:
-
-```
-.gemini/extensions/my-extension/
-├── gemini-extension.json
-└── skills/
-    └── security-audit/
-        └── SKILL.md
-```
-
-Will expose a `security-audit` skill that the model can activate.
+Bundle [agent skills](../cli/skills.md) to provide specialized workflows. Place
+skill definitions in a `skills/` directory. For example,
+`skills/security-audit/SKILL.md` exposes a `security-audit` skill.
 
 ### Sub-agents
 
-> **Note: Sub-agents are currently an experimental feature.**
+> **Note:** Sub-agents are a preview feature currently under active development.
 
-Extensions can provide [sub-agents](../core/subagents.md) that users can
-delegate tasks to.
+Provide [sub-agents](../core/subagents.md) that users can delegate tasks to. Add
+agent definition files (`.md`) to an `agents/` directory in your extension root.
 
-To bundle sub-agents with your extension, create an `agents/` directory in your
-extension's root folder and add your agent definition files (`.md`) there.
+### Themes
+
+Extensions can provide custom themes to personalize the CLI UI. Themes are
+defined in the `themes` array in `gemini-extension.json`.
 
 **Example**
 
-```
-.gemini/extensions/my-extension/
-├── gemini-extension.json
-└── agents/
-    ├── security-auditor.md
-    └── database-expert.md
+```json
+{
+  "name": "my-green-extension",
+  "version": "1.0.0",
+  "themes": [
+    {
+      "name": "shades-of-green",
+      "type": "custom",
+      "background": {
+        "primary": "#1a362a"
+      },
+      "text": {
+        "primary": "#a6e3a1",
+        "secondary": "#6e8e7a",
+        "link": "#89e689"
+      },
+      "status": {
+        "success": "#76c076",
+        "warning": "#d9e689",
+        "error": "#b34e4e"
+      },
+      "border": {
+        "default": "#4a6c5a"
+      },
+      "ui": {
+        "comment": "#6e8e7a"
+      }
+    }
+  ]
+}
 ```
 
-Gemini CLI will automatically discover and load these agents when the extension
-is installed and enabled.
+Custom themes provided by extensions can be selected using the `/theme` command
+or by setting the `ui.theme` property in your `settings.json` file. Note that
+when referring to a theme from an extension, the extension name is appended to
+the theme name in parentheses, e.g., `shades-of-green (my-green-extension)`.
 
 ### Conflict resolution
 
-Extension commands have the lowest precedence. When a conflict occurs with user
-or project commands:
-
-1. **No conflict**: Extension command uses its natural name (e.g., `/deploy`)
-2. **With conflict**: Extension command is renamed with the extension prefix
-   (e.g., `/gcp.deploy`)
-
-For example, if both a user and the `gcp` extension define a `deploy` command:
-
-- `/deploy` - Executes the user's deploy command
-- `/gcp.deploy` - Executes the extension's deploy command (marked with `[gcp]`
-  tag)
+Extension commands have the lowest precedence. If an extension command name
+conflicts with a user or project command, the extension command is prefixed with
+the extension name (e.g., `/gcp.deploy`) using a dot separator.
 
 ## Variables
 
-Gemini CLI extensions allow variable substitution in both
-`gemini-extension.json` and `hooks/hooks.json`. This can be useful if e.g., you
-need the current directory to run an MCP server using an argument like
-`"args": ["${extensionPath}${/}dist${/}server.js"]`.
+Gemini CLI supports variable substitution in `gemini-extension.json` and
+`hooks/hooks.json`.
 
-**Supported variables:**
-
-| variable                   | description                                                                                                                                                     |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `${extensionPath}`         | The fully-qualified path of the extension in the user's filesystem e.g., '/Users/username/.gemini/extensions/example-extension'. This will not unwrap symlinks. |
-| `${workspacePath}`         | The fully-qualified path of the current workspace.                                                                                                              |
-| `${/} or ${pathSeparator}` | The path separator (differs per OS).                                                                                                                            |
+| Variable           | Description                                     |
+| :----------------- | :---------------------------------------------- |
+| `${extensionPath}` | The absolute path to the extension's directory. |
+| `${workspacePath}` | The absolute path to the current workspace.     |
+| `${/}`             | The platform-specific path separator.           |
