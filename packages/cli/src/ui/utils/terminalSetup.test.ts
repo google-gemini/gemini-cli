@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { terminalSetup, VSCODE_SHIFT_ENTER_SEQUENCE } from './terminalSetup.js';
+import {
+  terminalSetup,
+  shouldPromptForTerminalSetup,
+  VSCODE_SHIFT_ENTER_SEQUENCE,
+} from './terminalSetup.js';
 
 // Mock dependencies
 const mocks = vi.hoisted(() => ({
@@ -20,6 +24,25 @@ const mocks = vi.hoisted(() => ({
     write: vi.fn(),
     on: vi.fn(),
   },
+}));
+
+// Mock React (needed because terminalSetup.ts imports useEffect/useRef)
+vi.mock('react', () => ({
+  useEffect: vi.fn(),
+  useRef: vi.fn(() => ({ current: false })),
+}));
+
+// Mock persistentState
+vi.mock('../../utils/persistentState.js', () => ({
+  persistentState: {
+    get: vi.fn().mockReturnValue(undefined),
+    set: vi.fn(),
+  },
+}));
+
+// Mock consent module
+vi.mock('../../config/extensions/consent.js', () => ({
+  requestConsentInteractive: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -48,6 +71,12 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     homedir: mocks.homedir,
+    debugLogger: {
+      ...actual.debugLogger,
+      debug: vi.fn(),
+      log: vi.fn(),
+      warn: vi.fn(),
+    },
   };
 });
 
@@ -56,6 +85,9 @@ vi.mock('./terminalCapabilityManager.js', () => ({
     isKittyProtocolEnabled: vi.fn().mockReturnValue(false),
   },
 }));
+
+// Import the mock so we can control isKittyProtocolEnabled per test
+import { terminalCapabilityManager } from './terminalCapabilityManager.js';
 
 describe('terminalSetup', () => {
   beforeEach(() => {
@@ -71,6 +103,9 @@ describe('terminalSetup', () => {
     mocks.mkdir.mockResolvedValue(undefined);
     mocks.copyFile.mockResolvedValue(undefined);
     mocks.exec.mockImplementation((cmd, cb) => cb(null, { stdout: '' }));
+    vi.mocked(terminalCapabilityManager.isKittyProtocolEnabled).mockReturnValue(
+      false,
+    );
   });
 
   afterEach(() => {
@@ -193,6 +228,101 @@ describe('terminalSetup', () => {
 
       expect(result.success).toBe(true);
       expect(mocks.writeFile).toHaveBeenCalled();
+    });
+  });
+
+  describe('shouldPromptForTerminalSetup', () => {
+    it('should return false when kitty protocol is enabled', async () => {
+      vi.mocked(
+        terminalCapabilityManager.isKittyProtocolEnabled,
+      ).mockReturnValue(true);
+      const result = await shouldPromptForTerminalSetup();
+      expect(result).toBe(false);
+    });
+
+    it('should return false when no supported terminal is detected', async () => {
+      // No terminal env vars set (defaults from beforeEach clear them)
+      mocks.exec.mockImplementation(
+        (cmd: string, cb: (err: null, result: { stdout: string }) => void) =>
+          cb(null, { stdout: 'bash\n' }),
+      );
+      const result = await shouldPromptForTerminalSetup();
+      expect(result).toBe(false);
+    });
+
+    it('should return true when in VS Code with no keybindings file', async () => {
+      process.env['TERM_PROGRAM'] = 'vscode';
+      mocks.readFile.mockRejectedValue(new Error('ENOENT'));
+
+      const result = await shouldPromptForTerminalSetup();
+      expect(result).toBe(true);
+    });
+
+    it('should return true when in VS Code with empty keybindings', async () => {
+      process.env['TERM_PROGRAM'] = 'vscode';
+      mocks.readFile.mockResolvedValue('[]');
+
+      const result = await shouldPromptForTerminalSetup();
+      expect(result).toBe(true);
+    });
+
+    it('should return false when both shift+enter and ctrl+enter bindings exist', async () => {
+      process.env['TERM_PROGRAM'] = 'vscode';
+      const existingBindings = [
+        {
+          key: 'shift+enter',
+          command: 'workbench.action.terminal.sendSequence',
+          args: { text: VSCODE_SHIFT_ENTER_SEQUENCE },
+        },
+        {
+          key: 'ctrl+enter',
+          command: 'workbench.action.terminal.sendSequence',
+          args: { text: VSCODE_SHIFT_ENTER_SEQUENCE },
+        },
+      ];
+      mocks.readFile.mockResolvedValue(JSON.stringify(existingBindings));
+
+      const result = await shouldPromptForTerminalSetup();
+      expect(result).toBe(false);
+    });
+
+    it('should return true when only shift+enter binding exists', async () => {
+      process.env['TERM_PROGRAM'] = 'vscode';
+      const existingBindings = [
+        {
+          key: 'shift+enter',
+          command: 'workbench.action.terminal.sendSequence',
+          args: { text: VSCODE_SHIFT_ENTER_SEQUENCE },
+        },
+      ];
+      mocks.readFile.mockResolvedValue(JSON.stringify(existingBindings));
+
+      const result = await shouldPromptForTerminalSetup();
+      expect(result).toBe(true);
+    });
+
+    it('should return true when keybindings file contains invalid JSON', async () => {
+      process.env['TERM_PROGRAM'] = 'vscode';
+      mocks.readFile.mockResolvedValue('{ invalid json');
+
+      const result = await shouldPromptForTerminalSetup();
+      expect(result).toBe(true);
+    });
+
+    it('should return true when keybindings file is not an array', async () => {
+      process.env['TERM_PROGRAM'] = 'vscode';
+      mocks.readFile.mockResolvedValue('{}');
+
+      const result = await shouldPromptForTerminalSetup();
+      expect(result).toBe(true);
+    });
+
+    it('should work for Cursor terminal', async () => {
+      process.env['CURSOR_TRACE_ID'] = 'some-id';
+      mocks.readFile.mockRejectedValue(new Error('ENOENT'));
+
+      const result = await shouldPromptForTerminalSetup();
+      expect(result).toBe(true);
     });
   });
 });

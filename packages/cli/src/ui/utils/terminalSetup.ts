@@ -32,6 +32,11 @@ import { promisify } from 'node:util';
 import { terminalCapabilityManager } from './terminalCapabilityManager.js';
 
 import { debugLogger, homedir } from '@google/gemini-cli-core';
+import { useEffect, useRef } from 'react';
+import { persistentState } from '../../utils/persistentState.js';
+import { requestConsentInteractive } from '../../config/extensions/consent.js';
+import { MessageType, type ConfirmationRequest } from '../types.js';
+import type { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 
 export const VSCODE_SHIFT_ENTER_SEQUENCE = '\\\r\n';
 
@@ -53,6 +58,54 @@ export interface TerminalSetupResult {
 }
 
 type SupportedTerminal = 'vscode' | 'cursor' | 'windsurf' | 'antigravity';
+
+/**
+ * Terminal metadata used for configuration.
+ */
+interface TerminalData {
+  terminalName: string;
+  appName: string;
+}
+
+const TERMINAL_DATA: Record<SupportedTerminal, TerminalData> = {
+  vscode: { terminalName: 'VS Code', appName: 'Code' },
+  cursor: { terminalName: 'Cursor', appName: 'Cursor' },
+  windsurf: { terminalName: 'Windsurf', appName: 'Windsurf' },
+  antigravity: { terminalName: 'Antigravity', appName: 'Antigravity' },
+};
+
+/**
+ * Maps a supported terminal ID to its display name and config folder name.
+ */
+function getSupportedTerminalData(
+  terminal: SupportedTerminal,
+): TerminalData | null {
+  return TERMINAL_DATA[terminal] || null;
+}
+
+type Keybinding = {
+  key?: string;
+  command?: string;
+  args?: { text?: string };
+};
+
+/**
+ * Checks if a keybindings array contains our specific binding for a given key.
+ */
+function hasOurBinding(
+  keybindings: unknown[],
+  key: 'shift+enter' | 'ctrl+enter',
+): boolean {
+  return keybindings.some((kb) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const binding = kb as Keybinding;
+    return (
+      binding.key === key &&
+      binding.command === 'workbench.action.terminal.sendSequence' &&
+      binding.args?.text === VSCODE_SHIFT_ENTER_SEQUENCE
+    );
+  });
+}
 
 export function getTerminalProgram(): SupportedTerminal | null {
   const termProgram = process.env['TERM_PROGRAM'];
@@ -317,20 +370,57 @@ async function configureVSCodeStyle(
 
 // Terminal-specific configuration functions
 
-async function configureVSCode(): Promise<TerminalSetupResult> {
-  return configureVSCodeStyle('VS Code', 'Code');
-}
+/**
+ * Determines whether it is useful to prompt the user to run /terminal-setup
+ * in the current environment.
+ *
+ * Returns true when:
+ * - Kitty/modifyOtherKeys keyboard protocol is not already enabled, and
+ * - We're running inside a supported terminal (VS Code, Cursor, Windsurf, Antigravity), and
+ * - The keybindings file either does not exist or does not already contain both
+ *   of our Shift+Enter and Ctrl+Enter bindings.
+ */
+export async function shouldPromptForTerminalSetup(): Promise<boolean> {
+  if (terminalCapabilityManager.isKittyProtocolEnabled()) {
+    return false;
+  }
 
-async function configureCursor(): Promise<TerminalSetupResult> {
-  return configureVSCodeStyle('Cursor', 'Cursor');
-}
+  const terminal = await detectTerminal();
+  if (!terminal) {
+    return false;
+  }
 
-async function configureWindsurf(): Promise<TerminalSetupResult> {
-  return configureVSCodeStyle('Windsurf', 'Windsurf');
-}
+  const terminalData = getSupportedTerminalData(terminal);
+  if (!terminalData) {
+    return false;
+  }
 
-async function configureAntigravity(): Promise<TerminalSetupResult> {
-  return configureVSCodeStyle('Antigravity', 'Antigravity');
+  const configDir = getVSCodeStyleConfigDir(terminalData.appName);
+  if (!configDir) {
+    return false;
+  }
+
+  const keybindingsFile = path.join(configDir, 'keybindings.json');
+
+  try {
+    const content = await fs.readFile(keybindingsFile, 'utf8');
+    const cleanContent = stripJsonComments(content);
+    const parsedContent = JSON.parse(cleanContent);
+
+    if (!Array.isArray(parsedContent)) {
+      return true;
+    }
+
+    const hasOurShiftEnter = hasOurBinding(parsedContent, 'shift+enter');
+    const hasOurCtrlEnter = hasOurBinding(parsedContent, 'ctrl+enter');
+
+    return !(hasOurShiftEnter && hasOurCtrlEnter);
+  } catch (error) {
+    debugLogger.debug(
+      `Failed to read or parse keybindings, assuming prompt is needed: ${error}`,
+    );
+    return true;
+  }
 }
 
 /**
@@ -372,19 +462,91 @@ export async function terminalSetup(): Promise<TerminalSetupResult> {
     };
   }
 
-  switch (terminal) {
-    case 'vscode':
-      return configureVSCode();
-    case 'cursor':
-      return configureCursor();
-    case 'windsurf':
-      return configureWindsurf();
-    case 'antigravity':
-      return configureAntigravity();
-    default:
-      return {
-        success: false,
-        message: `Terminal "${terminal}" is not supported yet.`,
-      };
+  const terminalData = getSupportedTerminalData(terminal);
+  if (!terminalData) {
+    return {
+      success: false,
+      message: `Terminal "${terminal}" is not supported yet.`,
+    };
   }
+
+  return configureVSCodeStyle(terminalData.terminalName, terminalData.appName);
+}
+
+const TERMINAL_SETUP_CONSENT_MESSAGE =
+  'Would you like to configure your terminal for multiline input (Shift+Enter / Ctrl+Enter)?\n' +
+  'This will run the `/terminal-setup` command automatically.';
+
+function formatTerminalSetupResultMessage(result: TerminalSetupResult): string {
+  if (result.success) {
+    return result.requiresRestart
+      ? `${result.message}\nPlease restart your terminal for changes to take effect.`
+      : result.message;
+  }
+  return `Terminal setup failed: ${result.message}`;
+}
+
+/**
+ * React hook that prompts the user once to run /terminal-setup when it would
+ * be useful (i.e. inside a supported terminal without multiline keybindings).
+ *
+ * Uses a ref for the cancelled flag so that React re-renders do not
+ * prematurely cancel the async flow — only an actual unmount sets it.
+ */
+export function useTerminalSetupPrompt(
+  addConfirmUpdateExtensionRequest: (value: ConfirmationRequest) => void,
+  historyManager: UseHistoryManagerReturn,
+): void {
+  const cancelledRef = useRef(false);
+
+  useEffect(() => {
+    cancelledRef.current = false;
+
+    void (async () => {
+      try {
+        if (persistentState.get('terminalSetupPromptShown')) {
+          return;
+        }
+
+        const shouldPrompt = await shouldPromptForTerminalSetup();
+        if (cancelledRef.current || !shouldPrompt) {
+          return;
+        }
+
+        const consented = await requestConsentInteractive(
+          TERMINAL_SETUP_CONSENT_MESSAGE,
+          addConfirmUpdateExtensionRequest,
+        );
+        if (cancelledRef.current) {
+          return;
+        }
+
+        persistentState.set('terminalSetupPromptShown', true);
+
+        if (!consented) {
+          return;
+        }
+
+        const result = await terminalSetup();
+        if (cancelledRef.current) {
+          return;
+        }
+
+        historyManager.addItem(
+          {
+            type: result.success ? MessageType.INFO : MessageType.ERROR,
+            text: formatTerminalSetupResultMessage(result),
+          },
+          Date.now(),
+        );
+      } catch (error) {
+        debugLogger.debug('Terminal setup prompt failed:', error);
+      }
+    })();
+
+    return () => {
+      cancelledRef.current = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 }

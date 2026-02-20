@@ -143,6 +143,7 @@ import { isWorkspaceTrusted } from '../config/trustedFolders.js';
 import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
 import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
+import { useTerminalSetupPrompt } from './utils/terminalSetup.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useBanner } from './hooks/useBanner.js';
 import { useHookDisplayState } from './hooks/useHookDisplayState.js';
@@ -550,6 +551,9 @@ export const AppContainer = (props: AppContainerProps) => {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     initializeFromLogger(logger);
   }, [logger, initializeFromLogger]);
+
+  // Prompt user to run /terminal-setup if applicable (one-time)
+  useTerminalSetupPrompt(addConfirmUpdateExtensionRequest, historyManager);
 
   const refreshStatic = useCallback(() => {
     if (!isAlternateBuffer) {
