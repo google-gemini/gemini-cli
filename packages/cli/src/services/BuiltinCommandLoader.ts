@@ -58,6 +58,8 @@ import { shellsCommand } from '../ui/commands/shellsCommand.js';
 import { vimCommand } from '../ui/commands/vimCommand.js';
 import { setupGithubCommand } from '../ui/commands/setupGithubCommand.js';
 import { terminalSetupCommand } from '../ui/commands/terminalSetupCommand.js';
+import { autoCommand } from '../ui/commands/autoCommand.js';
+import { interactiveCommand } from '../ui/commands/interactiveCommand.js';
 
 /**
  * Loads the core, hard-coded slash commands that are an integral part
@@ -82,6 +84,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       aboutCommand,
       ...(this.config?.isAgentsEnabled() ? [agentsCommand] : []),
       authCommand,
+      autoCommand,
       bugCommand,
       {
         ...chatCommand,
@@ -124,6 +127,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       rewindCommand,
       await ideCommand(),
       initCommand,
+      interactiveCommand,
       ...(isNightlyBuild ? [oncallCommand] : []),
       ...(this.config?.getMcpEnabled() === false
         ? [

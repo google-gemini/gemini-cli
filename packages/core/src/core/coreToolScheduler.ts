@@ -46,6 +46,7 @@ import { CoreToolCallStatus } from '../scheduler/types.js';
 import { ToolExecutor } from '../scheduler/tool-executor.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getPolicyDenialError } from '../scheduler/policy.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export type {
   ToolCall,
@@ -630,6 +631,15 @@ export class CoreToolScheduler {
           .check(toolCallForPolicy, serverName);
 
         if (decision === PolicyDecision.DENY) {
+          // Track denials in auto mode for fallback detection
+          if (this.config.isAutoMode()) {
+            const exitedAutoMode = this.config.trackAutoModeDenial();
+            if (exitedAutoMode) {
+              debugLogger.debug(
+                '[CoreToolScheduler] Auto mode exited due to too many consecutive denials. Falling back to interactive mode.',
+              );
+            }
+          }
           const { errorMessage, errorType } = getPolicyDenialError(
             this.config,
             rule,
@@ -645,6 +655,10 @@ export class CoreToolScheduler {
         }
 
         if (decision === PolicyDecision.ALLOW) {
+          // Tool allowed - reset denial counter if in auto mode
+          if (this.config.isAutoMode()) {
+            this.config.resetAutoModeDenialCount();
+          }
           this.setToolCallOutcome(
             reqInfo.callId,
             ToolConfirmationOutcome.ProceedAlways,

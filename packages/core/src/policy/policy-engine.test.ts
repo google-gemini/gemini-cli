@@ -312,6 +312,45 @@ describe('PolicyEngine', () => {
       ).toBe(PolicyDecision.DENY);
     });
 
+    it('should handle runtime non-interactive mode via setRuntimeNonInteractive', async () => {
+      const config: PolicyEngineConfig = {
+        nonInteractive: false,
+        rules: [
+          { toolName: 'interactive-tool', decision: PolicyDecision.ASK_USER },
+          { toolName: 'allowed-tool', decision: PolicyDecision.ALLOW },
+        ],
+      };
+
+      engine = new PolicyEngine(config);
+
+      // Initially interactive: ASK_USER stays ASK_USER
+      expect(
+        (await engine.check({ name: 'interactive-tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.ASK_USER);
+
+      // Enable runtime non-interactive (auto mode)
+      engine.setRuntimeNonInteractive(true);
+      expect(engine.isEffectivelyNonInteractive()).toBe(true);
+
+      // ASK_USER should now become DENY
+      expect(
+        (await engine.check({ name: 'interactive-tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.DENY);
+      // ALLOW should remain ALLOW
+      expect(
+        (await engine.check({ name: 'allowed-tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // Disable runtime non-interactive (back to interactive)
+      engine.setRuntimeNonInteractive(false);
+      expect(engine.isEffectivelyNonInteractive()).toBe(false);
+
+      // ASK_USER should be restored
+      expect(
+        (await engine.check({ name: 'interactive-tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.ASK_USER);
+    });
+
     it('should dynamically switch between modes and respect rule modes', async () => {
       const rules: PolicyRule[] = [
         {

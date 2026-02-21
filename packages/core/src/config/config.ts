@@ -68,7 +68,10 @@ import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
-import { logRipgrepFallback, logFlashFallback } from '../telemetry/loggers.js';
+import { logRipgrepFallback, logFlashFallback ,
+  logApprovalModeSwitch,
+  logApprovalModeDuration,
+} from '../telemetry/loggers.js';
 import {
   RipgrepFallbackEvent,
   FlashFallbackEvent,
@@ -103,9 +106,7 @@ import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
-import type { UserTierId } from '../code_assist/types.js';
-import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
-import type { AdminControlsSettings } from '../code_assist/types.js';
+import type { UserTierId , RetrieveUserQuotaResponse , AdminControlsSettings } from '../code_assist/types.js';
 import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
@@ -119,10 +120,6 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
-import {
-  logApprovalModeSwitch,
-  logApprovalModeDuration,
-} from '../telemetry/loggers.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath } from '../utils/paths.js';
 import { UserHintService } from './userHintService.js';
@@ -699,6 +696,17 @@ export class Config {
   private lastModeSwitchTime: number = Date.now();
   readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
+
+  /**
+   * When true, the session is in "auto mode" — a runtime state where
+   * ASK_USER policy decisions are automatically denied, similar to headless
+   * mode, but without changing the underlying `interactive` flag.
+   * This allows switching a running interactive session into autonomous
+   * execution where restricted commands are auto-rejected.
+   */
+  private _autoMode: boolean = false;
+  private _autoModeDenialCount: number = 0;
+  private static readonly AUTO_MODE_MAX_DENIALS = 5;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -2377,6 +2385,65 @@ export class Config {
 
   isInteractive(): boolean {
     return this.interactive;
+  }
+
+  /**
+   * Returns true if the session is currently in auto mode.
+   * In auto mode, ASK_USER policy decisions are automatically denied
+   * to allow autonomous execution without user confirmation.
+   */
+  isAutoMode(): boolean {
+    return this._autoMode;
+  }
+
+  /**
+   * Enters auto mode, where ASK_USER policy decisions are automatically
+   * denied. This is useful when the user wants to step away and let the
+   * agent continue working, auto-rejecting any commands that require
+   * confirmation so the agent tries alternative safe approaches.
+   */
+  enterAutoMode(): void {
+    this._autoMode = true;
+    this._autoModeDenialCount = 0;
+    this.policyEngine.setRuntimeNonInteractive(true);
+    debugLogger.debug('[Config] Entered auto mode');
+  }
+
+  /**
+   * Exits auto mode and returns to normal interactive mode.
+   * The agent will again block for user confirmation on restricted commands.
+   */
+  exitAutoMode(): void {
+    this._autoMode = false;
+    this._autoModeDenialCount = 0;
+    this.policyEngine.setRuntimeNonInteractive(false);
+    debugLogger.debug('[Config] Exited auto mode');
+  }
+
+  /**
+   * Tracks a denial that occurred in auto mode. If too many consecutive
+   * denials happen, automatically falls back to interactive mode.
+   * @returns true if auto mode was exited due to exceeding the threshold.
+   */
+  trackAutoModeDenial(): boolean {
+    if (!this._autoMode) return false;
+    this._autoModeDenialCount++;
+    debugLogger.debug(
+      `[Config] Auto mode denial count: ${this._autoModeDenialCount}/${Config.AUTO_MODE_MAX_DENIALS}`,
+    );
+    if (this._autoModeDenialCount >= Config.AUTO_MODE_MAX_DENIALS) {
+      this.exitAutoMode();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Resets the auto mode denial counter. Called when a tool executes
+   * successfully in auto mode, proving the agent is making progress.
+   */
+  resetAutoModeDenialCount(): void {
+    this._autoModeDenialCount = 0;
   }
 
   getUseRipgrep(): boolean {
