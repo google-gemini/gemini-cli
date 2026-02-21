@@ -20,6 +20,7 @@ import {
   FatalConfigError,
   FatalTurnLimitedError,
   FatalToolExecutionError,
+  FatalRateLimitError,
 } from './errors.js';
 
 describe('getErrorMessage', () => {
@@ -232,6 +233,9 @@ describe('getErrorType', () => {
     expect(getErrorType(new FatalToolExecutionError('test'))).toBe(
       'FatalToolExecutionError',
     );
+    expect(getErrorType(new FatalRateLimitError('test'))).toBe(
+      'FatalRateLimitError',
+    );
     expect(getErrorType(new FatalCancellationError('test'))).toBe(
       'FatalCancellationError',
     );
@@ -248,5 +252,23 @@ describe('getErrorType', () => {
     expect(getErrorType({})).toBe('unknown');
     expect(getErrorType(null)).toBe('unknown');
     expect(getErrorType(undefined)).toBe('unknown');
+  });
+});
+
+describe('FatalRateLimitError', () => {
+  it('should be an instance of FatalRateLimitError and Error', () => {
+    const err = new FatalRateLimitError('rate limit exceeded');
+    expect(err).toBeInstanceOf(FatalRateLimitError);
+    expect(err).toBeInstanceOf(Error);
+  });
+
+  it('should carry the provided message', () => {
+    const err = new FatalRateLimitError('too many requests');
+    expect(err.message).toBe('too many requests');
+  });
+
+  it('should have exit code 55', () => {
+    const err = new FatalRateLimitError('rate limit exceeded');
+    expect(err.exitCode).toBe(55);
   });
 });

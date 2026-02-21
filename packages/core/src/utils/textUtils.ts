@@ -82,3 +82,29 @@ export function truncateString(
   }
   return str.slice(0, maxLength) + suffix;
 }
+
+/**
+ * Counts the number of lines in a string.
+ * An empty string is considered to have zero lines.
+ * A string without any newline characters is considered to have one line.
+ *
+ * @param text The string to count lines in.
+ * @returns The number of lines.
+ */
+export function countLines(text: string): number {
+  if (text.length === 0) {
+    return 0;
+  }
+  // Split on both Unix (\n) and Windows (\r\n) line endings.
+  return text.split(/\r?\n/).length;
+}
+
+/**
+ * Returns true if the given line contains only whitespace characters (or is empty).
+ *
+ * @param line The line to check.
+ * @returns True when the line is blank.
+ */
+export function isBlankLine(line: string): boolean {
+  return line.trim().length === 0;
+}

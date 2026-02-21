@@ -5,7 +5,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { safeLiteralReplace, truncateString } from './textUtils.js';
+import {
+  safeLiteralReplace,
+  truncateString,
+  countLines,
+  isBlankLine,
+} from './textUtils.js';
 
 describe('safeLiteralReplace', () => {
   it('returns original string when oldString empty or not found', () => {
@@ -97,5 +102,57 @@ describe('truncateString', () => {
 
   it('should handle empty string', () => {
     expect(truncateString('', 5)).toBe('');
+  });
+});
+
+describe('countLines', () => {
+  it('returns 0 for an empty string', () => {
+    expect(countLines('')).toBe(0);
+  });
+
+  it('returns 1 for a string with no newlines', () => {
+    expect(countLines('hello world')).toBe(1);
+  });
+
+  it('counts Unix line endings correctly', () => {
+    expect(countLines('line1\nline2\nline3')).toBe(3);
+  });
+
+  it('counts Windows line endings correctly', () => {
+    expect(countLines('line1\r\nline2\r\nline3')).toBe(3);
+  });
+
+  it('counts a trailing newline as an additional line', () => {
+    expect(countLines('line1\nline2\n')).toBe(3);
+  });
+
+  it('counts a single newline as two lines', () => {
+    expect(countLines('\n')).toBe(2);
+  });
+});
+
+describe('isBlankLine', () => {
+  it('returns true for an empty string', () => {
+    expect(isBlankLine('')).toBe(true);
+  });
+
+  it('returns true for a string of only spaces', () => {
+    expect(isBlankLine('   ')).toBe(true);
+  });
+
+  it('returns true for a string of only tabs', () => {
+    expect(isBlankLine('\t\t')).toBe(true);
+  });
+
+  it('returns true for a mixed whitespace string', () => {
+    expect(isBlankLine(' \t  \t ')).toBe(true);
+  });
+
+  it('returns false for a string with non-whitespace content', () => {
+    expect(isBlankLine('hello')).toBe(false);
+  });
+
+  it('returns false for a string with leading/trailing whitespace around content', () => {
+    expect(isBlankLine('  hello  ')).toBe(false);
   });
 });
