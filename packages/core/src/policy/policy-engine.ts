@@ -100,7 +100,7 @@ export class PolicyEngine {
   private checkers: SafetyCheckerRule[];
   private hookCheckers: HookCheckerRule[];
   private readonly defaultDecision: PolicyDecision;
-  private readonly nonInteractive: boolean;
+  private nonInteractive: boolean;
   private readonly checkerRunner?: CheckerRunner;
   private approvalMode: ApprovalMode;
 
@@ -132,6 +132,20 @@ export class PolicyEngine {
    */
   getApprovalMode(): ApprovalMode {
     return this.approvalMode;
+  }
+
+  /**
+   * Update whether the engine should treat ASK_USER as DENY.
+   */
+  setNonInteractive(enabled: boolean): void {
+    this.nonInteractive = enabled;
+  }
+
+  /**
+   * Returns true when ASK_USER should be treated as DENY.
+   */
+  isNonInteractive(): boolean {
+    return this.nonInteractive;
   }
 
   private shouldDowngradeForRedirection(
