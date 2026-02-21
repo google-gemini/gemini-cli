@@ -108,7 +108,27 @@ describe('<Scrollable />', () => {
       throw new Error('capturedEntry is undefined');
     }
 
-    // Initial state (starts at bottom because of auto-scroll logic)
+    // Initial state (starts at top by default)
+    expect(capturedEntry.getScrollState().scrollTop).toBe(0);
+
+    // Initial state with scrollToBottom={true}
+    unmount();
+    const { waitUntilReady: waitUntilReady2, unmount: unmount2 } =
+      renderWithProviders(
+        <Scrollable hasFocus={true} height={5} scrollToBottom={true}>
+          <Text>Line 1</Text>
+          <Text>Line 2</Text>
+          <Text>Line 3</Text>
+          <Text>Line 4</Text>
+          <Text>Line 5</Text>
+          <Text>Line 6</Text>
+          <Text>Line 7</Text>
+          <Text>Line 8</Text>
+          <Text>Line 9</Text>
+          <Text>Line 10</Text>
+        </Scrollable>,
+      );
+    await waitUntilReady2();
     expect(capturedEntry.getScrollState().scrollTop).toBe(5);
 
     // Call scrollBy multiple times (upwards) in the same tick
@@ -116,14 +136,14 @@ describe('<Scrollable />', () => {
       capturedEntry!.scrollBy(-1);
       capturedEntry!.scrollBy(-1);
     });
-    // Should have moved up by 2
+    // Should have moved up by 2 (5 -> 3)
     expect(capturedEntry.getScrollState().scrollTop).toBe(3);
 
     await act(async () => {
       capturedEntry!.scrollBy(-2);
     });
     expect(capturedEntry.getScrollState().scrollTop).toBe(1);
-    unmount();
+    unmount2();
   });
 
   describe('keypress handling', () => {

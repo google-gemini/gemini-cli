@@ -10,6 +10,16 @@ interface GaxiosError {
   };
 }
 
+function isGaxiosError(error: unknown): error is GaxiosError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    typeof (error as { response: unknown }).response === 'object' &&
+    (error as { response: unknown }).response !== null
+  );
+}
+
 export function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error;
 }
@@ -24,6 +34,15 @@ export function getErrorMessage(error: unknown): string {
   } catch {
     return 'Failed to get error details';
   }
+}
+
+export function getErrorType(error: unknown): string {
+  if (!(error instanceof Error)) return 'unknown';
+
+  // Return constructor name if the generic 'Error' name is used (for custom errors)
+  return error.name === 'Error'
+    ? (error.constructor?.name ?? 'Error')
+    : error.name;
 }
 
 export class FatalError extends Error {
@@ -96,11 +115,41 @@ interface ResponseData {
   };
 }
 
+function isResponseData(data: unknown): data is ResponseData {
+  if (typeof data !== 'object' || data === null) {
+    return false;
+  }
+  const candidate = data as ResponseData;
+  if (!('error' in candidate)) {
+    return false;
+  }
+  const error = candidate.error;
+  if (typeof error !== 'object' || error === null) {
+    return false; // error property exists but is not an object (could be undefined, but we checked 'in')
+  }
+
+  // Optional properties check
+  if (
+    'code' in error &&
+    typeof error.code !== 'number' &&
+    error.code !== undefined
+  ) {
+    return false;
+  }
+  if (
+    'message' in error &&
+    typeof error.message !== 'string' &&
+    error.message !== undefined
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 export function toFriendlyError(error: unknown): unknown {
-  if (error && typeof error === 'object' && 'response' in error) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const gaxiosError = error as GaxiosError;
-    const data = parseResponseData(gaxiosError);
+  if (isGaxiosError(error)) {
+    const data = parseResponseData(error);
     if (data && data.error && data.error.message && data.error.code) {
       switch (data.error.code) {
         case 400:
@@ -120,17 +169,20 @@ export function toFriendlyError(error: unknown): unknown {
 }
 
 function parseResponseData(error: GaxiosError): ResponseData | undefined {
+  let data = error.response?.data;
   // Inexplicably, Gaxios sometimes doesn't JSONify the response data.
-  if (typeof error.response?.data === 'string') {
+  if (typeof data === 'string') {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return JSON.parse(error.response?.data) as ResponseData;
+      data = JSON.parse(data);
     } catch {
       return undefined;
     }
   }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  return error.response?.data as ResponseData | undefined;
+
+  if (isResponseData(data)) {
+    return data;
+  }
+  return undefined;
 }
 
 /**
@@ -143,8 +195,15 @@ function parseResponseData(error: GaxiosError): ResponseData | undefined {
 export function isAuthenticationError(error: unknown): boolean {
   // Check for MCP SDK errors with code property
   // (SseError and StreamableHTTPError both have numeric 'code' property)
-  if (error && typeof error === 'object' && 'code' in error) {
-    const errorCode = (error as { code: unknown }).code;
+  if (
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    typeof (error as { code: unknown }).code === 'number'
+  ) {
+    // Safe access after check
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const errorCode = (error as { code: number }).code;
     if (errorCode === 401) {
       return true;
     }

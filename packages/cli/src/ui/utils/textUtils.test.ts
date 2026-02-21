@@ -332,6 +332,35 @@ describe('textUtils', () => {
       });
     });
 
+    describe('BiDi and deceptive Unicode characters', () => {
+      it('should strip BiDi override characters', () => {
+        const input = 'safe\u202Etxt.sh';
+        // When stripped, it should be 'safetxt.sh'
+        expect(stripUnsafeCharacters(input)).toBe('safetxt.sh');
+      });
+
+      it('should strip all BiDi control characters (LRM, RLM, U+202A-U+202E, U+2066-U+2069)', () => {
+        const bidiChars =
+          '\u200E\u200F\u202A\u202B\u202C\u202D\u202E\u2066\u2067\u2068\u2069';
+        expect(stripUnsafeCharacters('a' + bidiChars + 'b')).toBe('ab');
+      });
+
+      it('should strip zero-width characters (U+200B, U+FEFF)', () => {
+        const zeroWidthChars = '\u200B\uFEFF';
+        expect(stripUnsafeCharacters('a' + zeroWidthChars + 'b')).toBe('ab');
+      });
+
+      it('should preserve ZWJ (U+200D) for complex emojis', () => {
+        const input = 'Family: 👨‍👩‍👧‍👦';
+        expect(stripUnsafeCharacters(input)).toBe('Family: 👨‍👩‍👧‍👦');
+      });
+
+      it('should preserve ZWNJ (U+200C)', () => {
+        const input = 'hello\u200Cworld';
+        expect(stripUnsafeCharacters(input)).toBe('hello\u200Cworld');
+      });
+    });
+
     describe('performance: regex vs array-based', () => {
       it('should handle real-world terminal output with control chars', () => {
         // Simulate terminal output with various control sequences

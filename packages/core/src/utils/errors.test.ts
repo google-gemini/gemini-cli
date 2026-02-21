@@ -12,6 +12,14 @@ import {
   BadRequestError,
   ForbiddenError,
   getErrorMessage,
+  getErrorType,
+  FatalAuthenticationError,
+  FatalCancellationError,
+  FatalInputError,
+  FatalSandboxError,
+  FatalConfigError,
+  FatalTurnLimitedError,
+  FatalToolExecutionError,
 } from './errors.js';
 
 describe('getErrorMessage', () => {
@@ -199,5 +207,46 @@ describe('toFriendlyError', () => {
   it('should return original error if not a Gaxios error object', () => {
     const error = new Error('Regular Error');
     expect(toFriendlyError(error)).toBe(error);
+  });
+});
+
+describe('getErrorType', () => {
+  it('should return error name for standard errors', () => {
+    expect(getErrorType(new Error('test'))).toBe('Error');
+    expect(getErrorType(new TypeError('test'))).toBe('TypeError');
+    expect(getErrorType(new SyntaxError('test'))).toBe('SyntaxError');
+  });
+
+  it('should return constructor name for custom errors', () => {
+    expect(getErrorType(new FatalAuthenticationError('test'))).toBe(
+      'FatalAuthenticationError',
+    );
+    expect(getErrorType(new FatalInputError('test'))).toBe('FatalInputError');
+    expect(getErrorType(new FatalSandboxError('test'))).toBe(
+      'FatalSandboxError',
+    );
+    expect(getErrorType(new FatalConfigError('test'))).toBe('FatalConfigError');
+    expect(getErrorType(new FatalTurnLimitedError('test'))).toBe(
+      'FatalTurnLimitedError',
+    );
+    expect(getErrorType(new FatalToolExecutionError('test'))).toBe(
+      'FatalToolExecutionError',
+    );
+    expect(getErrorType(new FatalCancellationError('test'))).toBe(
+      'FatalCancellationError',
+    );
+    expect(getErrorType(new ForbiddenError('test'))).toBe('ForbiddenError');
+    expect(getErrorType(new UnauthorizedError('test'))).toBe(
+      'UnauthorizedError',
+    );
+    expect(getErrorType(new BadRequestError('test'))).toBe('BadRequestError');
+  });
+
+  it('should return "unknown" for non-Error objects', () => {
+    expect(getErrorType('string error')).toBe('unknown');
+    expect(getErrorType(123)).toBe('unknown');
+    expect(getErrorType({})).toBe('unknown');
+    expect(getErrorType(null)).toBe('unknown');
+    expect(getErrorType(undefined)).toBe('unknown');
   });
 });
