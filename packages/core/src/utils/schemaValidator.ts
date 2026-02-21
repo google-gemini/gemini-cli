@@ -12,9 +12,9 @@ import * as addFormats from 'ajv-formats';
 import { debugLogger } from './debugLogger.js';
 
 // Ajv's ESM/CJS interop: use 'any' for compatibility as recommended by Ajv docs
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
 const AjvClass = (AjvPkg as any).default || AjvPkg;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
 const Ajv2020Class = (Ajv2020Pkg as any).default || Ajv2020Pkg;
 
 const ajvOptions = {
@@ -29,12 +29,14 @@ const ajvOptions = {
 };
 
 // Draft-07 validator (default)
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const ajvDefault: Ajv = new AjvClass(ajvOptions);
 
 // Draft-2020-12 validator for MCP servers using rmcp
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const ajv2020: Ajv = new Ajv2020Class(ajvOptions);
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
 const addFormatsFunc = (addFormats as any).default || addFormats;
 addFormatsFunc(ajvDefault);
 addFormatsFunc(ajv2020);

@@ -32,7 +32,6 @@ import type {
   ConversationFinishedEvent,
   ChatCompressionEvent,
   MalformedJsonResponseEvent,
-  InvalidChunkEvent,
   ContentRetryEvent,
   ContentRetryFailureEvent,
   RipgrepFallbackEvent,
@@ -65,7 +64,6 @@ import {
   recordToolCallMetrics,
   recordChatCompressionMetrics,
   recordFileOperationMetric,
-  recordInvalidChunk,
   recordContentRetry,
   recordContentRetryFailure,
   recordModelRoutingMetrics,
@@ -147,12 +145,14 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
     });
 
     if (event.metadata) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const added = event.metadata['model_added_lines'];
       if (typeof added === 'number' && added > 0) {
         recordLinesChanged(config, added, 'added', {
           function_name: event.function_name,
         });
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const removed = event.metadata['model_removed_lines'];
       if (typeof removed === 'number' && removed > 0) {
         recordLinesChanged(config, removed, 'removed', {
@@ -467,22 +467,6 @@ export function logMalformedJsonResponse(
       attributes: event.toOpenTelemetryAttributes(config),
     };
     logger.emit(logRecord);
-  });
-}
-
-export function logInvalidChunk(
-  config: Config,
-  event: InvalidChunkEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logInvalidChunkEvent(event);
-  bufferTelemetryEvent(() => {
-    const logger = logs.getLogger(SERVICE_NAME);
-    const logRecord: LogRecord = {
-      body: event.toLogBody(),
-      attributes: event.toOpenTelemetryAttributes(config),
-    };
-    logger.emit(logRecord);
-    recordInvalidChunk(config);
   });
 }
 

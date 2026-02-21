@@ -229,6 +229,7 @@ export class CheckerRunner {
 
         // Try to parse the output
         try {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const rawResult = JSON.parse(stdout);
           const result = SafetyCheckResultSchema.parse(rawResult);
 

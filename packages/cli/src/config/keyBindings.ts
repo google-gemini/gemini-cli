@@ -212,7 +212,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.REVERSE_SEARCH]: [{ key: 'r', ctrl: true }],
   [Command.REWIND]: [{ key: 'double escape' }],
   [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return', ctrl: false }],
-  [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab' }],
+  [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab', shift: false }],
 
   // Navigation
   [Command.NAVIGATION_UP]: [{ key: 'up', shift: false }],
@@ -231,7 +231,10 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.DIALOG_PREV]: [{ key: 'tab', shift: true }],
 
   // Suggestions & Completions
-  [Command.ACCEPT_SUGGESTION]: [{ key: 'tab' }, { key: 'return', ctrl: false }],
+  [Command.ACCEPT_SUGGESTION]: [
+    { key: 'tab', shift: false },
+    { key: 'return', ctrl: false },
+  ],
   [Command.COMPLETION_UP]: [
     { key: 'up', shift: false },
     { key: 'p', shift: false, ctrl: true },

@@ -125,8 +125,12 @@ import {
 } from '../telemetry/loggers.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath } from '../utils/paths.js';
+import { UserHintService } from './userHintService.js';
+import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
+import { loadPoliciesFromToml } from '../policy/toml-loader.js';
 
 export interface AccessibilitySettings {
+  /** @deprecated Use ui.loadingPhrases instead. */
   enableLoadingPhrases?: boolean;
   screenReader?: boolean;
 }
@@ -137,6 +141,10 @@ export interface BugCommandSettings {
 
 export interface SummarizeToolOutputSettings {
   tokenBudget?: number;
+}
+
+export interface PlanSettings {
+  directory?: string;
 }
 
 export interface TelemetrySettings {
@@ -373,6 +381,13 @@ export interface McpEnablementCallbacks {
   isFileEnabled: (serverId: string) => Promise<boolean>;
 }
 
+export interface PolicyUpdateConfirmationRequest {
+  scope: string;
+  identifier: string;
+  policyDir: string;
+  newHash: string;
+}
+
 export interface ConfigParameters {
   sessionId: string;
   clientVersion?: string;
@@ -453,6 +468,7 @@ export interface ConfigParameters {
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
+  policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
   output?: OutputSettings;
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
@@ -481,6 +497,8 @@ export interface ConfigParameters {
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
   plan?: boolean;
+  planSettings?: PlanSettings;
+  modelSteering?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
@@ -629,6 +647,9 @@ export class Config {
   private readonly useWriteTodos: boolean;
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
+  private policyUpdateConfirmationRequest:
+    | PolicyUpdateConfirmationRequest
+    | undefined;
   private readonly outputSettings: OutputSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
@@ -670,11 +691,13 @@ export class Config {
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
+  private readonly modelSteering: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
   private lastModeSwitchTime: number = Date.now();
+  readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
 
   constructor(params: ConfigParameters) {
@@ -763,6 +786,10 @@ export class Config {
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.experimentalJitContext = params.experimentalJitContext ?? false;
+    this.modelSteering = params.modelSteering ?? false;
+    this.userHintService = new UserHintService(() =>
+      this.isModelSteeringEnabled(),
+    );
     this.toolOutputMasking = {
       enabled: params.toolOutputMasking?.enabled ?? true,
       toolProtectionThreshold:
@@ -827,6 +854,7 @@ export class Config {
     this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir, this.sessionId);
+    this.storage.setCustomPlansDir(params.planSettings?.directory);
 
     this.fakeResponses = params.fakeResponses;
     this.recordResponses = params.recordResponses;
@@ -838,6 +866,8 @@ export class Config {
       approvalMode:
         params.approvalMode ?? params.policyEngineConfig?.approvalMode,
     });
+    this.policyUpdateConfirmationRequest =
+      params.policyUpdateConfirmationRequest;
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
     this.acknowledgedAgentsService = new AcknowledgedAgentsService();
     this.skillManager = new SkillManager();
@@ -940,7 +970,7 @@ export class Config {
 
     // Add plans directory to workspace context for plan file storage
     if (this.planEnabled) {
-      const plansDir = this.storage.getProjectTempPlansDir();
+      const plansDir = this.storage.getPlansDir();
       await fs.promises.mkdir(plansDir, { recursive: true });
       this.workspaceContext.addDirectory(plansDir);
     }
@@ -1040,6 +1070,12 @@ export class Config {
 
     // Reset availability status when switching auth (e.g. from limited key to OAuth)
     this.modelAvailabilityService.reset();
+
+    // Clear stale authType to ensure getGemini31LaunchedSync doesn't return stale results
+    // during the transition.
+    if (this.contentGeneratorConfig) {
+      this.contentGeneratorConfig.authType = undefined;
+    }
 
     const newContentGeneratorConfig = await createContentGeneratorConfig(
       this,
@@ -1163,7 +1199,7 @@ export class Config {
     return this.remoteAdminSettings;
   }
 
-  setRemoteAdminSettings(settings: AdminControlsSettings): void {
+  setRemoteAdminSettings(settings: AdminControlsSettings | undefined): void {
     this.remoteAdminSettings = settings;
   }
 
@@ -1320,7 +1356,10 @@ export class Config {
     if (pooled.remaining !== undefined) {
       return pooled.remaining;
     }
-    const primaryModel = resolveModel(this.getModel());
+    const primaryModel = resolveModel(
+      this.getModel(),
+      this.getGemini31LaunchedSync(),
+    );
     return this.modelQuotas.get(primaryModel)?.remaining;
   }
 
@@ -1329,7 +1368,10 @@ export class Config {
     if (pooled.limit !== undefined) {
       return pooled.limit;
     }
-    const primaryModel = resolveModel(this.getModel());
+    const primaryModel = resolveModel(
+      this.getModel(),
+      this.getGemini31LaunchedSync(),
+    );
     return this.modelQuotas.get(primaryModel)?.limit;
   }
 
@@ -1338,7 +1380,10 @@ export class Config {
     if (pooled.resetTime !== undefined) {
       return pooled.resetTime;
     }
-    const primaryModel = resolveModel(this.getModel());
+    const primaryModel = resolveModel(
+      this.getModel(),
+      this.getGemini31LaunchedSync(),
+    );
     return this.modelQuotas.get(primaryModel)?.resetTime;
   }
 
@@ -1637,6 +1682,10 @@ export class Config {
     return this.experimentalJitContext;
   }
 
+  isModelSteeringEnabled(): boolean {
+    return this.modelSteering;
+  }
+
   getToolOutputMaskingEnabled(): boolean {
     return this.toolOutputMasking.enabled;
   }
@@ -1702,6 +1751,41 @@ export class Config {
     return this.policyEngine.getApprovalMode();
   }
 
+  getPolicyUpdateConfirmationRequest():
+    | PolicyUpdateConfirmationRequest
+    | undefined {
+    return this.policyUpdateConfirmationRequest;
+  }
+
+  /**
+   * Hot-loads workspace policies from the specified directory into the active policy engine.
+   * This allows applying newly accepted policies without requiring an application restart.
+   *
+   * @param policyDir The directory containing the workspace policy TOML files.
+   */
+  async loadWorkspacePolicies(policyDir: string): Promise<void> {
+    const { rules, checkers } = await loadPoliciesFromToml(
+      [policyDir],
+      () => WORKSPACE_POLICY_TIER,
+    );
+
+    // Clear existing workspace policies to prevent duplicates/stale rules
+    this.policyEngine.removeRulesByTier(WORKSPACE_POLICY_TIER);
+    this.policyEngine.removeCheckersByTier(WORKSPACE_POLICY_TIER);
+
+    for (const rule of rules) {
+      this.policyEngine.addRule(rule);
+    }
+
+    for (const checker of checkers) {
+      this.policyEngine.addChecker(checker);
+    }
+
+    this.policyUpdateConfirmationRequest = undefined;
+
+    debugLogger.debug(`Workspace policies loaded from: ${policyDir}`);
+  }
+
   setApprovalMode(mode: ApprovalMode): void {
     if (!this.isTrustedFolder() && mode !== ApprovalMode.DEFAULT) {
       throw new Error(
@@ -1724,7 +1808,11 @@ export class Config {
     const isPlanModeTransition =
       currentMode !== mode &&
       (currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN);
-    if (isPlanModeTransition) {
+    const isYoloModeTransition =
+      currentMode !== mode &&
+      (currentMode === ApprovalMode.YOLO || mode === ApprovalMode.YOLO);
+
+    if (isPlanModeTransition || isYoloModeTransition) {
       this.syncPlanModeTools();
       this.updateSystemInstructionIfInitialized();
     }
@@ -1734,8 +1822,13 @@ export class Config {
    * Synchronizes enter/exit plan mode tools based on current mode.
    */
   syncPlanModeTools(): void {
-    const isPlanMode = this.getApprovalMode() === ApprovalMode.PLAN;
     const registry = this.getToolRegistry();
+    if (!registry) {
+      return;
+    }
+    const approvalMode = this.getApprovalMode();
+    const isPlanMode = approvalMode === ApprovalMode.PLAN;
+    const isYoloMode = approvalMode === ApprovalMode.YOLO;
 
     if (isPlanMode) {
       if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
@@ -1748,7 +1841,7 @@ export class Config {
       if (registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
         registry.unregisterTool(EXIT_PLAN_MODE_TOOL_NAME);
       }
-      if (this.planEnabled) {
+      if (this.planEnabled && !isYoloMode) {
         if (!registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
           registry.registerTool(new EnterPlanModeTool(this, this.messageBus));
         }
@@ -2172,6 +2265,36 @@ export class Config {
     return (
       this.experiments?.flags[ExperimentFlags.BANNER_TEXT_CAPACITY_ISSUES]
         ?.stringValue ?? ''
+    );
+  }
+
+  /**
+   * Returns whether Gemini 3.1 has been launched.
+   * This method is async and ensures that experiments are loaded before returning the result.
+   */
+  async getGemini31Launched(): Promise<boolean> {
+    await this.ensureExperimentsLoaded();
+    return this.getGemini31LaunchedSync();
+  }
+
+  /**
+   * Returns whether Gemini 3.1 has been launched.
+   *
+   * Note: This method should only be called after startup, once experiments have been loaded.
+   * If you need to call this during startup or from an async context, use
+   * getGemini31Launched instead.
+   */
+  getGemini31LaunchedSync(): boolean {
+    const authType = this.contentGeneratorConfig?.authType;
+    if (
+      authType === AuthType.USE_GEMINI ||
+      authType === AuthType.USE_VERTEX_AI
+    ) {
+      return true;
+    }
+    return (
+      this.experiments?.flags[ExperimentFlags.GEMINI_3_1_PRO_LAUNCHED]
+        ?.boolValue ?? false
     );
   }
 

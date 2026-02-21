@@ -17,6 +17,7 @@ export * from './policy/types.js';
 export * from './policy/policy-engine.js';
 export * from './policy/toml-loader.js';
 export * from './policy/config.js';
+export * from './policy/integrity.js';
 export * from './confirmation-bus/types.js';
 export * from './confirmation-bus/message-bus.js';
 
@@ -110,6 +111,7 @@ export * from './utils/constants.js';
 // Export services
 export * from './services/fileDiscoveryService.js';
 export * from './services/gitService.js';
+export * from './services/FolderTrustDiscoveryService.js';
 export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
 export * from './services/sessionSummaryUtils.js';
@@ -179,7 +181,8 @@ export { OAuthUtils } from './mcp/oauth-utils.js';
 
 // Export telemetry functions
 export * from './telemetry/index.js';
-export { sessionId } from './utils/session.js';
+export { sessionId, createSessionId } from './utils/session.js';
+export * from './utils/compatibility.js';
 export * from './utils/browser.js';
 export { Storage } from './config/storage.js';
 

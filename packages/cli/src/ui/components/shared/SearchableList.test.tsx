@@ -8,11 +8,50 @@ import React from 'react';
 import { render } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SearchableList, type SearchableListProps } from './SearchableList.js';
+import {
+  SearchableList,
+  type SearchableListProps,
+  type SearchListState,
+  type GenericListItem,
+} from './SearchableList.js';
 import { KeypressProvider } from '../../contexts/KeypressContext.js';
-import { type GenericListItem } from '../../hooks/useFuzzyList.js';
+import { useTextBuffer } from './text-buffer.js';
 
-// Mock UI State
+const useMockSearch = (props: {
+  items: GenericListItem[];
+  initialQuery?: string;
+  onSearch?: (query: string) => void;
+}): SearchListState<GenericListItem> => {
+  const { onSearch, items, initialQuery = '' } = props;
+  const [text, setText] = React.useState(initialQuery);
+  const filteredItems = React.useMemo(
+    () =>
+      items.filter((item: GenericListItem) =>
+        item.label.toLowerCase().includes(text.toLowerCase()),
+      ),
+    [items, text],
+  );
+
+  React.useEffect(() => {
+    onSearch?.(text);
+  }, [text, onSearch]);
+
+  const searchBuffer = useTextBuffer({
+    initialText: text,
+    onChange: setText,
+    viewport: { width: 100, height: 1 },
+    singleLine: true,
+  });
+
+  return {
+    filteredItems,
+    searchBuffer,
+    searchQuery: text,
+    setSearchQuery: setText,
+    maxLabelWidth: 10,
+  };
+};
+
 vi.mock('../../contexts/UIStateContext.js', () => ({
   useUIState: () => ({
     mainAreaWidth: 100,
@@ -55,6 +94,7 @@ describe('SearchableList', () => {
       items: mockItems,
       onSelect: mockOnSelect,
       onClose: mockOnClose,
+      useSearch: useMockSearch,
       ...props,
     };
 
@@ -65,26 +105,64 @@ describe('SearchableList', () => {
     );
   };
 
-  it('should render all items initially', () => {
-    const { lastFrame } = renderList();
+  it('should render all items initially', async () => {
+    const { lastFrame, waitUntilReady } = renderList();
+    await waitUntilReady();
     const frame = lastFrame();
 
-    // Check for title
     expect(frame).toContain('Test List');
 
-    // Check for items
     expect(frame).toContain('Item One');
     expect(frame).toContain('Item Two');
     expect(frame).toContain('Item Three');
 
-    // Check for descriptions
     expect(frame).toContain('Description for item one');
+  });
+
+  it('should reset selection to top when items change if resetSelectionOnItemsChange is true', async () => {
+    const { lastFrame, stdin, waitUntilReady } = renderList({
+      resetSelectionOnItemsChange: true,
+    });
+    await waitUntilReady();
+
+    await React.act(async () => {
+      stdin.write('\u001B[B'); // Down arrow
+    });
+
+    await waitFor(() => {
+      const frame = lastFrame();
+      expect(frame).toContain('● Item Two');
+    });
+    expect(lastFrame()).toMatchSnapshot();
+
+    await React.act(async () => {
+      stdin.write('One');
+    });
+
+    await waitFor(() => {
+      const frame = lastFrame();
+      expect(frame).toContain('Item One');
+      expect(frame).not.toContain('Item Two');
+    });
+    expect(lastFrame()).toMatchSnapshot();
+
+    await React.act(async () => {
+      // Backspace "One" (3 chars)
+      stdin.write('\u007F\u007F\u007F');
+    });
+
+    await waitFor(() => {
+      const frame = lastFrame();
+      expect(frame).toContain('Item Two');
+      expect(frame).toContain('● Item One');
+      expect(frame).not.toContain('● Item Two');
+    });
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('should filter items based on search query', async () => {
     const { lastFrame, stdin } = renderList();
 
-    // Type "Two" into search
     await React.act(async () => {
       stdin.write('Two');
     });
@@ -100,7 +178,6 @@ describe('SearchableList', () => {
   it('should show "No items found." when no items match', async () => {
     const { lastFrame, stdin } = renderList();
 
-    // Type something that won't match
     await React.act(async () => {
       stdin.write('xyz123');
     });
@@ -114,7 +191,6 @@ describe('SearchableList', () => {
   it('should handle selection with Enter', async () => {
     const { stdin } = renderList();
 
-    // Select first item (default active)
     await React.act(async () => {
       stdin.write('\r'); // Enter
     });
@@ -127,12 +203,10 @@ describe('SearchableList', () => {
   it('should handle navigation and selection', async () => {
     const { stdin } = renderList();
 
-    // Navigate down to second item
     await React.act(async () => {
-      stdin.write('\u001B[B'); // Down Arrow
+      stdin.write('\u001B[B'); // Down arrow
     });
 
-    // Select second item
     await React.act(async () => {
       stdin.write('\r'); // Enter
     });
@@ -152,5 +226,11 @@ describe('SearchableList', () => {
     await waitFor(() => {
       expect(mockOnClose).toHaveBeenCalled();
     });
+  });
+
+  it('should match snapshot', async () => {
+    const { lastFrame, waitUntilReady } = renderList();
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
   });
 });

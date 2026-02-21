@@ -19,6 +19,12 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion. …          │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
@@ -27,12 +33,6 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -43,7 +43,8 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings enabled' correctly 1`] = `
@@ -65,6 +66,12 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion. …          │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
@@ -73,12 +80,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -89,7 +90,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings disabled' correctly 1`] = `
@@ -111,6 +113,12 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Enable Auto Update                                                                     true*  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion. …          │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
 │    Enable Prompt Completion                                                              false*  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
@@ -119,12 +127,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -135,7 +137,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'default state' correctly 1`] = `
@@ -157,6 +160,12 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion. …          │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
@@ -165,12 +174,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -181,7 +184,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'file filtering settings configured' correctly 1`] = `
@@ -203,6 +207,12 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion. …          │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
@@ -211,12 +221,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -227,7 +231,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selector' correctly 1`] = `
@@ -249,6 +254,12 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion. …          │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
@@ -257,12 +268,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -273,7 +278,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and number settings' correctly 1`] = `
@@ -295,6 +301,12 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Enable Auto Update                                                                    false*  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion. …          │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
@@ -303,12 +315,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -319,7 +325,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'tools and security settings' correctly 1`] = `
@@ -341,6 +348,12 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion. …          │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
@@ -349,12 +362,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -365,7 +372,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settings enabled' correctly 1`] = `
@@ -387,6 +395,12 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Enable Auto Update                                                                    false*  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion. …          │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
 │    Enable Prompt Completion                                                               true*  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
@@ -395,12 +409,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -411,5 +419,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;

@@ -37,50 +37,56 @@ describe('<Scrollable />', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders children', () => {
-    const { lastFrame } = renderWithProviders(
+  it('renders children', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <Scrollable hasFocus={false} height={5}>
         <Text>Hello World</Text>
       </Scrollable>,
     );
+    await waitUntilReady();
     expect(lastFrame()).toContain('Hello World');
+    unmount();
   });
 
-  it('renders multiple children', () => {
-    const { lastFrame } = renderWithProviders(
+  it('renders multiple children', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <Scrollable hasFocus={false} height={5}>
         <Text>Line 1</Text>
         <Text>Line 2</Text>
         <Text>Line 3</Text>
       </Scrollable>,
     );
+    await waitUntilReady();
     expect(lastFrame()).toContain('Line 1');
     expect(lastFrame()).toContain('Line 2');
     expect(lastFrame()).toContain('Line 3');
+    unmount();
   });
 
-  it('matches snapshot', () => {
-    const { lastFrame } = renderWithProviders(
+  it('matches snapshot', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <Scrollable hasFocus={false} height={5}>
         <Text>Line 1</Text>
         <Text>Line 2</Text>
         <Text>Line 3</Text>
       </Scrollable>,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('updates scroll position correctly when scrollBy is called multiple times in the same tick', () => {
+  it('updates scroll position correctly when scrollBy is called multiple times in the same tick', async () => {
     let capturedEntry: ScrollProviderModule.ScrollableEntry | undefined;
     vi.spyOn(ScrollProviderModule, 'useScrollable').mockImplementation(
-      (entry, isActive) => {
+      async (entry, isActive) => {
         if (isActive) {
           capturedEntry = entry as ScrollProviderModule.ScrollableEntry;
         }
       },
     );
 
-    renderWithProviders(
+    const { waitUntilReady, unmount } = renderWithProviders(
       <Scrollable hasFocus={true} height={5}>
         <Text>Line 1</Text>
         <Text>Line 2</Text>
@@ -94,6 +100,7 @@ describe('<Scrollable />', () => {
         <Text>Line 10</Text>
       </Scrollable>,
     );
+    await waitUntilReady();
 
     expect(capturedEntry).toBeDefined();
 
@@ -101,21 +108,42 @@ describe('<Scrollable />', () => {
       throw new Error('capturedEntry is undefined');
     }
 
-    // Initial state (starts at bottom because of auto-scroll logic)
+    // Initial state (starts at top by default)
+    expect(capturedEntry.getScrollState().scrollTop).toBe(0);
+
+    // Initial state with scrollToBottom={true}
+    unmount();
+    const { waitUntilReady: waitUntilReady2, unmount: unmount2 } =
+      renderWithProviders(
+        <Scrollable hasFocus={true} height={5} scrollToBottom={true}>
+          <Text>Line 1</Text>
+          <Text>Line 2</Text>
+          <Text>Line 3</Text>
+          <Text>Line 4</Text>
+          <Text>Line 5</Text>
+          <Text>Line 6</Text>
+          <Text>Line 7</Text>
+          <Text>Line 8</Text>
+          <Text>Line 9</Text>
+          <Text>Line 10</Text>
+        </Scrollable>,
+      );
+    await waitUntilReady2();
     expect(capturedEntry.getScrollState().scrollTop).toBe(5);
 
     // Call scrollBy multiple times (upwards) in the same tick
-    act(() => {
+    await act(async () => {
       capturedEntry!.scrollBy(-1);
       capturedEntry!.scrollBy(-1);
     });
-    // Should have moved up by 2
+    // Should have moved up by 2 (5 -> 3)
     expect(capturedEntry.getScrollState().scrollTop).toBe(3);
 
-    act(() => {
+    await act(async () => {
       capturedEntry!.scrollBy(-2);
     });
     expect(capturedEntry.getScrollState().scrollTop).toBe(1);
+    unmount2();
   });
 
   describe('keypress handling', () => {
@@ -169,21 +197,22 @@ describe('<Scrollable />', () => {
 
         let capturedEntry: ScrollProviderModule.ScrollableEntry | undefined;
         vi.spyOn(ScrollProviderModule, 'useScrollable').mockImplementation(
-          (entry, isActive) => {
+          async (entry, isActive) => {
             if (isActive) {
               capturedEntry = entry as ScrollProviderModule.ScrollableEntry;
             }
           },
         );
 
-        const { stdin } = renderWithProviders(
+        const { stdin, waitUntilReady, unmount } = renderWithProviders(
           <Scrollable hasFocus={true} height={5}>
             <Text>Content</Text>
           </Scrollable>,
         );
+        await waitUntilReady();
 
         // Ensure initial state using existing scrollBy method
-        act(() => {
+        await act(async () => {
           // Reset to top first, then scroll to desired start position
           capturedEntry!.scrollBy(-100);
           if (initialScrollTop > 0) {
@@ -194,13 +223,15 @@ describe('<Scrollable />', () => {
           initialScrollTop,
         );
 
-        act(() => {
+        await act(async () => {
           stdin.write(keySequence);
         });
+        await waitUntilReady();
 
         expect(capturedEntry!.getScrollState().scrollTop).toBe(
           expectedScrollTop,
         );
+        unmount();
       },
     );
   });

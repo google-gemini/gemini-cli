@@ -81,6 +81,13 @@
           "default": true,
           "type": "boolean"
         },
+        "enableNotifications": {
+          "title": "Enable Notifications",
+          "description": "Enable run-event notifications for action-required prompts and session completion. Currently macOS only.",
+          "markdownDescription": "Enable run-event notifications for action-required prompts and session completion. Currently macOS only.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "checkpointing": {
           "title": "Checkpointing",
           "description": "Session checkpointing settings.",
@@ -94,6 +101,22 @@
               "markdownDescription": "Enable session checkpointing for recovery\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `false`",
               "default": false,
               "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "plan": {
+          "title": "Plan",
+          "description": "Planning features configuration.",
+          "markdownDescription": "Planning features configuration.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "directory": {
+              "title": "Plan Directory",
+              "description": "The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.",
+              "markdownDescription": "The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.\n\n- Category: `General`\n- Requires restart: `yes`",
+              "type": "string"
             }
           },
           "additionalProperties": false
@@ -255,6 +278,13 @@
           "default": true,
           "type": "boolean"
         },
+        "showCompatibilityWarnings": {
+          "title": "Show Compatibility Warnings",
+          "description": "Show warnings about terminal or OS compatibility issues.",
+          "markdownDescription": "Show warnings about terminal or OS compatibility issues.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "hideTips": {
           "title": "Hide Tips",
           "description": "Hide helpful tips in the UI",
@@ -391,6 +421,14 @@
           "default": true,
           "type": "boolean"
         },
+        "loadingPhrases": {
+          "title": "Loading Phrases",
+          "description": "What to show while the model is working: tips, witty comments, both, or nothing.",
+          "markdownDescription": "What to show while the model is working: tips, witty comments, both, or nothing.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `tips`",
+          "default": "tips",
+          "type": "string",
+          "enum": ["tips", "witty", "all", "off"]
+        },
         "customWittyPhrases": {
           "title": "Custom Witty Phrases",
           "description": "Custom witty phrases to display during loading. When provided, the CLI cycles through these instead of the defaults.",
@@ -410,8 +448,8 @@
           "properties": {
             "enableLoadingPhrases": {
               "title": "Enable Loading Phrases",
-              "description": "Enable loading phrases during operations.",
-              "markdownDescription": "Enable loading phrases during operations.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+              "description": "@deprecated Use ui.loadingPhrases instead. Enable loading phrases during operations.",
+              "markdownDescription": "@deprecated Use ui.loadingPhrases instead. Enable loading phrases during operations.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
@@ -1573,8 +1611,15 @@
         },
         "useOSC52Paste": {
           "title": "Use OSC 52 Paste",
-          "description": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).",
-          "markdownDescription": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "description": "Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).",
+          "markdownDescription": "Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "useOSC52Copy": {
+          "title": "Use OSC 52 Copy",
+          "description": "Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).",
+          "markdownDescription": "Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -1582,6 +1627,13 @@
           "title": "Plan",
           "description": "Enable planning features (Plan Mode and tools).",
           "markdownDescription": "Enable planning features (Plan Mode and tools).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "modelSteering": {
+          "title": "Model Steering",
+          "description": "Enable model steering (user hints) to guide the model during tool execution.",
+          "markdownDescription": "Enable model steering (user hints) to guide the model during tool execution.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         }
