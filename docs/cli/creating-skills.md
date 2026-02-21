@@ -8,9 +8,20 @@ the capabilities of Gemini CLI.
 The recommended way to create a new skill is to use the built-in `skill-creator`
 skill. To use it, ask Gemini CLI to create a new skill for you.
 
-**Example prompt:**
+**Example prompts:**
 
 > "create a new skill called 'code-reviewer'"
+
+> "create a local skill for data analysis" (creates in `.gemini/skills/` for
+> quick iteration)
+
+Gemini CLI will ask where you want the skill created:
+
+- **Local development** (`.gemini/skills/`): Best for rapid iteration and
+  testing. After creation, simply run `/skills reload` to use the skill
+  immediately.
+- **Package for distribution**: Best for skills you plan to share or distribute.
+  Requires packaging before use.
 
 Gemini CLI will then use the `skill-creator` to generate the skill:
 
