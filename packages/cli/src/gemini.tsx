@@ -102,6 +102,7 @@ import { createPolicyUpdater } from './config/policy.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
 import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 import { TerminalProvider } from './ui/contexts/TerminalContext.js';
+import { OverflowProvider } from './ui/contexts/OverflowContext.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
@@ -238,17 +239,19 @@ export async function startInteractiveUI(
           >
             <TerminalProvider>
               <ScrollProvider>
-                <SessionStatsProvider>
-                  <VimModeProvider settings={settings}>
-                    <AppContainer
-                      config={config}
-                      startupWarnings={startupWarnings}
-                      version={version}
-                      resumedSessionData={resumedSessionData}
-                      initializationResult={initializationResult}
-                    />
-                  </VimModeProvider>
-                </SessionStatsProvider>
+                <OverflowProvider>
+                  <SessionStatsProvider>
+                    <VimModeProvider settings={settings}>
+                      <AppContainer
+                        config={config}
+                        startupWarnings={startupWarnings}
+                        version={version}
+                        resumedSessionData={resumedSessionData}
+                        initializationResult={initializationResult}
+                      />
+                    </VimModeProvider>
+                  </SessionStatsProvider>
+                </OverflowProvider>
               </ScrollProvider>
             </TerminalProvider>
           </MouseProvider>
@@ -583,7 +586,7 @@ export async function main() {
 
     const policyEngine = config.getPolicyEngine();
     const messageBus = config.getMessageBus();
-    createPolicyUpdater(policyEngine, messageBus);
+    createPolicyUpdater(policyEngine, messageBus, config.storage);
 
     // Register SessionEnd hook to fire on graceful exit
     // This runs before telemetry shutdown in runExitCleanup()
@@ -671,6 +674,10 @@ export async function main() {
     }
 
     let input = config.getQuestion();
+    const useAlternateBuffer = shouldEnterAlternateScreen(
+      isAlternateBufferEnabled(settings),
+      config.getScreenReader(),
+    );
     const rawStartupWarnings = await getStartupWarnings();
     const startupWarnings: StartupWarning[] = [
       ...rawStartupWarnings.map((message) => ({
@@ -678,7 +685,9 @@ export async function main() {
         message,
         priority: WarningPriority.High,
       })),
-      ...(await getUserStartupWarnings(settings.merged)),
+      ...(await getUserStartupWarnings(settings.merged, undefined, {
+        isAlternateBuffer: useAlternateBuffer,
+      })),
     ];
 
     // Handle --resume flag
