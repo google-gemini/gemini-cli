@@ -72,14 +72,9 @@
             "slug": "docs/extensions/index"
           },
           { "label": "Headless mode", "slug": "docs/cli/headless" },
-          { "label": "Help", "link": "/docs/reference/commands/#help-or" },
           { "label": "Hooks", "slug": "docs/hooks" },
           { "label": "IDE integration", "slug": "docs/ide-integration" },
           { "label": "MCP servers", "slug": "docs/tools/mcp-server" },
-          {
-            "label": "Memory management",
-            "link": "/docs/reference/commands/#memory"
-          },
           { "label": "Model routing", "slug": "docs/cli/model-routing" },
           { "label": "Model selection", "slug": "docs/cli/model" },
           { "label": "Plan mode", "badge": "🧪", "slug": "docs/cli/plan-mode" },
@@ -96,13 +91,8 @@
           { "label": "Rewind", "slug": "docs/cli/rewind" },
           { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
           { "label": "Settings", "slug": "docs/cli/settings" },
-          {
-            "label": "Shell",
-            "link": "/docs/reference/commands/#shells-or-bashes"
-          },
           { "label": "Telemetry", "slug": "docs/cli/telemetry" },
-          { "label": "Token caching", "slug": "docs/cli/token-caching" },
-          { "label": "Tools", "link": "/docs/reference/commands/#tools" }
+          { "label": "Token caching", "slug": "docs/cli/token-caching" }
         ]
       },
       {
