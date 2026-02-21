@@ -63,3 +63,56 @@ If you installed the CLI globally using MacPorts (e.g.,
 ```bash
 sudo port uninstall gemini-cli
 ```
+# Uninstalling the CLI (additional methods)
+
+The following methods are not covered in the standard uninstall guide.
+
+## Method 5: Anaconda
+
+Remove just the CLI package, or delete the entire environment:
+
+```bash
+# Option 1: Remove only the CLI package
+conda activate gemini_env
+npm uninstall -g @google/gemini-cli
+
+# Option 2: Remove the entire Gemini environment
+conda deactivate
+conda remove -n gemini_env --all
+```
+
+## Method 6: Sandbox (Docker/Podman)
+
+Remove the sandbox image from your local registry, replacing `<version>` with
+the version you installed:
+
+```bash
+# Docker
+docker rmi us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:<version>
+
+# Podman
+podman rmi us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:<version>
+```
+
+## Method 7: Source installation
+
+If you linked a local build with `npm link`, unlink it first before removing
+the repository to avoid conflicts with any global npm installation:
+
+```bash
+# Unlink the local package
+npm unlink packages/cli
+
+# Remove the cloned repository
+cd ..
+rm -rf gemini-cli
+```
+
+## Verify the CLI has been removed
+
+After uninstalling, confirm the CLI is no longer present:
+
+```bash
+which gemini       # Should return nothing
+gemini --version   # Should return "command not found"
+```
