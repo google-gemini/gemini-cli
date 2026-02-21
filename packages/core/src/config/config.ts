@@ -68,7 +68,10 @@ import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
-import { logRipgrepFallback, logFlashFallback } from '../telemetry/loggers.js';
+import { logRipgrepFallback, logFlashFallback ,
+  logApprovalModeSwitch,
+  logApprovalModeDuration,
+} from '../telemetry/loggers.js';
 import {
   RipgrepFallbackEvent,
   FlashFallbackEvent,
@@ -103,9 +106,7 @@ import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
-import type { UserTierId } from '../code_assist/types.js';
-import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
-import type { AdminControlsSettings } from '../code_assist/types.js';
+import type { UserTierId , RetrieveUserQuotaResponse , AdminControlsSettings } from '../code_assist/types.js';
 import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
@@ -119,10 +120,6 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
-import {
-  logApprovalModeSwitch,
-  logApprovalModeDuration,
-} from '../telemetry/loggers.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath } from '../utils/paths.js';
 import { UserHintService } from './userHintService.js';
@@ -628,6 +625,7 @@ export class Config {
   private readonly compressionThreshold: number | undefined;
   /** Public for testing only */
   readonly interactive: boolean;
+  private interactiveOverride: boolean | undefined;
   private readonly ptyInfo: string;
   private readonly trustedFolder: boolean | undefined;
   private readonly useRipgrep: boolean;
@@ -699,6 +697,12 @@ export class Config {
   private lastModeSwitchTime: number = Date.now();
   readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
+  private headlessSnapshot:
+    | {
+        nonInteractive: boolean;
+        interactiveOverride?: boolean;
+      }
+    | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -1749,6 +1753,38 @@ export class Config {
 
   getApprovalMode(): ApprovalMode {
     return this.policyEngine.getApprovalMode();
+  }
+
+  getInteractiveOverride(): boolean | undefined {
+    return this.interactiveOverride;
+  }
+
+  isHeadlessModeActive(): boolean {
+    return this.headlessSnapshot !== undefined;
+  }
+
+  enterHeadlessMode(): void {
+    if (this.headlessSnapshot) {
+      return;
+    }
+    this.headlessSnapshot = {
+      nonInteractive: this.policyEngine.isNonInteractive(),
+      interactiveOverride: this.interactiveOverride,
+    };
+    this.policyEngine.setNonInteractive(true);
+    this.interactiveOverride = false;
+    this.updateSystemInstructionIfInitialized();
+  }
+
+  exitHeadlessMode(): void {
+    if (!this.headlessSnapshot) {
+      return;
+    }
+    const snapshot = this.headlessSnapshot;
+    this.headlessSnapshot = undefined;
+    this.policyEngine.setNonInteractive(snapshot.nonInteractive);
+    this.interactiveOverride = snapshot.interactiveOverride;
+    this.updateSystemInstructionIfInitialized();
   }
 
   getPolicyUpdateConfirmationRequest():

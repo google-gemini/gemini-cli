@@ -312,6 +312,28 @@ describe('PolicyEngine', () => {
       ).toBe(PolicyDecision.DENY);
     });
 
+    it('should toggle non-interactive behavior at runtime', async () => {
+      const rules: PolicyRule[] = [
+        { toolName: 'interactive-tool', decision: PolicyDecision.ASK_USER },
+      ];
+
+      engine = new PolicyEngine({ rules, nonInteractive: false });
+
+      expect(
+        (await engine.check({ name: 'interactive-tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.ASK_USER);
+
+      engine.setNonInteractive(true);
+      expect(
+        (await engine.check({ name: 'interactive-tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.DENY);
+
+      engine.setNonInteractive(false);
+      expect(
+        (await engine.check({ name: 'interactive-tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.ASK_USER);
+    });
+
     it('should dynamically switch between modes and respect rule modes', async () => {
       const rules: PolicyRule[] = [
         {

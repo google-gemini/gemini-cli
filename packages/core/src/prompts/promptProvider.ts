@@ -49,7 +49,10 @@ export class PromptProvider {
       process.env['GEMINI_SYSTEM_MD'],
     );
 
-    const interactiveMode = interactiveOverride ?? config.isInteractive();
+    const interactiveMode =
+      interactiveOverride ??
+      config.getInteractiveOverride?.() ??
+      config.isInteractive();
     const approvalMode = config.getApprovalMode?.() ?? ApprovalMode.DEFAULT;
     const isPlanMode = approvalMode === ApprovalMode.PLAN;
     const isYoloMode = approvalMode === ApprovalMode.YOLO;

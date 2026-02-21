@@ -216,6 +216,7 @@ export const useGeminiStream = (
   const [_isFirstToolInGroup, isFirstToolInGroupRef, setIsFirstToolInGroup] =
     useStateAndRef<boolean>(true);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
+  const headlessCancelledRef = useRef<Set<string>>(new Set());
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const storage = config.storage;
   const logger = useLogger(storage);
@@ -1131,9 +1132,10 @@ export const useGeminiStream = (
       stream: AsyncIterable<GeminiEvent>,
       userMessageTimestamp: number,
       signal: AbortSignal,
-    ): Promise<StreamProcessingStatus> => {
+    ): Promise<{ status: StreamProcessingStatus; toolCallCount: number }> => {
       let geminiMessageBuffer = '';
       const toolCallRequests: ToolCallRequestInfo[] = [];
+      let status = StreamProcessingStatus.Completed;
       for await (const event of stream) {
         if (
           event.type !== ServerGeminiEventType.Thought &&
@@ -1160,9 +1162,11 @@ export const useGeminiStream = (
             break;
           case ServerGeminiEventType.UserCancelled:
             handleUserCancelledEvent(userMessageTimestamp);
+            status = StreamProcessingStatus.UserCancelled;
             break;
           case ServerGeminiEventType.Error:
             handleErrorEvent(event.value, userMessageTimestamp);
+            status = StreamProcessingStatus.Error;
             break;
           case ServerGeminiEventType.AgentExecutionStopped:
             handleAgentExecutionStoppedEvent(
@@ -1228,7 +1232,7 @@ export const useGeminiStream = (
         }
         await scheduleToolCalls(toolCallRequests, signal);
       }
-      return StreamProcessingStatus.Completed;
+      return { status, toolCallCount: toolCallRequests.length };
     },
     [
       handleContentEvent,
@@ -1251,6 +1255,20 @@ export const useGeminiStream = (
       setThought,
     ],
   );
+
+  const exitHeadlessModeIfActive = useCallback(() => {
+    if (config.isHeadlessModeActive()) {
+      config.exitHeadlessMode();
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: 'Headless mode ended. Back to interactive.',
+        },
+        Date.now(),
+      );
+    }
+  }, [config, addItem]);
+
   const submitQuery = useCallback(
     async (
       query: PartListUnion,
@@ -1332,11 +1350,12 @@ export const useGeminiStream = (
                 false,
                 query,
               );
-              const processingStatus = await processGeminiStreamEvents(
-                stream,
-                userMessageTimestamp,
-                abortSignal,
-              );
+              const { status: processingStatus, toolCallCount } =
+                await processGeminiStreamEvents(
+                  stream,
+                  userMessageTimestamp,
+                  abortSignal,
+                );
 
               if (processingStatus === StreamProcessingStatus.UserCancelled) {
                 return;
@@ -1345,6 +1364,10 @@ export const useGeminiStream = (
               if (pendingHistoryItemRef.current) {
                 addItem(pendingHistoryItemRef.current, userMessageTimestamp);
                 setPendingHistoryItem(null);
+              }
+
+              if (toolCallCount === 0) {
+                exitHeadlessModeIfActive();
               }
               if (loopDetectedRef.current) {
                 loopDetectedRef.current = false;
@@ -1427,6 +1450,7 @@ export const useGeminiStream = (
       geminiClient,
       onAuthError,
       config,
+      exitHeadlessModeIfActive,
       startNewPrompt,
       getPromptCount,
       setThought,
@@ -1475,6 +1499,50 @@ export const useGeminiStream = (
     },
     [config, toolCalls],
   );
+
+  useEffect(() => {
+    if (!config.isHeadlessModeActive()) {
+      headlessCancelledRef.current.clear();
+      return;
+    }
+
+    const awaitingApprovalCalls = toolCalls.filter(
+      (call): call is TrackedWaitingToolCall =>
+        call.status === 'awaiting_approval',
+    );
+
+    if (awaitingApprovalCalls.length === 0) {
+      return;
+    }
+
+    const autoCancel = async () => {
+      for (const call of awaitingApprovalCalls) {
+        if (!call.correlationId) {
+          continue;
+        }
+        if (headlessCancelledRef.current.has(call.request.callId)) {
+          continue;
+        }
+        headlessCancelledRef.current.add(call.request.callId);
+        try {
+          await config.getMessageBus().publish({
+            type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+            correlationId: call.correlationId,
+            confirmed: false,
+            requiresUserConfirmation: false,
+            outcome: ToolConfirmationOutcome.Cancel,
+          });
+        } catch (error) {
+          debugLogger.warn(
+            `Failed to auto-cancel tool call ${call.request.callId}:`,
+            error,
+          );
+        }
+      }
+    };
+
+    void autoCancel();
+  }, [config, toolCalls]);
 
   const handleCompletedTools = useCallback(
     async (completedToolCallsFromScheduler: TrackedToolCall[]) => {
@@ -1565,6 +1633,7 @@ export const useGeminiStream = (
           text: `Agent execution stopped: ${stopExecutionTool.response.error.message}`,
         });
         setIsResponding(false);
+        exitHeadlessModeIfActive();
 
         const callIdsToMarkAsSubmitted = geminiTools.map(
           (toolCall) => toolCall.request.callId,
@@ -1606,6 +1675,7 @@ export const useGeminiStream = (
           (toolCall) => toolCall.request.callId,
         );
         markToolsAsSubmitted(callIdsToMarkAsSubmitted);
+        exitHeadlessModeIfActive();
         return;
       }
 
@@ -1669,6 +1739,7 @@ export const useGeminiStream = (
       registerBackgroundShell,
       consumeUserHint,
       config,
+      exitHeadlessModeIfActive,
     ],
   );
 

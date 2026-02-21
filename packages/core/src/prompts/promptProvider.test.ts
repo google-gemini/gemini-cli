@@ -51,6 +51,7 @@ describe('PromptProvider', () => {
       }),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       getApprovalMode: vi.fn(),
+      getInteractiveOverride: vi.fn(),
     } as unknown as Config;
   });
 
@@ -86,5 +87,18 @@ describe('PromptProvider', () => {
     expect(prompt).toContain(
       `# Contextual Instructions (${DEFAULT_CONTEXT_FILENAME}, CUSTOM.md)`,
     );
+  });
+
+  it('should respect interactive override for headless mode', () => {
+    vi.mocked(getAllGeminiMdFilenames).mockReturnValue([
+      DEFAULT_CONTEXT_FILENAME,
+    ]);
+    vi.mocked(mockConfig.getInteractiveOverride).mockReturnValue(false);
+    vi.mocked(mockConfig.isInteractive).mockReturnValue(true);
+
+    const provider = new PromptProvider();
+    const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('autonomous CLI agent');
   });
 });
