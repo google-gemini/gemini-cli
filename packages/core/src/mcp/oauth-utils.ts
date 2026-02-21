@@ -36,6 +36,19 @@ export interface OAuthAuthorizationServerMetadata {
   scopes_supported?: string[];
 }
 
+/**
+ * OAuth protected resource metadata as per RFC 9728.
+ */
+export interface OAuthProtectedResourceMetadata {
+  resource: string;
+  authorization_servers?: string[];
+  bearer_methods_supported?: string[];
+  resource_documentation?: string;
+  resource_signing_alg_values_supported?: string[];
+  resource_encryption_alg_values_supported?: string[];
+  resource_encryption_enc_values_supported?: string[];
+}
+
 const OAuthAuthorizationServerMetadataSchema = z.object({
   issuer: z.string().optional(),
   authorization_endpoint: z.string(),
@@ -49,19 +62,6 @@ const OAuthAuthorizationServerMetadataSchema = z.object({
   code_challenge_methods_supported: z.array(z.string()).optional(),
   scopes_supported: z.array(z.string()).optional(),
 });
-
-/**
- * OAuth protected resource metadata as per RFC 9728.
- */
-export interface OAuthProtectedResourceMetadata {
-  resource: string;
-  authorization_servers?: string[];
-  bearer_methods_supported?: string[];
-  resource_documentation?: string;
-  resource_signing_alg_values_supported?: string[];
-  resource_encryption_alg_values_supported?: string[];
-  resource_encryption_enc_values_supported?: string[];
-}
 
 const OAuthProtectedResourceMetadataSchema = z.object({
   resource: z.string(),

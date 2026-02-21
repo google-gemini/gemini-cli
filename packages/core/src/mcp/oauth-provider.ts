@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { z } from 'zod';
 import * as http from 'node:http';
 import * as crypto from 'node:crypto';
 import type * as net from 'node:net';
@@ -89,6 +90,37 @@ interface PKCEParams {
   state: string;
 }
 
+const OAuthTokenResponseSchema = z.object({
+  access_token: z.string(),
+  token_type: z.string(),
+  expires_in: z.number().optional(),
+  refresh_token: z.string().optional(),
+  scope: z.string().optional(),
+});
+
+const OAuthClientRegistrationResponseSchema = z.object({
+  client_id: z.string(),
+  client_secret: z.string().optional(),
+  client_id_issued_at: z.number().optional(),
+  client_secret_expires_at: z.number().optional(),
+  redirect_uris: z.array(z.string()),
+  grant_types: z.array(z.string()),
+  response_types: z.array(z.string()),
+  token_endpoint_auth_method: z.string(),
+  scope: z.string().optional(),
+});
+
+function isAddressInfo(
+  addr: net.AddressInfo | string | null,
+): addr is net.AddressInfo {
+  return (
+    addr !== null &&
+    typeof addr === 'object' &&
+    'port' in addr &&
+    typeof (addr as { port?: unknown }).port === 'number'
+  );
+}
+
 const REDIRECT_PATH = '/oauth/callback';
 const HTTP_OK = 200;
 
@@ -142,8 +174,10 @@ export class MCPOAuthProvider {
       );
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return (await response.json()) as OAuthClientRegistrationResponse;
+    const jsonResponse: unknown = await response.json();
+    const oauthClientRegistrationResponse =
+      OAuthClientRegistrationResponseSchema.parse(jsonResponse);
+    return oauthClientRegistrationResponse;
   }
 
   /**
@@ -377,13 +411,21 @@ export class MCPOAuthProvider {
         }
 
         server.listen(listenPort, () => {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const address = server.address() as net.AddressInfo;
-          serverPort = address.port;
-          debugLogger.log(
-            `OAuth callback server listening on port ${serverPort}`,
-          );
-          portResolve(serverPort); // Resolve port promise immediately
+          const address = server.address();
+          if (isAddressInfo(address)) {
+            serverPort = address.port;
+            debugLogger.log(
+              `OAuth callback server listening on port ${serverPort}`,
+            );
+            portResolve(serverPort); // Resolve port promise immediately
+          } else {
+            const error = new Error(
+              'Failed to determine OAuth callback server port',
+            );
+            portReject(error);
+            reject(error);
+            return;
+          }
         });
 
         // Timeout after 5 minutes
@@ -581,8 +623,9 @@ export class MCPOAuthProvider {
 
     // Try to parse as JSON first, fall back to form-urlencoded
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return JSON.parse(responseText) as OAuthTokenResponse;
+      const parsedResponse: unknown = JSON.parse(responseText);
+      const oauthTokenResponse = OAuthTokenResponseSchema.parse(parsedResponse);
+      return oauthTokenResponse;
     } catch {
       // Parse form-urlencoded response
       const tokenParams = new URLSearchParams(responseText);
@@ -704,8 +747,9 @@ export class MCPOAuthProvider {
 
     // Try to parse as JSON first, fall back to form-urlencoded
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return JSON.parse(responseText) as OAuthTokenResponse;
+      const parsedResponse: unknown = JSON.parse(responseText);
+      const oauthTokenResponse = OAuthTokenResponseSchema.parse(parsedResponse);
+      return oauthTokenResponse;
     } catch {
       // Parse form-urlencoded response
       const tokenParams = new URLSearchParams(responseText);
