@@ -71,13 +71,12 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
   // - 2 lines for the rounded border
   // - 2 lines for the Header (text + margin)
   // - 2 lines for Tool Identity (text + margin)
-  const availableContentHeight =
-    constrainHeight && !isAlternateBuffer
-      ? Math.max(maxHeight - (hideToolIdentity ? 4 : 6), 4)
-      : undefined;
+  const availableContentHeight = constrainHeight
+    ? Math.max(maxHeight - (hideToolIdentity ? 4 : 6), 4)
+    : undefined;
 
-  return (
-    <OverflowProvider>
+  const content = (
+    <>
       <Box flexDirection="column" width={mainAreaWidth} flexShrink={0}>
         <StickyHeader
           width={mainAreaWidth}
@@ -152,6 +151,13 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
         />
       </Box>
       <ShowMoreLines constrainHeight={constrainHeight} />
-    </OverflowProvider>
+    </>
+  );
+
+  return isAlternateBuffer ? (
+    /* Shadow the global provider to maintain isolation in ASB mode. */
+    <OverflowProvider>{content}</OverflowProvider>
+  ) : (
+    content
   );
 };

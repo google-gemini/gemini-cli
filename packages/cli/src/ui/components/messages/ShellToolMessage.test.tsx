@@ -191,7 +191,7 @@ describe('<ShellToolMessage />', () => {
         true,
       ],
       [
-        'defaults to ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is undefined',
+        'defaults to ACTIVE_SHELL_MAX_LINES in alternate buffer when availableTerminalHeight is undefined',
         undefined,
         ACTIVE_SHELL_MAX_LINES,
         false,
@@ -218,6 +218,76 @@ describe('<ShellToolMessage />', () => {
       const frame = lastFrame();
       expect(frame.match(/Line \d+/g)?.length).toBe(expectedMaxLines);
       expect(frame).toMatchSnapshot();
+    });
+
+    it('fully expands in standard mode when availableTerminalHeight is undefined', async () => {
+      const { lastFrame } = renderShell(
+        {
+          resultDisplay: LONG_OUTPUT,
+          renderOutputAsMarkdown: false,
+          availableTerminalHeight: undefined,
+          status: CoreToolCallStatus.Executing,
+        },
+        { useAlternateBuffer: false },
+      );
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        // Should show all 100 lines
+        expect(frame.match(/Line \d+/g)?.length).toBe(100);
+      });
+    });
+
+    it('fully expands in alternate buffer mode when constrainHeight is false and isExpandable is true', async () => {
+      const { lastFrame, waitUntilReady } = renderShell(
+        {
+          resultDisplay: LONG_OUTPUT,
+          renderOutputAsMarkdown: false,
+          availableTerminalHeight: undefined,
+          status: CoreToolCallStatus.Success,
+          isExpandable: true,
+        },
+        {
+          useAlternateBuffer: true,
+          uiState: {
+            constrainHeight: false,
+          },
+        },
+      );
+
+      await waitUntilReady();
+      await waitFor(() => {
+        const frame = lastFrame();
+        // Should show all 100 lines because constrainHeight is false and isExpandable is true
+        expect(frame.match(/Line \d+/g)?.length).toBe(100);
+      });
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
+    it('stays constrained in alternate buffer mode when isExpandable is false even if constrainHeight is false', async () => {
+      const { lastFrame, waitUntilReady } = renderShell(
+        {
+          resultDisplay: LONG_OUTPUT,
+          renderOutputAsMarkdown: false,
+          availableTerminalHeight: undefined,
+          status: CoreToolCallStatus.Success,
+          isExpandable: false,
+        },
+        {
+          useAlternateBuffer: true,
+          uiState: {
+            constrainHeight: false,
+          },
+        },
+      );
+
+      await waitUntilReady();
+      await waitFor(() => {
+        const frame = lastFrame();
+        // Should still be constrained to ACTIVE_SHELL_MAX_LINES (15) because isExpandable is false
+        expect(frame.match(/Line \d+/g)?.length).toBe(15);
+      });
+      expect(lastFrame()).toMatchSnapshot();
     });
   });
 });

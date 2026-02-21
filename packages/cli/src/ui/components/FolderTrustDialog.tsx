@@ -285,33 +285,37 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
     );
   };
 
-  return (
-    <OverflowProvider>
-      <Box flexDirection="column" width="100%">
-        <Box flexDirection="column" marginLeft={1} marginRight={1}>
-          {renderContent()}
-        </Box>
-
-        <Box paddingX={2} marginBottom={1}>
-          <ShowMoreLines constrainHeight={constrainHeight} />
-        </Box>
-
-        {isRestarting && (
-          <Box marginLeft={1} marginTop={1}>
-            <Text color={theme.status.warning}>
-              Gemini CLI is restarting to apply the trust changes...
-            </Text>
-          </Box>
-        )}
-        {exiting && (
-          <Box marginLeft={1} marginTop={1}>
-            <Text color={theme.status.warning}>
-              A folder trust level must be selected to continue. Exiting since
-              escape was pressed.
-            </Text>
-          </Box>
-        )}
+  const content = (
+    <Box flexDirection="column" width="100%">
+      <Box flexDirection="column" marginLeft={1} marginRight={1}>
+        {renderContent()}
       </Box>
-    </OverflowProvider>
+
+      <Box paddingX={2} marginBottom={1}>
+        <ShowMoreLines constrainHeight={constrainHeight} />
+      </Box>
+
+      {isRestarting && (
+        <Box marginLeft={1} marginTop={1}>
+          <Text color={theme.status.warning}>
+            Gemini CLI is restarting to apply the trust changes...
+          </Text>
+        </Box>
+      )}
+      {exiting && (
+        <Box marginLeft={1} marginTop={1}>
+          <Text color={theme.status.warning}>
+            A folder trust level must be selected to continue. Exiting since
+            escape was pressed.
+          </Text>
+        </Box>
+      )}
+    </Box>
+  );
+
+  return isAlternateBuffer ? (
+    <OverflowProvider>{content}</OverflowProvider>
+  ) : (
+    content
   );
 };
