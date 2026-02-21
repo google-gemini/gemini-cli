@@ -20,13 +20,9 @@ import type {
   ToolInvocation,
   ToolLocation,
   ToolResult,
+  ToolConfirmationOutcome,
 } from './tools.js';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
-  Kind,
-  type ToolConfirmationOutcome,
-} from './tools.js';
+import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';

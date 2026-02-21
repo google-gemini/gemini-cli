@@ -38,10 +38,11 @@ import {
 import { IdeClient } from '../ide/ide-client.js';
 import { FixLLMEditWithInstruction } from '../utils/llm-edit-fixer.js';
 import { safeLiteralReplace, detectLineEnding } from '../utils/textUtils.js';
-import { EditStrategyEvent } from '../telemetry/types.js';
-import { logEditStrategy } from '../telemetry/loggers.js';
-import { EditCorrectionEvent } from '../telemetry/types.js';
-import { logEditCorrectionEvent } from '../telemetry/loggers.js';
+import { EditStrategyEvent, EditCorrectionEvent } from '../telemetry/types.js';
+import {
+  logEditStrategy,
+  logEditCorrectionEvent,
+} from '../telemetry/loggers.js';
 
 import { correctPath } from '../utils/pathCorrector.js';
 import {
