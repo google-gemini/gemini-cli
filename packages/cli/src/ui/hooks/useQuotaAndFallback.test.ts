@@ -96,9 +96,13 @@ describe('useQuotaAndFallback', () => {
   });
 
   describe('Fallback Handler Logic', () => {
-    // Helper function to render the hook and extract the registered handler
-    const getRegisteredHandler = (): FallbackModelHandler => {
-      renderHook(() =>
+    it('should proceed with fallback for API key users', async () => {
+      // Override the default mock from beforeEach for this specific test
+      vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
+        authType: AuthType.USE_GEMINI,
+      });
+
+      const { result } = renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
@@ -107,20 +111,27 @@ describe('useQuotaAndFallback', () => {
           onShowAuthSelection: mockOnShowAuthSelection,
         }),
       );
-      return setFallbackHandlerSpy.mock.calls[0][0] as FallbackModelHandler;
-    };
 
-    it('should return null and take no action if authType is not LOGIN_WITH_GOOGLE', async () => {
-      // Override the default mock from beforeEach for this specific test
-      vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
-        authType: AuthType.USE_GEMINI,
+      const handler = setFallbackHandlerSpy.mock
+        .calls[0][0] as FallbackModelHandler;
+
+      let promise: Promise<FallbackIntent | null>;
+      act(() => {
+        promise = handler('gemini-pro', 'gemini-flash', new Error());
       });
 
-      const handler = getRegisteredHandler();
-      const result = await handler('gemini-pro', 'gemini-flash', new Error());
+      // The hook should now have a pending request for the UI to handle
+      const request = result.current.proQuotaRequest;
+      expect(request).not.toBeNull();
+      expect(request?.failedModel).toBe('gemini-pro');
 
-      expect(result).toBeNull();
-      expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
+      // Simulate the user choosing to continue with the fallback model
+      act(() => {
+        result.current.handleProQuotaChoice('retry_always');
+      });
+
+      const intent = await promise!;
+      expect(intent).toBe('retry_always');
     });
 
     describe('Interactive Fallback', () => {
