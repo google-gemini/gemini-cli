@@ -589,23 +589,21 @@ export const useSessionBrowserState = (
     return sortSessions(filtered, sortOrder, sortReverse);
   }, [sessions, searchQuery, sortOrder, sortReverse]);
 
-  // Skip the current session on initial load so the cursor starts on the
-  // first resumable item instead of a disabled one.
-  const hasInitializedActiveIndex = useRef(false);
+  // Ensure the cursor always lands on a resumable item and skips disabled ones
+  // when the session list changes (e.g., on initial load, search, or delete).
   useEffect(() => {
     if (
-      !hasInitializedActiveIndex.current &&
-      filteredAndSortedSessions.length > 0
+      filteredAndSortedSessions.length > 0 &&
+      filteredAndSortedSessions[activeIndex]?.isCurrentSession
     ) {
       const firstSelectable = filteredAndSortedSessions.findIndex(
         (s) => !s.isCurrentSession,
       );
-      if (firstSelectable > 0) {
+      if (firstSelectable !== -1) {
         setActiveIndex(firstSelectable);
       }
-      hasInitializedActiveIndex.current = true;
     }
-  }, [filteredAndSortedSessions, setActiveIndex]);
+  }, [filteredAndSortedSessions, activeIndex, setActiveIndex]);
 
   // Reset full content flag when search is cleared
   useEffect(() => {
