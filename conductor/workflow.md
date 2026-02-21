@@ -119,7 +119,7 @@ that also concludes a phase in `plan.md`.
     - Before execution, you **must** announce the exact shell command you will
       use to run the tests.
     - **Example Announcement:** "I will now run the automated test suite to
-      verify the phase. **Command:** `CI=true npm test`"
+      verify the phase. **Command:** `npm run test:ci`"
     - Execute the announced command.
     - If tests fail, you **must** inform the user and begin debugging. You may
       attempt to propose a fix a **maximum of two times**. If the tests still
