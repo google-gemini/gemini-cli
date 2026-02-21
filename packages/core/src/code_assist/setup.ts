@@ -4,16 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ClientMetadata,
-  GeminiUserTier,
-  IneligibleTier,
-  LoadCodeAssistResponse,
-  OnboardUserRequest,
+import {
+  type ClientMetadata,
+  type GeminiUserTier,
+  type IneligibleTier,
+  type LoadCodeAssistResponse,
+  type OnboardUserRequest,
+  UserTierId,
+  IneligibleTierReasonCode,
 } from './types.js';
-import { UserTierId, IneligibleTierReasonCode } from './types.js';
-import type { HttpOptions } from './server.js';
-import { CodeAssistServer } from './server.js';
+import { type HttpOptions, CodeAssistServer } from './server.js';
 import type { AuthClient } from 'google-auth-library';
 import type { ValidationHandler } from '../fallback/types.js';
 import { ChangeAuthRequestedError } from '../utils/errors.js';

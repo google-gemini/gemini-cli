@@ -16,11 +16,11 @@ import {
 import EventEmitter from 'node:events';
 import type { Readable } from 'node:stream';
 import { type ChildProcess } from 'node:child_process';
-import type {
-  ShellOutputEvent,
-  ShellExecutionConfig,
+import {
+  type ShellOutputEvent,
+  type ShellExecutionConfig,
+  ShellExecutionService,
 } from './shellExecutionService.js';
-import { ShellExecutionService } from './shellExecutionService.js';
 import type { AnsiOutput, AnsiToken } from '../utils/terminalSerializer.js';
 
 // Hoisted Mocks

@@ -5,22 +5,23 @@
  */
 
 import type { AuthClient } from 'google-auth-library';
-import type {
-  CodeAssistGlobalUserSettingResponse,
-  LoadCodeAssistRequest,
-  LoadCodeAssistResponse,
-  LongRunningOperationResponse,
-  OnboardUserRequest,
-  SetCodeAssistGlobalUserSettingRequest,
-  ClientMetadata,
-  RetrieveUserQuotaRequest,
-  RetrieveUserQuotaResponse,
-  FetchAdminControlsRequest,
-  FetchAdminControlsResponse,
-  ConversationOffered,
-  ConversationInteraction,
-  StreamingLatency,
-  RecordCodeAssistMetricsRequest,
+import {
+  type CodeAssistGlobalUserSettingResponse,
+  type LoadCodeAssistRequest,
+  type LoadCodeAssistResponse,
+  type LongRunningOperationResponse,
+  type OnboardUserRequest,
+  type SetCodeAssistGlobalUserSettingRequest,
+  type ClientMetadata,
+  type RetrieveUserQuotaRequest,
+  type RetrieveUserQuotaResponse,
+  type FetchAdminControlsRequest,
+  type FetchAdminControlsResponse,
+  type ConversationOffered,
+  type ConversationInteraction,
+  type StreamingLatency,
+  type RecordCodeAssistMetricsRequest,
+  UserTierId,
 } from './types.js';
 import type {
   ListExperimentsRequest,
@@ -37,12 +38,9 @@ import type {
 import * as readline from 'node:readline';
 import { Readable } from 'node:stream';
 import type { ContentGenerator } from '../core/contentGenerator.js';
-import { UserTierId } from './types.js';
-import type {
-  CaCountTokenResponse,
-  CaGenerateContentResponse,
-} from './converter.js';
 import {
+  type CaCountTokenResponse,
+  type CaGenerateContentResponse,
   fromCountTokenResponse,
   fromGenerateContentResponse,
   toCountTokenRequest,

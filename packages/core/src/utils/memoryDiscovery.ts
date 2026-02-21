@@ -11,8 +11,10 @@ import { bfsFileSearch } from './bfsFileSearch.js';
 import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
 import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { processImports } from './memoryImportProcessor.js';
-import type { FileFilteringOptions } from '../config/constants.js';
-import { DEFAULT_MEMORY_FILE_FILTERING_OPTIONS } from '../config/constants.js';
+import {
+  type FileFilteringOptions,
+  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+} from '../config/constants.js';
 import { GEMINI_DIR, homedir, normalizePath } from './paths.js';
 import type { ExtensionLoader } from './extensionLoader.js';
 import { debugLogger } from './debugLogger.js';

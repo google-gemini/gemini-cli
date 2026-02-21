@@ -11,27 +11,25 @@ import crypto from 'node:crypto';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../index.js';
 import { ToolErrorType } from './tool-error.js';
-import type {
-  ToolInvocation,
-  ToolResult,
-  ToolCallConfirmationDetails,
-  ToolExecuteConfirmationDetails,
-} from './tools.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   ToolConfirmationOutcome,
   Kind,
+  type ToolInvocation,
+  type ToolResult,
+  type ToolCallConfirmationDetails,
+  type ToolExecuteConfirmationDetails,
   type PolicyUpdateOptions,
 } from './tools.js';
 
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
-import type {
-  ShellExecutionConfig,
-  ShellOutputEvent,
+import {
+  type ShellExecutionConfig,
+  type ShellOutputEvent,
+  ShellExecutionService,
 } from '../services/shellExecutionService.js';
-import { ShellExecutionService } from '../services/shellExecutionService.js';
 import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {

@@ -56,12 +56,12 @@ vi.mock('node:readline', () => ({
 
 import * as http from 'node:http';
 import * as crypto from 'node:crypto';
-import type {
-  MCPOAuthConfig,
-  OAuthTokenResponse,
-  OAuthClientRegistrationResponse,
+import {
+  type MCPOAuthConfig,
+  type OAuthTokenResponse,
+  type OAuthClientRegistrationResponse,
+  MCPOAuthProvider,
 } from './oauth-provider.js';
-import { MCPOAuthProvider } from './oauth-provider.js';
 import { getConsentForOauth } from '../utils/authConsent.js';
 import type { OAuthToken } from './token-storage/types.js';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';

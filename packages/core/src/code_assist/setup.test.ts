@@ -14,8 +14,7 @@ import { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import { ChangeAuthRequestedError } from '../utils/errors.js';
 import { CodeAssistServer } from '../code_assist/server.js';
 import type { OAuth2Client } from 'google-auth-library';
-import type { GeminiUserTier } from './types.js';
-import { UserTierId } from './types.js';
+import { type GeminiUserTier, UserTierId } from './types.js';
 
 vi.mock('../code_assist/server.js');
 

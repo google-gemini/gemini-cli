@@ -4,8 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { AnyDeclarativeTool, AnyToolInvocation } from '../index.js';
-import { isTool } from '../index.js';
+import {
+  type AnyDeclarativeTool,
+  type AnyToolInvocation,
+  isTool,
+} from '../index.js';
 import { SHELL_TOOL_NAMES } from './shell-utils.js';
 import levenshtein from 'fast-levenshtein';
 import { ApprovalMode } from '../policy/types.js';

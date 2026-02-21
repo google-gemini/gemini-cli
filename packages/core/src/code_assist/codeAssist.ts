@@ -4,12 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ContentGenerator } from '../core/contentGenerator.js';
-import { AuthType } from '../core/contentGenerator.js';
+import { type ContentGenerator, AuthType } from '../core/contentGenerator.js';
 import { getOauthClient } from './oauth2.js';
 import { setupUser } from './setup.js';
-import type { HttpOptions } from './server.js';
-import { CodeAssistServer } from './server.js';
+import { type HttpOptions, CodeAssistServer } from './server.js';
 import type { Config } from '../config/config.js';
 import { LoggingContentGenerator } from '../core/loggingContentGenerator.js';
 

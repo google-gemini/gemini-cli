@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { GenerateContentResponse } from '@google/genai';
-import { ApiError } from '@google/genai';
+import { type GenerateContentResponse, ApiError } from '@google/genai';
 import {
   TerminalQuotaError,
   RetryableQuotaError,

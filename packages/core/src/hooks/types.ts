@@ -10,12 +10,12 @@ import type {
   ToolConfig as GenAIToolConfig,
   ToolListUnion,
 } from '@google/genai';
-import type {
-  LLMRequest,
-  LLMResponse,
-  HookToolConfig,
+import {
+  type LLMRequest,
+  type LLMResponse,
+  type HookToolConfig,
+  defaultHookTranslator,
 } from './hookTranslator.js';
-import { defaultHookTranslator } from './hookTranslator.js';
 
 /**
  * Configuration source levels in precedence order (highest to lowest)

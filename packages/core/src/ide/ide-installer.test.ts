@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal();
@@ -23,8 +23,6 @@ vi.mock('../utils/paths.js', async (importOriginal) => {
     homedir: vi.fn(),
   };
 });
-
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getIdeInstaller } from './ide-installer.js';
 import * as child_process from 'node:child_process';
 import * as fs from 'node:fs';

@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import 'vitest';
 import {
   vi,
   describe,
@@ -15,10 +14,17 @@ import {
   afterAll,
   beforeEach,
 } from 'vitest';
-import type { LogEvent, LogEventEntry } from './clearcut-logger.js';
-import { ClearcutLogger, EventNames, TEST_ONLY } from './clearcut-logger.js';
-import type { ContentGeneratorConfig } from '../../core/contentGenerator.js';
-import { AuthType } from '../../core/contentGenerator.js';
+import {
+  type LogEvent,
+  type LogEventEntry,
+  ClearcutLogger,
+  EventNames,
+  TEST_ONLY,
+} from './clearcut-logger.js';
+import {
+  type ContentGeneratorConfig,
+  AuthType,
+} from '../../core/contentGenerator.js';
 import type { SuccessfulToolCall } from '../../core/coreToolScheduler.js';
 import type { ConfigParameters } from '../../config/config.js';
 import { EventMetadataKey } from './event-metadata-key.js';
@@ -41,8 +47,7 @@ import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import { UserAccountManager } from '../../utils/userAccountManager.js';
 import { InstallationManager } from '../../utils/installationManager.js';
 
-import si from 'systeminformation';
-import type { Systeminformation } from 'systeminformation';
+import si, { type Systeminformation } from 'systeminformation';
 import * as os from 'node:os';
 
 interface CustomMatchers<R = unknown> {

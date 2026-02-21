@@ -6,8 +6,11 @@
 
 import { BaseTokenStorage } from './base-token-storage.js';
 import { FileTokenStorage } from './file-token-storage.js';
-import type { TokenStorage, OAuthCredentials } from './types.js';
-import { TokenStorageType } from './types.js';
+import {
+  TokenStorageType,
+  type TokenStorage,
+  type OAuthCredentials,
+} from './types.js';
 import { coreEvents } from '../../utils/events.js';
 import { TokenStorageInitializationEvent } from '../../telemetry/types.js';
 

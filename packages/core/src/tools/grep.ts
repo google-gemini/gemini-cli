@@ -10,13 +10,18 @@ import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { globStream } from 'glob';
-import type { ToolInvocation, ToolResult } from './tools.js';
+import {
+  type ToolInvocation,
+  type ToolResult,
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+} from './tools.js';
 import { execStreaming } from '../utils/shell-utils.js';
 import {
   DEFAULT_TOTAL_MAX_MATCHES,
   DEFAULT_SEARCH_TIMEOUT_MS,
 } from './constants.js';
-import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { isGitRepository } from '../utils/gitUtils.js';

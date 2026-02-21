@@ -7,8 +7,14 @@
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import path from 'node:path';
 import { makeRelative, shortenPath } from '../utils/paths.js';
-import type { ToolInvocation, ToolLocation, ToolResult } from './tools.js';
-import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
+import {
+  type ToolInvocation,
+  type ToolLocation,
+  type ToolResult,
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+} from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 
 import type { PartUnion } from '@google/genai';

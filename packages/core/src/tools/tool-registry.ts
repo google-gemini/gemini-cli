@@ -5,12 +5,14 @@
  */
 
 import type { FunctionDeclaration } from '@google/genai';
-import type {
-  AnyDeclarativeTool,
-  ToolResult,
-  ToolInvocation,
+import {
+  type AnyDeclarativeTool,
+  type ToolResult,
+  type ToolInvocation,
+  Kind,
+  BaseDeclarativeTool,
+  BaseToolInvocation,
 } from './tools.js';
-import { Kind, BaseDeclarativeTool, BaseToolInvocation } from './tools.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import { spawn } from 'node:child_process';

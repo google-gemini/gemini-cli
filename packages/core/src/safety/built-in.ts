@@ -6,8 +6,11 @@
 
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import type { SafetyCheckInput, SafetyCheckResult } from './protocol.js';
-import { SafetyCheckDecision } from './protocol.js';
+import {
+  type SafetyCheckInput,
+  type SafetyCheckResult,
+  SafetyCheckDecision,
+} from './protocol.js';
 import type { AllowedPathConfig } from '../policy/types.js';
 
 /**

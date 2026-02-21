@@ -10,13 +10,15 @@ import {
   type SendMessageResult,
 } from './a2a-client-manager.js';
 import type { AgentCard, Task } from '@a2a-js/sdk';
-import type { AuthenticationHandler, Client } from '@a2a-js/sdk/client';
-import { ClientFactory, DefaultAgentCardResolver } from '@a2a-js/sdk/client';
-import { debugLogger } from '../utils/debugLogger.js';
 import {
+  type AuthenticationHandler,
+  type Client,
+  ClientFactory,
+  DefaultAgentCardResolver,
   createAuthenticatingFetchWithRetry,
   ClientFactoryOptions,
 } from '@a2a-js/sdk/client';
+import { debugLogger } from '../utils/debugLogger.js';
 
 vi.mock('../utils/debugLogger.js', () => ({
   debugLogger: {

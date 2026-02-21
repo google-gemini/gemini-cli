@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ErrorInfo,
-  GoogleApiError,
-  Help,
-  QuotaFailure,
-  RetryInfo,
+import {
+  type ErrorInfo,
+  type GoogleApiError,
+  type Help,
+  type QuotaFailure,
+  type RetryInfo,
+  parseGoogleApiError,
 } from './googleErrors.js';
-import { parseGoogleApiError } from './googleErrors.js';
 import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 
 /**

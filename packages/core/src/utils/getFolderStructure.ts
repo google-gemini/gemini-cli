@@ -12,8 +12,10 @@ import type {
   FileDiscoveryService,
   FilterFilesOptions,
 } from '../services/fileDiscoveryService.js';
-import type { FileFilteringOptions } from '../config/constants.js';
-import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
+import {
+  type FileFilteringOptions,
+  DEFAULT_FILE_FILTERING_OPTIONS,
+} from '../config/constants.js';
 import { debugLogger } from './debugLogger.js';
 
 const MAX_ITEMS = 200;

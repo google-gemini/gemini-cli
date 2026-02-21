@@ -5,8 +5,7 @@
  */
 
 import stripAnsi from 'strip-ansi';
-import type { PtyImplementation } from '../utils/getPty.js';
-import { getPty } from '../utils/getPty.js';
+import { type PtyImplementation, getPty } from '../utils/getPty.js';
 import { spawn as cpSpawn, type ChildProcess } from 'node:child_process';
 import { TextDecoder } from 'node:util';
 import os from 'node:os';

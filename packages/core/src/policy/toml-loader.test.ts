@@ -14,8 +14,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { loadPoliciesFromToml } from './toml-loader.js';
-import type { PolicyLoadResult } from './toml-loader.js';
+import { loadPoliciesFromToml, type PolicyLoadResult } from './toml-loader.js';
 import { PolicyEngine } from './policy-engine.js';
 
 const __filename = fileURLToPath(import.meta.url);

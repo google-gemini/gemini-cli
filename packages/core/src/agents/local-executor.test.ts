@@ -47,19 +47,19 @@ import {
   logAgentFinish,
   logRecoveryAttempt,
 } from '../telemetry/loggers.js';
-import { LlmRole } from '../telemetry/types.js';
 import {
+  LlmRole,
   AgentStartEvent,
   AgentFinishEvent,
   RecoveryAttemptEvent,
 } from '../telemetry/types.js';
-import type {
-  AgentInputs,
-  LocalAgentDefinition,
-  SubagentActivityEvent,
-  OutputConfig,
+import {
+  type AgentInputs,
+  type LocalAgentDefinition,
+  type SubagentActivityEvent,
+  type OutputConfig,
+  AgentTerminateMode,
 } from './types.js';
-import { AgentTerminateMode } from './types.js';
 import type { AnyDeclarativeTool, AnyToolInvocation } from '../tools/tools.js';
 import type { ToolCallRequestInfo } from '../scheduler/types.js';
 import { CompressionStatus } from '../core/turn.js';
@@ -68,8 +68,7 @@ import type {
   ModelConfigKey,
   ResolvedModelConfig,
 } from '../services/modelConfigService.js';
-import type { AgentRegistry } from './registry.js';
-import { getModelConfigAlias } from './registry.js';
+import { type AgentRegistry, getModelConfigAlias } from './registry.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 
 const {
