@@ -312,11 +312,13 @@ export function AgentConfigDialog({
         currentValue !== undefined ? currentValue : defaultValue;
       const newValue = !effectiveValue;
 
-      const newOverride = setNestedValue(pendingOverride, field.path, newValue);
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const newOverrideTyped = newOverride as AgentOverride;
-
-      setPendingOverride(newOverrideTyped);
+      const newOverride = setNestedValue(
+        pendingOverride,
+        field.path,
+        newValue,
+      ) as AgentOverride;
+      setPendingOverride(newOverride);
       setModifiedFields((prev) => new Set(prev).add(key));
 
       // Save the field value to settings
@@ -350,11 +352,14 @@ export function AgentConfigDialog({
       }
 
       // Update pending override locally
-      const newOverride = setNestedValue(pendingOverride, field.path, parsed);
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const newOverrideTyped = newOverride as AgentOverride;
+      const newOverride = setNestedValue(
+        pendingOverride,
+        field.path,
+        parsed,
+      ) as AgentOverride;
 
-      setPendingOverride(newOverrideTyped);
+      setPendingOverride(newOverride);
       setModifiedFields((prev) => new Set(prev).add(key));
 
       // Save the field value to settings
@@ -370,15 +375,14 @@ export function AgentConfigDialog({
       if (!field) return;
 
       // Remove the override (set to undefined)
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const newOverride = setNestedValue(
         pendingOverride,
         field.path,
         undefined,
-      );
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const newOverrideTyped = newOverride as AgentOverride;
+      ) as AgentOverride;
 
-      setPendingOverride(newOverrideTyped);
+      setPendingOverride(newOverride);
       setModifiedFields((prev) => {
         const updated = new Set(prev);
         updated.delete(key);
