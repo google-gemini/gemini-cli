@@ -574,6 +574,133 @@ describe('Session', () => {
     );
   });
 
+  it('should use filePath for ACP diff content in permission request', async () => {
+    const confirmationDetails = {
+      type: 'edit',
+      title: 'Confirm Write: test.txt',
+      fileName: 'test.txt',
+      filePath: '/tmp/test.txt',
+      originalContent: 'old',
+      newContent: 'new',
+      onConfirm: vi.fn(),
+    };
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    mockConnection.requestPermission.mockResolvedValue({
+      outcome: {
+        outcome: 'selected',
+        optionId: ToolConfirmationOutcome.ProceedOnce,
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolCall: expect.objectContaining({
+          content: [
+            {
+              type: 'diff',
+              path: '/tmp/test.txt',
+              oldText: 'old',
+              newText: 'new',
+            },
+          ],
+        }),
+      }),
+    );
+  });
+
+  it('should use filePath for ACP diff content in tool result', async () => {
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+      execute: vi.fn().mockResolvedValue({
+        llmContent: 'Tool Result',
+        returnDisplay: {
+          fileName: 'test.txt',
+          filePath: '/tmp/test.txt',
+          originalContent: 'old',
+          newContent: 'new',
+        },
+      }),
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    const updateCalls = mockConnection.sessionUpdate.mock.calls.map(
+      (call) => call[0],
+    );
+    const toolCallUpdate = updateCalls.find(
+      (call) => call.update?.sessionUpdate === 'tool_call_update',
+    );
+
+    expect(toolCallUpdate).toEqual(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          content: [
+            {
+              type: 'diff',
+              path: '/tmp/test.txt',
+              oldText: 'old',
+              newText: 'new',
+            },
+          ],
+        }),
+      }),
+    );
+  });
+
   it('should handle tool call cancellation by user', async () => {
     const confirmationDetails = {
       type: 'info',
