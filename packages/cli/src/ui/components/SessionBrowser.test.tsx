@@ -332,7 +332,7 @@ describe('SessionBrowser component', () => {
     expect(resumedSession).toEqual(session2);
   });
 
-  it('does not allow resuming or deleting the current session', async () => {
+  it('does not allow navigating to the current session', async () => {
     const currentSession = createSession({
       id: 'current',
       file: 'current',
@@ -366,15 +366,116 @@ describe('SessionBrowser component', () => {
     );
     await waitUntilReady();
 
-    // Active selection is at 0 (current session).
+    // Cursor starts on otherSession (skipping current session).
+    // Pressing up should NOT move to the current session — cursor stays.
+    triggerKey({ name: 'up', sequence: '[A' });
+    await waitUntilReady();
+
+    // Pressing Enter should resume the other session (cursor stayed on it).
     triggerKey({ name: 'return', sequence: '\r' });
     await waitUntilReady();
-    expect(onResumeSession).not.toHaveBeenCalled();
+    expect(onResumeSession).toHaveBeenCalledTimes(1);
+    const [resumedSession] = onResumeSession.mock.calls[0];
+    expect(resumedSession).toEqual(otherSession);
+  });
 
-    // Attempt delete.
-    triggerKey({ sequence: 'x', name: 'x' });
+  it('skips current session on initial load and starts cursor on first resumable item', async () => {
+    const currentSession = createSession({
+      id: 'current',
+      file: 'current',
+      displayName: 'Current session',
+      isCurrentSession: true,
+      index: 0,
+      lastUpdated: '2025-01-02T12:00:00Z',
+    });
+    const otherSession = createSession({
+      id: 'other',
+      file: 'other',
+      displayName: 'Other session',
+      isCurrentSession: false,
+      index: 1,
+      lastUpdated: '2025-01-01T12:00:00Z',
+    });
+
+    const config = createMockConfig();
+    const onResumeSession = vi.fn();
+    const onDeleteSession = vi.fn().mockResolvedValue(undefined);
+    const onExit = vi.fn();
+
+    const { waitUntilReady } = render(
+      <TestSessionBrowser
+        config={config}
+        onResumeSession={onResumeSession}
+        onDeleteSession={onDeleteSession}
+        onExit={onExit}
+        testSessions={[currentSession, otherSession]}
+      />,
+    );
     await waitUntilReady();
-    expect(onDeleteSession).not.toHaveBeenCalled();
+
+    // Pressing Enter immediately should resume the other session,
+    // because the cursor skipped the current session.
+    triggerKey({ name: 'return', sequence: '\r' });
+    await waitUntilReady();
+
+    expect(onResumeSession).toHaveBeenCalledTimes(1);
+    const [resumedSession] = onResumeSession.mock.calls[0];
+    expect(resumedSession).toEqual(otherSession);
+  });
+
+  it('arrow key navigation skips over the current session', async () => {
+    const currentSession = createSession({
+      id: 'current',
+      file: 'current',
+      displayName: 'Current session',
+      isCurrentSession: true,
+      index: 0,
+      lastUpdated: '2025-01-03T12:00:00Z',
+    });
+    const session2 = createSession({
+      id: 'two',
+      file: 'two',
+      displayName: 'Second session',
+      isCurrentSession: false,
+      index: 1,
+      lastUpdated: '2025-01-02T12:00:00Z',
+    });
+    const session3 = createSession({
+      id: 'three',
+      file: 'three',
+      displayName: 'Third session',
+      isCurrentSession: false,
+      index: 2,
+      lastUpdated: '2025-01-01T12:00:00Z',
+    });
+
+    const config = createMockConfig();
+    const onResumeSession = vi.fn();
+    const onDeleteSession = vi.fn().mockResolvedValue(undefined);
+    const onExit = vi.fn();
+
+    const { waitUntilReady } = render(
+      <TestSessionBrowser
+        config={config}
+        onResumeSession={onResumeSession}
+        onDeleteSession={onDeleteSession}
+        onExit={onExit}
+        testSessions={[currentSession, session2, session3]}
+      />,
+    );
+    await waitUntilReady();
+
+    // Cursor starts on session2 (index 1), skipping current session.
+    // Press up — should stay on session2 since current session above is disabled.
+    triggerKey({ name: 'up', sequence: '[A' });
+    await waitUntilReady();
+
+    triggerKey({ name: 'return', sequence: '\r' });
+    await waitUntilReady();
+
+    expect(onResumeSession).toHaveBeenCalledTimes(1);
+    const [resumedSession] = onResumeSession.mock.calls[0];
+    expect(resumedSession).toEqual(session2);
   });
 
   it('shows an error state when loading sessions fails', async () => {
