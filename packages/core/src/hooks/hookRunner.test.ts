@@ -8,8 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { HookRunner } from './hookRunner.js';
 import { HookEventName, HookType, ConfigSource } from './types.js';
-import type { HookConfig } from './types.js';
-import type { HookInput } from './types.js';
+import type { HookConfig, HookInput } from './types.js';
 import type { Readable, Writable } from 'node:stream';
 import type { Config } from '../config/config.js';
 
