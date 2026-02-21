@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from '@google/gemini-cli-core';
 import {
   GeminiEventType,
   ApprovalMode,
+  type Config,
   type ToolCallConfirmationDetails,
 } from '@google/gemini-cli-core';
 import type {
