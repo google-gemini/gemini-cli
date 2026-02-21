@@ -30,6 +30,7 @@ import { ApprovalMode } from '../policy/types.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
 
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
+import { getDiffContextSnippet } from './diff-utils.js';
 import {
   type ModifiableDeclarativeTool,
   type ModifyContext,
@@ -37,10 +38,11 @@ import {
 import { IdeClient } from '../ide/ide-client.js';
 import { FixLLMEditWithInstruction } from '../utils/llm-edit-fixer.js';
 import { safeLiteralReplace, detectLineEnding } from '../utils/textUtils.js';
-import { EditStrategyEvent } from '../telemetry/types.js';
-import { logEditStrategy } from '../telemetry/loggers.js';
-import { EditCorrectionEvent } from '../telemetry/types.js';
-import { logEditCorrectionEvent } from '../telemetry/loggers.js';
+import { EditStrategyEvent, EditCorrectionEvent } from '../telemetry/types.js';
+import {
+  logEditStrategy,
+  logEditCorrectionEvent,
+} from '../telemetry/loggers.js';
 
 import { correctPath } from '../utils/pathCorrector.js';
 import {
@@ -871,6 +873,16 @@ class EditToolInvocation
           ? `Created new file: ${this.params.file_path} with provided content.`
           : `Successfully modified file: ${this.params.file_path} (${editData.occurrences} replacements).`,
       ];
+
+      // Return a diff of the file before and after the write so that the agent
+      // can avoid the need to spend a turn doing a verification read.
+      const snippet = getDiffContextSnippet(
+        editData.currentContent ?? '',
+        finalContent,
+        5,
+      );
+      llmSuccessMessageParts.push(`Here is the updated code:
+${snippet}`);
       const fuzzyFeedback = getFuzzyMatchFeedback(editData);
       if (fuzzyFeedback) {
         llmSuccessMessageParts.push(fuzzyFeedback);

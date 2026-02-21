@@ -35,7 +35,7 @@ import {
 export const DEFAULT_LEGACY_SET: CoreToolSet = {
   read_file: {
     name: READ_FILE_TOOL_NAME,
-    description: `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
+    description: `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'start_line' and 'end_line' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -43,14 +43,14 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
           description: 'The path to the file to read.',
           type: 'string',
         },
-        offset: {
+        start_line: {
           description:
-            "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
+            'Optional: The 1-based line number to start reading from.',
           type: 'number',
         },
-        limit: {
+        end_line: {
           description:
-            "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
+            'Optional: The 1-based line number to end reading at (inclusive).',
           type: 'number',
         },
       },

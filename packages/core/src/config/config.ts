@@ -68,7 +68,12 @@ import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
-import { logRipgrepFallback, logFlashFallback } from '../telemetry/loggers.js';
+import {
+  logRipgrepFallback,
+  logFlashFallback,
+  logApprovalModeSwitch,
+  logApprovalModeDuration,
+} from '../telemetry/loggers.js';
 import {
   RipgrepFallbackEvent,
   FlashFallbackEvent,
@@ -103,9 +108,11 @@ import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
-import type { UserTierId } from '../code_assist/types.js';
-import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
-import type { AdminControlsSettings } from '../code_assist/types.js';
+import type {
+  UserTierId,
+  RetrieveUserQuotaResponse,
+  AdminControlsSettings,
+} from '../code_assist/types.js';
 import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
@@ -119,10 +126,6 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
-import {
-  logApprovalModeSwitch,
-  logApprovalModeDuration,
-} from '../telemetry/loggers.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath } from '../utils/paths.js';
 import { UserHintService } from './userHintService.js';
@@ -1071,6 +1074,12 @@ export class Config {
     // Reset availability status when switching auth (e.g. from limited key to OAuth)
     this.modelAvailabilityService.reset();
 
+    // Clear stale authType to ensure getGemini31LaunchedSync doesn't return stale results
+    // during the transition.
+    if (this.contentGeneratorConfig) {
+      this.contentGeneratorConfig.authType = undefined;
+    }
+
     const newContentGeneratorConfig = await createContentGeneratorConfig(
       this,
       authMethod,
@@ -1350,7 +1359,10 @@ export class Config {
     if (pooled.remaining !== undefined) {
       return pooled.remaining;
     }
-    const primaryModel = resolveModel(this.getModel());
+    const primaryModel = resolveModel(
+      this.getModel(),
+      this.getGemini31LaunchedSync(),
+    );
     return this.modelQuotas.get(primaryModel)?.remaining;
   }
 
@@ -1359,7 +1371,10 @@ export class Config {
     if (pooled.limit !== undefined) {
       return pooled.limit;
     }
-    const primaryModel = resolveModel(this.getModel());
+    const primaryModel = resolveModel(
+      this.getModel(),
+      this.getGemini31LaunchedSync(),
+    );
     return this.modelQuotas.get(primaryModel)?.limit;
   }
 
@@ -1368,7 +1383,10 @@ export class Config {
     if (pooled.resetTime !== undefined) {
       return pooled.resetTime;
     }
-    const primaryModel = resolveModel(this.getModel());
+    const primaryModel = resolveModel(
+      this.getModel(),
+      this.getGemini31LaunchedSync(),
+    );
     return this.modelQuotas.get(primaryModel)?.resetTime;
   }
 
@@ -2250,6 +2268,36 @@ export class Config {
     return (
       this.experiments?.flags[ExperimentFlags.BANNER_TEXT_CAPACITY_ISSUES]
         ?.stringValue ?? ''
+    );
+  }
+
+  /**
+   * Returns whether Gemini 3.1 has been launched.
+   * This method is async and ensures that experiments are loaded before returning the result.
+   */
+  async getGemini31Launched(): Promise<boolean> {
+    await this.ensureExperimentsLoaded();
+    return this.getGemini31LaunchedSync();
+  }
+
+  /**
+   * Returns whether Gemini 3.1 has been launched.
+   *
+   * Note: This method should only be called after startup, once experiments have been loaded.
+   * If you need to call this during startup or from an async context, use
+   * getGemini31Launched instead.
+   */
+  getGemini31LaunchedSync(): boolean {
+    const authType = this.contentGeneratorConfig?.authType;
+    if (
+      authType === AuthType.USE_GEMINI ||
+      authType === AuthType.USE_VERTEX_AI
+    ) {
+      return true;
+    }
+    return (
+      this.experiments?.flags[ExperimentFlags.GEMINI_3_1_PRO_LAUNCHED]
+        ?.boolValue ?? false
     );
   }
 

@@ -39,8 +39,8 @@ import {
 } from '../../config/settingsSchema.js';
 import { coreEvents, debugLogger } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
-import { useUIState } from '../contexts/UIStateContext.js';
-import { useTextBuffer } from './shared/text-buffer.js';
+
+import { useSearchBuffer } from '../hooks/useSearchBuffer.js';
 import {
   BaseSettingsDialog,
   type SettingsDialogItem,
@@ -115,6 +115,7 @@ export function SettingsDialog({
     }
 
     const doSearch = async () => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const results = await fzfInstance.find(searchQuery);
 
       if (!active) return;
@@ -207,20 +208,10 @@ export function SettingsDialog({
     return max;
   }, [selectedScope, settings]);
 
-  // Get mainAreaWidth for search buffer viewport
-  const { mainAreaWidth } = useUIState();
-  const viewportWidth = mainAreaWidth - 8;
-
   // Search input buffer
-  const searchBuffer = useTextBuffer({
+  const searchBuffer = useSearchBuffer({
     initialText: '',
-    initialCursorOffset: 0,
-    viewport: {
-      width: viewportWidth,
-      height: 1,
-    },
-    singleLine: true,
-    onChange: (text) => setSearchQuery(text),
+    onChange: setSearchQuery,
   });
 
   // Generate items for BaseSettingsDialog
