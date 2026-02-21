@@ -83,6 +83,7 @@ export class FakeContentGenerator implements ContentGenerator {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     role: LlmRole,
   ): Promise<GenerateContentResponse> {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return Object.setPrototypeOf(
       this.getNextResponse('generateContent', request),
       GenerateContentResponse.prototype,
@@ -110,12 +111,14 @@ export class FakeContentGenerator implements ContentGenerator {
   async countTokens(
     request: CountTokensParameters,
   ): Promise<CountTokensResponse> {
+     
     return this.getNextResponse('countTokens', request);
   }
 
   async embedContent(
     request: EmbedContentParameters,
   ): Promise<EmbedContentResponse> {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return Object.setPrototypeOf(
       this.getNextResponse('embedContent', request),
       EmbedContentResponse.prototype,
