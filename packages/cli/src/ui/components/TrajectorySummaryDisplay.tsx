@@ -21,11 +21,14 @@ function normalizeSummary(text: string): string {
   const sentenceMatch = collapsed.match(/^(.+?[.!?])(\s|$)/);
   const sentence = sentenceMatch ? sentenceMatch[1] : collapsed;
 
-  if (sentence.length <= MAX_SUMMARY_LENGTH) {
+  const graphemes = Array.from(sentence);
+  if (graphemes.length <= MAX_SUMMARY_LENGTH) {
     return sentence;
   }
 
-  return sentence.slice(0, Math.max(0, MAX_SUMMARY_LENGTH - 3)) + '...';
+  return (
+    graphemes.slice(0, Math.max(0, MAX_SUMMARY_LENGTH - 3)).join('') + '...'
+  );
 }
 
 function deriveGoalSummary(history: Array<{ type: string; text?: string }>) {
