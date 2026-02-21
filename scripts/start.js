@@ -32,7 +32,7 @@ execSync('node ./scripts/check-build-status.js', {
   cwd: root,
 });
 
-const nodeArgs = ['--no-deprecation'];
+const nodeArgs = ['--disable-warning=DEP0040'];
 
 let sandboxCommand = undefined;
 try {
