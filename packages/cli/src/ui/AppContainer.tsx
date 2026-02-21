@@ -107,7 +107,7 @@ import { calculatePromptWidths } from './components/InputPrompt.js';
 import { calculateMainAreaWidth } from './utils/ui-sizing.js';
 import ansiEscapes from 'ansi-escapes';
 import { basename, join as pathJoin } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import { computeTerminalTitle } from '../utils/windowTitle.js';
@@ -588,7 +588,7 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   const openContentInExternalEditor = useCallback(
-    async (content: string): Promise<void> => {
+    (content: string): void => {
       const tmpDir = fs.mkdtempSync(pathJoin(os.tmpdir(), 'gemini-chat-'));
       const filePath = pathJoin(tmpDir, 'chat.md');
       fs.writeFileSync(filePath, content, 'utf8');
@@ -620,26 +620,10 @@ export const AppContainer = (props: AppContainerProps) => {
       const spawnCmd = exe;
       const spawnArgs = [...embeddedArgs, ...args];
 
-      const wasRaw = stdin?.isRaw ?? false;
-      try {
-        setRawMode?.(false);
-        const { status, error } = spawnSync(spawnCmd, spawnArgs, {
-          stdio: 'inherit',
-          shell: process.platform === 'win32',
-        });
-        if (error) throw error;
-        if (typeof status === 'number' && status !== 0) {
-          throw new Error(`External editor exited with status ${status}`);
-        }
-      } catch (err) {
-        coreEvents.emitFeedback(
-          'error',
-          '[AppContainer] external editor error',
-          err,
-        );
-      } finally {
-        coreEvents.emit(CoreEvent.ExternalEditorClosed);
-        if (wasRaw) setRawMode?.(true);
+      let cleaned = false;
+      const cleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
         try {
           fs.unlinkSync(filePath);
         } catch {
@@ -650,9 +634,48 @@ export const AppContainer = (props: AppContainerProps) => {
         } catch {
           /* ignore */
         }
+      };
+
+      try {
+        const child = spawn(spawnCmd, spawnArgs, {
+          stdio: 'inherit',
+          shell: process.platform === 'win32',
+        });
+
+        // Ensure temp files are removed if gemini-cli exits while the editor
+        // is still open (cleanup() is otherwise only triggered by child events).
+        registerCleanup(cleanup);
+
+        child.on('error', (err) => {
+          coreEvents.emitFeedback(
+            'error',
+            '[AppContainer] external editor error',
+            err,
+          );
+          cleanup();
+        });
+
+        child.on('close', (code) => {
+          if (typeof code === 'number' && code !== 0) {
+            coreEvents.emitFeedback(
+              'error',
+              '[AppContainer] external editor error',
+              new Error(`External editor exited with status ${code}`),
+            );
+          }
+          coreEvents.emit(CoreEvent.ExternalEditorClosed);
+          cleanup();
+        });
+      } catch (err) {
+        coreEvents.emitFeedback(
+          'error',
+          '[AppContainer] external editor error',
+          err,
+        );
+        cleanup();
       }
     },
-    [stdin, setRawMode, getPreferredEditor],
+    [getPreferredEditor],
   );
 
   const buffer = useTextBuffer({

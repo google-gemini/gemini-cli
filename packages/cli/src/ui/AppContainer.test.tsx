@@ -39,6 +39,7 @@ const mockCoreEvents = vi.hoisted(() => ({
   off: vi.fn(),
   drainBacklogs: vi.fn(),
   emit: vi.fn(),
+  emitFeedback: vi.fn(),
 }));
 
 // Mock IdeClient
@@ -196,8 +197,9 @@ import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
 import { useFocus } from './hooks/useFocus.js';
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import { registerCleanup } from '../utils/cleanup.js';
 
 // Mock external utilities
 vi.mock('../utils/events.js');
@@ -206,7 +208,7 @@ vi.mock('./utils/ConsolePatcher.js');
 vi.mock('../utils/cleanup.js');
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
-  return { ...actual, spawnSync: vi.fn(() => ({ status: 0 })) };
+  return { ...actual, spawn: vi.fn() };
 });
 
 import { useHistory } from './hooks/useHistoryManager.js';
@@ -3782,7 +3784,11 @@ describe('AppContainer State Management', () => {
 
   describe('openContentInExternalEditor', () => {
     let capturedSlashActions: {
-      openContentInExternalEditor: (content: string) => Promise<void>;
+      openContentInExternalEditor: (content: string) => void;
+    };
+    let mockChild: {
+      handlers: Record<string, (...args: unknown[]) => void>;
+      on: ReturnType<typeof vi.fn>;
     };
     let savedVisual: string | undefined;
     let originalPlatform: NodeJS.Platform;
@@ -3791,6 +3797,14 @@ describe('AppContainer State Management', () => {
       originalPlatform = process.platform;
       savedVisual = process.env['VISUAL'];
       delete process.env['VISUAL'];
+
+      mockChild = {
+        handlers: {},
+        on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+          mockChild.handlers[event] = handler;
+        }),
+      };
+      (spawn as ReturnType<typeof vi.fn>).mockReturnValue(mockChild);
 
       vi.spyOn(fs, 'mkdtempSync').mockReturnValue('/tmp/gemini-chat-test');
       vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
@@ -3831,23 +3845,42 @@ describe('AppContainer State Management', () => {
       }
     });
 
-    const renderAndCall = async () => {
+    const renderAndCall = async (content = 'test content') => {
       let unmount: (() => void) | undefined;
       await act(async () => {
         ({ unmount } = renderAppContainer());
       });
       await waitFor(() => expect(capturedSlashActions).toBeDefined());
-      await act(async () => {
-        await capturedSlashActions.openContentInExternalEditor('test content');
+      act(() => {
+        capturedSlashActions.openContentInExternalEditor(content);
       });
-      unmount!();
+      return { unmount: unmount! };
     };
 
-    it('uses shell: false on non-Windows and splits $EDITOR into exe and embedded args', async () => {
-      vi.stubEnv('EDITOR', 'vim -u NONE');
-      await renderAndCall();
+    it('writes content to a temp file and spawns the editor non-blocking', async () => {
+      vi.stubEnv('EDITOR', 'vim');
+      const { unmount } = await renderAndCall();
 
-      expect(spawnSync).toHaveBeenCalledWith(
+      expect(fs.mkdtempSync).toHaveBeenCalled();
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        expect.stringContaining('chat.md'),
+        'test content',
+        'utf8',
+      );
+      expect(spawn).toHaveBeenCalledWith(
+        'vim',
+        expect.arrayContaining([expect.stringContaining('chat.md')]),
+        expect.objectContaining({ stdio: 'inherit', shell: false }),
+      );
+
+      unmount();
+    });
+
+    it('splits $EDITOR into exe and embedded args on non-Windows', async () => {
+      vi.stubEnv('EDITOR', 'vim -u NONE');
+      const { unmount } = await renderAndCall();
+
+      expect(spawn).toHaveBeenCalledWith(
         'vim',
         expect.arrayContaining([
           '-u',
@@ -3856,51 +3889,120 @@ describe('AppContainer State Management', () => {
         ]),
         expect.objectContaining({ shell: false }),
       );
+
+      unmount();
     });
 
-    it('uses shell: true on Windows for .cmd editors', async () => {
+    it('uses shell: true on Windows', async () => {
       vi.stubEnv('EDITOR', 'code.cmd');
       Object.defineProperty(process, 'platform', {
         value: 'win32',
         configurable: true,
       });
-      await renderAndCall();
+      const { unmount } = await renderAndCall();
 
-      expect(spawnSync).toHaveBeenCalledWith(
+      expect(spawn).toHaveBeenCalledWith(
         'code.cmd',
         expect.arrayContaining([expect.stringContaining('chat.md')]),
         expect.objectContaining({ shell: true }),
       );
-    });
 
-    it('uses shell: true on Windows with metacharacters in $EDITOR', async () => {
-      vi.stubEnv('EDITOR', 'notepad & calc');
-      Object.defineProperty(process, 'platform', {
-        value: 'win32',
-        configurable: true,
-      });
-      await renderAndCall();
-
-      expect(spawnSync).toHaveBeenCalledWith(
-        'notepad',
-        expect.arrayContaining([
-          '&',
-          'calc',
-          expect.stringContaining('chat.md'),
-        ]),
-        expect.objectContaining({ shell: true }),
-      );
+      unmount();
     });
 
     it('handles quoted paths with spaces in $EDITOR', async () => {
       vi.stubEnv('EDITOR', '"/path with spaces/my-editor" --arg');
-      await renderAndCall();
+      const { unmount } = await renderAndCall();
 
-      expect(spawnSync).toHaveBeenCalledWith(
+      expect(spawn).toHaveBeenCalledWith(
         '/path with spaces/my-editor',
         expect.arrayContaining(['--arg', expect.stringContaining('chat.md')]),
         expect.objectContaining({ shell: false }),
       );
+
+      unmount();
+    });
+
+    it('cleans up temp files when the editor process closes', async () => {
+      vi.stubEnv('EDITOR', 'vim');
+      const { unmount } = await renderAndCall();
+
+      act(() => {
+        mockChild.handlers['close']?.(0);
+      });
+
+      expect(fs.unlinkSync).toHaveBeenCalledWith(
+        expect.stringContaining('chat.md'),
+      );
+      expect(fs.rmSync).toHaveBeenCalledWith(
+        '/tmp/gemini-chat-test',
+        expect.objectContaining({ recursive: true }),
+      );
+
+      unmount();
+    });
+
+    it('emits ExternalEditorClosed when the editor process closes', async () => {
+      vi.stubEnv('EDITOR', 'vim');
+      const { unmount } = await renderAndCall();
+
+      act(() => {
+        mockChild.handlers['close']?.(0);
+      });
+
+      expect(mockCoreEvents.emit).toHaveBeenCalledWith(
+        CoreEvent.ExternalEditorClosed,
+      );
+
+      unmount();
+    });
+
+    it('cleans up temp files on editor process error', async () => {
+      vi.stubEnv('EDITOR', 'vim');
+      const { unmount } = await renderAndCall();
+
+      act(() => {
+        mockChild.handlers['error']?.(new Error('spawn failed'));
+      });
+
+      expect(fs.unlinkSync).toHaveBeenCalledWith(
+        expect.stringContaining('chat.md'),
+      );
+      expect(fs.rmSync).toHaveBeenCalledWith(
+        '/tmp/gemini-chat-test',
+        expect.objectContaining({ recursive: true }),
+      );
+
+      unmount();
+    });
+
+    it('registers cleanup with registerCleanup so temp files are removed if gemini-cli exits while editor is open', async () => {
+      vi.stubEnv('EDITOR', 'vim');
+      const { unmount } = await renderAndCall();
+
+      expect(registerCleanup).toHaveBeenCalledWith(expect.any(Function));
+
+      unmount();
+    });
+
+    it('cleanup is idempotent: calling it twice only deletes files once', async () => {
+      vi.stubEnv('EDITOR', 'vim');
+      const { unmount } = await renderAndCall();
+
+      // Simulate editor closing normally, then gemini-cli exit also firing cleanup.
+      act(() => {
+        mockChild.handlers['close']?.(0);
+      });
+      // Invoke the registered exit cleanup a second time.
+      const registeredFn = (
+        registerCleanup as ReturnType<typeof vi.fn>
+      ).mock.calls.at(-1)?.[0] as () => void;
+      registeredFn();
+
+      expect(fs.unlinkSync).toHaveBeenCalledTimes(1);
+      expect(fs.rmSync).toHaveBeenCalledTimes(1);
+
+      unmount();
     });
   });
 });
