@@ -15,8 +15,8 @@ support VS Code extensions. To build support for other editors, see the
   to provide more relevant and accurate responses. This context includes:
   - The **10 most recently accessed files** in your workspace.
   - Your active cursor position.
-  - Any text you have selected (up to a 16KB limit; longer selections will be
-    truncated).
+  - Any text you have selected (up to a 16KB limit; longer selections are
+    truncated and indicated with a `... [TRUNCATED]` suffix).
 
 - **Native diffing:** When Gemini suggests code modifications, you can view the
   changes directly within your IDE's native diff viewer. This allows you to

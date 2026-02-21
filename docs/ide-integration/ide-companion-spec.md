@@ -151,10 +151,15 @@ and truncation steps before sending the information to the model.
   on setting `isActive: true` and providing cursor/selection details only for
   the currently focused file.
 - **Truncation:** To manage token limits, the CLI truncates both the file list
-  (to 10 files) and the `selectedText` (to 16KB).
+  (to 10 files) and the `selectedText` (to 16KB). When truncating
+  `selectedText`, the CLI appends the suffix `... [TRUNCATED]` so the model
+  knows the selection was cut. Plugins that truncate before sending should do
+  the same.
 
 While the CLI handles the final truncation, it is highly recommended that your
-plugin also limits the amount of context it sends.
+plugin also limits the amount of context it sends and, when truncating
+`selectedText`, appends a truncation suffix (e.g. `... [TRUNCATED]`) for
+consistency.
 
 ## III. The diffing interface
 
