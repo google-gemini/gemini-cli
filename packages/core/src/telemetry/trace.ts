@@ -12,8 +12,8 @@ import {
   type SpanOptions,
 } from '@opentelemetry/api';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-import type { GeminiCliOperation } from './constants.js';
 import {
+  type GeminiCliOperation,
   GEMINI_CLI_SESSION_ID,
   GEN_AI_AGENT_DESCRIPTION,
   GEN_AI_AGENT_NAME,

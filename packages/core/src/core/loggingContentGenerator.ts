@@ -264,6 +264,7 @@ export class LoggingContentGenerator implements ContentGenerator {
             .catch((e) => debugLogger.debug('quota refresh failed', e));
           return response;
         } catch (error) {
+          spanMetadata.error = error;
           const durationMs = Date.now() - startTime;
           this._logApiError(
             durationMs,
@@ -403,9 +404,9 @@ export class LoggingContentGenerator implements ContentGenerator {
       this.config
         .refreshUserQuotaIfStale()
         .catch((e) => debugLogger.debug('quota refresh failed', e));
-      spanMetadata.output = responses
-        .map((r) => r.candidates?.[0]?.content ?? null)
-        .filter((c) => c !== null);
+      spanMetadata.output = responses.map(
+        (response) => response.candidates?.[0]?.content ?? null,
+      );
       if (lastUsageMetadata) {
         spanMetadata.attributes[GEMINI_CLI_GENERATE_CONTENT_USAGE] =
           safeJsonStringify(lastUsageMetadata);
