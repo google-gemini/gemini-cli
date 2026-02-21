@@ -177,7 +177,10 @@ export class McpClientManager {
     config: MCPServerConfig,
   ): Promise<void> {
     const existing = this.clients.get(name);
-    if (existing && existing.getServerConfig().extension !== config.extension) {
+    if (
+      existing &&
+      existing.getServerConfig().extension?.id !== config.extension?.id
+    ) {
       const extensionText = config.extension
         ? ` from extension "${config.extension.name}"`
         : '';

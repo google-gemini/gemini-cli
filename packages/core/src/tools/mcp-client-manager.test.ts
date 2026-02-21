@@ -381,6 +381,36 @@ describe('McpClientManager', () => {
       expect(manager.getMcpServers()).not.toHaveProperty('test-server');
     });
 
+    it('should ignore an extension attempting to register a server with an existing name', async () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      const userConfig = { command: 'node', args: ['user-server.js'] };
+
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': userConfig,
+      });
+      mockedMcpClient.getServerConfig.mockReturnValue(userConfig);
+
+      await manager.startConfiguredMcpServers();
+      expect(mockedMcpClient.connect).toHaveBeenCalledTimes(1);
+
+      const extension: GeminiCLIExtension = {
+        name: 'test-extension',
+        mcpServers: {
+          'test-server': { command: 'node', args: ['ext-server.js'] },
+        },
+        isActive: true,
+        version: '1.0.0',
+        path: '/some-path',
+        contextFiles: [],
+        id: '123',
+      };
+
+      await manager.startExtension(extension);
+
+      expect(mockedMcpClient.disconnect).not.toHaveBeenCalled();
+      expect(mockedMcpClient.connect).toHaveBeenCalledTimes(1);
+    });
+
     it('should remove servers from blockedMcpServers when stopExtension is called', async () => {
       mockConfig.getBlockedMcpServers.mockReturnValue(['blocked-server']);
       const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
