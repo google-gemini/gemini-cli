@@ -636,6 +636,7 @@ async function fetchCachedCredentials(): Promise<
   for (const keyFile of pathsToTry) {
     try {
       const keyFileString = await fs.readFile(keyFile, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return JSON.parse(keyFileString);
     } catch (error) {
       // Log specific error for debugging, but continue trying other paths
@@ -695,6 +696,7 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
       return;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const userInfo = await response.json();
     await userAccountManager.cacheGoogleAccount(userInfo.email);
   } catch (error) {
