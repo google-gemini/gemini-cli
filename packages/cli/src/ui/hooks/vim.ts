@@ -151,7 +151,10 @@ const vimReducer = (state: VimState, action: VimAction): VimState => {
  * @param onSubmit - Optional callback for command submission
  * @returns Object with vim state and input handler
  */
-export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
+export function useVim(
+  buffer: TextBuffer,
+  onSubmit?: (value: string) => void | Promise<void>,
+) {
   const { vimEnabled, vimMode, setVimMode } = useVimMode();
   const [state, dispatch] = useReducer(vimReducer, initialVimState);
 
@@ -431,7 +434,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           // Handle command submission directly
           const submittedValue = buffer.text;
           buffer.setText('');
-          onSubmit(submittedValue);
+          void onSubmit(submittedValue);
           return true;
         }
         return true; // Handled by vim (even if no onSubmit callback)

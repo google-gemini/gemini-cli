@@ -11,14 +11,11 @@ import { debugLogger } from './debugLogger.js';
 
 // Simple console logger for import processing
 const logger = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  debug: (...args: any[]) =>
+  debug: (...args: unknown[]) =>
     debugLogger.debug('[DEBUG] [ImportProcessor]', ...args),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  warn: (...args: any[]) =>
+  warn: (...args: unknown[]) =>
     debugLogger.warn('[WARN] [ImportProcessor]', ...args),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  error: (...args: any[]) =>
+  error: (...args: unknown[]) =>
     debugLogger.error('[ERROR] [ImportProcessor]', ...args),
 };
 

@@ -13,8 +13,7 @@ import { debugLogger } from './debugLogger.js';
 // Simple console logger for now.
 // TODO: Integrate with a more robust server-side logger.
 const logger = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  debug: (...args: any[]) =>
+  debug: (...args: unknown[]) =>
     debugLogger.debug('[DEBUG] [BfsFileSearch]', ...args),
 };
 

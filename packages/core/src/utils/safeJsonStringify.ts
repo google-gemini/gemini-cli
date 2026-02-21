@@ -11,8 +11,6 @@
  * @param space - Optional space parameter for formatting (defaults to no formatting)
  * @returns JSON string with circular references replaced by [Circular]
  */
-import type { Config } from '../config/config.js';
-
 export function safeJsonStringify(
   obj: unknown,
   space?: string | number,
@@ -34,13 +32,12 @@ export function safeJsonStringify(
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function removeEmptyObjects(data: any): object {
-  const cleanedObject: { [key: string]: unknown } = {};
+function removeEmptyObjects(data: object): Record<string, unknown> {
+  const cleanedObject: Record<string, unknown> = {};
   for (const k in data) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const v = data[k];
-    if (v !== null && v !== undefined && typeof v === 'boolean') {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const v = (data as Record<string, unknown>)[k];
+    if (typeof v === 'boolean') {
       cleanedObject[k] = v;
     }
   }
@@ -54,12 +51,11 @@ function removeEmptyObjects(data: any): object {
  * @param obj - The object to stringify
  * @returns JSON string with circular references skipped and only non-null, Boolean member values retained.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function safeJsonStringifyBooleanValuesOnly(obj: any): string {
+export function safeJsonStringifyBooleanValuesOnly(obj: unknown): string {
   let configSeen = false;
-  return JSON.stringify(removeEmptyObjects(obj), (key, value) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    if ((value as Config) !== null && !configSeen) {
+  const data = typeof obj === 'object' && obj !== null ? obj : {};
+  return JSON.stringify(removeEmptyObjects(data), (_key, value) => {
+    if (value !== null && !configSeen) {
       configSeen = true;
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return value;

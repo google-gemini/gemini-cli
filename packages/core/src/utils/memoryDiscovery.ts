@@ -23,14 +23,11 @@ import { CoreEvent, coreEvents } from './events.js';
 // Simple console logger, similar to the one previously in CLI's config.ts
 // TODO: Integrate with a more robust server-side logger if available/appropriate.
 const logger = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  debug: (...args: any[]) =>
+  debug: (...args: unknown[]) =>
     debugLogger.debug('[DEBUG] [MemoryDiscovery]', ...args),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  warn: (...args: any[]) =>
+  warn: (...args: unknown[]) =>
     debugLogger.warn('[WARN] [MemoryDiscovery]', ...args),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  error: (...args: any[]) =>
+  error: (...args: unknown[]) =>
     debugLogger.error('[ERROR] [MemoryDiscovery]', ...args),
 };
 

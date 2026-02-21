@@ -888,9 +888,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openPermissionsDialog,
       quit: (messages: HistoryItem[]) => {
         setQuittingMessages(messages);
-        setTimeout(async () => {
-          await runExitCleanup();
-          process.exit(0);
+        setTimeout(() => {
+          void (async () => {
+            await runExitCleanup();
+            process.exit(0);
+          })();
         }, 100);
       },
       setDebugMessage,

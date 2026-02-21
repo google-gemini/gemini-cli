@@ -10,7 +10,7 @@ import { StreamingState } from '../types.js';
 export interface UseMessageQueueOptions {
   isConfigInitialized: boolean;
   streamingState: StreamingState;
-  submitQuery: (query: string) => void;
+  submitQuery: (query: string) => void | Promise<void>;
   isMcpReady: boolean;
 }
 
@@ -76,7 +76,7 @@ export function useMessageQueue({
       const combinedMessage = messageQueue.join('\n\n');
       // Clear the queue and submit
       setMessageQueue([]);
-      submitQuery(combinedMessage);
+      void submitQuery(combinedMessage);
     }
   }, [
     isConfigInitialized,

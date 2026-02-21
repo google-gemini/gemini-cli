@@ -11,11 +11,19 @@ import Ajv2020Pkg from 'ajv/dist/2020.js';
 import * as addFormats from 'ajv-formats';
 import { debugLogger } from './debugLogger.js';
 
-// Ajv's ESM/CJS interop: use 'any' for compatibility as recommended by Ajv docs
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
-const AjvClass = (AjvPkg as any).default || AjvPkg;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
-const Ajv2020Class = (Ajv2020Pkg as any).default || Ajv2020Pkg;
+// Ajv's ESM/CJS interop: the default import lacks construct signatures in ESM types,
+// so we cast through unknown to both find the .default export and ensure the result
+// is typed as a constructable.
+type AjvCtor = new (opts?: object) => Ajv;
+type AddFormatsFn = (ajv: Ajv) => Ajv;
+/* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+const AjvClass =
+  (AjvPkg as unknown as { default?: AjvCtor }).default ??
+  (AjvPkg as unknown as AjvCtor);
+const Ajv2020Class =
+  (Ajv2020Pkg as unknown as { default?: AjvCtor }).default ??
+  (Ajv2020Pkg as unknown as AjvCtor);
+/* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
 
 const ajvOptions = {
   // See: https://ajv.js.org/options.html#strict-mode-options
@@ -36,8 +44,11 @@ const ajvDefault: Ajv = new AjvClass(ajvOptions);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const ajv2020: Ajv = new Ajv2020Class(ajvOptions);
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
-const addFormatsFunc = (addFormats as any).default || addFormats;
+/* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+const addFormatsFunc =
+  (addFormats as unknown as { default?: AddFormatsFn }).default ??
+  (addFormats as unknown as AddFormatsFn);
+/* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
 addFormatsFunc(ajvDefault);
 addFormatsFunc(ajv2020);
 

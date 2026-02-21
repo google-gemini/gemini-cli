@@ -133,9 +133,11 @@ export function AuthDialog({
           config.isBrowserLaunchSuppressed()
         ) {
           setExiting(true);
-          setTimeout(async () => {
-            await runExitCleanup();
-            process.exit(RELAUNCH_EXIT_CODE);
+          setTimeout(() => {
+            void (async () => {
+              await runExitCleanup();
+              process.exit(RELAUNCH_EXIT_CODE);
+            })();
           }, 100);
           return;
         }

@@ -172,6 +172,7 @@ export default tseslint.config(
       'default-case': 'error',
       '@typescript-eslint/await-thenable': ['error'],
       '@typescript-eslint/no-floating-promises': ['error'],
+      '@typescript-eslint/no-misused-promises': ['error'],
       '@typescript-eslint/no-unnecessary-type-assertion': ['error'],
       'no-restricted-imports': [
         'error',

@@ -90,37 +90,39 @@ async function saveFromCommand(
       safeResolve(false);
     });
 
-    child.on('close', async (code) => {
-      if (resolved) return;
+    child.on('close', (code) => {
+      void (async () => {
+        if (resolved) return;
 
-      if (code !== 0) {
-        debugLogger.debug(
-          `${command} exited with code ${code}. Args: ${args.join(' ')}`,
-        );
-        safeResolve(false);
-        return;
-      }
-
-      // Helper to check file size
-      const checkFile = async () => {
-        try {
-          const stats = await fs.stat(destination);
-          safeResolve(stats.size > 0);
-        } catch (e) {
-          debugLogger.debug(`Failed to stat output file ${destination}:`, e);
+        if (code !== 0) {
+          debugLogger.debug(
+            `${command} exited with code ${code}. Args: ${args.join(' ')}`,
+          );
           safeResolve(false);
+          return;
         }
-      };
 
-      if (fileStream.writableFinished) {
-        await checkFile();
-      } else {
-        fileStream.on('finish', checkFile);
-        // In case finish never fires due to error (though error handler should catch it)
-        fileStream.on('close', async () => {
-          if (!resolved) await checkFile();
-        });
-      }
+        // Helper to check file size
+        const checkFile = async () => {
+          try {
+            const stats = await fs.stat(destination);
+            safeResolve(stats.size > 0);
+          } catch (e) {
+            debugLogger.debug(`Failed to stat output file ${destination}:`, e);
+            safeResolve(false);
+          }
+        };
+
+        if (fileStream.writableFinished) {
+          await checkFile();
+        } else {
+          fileStream.on('finish', () => void checkFile());
+          // In case finish never fires due to error (though error handler should catch it)
+          fileStream.on('close', () => {
+            if (!resolved) void checkFile();
+          });
+        }
+      })();
     });
   });
 }

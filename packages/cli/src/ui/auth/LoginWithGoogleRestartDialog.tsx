@@ -26,18 +26,20 @@ export const LoginWithGoogleRestartDialog = ({
         onDismiss();
         return true;
       } else if (key.name === 'r' || key.name === 'R') {
-        setTimeout(async () => {
-          if (process.send) {
-            const remoteSettings = config.getRemoteAdminSettings();
-            if (remoteSettings) {
-              process.send({
-                type: 'admin-settings-update',
-                settings: remoteSettings,
-              });
+        setTimeout(() => {
+          void (async () => {
+            if (process.send) {
+              const remoteSettings = config.getRemoteAdminSettings();
+              if (remoteSettings) {
+                process.send({
+                  type: 'admin-settings-update',
+                  settings: remoteSettings,
+                });
+              }
             }
-          }
-          await runExitCleanup();
-          process.exit(RELAUNCH_EXIT_CODE);
+            await runExitCleanup();
+            process.exit(RELAUNCH_EXIT_CODE);
+          })();
         }, 100);
         return true;
       }

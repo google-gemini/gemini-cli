@@ -153,14 +153,18 @@ async function initOauthClient(
     return client;
   }
 
-  client.on('tokens', async (tokens: Credentials) => {
-    if (useEncryptedStorage) {
-      await OAuthCredentialStorage.saveCredentials(tokens);
-    } else {
-      await cacheCredentials(tokens);
-    }
+  client.on('tokens', (tokens: Credentials) => {
+    (async () => {
+      if (useEncryptedStorage) {
+        await OAuthCredentialStorage.saveCredentials(tokens);
+      } else {
+        await cacheCredentials(tokens);
+      }
 
-    await triggerPostAuthCallbacks(tokens);
+      await triggerPostAuthCallbacks(tokens);
+    })().catch((e) => {
+      debugLogger.error('Error persisting OAuth token refresh:', e);
+    });
   });
 
   if (credentials) {
@@ -481,91 +485,94 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
   });
 
   const loginCompletePromise = new Promise<void>((resolve, reject) => {
-    const server = http.createServer(async (req, res) => {
-      try {
-        if (req.url!.indexOf('/oauth2callback') === -1) {
-          res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_FAILURE_URL });
-          res.end();
-          reject(
-            new FatalAuthenticationError(
-              'OAuth callback not received. Unexpected request: ' + req.url,
-            ),
-          );
-        }
-        // acquire the code from the querystring, and close the web server.
-        const qs = new url.URL(req.url!, 'http://127.0.0.1:3000').searchParams;
-        if (qs.get('error')) {
-          res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_FAILURE_URL });
-          res.end();
-
-          const errorCode = qs.get('error');
-          const errorDescription =
-            qs.get('error_description') || 'No additional details provided';
-          reject(
-            new FatalAuthenticationError(
-              `Google OAuth error: ${errorCode}. ${errorDescription}`,
-            ),
-          );
-        } else if (qs.get('state') !== state) {
-          res.end('State mismatch. Possible CSRF attack');
-
-          reject(
-            new FatalAuthenticationError(
-              'OAuth state mismatch. Possible CSRF attack or browser session issue.',
-            ),
-          );
-        } else if (qs.get('code')) {
-          try {
-            const { tokens } = await client.getToken({
-              code: qs.get('code')!,
-              redirect_uri: redirectUri,
-            });
-            client.setCredentials(tokens);
-
-            // Retrieve and cache Google Account ID during authentication
-            try {
-              await fetchAndCacheUserInfo(client);
-            } catch (error) {
-              debugLogger.warn(
-                'Failed to retrieve Google Account ID during authentication:',
-                getErrorMessage(error),
-              );
-              // Don't fail the auth flow if Google Account ID retrieval fails
-            }
-
-            res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_SUCCESS_URL });
-            res.end();
-            resolve();
-          } catch (error) {
+    const server = http.createServer((req, res) => {
+      void (async () => {
+        try {
+          if (req.url!.indexOf('/oauth2callback') === -1) {
             res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_FAILURE_URL });
             res.end();
             reject(
               new FatalAuthenticationError(
-                `Failed to exchange authorization code for tokens: ${getErrorMessage(error)}`,
+                'OAuth callback not received. Unexpected request: ' + req.url,
               ),
             );
           }
-        } else {
-          reject(
-            new FatalAuthenticationError(
-              'No authorization code received from Google OAuth. Please try authenticating again.',
-            ),
-          );
+          // acquire the code from the querystring, and close the web server.
+          const qs = new url.URL(req.url!, 'http://127.0.0.1:3000')
+            .searchParams;
+          if (qs.get('error')) {
+            res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_FAILURE_URL });
+            res.end();
+
+            const errorCode = qs.get('error');
+            const errorDescription =
+              qs.get('error_description') || 'No additional details provided';
+            reject(
+              new FatalAuthenticationError(
+                `Google OAuth error: ${errorCode}. ${errorDescription}`,
+              ),
+            );
+          } else if (qs.get('state') !== state) {
+            res.end('State mismatch. Possible CSRF attack');
+
+            reject(
+              new FatalAuthenticationError(
+                'OAuth state mismatch. Possible CSRF attack or browser session issue.',
+              ),
+            );
+          } else if (qs.get('code')) {
+            try {
+              const { tokens } = await client.getToken({
+                code: qs.get('code')!,
+                redirect_uri: redirectUri,
+              });
+              client.setCredentials(tokens);
+
+              // Retrieve and cache Google Account ID during authentication
+              try {
+                await fetchAndCacheUserInfo(client);
+              } catch (error) {
+                debugLogger.warn(
+                  'Failed to retrieve Google Account ID during authentication:',
+                  getErrorMessage(error),
+                );
+                // Don't fail the auth flow if Google Account ID retrieval fails
+              }
+
+              res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_SUCCESS_URL });
+              res.end();
+              resolve();
+            } catch (error) {
+              res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_FAILURE_URL });
+              res.end();
+              reject(
+                new FatalAuthenticationError(
+                  `Failed to exchange authorization code for tokens: ${getErrorMessage(error)}`,
+                ),
+              );
+            }
+          } else {
+            reject(
+              new FatalAuthenticationError(
+                'No authorization code received from Google OAuth. Please try authenticating again.',
+              ),
+            );
+          }
+        } catch (e) {
+          // Provide more specific error message for unexpected errors during OAuth flow
+          if (e instanceof FatalAuthenticationError) {
+            reject(e);
+          } else {
+            reject(
+              new FatalAuthenticationError(
+                `Unexpected error during OAuth authentication: ${getErrorMessage(e)}`,
+              ),
+            );
+          }
+        } finally {
+          server.close();
         }
-      } catch (e) {
-        // Provide more specific error message for unexpected errors during OAuth flow
-        if (e instanceof FatalAuthenticationError) {
-          reject(e);
-        } else {
-          reject(
-            new FatalAuthenticationError(
-              `Unexpected error during OAuth authentication: ${getErrorMessage(e)}`,
-            ),
-          );
-        }
-      } finally {
-        server.close();
-      }
+      })();
     });
 
     server.listen(port, host, () => {

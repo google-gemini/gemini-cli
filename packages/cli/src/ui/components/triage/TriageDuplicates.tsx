@@ -358,32 +358,34 @@ Return a JSON object with:
       });
 
       // Trigger analysis for each
-      issuesToAnalyze.forEach(async (issue) => {
-        try {
-          const result = await analyzeIssue(issue);
-          setState((prev) => {
-            const nextCache = new Map(prev.analysisCache);
-            if (result) {
-              nextCache.set(issue.number, result);
-            }
-            const nextAnalyzing = new Set(prev.analyzingIds);
-            nextAnalyzing.delete(issue.number);
-            return {
-              ...prev,
-              analysisCache: nextCache,
-              analyzingIds: nextAnalyzing,
-            };
-          });
-        } catch (e) {
-          // If failed, remove from analyzing so we might retry or just leave it
-          debugLogger.error(`Analysis failed for ${issue.number}`, e);
-          setState((prev) => {
-            const nextAnalyzing = new Set(prev.analyzingIds);
-            nextAnalyzing.delete(issue.number);
-            return { ...prev, analyzingIds: nextAnalyzing };
-          });
-        }
-      });
+      for (const issue of issuesToAnalyze) {
+        void (async () => {
+          try {
+            const result = await analyzeIssue(issue);
+            setState((prev) => {
+              const nextCache = new Map(prev.analysisCache);
+              if (result) {
+                nextCache.set(issue.number, result);
+              }
+              const nextAnalyzing = new Set(prev.analyzingIds);
+              nextAnalyzing.delete(issue.number);
+              return {
+                ...prev,
+                analysisCache: nextCache,
+                analyzingIds: nextAnalyzing,
+              };
+            });
+          } catch (e) {
+            // If failed, remove from analyzing so we might retry or just leave it
+            debugLogger.error(`Analysis failed for ${issue.number}`, e);
+            setState((prev) => {
+              const nextAnalyzing = new Set(prev.analyzingIds);
+              nextAnalyzing.delete(issue.number);
+              return { ...prev, analyzingIds: nextAnalyzing };
+            });
+          }
+        })();
+      }
     };
 
     void analyzeNext();

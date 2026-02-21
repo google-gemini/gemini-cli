@@ -337,34 +337,36 @@ export class IDEServer {
         }
       });
 
-      this.server = app.listen(0, '127.0.0.1', async () => {
-        const address = this.server?.address();
-        if (address && typeof address !== 'string') {
-          this.port = address.port;
-          this.log(`IDE server listening on http://127.0.0.1:${this.port}`);
-          let portFile: string | undefined;
-          try {
-            const portDir = path.join(tmpdir(), 'gemini', 'ide');
-            await fs.mkdir(portDir, { recursive: true });
-            portFile = path.join(
-              portDir,
-              `gemini-ide-server-${process.ppid}-${this.port}.json`,
-            );
-            this.portFile = portFile;
-          } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            this.log(`Failed to create IDE port file: ${message}`);
-          }
+      this.server = app.listen(0, '127.0.0.1', () => {
+        void (async () => {
+          const address = this.server?.address();
+          if (address && typeof address !== 'string') {
+            this.port = address.port;
+            this.log(`IDE server listening on http://127.0.0.1:${this.port}`);
+            let portFile: string | undefined;
+            try {
+              const portDir = path.join(tmpdir(), 'gemini', 'ide');
+              await fs.mkdir(portDir, { recursive: true });
+              portFile = path.join(
+                portDir,
+                `gemini-ide-server-${process.ppid}-${this.port}.json`,
+              );
+              this.portFile = portFile;
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              this.log(`Failed to create IDE port file: ${message}`);
+            }
 
-          await writePortAndWorkspace({
-            context,
-            port: this.port,
-            portFile: this.portFile,
-            authToken: this.authToken ?? '',
-            log: this.log,
-          });
-        }
-        resolve();
+            await writePortAndWorkspace({
+              context,
+              port: this.port,
+              portFile: this.portFile,
+              authToken: this.authToken ?? '',
+              log: this.log,
+            });
+          }
+          resolve();
+        })();
       });
 
       this.server.on('close', () => {

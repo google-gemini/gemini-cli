@@ -54,9 +54,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     if (isRestarting) {
-      timer = setTimeout(async () => {
-        await relaunchApp();
-      }, 250);
+      timer = setTimeout(() => void relaunchApp(), 250);
     }
     return () => {
       if (timer) clearTimeout(timer);
@@ -66,9 +64,11 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
   const handleExit = useCallback(() => {
     setExiting(true);
     // Give time for the UI to render the exiting message
-    setTimeout(async () => {
-      await runExitCleanup();
-      process.exit(ExitCodes.FATAL_CANCELLATION_ERROR);
+    setTimeout(() => {
+      void (async () => {
+        await runExitCleanup();
+        process.exit(ExitCodes.FATAL_CANCELLATION_ERROR);
+      })();
     }, 100);
   }, []);
 
