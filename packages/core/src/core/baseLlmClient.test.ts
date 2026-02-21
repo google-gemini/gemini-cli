@@ -15,22 +15,24 @@ import {
   type Mock,
 } from 'vitest';
 
-import { BaseLlmClient, type GenerateJsonOptions } from './baseLlmClient.js';
+import type {
+  GenerateContentOptions,
+  GenerateJsonOptions,
+} from './baseLlmClient.js';
+import { BaseLlmClient } from './baseLlmClient.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
-import type { GenerateContentOptions } from './baseLlmClient.js';
 import type { GenerateContentResponse } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { AuthType } from './contentGenerator.js';
 import { reportError } from '../utils/errorReporting.js';
 import { logMalformedJsonResponse } from '../telemetry/loggers.js';
 import { retryWithBackoff } from '../utils/retry.js';
-import { MalformedJsonResponseEvent } from '../telemetry/types.js';
+import { MalformedJsonResponseEvent, LlmRole } from '../telemetry/types.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { ModelConfigService } from '../services/modelConfigService.js';
 import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
-import { LlmRole } from '../telemetry/types.js';
 
 vi.mock('../utils/errorReporting.js');
 vi.mock('../telemetry/loggers.js');

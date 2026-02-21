@@ -17,8 +17,8 @@ import {
   BeforeToolSelectionHookOutput,
   AfterModelHookOutput,
   AfterAgentHookOutput,
+  HookEventName,
 } from './types.js';
-import { HookEventName } from './types.js';
 
 /**
  * Aggregated hook result
