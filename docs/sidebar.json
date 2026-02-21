@@ -100,10 +100,6 @@
             "label": "Shell",
             "link": "/docs/reference/commands/#shells-or-bashes"
           },
-          {
-            "label": "Stats",
-            "link": "/docs/reference/commands/#stats"
-          },
           { "label": "Telemetry", "slug": "docs/cli/telemetry" },
           { "label": "Token caching", "slug": "docs/cli/token-caching" },
           { "label": "Tools", "link": "/docs/reference/commands/#tools" }
