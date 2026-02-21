@@ -9,6 +9,8 @@ import { Box, Text } from 'ink';
 import { useMemo } from 'react';
 import { theme } from '../semantic-colors.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { parseSlashCommand } from '../../utils/commands.js';
+import type { SlashCommand } from '../commands/types.js';
 
 const MAX_SUMMARY_LENGTH = 80;
 
@@ -31,7 +33,10 @@ function normalizeSummary(text: string): string {
   );
 }
 
-function deriveGoalSummary(history: Array<{ type: string; text?: string }>) {
+function deriveGoalSummary(
+  history: Array<{ type: string; text?: string }>,
+  commands: readonly SlashCommand[],
+) {
   for (const item of history) {
     if (item.type !== 'user') {
       continue;
@@ -41,11 +46,15 @@ function deriveGoalSummary(history: Array<{ type: string; text?: string }>) {
       continue;
     }
     if (trimmed.startsWith('/')) {
-      const withoutCommand = trimmed.replace(/^\/\S+\s*/, '').trim();
-      if (!withoutCommand) {
+      // Use parseSlashCommand to correctly strip the command path (including
+      // subcommands like `/memory add` or `/chat resume`) so that only the
+      // meaningful user-supplied arguments are used as the goal summary.
+      const { args } = parseSlashCommand(trimmed, commands);
+      const argsText = args.trim();
+      if (!argsText) {
         continue; // Skip slash commands like /help or /plan with no args
       }
-      return normalizeSummary(withoutCommand);
+      return normalizeSummary(argsText);
     }
     return normalizeSummary(trimmed);
   }
@@ -53,8 +62,11 @@ function deriveGoalSummary(history: Array<{ type: string; text?: string }>) {
 }
 
 export const TrajectorySummaryDisplay: React.FC = () => {
-  const { history } = useUIState();
-  const summary = useMemo(() => deriveGoalSummary(history), [history]);
+  const { history, slashCommands } = useUIState();
+  const summary = useMemo(
+    () => deriveGoalSummary(history, slashCommands ?? []),
+    [history, slashCommands],
+  );
 
   if (!summary) {
     return null;
