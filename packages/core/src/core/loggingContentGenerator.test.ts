@@ -15,7 +15,13 @@ vi.mock('../telemetry/loggers.js', () => ({
 }));
 
 const runInDevTraceSpan = vi.hoisted(() =>
-  vi.fn(async (meta, fn) => fn({ metadata: {}, endSpan: vi.fn() })),
+  vi.fn(async (opts, fn) => {
+    const metadata = { attributes: opts.attributes || {} };
+    return fn({
+      metadata,
+      endSpan: vi.fn(),
+    });
+  }),
 );
 
 vi.mock('../telemetry/trace.js', () => ({
@@ -33,6 +39,14 @@ import type { Config } from '../config/config.js';
 import { UserTierId } from '../code_assist/types.js';
 import { ApiRequestEvent, LlmRole } from '../telemetry/types.js';
 import { FatalAuthenticationError } from '../utils/errors.js';
+import {
+  GEMINI_CLI_GENERATE_CONTENT_CONFIG,
+  GEMINI_CLI_GENERATE_CONTENT_USAGE,
+  GeminiCliOperation,
+  GEN_AI_PROMPT_NAME,
+  GEN_AI_REQUEST_MODEL,
+} from '../telemetry/constants.js';
+import { type SpanMetadata } from '../telemetry/trace.js';
 
 describe('LoggingContentGenerator', () => {
   let wrapped: ContentGenerator;
@@ -68,10 +82,19 @@ describe('LoggingContentGenerator', () => {
       const req = {
         contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
         model: 'gemini-pro',
+        config: {
+          topK: 1,
+        },
       };
       const userPromptId = 'prompt-123';
       const response: GenerateContentResponse = {
-        candidates: [],
+        candidates: [
+          {
+            content: {
+              parts: [{ text: 'hello' }],
+            },
+          },
+        ],
         usageMetadata: {
           promptTokenCount: 1,
           candidatesTokenCount: 2,
@@ -108,12 +131,42 @@ describe('LoggingContentGenerator', () => {
       );
       const responseEvent = vi.mocked(logApiResponse).mock.calls[0][1];
       expect(responseEvent.duration_ms).toBe(1000);
+
+      expect(runInDevTraceSpan).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: GeminiCliOperation.LLMCall,
+          attributes: expect.objectContaining({
+            [GEN_AI_REQUEST_MODEL]: 'gemini-pro',
+            [GEN_AI_PROMPT_NAME]: userPromptId,
+            [GEMINI_CLI_GENERATE_CONTENT_CONFIG]: JSON.stringify(req.config),
+          }),
+        }),
+        expect.any(Function),
+      );
+
+      const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
+      const fn = spanArgs[1];
+      const metadata: SpanMetadata = { name: '', attributes: {} };
+      await fn({ metadata, endSpan: vi.fn() });
+
+      expect(metadata).toMatchObject({
+        input: req.contents,
+        output: response.candidates?.[0]?.content,
+        attributes: {
+          [GEMINI_CLI_GENERATE_CONTENT_USAGE]: JSON.stringify(
+            response.usageMetadata,
+          ),
+        },
+      });
     });
 
     it('should log error on failure', async () => {
       const req = {
         contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
         model: 'gemini-pro',
+        config: {
+          topK: 1,
+        },
       };
       const userPromptId = 'prompt-123';
       const error = new Error('test error');
@@ -121,7 +174,7 @@ describe('LoggingContentGenerator', () => {
       const startTime = new Date('2025-01-01T00:00:00.000Z');
       vi.setSystemTime(startTime);
 
-      const promise = loggingContentGenerator.generateContent(
+      let promise = loggingContentGenerator.generateContent(
         req,
         userPromptId,
         LlmRole.MAIN,
@@ -137,6 +190,29 @@ describe('LoggingContentGenerator', () => {
       );
       const errorEvent = vi.mocked(logApiError).mock.calls[0][1];
       expect(errorEvent.duration_ms).toBe(1000);
+
+      expect(runInDevTraceSpan).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: GeminiCliOperation.LLMCall,
+          attributes: expect.objectContaining({
+            [GEN_AI_REQUEST_MODEL]: 'gemini-pro',
+            [GEN_AI_PROMPT_NAME]: userPromptId,
+            [GEMINI_CLI_GENERATE_CONTENT_CONFIG]: JSON.stringify(req.config),
+          }),
+        }),
+        expect.any(Function),
+      );
+
+      const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
+      const fn = spanArgs[1];
+      const metadata: SpanMetadata = { name: '', attributes: {} };
+      promise = fn({ metadata, endSpan: vi.fn() });
+
+      await expect(promise).rejects.toThrow(error);
+
+      expect(metadata).toMatchObject({
+        error,
+      });
     });
 
     describe('error type extraction', () => {
@@ -158,10 +234,19 @@ describe('LoggingContentGenerator', () => {
       const req = {
         contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
         model: 'gemini-pro',
+        config: {
+          topK: 1,
+        },
       };
       const userPromptId = 'prompt-123';
       const response = {
-        candidates: [],
+        candidates: [
+          {
+            content: {
+              parts: [{ text: 'hello' }],
+            },
+          },
+        ],
         usageMetadata: {
           promptTokenCount: 1,
           candidatesTokenCount: 2,
@@ -181,7 +266,7 @@ describe('LoggingContentGenerator', () => {
 
       vi.setSystemTime(startTime);
 
-      const stream = await loggingContentGenerator.generateContentStream(
+      let stream = await loggingContentGenerator.generateContentStream(
         req,
 
         userPromptId,
@@ -206,6 +291,42 @@ describe('LoggingContentGenerator', () => {
       );
       const responseEvent = vi.mocked(logApiResponse).mock.calls[0][1];
       expect(responseEvent.duration_ms).toBe(1000);
+
+      expect(runInDevTraceSpan).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: GeminiCliOperation.LLMCall,
+          noAutoEnd: true,
+          attributes: expect.objectContaining({
+            [GEN_AI_REQUEST_MODEL]: 'gemini-pro',
+            [GEN_AI_PROMPT_NAME]: userPromptId,
+            [GEMINI_CLI_GENERATE_CONTENT_CONFIG]: JSON.stringify(req.config),
+          }),
+        }),
+        expect.any(Function),
+      );
+
+      const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
+      const fn = spanArgs[1];
+      const metadata: SpanMetadata = { name: '', attributes: {} };
+
+      vi.mocked(wrapped.generateContentStream).mockResolvedValue(
+        createAsyncGenerator(),
+      );
+      stream = await fn({ metadata, endSpan: vi.fn() });
+
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      expect(metadata).toMatchObject({
+        input: req.contents,
+        output: [response.candidates?.[0]?.content],
+        attributes: {
+          [GEMINI_CLI_GENERATE_CONTENT_USAGE]: JSON.stringify(
+            response.usageMetadata,
+          ),
+        },
+      });
     });
 
     it('should log error on failure', async () => {
@@ -323,6 +444,9 @@ describe('LoggingContentGenerator', () => {
       const req = {
         contents: [{ role: 'user', parts: [] }],
         model: 'gemini-pro',
+        config: {
+          mimeType: 'text/plain',
+        },
       };
       const response: EmbedContentResponse = { embeddings: [{ values: [] }] };
       vi.mocked(wrapped.embedContent).mockResolvedValue(response);
@@ -331,6 +455,27 @@ describe('LoggingContentGenerator', () => {
 
       expect(wrapped.embedContent).toHaveBeenCalledWith(req);
       expect(result).toBe(response);
+
+      expect(runInDevTraceSpan).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: GeminiCliOperation.LLMCall,
+          attributes: expect.objectContaining({
+            [GEN_AI_REQUEST_MODEL]: req.model,
+            [GEMINI_CLI_GENERATE_CONTENT_CONFIG]: JSON.stringify(req.config),
+          }),
+        }),
+        expect.any(Function),
+      );
+
+      const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
+      const fn = spanArgs[1];
+      const metadata: SpanMetadata = { name: '', attributes: {} };
+      await fn({ metadata, endSpan: vi.fn() });
+
+      expect(metadata).toMatchObject({
+        input: req.contents,
+        output: response,
+      });
     });
   });
 

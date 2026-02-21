@@ -22,9 +22,29 @@ import type {
   ToolInvocation,
   ToolResult,
 } from '../tools/tools.js';
+import {
+  GeminiCliOperation,
+  GEN_AI_AGENT_DESCRIPTION,
+  GEN_AI_AGENT_NAME,
+} from '../telemetry/constants.js';
 import type { ToolRegistry } from 'src/tools/tool-registry.js';
 
 vi.mock('./subagent-tool-wrapper.js');
+
+// Mock runInDevTraceSpan
+const runInDevTraceSpan = vi.hoisted(() =>
+  vi.fn(async (opts, fn) => {
+    const metadata = { attributes: opts.attributes || {} };
+    return fn({
+      metadata,
+      endSpan: vi.fn(),
+    });
+  }),
+);
+
+vi.mock('../telemetry/trace.js', () => ({
+  runInDevTraceSpan,
+}));
 
 const MockSubagentToolWrapper = vi.mocked(SubagentToolWrapper);
 
@@ -148,6 +168,17 @@ describe('SubAgentInvocation', () => {
     expect(mockInnerInvocation.execute).toHaveBeenCalledWith(
       abortSignal,
       updateOutput,
+    );
+
+    expect(runInDevTraceSpan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: GeminiCliOperation.AgentCall,
+        attributes: expect.objectContaining({
+          [GEN_AI_AGENT_NAME]: testDefinition.name,
+          [GEN_AI_AGENT_DESCRIPTION]: testDefinition.description,
+        }),
+      }),
+      expect.any(Function),
     );
   });
 
