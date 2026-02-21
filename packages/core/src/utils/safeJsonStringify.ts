@@ -11,8 +11,6 @@
  * @param space - Optional space parameter for formatting (defaults to no formatting)
  * @returns JSON string with circular references replaced by [Circular]
  */
-import type { Config } from '../config/config.js';
-
 export function safeJsonStringify(
   obj: unknown,
   space?: string | number,
@@ -58,8 +56,7 @@ function removeEmptyObjects(data: any): object {
 export function safeJsonStringifyBooleanValuesOnly(obj: any): string {
   let configSeen = false;
   return JSON.stringify(removeEmptyObjects(obj), (key, value) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    if ((value as Config) !== null && !configSeen) {
+    if (value !== null && !configSeen) {
       configSeen = true;
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return value;
