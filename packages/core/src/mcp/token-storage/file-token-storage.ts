@@ -68,6 +68,21 @@ export class FileTokenStorage extends BaseTokenStorage {
     await fs.mkdir(dir, { recursive: true, mode: 0o700 });
   }
 
+  /**
+   * Handles a corrupted token file by backing it up and allowing a fresh start.
+   * This prevents users from being locked out when switching auth types or
+   * encountering genuine file corruption.
+   */
+  private async handleCorruptedFile(): Promise<void> {
+    try {
+      const backupPath = `${this.tokenFilePath}.backup-${Date.now()}`;
+      await fs.rename(this.tokenFilePath, backupPath);
+    } catch (_error: unknown) {
+      // If backup fails (e.g., file doesn't exist anymore), just continue
+      // The important thing is to not block the user from saving new credentials
+    }
+  }
+
   private async loadTokens(): Promise<Map<string, OAuthCredentials>> {
     try {
       const data = await fs.readFile(this.tokenFilePath, 'utf-8');
@@ -87,7 +102,11 @@ export class FileTokenStorage extends BaseTokenStorage {
           'Unsupported state or unable to authenticate data',
         )
       ) {
-        throw new Error('Token file corrupted');
+        // Decryption failed - this can happen when switching between auth types
+        // or if the file is genuinely corrupted. Instead of throwing an error,
+        // we'll backup the corrupted file and start fresh to allow the user to continue.
+        await this.handleCorruptedFile();
+        return new Map();
       }
       throw error;
     }
