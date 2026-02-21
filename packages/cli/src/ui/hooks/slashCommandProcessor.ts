@@ -86,7 +86,7 @@ interface SlashCommandProcessorActions {
   toggleBackgroundShell: () => void;
   toggleShortcutsHelp: () => void;
   setText: (text: string) => void;
-  openContentInExternalEditor: (content: string) => void;
+  openContentInExternalEditor: (content: string) => Promise<void>;
 }
 
 /**
@@ -658,7 +658,7 @@ export const useSlashCommandProcessor = (
                   return { type: 'handled' };
                 }
                 case 'open_in_editor': {
-                  actions.openContentInExternalEditor(result.content);
+                  await actions.openContentInExternalEditor(result.content);
                   return { type: 'handled' };
                 }
                 default: {

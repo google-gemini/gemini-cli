@@ -3784,7 +3784,7 @@ describe('AppContainer State Management', () => {
 
   describe('openContentInExternalEditor', () => {
     let capturedSlashActions: {
-      openContentInExternalEditor: (content: string) => void;
+      openContentInExternalEditor: (content: string) => Promise<void>;
     };
     let mockChild: {
       handlers: Record<string, (...args: unknown[]) => void>;
@@ -3806,10 +3806,12 @@ describe('AppContainer State Management', () => {
       };
       (spawn as ReturnType<typeof vi.fn>).mockReturnValue(mockChild);
 
-      vi.spyOn(fs, 'mkdtempSync').mockReturnValue('/tmp/gemini-chat-test');
-      vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
-      vi.spyOn(fs, 'unlinkSync').mockImplementation(() => {});
-      vi.spyOn(fs, 'rmSync').mockImplementation(() => {});
+      vi.spyOn(fs.promises, 'mkdtemp').mockResolvedValue(
+        '/tmp/gemini-chat-test',
+      );
+      vi.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined);
+      vi.spyOn(fs.promises, 'unlink').mockResolvedValue(undefined);
+      vi.spyOn(fs.promises, 'rm').mockResolvedValue(undefined);
 
       // Capture slashCommandActions by shape, not by arg index, so the test
       // stays valid if the hook signature changes.
@@ -3851,8 +3853,8 @@ describe('AppContainer State Management', () => {
         ({ unmount } = renderAppContainer());
       });
       await waitFor(() => expect(capturedSlashActions).toBeDefined());
-      act(() => {
-        capturedSlashActions.openContentInExternalEditor(content);
+      await act(async () => {
+        await capturedSlashActions.openContentInExternalEditor(content);
       });
       return { unmount: unmount! };
     };
@@ -3861,8 +3863,8 @@ describe('AppContainer State Management', () => {
       vi.stubEnv('EDITOR', 'vim');
       const { unmount } = await renderAndCall();
 
-      expect(fs.mkdtempSync).toHaveBeenCalled();
-      expect(fs.writeFileSync).toHaveBeenCalledWith(
+      expect(fs.promises.mkdtemp).toHaveBeenCalled();
+      expect(fs.promises.writeFile).toHaveBeenCalledWith(
         expect.stringContaining('chat.md'),
         'test content',
         'utf8',
@@ -3967,14 +3969,14 @@ describe('AppContainer State Management', () => {
       vi.stubEnv('EDITOR', 'vim');
       const { unmount } = await renderAndCall();
 
-      act(() => {
+      await act(async () => {
         mockChild.handlers['close']?.(0);
       });
 
-      expect(fs.unlinkSync).toHaveBeenCalledWith(
+      expect(fs.promises.unlink).toHaveBeenCalledWith(
         expect.stringContaining('chat.md'),
       );
-      expect(fs.rmSync).toHaveBeenCalledWith(
+      expect(fs.promises.rm).toHaveBeenCalledWith(
         '/tmp/gemini-chat-test',
         expect.objectContaining({ recursive: true }),
       );
@@ -3986,7 +3988,7 @@ describe('AppContainer State Management', () => {
       vi.stubEnv('EDITOR', 'vim');
       const { unmount } = await renderAndCall();
 
-      act(() => {
+      await act(async () => {
         mockChild.handlers['close']?.(0);
       });
 
@@ -4001,14 +4003,14 @@ describe('AppContainer State Management', () => {
       vi.stubEnv('EDITOR', 'vim');
       const { unmount } = await renderAndCall();
 
-      act(() => {
+      await act(async () => {
         mockChild.handlers['error']?.(new Error('spawn failed'));
       });
 
-      expect(fs.unlinkSync).toHaveBeenCalledWith(
+      expect(fs.promises.unlink).toHaveBeenCalledWith(
         expect.stringContaining('chat.md'),
       );
-      expect(fs.rmSync).toHaveBeenCalledWith(
+      expect(fs.promises.rm).toHaveBeenCalledWith(
         '/tmp/gemini-chat-test',
         expect.objectContaining({ recursive: true }),
       );
@@ -4030,17 +4032,17 @@ describe('AppContainer State Management', () => {
       const { unmount } = await renderAndCall();
 
       // Simulate editor closing normally, then gemini-cli exit also firing cleanup.
-      act(() => {
+      await act(async () => {
         mockChild.handlers['close']?.(0);
       });
       // Invoke the registered exit cleanup a second time.
       const registeredFn = (
         registerCleanup as ReturnType<typeof vi.fn>
-      ).mock.calls.at(-1)?.[0] as () => void;
-      registeredFn();
+      ).mock.calls.at(-1)?.[0] as () => Promise<void>;
+      await registeredFn();
 
-      expect(fs.unlinkSync).toHaveBeenCalledTimes(1);
-      expect(fs.rmSync).toHaveBeenCalledTimes(1);
+      expect(fs.promises.unlink).toHaveBeenCalledTimes(1);
+      expect(fs.promises.rm).toHaveBeenCalledTimes(1);
 
       unmount();
     });

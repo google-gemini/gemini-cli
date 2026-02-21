@@ -171,7 +171,7 @@ describe('useSlashCommandProcessor', () => {
         displayName: string,
         definition: unknown,
       ) => void;
-      openContentInExternalEditor?: (content: string) => void;
+      openContentInExternalEditor?: (content: string) => Promise<void>;
     } = {},
   ) => {
     const {
@@ -181,7 +181,7 @@ describe('useSlashCommandProcessor', () => {
       setIsProcessing = vi.fn(),
       refreshStatic = vi.fn(),
       openAgentConfigDialog = vi.fn(),
-      openContentInExternalEditor = vi.fn(),
+      openContentInExternalEditor = vi.fn().mockResolvedValue(undefined),
     } = options;
 
     mockBuiltinLoadCommands.mockResolvedValue(Object.freeze(builtinCommands));
@@ -759,7 +759,9 @@ describe('useSlashCommandProcessor', () => {
     });
 
     it('should call openContentInExternalEditor for "open_in_editor" action', async () => {
-      const mockOpenContentInExternalEditor = vi.fn();
+      const mockOpenContentInExternalEditor = vi
+        .fn()
+        .mockResolvedValue(undefined);
       const editorCommand = createTestCommand({
         name: 'editorcmd',
         action: vi.fn().mockResolvedValue({

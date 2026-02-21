@@ -589,10 +589,12 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   const openContentInExternalEditor = useCallback(
-    (content: string): void => {
-      const tmpDir = fs.mkdtempSync(pathJoin(os.tmpdir(), 'gemini-chat-'));
+    async (content: string): Promise<void> => {
+      const tmpDir = await fs.promises.mkdtemp(
+        pathJoin(os.tmpdir(), 'gemini-chat-'),
+      );
       const filePath = pathJoin(tmpDir, 'chat.md');
-      fs.writeFileSync(filePath, content, 'utf8');
+      await fs.promises.writeFile(filePath, content, 'utf8');
 
       let command: string | undefined;
       const args = [filePath];
@@ -635,16 +637,16 @@ export const AppContainer = (props: AppContainerProps) => {
       const spawnArgs = [...embeddedArgs, ...args];
 
       let cleaned = false;
-      const cleanup = () => {
+      const cleanup = async (): Promise<void> => {
         if (cleaned) return;
         cleaned = true;
         try {
-          fs.unlinkSync(filePath);
+          await fs.promises.unlink(filePath);
         } catch {
           /* ignore */
         }
         try {
-          fs.rmSync(tmpDir, { recursive: true, force: true });
+          await fs.promises.rm(tmpDir, { recursive: true, force: true });
         } catch {
           /* ignore */
         }
@@ -666,7 +668,7 @@ export const AppContainer = (props: AppContainerProps) => {
             '[AppContainer] external editor error',
             err,
           );
-          cleanup();
+          void cleanup();
         });
 
         child.on('close', (code) => {
@@ -678,7 +680,7 @@ export const AppContainer = (props: AppContainerProps) => {
             );
           }
           coreEvents.emit(CoreEvent.ExternalEditorClosed);
-          cleanup();
+          void cleanup();
         });
       } catch (err) {
         coreEvents.emitFeedback(
@@ -686,7 +688,7 @@ export const AppContainer = (props: AppContainerProps) => {
           '[AppContainer] external editor error',
           err,
         );
-        cleanup();
+        await cleanup();
       }
     },
     [getPreferredEditor],
