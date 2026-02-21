@@ -8,6 +8,7 @@ import {
   useCallback,
   useMemo,
   useEffect,
+  useRef,
   useState,
   createElement,
 } from 'react';
@@ -144,6 +145,11 @@ export const useSlashCommandProcessor = (
     null,
   );
 
+  // Tracks the text content of the most recent slash command output so that
+  // /copy can access it even though slash command outputs never enter the
+  // Gemini chat history.
+  const lastSlashCommandOutputRef = useRef<string | undefined>(undefined);
+
   const pendingHistoryItems = useMemo(() => {
     const items: HistoryItemWithoutId[] = [];
     if (pendingItem != null) {
@@ -243,6 +249,7 @@ export const useSlashCommandProcessor = (
         removeComponent: () => setCustomDialog(null),
         toggleBackgroundShell: actions.toggleBackgroundShell,
         toggleShortcutsHelp: actions.toggleShortcutsHelp,
+        getLastSlashCommandOutput: () => lastSlashCommandOutputRef.current,
       },
       session: {
         stats: session.stats,
@@ -447,6 +454,8 @@ export const useSlashCommandProcessor = (
                     toolArgs: result.toolArgs,
                   };
                 case 'message':
+                  // Store the output text so /copy can retrieve it later.
+                  lastSlashCommandOutputRef.current = result.content;
                   addItem(
                     {
                       type:
