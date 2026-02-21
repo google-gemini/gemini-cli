@@ -20,7 +20,8 @@ import {
   getEffectiveDefaultValue,
   getEffectiveValue,
   isInScope,
-  isRecord,
+  getEditValue,
+  parseEditedValue,
 } from '../../utils/settingsUtils.js';
 import {
   useSettingsStore,
@@ -49,103 +50,10 @@ interface SettingsDialogProps {
 
 const MAX_ITEMS_TO_SHOW = 8;
 
-function getEditValue(
-  type: SettingsType,
-  rawValue: SettingsValue,
-): string | undefined {
-  if (rawValue === undefined) {
-    return undefined;
-  }
-
-  if (type === 'array' && Array.isArray(rawValue)) {
-    return rawValue.join(', ');
-  }
-
-  if (type === 'object' && rawValue !== null && typeof rawValue === 'object') {
-    return JSON.stringify(rawValue);
-  }
-
-  return undefined;
-}
-
-function tryParseJsonStringArray(input: string): string[] | null {
-  try {
-    const parsed = JSON.parse(input);
-    if (
-      Array.isArray(parsed) &&
-      parsed.every((item): item is string => typeof item === 'string')
-    ) {
-      return parsed;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function tryParseJsonObject(input: string): Record<string, unknown> | null {
-  try {
-    const parsed: unknown = JSON.parse(input);
-    if (isRecord(parsed) && !Array.isArray(parsed)) {
-      return parsed;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function parseStringArrayValue(input: string): string[] {
-  const trimmed = input.trim();
-  if (trimmed === '') return [];
-
-  return (
-    tryParseJsonStringArray(trimmed) ??
-    input
-      .split(',')
-      .map((p) => p.trim())
-      .filter((p) => p.length > 0)
-  );
-}
-
-function parseObjectValue(input: string): Record<string, unknown> | null {
-  const trimmed = input.trim();
-  if (trimmed === '') {
-    return null;
-  }
-
-  return tryParseJsonObject(trimmed);
-}
-
-function parseEditedValue(
-  type: SettingsType,
-  newValue: string,
-): SettingsValue | null {
-  if (type === 'number') {
-    if (newValue.trim() === '') {
-      return null;
-    }
-
-    const numParsed = Number(newValue.trim());
-    if (Number.isNaN(numParsed)) {
-      return null;
-    }
-
-    return numParsed;
-  }
-
-  if (type === 'array') {
-    return parseStringArrayValue(newValue);
-  }
-
-  if (type === 'object') {
-    return parseObjectValue(newValue);
-  }
-
-  return newValue;
-}
-
-function capturePerScopeRestartSnapshot(
+// Create a snapshot of the initial per-scope state of Restart Required Settings
+// This creates a nested map of the form
+// restartRequiredSetting -> Map { scopeName -> value }
+function getActiveRestartRequiredSettings(
   settings: SettingsState,
 ): Map<string, Map<string, string>> {
   const snapshot = new Map<string, Map<string, string>>();
@@ -184,11 +92,14 @@ export function SettingsDialog({
   );
 
   // Snapshot restart-required values at mount time for diff tracking
-  const [initialRestartValues] = useState(() =>
-    capturePerScopeRestartSnapshot(settings),
+  const [activeRestartRequiredSettings] = useState(() =>
+    getActiveRestartRequiredSettings(settings),
   );
 
-  const restartChangedKeys = useMemo(() => {
+  // Track whether a restart is required to apply the changes in the Settings json file
+  // This does not care for inheritance
+  // It checks whether a proposed change from this UI to a settings.json file requires a restart to take effect in the app
+  const pendingRestartRequiredSettings = useMemo(() => {
     const changed = new Set<string>();
     const scopes: Array<[string, Settings]> = [
       ['User', settings.user.settings],
@@ -196,9 +107,10 @@ export function SettingsDialog({
       ['System', settings.system.settings],
     ];
 
-    for (const [key, initialScopeMap] of initialRestartValues) {
+    // Iterate through the nested map snapshot in activeRestartRequiredSettings, diff with current settings
+    for (const [key, initialScopeMap] of activeRestartRequiredSettings) {
       for (const [scopeName, scopeSettings] of scopes) {
-        const currentValue = !isInScope(key, scopeSettings)
+        const currentValue = isInScope(key, scopeSettings)
           ? getEffectiveValue(key, scopeSettings)
           : undefined;
         const initialJson = initialScopeMap.get(scopeName);
@@ -209,9 +121,9 @@ export function SettingsDialog({
       }
     }
     return changed;
-  }, [settings, initialRestartValues]);
+  }, [settings, activeRestartRequiredSettings]);
 
-  const showRestartPrompt = restartChangedKeys.size > 0;
+  const showRestartPrompt = pendingRestartRequiredSettings.size > 0;
 
   // Generate items for SearchableList
   const settingKeys = useMemo(() => getDialogSettingKeys(), []);

@@ -293,4 +293,101 @@ export function getDisplayValue(
   return valueString;
 }
 
+/**Utilities for parsing Settings that can be inline edited by the user typing out values */
+function tryParseJsonStringArray(input: string): string[] | null {
+  try {
+    const parsed = JSON.parse(input);
+    if (
+      Array.isArray(parsed) &&
+      parsed.every((item): item is string => typeof item === 'string')
+    ) {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function tryParseJsonObject(input: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(input);
+    if (isRecord(parsed) && !Array.isArray(parsed)) {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function parseStringArrayValue(input: string): string[] {
+  const trimmed = input.trim();
+  if (trimmed === '') return [];
+
+  return (
+    tryParseJsonStringArray(trimmed) ??
+    input
+      .split(',')
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0)
+  );
+}
+
+function parseObjectValue(input: string): Record<string, unknown> | null {
+  const trimmed = input.trim();
+  if (trimmed === '') {
+    return null;
+  }
+
+  return tryParseJsonObject(trimmed);
+}
+
+export function parseEditedValue(
+  type: SettingsType,
+  newValue: string,
+): SettingsValue | null {
+  if (type === 'number') {
+    if (newValue.trim() === '') {
+      return null;
+    }
+
+    const numParsed = Number(newValue.trim());
+    if (Number.isNaN(numParsed)) {
+      return null;
+    }
+
+    return numParsed;
+  }
+
+  if (type === 'array') {
+    return parseStringArrayValue(newValue);
+  }
+
+  if (type === 'object') {
+    return parseObjectValue(newValue);
+  }
+
+  return newValue;
+}
+
+export function getEditValue(
+  type: SettingsType,
+  rawValue: SettingsValue,
+): string | undefined {
+  if (rawValue === undefined) {
+    return undefined;
+  }
+
+  if (type === 'array' && Array.isArray(rawValue)) {
+    return rawValue.join(', ');
+  }
+
+  if (type === 'object' && rawValue !== null && typeof rawValue === 'object') {
+    return JSON.stringify(rawValue);
+  }
+
+  return undefined;
+}
+
 export const TEST_ONLY = { clearFlattenedSchema };
