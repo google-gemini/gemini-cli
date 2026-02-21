@@ -677,7 +677,7 @@ describe('InputPrompt', () => {
 
       // Send Ctrl+V
       await act(async () => {
-        stdin.write('\x16'); // Ctrl+V
+        stdin.write(process.platform === 'darwin' ? '\x1bv' : '\x16'); // Paste shortcut
       });
       await waitFor(() => {
         expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
@@ -700,7 +700,7 @@ describe('InputPrompt', () => {
       );
 
       await act(async () => {
-        stdin.write('\x16'); // Ctrl+V
+        stdin.write(process.platform === 'darwin' ? '\x1bv' : '\x16'); // Paste shortcut
       });
       await waitFor(() => {
         expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
@@ -719,7 +719,7 @@ describe('InputPrompt', () => {
       );
 
       await act(async () => {
-        stdin.write('\x16'); // Ctrl+V
+        stdin.write(process.platform === 'darwin' ? '\x1bv' : '\x16'); // Paste shortcut
       });
       await waitFor(() => {
         expect(clipboardUtils.saveClipboardImage).toHaveBeenCalled();
@@ -749,7 +749,7 @@ describe('InputPrompt', () => {
       );
 
       await act(async () => {
-        stdin.write('\x16'); // Ctrl+V
+        stdin.write(process.platform === 'darwin' ? '\x1bv' : '\x16'); // Paste shortcut
       });
       await waitFor(() => {
         // Should insert at cursor position with spaces
@@ -780,7 +780,7 @@ describe('InputPrompt', () => {
       );
 
       await act(async () => {
-        stdin.write('\x16'); // Ctrl+V
+        stdin.write(process.platform === 'darwin' ? '\x1bv' : '\x16'); // Paste shortcut
       });
       await waitFor(() => {
         expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
@@ -806,7 +806,7 @@ describe('InputPrompt', () => {
       );
 
       await act(async () => {
-        stdin.write('\x16'); // Ctrl+V
+        stdin.write(process.platform === 'darwin' ? '\x1bv' : '\x16'); // Paste shortcut
       });
 
       await waitFor(() => {
@@ -833,7 +833,7 @@ describe('InputPrompt', () => {
       const writeSpy = vi.spyOn(stdout, 'write');
 
       await act(async () => {
-        stdin.write('\x16'); // Ctrl+V
+        stdin.write(process.platform === 'darwin' ? '\x1bv' : '\x16'); // Paste shortcut
       });
 
       await waitFor(() => {
@@ -2183,7 +2183,7 @@ describe('InputPrompt', () => {
       );
 
       await act(async () => {
-        stdin.write('\x16'); // Ctrl+V
+        stdin.write(process.platform === 'darwin' ? '\x1bv' : '\x16'); // Paste shortcut
       });
 
       await waitFor(() => {
@@ -2206,7 +2206,7 @@ describe('InputPrompt', () => {
       );
 
       await act(async () => {
-        stdin.write('\x16'); // Ctrl+V
+        stdin.write(process.platform === 'darwin' ? '\x1bv' : '\x16'); // Paste shortcut
       });
 
       await waitFor(() => {
@@ -2229,7 +2229,7 @@ describe('InputPrompt', () => {
       );
 
       await act(async () => {
-        stdin.write('\x16'); // Ctrl+V
+        stdin.write(process.platform === 'darwin' ? '\x1bv' : '\x16'); // Paste shortcut
       });
 
       await waitFor(() => {
@@ -4118,13 +4118,13 @@ describe('InputPrompt', () => {
 
     it.each([
       {
-        name: 'hint appears on large paste via Ctrl+V',
+        name: 'hint appears on large paste via paste shortcut',
         text: 'line1\nline2\nline3\nline4\nline5\nline6',
         method: 'ctrl-v',
         expectHint: true,
       },
       {
-        name: 'hint does not appear for small pastes via Ctrl+V',
+        name: 'hint does not appear for small pastes via paste shortcut',
         text: 'hello',
         method: 'ctrl-v',
         expectHint: false,
@@ -4162,7 +4162,7 @@ describe('InputPrompt', () => {
 
       await act(async () => {
         if (method === 'ctrl-v') {
-          stdin.write('\x16'); // Ctrl+V
+          stdin.write(process.platform === 'darwin' ? '\x1bv' : '\x16'); // Paste shortcut
         } else {
           stdin.write(`\x1b[200~${text}\x1b[201~`);
         }
@@ -4558,8 +4558,8 @@ describe('InputPrompt', () => {
         input: '\x1b[200~pasted text\x1b[201~',
       },
       {
-        name: 'Ctrl+V (PASTE_CLIPBOARD) is pressed',
-        input: '\x16',
+        name: 'PASTE_CLIPBOARD shortcut is pressed',
+        input: process.platform === 'darwin' ? '\x1bv' : '\x16',
         setupMocks: () => {
           vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
           vi.mocked(clipboardy.read).mockResolvedValue('clipboard text');
