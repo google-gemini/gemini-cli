@@ -28,10 +28,6 @@ function isHeaderRecord(
   return !Array.isArray(h);
 }
 
-function isBufferEncoding(value: unknown): value is BufferEncoding {
-  return typeof value === 'string' && Buffer.isEncoding(value);
-}
-
 function isRequestOptions(value: unknown): value is http.RequestOptions {
   return (
     typeof value === 'object' &&
@@ -47,9 +43,17 @@ function isIncomingMessageCallback(
   return typeof value === 'function';
 }
 
+type HttpRequestArgs =
+  | []
+  | [
+      url: string | URL | http.RequestOptions,
+      options?: http.RequestOptions | ((res: http.IncomingMessage) => void),
+      callback?: (res: http.IncomingMessage) => void,
+    ];
+
 function callHttpRequest(
   originalFn: typeof http.request,
-  args: unknown[],
+  args: HttpRequestArgs,
 ): http.ClientRequest {
   if (args.length === 0) {
     return originalFn({});
@@ -429,7 +433,7 @@ export class ActivityLogger extends EventEmitter {
 
     const wrapRequest = (
       originalFn: typeof http.request,
-      args: unknown[],
+      args: HttpRequestArgs,
       protocol: string,
     ) => {
       const firstArg = args[0];
@@ -488,9 +492,12 @@ export class ActivityLogger extends EventEmitter {
       const oldWrite = req.write;
       const oldEnd = req.end;
 
-      req.write = function (chunk: unknown, ...etc: unknown[]) {
+      req.write = function (chunk: string | Uint8Array, ...etc: unknown[]) {
         if (chunk) {
-          const encoding = isBufferEncoding(etc[0]) ? etc[0] : undefined;
+          const encoding =
+            typeof etc[0] === 'string' && Buffer.isEncoding(etc[0])
+              ? etc[0]
+              : undefined;
           requestChunks.push(
             Buffer.isBuffer(chunk)
               ? chunk
@@ -507,11 +514,15 @@ export class ActivityLogger extends EventEmitter {
 
       req.end = function (
         this: http.ClientRequest,
-        chunk: unknown,
+        chunkOrCb?: string | Uint8Array | (() => void),
         ...etc: unknown[]
       ) {
-        if (chunk && typeof chunk !== 'function') {
-          const encoding = isBufferEncoding(etc[0]) ? etc[0] : undefined;
+        const chunk = typeof chunkOrCb === 'function' ? undefined : chunkOrCb;
+        if (chunk) {
+          const encoding =
+            typeof etc[0] === 'string' && Buffer.isEncoding(etc[0])
+              ? etc[0]
+              : undefined;
           requestChunks.push(
             Buffer.isBuffer(chunk)
               ? chunk
@@ -534,7 +545,7 @@ export class ActivityLogger extends EventEmitter {
           pending: true,
         });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-return
-        return (oldEnd as any).apply(this, [chunk, ...etc]);
+        return (oldEnd as any).apply(this, [chunkOrCb, ...etc]);
       };
 
       req.on('response', (res: http.IncomingMessage) => {
@@ -611,7 +622,15 @@ export class ActivityLogger extends EventEmitter {
         url: string | URL | http.RequestOptions,
         options?: http.RequestOptions | ((res: http.IncomingMessage) => void),
         callback?: (res: http.IncomingMessage) => void,
-      ): http.ClientRequest => wrapRequest(originalRequest, [url, options, callback], 'http:'),
+      ): http.ClientRequest => {
+        const args: HttpRequestArgs =
+          callback !== undefined
+            ? [url, options, callback]
+            : options !== undefined
+              ? [url, options]
+              : [url];
+        return wrapRequest(originalRequest, args, 'http:');
+      },
       writable: true,
       configurable: true,
     });
@@ -620,11 +639,19 @@ export class ActivityLogger extends EventEmitter {
         url: string | URL | http.RequestOptions,
         options?: http.RequestOptions | ((res: http.IncomingMessage) => void),
         callback?: (res: http.IncomingMessage) => void,
-      ): http.ClientRequest => wrapRequest(
+      ): http.ClientRequest => {
+        const args: HttpRequestArgs =
+          callback !== undefined
+            ? [url, options, callback]
+            : options !== undefined
+              ? [url, options]
+              : [url];
+        return wrapRequest(
           originalHttpsRequest as typeof http.request,
-          [url, options, callback],
+          args,
           'https:',
-        ),
+        );
+      },
       writable: true,
       configurable: true,
     });
