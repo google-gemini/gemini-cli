@@ -237,6 +237,40 @@ function validateShellCommandSyntax(
 }
 
 /**
+ * Validates that an ALLOW rule for a shell tool has a scope restriction
+ * (commandPrefix, commandRegex, or argsPattern). An un-scoped ALLOW rule for
+ * a shell tool would auto-approve ALL shell commands, which is a security risk.
+ * Returns an error message if the rule is overly broad, or null if it is safe.
+ */
+function validateShellAllowRuleScope(
+  rule: PolicyRuleToml,
+  ruleIndex: number,
+): string | null {
+  const SHELL_TOOL_NAME_CONST = 'run_shell_command';
+  const toolNames = Array.isArray(rule.toolName)
+    ? rule.toolName
+    : rule.toolName
+      ? [rule.toolName]
+      : [];
+  const isShellTool = toolNames.includes(SHELL_TOOL_NAME_CONST);
+  if (
+    isShellTool &&
+    rule.decision === PolicyDecision.ALLOW &&
+    !rule.commandPrefix &&
+    !rule.commandRegex &&
+    !rule.argsPattern
+  ) {
+    return (
+      `Rule #${ruleIndex + 1}: unsafe ALLOW rule for "${SHELL_TOOL_NAME_CONST}" has no scope restriction.\n` +
+      `  This rule will auto-approve ALL shell commands, bypassing user confirmation.\n` +
+      `  Fix: Add a commandPrefix (e.g. commandPrefix = "git") or argsPattern to restrict which commands are approved.\n` +
+      `  This rule has been ignored for security. To intentionally allow all commands, use approval mode "yolo" instead.`
+    );
+  }
+  return null;
+}
+
+/**
  * Transforms a priority number based on the policy tier.
  * Formula: tier + priority/1000
  *
@@ -332,10 +366,13 @@ export async function loadPoliciesFromToml(
         // Validate shell command convenience syntax
         const tomlRules = validationResult.data.rule ?? [];
 
+        // Track rule indices that should be skipped (unsafe/invalid)
+        const skippedRuleIndices = new Set<number>();
+
         for (let i = 0; i < tomlRules.length; i++) {
           const rule = tomlRules[i];
-          const validationError = validateShellCommandSyntax(rule, i);
-          if (validationError) {
+          const syntaxError = validateShellCommandSyntax(rule, i);
+          if (syntaxError) {
             errors.push({
               filePath,
               fileName: file,
@@ -343,14 +380,35 @@ export async function loadPoliciesFromToml(
               ruleIndex: i,
               errorType: 'rule_validation',
               message: 'Invalid shell command syntax',
-              details: validationError,
+              details: syntaxError,
             });
-            // Continue to next rule, don't skip the entire file
+            // Mark this rule as skipped so it won't be loaded into the engine
+            skippedRuleIndices.add(i);
+            continue;
+          }
+
+          // Check for overly broad shell ALLOW rules (no scope restriction)
+          const scopeError = validateShellAllowRuleScope(rule, i);
+          if (scopeError) {
+            errors.push({
+              filePath,
+              fileName: file,
+              tier: tierName,
+              ruleIndex: i,
+              errorType: 'rule_validation',
+              message: 'Unsafe broad shell ALLOW rule ignored',
+              details: scopeError,
+              suggestion:
+                'Add a commandPrefix or argsPattern to restrict which commands are approved, or delete this rule from the file.',
+            });
+            // Mark this rule as skipped so it won't be loaded into the engine
+            skippedRuleIndices.add(i);
           }
         }
 
-        // Transform rules
+        // Transform rules (skipping any that were flagged as unsafe)
         const parsedRules: PolicyRule[] = (validationResult.data.rule ?? [])
+          .filter((_, index) => !skippedRuleIndices.has(index))
           .flatMap((rule) => {
             const argsPatterns = buildArgsPatterns(
               rule.argsPattern,

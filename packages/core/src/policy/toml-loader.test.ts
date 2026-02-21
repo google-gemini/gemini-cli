@@ -562,6 +562,87 @@ priority = 100
     });
   });
 
+  describe('Broad Shell ALLOW Rule Scope Validation (GH #19799)', () => {
+    it('should reject a broad shell ALLOW rule without scope for security', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+decision = "allow"
+priority = 100
+`);
+
+      // The rule should be reported as an error
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].errorType).toBe('rule_validation');
+      expect(result.errors[0].message).toContain(
+        'Unsafe broad shell ALLOW rule ignored',
+      );
+      expect(result.errors[0].details).toContain('no scope restriction');
+      // And it must NOT be loaded into the engine (this is the key fix)
+      expect(result.rules).toHaveLength(0);
+    });
+
+    it('should reject a broad shell ALLOW rule when toolName is an array', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = ["run_shell_command"]
+decision = "allow"
+priority = 100
+`);
+
+      // Array-based toolName must also be caught (critical bypass vector)
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].errorType).toBe('rule_validation');
+      expect(result.errors[0].message).toContain(
+        'Unsafe broad shell ALLOW rule ignored',
+      );
+      expect(result.rules).toHaveLength(0);
+    });
+
+    it('should allow a scoped shell commandPrefix ALLOW rule normally', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "deno"
+decision = "allow"
+priority = 100
+`);
+
+      // No errors — this is a properly scoped rule
+      expect(result.errors).toHaveLength(0);
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].argsPattern).toBeDefined();
+    });
+
+    it('should allow a broad shell DENY rule without scope (DENY is not a security risk)', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+decision = "deny"
+priority = 100
+`);
+
+      // DENY rules without scope are fine — they block commands, not allow them
+      expect(result.errors).toHaveLength(0);
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should allow a scoped shell argsPattern ALLOW rule normally', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+argsPattern = '"command":"deno'
+decision = "allow"
+priority = 100
+`);
+
+      // argsPattern scoped rules are fine
+      expect(result.errors).toHaveLength(0);
+      expect(result.rules).toHaveLength(1);
+    });
+  });
+
   describe('Built-in Plan Mode Policy', () => {
     it('should override default subagent rules when in Plan Mode', async () => {
       const planTomlPath = path.resolve(__dirname, 'policies', 'plan.toml');
