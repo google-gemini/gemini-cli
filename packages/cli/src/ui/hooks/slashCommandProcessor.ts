@@ -558,9 +558,11 @@ export const useSlashCommandProcessor = (
                       ) {
                         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                         parsedArgs = jsonArgs as Record<string, unknown>;
+                      } else {
+                        parsedArgs = { raw: args };
                       }
                     } catch {
-                      // Fall back to raw args if JSON parsing fails
+                      parsedArgs = { raw: args };
                     }
                   }
 
