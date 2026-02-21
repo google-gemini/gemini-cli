@@ -5,8 +5,15 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Mock } from 'vitest';
-import { vi, describe, it, expect, beforeEach, type Mocked } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  type Mocked,
+  type Mock,
+} from 'vitest';
 import * as fs from 'node:fs';
 import { EDIT_TOOL_NAME } from '../tools/tool-names.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
@@ -130,8 +137,10 @@ describe('editCorrector', () => {
       );
     });
     it('should correctly process strings with some targeted escapes', () => {
+      // Note: C:\\Users\\name - the \\n in \\name should NOT be unescaped to newline
+      // because 'name' starts with lowercase letters (likely a path component, not an escape sequence)
       expect(unescapeStringForGeminiBug('C:\\Users\\name')).toBe(
-        'C:\\Users\name',
+        'C:\\Users\\name',
       );
     });
     it('should handle complex cases with mixed slashes and characters', () => {
@@ -142,17 +151,111 @@ describe('editCorrector', () => {
     it('should handle escaped backslashes', () => {
       expect(unescapeStringForGeminiBug('\\\\')).toBe('\\');
       expect(unescapeStringForGeminiBug('C:\\\\Users')).toBe('C:\\Users');
+      // Note: path\\to\\file - the \\t should NOT unescape because 'o' follows (lowercase)
       expect(unescapeStringForGeminiBug('path\\\\to\\\\file')).toBe(
-        'path\to\\file',
+        'path\\to\\file',
       );
     });
     it('should handle escaped backslashes mixed with other escapes (aggressive unescaping)', () => {
+      // Note: line1\\\\\\nline2 - the \\n should NOT unescape because 'line2' follows (lowercase)
       expect(unescapeStringForGeminiBug('line1\\\\\\nline2')).toBe(
-        'line1\nline2',
+        'line1\\nline2',
       );
+      // Note: \\\\nline - the \\n should NOT unescape because 'line' follows (lowercase)
       expect(unescapeStringForGeminiBug('quote\\\\"text\\\\nline')).toBe(
-        'quote"text\nline',
+        'quote"text\\nline',
       );
+    });
+
+    // LaTeX-specific tests (issue #19802)
+    it('should NOT unescape backslash-t in LaTeX commands', () => {
+      expect(unescapeStringForGeminiBug('\\title{My Document}')).toBe(
+        '\\title{My Document}',
+      );
+      expect(unescapeStringForGeminiBug('\\textbf{Bold Text}')).toBe(
+        '\\textbf{Bold Text}',
+      );
+      expect(unescapeStringForGeminiBug('\\table{data}')).toBe('\\table{data}');
+      expect(unescapeStringForGeminiBug('\\tableofcontents')).toBe(
+        '\\tableofcontents',
+      );
+    });
+
+    it('should NOT unescape backslash-n in LaTeX commands', () => {
+      expect(unescapeStringForGeminiBug('\\newline')).toBe('\\newline');
+      expect(unescapeStringForGeminiBug('\\newcommand{\\test}')).toBe(
+        '\\newcommand{\\test}',
+      );
+      expect(unescapeStringForGeminiBug('\\noindent')).toBe('\\noindent');
+    });
+
+    it('should NOT unescape backslash-r in LaTeX/regex commands', () => {
+      expect(unescapeStringForGeminiBug('\\ref{fig:1}')).toBe('\\ref{fig:1}');
+      expect(unescapeStringForGeminiBug('\\renewcommand')).toBe(
+        '\\renewcommand',
+      );
+    });
+
+    it('should handle mixed LaTeX commands and actual escape sequences', () => {
+      // LaTeX command followed by actual tab  - \tNext has capital N, so should become tab
+      expect(unescapeStringForGeminiBug('\\title{Test}\\tNext')).toBe(
+        '\\title{Test}\tNext',
+      );
+      // Actual newline followed by LaTeX command
+      expect(unescapeStringForGeminiBug('Line1\\n\\newpage')).toBe(
+        'Line1\n\\newpage',
+      );
+      // Mixed content - \ttab has lowercase t after \t, so both stay as-is
+      expect(
+        unescapeStringForGeminiBug('\\textbf{Bold}\\nNew line\\ttab'),
+      ).toBe('\\textbf{Bold}\nNew line\\ttab');
+    });
+
+    it('should handle regex patterns with backslashes', () => {
+      // Regex patterns often use \d, \w, \s which shouldn't be unescaped
+      expect(unescapeStringForGeminiBug('\\d+')).toBe('\\d+');
+      expect(unescapeStringForGeminiBug('\\w+')).toBe('\\w+');
+      expect(unescapeStringForGeminiBug('\\s+')).toBe('\\s+');
+      // But \t and \n in regex contexts (not followed by letters) should be unescaped
+      expect(unescapeStringForGeminiBug('test\\t+')).toBe('test\t+');
+      expect(unescapeStringForGeminiBug('line\\n+')).toBe('line\n+');
+    });
+
+    it('should handle Windows file paths correctly', () => {
+      // Windows paths should be preserved
+      expect(unescapeStringForGeminiBug('C:\\temp\\file.txt')).toBe(
+        'C:\\temp\\file.txt',
+      );
+      expect(unescapeStringForGeminiBug('D:\\test\\readme.md')).toBe(
+        'D:\\test\\readme.md',
+      );
+    });
+
+    it('should handle escape sequences at end of string', () => {
+      expect(unescapeStringForGeminiBug('test\\n')).toBe('test\n');
+      expect(unescapeStringForGeminiBug('test\\t')).toBe('test\t');
+      expect(unescapeStringForGeminiBug('test\\r')).toBe('test\r');
+    });
+
+    it('should handle escape sequences followed by punctuation', () => {
+      expect(unescapeStringForGeminiBug('line\\n,')).toBe('line\n,');
+      expect(unescapeStringForGeminiBug('tab\\t.')).toBe('tab\t.');
+      expect(unescapeStringForGeminiBug('text\\n{}')).toBe('text\n{}');
+    });
+
+    it('should handle complex LaTeX document structure', () => {
+      const latexCode = `\\documentclass{article}
+\\usepackage{geometry}
+\\title{Critical Review}
+\\author{Gemini CLI}
+\\begin{document}
+\\maketitle
+\\section{Introduction}
+\\textbf{This} is \\textit{text}.
+\\end{document}`;
+
+      // Should preserve all LaTeX commands
+      expect(unescapeStringForGeminiBug(latexCode)).toBe(latexCode);
     });
   });
 

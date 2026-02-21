@@ -732,44 +732,76 @@ function trimPairIfPossible(
 
 /**
  * Unescapes a string that might have been overly escaped by an LLM.
+ *
+ * This function handles cases where the LLM over-escapes strings (e.g., \\n instead of \n),
+ * but it must NOT unescape legitimate backslash sequences that are part of the content,
+ * such as LaTeX commands (\title, \textbf), regex patterns (\d, \w), or other domain-specific syntax.
+ *
+ * Strategy: Only unescape when it's clearly an escape sequence bug, not part of a command/identifier.
+ * - LaTeX commands are typically: backslash + LOWERCASE letters (e.g., \title, \textbf, \newline)
+ * - Escape sequences are: backslash + letter + (NON-lowercase-letter | end-of-string)
+ *   Examples: \tTest (tab + Test), \n\n (newline), Hello\nWorld (newline between words)
  */
 export function unescapeStringForGeminiBug(inputString: string): string {
-  // Regex explanation:
-  // \\ : Matches exactly one literal backslash character.
-  // (n|t|r|'|"|`|\\|\n) : This is a capturing group. It matches one of the following:
-  //   n, t, r, ', ", ` : These match the literal characters 'n', 't', 'r', single quote, double quote, or backtick.
-  //                       This handles cases like "\\n", "\\`", etc.
-  //   \\ : This matches a literal backslash. This handles cases like "\\\\" (escaped backslash).
-  //   \n : This matches an actual newline character. This handles cases where the input
-  //        string might have something like "\\\n" (a literal backslash followed by a newline).
-  // g : Global flag, to replace all occurrences.
+  // Strategy: Process in a single pass with careful lookahead
+  // Match: one or more backslashes followed by (n|t|r|'|"|`|\\|\n)
+  // For n, t, r: Only unescape if NOT followed by a LOWERCASE letter (LaTeX commands use lowercase)
+  // For quotes/backticks/backslashes: Always safe to unescape
 
   return inputString.replace(
     /\\+(n|t|r|'|"|`|\\|\n)/g,
-    (match, capturedChar) => {
-      // 'match' is the entire erroneous sequence, e.g., if the input (in memory) was "\\\\`", match is "\\\\`".
-      // 'capturedChar' is the character that determines the true meaning, e.g., '`'.
+    (
+      match: string,
+      capturedChar: string,
+      offset: number,
+      fullString: string,
+    ): string => {
+      // For n, t, r: check if followed by a LOWERCASE letter
+      if (
+        capturedChar === 'n' ||
+        capturedChar === 't' ||
+        capturedChar === 'r'
+      ) {
+        // Look at the next character after the match
+        const nextCharIndex = offset + match.length;
+        const nextChar: string =
+          nextCharIndex < fullString.length ? fullString[nextCharIndex] : '';
 
+        // If followed by a LOWERCASE letter, preserve the backslash (it's likely a LaTeX command)
+        // Examples: \title, \textbf, \newline (lowercase follows)
+        // Counter-examples: \tTest, \n\n, test\n (uppercase/punct/end follows - these ARE escape sequences)
+        if (/[a-z]/.test(nextChar)) {
+          // Return the LAST backslash + the character (e.g., \\t -> \t for \title)
+          return '\\' + capturedChar;
+        }
+
+        // Otherwise, unescape to the actual control character
+        switch (capturedChar) {
+          case 'n':
+            return '\n';
+          case 't':
+            return '\t';
+          case 'r':
+            return '\r';
+          default:
+            // Should not reach here given the regex, but satisfy default-case
+            return match;
+        }
+      }
+
+      // For other characters, always unescape
       switch (capturedChar) {
-        case 'n':
-          return '\n'; // Correctly escaped: \n (newline character)
-        case 't':
-          return '\t'; // Correctly escaped: \t (tab character)
-        case 'r':
-          return '\r'; // Correctly escaped: \r (carriage return character)
         case "'":
-          return "'"; // Correctly escaped: ' (apostrophe character)
+          return "'";
         case '"':
-          return '"'; // Correctly escaped: " (quotation mark character)
+          return '"';
         case '`':
-          return '`'; // Correctly escaped: ` (backtick character)
-        case '\\': // This handles when 'capturedChar' is a literal backslash
-          return '\\'; // Replace escaped backslash (e.g., "\\\\") with single backslash
-        case '\n': // This handles when 'capturedChar' is an actual newline
-          return '\n'; // Replace the whole erroneous sequence (e.g., "\\\n" in memory) with a clean newline
+          return '`';
+        case '\\':
+          return '\\';
+        case '\n':
+          return '\n';
         default:
-          // This fallback should ideally not be reached if the regex captures correctly.
-          // It would return the original matched sequence if an unexpected character was captured.
           return match;
       }
     },
