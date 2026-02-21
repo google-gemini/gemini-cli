@@ -226,8 +226,14 @@ export class HookSystem {
 
   async fireBeforeAgentEvent(
     prompt: string,
+    commandName?: string,
+    commandArgs?: Record<string, unknown>,
   ): Promise<DefaultHookOutput | undefined> {
-    const result = await this.hookEventHandler.fireBeforeAgentEvent(prompt);
+    const result = await this.hookEventHandler.fireBeforeAgentEvent(
+      prompt,
+      commandName,
+      commandArgs,
+    );
     return result.finalOutput;
   }
 
@@ -235,11 +241,15 @@ export class HookSystem {
     prompt: string,
     response: string,
     stopHookActive: boolean = false,
+    commandName?: string,
+    commandArgs?: Record<string, unknown>,
   ): Promise<DefaultHookOutput | undefined> {
     const result = await this.hookEventHandler.fireAfterAgentEvent(
       prompt,
       response,
       stopHookActive,
+      commandName,
+      commandArgs,
     );
     return result.finalOutput;
   }
