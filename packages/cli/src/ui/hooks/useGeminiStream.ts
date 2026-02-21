@@ -33,6 +33,7 @@ import {
   ValidationRequiredError,
   coreEvents,
   CoreEvent,
+  GeminiCliOperation,
   CoreToolCallStatus,
   buildUserSteeringHintPrompt,
   generateSteeringAckMessage,
@@ -1258,7 +1259,11 @@ export const useGeminiStream = (
       prompt_id?: string,
     ) =>
       runInDevTraceSpan(
-        { name: 'submitQuery' },
+        {
+          operation: options?.isContinuation
+            ? GeminiCliOperation.SystemPrompt
+            : GeminiCliOperation.UserPrompt,
+        },
         async ({ metadata: spanMetadata }) => {
           spanMetadata.input = query;
 

@@ -25,6 +25,7 @@ import type {
   Config,
   EditorType,
   AnyToolInvocation,
+  SpanMetadata,
 } from '@google/gemini-cli-core';
 import {
   CoreToolCallStatus,
@@ -39,6 +40,7 @@ import {
   coreEvents,
   CoreEvent,
   MCPDiscoveryState,
+  GeminiCliOperation,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -100,6 +102,19 @@ const MockValidationRequiredError = vi.hoisted(
     },
 );
 
+const mockRunInDevTraceSpan = vi.hoisted(() =>
+  vi.fn(async (opts, fn) => {
+    const metadata: SpanMetadata = {
+      name: opts.operation,
+      attributes: opts.attributes || {},
+    };
+    return await fn({
+      metadata,
+      endSpan: vi.fn(),
+    });
+  }),
+);
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actualCoreModule = (await importOriginal()) as any;
   return {
@@ -112,6 +127,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     tokenLimit: vi.fn().mockReturnValue(100), // Mock tokenLimit
     recordToolCallInteractions: vi.fn().mockResolvedValue(undefined),
     getCodeAssistServer: vi.fn().mockReturnValue(undefined),
+    runInDevTraceSpan: mockRunInDevTraceSpan,
   };
 });
 
@@ -793,6 +809,23 @@ describe('useGeminiStream', () => {
           item.text.includes('Got it. Focusing on tests only.'),
       ),
     ).toBe(true);
+
+    expect(mockRunInDevTraceSpan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: GeminiCliOperation.SystemPrompt,
+      }),
+      expect.any(Function),
+    );
+
+    const spanArgs = mockRunInDevTraceSpan.mock.calls[0];
+    const fn = spanArgs[1];
+    const metadata = { attributes: {} };
+    await act(async () => {
+      await fn({ metadata, endSpan: vi.fn() });
+    });
+    expect(metadata).toMatchObject({
+      input: sentParts,
+    });
   });
 
   it('should handle all tool calls being cancelled', async () => {
@@ -2423,6 +2456,11 @@ describe('useGeminiStream', () => {
     // This is the core fix validation: Rationale comes before tools are even scheduled (awaited)
     expect(rationaleIndex).toBeLessThan(scheduleIndex);
     expect(rationaleIndex).toBeLessThan(toolGroupIndex);
+
+    // Ensure all state updates from recursive submitQuery are settled
+    await waitFor(() => {
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
   });
 
   it('should process @include commands, adding user turn after processing to prevent race conditions', async () => {
@@ -3524,5 +3562,32 @@ describe('useGeminiStream', () => {
 
       expect(result.current.pendingHistoryItems.length).toEqual(0);
     });
+  });
+
+  it('should trace UserPrompt telemetry on submitQuery', async () => {
+    const { result } = renderTestHook();
+
+    mockSendMessageStream.mockReturnValue(
+      (async function* () {
+        yield { type: ServerGeminiEventType.Content, value: 'Response' };
+      })(),
+    );
+
+    await act(async () => {
+      await result.current.submitQuery('telemetry test query');
+    });
+
+    const userPromptCall = mockRunInDevTraceSpan.mock.calls.find(
+      (call) =>
+        call[0].operation === GeminiCliOperation.UserPrompt ||
+        call[0].operation === 'UserPrompt',
+    );
+    expect(userPromptCall).toBeDefined();
+
+    const spanMetadata = {} as SpanMetadata;
+    await act(async () => {
+      await userPromptCall![1]({ metadata: spanMetadata, endSpan: vi.fn() });
+    });
+    expect(spanMetadata.input).toBe('telemetry test query');
   });
 });
