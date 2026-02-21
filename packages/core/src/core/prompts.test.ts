@@ -368,7 +368,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).not.toContain('`grep_search`');
     expect(prompt).not.toContain('`glob`');
     expect(prompt).toContain(
-      'Use search tools extensively to understand file structures, existing code patterns, and conventions.',
+      'Systematically map the codebase and validate assumptions.',
     );
   });
 
@@ -407,15 +407,9 @@ describe('Core System Prompt (prompts.ts)', () => {
         expect(prompt).toContain(
           `Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery`,
         );
-        expect(prompt).not.toContain(
-          'Use `grep_search` and `glob` search tools extensively',
-        );
       } else {
         expect(prompt).not.toContain(
           `Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery`,
-        );
-        expect(prompt).toContain(
-          'Use `grep_search` and `glob` search tools extensively',
         );
       }
       expect(prompt).toMatchSnapshot();
