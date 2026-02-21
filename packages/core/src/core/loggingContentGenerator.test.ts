@@ -334,6 +334,41 @@ describe('LoggingContentGenerator', () => {
     });
   });
 
+  describe('_parseBaseUrl', () => {
+    it('should parse a valid HTTPS URL', () => {
+      const result = LoggingContentGenerator._parseBaseUrl(
+        'https://my-proxy.example.com',
+      );
+      expect(result).toEqual({ address: 'my-proxy.example.com', port: 443 });
+    });
+
+    it('should parse a valid HTTP URL', () => {
+      const result = LoggingContentGenerator._parseBaseUrl(
+        'http://localhost:8080',
+      );
+      expect(result).toEqual({ address: 'localhost', port: 8080 });
+    });
+
+    it('should default to port 80 for HTTP URLs without explicit port', () => {
+      const result = LoggingContentGenerator._parseBaseUrl(
+        'http://my-proxy.example.com',
+      );
+      expect(result).toEqual({ address: 'my-proxy.example.com', port: 80 });
+    });
+
+    it('should parse a URL with a custom port', () => {
+      const result = LoggingContentGenerator._parseBaseUrl(
+        'https://my-proxy.example.com:9443',
+      );
+      expect(result).toEqual({ address: 'my-proxy.example.com', port: 9443 });
+    });
+
+    it('should return the raw string as address for an invalid URL', () => {
+      const result = LoggingContentGenerator._parseBaseUrl('not-a-valid-url');
+      expect(result).toEqual({ address: 'not-a-valid-url', port: 443 });
+    });
+  });
+
   describe('delegation', () => {
     it('should delegate userTier to wrapped', () => {
       wrapped.userTier = UserTierId.STANDARD;

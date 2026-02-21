@@ -108,6 +108,10 @@ export class LoggingContentGenerator implements ContentGenerator {
 
     // Case 2: Using an API key for Vertex AI.
     if (genConfig?.vertexai) {
+      const customVertexUrl = process.env['GOOGLE_VERTEX_BASE_URL'];
+      if (customVertexUrl) {
+        return LoggingContentGenerator._parseBaseUrl(customVertexUrl);
+      }
       const location = process.env['GOOGLE_CLOUD_LOCATION'];
       if (location) {
         return { address: `${location}-aiplatform.googleapis.com`, port: 443 };
@@ -118,7 +122,25 @@ export class LoggingContentGenerator implements ContentGenerator {
 
     // Case 3: Default to the public Gemini API endpoint.
     // This is used when an API key is provided but not for Vertex AI.
+    const customGeminiUrl = process.env['GOOGLE_GEMINI_BASE_URL'];
+    if (customGeminiUrl) {
+      return LoggingContentGenerator._parseBaseUrl(customGeminiUrl);
+    }
     return { address: `generativelanguage.googleapis.com`, port: 443 };
+  }
+
+  static _parseBaseUrl(baseUrl: string): ServerDetails {
+    try {
+      const url = new URL(baseUrl);
+      const port = url.port
+        ? parseInt(url.port, 10)
+        : url.protocol === 'https:'
+          ? 443
+          : 80;
+      return { address: url.hostname, port };
+    } catch {
+      return { address: baseUrl, port: 443 };
+    }
   }
 
   private _logApiResponse(
