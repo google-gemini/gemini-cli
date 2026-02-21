@@ -141,7 +141,7 @@ that also concludes a phase in `plan.md`.
       The automated tests have passed. For manual verification, please follow these steps:
 
       **Manual Verification Steps:**
-      1.  **Start the development server with the command:** `npm run dev`
+      1.  **Start the development server with the command:** `npm start`
       2.  **Open your browser to:** `http://localhost:3000`
       3.  **Confirm that you see:** The new user profile page, with the user's name and email displayed correctly.
       ```
