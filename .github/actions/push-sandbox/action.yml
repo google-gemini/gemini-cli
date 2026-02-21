@@ -72,16 +72,12 @@ runs:
       env:
         GEMINI_SANDBOX_IMAGE_TAG: '${{ steps.image_tag.outputs.FINAL_TAG }}'
         GEMINI_SANDBOX: 'docker'
+        BUILD_SANDBOX_FLAGS: "--platform linux/amd64,linux/arm64 ${{ inputs.dry-run != 'true' && '--push' || '' }}"
       run: |-
         npm run build:sandbox -- \
           --image google/gemini-cli-sandbox:${{ steps.image_tag.outputs.FINAL_TAG }} \
           --output-file final_image_uri.txt
         echo "uri=$(cat final_image_uri.txt)" >> $GITHUB_OUTPUT
-    - name: 'publish'
-      shell: 'bash'
-      if: "${{ inputs.dry-run != 'true' }}"
-      run: |-
-        docker push "${{ steps.docker_build.outputs.uri }}"
     - name: 'Create issue on failure'
       if: |-
         ${{ failure() }}
