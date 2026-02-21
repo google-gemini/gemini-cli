@@ -835,4 +835,67 @@ describe('ChatCompressionService', () => {
       );
     });
   });
+
+  it('should strip function_response.parts (Gemini 3 multimodal data) before sending to summarizer', async () => {
+    const history: Content[] = [
+      { role: 'user', parts: [{ text: 'msg1' }] },
+      {
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              name: 'screenshot_tool',
+              response: { output: 'Screenshot taken.' },
+              // Gemini 3 nests inlineData inside function_response.parts at runtime
+              parts: [
+                { inlineData: { mimeType: 'image/png', data: 'base64data' } },
+              ],
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any,
+          },
+        ],
+      },
+      { role: 'model', parts: [{ text: 'resp2' }] },
+      { role: 'user', parts: [{ text: 'msg3' }] },
+      { role: 'model', parts: [{ text: 'resp4' }] },
+    ];
+
+    vi.mocked(mockChat.getHistory).mockReturnValue(history);
+    vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(600000);
+
+    await service.compress(
+      mockChat,
+      mockPromptId,
+      true,
+      mockModel,
+      mockConfig,
+      false,
+    );
+
+    // Verify that both generateContent calls had the nested .parts stripped
+    const generateContentMock = vi.mocked(
+      mockConfig.getBaseLlmClient().generateContent,
+    );
+    expect(generateContentMock).toHaveBeenCalledTimes(2);
+
+    for (const call of generateContentMock.mock.calls) {
+      const contents = call[0].contents;
+      for (const content of contents) {
+        for (const part of content.parts ?? []) {
+          if (part.functionResponse) {
+            // The nested .parts field should have been removed
+            expect(
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (part.functionResponse as any).parts,
+            ).toBeUndefined();
+            // But the rest of functionResponse should be preserved
+            expect(part.functionResponse.name).toBe('screenshot_tool');
+            expect(part.functionResponse.response).toEqual({
+              output: 'Screenshot taken.',
+            });
+          }
+        }
+      }
+    }
+  });
 });

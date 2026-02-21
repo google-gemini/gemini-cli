@@ -228,6 +228,29 @@ async function truncateHistoryToBudget(
   return truncatedHistory;
 }
 
+/**
+ * Strips the Gemini-3-specific `function_response.parts` (nested multimodal
+ * data such as inlineData) from history entries. The compression summarizer
+ * model may not support this feature, so we sanitize before sending.
+ */
+function sanitizeHistoryForSummarizer(history: Content[]): Content[] {
+  return history.map((content) => ({
+    ...content,
+    parts: content.parts?.map((part) => {
+      if (part.functionResponse) {
+         
+        const { parts: _nestedParts, ...cleanFR } =
+          part.functionResponse as // The `parts` field is added at runtime for Gemini 3 models and is
+          // not part of the official FunctionResponse type.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          Record<string, any>;
+        return { functionResponse: cleanFR } as typeof part;
+      }
+      return part;
+    }),
+  }));
+}
+
 export class ChatCompressionService {
   async compress(
     chat: GeminiChat,
@@ -353,7 +376,7 @@ export class ChatCompressionService {
     const summaryResponse = await config.getBaseLlmClient().generateContent({
       modelConfigKey: { model: modelStringToModelConfigAlias(model) },
       contents: [
-        ...historyForSummarizer,
+        ...sanitizeHistoryForSummarizer(historyForSummarizer),
         {
           role: 'user',
           parts: [
@@ -378,7 +401,7 @@ export class ChatCompressionService {
       .generateContent({
         modelConfigKey: { model: modelStringToModelConfigAlias(model) },
         contents: [
-          ...historyForSummarizer,
+          ...sanitizeHistoryForSummarizer(historyForSummarizer),
           {
             role: 'model',
             parts: [{ text: summary }],
