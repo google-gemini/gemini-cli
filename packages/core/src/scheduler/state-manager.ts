@@ -17,8 +17,7 @@ import type {
   ExecutingToolCall,
   ToolCallResponseInfo,
 } from './types.js';
-import { CoreToolCallStatus } from './types.js';
-import { ROOT_SCHEDULER_ID } from './types.js';
+import { CoreToolCallStatus , ROOT_SCHEDULER_ID } from './types.js';
 import type {
   ToolConfirmationOutcome,
   ToolResultDisplay,
@@ -531,6 +530,11 @@ export class SchedulerStateManager {
     const progressPercent =
       execData?.progressPercent ??
       ('progressPercent' in call ? call.progressPercent : undefined);
+    const progress =
+      execData?.progress ?? ('progress' in call ? call.progress : undefined);
+    const progressTotal =
+      execData?.progressTotal ??
+      ('progressTotal' in call ? call.progressTotal : undefined);
 
     return {
       request: call.request,
@@ -543,6 +547,8 @@ export class SchedulerStateManager {
       pid,
       progressMessage,
       progressPercent,
+      progress,
+      progressTotal,
       schedulerId: call.schedulerId,
       approvalMode: call.approvalMode,
     };

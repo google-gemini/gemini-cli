@@ -110,6 +110,8 @@ export interface IndividualToolCallDisplay {
   approvalMode?: ApprovalMode;
   progressMessage?: string;
   progressPercent?: number;
+  progress?: number;
+  progressTotal?: number;
 }
 
 export interface CompressionProps {

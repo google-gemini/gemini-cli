@@ -13,6 +13,7 @@ import {
   ToolStatusIndicator,
   ToolInfo,
   TrailingIndicator,
+  McpProgressIndicator,
   type TextEmphasis,
   STATUS_INDICATOR_WIDTH,
   isThisShellFocusable as checkIsShellFocusable,
@@ -20,7 +21,7 @@ import {
   useFocusHint,
   FocusHint,
 } from './ToolShared.js';
-import { type Config } from '@google/gemini-cli-core';
+import { type Config, CoreToolCallStatus } from '@google/gemini-cli-core';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
 
 export type { TextEmphasis };
@@ -56,7 +57,8 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   ptyId,
   config,
   progressMessage,
-  progressPercent,
+  progress,
+  progressTotal,
 }) => {
   const isThisShellFocused = checkIsShellFocused(
     name,
@@ -91,8 +93,6 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           status={status}
           description={description}
           emphasis={emphasis}
-          progressMessage={progressMessage}
-          progressPercent={progressPercent}
         />
         <FocusHint
           shouldShowFocusHint={shouldShowFocusHint}
@@ -112,6 +112,14 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         paddingX={1}
         flexDirection="column"
       >
+        {status === CoreToolCallStatus.Executing && progress !== undefined && (
+          <McpProgressIndicator
+            progress={progress}
+            total={progressTotal}
+            message={progressMessage}
+            barWidth={20}
+          />
+        )}
         <ToolResultDisplay
           resultDisplay={resultDisplay}
           availableTerminalHeight={availableTerminalHeight}
