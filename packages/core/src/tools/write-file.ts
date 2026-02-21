@@ -36,6 +36,7 @@ import {
 } from '../utils/editCorrector.js';
 import { detectLineEnding } from '../utils/textUtils.js';
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
+import { getDiffContextSnippet } from './diff-utils.js';
 import type {
   ModifiableDeclarativeTool,
   ModifyContext,
@@ -350,6 +351,15 @@ class WriteFileToolInvocation extends BaseToolInvocation<
           `User modified the \`content\` to be: ${content}`,
         );
       }
+
+      // Return a diff of the file before and after the write so that the agent
+      // can avoid the need to spend a turn doing a verification read.
+      const snippet = getDiffContextSnippet(
+        isNewFile ? '' : originalContent,
+        finalContent,
+        5,
+      );
+      llmSuccessMessageParts.push(`Here is the updated code:\n${snippet}`);
 
       // Log file operation for telemetry (without diff_stat to avoid double-counting)
       const mimetype = getSpecificMimeType(this.resolvedPath);
