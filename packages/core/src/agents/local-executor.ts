@@ -34,8 +34,7 @@ import {
   AgentStartEvent,
   AgentFinishEvent,
   RecoveryAttemptEvent,
-  LlmRole,
-} from '../telemetry/types.js';
+ LlmRole } from '../telemetry/types.js';
 import type {
   LocalAgentDefinition,
   AgentInputs,
@@ -565,13 +564,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         } else {
           // Recovery Failed. Set the final error message based on the *original* reason.
           if (terminateReason === AgentTerminateMode.TIMEOUT) {
-            finalResult = `Agent timed out after ${maxTimeMinutes} minutes.`;
+            finalResult = `Agent '${this.definition.name}' timed out after ${maxTimeMinutes} minutes. To increase, configure in settings.json: { "agents": { "overrides": { "${this.definition.name}": { "runConfig": { "maxTimeMinutes": <value> } } } } }`;
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'timeout',
             });
           } else if (terminateReason === AgentTerminateMode.MAX_TURNS) {
-            finalResult = `Agent reached max turns limit (${maxTurns}).`;
+            finalResult = `Agent '${this.definition.name}' reached max turns limit (${maxTurns}). To increase, configure in settings.json: { "agents": { "overrides": { "${this.definition.name}": { "runConfig": { "maxTurns": <value> } } } } }`;
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'max_turns',
@@ -636,7 +635,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         }
 
         // Recovery failed or wasn't possible
-        finalResult = `Agent timed out after ${maxTimeMinutes} minutes.`;
+        finalResult = `Agent '${this.definition.name}' timed out after ${maxTimeMinutes} minutes. To increase, configure in settings.json: { "agents": { "overrides": { "${this.definition.name}": { "runConfig": { "maxTimeMinutes": <value> } } } } }`;
         this.emitActivity('ERROR', {
           error: finalResult,
           context: 'timeout',
