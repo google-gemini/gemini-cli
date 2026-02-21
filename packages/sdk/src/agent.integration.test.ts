@@ -8,10 +8,9 @@ import { describe, it, expect } from 'vitest';
 import { GeminiCliAgent } from './agent.js';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __dirname = path.dirname(__filename);
 
 // Set this to true locally when you need to update snapshots
 const RECORD_MODE = process.env['RECORD_NEW_RESPONSES'] === 'true';
