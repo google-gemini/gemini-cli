@@ -35,10 +35,20 @@ describe('ToastDisplay', () => {
       buffer: { text: '' } as TextBuffer,
       history: [] as HistoryItem[],
       queueErrorMessage: null,
+      showIsExpandableHint: false,
     };
 
     it('returns false for default state', () => {
       expect(shouldShowToast(baseState as UIState)).toBe(false);
+    });
+
+    it('returns true when showIsExpandableHint is true', () => {
+      expect(
+        shouldShowToast({
+          ...baseState,
+          showIsExpandableHint: true,
+        } as UIState),
+      ).toBe(true);
     });
 
     it('returns true when ctrlCPressedOnce is true', () => {
@@ -169,5 +179,23 @@ describe('ToastDisplay', () => {
     });
     await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('renders expansion hint when showIsExpandableHint is true', async () => {
+    const { lastFrame, waitUntilReady } = renderToastDisplay({
+      showIsExpandableHint: true,
+      constrainHeight: true,
+    });
+    await waitUntilReady();
+    expect(lastFrame()).toContain('Press Ctrl+O to show more lines');
+  });
+
+  it('renders collapse hint when showIsExpandableHint is true and constrainHeight is false', async () => {
+    const { lastFrame, waitUntilReady } = renderToastDisplay({
+      showIsExpandableHint: true,
+      constrainHeight: false,
+    });
+    await waitUntilReady();
+    expect(lastFrame()).toContain('Press Ctrl+O to collapse lines');
   });
 });
