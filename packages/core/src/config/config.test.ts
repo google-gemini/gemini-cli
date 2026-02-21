@@ -20,7 +20,7 @@ import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryT
 import {
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
-} from '../telemetry/index.js';
+ uiTelemetryService } from '../telemetry/index.js';
 import type { ContentGeneratorConfig } from '../core/contentGenerator.js';
 import {
   AuthType,
@@ -201,14 +201,12 @@ vi.mock('../services/contextManager.js', () => ({
 
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { tokenLimit } from '../core/tokenLimits.js';
-import { uiTelemetryService } from '../telemetry/index.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import type { CodeAssistServer } from '../code_assist/server.js';
 import { ContextManager } from '../services/contextManager.js';
 import { UserTierId } from '../code_assist/types.js';
-import type { ModelConfigService } from '../services/modelConfigService.js';
-import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
+import type { ModelConfigService , ModelConfigServiceConfig } from '../services/modelConfigService.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 
@@ -2698,5 +2696,135 @@ describe('syncPlanModeTools', () => {
     config.syncPlanModeTools();
 
     expect(setToolsSpy).toHaveBeenCalled();
+  });
+});
+
+describe('Auto Mode', () => {
+  const MODEL = DEFAULT_GEMINI_MODEL;
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    targetDir: '/tmp',
+    debugMode: false,
+    sessionId: 'test-auto-mode',
+    model: MODEL,
+    interactive: true,
+    usageStatisticsEnabled: false,
+    telemetry: { enabled: false },
+  };
+
+  it('should start with auto mode disabled', () => {
+    const config = new Config(baseParams);
+    expect(config.isAutoMode()).toBe(false);
+  });
+
+  it('should enable auto mode via enterAutoMode', () => {
+    const config = new Config(baseParams);
+    config.enterAutoMode();
+    expect(config.isAutoMode()).toBe(true);
+    expect(config.getPolicyEngine().isEffectivelyNonInteractive()).toBe(true);
+  });
+
+  it('should disable auto mode via exitAutoMode', () => {
+    const config = new Config(baseParams);
+    config.enterAutoMode();
+    expect(config.isAutoMode()).toBe(true);
+
+    config.exitAutoMode();
+    expect(config.isAutoMode()).toBe(false);
+    expect(config.getPolicyEngine().isEffectivelyNonInteractive()).toBe(false);
+  });
+
+  it('should track denials and exit auto mode after threshold', () => {
+    const config = new Config(baseParams);
+    config.enterAutoMode();
+
+    // Track denials up to but not exceeding threshold
+    for (let i = 0; i < 4; i++) {
+      const exited = config.trackAutoModeDenial();
+      expect(exited).toBe(false);
+      expect(config.isAutoMode()).toBe(true);
+    }
+
+    // 5th denial should trigger fallback
+    const exited = config.trackAutoModeDenial();
+    expect(exited).toBe(true);
+    expect(config.isAutoMode()).toBe(false);
+    expect(config.getPolicyEngine().isEffectivelyNonInteractive()).toBe(false);
+  });
+
+  it('should reset denial count on resetAutoModeDenialCount', () => {
+    const config = new Config(baseParams);
+    config.enterAutoMode();
+
+    // Track 4 denials
+    for (let i = 0; i < 4; i++) {
+      config.trackAutoModeDenial();
+    }
+
+    // Reset the counter
+    config.resetAutoModeDenialCount();
+
+    // Should be able to track 4 more denials without exiting
+    for (let i = 0; i < 4; i++) {
+      const exited = config.trackAutoModeDenial();
+      expect(exited).toBe(false);
+    }
+
+    expect(config.isAutoMode()).toBe(true);
+  });
+
+  it('should not track denials when not in auto mode', () => {
+    const config = new Config(baseParams);
+    const exited = config.trackAutoModeDenial();
+    expect(exited).toBe(false);
+    expect(config.isAutoMode()).toBe(false);
+  });
+
+  it('should convert ASK_USER to DENY in auto mode via PolicyEngine', async () => {
+    const config = new Config({
+      ...baseParams,
+      policyEngineConfig: {
+        rules: [
+          {
+            toolName: 'restricted-tool',
+            decision:
+              'ask_user' as unknown as import('../policy/types.js').PolicyDecision,
+          },
+          {
+            toolName: 'safe-tool',
+            decision:
+              'allow' as unknown as import('../policy/types.js').PolicyDecision,
+          },
+        ],
+      },
+    });
+
+    // Before auto mode: ASK_USER stays
+    const result1 = await config
+      .getPolicyEngine()
+      .check({ name: 'restricted-tool' }, undefined);
+    expect(result1.decision).toBe('ask_user');
+
+    // Enter auto mode
+    config.enterAutoMode();
+
+    // After auto mode: ASK_USER becomes DENY
+    const result2 = await config
+      .getPolicyEngine()
+      .check({ name: 'restricted-tool' }, undefined);
+    expect(result2.decision).toBe('deny');
+
+    // ALLOW stays ALLOW
+    const result3 = await config
+      .getPolicyEngine()
+      .check({ name: 'safe-tool' }, undefined);
+    expect(result3.decision).toBe('allow');
+
+    // Exit auto mode: ASK_USER restored
+    config.exitAutoMode();
+    const result4 = await config
+      .getPolicyEngine()
+      .check({ name: 'restricted-tool' }, undefined);
+    expect(result4.decision).toBe('ask_user');
   });
 });

@@ -101,6 +101,7 @@ export class PolicyEngine {
   private hookCheckers: HookCheckerRule[];
   private readonly defaultDecision: PolicyDecision;
   private readonly nonInteractive: boolean;
+  private runtimeNonInteractive: boolean = false;
   private readonly checkerRunner?: CheckerRunner;
   private approvalMode: ApprovalMode;
 
@@ -132,6 +133,23 @@ export class PolicyEngine {
    */
   getApprovalMode(): ApprovalMode {
     return this.approvalMode;
+  }
+
+  /**
+   * Set the runtime non-interactive flag. When enabled, ASK_USER decisions
+   * are converted to DENY, similar to headless mode, but this can be toggled
+   * at runtime to support switching an interactive session to auto mode.
+   */
+  setRuntimeNonInteractive(value: boolean): void {
+    this.runtimeNonInteractive = value;
+  }
+
+  /**
+   * Returns whether the engine is currently in a non-interactive state
+   * (either from initialization or runtime toggle).
+   */
+  isEffectivelyNonInteractive(): boolean {
+    return this.nonInteractive || this.runtimeNonInteractive;
   }
 
   private shouldDowngradeForRedirection(
@@ -630,8 +648,12 @@ export class PolicyEngine {
   }
 
   private applyNonInteractiveMode(decision: PolicyDecision): PolicyDecision {
-    // In non-interactive mode, ASK_USER becomes DENY
-    if (this.nonInteractive && decision === PolicyDecision.ASK_USER) {
+    // In non-interactive mode (either startup or runtime auto mode),
+    // ASK_USER becomes DENY
+    if (
+      (this.nonInteractive || this.runtimeNonInteractive) &&
+      decision === PolicyDecision.ASK_USER
+    ) {
       return PolicyDecision.DENY;
     }
     return decision;
