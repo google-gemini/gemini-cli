@@ -128,6 +128,7 @@ export const INFORMATIVE_TIPS = [
   'Delete a conversation checkpoint with /chat delete <tag>…',
   'Share your conversation to a file with /chat share <file>…',
   'Clear the screen and history with /clear…',
+  'Navigate your session history with /rewind…',
   'Save tokens by summarizing the context with /compress…',
   'Copy the last response to your clipboard with /copy…',
   'Open the full documentation in your browser with /docs…',
@@ -160,6 +161,7 @@ export const INFORMATIVE_TIPS = [
   'Set up GitHub Actions with /setup-github…',
   'Configure terminal keybindings for multiline input with /terminal-setup…',
   'Find relevant documentation with /find-docs…',
+  'Generate prompt suggestions with /prompt-suggest…',
   'Execute any shell command with !<command>…',
   // Command tips end here
 ];
