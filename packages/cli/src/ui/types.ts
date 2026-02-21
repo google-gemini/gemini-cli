@@ -477,7 +477,7 @@ export interface ConsoleMessageItem {
 export interface SubmitPromptResult {
   type: 'submit_prompt';
   content: PartListUnion;
-  commandName: string;
+  commandName?: string;
   commandArgs?: Record<string, unknown>;
 }
 
