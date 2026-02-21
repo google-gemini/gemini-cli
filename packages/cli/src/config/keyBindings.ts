@@ -265,11 +265,16 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 'j', ctrl: true },
   ],
   [Command.OPEN_EXTERNAL_EDITOR]: [{ key: 'x', ctrl: true }],
-  [Command.PASTE_CLIPBOARD]: [
-    { key: 'v', ctrl: true },
-    { key: 'v', cmd: true },
-    { key: 'v', alt: true },
-  ],
+  [Command.PASTE_CLIPBOARD]:
+    process.platform === 'darwin'
+      ? [
+          { key: 'v', cmd: true },
+          { key: 'v', alt: true }, // Option+v
+        ]
+      : [
+          { key: 'v', ctrl: true },
+          { key: 'v', alt: true },
+        ],
 
   // App Controls
   [Command.SHOW_ERROR_DETAILS]: [{ key: 'f12' }],
