@@ -170,6 +170,7 @@ async function searchResourceCandidates(
   const results = await fzf.find(normalizedPattern, {
     limit: MAX_SUGGESTIONS_TO_SHOW * 3,
   });
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return results.map(
     (result: { item: ResourceSuggestionCandidate }) => result.item.suggestion,
   );
@@ -193,6 +194,7 @@ async function searchAgentCandidates(
   const results = await fzf.find(normalizedPattern, {
     limit: MAX_SUGGESTIONS_TO_SHOW,
   });
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return results.map((r: { item: Suggestion }) => r.item);
 }
 
