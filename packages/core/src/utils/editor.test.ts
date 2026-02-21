@@ -22,6 +22,7 @@ import {
   isEditorAvailable,
   isEditorAvailableAsync,
   resolveEditorAsync,
+  isGuiEditorCommand,
   type EditorType,
 } from './editor.js';
 import { coreEvents, CoreEvent } from './events.js';
@@ -708,6 +709,35 @@ describe('editor utils', () => {
       const result = await resolvePromise;
       expect(result).toBe('vim');
       expect(emitSpy).toHaveBeenCalledWith(CoreEvent.RequestEditorSelection);
+    });
+  });
+
+  describe('isGuiEditorCommand', () => {
+    it.each([
+      ['code', true],
+      ['codium', true],
+      ['windsurf', true],
+      ['cursor', true],
+      ['zed', true],
+      ['zeditor', true],
+      ['agy', true],
+      ['antigravity', true],
+      ['CODE', true], // case-insensitive
+    ])('returns true for GUI editor exe %s', (exe, expected) => {
+      expect(isGuiEditorCommand(exe)).toBe(expected);
+    });
+
+    it.each([
+      ['vim'],
+      ['nvim'],
+      ['emacs'],
+      ['hx'],
+      ['notepad'],
+      ['vi'],
+      ['nano'],
+      [''],
+    ])('returns false for non-GUI editor exe %s', (exe) => {
+      expect(isGuiEditorCommand(exe)).toBe(false);
     });
   });
 });

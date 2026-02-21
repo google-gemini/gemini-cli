@@ -45,6 +45,7 @@ import {
   type EditorType,
   getEditorCommand,
   isGuiEditor,
+  isGuiEditorCommand,
   type Config,
   type IdeInfo,
   type IdeContext,
@@ -605,10 +606,23 @@ export const AppContainer = (props: AppContainerProps) => {
       }
 
       if (!command) {
-        command =
-          process.env['VISUAL'] ??
-          process.env['EDITOR'] ??
-          (process.platform === 'win32' ? 'notepad' : 'vi');
+        const editorFromEnv = process.env['VISUAL'] ?? process.env['EDITOR'];
+        if (editorFromEnv) {
+          command = editorFromEnv;
+          // Detect GUI editors set via $VISUAL/$EDITOR that fork into the
+          // background and need --wait to block until the file is closed.
+          const firstToken =
+            editorFromEnv.match(/[^\s"']+|"([^"]*)"|'([^']*)'/)?.[0] ?? '';
+          const exeBasename = basename(firstToken.replace(/["']/g, '')).replace(
+            /\.(exe|cmd)$/i,
+            '',
+          );
+          if (isGuiEditorCommand(exeBasename) && !args.includes('--wait')) {
+            args.unshift('--wait');
+          }
+        } else {
+          command = process.platform === 'win32' ? 'notepad' : 'vi';
+        }
       }
 
       // Tokenize the command string respecting quoted segments so paths with

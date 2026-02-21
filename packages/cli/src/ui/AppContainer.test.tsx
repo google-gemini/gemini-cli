@@ -3876,6 +3876,46 @@ describe('AppContainer State Management', () => {
       unmount();
     });
 
+    it('prepends --wait when $EDITOR is a known GUI editor', async () => {
+      vi.stubEnv('EDITOR', 'code');
+      const { unmount } = await renderAndCall();
+
+      expect(spawn).toHaveBeenCalledWith(
+        'code',
+        expect.arrayContaining(['--wait', expect.stringContaining('chat.md')]),
+        expect.objectContaining({ shell: false }),
+      );
+
+      unmount();
+    });
+
+    it('prepends --wait when $VISUAL is a known GUI editor with a path', async () => {
+      vi.stubEnv('VISUAL', '"/usr/local/bin/cursor" --some-flag');
+      const { unmount } = await renderAndCall();
+
+      expect(spawn).toHaveBeenCalledWith(
+        '/usr/local/bin/cursor',
+        expect.arrayContaining([
+          '--wait',
+          '--some-flag',
+          expect.stringContaining('chat.md'),
+        ]),
+        expect.objectContaining({ shell: false }),
+      );
+
+      unmount();
+    });
+
+    it('does not prepend --wait for terminal editors from $EDITOR', async () => {
+      vi.stubEnv('EDITOR', 'vim');
+      const { unmount } = await renderAndCall();
+
+      const call = (spawn as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(call[1]).not.toContain('--wait');
+
+      unmount();
+    });
+
     it('splits $EDITOR into exe and embedded args on non-Windows', async () => {
       vi.stubEnv('EDITOR', 'vim -u NONE');
       const { unmount } = await renderAndCall();
