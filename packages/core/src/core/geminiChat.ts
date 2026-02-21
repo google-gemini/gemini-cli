@@ -517,11 +517,12 @@ export class GeminiChat {
 
       lastModelToUse = modelToUse;
       const config: GenerateContentConfig = {
-        ...currentGenerateContentConfig,
-        // TODO(12622): Ensure we don't overrwrite these when they are
-        // passed via config.
+        // 1. Set chat-level defaults (lowest precedence).
         systemInstruction: this.systemInstruction,
         tools: this.tools,
+        // 2. Spread the current request's config to override defaults.
+        ...currentGenerateContentConfig,
+        // 3. Enforce the abortSignal for this specific call (highest precedence).
         abortSignal,
       };
 
