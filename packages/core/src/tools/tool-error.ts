@@ -65,6 +65,10 @@ export enum ToolErrorType {
   // Shell errors
   SHELL_EXECUTE_ERROR = 'shell_execute_error',
 
+  // SSH errors
+  SSH_CONNECTION_ERROR = 'ssh_connection_error',
+  SSH_EXECUTION_ERROR = 'ssh_execution_error',
+
   // DiscoveredTool-specific Errors
   DISCOVERED_TOOL_EXECUTION_ERROR = 'discovered_tool_execution_error',
 
