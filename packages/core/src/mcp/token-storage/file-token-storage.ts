@@ -4,13 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { z } from 'zod';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import { BaseTokenStorage } from './base-token-storage.js';
-import type { OAuthCredentials } from './types.js';
+import { type OAuthCredentials, OAuthCredentialsSchema } from './types.js';
 import { GEMINI_DIR, homedir } from '../../utils/paths.js';
+const OAuthCredentialsRecordSchema = z.record(OAuthCredentialsSchema);
+
+function isErrnoException(e: unknown): e is NodeJS.ErrnoException {
+  return (
+    e !== null &&
+    typeof e === 'object' &&
+    'code' in e &&
+    typeof (e as { code?: unknown }).code === 'string'
+  );
+}
 
 export class FileTokenStorage extends BaseTokenStorage {
   private readonly tokenFilePath: string;
@@ -72,20 +83,17 @@ export class FileTokenStorage extends BaseTokenStorage {
     try {
       const data = await fs.readFile(this.tokenFilePath, 'utf-8');
       const decrypted = this.decrypt(data);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const tokens = JSON.parse(decrypted) as Record<string, OAuthCredentials>;
+      const parsed: unknown = JSON.parse(decrypted);
+      const tokens = OAuthCredentialsRecordSchema.parse(parsed);
       return new Map(Object.entries(tokens));
     } catch (error: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const err = error as NodeJS.ErrnoException & { message?: string };
-      if (err.code === 'ENOENT') {
+      if (isErrnoException(error) && error.code === 'ENOENT') {
         return new Map();
       }
+      const message = error instanceof Error ? error.message : String(error);
       if (
-        err.message?.includes('Invalid encrypted data format') ||
-        err.message?.includes(
-          'Unsupported state or unable to authenticate data',
-        )
+        message?.includes('Invalid encrypted data format') ||
+        message?.includes('Unsupported state or unable to authenticate data')
       ) {
         // Decryption failed - this can happen when switching between auth types
         // or if the file is genuinely corrupted.
@@ -151,11 +159,10 @@ export class FileTokenStorage extends BaseTokenStorage {
       try {
         await fs.unlink(this.tokenFilePath);
       } catch (error: unknown) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const err = error as NodeJS.ErrnoException;
-        if (err.code !== 'ENOENT') {
-          throw error;
+        if (isErrnoException(error) && error.code === 'ENOENT') {
+          return;
         }
+        throw error instanceof Error ? error : new Error(String(error));
       }
     } else {
       await this.saveTokens(tokens);
@@ -184,11 +191,10 @@ export class FileTokenStorage extends BaseTokenStorage {
     try {
       await fs.unlink(this.tokenFilePath);
     } catch (error: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const err = error as NodeJS.ErrnoException;
-      if (err.code !== 'ENOENT') {
-        throw error;
+      if (isErrnoException(error) && error.code === 'ENOENT') {
+        return;
       }
+      throw error instanceof Error ? error : new Error(String(error));
     }
   }
 }
