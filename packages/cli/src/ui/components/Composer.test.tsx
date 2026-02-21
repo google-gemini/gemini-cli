@@ -28,8 +28,8 @@ import {
   ApprovalMode,
   tokenLimit,
   CoreToolCallStatus,
+  type Config,
 } from '@google/gemini-cli-core';
-import type { Config } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
 import { TransientMessageType } from '../../utils/events.js';
 import type { LoadedSettings } from '../../config/settings.js';

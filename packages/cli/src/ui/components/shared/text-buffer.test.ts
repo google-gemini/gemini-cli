@@ -15,16 +15,14 @@ import {
   renderHookWithProviders,
 } from '../../../test-utils/render.js';
 
-import type {
-  Viewport,
-  TextBuffer,
-  TextBufferState,
-  TextBufferAction,
-  Transformation,
-  VisualLayout,
-  TextBufferOptions,
-} from './text-buffer.js';
 import {
+  type Viewport,
+  type TextBuffer,
+  type TextBufferState,
+  type TextBufferAction,
+  type Transformation,
+  type VisualLayout,
+  type TextBufferOptions,
   useTextBuffer,
   offsetToLogicalPos,
   logicalPosToOffset,

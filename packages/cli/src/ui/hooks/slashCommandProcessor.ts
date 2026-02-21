@@ -14,14 +14,12 @@ import {
 import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
-import type {
-  Config,
-  ExtensionsStartingEvent,
-  ExtensionsStoppingEvent,
-  ToolCallConfirmationDetails,
-  AgentDefinition,
-} from '@google/gemini-cli-core';
 import {
+  type Config,
+  type ExtensionsStartingEvent,
+  type ExtensionsStoppingEvent,
+  type ToolCallConfirmationDetails,
+  type AgentDefinition,
   GitService,
   Logger,
   logSlashCommand,
@@ -37,15 +35,15 @@ import {
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
-import type {
-  Message,
-  HistoryItemWithoutId,
-  SlashCommandProcessorResult,
-  HistoryItem,
-  ConfirmationRequest,
-  IndividualToolCallDisplay,
+import {
+  type Message,
+  type HistoryItemWithoutId,
+  type SlashCommandProcessorResult,
+  type HistoryItem,
+  type ConfirmationRequest,
+  type IndividualToolCallDisplay,
+  MessageType,
 } from '../types.js';
-import { MessageType } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { type CommandContext, type SlashCommand } from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';

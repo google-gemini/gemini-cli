@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type React from 'react';
 import {
   useRef,
   forwardRef,
@@ -12,7 +13,6 @@ import {
   useMemo,
   useEffect,
 } from 'react';
-import type React from 'react';
 import {
   VirtualizedList,
   type VirtualizedListRef,

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type React from 'react';
 import {
   useState,
   useRef,
@@ -14,7 +15,6 @@ import {
   useMemo,
   useCallback,
 } from 'react';
-import type React from 'react';
 import { theme } from '../../semantic-colors.js';
 import { useBatchedScroll } from '../../hooks/useBatchedScroll.js';
 import { useUIState } from '../../contexts/UIStateContext.js';

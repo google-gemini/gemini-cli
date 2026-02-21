@@ -6,12 +6,12 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type {
-  CommandContext,
-  SlashCommand,
-  SlashCommandActionReturn,
+import {
+  type CommandContext,
+  type SlashCommand,
+  type SlashCommandActionReturn,
+  CommandKind,
 } from './types.js';
-import { CommandKind } from './types.js';
 import { performInit } from '@google/gemini-cli-core';
 
 export const initCommand: SlashCommand = {

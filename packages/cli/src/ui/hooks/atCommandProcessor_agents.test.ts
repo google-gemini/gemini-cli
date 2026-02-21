@@ -6,12 +6,10 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handleAtCommand } from './atCommandProcessor.js';
-import type {
-  Config,
-  AgentDefinition,
-  MessageBus,
-} from '@google/gemini-cli-core';
 import {
+  type Config,
+  type AgentDefinition,
+  type MessageBus,
   FileDiscoveryService,
   GlobTool,
   ReadManyFilesTool,

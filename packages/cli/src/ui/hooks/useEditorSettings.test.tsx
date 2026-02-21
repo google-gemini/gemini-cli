@@ -16,11 +16,11 @@ import {
 import { act } from 'react';
 import { render } from '../../test-utils/render.js';
 import { useEditorSettings } from './useEditorSettings.js';
-import type {
-  LoadableSettingScope,
-  LoadedSettings,
+import {
+  type LoadableSettingScope,
+  type LoadedSettings,
+  SettingScope,
 } from '../../config/settings.js';
-import { SettingScope } from '../../config/settings.js';
 import { MessageType } from '../types.js';
 import {
   type EditorType,

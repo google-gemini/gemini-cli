@@ -4,15 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  Config,
-  ToolCallRequestInfo,
-  ResumedSessionData,
-  UserFeedbackPayload,
-} from '@google/gemini-cli-core';
-import { isSlashCommand } from './ui/utils/commandUtils.js';
-import type { LoadedSettings } from './config/settings.js';
 import {
+  type Config,
+  type ToolCallRequestInfo,
+  type ResumedSessionData,
+  type UserFeedbackPayload,
   GeminiEventType,
   FatalInputError,
   promptIdContext,
@@ -30,6 +26,8 @@ import {
   Scheduler,
   ROOT_SCHEDULER_ID,
 } from '@google/gemini-cli-core';
+import { isSlashCommand } from './ui/utils/commandUtils.js';
+import type { LoadedSettings } from './config/settings.js';
 
 import type { Content, Part } from '@google/genai';
 import readline from 'node:readline';

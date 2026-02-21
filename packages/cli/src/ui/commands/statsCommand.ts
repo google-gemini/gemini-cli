@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  HistoryItemStats,
-  HistoryItemModelStats,
-  HistoryItemToolStats,
+import {
+  type HistoryItemStats,
+  type HistoryItemModelStats,
+  type HistoryItemToolStats,
+  MessageType,
 } from '../types.js';
-import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
 import { UserAccountManager } from '@google/gemini-cli-core';
 import {

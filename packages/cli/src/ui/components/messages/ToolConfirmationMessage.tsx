@@ -17,9 +17,11 @@ import {
   hasRedirection,
   debugLogger,
 } from '@google/gemini-cli-core';
-import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
+import {
+  type RadioSelectItem,
+  RadioButtonSelect,
+} from '../shared/RadioButtonSelect.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
-import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
 import { MaxSizedBox, MINIMUM_MAX_HEIGHT } from '../shared/MaxSizedBox.js';
 import {
   sanitizeForDisplay,

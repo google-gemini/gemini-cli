@@ -5,8 +5,10 @@
  */
 
 import { renderWithProviders } from '../../../test-utils/render.js';
-import type { CompressionDisplayProps } from './CompressionMessage.js';
-import { CompressionMessage } from './CompressionMessage.js';
+import {
+  type CompressionDisplayProps,
+  CompressionMessage,
+} from './CompressionMessage.js';
 import { CompressionStatus } from '@google/gemini-cli-core';
 import type { CompressionProps } from '../../types.js';
 import { describe, it, expect } from 'vitest';

@@ -6,8 +6,11 @@
 
 import { vi } from 'vitest';
 import type { Config } from '@google/gemini-cli-core';
-import type { LoadedSettings, Settings } from '../config/settings.js';
-import { createTestMergedSettings } from '../config/settings.js';
+import {
+  type LoadedSettings,
+  type Settings,
+  createTestMergedSettings,
+} from '../config/settings.js';
 
 /**
  * Creates a mocked Config object with default values and allows overrides.

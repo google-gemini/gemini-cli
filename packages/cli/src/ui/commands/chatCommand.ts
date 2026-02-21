@@ -8,26 +8,26 @@ import * as fsPromises from 'node:fs/promises';
 import React from 'react';
 import { Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import type {
-  CommandContext,
-  SlashCommand,
-  SlashCommandActionReturn,
+import {
+  type CommandContext,
+  type SlashCommand,
+  type SlashCommandActionReturn,
+  CommandKind,
 } from './types.js';
-import { CommandKind } from './types.js';
 import {
   decodeTagName,
   type MessageActionReturn,
   INITIAL_HISTORY_LENGTH,
+  convertToRestPayload,
 } from '@google/gemini-cli-core';
 import path from 'node:path';
-import type {
-  HistoryItemWithoutId,
-  HistoryItemChatList,
-  ChatDetail,
+import {
+  type HistoryItemWithoutId,
+  type HistoryItemChatList,
+  type ChatDetail,
+  MessageType,
 } from '../types.js';
-import { MessageType } from '../types.js';
 import { exportHistoryToFile } from '../utils/historyExportUtils.js';
-import { convertToRestPayload } from '@google/gemini-cli-core';
 
 const getSavedChatTags = async (
   context: CommandContext,

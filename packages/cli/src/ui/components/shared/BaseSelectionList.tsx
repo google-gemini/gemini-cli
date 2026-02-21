@@ -8,9 +8,10 @@ import type React from 'react';
 import { useEffect, useState } from 'react';
 import { Text, Box } from 'ink';
 import { theme } from '../../semantic-colors.js';
-import { useSelectionList } from '../../hooks/useSelectionList.js';
-
-import type { SelectionListItem } from '../../hooks/useSelectionList.js';
+import {
+  useSelectionList,
+  type SelectionListItem,
+} from '../../hooks/useSelectionList.js';
 
 export interface RenderItemContext {
   isSelected: boolean;

@@ -4,16 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  Config,
-  ToolRegistry,
-  ServerGeminiStreamEvent,
-  SessionMetrics,
-  AnyDeclarativeTool,
-  AnyToolInvocation,
-  UserFeedbackPayload,
-} from '@google/gemini-cli-core';
 import {
+  type Config,
+  type ToolRegistry,
+  type ServerGeminiStreamEvent,
+  type SessionMetrics,
+  type AnyDeclarativeTool,
+  type AnyToolInvocation,
+  type UserFeedbackPayload,
   ToolErrorType,
   GeminiEventType,
   OutputFormat,

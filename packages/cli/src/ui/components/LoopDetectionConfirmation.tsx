@@ -5,8 +5,10 @@
  */
 
 import { Box, Text } from 'ink';
-import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
-import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import {
+  type RadioSelectItem,
+  RadioButtonSelect,
+} from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
 

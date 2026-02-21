@@ -5,8 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Config } from '@google/gemini-cli-core';
-import { ChatRecordingService } from '@google/gemini-cli-core';
+import { type Config, ChatRecordingService } from '@google/gemini-cli-core';
 import { listSessions, deleteSession } from './sessions.js';
 import { SessionSelector, type SessionInfo } from './sessionUtils.js';
 

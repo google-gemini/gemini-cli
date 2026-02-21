@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  OpenDialogActionReturn,
-  SlashCommand,
-  SlashCommandActionReturn,
+import {
+  type OpenDialogActionReturn,
+  type SlashCommand,
+  type SlashCommandActionReturn,
+  CommandKind,
 } from './types.js';
-import { CommandKind } from './types.js';
 import * as process from 'node:process';
 import * as path from 'node:path';
 import * as fs from 'node:fs';

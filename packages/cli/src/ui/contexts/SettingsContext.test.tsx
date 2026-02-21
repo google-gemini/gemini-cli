@@ -5,9 +5,8 @@
  */
 
 import type React from 'react';
-import { Component, type ReactNode } from 'react';
+import { Component, type ReactNode, act } from 'react';
 import { renderHook, render } from '../../test-utils/render.js';
-import { act } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SettingsContext, useSettingsStore } from './SettingsContext.js';
 import {

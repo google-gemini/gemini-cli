@@ -8,14 +8,14 @@ import {
   render as inkRenderDirect,
   type Instance as InkInstance,
   type RenderOptions,
+  Box,
 } from 'ink';
 import { EventEmitter } from 'node:events';
-import { Box } from 'ink';
 import type React from 'react';
+import { act, useState } from 'react';
 import { Terminal } from '@xterm/headless';
 import { vi } from 'vitest';
 import stripAnsi from 'strip-ansi';
-import { act, useState } from 'react';
 import os from 'node:os';
 import { LoadedSettings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';

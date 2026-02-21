@@ -8,8 +8,12 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { hooksCommand } from './hooksCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
-import type { HookRegistryEntry } from '@google/gemini-cli-core';
-import { HookType, HookEventName, ConfigSource } from '@google/gemini-cli-core';
+import {
+  type HookRegistryEntry,
+  HookType,
+  HookEventName,
+  ConfigSource,
+} from '@google/gemini-cli-core';
 import type { CommandContext } from './types.js';
 import { SettingScope } from '../../config/settings.js';
 

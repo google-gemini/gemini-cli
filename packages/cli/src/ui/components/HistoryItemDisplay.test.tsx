@@ -6,8 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
-import { type HistoryItem } from '../types.js';
-import { MessageType } from '../types.js';
+import { type HistoryItem, MessageType } from '../types.js';
 import { SessionStatsProvider } from '../contexts/SessionContext.js';
 import {
   type Config,

@@ -6,8 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders } from '../../../test-utils/render.js';
-import type { Text } from 'ink';
-import { Box } from 'ink';
+import { type Text, Box } from 'ink';
 import type React from 'react';
 import {
   RadioButtonSelect,

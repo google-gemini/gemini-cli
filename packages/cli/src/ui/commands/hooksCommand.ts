@@ -4,14 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { SlashCommand, CommandContext } from './types.js';
-import { CommandKind } from './types.js';
+import {
+  type SlashCommand,
+  type CommandContext,
+  CommandKind,
+} from './types.js';
 import { MessageType, type HistoryItemHooksList } from '../types.js';
-import type {
-  HookRegistryEntry,
-  MessageActionReturn,
+import {
+  type HookRegistryEntry,
+  type MessageActionReturn,
+  getErrorMessage,
 } from '@google/gemini-cli-core';
-import { getErrorMessage } from '@google/gemini-cli-core';
 import { SettingScope, isLoadableSettingScope } from '../../config/settings.js';
 import { enableHook, disableHook } from '../../utils/hookSettings.js';
 import { renderHookActionFeedback } from '../../utils/hookUtils.js';

@@ -9,15 +9,14 @@ import type {
   LoadedSettings,
   LoadableSettingScope,
 } from '../config/settings.js';
-import type {
-  SettingDefinition,
-  SettingsSchema,
-  SettingsType,
-  SettingsValue,
+import {
+  type SettingDefinition,
+  type SettingsSchema,
+  type SettingsType,
+  type SettingsValue,
+  getSettingsSchema,
 } from '../config/settingsSchema.js';
-import { getSettingsSchema } from '../config/settingsSchema.js';
-import type { Config } from '@google/gemini-cli-core';
-import { ExperimentFlags } from '@google/gemini-cli-core';
+import { type Config, ExperimentFlags } from '@google/gemini-cli-core';
 
 // The schema is now nested, but many parts of the UI and logic work better
 // with a flattened structure and dot-notation keys. This section flattens the

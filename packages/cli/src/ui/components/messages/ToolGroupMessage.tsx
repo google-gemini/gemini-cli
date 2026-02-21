@@ -7,12 +7,13 @@
 import type React from 'react';
 import { useMemo } from 'react';
 import { Box, Text } from 'ink';
-import type {
-  HistoryItem,
-  HistoryItemWithoutId,
-  IndividualToolCallDisplay,
+import {
+  type HistoryItem,
+  type HistoryItemWithoutId,
+  type IndividualToolCallDisplay,
+  ToolCallStatus,
+  mapCoreStatusToDisplayStatus,
 } from '../../types.js';
-import { ToolCallStatus, mapCoreStatusToDisplayStatus } from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
 import { ShellToolMessage } from './ShellToolMessage.js';
 import { theme } from '../../semantic-colors.js';

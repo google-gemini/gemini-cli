@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback } from 'react';
 import type React from 'react';
+import { useCallback } from 'react';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { ShellExecutionService } from '@google/gemini-cli-core';
 import { keyToAnsi, type Key } from '../hooks/keyToAnsi.js';

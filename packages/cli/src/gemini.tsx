@@ -16,12 +16,16 @@ import v8 from 'node:v8';
 import os from 'node:os';
 import dns from 'node:dns';
 import { start_sandbox } from './utils/sandbox.js';
-import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
+import {
+  type DnsResolutionOrder,
+  type LoadedSettings,
+  loadSettings,
+  SettingScope,
+} from './config/settings.js';
 import {
   loadTrustedFolders,
   type TrustedFoldersError,
 } from './config/trustedFolders.js';
-import { loadSettings, SettingScope } from './config/settings.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';

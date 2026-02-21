@@ -17,8 +17,11 @@ import {
   getGitHubRepoInfo,
 } from '../../utils/gitUtils.js';
 
-import type { SlashCommand, SlashCommandActionReturn } from './types.js';
-import { CommandKind } from './types.js';
+import {
+  type SlashCommand,
+  type SlashCommandActionReturn,
+  CommandKind,
+} from './types.js';
 import { getUrlOpenCommand } from '../../ui/utils/commandUtils.js';
 import { debugLogger } from '@google/gemini-cli-core';
 

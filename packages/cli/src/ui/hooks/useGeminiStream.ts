@@ -36,33 +36,32 @@ import {
   CoreToolCallStatus,
   buildUserSteeringHintPrompt,
   generateSteeringAckMessage,
-} from '@google/gemini-cli-core';
-import type {
-  Config,
-  EditorType,
-  GeminiClient,
-  ServerGeminiChatCompressedEvent,
-  ServerGeminiContentEvent as ContentEvent,
-  ServerGeminiFinishedEvent,
-  ServerGeminiStreamEvent as GeminiEvent,
-  ThoughtSummary,
-  ToolCallRequestInfo,
-  ToolCallResponseInfo,
-  GeminiErrorEventValue,
-  RetryAttemptPayload,
+  type Config,
+  type EditorType,
+  type GeminiClient,
+  type ServerGeminiChatCompressedEvent,
+  type ServerGeminiContentEvent as ContentEvent,
+  type ServerGeminiFinishedEvent,
+  type ServerGeminiStreamEvent as GeminiEvent,
+  type ThoughtSummary,
+  type ToolCallRequestInfo,
+  type ToolCallResponseInfo,
+  type GeminiErrorEventValue,
+  type RetryAttemptPayload,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
-import type {
-  HistoryItem,
-  HistoryItemThinking,
-  HistoryItemWithoutId,
-  HistoryItemToolGroup,
-  HistoryItemInfo,
-  IndividualToolCallDisplay,
-  SlashCommandProcessorResult,
-  HistoryItemModel,
+import {
+  type HistoryItem,
+  type HistoryItemThinking,
+  type HistoryItemWithoutId,
+  type HistoryItemToolGroup,
+  type HistoryItemInfo,
+  type IndividualToolCallDisplay,
+  type SlashCommandProcessorResult,
+  type HistoryItemModel,
+  StreamingState,
+  MessageType,
 } from '../types.js';
-import { StreamingState, MessageType } from '../types.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';

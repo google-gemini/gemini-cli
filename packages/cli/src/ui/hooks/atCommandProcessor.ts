@@ -7,8 +7,9 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { PartListUnion, PartUnion } from '@google/genai';
-import type { AnyToolInvocation, Config } from '@google/gemini-cli-core';
 import {
+  type AnyToolInvocation,
+  type Config,
   debugLogger,
   getErrorMessage,
   isNodeError,
