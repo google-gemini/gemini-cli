@@ -15,6 +15,10 @@ export const copyCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, _args): Promise<SlashCommandActionReturn | void> => {
+    // Prefer the last slash command output (e.g. /help, /tools) if available,
+    // otherwise fall back to the last model response from the chat history.
+    const lastSlashOutput = context.ui.getLastSlashCommandOutput();
+
     const chat = context.services.config?.getGeminiClient()?.getChat();
     const history = chat?.getHistory();
 
@@ -23,44 +27,39 @@ export const copyCommand: SlashCommand = {
       ? history.filter((item) => item.role === 'model').pop()
       : undefined;
 
-    if (!lastAiMessage) {
+    // Extract text from the AI message parts
+    const lastAiOutput = lastAiMessage?.parts
+      ?.filter((part) => part.text)
+      .map((part) => part.text)
+      .join('');
+
+    const textToCopy = lastSlashOutput ?? lastAiOutput;
+
+    if (!textToCopy) {
       return {
         type: 'message',
         messageType: 'info',
         content: 'No output in history',
       };
     }
-    // Extract text from the parts
-    const lastAiOutput = lastAiMessage.parts
-      ?.filter((part) => part.text)
-      .map((part) => part.text)
-      .join('');
 
-    if (lastAiOutput) {
-      try {
-        const settings = context.services.settings.merged;
-        await copyToClipboard(lastAiOutput, settings);
+    try {
+      const settings = context.services.settings.merged;
+      await copyToClipboard(textToCopy, settings);
 
-        return {
-          type: 'message',
-          messageType: 'info',
-          content: 'Last output copied to the clipboard',
-        };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        debugLogger.debug(message);
-
-        return {
-          type: 'message',
-          messageType: 'error',
-          content: `Failed to copy to the clipboard. ${message}`,
-        };
-      }
-    } else {
       return {
         type: 'message',
         messageType: 'info',
-        content: 'Last AI output contains no text to copy.',
+        content: 'Last output copied to the clipboard',
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      debugLogger.debug(message);
+
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Failed to copy to the clipboard. ${message}`,
       };
     }
   },

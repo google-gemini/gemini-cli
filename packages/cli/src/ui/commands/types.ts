@@ -92,6 +92,11 @@ export interface CommandContext {
     removeComponent: () => void;
     toggleBackgroundShell: () => void;
     toggleShortcutsHelp: () => void;
+    /**
+     * Returns the text content of the last slash command output, if any.
+     * Used by `/copy` to capture outputs from commands like `/help` or `/tools`.
+     */
+    getLastSlashCommandOutput: () => string | undefined;
   };
   // Session-specific data
   session: {

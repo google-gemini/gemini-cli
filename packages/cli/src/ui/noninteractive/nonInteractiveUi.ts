@@ -43,5 +43,6 @@ export function createNonInteractiveUI(): CommandContext['ui'] {
     removeComponent: () => {},
     toggleBackgroundShell: () => {},
     toggleShortcutsHelp: () => {},
+    getLastSlashCommandOutput: () => undefined,
   };
 }

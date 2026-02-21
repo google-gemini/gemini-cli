@@ -20,6 +20,7 @@ describe('copyCommand', () => {
   let mockCopyToClipboard: Mock;
   let mockGetChat: Mock;
   let mockGetHistory: Mock;
+  let mockGetLastSlashCommandOutput: Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -27,6 +28,7 @@ describe('copyCommand', () => {
     mockCopyToClipboard = vi.mocked(copyToClipboard);
     mockGetChat = vi.fn();
     mockGetHistory = vi.fn();
+    mockGetLastSlashCommandOutput = vi.fn().mockReturnValue(undefined);
 
     mockContext = createMockCommandContext({
       services: {
@@ -35,6 +37,9 @@ describe('copyCommand', () => {
             getChat: mockGetChat,
           }),
         },
+      },
+      ui: {
+        getLastSlashCommandOutput: mockGetLastSlashCommandOutput,
       },
     });
 
@@ -275,7 +280,7 @@ describe('copyCommand', () => {
     );
   });
 
-  it('should return info message when no text parts found in AI message', async () => {
+  it('should return info message when no text parts found in AI message and no slash output', async () => {
     if (!copyCommand.action) throw new Error('Command has no action');
 
     const historyWithEmptyParts = [
@@ -286,13 +291,14 @@ describe('copyCommand', () => {
     ];
 
     mockGetHistory.mockReturnValue(historyWithEmptyParts);
+    mockGetLastSlashCommandOutput.mockReturnValue(undefined);
 
     const result = await copyCommand.action(mockContext, '');
 
     expect(result).toEqual({
       type: 'message',
       messageType: 'info',
-      content: 'Last AI output contains no text to copy.',
+      content: 'No output in history',
     });
 
     expect(mockCopyToClipboard).not.toHaveBeenCalled();
@@ -314,5 +320,74 @@ describe('copyCommand', () => {
     });
 
     expect(mockCopyToClipboard).not.toHaveBeenCalled();
+  });
+
+  describe('slash command output', () => {
+    it('should copy last slash command output when no AI history exists', async () => {
+      if (!copyCommand.action) throw new Error('Command has no action');
+
+      mockGetChat.mockReturnValue(undefined);
+      mockGetLastSlashCommandOutput.mockReturnValue('/help output text');
+      mockCopyToClipboard.mockResolvedValue(undefined);
+
+      const result = await copyCommand.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'Last output copied to the clipboard',
+      });
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+        '/help output text',
+        expect.anything(),
+      );
+    });
+
+    it('should prefer slash command output over AI history', async () => {
+      if (!copyCommand.action) throw new Error('Command has no action');
+
+      const historyWithAiMessage = [
+        { role: 'model', parts: [{ text: 'AI response' }] },
+      ];
+      mockGetHistory.mockReturnValue(historyWithAiMessage);
+      mockGetLastSlashCommandOutput.mockReturnValue('/tools output text');
+      mockCopyToClipboard.mockResolvedValue(undefined);
+
+      const result = await copyCommand.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'Last output copied to the clipboard',
+      });
+      // Should copy the slash command output, not the AI response
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+        '/tools output text',
+        expect.anything(),
+      );
+    });
+
+    it('should fall back to AI history when no slash command output is set', async () => {
+      if (!copyCommand.action) throw new Error('Command has no action');
+
+      const historyWithAiMessage = [
+        { role: 'model', parts: [{ text: 'AI response' }] },
+      ];
+      mockGetHistory.mockReturnValue(historyWithAiMessage);
+      mockGetLastSlashCommandOutput.mockReturnValue(undefined);
+      mockCopyToClipboard.mockResolvedValue(undefined);
+
+      const result = await copyCommand.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'Last output copied to the clipboard',
+      });
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+        'AI response',
+        expect.anything(),
+      );
+    });
   });
 });
