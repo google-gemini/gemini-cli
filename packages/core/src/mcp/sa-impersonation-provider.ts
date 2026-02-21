@@ -111,11 +111,11 @@ export class ServiceAccountImpersonationProvider implements McpAuthProvider {
         return undefined;
       }
     } catch (e) {
+      const errorObj = e instanceof Error ? e : new Error(String(e));
       coreEvents.emitFeedback(
         'error',
         'Failed to obtain authentication token.',
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        e as Error,
+        errorObj,
       );
       return undefined;
     }
