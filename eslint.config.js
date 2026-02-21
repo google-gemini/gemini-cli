@@ -69,7 +69,8 @@ export default tseslint.config(
       ...importPlugin.configs.recommended.rules,
       ...importPlugin.configs.typescript.rules,
       'import/no-default-export': 'warn',
-      'import/no-unresolved': 'off', // Disable for now, can be noisy with monorepos/paths
+      'import/no-unresolved': 'off',
+      'import/no-duplicates': 'error',
     },
   },
   {
