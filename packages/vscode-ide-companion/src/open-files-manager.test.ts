@@ -355,7 +355,9 @@ describe('OpenFilesManager', () => {
     const manager = new OpenFilesManager(context);
     const uri = getUri('/test/file1.txt');
     const longText = 'a'.repeat(20000);
-    const truncatedText = longText.substring(0, 16384);
+    const suffix = '... [TRUNCATED]';
+    const maxContentLength = 16384 - suffix.length;
+    const truncatedText = longText.substring(0, maxContentLength) + suffix;
 
     const selection = {
       active: { line: 10, character: 20 },
@@ -382,6 +384,8 @@ describe('OpenFilesManager', () => {
 
     const file = manager.state.workspaceState!.openFiles![0];
     expect(file.selectedText).toBe(truncatedText);
+    expect(file.selectedText).toHaveLength(16384);
+    expect(file.selectedText!.endsWith(suffix)).toBe(true);
   });
 
   it('deactivates the previously active file', async () => {
