@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { z } from 'zod';
 import type { MCPOAuthConfig } from './oauth-provider.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -35,6 +36,20 @@ export interface OAuthAuthorizationServerMetadata {
   scopes_supported?: string[];
 }
 
+const OAuthAuthorizationServerMetadataSchema = z.object({
+  issuer: z.string().optional(),
+  authorization_endpoint: z.string(),
+  token_endpoint: z.string(),
+  token_endpoint_auth_methods_supported: z.array(z.string()).optional(),
+  revocation_endpoint: z.string().optional(),
+  revocation_endpoint_auth_methods_supported: z.array(z.string()).optional(),
+  registration_endpoint: z.string().optional(),
+  response_types_supported: z.array(z.string()).optional(),
+  grant_types_supported: z.array(z.string()).optional(),
+  code_challenge_methods_supported: z.array(z.string()).optional(),
+  scopes_supported: z.array(z.string()).optional(),
+});
+
 /**
  * OAuth protected resource metadata as per RFC 9728.
  */
@@ -47,6 +62,16 @@ export interface OAuthProtectedResourceMetadata {
   resource_encryption_alg_values_supported?: string[];
   resource_encryption_enc_values_supported?: string[];
 }
+
+const OAuthProtectedResourceMetadataSchema = z.object({
+  resource: z.string(),
+  authorization_servers: z.array(z.string()).optional(),
+  bearer_methods_supported: z.array(z.string()).optional(),
+  resource_documentation: z.string().optional(),
+  resource_signing_alg_values_supported: z.array(z.string()).optional(),
+  resource_encryption_alg_values_supported: z.array(z.string()).optional(),
+  resource_encryption_enc_values_supported: z.array(z.string()).optional(),
+});
 
 export const FIVE_MIN_BUFFER_MS = 5 * 60 * 1000;
 
@@ -101,8 +126,10 @@ export class OAuthUtils {
       if (!response.ok) {
         return null;
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return (await response.json()) as OAuthProtectedResourceMetadata;
+      const jsonResponse: unknown = await response.json();
+      const oauthProtectedResourceMetadata =
+        OAuthProtectedResourceMetadataSchema.parse(jsonResponse);
+      return oauthProtectedResourceMetadata;
     } catch (error) {
       debugLogger.debug(
         `Failed to fetch protected resource metadata from ${resourceMetadataUrl}: ${getErrorMessage(error)}`,
@@ -125,8 +152,10 @@ export class OAuthUtils {
       if (!response.ok) {
         return null;
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return (await response.json()) as OAuthAuthorizationServerMetadata;
+      const jsonResponse: unknown = await response.json();
+      const oauthAuthorizationServerMetadata =
+        OAuthAuthorizationServerMetadataSchema.parse(jsonResponse);
+      return oauthAuthorizationServerMetadata;
     } catch (error) {
       debugLogger.debug(
         `Failed to fetch authorization server metadata from ${authServerMetadataUrl}: ${getErrorMessage(error)}`,
