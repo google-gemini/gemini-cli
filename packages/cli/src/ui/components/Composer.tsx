@@ -26,6 +26,7 @@ import { ShowMoreLines } from './ShowMoreLines.js';
 import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { HorizontalLine } from './shared/HorizontalLine.js';
+import { TrajectorySummaryDisplay } from './TrajectorySummaryDisplay.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -318,6 +319,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         )}
         {showShortcutsHelp && <ShortcutsHelp />}
         {showUiDetails && <HorizontalLine />}
+        {showUiDetails && <TrajectorySummaryDisplay />}
         {showUiDetails && (
           <Box
             justifyContent={
