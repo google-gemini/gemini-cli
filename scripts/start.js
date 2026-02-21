@@ -32,7 +32,8 @@ execSync('node ./scripts/check-build-status.js', {
   cwd: root,
 });
 
-const nodeArgs = [];
+const nodeArgs = ['--disable-warning=DEP0040'];
+
 let sandboxCommand = undefined;
 try {
   sandboxCommand = execSync('node scripts/sandbox_command.js', {
