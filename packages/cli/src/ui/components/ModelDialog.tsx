@@ -48,7 +48,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const useCustomToolModel =
     useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
 
-  // Get quota info for display - this is the core feature!
   const quotaRemaining = config?.getQuotaRemaining?.();
   const quotaLimit = config?.getQuotaLimit?.();
   const quotaResetTime = config?.getQuotaResetTime?.();
