@@ -77,9 +77,16 @@ export class FileTokenStorage extends BaseTokenStorage {
     try {
       const backupPath = `${this.tokenFilePath}.backup-${Date.now()}`;
       await fs.rename(this.tokenFilePath, backupPath);
-    } catch (_error: unknown) {
-      // If backup fails (e.g., file doesn't exist anymore), just continue
-      // The important thing is to not block the user from saving new credentials
+    } catch (error: unknown) {
+      // If backup fails, we log a warning but continue to not block the user
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const err = error as NodeJS.ErrnoException;
+      // Don't warn if the file was already gone (e.g., race condition)
+      if (err.code !== 'ENOENT') {
+        process.stderr.write(
+          `Warning: Failed to back up corrupted token file. Reason: ${err.message}. The old file may be overwritten.\n`,
+        );
+      }
     }
   }
 
