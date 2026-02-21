@@ -46,6 +46,7 @@ interface HistoryItemDisplayProps {
   isPending: boolean;
   commands?: readonly SlashCommand[];
   availableTerminalHeightGemini?: number;
+  isExpandable?: boolean;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -55,6 +56,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   isPending,
   commands,
   availableTerminalHeightGemini,
+  isExpandable,
 }) => {
   const settings = useSettings();
   const inlineThinkingMode = getInlineThinkingMode(settings);
@@ -180,6 +182,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           terminalWidth={terminalWidth}
           borderTop={itemForDisplay.borderTop}
           borderBottom={itemForDisplay.borderBottom}
+          isExpandable={isExpandable}
         />
       )}
       {itemForDisplay.type === 'compression' && (

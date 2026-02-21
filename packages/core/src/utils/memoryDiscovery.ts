@@ -127,6 +127,7 @@ async function getGeminiMdFilePathsInternal(
         result.value.global.forEach((p) => globalPaths.add(p));
         result.value.project.forEach((p) => projectPaths.add(p));
       } else {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const error = result.reason;
         const message = error instanceof Error ? error.message : String(error);
         logger.error(`Error discovering files in directory: ${message}`);
@@ -299,6 +300,7 @@ export async function readGeminiMdFiles(
       } else {
         // This case shouldn't happen since we catch all errors above,
         // but handle it for completeness
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const error = result.reason;
         const message = error instanceof Error ? error.message : String(error);
         logger.error(`Unexpected error processing file: ${message}`);

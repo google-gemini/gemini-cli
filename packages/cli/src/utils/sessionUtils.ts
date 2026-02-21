@@ -254,6 +254,7 @@ export const getAllSessionFiles = async (
       async (file): Promise<SessionFileEntry> => {
         const filePath = path.join(chatsDir, file);
         try {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const content: ConversationRecord = JSON.parse(
             await fs.readFile(filePath, 'utf8'),
           );
@@ -498,6 +499,7 @@ export class SessionSelector {
     const sessionPath = path.join(chatsDir, sessionInfo.fileName);
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const sessionData: ConversationRecord = JSON.parse(
         await fs.readFile(sessionPath, 'utf8'),
       );

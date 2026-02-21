@@ -20,6 +20,7 @@ import {
 import {
   type CommandContext,
   type SlashCommand,
+  type SlashCommandActionReturn,
   CommandKind,
 } from './types.js';
 import open from 'open';
@@ -35,6 +36,7 @@ import { stat } from 'node:fs/promises';
 import { ExtensionSettingScope } from '../../config/extensions/extensionSettings.js';
 import { type ConfigLogger } from '../../commands/extensions/utils.js';
 import { ConfigExtensionDialog } from '../components/ConfigExtensionDialog.js';
+import { ExtensionRegistryView } from '../components/views/ExtensionRegistryView.js';
 import React from 'react';
 
 function showMessageIfNoExtensions(
@@ -265,7 +267,28 @@ async function restartAction(
   }
 }
 
-async function exploreAction(context: CommandContext) {
+async function exploreAction(
+  context: CommandContext,
+): Promise<SlashCommandActionReturn | void> {
+  const settings = context.services.settings.merged;
+  const useRegistryUI = settings.experimental?.extensionRegistry;
+
+  if (useRegistryUI) {
+    const extensionManager = context.services.config?.getExtensionLoader();
+    if (extensionManager instanceof ExtensionManager) {
+      return {
+        type: 'custom_dialog' as const,
+        component: React.createElement(ExtensionRegistryView, {
+          onSelect: (extension) => {
+            debugLogger.debug(`Selected extension: ${extension.extensionName}`);
+          },
+          onClose: () => context.ui.removeComponent(),
+          extensionManager,
+        }),
+      };
+    }
+  }
+
   const extensionsUrl = 'https://geminicli.com/extensions/';
 
   // Only check for NODE_ENV for explicit test mode, not for unit test framework

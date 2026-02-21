@@ -208,6 +208,7 @@ export interface ParsedLog {
     stdout?: string;
     stderr?: string;
     error?: string;
+    error_type?: string;
     prompt_id?: string;
   };
   scopeMetrics?: {
@@ -1255,6 +1256,8 @@ export class TestRig {
         success: boolean;
         duration_ms: number;
         prompt_id?: string;
+        error?: string;
+        error_type?: string;
       };
     }[] = [];
 
@@ -1272,6 +1275,8 @@ export class TestRig {
             success: logData.attributes.success ?? false,
             duration_ms: logData.attributes.duration_ms ?? 0,
             prompt_id: logData.attributes.prompt_id,
+            error: logData.attributes.error,
+            error_type: logData.attributes.error_type,
           },
         });
       }

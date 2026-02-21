@@ -831,6 +831,63 @@ describe('WriteFileTool', () => {
         }
       },
     );
+
+    it('should include the file content in llmContent', async () => {
+      const filePath = path.join(rootDir, 'content_check.txt');
+      const content = 'This is the content that should be returned.';
+      mockEnsureCorrectFileContent.mockResolvedValue(content);
+
+      const params = { file_path: filePath, content };
+      const invocation = tool.build(params);
+
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('Here is the updated code:');
+      expect(result.llmContent).toContain(content);
+    });
+
+    it('should return only changed lines plus context for large updates', async () => {
+      const filePath = path.join(rootDir, 'large_update.txt');
+      const lines = Array.from({ length: 100 }, (_, i) => `Line ${i + 1}`);
+      const originalContent = lines.join('\n');
+      fs.writeFileSync(filePath, originalContent, 'utf8');
+
+      const newLines = [...lines];
+      newLines[50] = 'Line 51 Modified'; // Modify one line in the middle
+
+      const newContent = newLines.join('\n');
+      mockEnsureCorrectEdit.mockResolvedValue({
+        params: {
+          file_path: filePath,
+          old_string: originalContent,
+          new_string: newContent,
+        },
+        occurrences: 1,
+      });
+
+      const params = { file_path: filePath, content: newContent };
+      const invocation = tool.build(params);
+
+      // Confirm execution first
+      const confirmDetails = await invocation.shouldConfirmExecute(abortSignal);
+      if (confirmDetails && 'onConfirm' in confirmDetails) {
+        await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
+      }
+
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('Here is the updated code:');
+      // Should contain the modified line
+      expect(result.llmContent).toContain('Line 51 Modified');
+      // Should contain context lines (e.g. Line 46, Line 56)
+      expect(result.llmContent).toContain('Line 46');
+      expect(result.llmContent).toContain('Line 56');
+      // Should NOT contain far away lines (e.g. Line 1, Line 100)
+      expect(result.llmContent).not.toContain('Line 1\n');
+      expect(result.llmContent).not.toContain('Line 100');
+      // Should indicate truncation
+      expect(result.llmContent).toContain('...');
+    });
   });
 
   describe('workspace boundary validation', () => {

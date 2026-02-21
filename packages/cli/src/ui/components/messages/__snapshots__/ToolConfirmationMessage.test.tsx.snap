@@ -35,6 +35,18 @@ Do you want to proceed?
 "
 `;
 
+exports[`ToolConfirmationMessage > should strip BiDi characters from MCP tool and server names 1`] = `
+"MCP Server: testserver
+Tool: testtool
+Allow execution of MCP tool "testtool" from server "testserver"?
+
+● 1. Allow once
+  2. Allow tool for this session
+  3. Allow all server tools for this session
+  4. No, suggest changes (esc)
+"
+`;
+
 exports[`ToolConfirmationMessage > with folder trust > 'for edit confirmations' > should NOT show "allow always" when folder is untrusted 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │                                                                              │

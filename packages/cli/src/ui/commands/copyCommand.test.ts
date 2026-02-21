@@ -125,6 +125,7 @@ describe('copyCommand', () => {
 
     expect(mockCopyToClipboard).toHaveBeenCalledWith(
       'Hi there! How can I help you?',
+      expect.anything(),
     );
   });
 
@@ -143,7 +144,10 @@ describe('copyCommand', () => {
 
     const result = await copyCommand.action(mockContext, '');
 
-    expect(mockCopyToClipboard).toHaveBeenCalledWith('Part 1: Part 2: Part 3');
+    expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      'Part 1: Part 2: Part 3',
+      expect.anything(),
+    );
     expect(result).toEqual({
       type: 'message',
       messageType: 'info',
@@ -170,7 +174,10 @@ describe('copyCommand', () => {
 
     const result = await copyCommand.action(mockContext, '');
 
-    expect(mockCopyToClipboard).toHaveBeenCalledWith('Text part more text');
+    expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      'Text part more text',
+      expect.anything(),
+    );
     expect(result).toEqual({
       type: 'message',
       messageType: 'info',
@@ -201,7 +208,10 @@ describe('copyCommand', () => {
 
     const result = await copyCommand.action(mockContext, '');
 
-    expect(mockCopyToClipboard).toHaveBeenCalledWith('Second AI response');
+    expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      'Second AI response',
+      expect.anything(),
+    );
     expect(result).toEqual({
       type: 'message',
       messageType: 'info',
@@ -230,6 +240,11 @@ describe('copyCommand', () => {
       messageType: 'error',
       content: `Failed to copy to the clipboard. ${clipboardError.message}`,
     });
+
+    expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      'AI response',
+      expect.anything(),
+    );
   });
 
   it('should handle non-Error clipboard errors', async () => {
@@ -253,6 +268,11 @@ describe('copyCommand', () => {
       messageType: 'error',
       content: `Failed to copy to the clipboard. ${rejectedValue}`,
     });
+
+    expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      'AI response',
+      expect.anything(),
+    );
   });
 
   it('should return info message when no text parts found in AI message', async () => {

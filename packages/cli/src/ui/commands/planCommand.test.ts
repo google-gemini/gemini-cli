@@ -51,7 +51,7 @@ describe('planCommand', () => {
           getApprovalMode: vi.fn(),
           getFileSystemService: vi.fn(),
           storage: {
-            getProjectTempPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
+            getPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
           },
         },
       },

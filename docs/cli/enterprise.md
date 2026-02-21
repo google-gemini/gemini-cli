@@ -20,7 +20,7 @@ The most powerful tools for enterprise administration are the system-wide
 settings files. These files allow you to define a baseline configuration
 (`system-defaults.json`) and a set of overrides (`settings.json`) that apply to
 all users on a machine. For a complete overview of configuration options, see
-the [Configuration documentation](../get-started/configuration.md).
+the [Configuration documentation](../reference/configuration.md).
 
 Settings are merged from four files. The precedence order for single-value
 settings (like `theme`) is:
@@ -224,8 +224,8 @@ gemini
 
 You can significantly enhance security by controlling which tools the Gemini
 model can use. This is achieved through the `tools.core` setting and the
-[Policy Engine](../core/policy-engine.md). For a list of available tools, see
-the [Tools documentation](../tools/index.md).
+[Policy Engine](../reference/policy-engine.md). For a list of available tools,
+see the [Tools documentation](../tools/index.md).
 
 ### Allowlisting with `coreTools`
 
@@ -245,8 +245,8 @@ on the approved list.
 
 ### Blocklisting with `excludeTools` (Deprecated)
 
-> **Deprecated:** Use the [Policy Engine](../core/policy-engine.md) for more
-> robust control.
+> **Deprecated:** Use the [Policy Engine](../reference/policy-engine.md) for
+> more robust control.
 
 Alternatively, you can add specific tools that are considered dangerous in your
 environment to a blocklist.
@@ -289,8 +289,8 @@ unintended tool execution.
 ## Managing custom tools (MCP servers)
 
 If your organization uses custom tools via
-[Model-Context Protocol (MCP) servers](../core/tools-api.md), it is crucial to
-understand how server configurations are managed to apply security policies
+[Model-Context Protocol (MCP) servers](../reference/tools-api.md), it is crucial
+to understand how server configurations are managed to apply security policies
 effectively.
 
 ### How MCP server configurations are merged

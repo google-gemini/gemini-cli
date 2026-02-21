@@ -217,13 +217,14 @@ export class AppRig {
   }
 
   private stubRefreshAuth() {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
     const gcConfig = this.config as any;
     gcConfig.refreshAuth = async (authMethod: AuthType) => {
       gcConfig.modelAvailabilityService.reset();
 
       const newContentGeneratorConfig = {
         authType: authMethod,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         proxy: gcConfig.getProxy(),
         apiKey: process.env['GEMINI_API_KEY'] || 'test-api-key',
       };

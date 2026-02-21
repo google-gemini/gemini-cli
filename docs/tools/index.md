@@ -98,5 +98,5 @@ Always review confirmation prompts carefully before allowing a tool to execute.
 ## Next steps
 
 - Learn how to [Provide context](../cli/gemini-md.md) to guide tool use.
-- Explore the [Command reference](../cli/commands.md) for tool-related slash
-  commands.
+- Explore the [Command reference](../reference/commands.md) for tool-related
+  slash commands.

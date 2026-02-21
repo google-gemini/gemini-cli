@@ -17,7 +17,7 @@ the main agent's context or toolset.
 > ```
 >
 > **Warning:** Subagents currently operate in
-> ["YOLO mode"](../get-started/configuration.md#command-line-arguments), meaning
+> ["YOLO mode"](../reference/configuration.md#command-line-arguments), meaning
 > they may execute tools without individual user confirmation for each step.
 > Proceed with caution when defining agents with powerful tools like
 > `run_shell_command` or `write_file`.

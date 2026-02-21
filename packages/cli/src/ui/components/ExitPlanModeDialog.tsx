@@ -65,7 +65,7 @@ function usePlanContent(planPath: string, config: Config): PlanContentState {
       try {
         const pathError = await validatePlanPath(
           planPath,
-          config.storage.getProjectTempPlansDir(),
+          config.storage.getPlansDir(),
           config.getTargetDir(),
         );
         if (ignore) return;
@@ -83,7 +83,7 @@ function usePlanContent(planPath: string, config: Config): PlanContentState {
 
         const result = await processSingleFileContent(
           planPath,
-          config.storage.getProjectTempPlansDir(),
+          config.storage.getPlansDir(),
           config.getFileSystemService(),
         );
 

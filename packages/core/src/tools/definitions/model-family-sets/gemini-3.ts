@@ -38,7 +38,7 @@ import {
 export const GEMINI_3_SET: CoreToolSet = {
   read_file: {
     name: READ_FILE_TOOL_NAME,
-    description: `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
+    description: `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'start_line' and 'end_line' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -46,14 +46,14 @@ export const GEMINI_3_SET: CoreToolSet = {
           description: 'The path to the file to read.',
           type: 'string',
         },
-        offset: {
+        start_line: {
           description:
-            "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
+            'Optional: The 1-based line number to start reading from.',
           type: 'number',
         },
-        limit: {
+        end_line: {
           description:
-            "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
+            'Optional: The 1-based line number to end reading at (inclusive).',
           type: 'number',
         },
       },
@@ -64,8 +64,7 @@ export const GEMINI_3_SET: CoreToolSet = {
   write_file: {
     name: WRITE_FILE_TOOL_NAME,
     description: `Writes content to a specified file in the local filesystem.
-
-      The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
+The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -132,7 +131,7 @@ export const GEMINI_3_SET: CoreToolSet = {
   grep_search_ripgrep: {
     name: GREP_TOOL_NAME,
     description:
-      'Searches for a regular expression pattern within file contents.',
+      'Searches for a regular expression pattern within file contents. This tool is FAST and optimized, powered by ripgrep. PREFERRED over standard `run_shell_command("grep ...")` due to better performance and automatic output limiting (defaults to 100 matches, but can be increased via `total_max_matches`).',
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -291,18 +290,8 @@ export const GEMINI_3_SET: CoreToolSet = {
 
   replace: {
     name: EDIT_TOOL_NAME,
-    description: `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool to examine the file's current content before attempting a text replacement.
-      
-      The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
-      
-      Expectation for required parameters:
-      1. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
-      2. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic and that \`old_string\` and \`new_string\` are different.
-      3. \`instruction\` is the detailed instruction of what needs to be changed. It is important to Make it specific and detailed so developers or large language models can understand what needs to be changed and perform the changes on their own if necessary. 
-      4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
-      **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.
-      5. Prefer to break down complex and long changes into multiple smaller atomic calls to this tool. Always check the content of the file after changes or not finding a string to match.
-      **Multiple replacements:** Set \`expected_replacements\` to the number of occurrences you want to replace. The tool will replace ALL occurrences that match \`old_string\` exactly. Ensure the number of replacements matches your expectation.`,
+    description: `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences ONLY when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting.
+The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -311,31 +300,17 @@ export const GEMINI_3_SET: CoreToolSet = {
           type: 'string',
         },
         instruction: {
-          description: `A clear, semantic instruction for the code change, acting as a high-quality prompt for an expert LLM assistant. It must be self-contained and explain the goal of the change.
-
-A good instruction should concisely answer:
-1.  WHY is the change needed? (e.g., "To fix a bug where users can be null...")
-2.  WHERE should the change happen? (e.g., "...in the 'renderUserProfile' function...")
-3.  WHAT is the high-level change? (e.g., "...add a null check for the 'user' object...")
-4.  WHAT is the desired outcome? (e.g., "...so that it displays a loading spinner instead of crashing.")
-
-**GOOD Example:** "In the 'calculateTotal' function, correct the sales tax calculation by updating the 'taxRate' constant from 0.05 to 0.075 to reflect the new regional tax laws."
-
-**BAD Examples:**
-- "Change the text." (Too vague)
-- "Fix the bug." (Doesn't explain the bug or the fix)
-- "Replace the line with this new line." (Brittle, just repeats the other parameters)
-`,
+          description: `A clear, semantic instruction for the code change, acting as a high-quality prompt for an expert LLM assistant. It must be self-contained and explain the goal of the change.`,
           type: 'string',
         },
         old_string: {
           description:
-            'The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
+            'The exact literal text to replace, unescaped. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
           type: 'string',
         },
         new_string: {
           description:
-            'The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
+            'The exact literal text to replace `old_string` with, unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
           type: 'string',
         },
         expected_replacements: {

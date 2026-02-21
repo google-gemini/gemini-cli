@@ -737,6 +737,42 @@ describe('Server Config (config.ts)', () => {
     );
   });
 
+  describe('Plan Settings', () => {
+    const testCases = [
+      {
+        name: 'should pass custom plan directory to storage',
+        planSettings: { directory: 'custom-plans' },
+        expected: 'custom-plans',
+      },
+      {
+        name: 'should call setCustomPlansDir with undefined if directory is not provided',
+        planSettings: {},
+        expected: undefined,
+      },
+      {
+        name: 'should call setCustomPlansDir with undefined if planSettings is not provided',
+        planSettings: undefined,
+        expected: undefined,
+      },
+    ];
+
+    testCases.forEach(({ name, planSettings, expected }) => {
+      it(`${name}`, () => {
+        const setCustomPlansDirSpy = vi.spyOn(
+          Storage.prototype,
+          'setCustomPlansDir',
+        );
+        new Config({
+          ...baseParams,
+          planSettings,
+        });
+
+        expect(setCustomPlansDirSpy).toHaveBeenCalledWith(expected);
+        setCustomPlansDirSpy.mockRestore();
+      });
+    });
+  });
+
   describe('Telemetry Settings', () => {
     it('should return default telemetry target if not provided', () => {
       const params: ConfigParameters = {
@@ -1356,7 +1392,22 @@ describe('setApprovalMode with folder trust', () => {
     expect(updateSpy).toHaveBeenCalled();
   });
 
-  it('should not update system instruction when switching between non-Plan modes', () => {
+  it('should update system instruction when entering YOLO mode', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue({
+      getTool: vi.fn().mockReturnValue(undefined),
+      unregisterTool: vi.fn(),
+      registerTool: vi.fn(),
+    } as Partial<ToolRegistry> as ToolRegistry);
+    const updateSpy = vi.spyOn(config, 'updateSystemInstructionIfInitialized');
+
+    config.setApprovalMode(ApprovalMode.YOLO);
+
+    expect(updateSpy).toHaveBeenCalled();
+  });
+
+  it('should not update system instruction when switching between non-Plan/non-YOLO modes', () => {
     const config = new Config(baseParams);
     vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
     const updateSpy = vi.spyOn(config, 'updateSystemInstructionIfInitialized');
@@ -2501,7 +2552,7 @@ describe('Plans Directory Initialization', () => {
 
     await config.initialize();
 
-    const plansDir = config.storage.getProjectTempPlansDir();
+    const plansDir = config.storage.getPlansDir();
     expect(fs.promises.mkdir).toHaveBeenCalledWith(plansDir, {
       recursive: true,
     });
@@ -2518,7 +2569,7 @@ describe('Plans Directory Initialization', () => {
 
     await config.initialize();
 
-    const plansDir = config.storage.getProjectTempPlansDir();
+    const plansDir = config.storage.getPlansDir();
     expect(fs.promises.mkdir).not.toHaveBeenCalledWith(plansDir, {
       recursive: true,
     });
@@ -2597,6 +2648,27 @@ describe('syncPlanModeTools', () => {
       ...baseParams,
       approvalMode: ApprovalMode.DEFAULT,
       plan: false,
+    });
+    const registry = new ToolRegistry(config, config.getMessageBus());
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue(registry);
+
+    const registerSpy = vi.spyOn(registry, 'registerTool');
+    vi.spyOn(registry, 'getTool').mockReturnValue(undefined);
+
+    config.syncPlanModeTools();
+
+    const { EnterPlanModeTool } = await import('../tools/enter-plan-mode.js');
+    const registeredTool = registerSpy.mock.calls.find(
+      (call) => call[0] instanceof EnterPlanModeTool,
+    );
+    expect(registeredTool).toBeUndefined();
+  });
+
+  it('should NOT register EnterPlanModeTool when in YOLO mode, even if plan is enabled', async () => {
+    const config = new Config({
+      ...baseParams,
+      approvalMode: ApprovalMode.YOLO,
+      plan: true,
     });
     const registry = new ToolRegistry(config, config.getMessageBus());
     vi.spyOn(config, 'getToolRegistry').mockReturnValue(registry);

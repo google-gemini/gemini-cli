@@ -17,7 +17,8 @@ export function shouldShowToast(uiState: UIState): boolean {
     uiState.ctrlDPressedOnce ||
     (uiState.showEscapePrompt &&
       (uiState.buffer.text.length > 0 || uiState.history.length > 0)) ||
-    Boolean(uiState.queueErrorMessage)
+    Boolean(uiState.queueErrorMessage) ||
+    uiState.showIsExpandableHint
   );
 }
 
@@ -71,6 +72,15 @@ export const ToastDisplay: React.FC = () => {
 
   if (uiState.queueErrorMessage) {
     return <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>;
+  }
+
+  if (uiState.showIsExpandableHint) {
+    const action = uiState.constrainHeight ? 'show more' : 'collapse';
+    return (
+      <Text color={theme.text.accent}>
+        Press Ctrl+O to {action} lines for the most recent response
+      </Text>
+    );
   }
 
   return null;

@@ -13,21 +13,19 @@ import type {
   GenerateContentConfig,
 } from '@google/genai';
 import type { Config } from '../config/config.js';
-import type { ContentGenerator } from './contentGenerator.js';
-import type { AuthType } from './contentGenerator.js';
+import type { ContentGenerator, AuthType } from './contentGenerator.js';
 import { handleFallback } from '../fallback/handler.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { reportError } from '../utils/errorReporting.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { logMalformedJsonResponse } from '../telemetry/loggers.js';
-import { MalformedJsonResponseEvent } from '../telemetry/types.js';
+import { MalformedJsonResponseEvent, LlmRole } from '../telemetry/types.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
-import { LlmRole } from '../telemetry/types.js';
 
 const DEFAULT_MAX_ATTEMPTS = 5;
 
@@ -164,6 +162,7 @@ export class BaseLlmClient {
     );
 
     // If we are here, the content is valid (not empty and parsable).
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return JSON.parse(
       this.cleanJsonResponse(getResponseText(result)!.trim(), model),
     );

@@ -373,7 +373,6 @@ agent_card_url: https://example.com/card
 auth:
   type: apiKey
   key: $MY_API_KEY
-  in: header
   name: X-Custom-Key
 ---
 `);
@@ -385,7 +384,6 @@ auth:
         auth: {
           type: 'apiKey',
           key: '$MY_API_KEY',
-          in: 'header',
           name: 'X-Custom-Key',
         },
       });
@@ -468,7 +466,7 @@ auth:
 ---
 `);
       await expect(parseAgentMarkdown(filePath)).rejects.toThrow(
-        /Basic scheme requires "username" and "password"/,
+        /Basic authentication requires "password"/,
       );
     });
 
@@ -494,7 +492,6 @@ auth:
         auth: {
           type: 'apiKey' as const,
           key: '$API_KEY',
-          in: 'header' as const,
         },
       };
 
@@ -505,7 +502,6 @@ auth:
         auth: {
           type: 'apiKey',
           key: '$API_KEY',
-          location: 'header',
         },
       });
     });

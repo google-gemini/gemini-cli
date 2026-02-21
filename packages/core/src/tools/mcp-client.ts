@@ -22,6 +22,7 @@ import type {
   Prompt,
   ReadResourceResult,
   Resource,
+  Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
   ListResourcesResultSchema,
@@ -31,7 +32,6 @@ import {
   ToolListChangedNotificationSchema,
   PromptListChangedNotificationSchema,
   ProgressNotificationSchema,
-  type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { ApprovalMode, PolicyDecision } from '../policy/types.js';
 import { parse } from 'shell-quote';
@@ -719,18 +719,17 @@ async function handleAutomaticOAuth(
   try {
     debugLogger.log(`🔐 '${mcpServerName}' requires OAuth authentication`);
 
-    // Always try to parse the resource metadata URI from the www-authenticate header
-    let oauthConfig;
-    const resourceMetadataUri =
-      OAuthUtils.parseWWWAuthenticateHeader(wwwAuthenticate);
-    if (resourceMetadataUri) {
-      oauthConfig = await OAuthUtils.discoverOAuthConfig(resourceMetadataUri);
-    } else if (hasNetworkTransport(mcpServerConfig)) {
+    const serverUrl = mcpServerConfig.httpUrl || mcpServerConfig.url;
+
+    // Try to discover OAuth config from the WWW-Authenticate header first
+    let oauthConfig = await OAuthUtils.discoverOAuthFromWWWAuthenticate(
+      wwwAuthenticate,
+      serverUrl,
+    );
+
+    if (!oauthConfig && hasNetworkTransport(mcpServerConfig)) {
       // Fallback: try to discover OAuth config from the base URL
-      const serverUrl = new URL(
-        mcpServerConfig.httpUrl || mcpServerConfig.url!,
-      );
-      const baseUrl = `${serverUrl.protocol}//${serverUrl.host}`;
+      const baseUrl = OAuthUtils.extractBaseUrl(serverUrl!);
       oauthConfig = await OAuthUtils.discoverOAuthConfig(baseUrl);
     }
 
@@ -754,8 +753,6 @@ async function handleAutomaticOAuth(
     };
 
     // Perform OAuth authentication
-    // Pass the server URL for proper discovery
-    const serverUrl = mcpServerConfig.httpUrl || mcpServerConfig.url;
     debugLogger.log(
       `Starting OAuth authentication for server '${mcpServerName}'...`,
     );
@@ -1999,6 +1996,7 @@ export async function createTransport(
       // The `XcodeMcpBridgeFixTransport` wrapper hides the underlying `StdioClientTransport`,
       // which exposes `stderr` for debug logging. We need to unwrap it to attach the listener.
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const underlyingTransport =
         transport instanceof XcodeMcpBridgeFixTransport
           ? // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
@@ -2010,6 +2008,7 @@ export async function createTransport(
         underlyingTransport.stderr
       ) {
         underlyingTransport.stderr.on('data', (data) => {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const stderrStr = data.toString().trim();
           debugLogger.debug(
             `[DEBUG] [MCP STDERR (${mcpServerName})]: `,

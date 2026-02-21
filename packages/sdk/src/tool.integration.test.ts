@@ -45,7 +45,8 @@ describe('GeminiCliAgent Tool Integration', () => {
     });
 
     const events = [];
-    const stream = agent.sendStream('What is 5 + 3?');
+    const session = agent.session();
+    const stream = session.sendStream('What is 5 + 3?');
 
     for await (const event of stream) {
       events.push(event);
@@ -85,9 +86,10 @@ describe('GeminiCliAgent Tool Integration', () => {
     });
 
     const events = [];
+    const session = agent.session();
     // Force the model to trigger the error first, then hopefully recover or at least acknowledge it.
     // The prompt is crafted to make the model try 'fail' first.
-    const stream = agent.sendStream(
+    const stream = session.sendStream(
       'Call the tool with "fail". If it fails, tell me the error message.',
     );
 
@@ -128,7 +130,8 @@ describe('GeminiCliAgent Tool Integration', () => {
     });
 
     const events = [];
-    const stream = agent.sendStream(
+    const session = agent.session();
+    const stream = session.sendStream(
       'Check the system status and report any errors.',
     );
 

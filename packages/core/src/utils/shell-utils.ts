@@ -479,6 +479,7 @@ function parsePowerShellCommandDetails(
       hasRedirection?: boolean;
     } | null = null;
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       parsed = JSON.parse(output);
     } catch {
       return { details: [], hasError: true };

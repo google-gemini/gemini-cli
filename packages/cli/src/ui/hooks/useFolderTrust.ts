@@ -14,7 +14,13 @@ import {
 } from '../../config/trustedFolders.js';
 import * as process from 'node:process';
 import { type HistoryItemWithoutId, MessageType } from '../types.js';
-import { coreEvents, ExitCodes, isHeadlessMode } from '@google/gemini-cli-core';
+import {
+  coreEvents,
+  ExitCodes,
+  isHeadlessMode,
+  FolderTrustDiscoveryService,
+  type FolderDiscoveryResults,
+} from '@google/gemini-cli-core';
 import { runExitCleanup } from '../../utils/cleanup.js';
 
 export const useFolderTrust = (
@@ -24,6 +30,8 @@ export const useFolderTrust = (
 ) => {
   const [isTrusted, setIsTrusted] = useState<boolean | undefined>(undefined);
   const [isFolderTrustDialogOpen, setIsFolderTrustDialogOpen] = useState(false);
+  const [discoveryResults, setDiscoveryResults] =
+    useState<FolderDiscoveryResults | null>(null);
   const [isRestarting, setIsRestarting] = useState(false);
   const startupMessageSent = useRef(false);
 
@@ -32,6 +40,19 @@ export const useFolderTrust = (
   useEffect(() => {
     let isMounted = true;
     const { isTrusted: trusted } = isWorkspaceTrusted(settings.merged);
+
+    if (trusted === undefined || trusted === false) {
+      void FolderTrustDiscoveryService.discover(process.cwd())
+        .then((results) => {
+          if (isMounted) {
+            setDiscoveryResults(results);
+          }
+        })
+        .catch(() => {
+          // Silently ignore discovery errors as they are handled within the service
+          // and reported via results.discoveryErrors if successful.
+        });
+    }
 
     const showUntrustedMessage = () => {
       if (trusted === false && !startupMessageSent.current) {
@@ -100,8 +121,6 @@ export const useFolderTrust = (
       onTrustChange(currentIsTrusted);
       setIsTrusted(currentIsTrusted);
 
-      // logic: we restart if the trust state *effectively* changes from the previous state.
-      // previous state was `isTrusted`. If undefined, we assume false (untrusted).
       const wasTrusted = isTrusted ?? false;
 
       if (wasTrusted !== currentIsTrusted) {
@@ -117,6 +136,7 @@ export const useFolderTrust = (
   return {
     isTrusted,
     isFolderTrustDialogOpen,
+    discoveryResults,
     handleFolderTrustSelect,
     isRestarting,
   };

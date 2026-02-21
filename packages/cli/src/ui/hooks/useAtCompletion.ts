@@ -166,9 +166,11 @@ async function searchResourceCandidates(
   const fzf = new AsyncFzf(candidates, {
     selector: (candidate: ResourceSuggestionCandidate) => candidate.searchKey,
   });
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const results = await fzf.find(normalizedPattern, {
     limit: MAX_SUGGESTIONS_TO_SHOW * 3,
   });
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return results.map(
     (result: { item: ResourceSuggestionCandidate }) => result.item.suggestion,
   );
@@ -188,9 +190,11 @@ async function searchAgentCandidates(
   const fzf = new AsyncFzf(candidates, {
     selector: (s: Suggestion) => s.label,
   });
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const results = await fzf.find(normalizedPattern, {
     limit: MAX_SUGGESTIONS_TO_SHOW,
   });
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return results.map((r: { item: Suggestion }) => r.item);
 }
 

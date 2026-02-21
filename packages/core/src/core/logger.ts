@@ -88,6 +88,7 @@ export class Logger {
     }
     try {
       const fileContent = await fs.readFile(this.logFilePath, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const parsedLogs = JSON.parse(fileContent);
       if (!Array.isArray(parsedLogs)) {
         debugLogger.debug(
@@ -352,6 +353,7 @@ export class Logger {
     const path = await this._getCheckpointPath(tag);
     try {
       const fileContent = await fs.readFile(path, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const parsedContent = JSON.parse(fileContent);
 
       // Handle legacy format (just an array of Content)
