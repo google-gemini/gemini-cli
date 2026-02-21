@@ -44,8 +44,18 @@ function isJetBrains(): boolean {
     .includes('jetbrains');
 }
 
+function isAntigravityFromEnv(): boolean {
+  return !!(
+    process.env['ANTIGRAVITY_CLI_ALIAS'] ||
+    process.env['TERM_PROGRAM'] === 'antigravity' ||
+    process.env['VSCODE_GIT_ASKPASS_MAIN']
+      ?.toLowerCase()
+      .includes('antigravity')
+  );
+}
+
 export function detectIdeFromEnv(): IdeInfo {
-  if (process.env['ANTIGRAVITY_CLI_ALIAS']) {
+  if (isAntigravityFromEnv()) {
     return IDE_DEFINITIONS.antigravity;
   }
   if (process.env['__COG_BASHRC_SOURCED']) {
@@ -88,6 +98,9 @@ function verifyVSCode(
     command: string;
   },
 ): IdeInfo {
+  if (ide.name === IDE_DEFINITIONS.vscode.name && isAntigravityFromEnv()) {
+    return IDE_DEFINITIONS.antigravity;
+  }
   if (ide.name !== IDE_DEFINITIONS.vscode.name) {
     return ide;
   }
@@ -147,11 +160,13 @@ export function detectIde(
     };
   }
 
-  // Only VS Code, Sublime Text and JetBrains integrations are currently supported.
+  // Only VS Code-family, Sublime Text, JetBrains, and Antigravity integrations
+  // are currently supported.
   if (
     process.env['TERM_PROGRAM'] !== 'vscode' &&
     process.env['TERM_PROGRAM'] !== 'sublime' &&
-    !isJetBrains()
+    !isJetBrains() &&
+    !isAntigravityFromEnv()
   ) {
     return undefined;
   }

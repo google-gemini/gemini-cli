@@ -20,6 +20,7 @@ describe('detectIde', () => {
     // Ensure these env vars don't leak from the host environment
     vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
     vi.stubEnv('TERM_PROGRAM', '');
+    vi.stubEnv('VSCODE_GIT_ASKPASS_MAIN', '');
     vi.stubEnv('CURSOR_TRACE_ID', '');
     vi.stubEnv('CODESPACES', '');
     vi.stubEnv('VSCODE_IPC_HOOK_CLI', '');
@@ -128,6 +129,32 @@ describe('detectIde', () => {
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.antigravity);
   });
 
+  it('should detect Antigravity via VSCODE_GIT_ASKPASS_MAIN', () => {
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+    vi.stubEnv(
+      'VSCODE_GIT_ASKPASS_MAIN',
+      '/Applications/Antigravity.app/askpass.sh',
+    );
+    expect(detectIde(ideProcessInfoNoCode)).toBe(IDE_DEFINITIONS.antigravity);
+  });
+
+  it('should detect Antigravity when TERM_PROGRAM is not vscode but env signal is present', () => {
+    vi.stubEnv('TERM_PROGRAM', '');
+    vi.stubEnv(
+      'VSCODE_GIT_ASKPASS_MAIN',
+      '/Applications/Antigravity.app/askpass.sh',
+    );
+    expect(detectIde(ideProcessInfoNoCode)).toBe(IDE_DEFINITIONS.antigravity);
+  });
+
+  it('should detect Antigravity when TERM_PROGRAM is antigravity', () => {
+    vi.stubEnv('TERM_PROGRAM', 'antigravity');
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+    vi.stubEnv('VSCODE_GIT_ASKPASS_MAIN', '');
+    expect(detectIde(ideProcessInfoNoCode)).toBe(IDE_DEFINITIONS.antigravity);
+  });
+
   it('should detect Sublime Text', () => {
     vi.stubEnv('TERM_PROGRAM', 'sublime');
     vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
@@ -200,6 +227,7 @@ describe('detectIde with ideInfoFromFile', () => {
   beforeEach(() => {
     vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
     vi.stubEnv('TERM_PROGRAM', '');
+    vi.stubEnv('VSCODE_GIT_ASKPASS_MAIN', '');
     vi.stubEnv('CURSOR_TRACE_ID', '');
     vi.stubEnv('CODESPACES', '');
     vi.stubEnv('VSCODE_IPC_HOOK_CLI', '');
