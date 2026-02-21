@@ -171,6 +171,14 @@ describe('isHeadlessMode', () => {
     }
   });
 
+  it('should return true if yolo option is provided', () => {
+    expect(isHeadlessMode({ yolo: true })).toBe(true);
+  });
+
+  it('should return false if yolo option is false', () => {
+    expect(isHeadlessMode({ yolo: false })).toBe(false);
+  });
+
   it('should return true if multiple headless indicators are set', () => {
     vi.stubEnv('CI', 'true');
     Object.defineProperty(process.stdout, 'isTTY', {
