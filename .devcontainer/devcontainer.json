@@ -1,0 +1,6 @@
+{
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "features": {}
+}"ghcr.io/daniellindemann/dev-container-features/dotnet-usersecrets-persistence:0": {}
+{ "ghcr.io/stuartleeks/dev-container-features/add-host:1": {}
+  
