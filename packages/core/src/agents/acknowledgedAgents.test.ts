@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AcknowledgedAgentsService } from './acknowledgedAgents.js';
 import { Storage } from '../config/storage.js';
 import * as fs from 'node:fs/promises';
@@ -13,24 +13,17 @@ import * as os from 'node:os';
 
 describe('AcknowledgedAgentsService', () => {
   let tempDir: string;
-  let originalGeminiCliHome: string | undefined;
 
   beforeEach(async () => {
     // Create a unique temp directory for each test
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-cli-test-'));
 
     // Override GEMINI_CLI_HOME to point to the temp directory
-    originalGeminiCliHome = process.env['GEMINI_CLI_HOME'];
-    process.env['GEMINI_CLI_HOME'] = tempDir;
+    vi.stubEnv('GEMINI_CLI_HOME', tempDir);
   });
 
   afterEach(async () => {
-    // Restore environment variable
-    if (originalGeminiCliHome) {
-      process.env['GEMINI_CLI_HOME'] = originalGeminiCliHome;
-    } else {
-      delete process.env['GEMINI_CLI_HOME'];
-    }
+    vi.unstubAllEnvs();
 
     // Clean up temp directory
     await fs.rm(tempDir, { recursive: true, force: true });
