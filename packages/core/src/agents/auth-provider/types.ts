@@ -34,14 +34,15 @@ export interface GoogleCredentialsAuthConfig extends BaseAuthConfig {
   scopes?: string[];
 }
 
-/** Client config corresponding to APIKeySecurityScheme. Only header location is supported. */
-// TODO: Add 'query' and 'cookie' location support if needed.
+/** Client config corresponding to APIKeySecurityScheme. */
 export interface ApiKeyAuthConfig extends BaseAuthConfig {
   type: 'apiKey';
   /** The secret. Supports $ENV_VAR, !command, or literal. */
   key: string;
   /** Header name. @default 'X-API-Key' */
   name?: string;
+  /** Where to send the API key. @default 'header' */
+  in?: 'header' | 'query' | 'cookie';
 }
 
 /** Client config corresponding to HTTPAuthSecurityScheme. */
