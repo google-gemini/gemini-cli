@@ -344,8 +344,8 @@
             "hideContextPercentage": {
               "title": "Hide Context Window Percentage",
               "description": "Hides the context window remaining percentage.",
-              "markdownDescription": "Hides the context window remaining percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
-              "default": true,
+              "markdownDescription": "Hides the context window remaining percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+              "default": false,
               "type": "boolean"
             }
           },
