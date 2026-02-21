@@ -13,8 +13,14 @@ import {
 } from '@opentelemetry/api';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 <<<<<<< HEAD
+<<<<<<< HEAD
 import {
   type GeminiCliOperation,
+=======
+import {
+  type GeminiCliOperation,
+  GEMINI_CLI_SESSION_ID,
+>>>>>>> 3eb31a334 (added test cases to all the changes.)
   GEN_AI_AGENT_DESCRIPTION,
   GEN_AI_AGENT_NAME,
   GEN_AI_CONVERSATION_ID,

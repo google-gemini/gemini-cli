@@ -6,8 +6,11 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ToolExecutor } from './tool-executor.js';
-import type { Config, AnyToolInvocation } from '../index.js';
-import type { ToolResult } from '../tools/tools.js';
+import {
+  type Config,
+  type ToolResult,
+  type AnyToolInvocation,
+} from '../index.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 import type { ScheduledToolCall } from './types.js';
