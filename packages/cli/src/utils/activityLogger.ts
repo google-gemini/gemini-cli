@@ -546,7 +546,8 @@ export class ActivityLogger extends EventEmitter {
           body,
           pending: true,
         });
-        return Function.prototype.apply.call(oldEnd, this, [chunk, ...etc]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-return
+        return (oldEnd as any).apply(this, [chunk, ...etc]);
       };
 
       req.on('response', (res: http.IncomingMessage) => {

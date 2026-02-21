@@ -419,6 +419,7 @@ export class ChatRecordingService {
   private readConversation(): ConversationRecord {
     try {
       this.cachedLastConvData = fs.readFileSync(this.conversationFile!, 'utf8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return JSON.parse(this.cachedLastConvData);
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
