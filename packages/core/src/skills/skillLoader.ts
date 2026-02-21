@@ -19,6 +19,10 @@ export interface SkillDefinition {
   name: string;
   /** A concise description of what the skill does. */
   description: string;
+  /** An optional regex pattern that triggers auto-activation of this skill. */
+  matcher?: string;
+  /** Pre-compiled regex for efficient matching. */
+  compiledMatcher?: RegExp;
   /** The absolute path to the skill's source file on disk. */
   location: string;
   /** The core logic/instructions of the skill. */
@@ -38,14 +42,18 @@ export const FRONTMATTER_REGEX =
  */
 function parseFrontmatter(
   content: string,
-): { name: string; description: string } | null {
+): { name: string; description: string; matcher?: string } | null {
   try {
     const parsed = yaml.load(content);
     if (parsed && typeof parsed === 'object') {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const { name, description } = parsed as Record<string, unknown>;
+      const { name, description, matcher } = parsed as Record<string, unknown>;
       if (typeof name === 'string' && typeof description === 'string') {
-        return { name, description };
+        return {
+          name,
+          description,
+          matcher: typeof matcher === 'string' ? matcher : undefined,
+        };
       }
     }
   } catch (yamlError) {
@@ -64,10 +72,11 @@ function parseFrontmatter(
  */
 function parseSimpleFrontmatter(
   content: string,
-): { name: string; description: string } | null {
+): { name: string; description: string; matcher?: string } | null {
   const lines = content.split(/\r?\n/);
   let name: string | undefined;
   let description: string | undefined;
+  let matcher: string | undefined;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -76,6 +85,13 @@ function parseSimpleFrontmatter(
     const nameMatch = line.match(/^\s*name:\s*(.*)$/);
     if (nameMatch) {
       name = nameMatch[1].trim();
+      continue;
+    }
+
+    // Match "matcher:" at the start of the line (optional whitespace)
+    const matcherMatch = line.match(/^\s*matcher:\s*(.*)$/);
+    if (matcherMatch) {
+      matcher = matcherMatch[1].trim();
       continue;
     }
 
@@ -102,7 +118,7 @@ function parseSimpleFrontmatter(
   }
 
   if (name !== undefined && description !== undefined) {
-    return { name, description };
+    return { name, description, matcher };
   }
   return null;
 }
@@ -177,9 +193,23 @@ export async function loadSkillFromFile(
     // Sanitize name for use as a filename/directory name (e.g. replace ':' with '-')
     const sanitizedName = frontmatter.name.replace(/[:\\/<>*?"|]/g, '-');
 
+    let compiledMatcher: RegExp | undefined;
+    if (frontmatter.matcher) {
+      try {
+        compiledMatcher = new RegExp(frontmatter.matcher, 'i');
+      } catch (error) {
+        debugLogger.error(
+          `Invalid regex pattern "${frontmatter.matcher}" in skill "${sanitizedName}" at "${filePath}":`,
+          error,
+        );
+      }
+    }
+
     return {
       name: sanitizedName,
       description: frontmatter.description,
+      matcher: frontmatter.matcher,
+      compiledMatcher,
       location: filePath,
       body: match[2]?.trim() ?? '',
     };
