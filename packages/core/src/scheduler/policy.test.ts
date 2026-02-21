@@ -145,7 +145,7 @@ describe('policy.ts', () => {
   });
 
   describe('updatePolicy', () => {
-    it('should set AUTO_EDIT mode for auto-edit transition tools', async () => {
+    it('should set AUTO_EDIT mode for auto-edit transition tools and publish policy update', async () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
@@ -165,7 +165,13 @@ describe('policy.ts', () => {
       expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
         ApprovalMode.AUTO_EDIT,
       );
-      expect(mockMessageBus.publish).not.toHaveBeenCalled();
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageBusType.UPDATE_POLICY,
+          toolName: 'replace',
+          persist: false,
+        }),
+      );
     });
 
     it('should handle standard policy updates (persist=false)', async () => {
