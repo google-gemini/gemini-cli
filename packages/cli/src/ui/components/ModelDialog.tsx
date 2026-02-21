@@ -27,6 +27,7 @@ import { theme } from '../semantic-colors.js';
 import { DescriptiveRadioButtonSelect } from './shared/DescriptiveRadioButtonSelect.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
+import { QuotaStatsInfo } from './QuotaStatsInfo.js';
 
 interface ModelDialogProps {
   onClose: () => void;
@@ -46,6 +47,11 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const selectedAuthType = settings.merged.security.auth.selectedType;
   const useCustomToolModel =
     useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
+
+  // Get quota info for display - this is the core feature!
+  const quotaRemaining = config?.getQuotaRemaining?.();
+  const quotaLimit = config?.getQuotaLimit?.();
+  const quotaResetTime = config?.getQuotaResetTime?.();
 
   const manualModelSelected = useMemo(() => {
     const manualModels = [
@@ -209,17 +215,28 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
           showNumbers={true}
         />
       </Box>
-      <Box marginTop={1} flexDirection="column">
-        <Box>
-          <Text color={theme.text.primary}>
-            Remember model for future sessions:{' '}
-          </Text>
-          <Text color={theme.status.success}>
-            {persistMode ? 'true' : 'false'}
-          </Text>
+      <Box marginTop={1}>
+        <Box flexDirection="column" gap={1} marginTop={1}>
+          {(quotaRemaining !== undefined || quotaLimit !== undefined) && (
+            <Box marginBottom={1}>
+              <QuotaStatsInfo
+                remaining={quotaRemaining}
+                limit={quotaLimit}
+                resetTime={quotaResetTime}
+              />
+            </Box>
+          )}
         </Box>
-        <Text color={theme.text.secondary}>(Press Tab to toggle)</Text>
       </Box>
+      <Box>
+        <Text color={theme.text.primary}>
+          Remember model for future sessions:{' '}
+        </Text>
+        <Text color={theme.status.success}>
+          {persistMode ? 'true' : 'false'}
+        </Text>
+      </Box>
+      <Text color={theme.text.secondary}>(Press Tab to toggle)</Text>
       <Box marginTop={1} flexDirection="column">
         <Text color={theme.text.secondary}>
           {'> To use a specific Gemini model on startup, use the --model flag.'}
