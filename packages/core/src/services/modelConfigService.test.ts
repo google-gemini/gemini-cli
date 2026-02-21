@@ -5,11 +5,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type {
-  ModelConfigAlias,
-  ModelConfigServiceConfig,
+import {
+  type ModelConfigAlias,
+  type ModelConfigServiceConfig,
+  ModelConfigService,
 } from './modelConfigService.js';
-import { ModelConfigService } from './modelConfigService.js';
 
 describe('ModelConfigService', () => {
   it('should resolve a basic alias to its model and settings', () => {

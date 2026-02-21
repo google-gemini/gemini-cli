@@ -4,17 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ToolConfirmationOutcome } from '../tools/tools.js';
 import {
   BaseToolInvocation,
+  type ToolConfirmationOutcome,
   type ToolResult,
   type ToolCallConfirmationDetails,
 } from '../tools/tools.js';
-import { DEFAULT_QUERY_STRING } from './types.js';
-import type {
-  RemoteAgentInputs,
-  RemoteAgentDefinition,
-  AgentInputs,
+import {
+  DEFAULT_QUERY_STRING,
+  type RemoteAgentInputs,
+  type RemoteAgentDefinition,
+  type AgentInputs,
 } from './types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { A2AClientManager } from './a2a-client-manager.js';

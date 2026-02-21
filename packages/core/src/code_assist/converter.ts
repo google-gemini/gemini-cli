@@ -4,29 +4,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  Content,
-  ContentListUnion,
-  ContentUnion,
-  GenerateContentConfig,
-  GenerateContentParameters,
-  CountTokensParameters,
-  CountTokensResponse,
-  GenerationConfigRoutingConfig,
-  MediaResolution,
-  Candidate,
-  ModelSelectionConfig,
-  GenerateContentResponsePromptFeedback,
-  GenerateContentResponseUsageMetadata,
-  Part,
-  SafetySetting,
-  PartUnion,
-  SpeechConfigUnion,
-  ThinkingConfig,
-  ToolListUnion,
-  ToolConfig,
+import {
+  type Content,
+  type ContentListUnion,
+  type ContentUnion,
+  type GenerateContentConfig,
+  type GenerateContentParameters,
+  type CountTokensParameters,
+  type CountTokensResponse,
+  type GenerationConfigRoutingConfig,
+  type MediaResolution,
+  type Candidate,
+  type ModelSelectionConfig,
+  type GenerateContentResponsePromptFeedback,
+  type GenerateContentResponseUsageMetadata,
+  type Part,
+  type SafetySetting,
+  type PartUnion,
+  type SpeechConfigUnion,
+  type ThinkingConfig,
+  type ToolListUnion,
+  type ToolConfig,
+  GenerateContentResponse,
 } from '@google/genai';
-import { GenerateContentResponse } from '@google/genai';
 
 export interface CAGenerateContentRequest {
   model: string;

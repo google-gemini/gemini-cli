@@ -5,8 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { ReadFileToolParams } from './read-file.js';
-import { ReadFileTool } from './read-file.js';
+import { type ReadFileToolParams, ReadFileTool } from './read-file.js';
 import { ToolErrorType } from './tool-error.js';
 import path from 'node:path';
 import { isSubpath } from '../utils/paths.js';

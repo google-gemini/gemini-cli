@@ -6,8 +6,7 @@
 
 import type { Content } from '@google/genai';
 import { createHash } from 'node:crypto';
-import type { ServerGeminiStreamEvent } from '../core/turn.js';
-import { GeminiEventType } from '../core/turn.js';
+import { type ServerGeminiStreamEvent, GeminiEventType } from '../core/turn.js';
 import {
   logLoopDetected,
   logLoopDetectionDisabled,
@@ -18,6 +17,7 @@ import {
   LoopDetectionDisabledEvent,
   LoopType,
   LlmLoopCheckEvent,
+  LlmRole,
 } from '../telemetry/types.js';
 import type { Config } from '../config/config.js';
 import {
@@ -25,7 +25,6 @@ import {
   isFunctionResponse,
 } from '../utils/messageInspectors.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { LlmRole } from '../telemetry/types.js';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;

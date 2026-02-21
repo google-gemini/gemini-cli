@@ -8,14 +8,14 @@ import { expect, it, describe, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import type {
-  ConversationRecord,
-  ToolCallRecord,
-  MessageRecord,
+import {
+  type ConversationRecord,
+  type ToolCallRecord,
+  type MessageRecord,
+  ChatRecordingService,
 } from './chatRecordingService.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
 import type { Content, Part } from '@google/genai';
-import { ChatRecordingService } from './chatRecordingService.js';
 import type { Config } from '../config/config.js';
 import { getProjectHash } from '../utils/paths.js';
 

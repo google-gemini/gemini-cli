@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { LogRecord } from '@opentelemetry/api-logs';
-import { logs } from '@opentelemetry/api-logs';
+import { type LogRecord, logs } from '@opentelemetry/api-logs';
 import type { Config } from '../config/config.js';
 import { SERVICE_NAME } from './constants.js';
 import {
@@ -13,51 +12,49 @@ import {
   EVENT_API_RESPONSE,
   EVENT_TOOL_CALL,
   EVENT_REWIND,
-} from './types.js';
-import type {
-  ApiErrorEvent,
-  ApiRequestEvent,
-  ApiResponseEvent,
-  FileOperationEvent,
-  IdeConnectionEvent,
-  StartSessionEvent,
-  ToolCallEvent,
-  UserPromptEvent,
-  FlashFallbackEvent,
-  NextSpeakerCheckEvent,
-  LoopDetectedEvent,
-  LoopDetectionDisabledEvent,
-  SlashCommandEvent,
-  RewindEvent,
-  ConversationFinishedEvent,
-  ChatCompressionEvent,
-  MalformedJsonResponseEvent,
-  ContentRetryEvent,
-  ContentRetryFailureEvent,
-  RipgrepFallbackEvent,
-  ToolOutputTruncatedEvent,
-  ModelRoutingEvent,
-  ExtensionDisableEvent,
-  ExtensionEnableEvent,
-  ExtensionUninstallEvent,
-  ExtensionInstallEvent,
-  ModelSlashCommandEvent,
-  EditStrategyEvent,
-  EditCorrectionEvent,
-  AgentStartEvent,
-  AgentFinishEvent,
-  RecoveryAttemptEvent,
-  WebFetchFallbackAttemptEvent,
-  ExtensionUpdateEvent,
-  ApprovalModeSwitchEvent,
-  ApprovalModeDurationEvent,
-  HookCallEvent,
-  StartupStatsEvent,
-  LlmLoopCheckEvent,
-  PlanExecutionEvent,
-  ToolOutputMaskingEvent,
-  KeychainAvailabilityEvent,
-  TokenStorageInitializationEvent,
+  type ApiErrorEvent,
+  type ApiRequestEvent,
+  type ApiResponseEvent,
+  type FileOperationEvent,
+  type IdeConnectionEvent,
+  type StartSessionEvent,
+  type ToolCallEvent,
+  type UserPromptEvent,
+  type FlashFallbackEvent,
+  type NextSpeakerCheckEvent,
+  type LoopDetectedEvent,
+  type LoopDetectionDisabledEvent,
+  type SlashCommandEvent,
+  type RewindEvent,
+  type ConversationFinishedEvent,
+  type ChatCompressionEvent,
+  type MalformedJsonResponseEvent,
+  type ContentRetryEvent,
+  type ContentRetryFailureEvent,
+  type RipgrepFallbackEvent,
+  type ToolOutputTruncatedEvent,
+  type ModelRoutingEvent,
+  type ExtensionDisableEvent,
+  type ExtensionEnableEvent,
+  type ExtensionUninstallEvent,
+  type ExtensionInstallEvent,
+  type ModelSlashCommandEvent,
+  type EditStrategyEvent,
+  type EditCorrectionEvent,
+  type AgentStartEvent,
+  type AgentFinishEvent,
+  type RecoveryAttemptEvent,
+  type WebFetchFallbackAttemptEvent,
+  type ExtensionUpdateEvent,
+  type ApprovalModeSwitchEvent,
+  type ApprovalModeDurationEvent,
+  type HookCallEvent,
+  type StartupStatsEvent,
+  type LlmLoopCheckEvent,
+  type PlanExecutionEvent,
+  type ToolOutputMaskingEvent,
+  type KeychainAvailabilityEvent,
+  type TokenStorageInitializationEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -80,8 +77,7 @@ import {
   recordTokenStorageInitialization,
 } from './metrics.js';
 import { bufferTelemetryEvent } from './sdk.js';
-import type { UiEvent } from './uiTelemetry.js';
-import { uiTelemetryService } from './uiTelemetry.js';
+import { type UiEvent, uiTelemetryService } from './uiTelemetry.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 import { debugLogger } from '../utils/debugLogger.js';
 

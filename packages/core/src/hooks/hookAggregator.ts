@@ -5,20 +5,18 @@
  */
 
 import { FunctionCallingConfigMode } from '@google/genai';
-import type {
-  HookOutput,
-  HookExecutionResult,
-  BeforeToolSelectionOutput,
-} from './types.js';
 import {
+  type HookOutput,
+  type HookExecutionResult,
+  type BeforeToolSelectionOutput,
   DefaultHookOutput,
   BeforeToolHookOutput,
   BeforeModelHookOutput,
   BeforeToolSelectionHookOutput,
   AfterModelHookOutput,
   AfterAgentHookOutput,
+  HookEventName,
 } from './types.js';
-import { HookEventName } from './types.js';
 
 /**
  * Aggregated hook result

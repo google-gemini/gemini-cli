@@ -13,16 +13,19 @@ import {
   vi,
   type Mocked,
 } from 'vitest';
-import type { WriteFileToolParams } from './write-file.js';
-import { getCorrectedFileContent, WriteFileTool } from './write-file.js';
+import {
+  type WriteFileToolParams,
+  getCorrectedFileContent,
+  WriteFileTool,
+} from './write-file.js';
 import { ToolErrorType } from './tool-error.js';
-import type {
-  FileDiff,
-  ToolEditConfirmationDetails,
-  ToolInvocation,
-  ToolResult,
+import {
+  type FileDiff,
+  type ToolEditConfirmationDetails,
+  type ToolInvocation,
+  type ToolResult,
+  ToolConfirmationOutcome,
 } from './tools.js';
-import { ToolConfirmationOutcome } from './tools.js';
 import { type EditToolParams } from './edit.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
@@ -33,14 +36,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { GeminiClient } from '../core/client.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
-import type { CorrectedEditResult } from '../utils/editCorrector.js';
 import {
+  type CorrectedEditResult,
   ensureCorrectEdit,
   ensureCorrectFileContent,
 } from '../utils/editCorrector.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
-import type { DiffUpdateResult } from '../ide/ide-client.js';
-import { IdeClient } from '../ide/ide-client.js';
+import { type DiffUpdateResult, IdeClient } from '../ide/ide-client.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import {
   createMockMessageBus,

@@ -7,13 +7,13 @@
 import type { Config } from '../config/config.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
-import { Type } from '@google/genai';
-import type {
-  Content,
-  Part,
-  FunctionCall,
-  FunctionDeclaration,
-  Schema,
+import {
+  Type,
+  type Content,
+  type Part,
+  type FunctionCall,
+  type FunctionDeclaration,
+  type Schema,
 } from '@google/genai';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import {
@@ -36,13 +36,11 @@ import {
   RecoveryAttemptEvent,
   LlmRole,
 } from '../telemetry/types.js';
-import type {
-  LocalAgentDefinition,
-  AgentInputs,
-  OutputObject,
-  SubagentActivityEvent,
-} from './types.js';
 import {
+  type LocalAgentDefinition,
+  type AgentInputs,
+  type OutputObject,
+  type SubagentActivityEvent,
   AgentTerminateMode,
   DEFAULT_QUERY_STRING,
   DEFAULT_MAX_TURNS,

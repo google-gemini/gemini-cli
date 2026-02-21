@@ -10,7 +10,6 @@ import * as nodePath from 'node:path';
 import * as os from 'node:os';
 import { getFolderStructure } from './getFolderStructure.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import * as path from 'node:path';
 import { GEMINI_DIR } from './paths.js';
 import { GEMINI_IGNORE_FILE_NAME } from 'src/config/constants.js';
 
@@ -18,20 +17,20 @@ describe('getFolderStructure', () => {
   let testRootDir: string;
 
   async function createEmptyDir(...pathSegments: string[]) {
-    const fullPath = path.join(testRootDir, ...pathSegments);
+    const fullPath = nodePath.join(testRootDir, ...pathSegments);
     await fsPromises.mkdir(fullPath, { recursive: true });
   }
 
   async function createTestFile(...pathSegments: string[]) {
-    const fullPath = path.join(testRootDir, ...pathSegments);
-    await fsPromises.mkdir(path.dirname(fullPath), { recursive: true });
+    const fullPath = nodePath.join(testRootDir, ...pathSegments);
+    await fsPromises.mkdir(nodePath.dirname(fullPath), { recursive: true });
     await fsPromises.writeFile(fullPath, '');
     return fullPath;
   }
 
   beforeEach(async () => {
     testRootDir = await fsPromises.mkdtemp(
-      path.join(os.tmpdir(), 'folder-structure-test-'),
+      nodePath.join(os.tmpdir(), 'folder-structure-test-'),
     );
   });
 
@@ -49,10 +48,10 @@ describe('getFolderStructure', () => {
       `
 Showing up to 200 items (files + folders).
 
-${testRootDir}${path.sep}
+${testRootDir}${nodePath.sep}
 ├───fileA1.ts
 ├───fileA2.js
-└───subfolderB${path.sep}
+└───subfolderB${nodePath.sep}
     └───fileB1.md
 `.trim(),
     );
@@ -64,7 +63,7 @@ ${testRootDir}${path.sep}
       `
 Showing up to 200 items (files + folders).
 
-${testRootDir}${path.sep}
+${testRootDir}${nodePath.sep}
 `
         .trim()
         .trim(),
@@ -85,15 +84,15 @@ ${testRootDir}${path.sep}
       `
 Showing up to 200 items (files + folders). Folders or files indicated with ... contain more items not shown, were ignored, or the display limit (200 items) was reached.
 
-${testRootDir}${path.sep}
+${testRootDir}${nodePath.sep}
 ├───.hiddenfile
 ├───file1.txt
-├───emptyFolder${path.sep}
-├───node_modules${path.sep}...
-└───subfolderA${path.sep}
+├───emptyFolder${nodePath.sep}
+├───node_modules${nodePath.sep}...
+└───subfolderA${nodePath.sep}
     ├───fileA1.ts
     ├───fileA2.js
-    └───subfolderB${path.sep}
+    └───subfolderB${nodePath.sep}
         └───fileB1.md
 `.trim(),
     );
@@ -112,12 +111,12 @@ ${testRootDir}${path.sep}
     const expected = `
 Showing up to 200 items (files + folders). Folders or files indicated with ... contain more items not shown, were ignored, or the display limit (200 items) was reached.
 
-${testRootDir}${path.sep}
+${testRootDir}${nodePath.sep}
 ├───.hiddenfile
 ├───file1.txt
-├───emptyFolder${path.sep}
-├───node_modules${path.sep}...
-└───subfolderA${path.sep}...
+├───emptyFolder${nodePath.sep}
+├───node_modules${nodePath.sep}...
+└───subfolderA${nodePath.sep}...
 `.trim();
     expect(structure.trim()).toBe(expected);
   });
@@ -133,9 +132,9 @@ ${testRootDir}${path.sep}
     const expected = `
 Showing up to 200 items (files + folders).
 
-${testRootDir}${path.sep}
+${testRootDir}${nodePath.sep}
 ├───fileA1.ts
-└───subfolderB${path.sep}
+└───subfolderB${nodePath.sep}
 `.trim();
     expect(structure.trim()).toBe(expected);
   });
@@ -151,10 +150,10 @@ ${testRootDir}${path.sep}
     const expected = `
 Showing up to 3 items (files + folders).
 
-${testRootDir}${path.sep}
+${testRootDir}${nodePath.sep}
 ├───fileA1.ts
 ├───fileA2.js
-└───subfolderB${path.sep}
+└───subfolderB${nodePath.sep}
 `.trim();
     expect(structure.trim()).toBe(expected);
   });
@@ -170,11 +169,11 @@ ${testRootDir}${path.sep}
     const expectedRevised = `
 Showing up to 4 items (files + folders). Folders or files indicated with ... contain more items not shown, were ignored, or the display limit (4 items) was reached.
 
-${testRootDir}${path.sep}
-├───folder-0${path.sep}
-├───folder-1${path.sep}
-├───folder-2${path.sep}
-├───folder-3${path.sep}
+${testRootDir}${nodePath.sep}
+├───folder-0${nodePath.sep}
+├───folder-1${nodePath.sep}
+├───folder-2${nodePath.sep}
+├───folder-3${nodePath.sep}
 └───...
 `.trim();
     expect(structure.trim()).toBe(expectedRevised);
@@ -191,7 +190,7 @@ ${testRootDir}${path.sep}
     const expected = `
 Showing up to 1 items (files + folders). Folders or files indicated with ... contain more items not shown, were ignored, or the display limit (1 items) was reached.
 
-${testRootDir}${path.sep}
+${testRootDir}${nodePath.sep}
 ├───fileA1.ts
 ├───...
 └───...
@@ -200,7 +199,7 @@ ${testRootDir}${path.sep}
   });
 
   it('should handle non-existent directory', async () => {
-    const nonExistentPath = path.join(testRootDir, 'non-existent');
+    const nonExistentPath = nodePath.join(testRootDir, 'non-existent');
     const structure = await getFolderStructure(nonExistentPath);
     expect(structure).toContain(
       `Error: Could not read directory "${nonExistentPath}". Check path and permissions.`,
@@ -216,10 +215,10 @@ ${testRootDir}${path.sep}
     const expected = `
 Showing up to 10 items (files + folders).
 
-${testRootDir}${path.sep}
-└───level1${path.sep}
-    └───level2${path.sep}
-        └───level3${path.sep}
+${testRootDir}${nodePath.sep}
+└───level1${nodePath.sep}
+    └───level2${nodePath.sep}
+        └───level3${nodePath.sep}
             └───file.txt
 `.trim();
     expect(structure.trim()).toBe(expected);
@@ -234,17 +233,17 @@ ${testRootDir}${path.sep}
     const expected = `
 Showing up to 3 items (files + folders).
 
-${testRootDir}${path.sep}
-└───level1${path.sep}
-    └───level2${path.sep}
-        └───level3${path.sep}
+${testRootDir}${nodePath.sep}
+└───level1${nodePath.sep}
+    └───level2${nodePath.sep}
+        └───level3${nodePath.sep}
 `.trim();
     expect(structure.trim()).toBe(expected);
   });
 
   describe('with gitignore', () => {
     beforeEach(async () => {
-      await fsPromises.mkdir(path.join(testRootDir, '.git'), {
+      await fsPromises.mkdir(nodePath.join(testRootDir, '.git'), {
         recursive: true,
       });
     });
@@ -266,7 +265,7 @@ ${testRootDir}${path.sep}
       });
 
       expect(structure).not.toContain('ignored.txt');
-      expect(structure).toContain(`node_modules${path.sep}...`);
+      expect(structure).toContain(`node_modules${nodePath.sep}...`);
       expect(structure).not.toContain('logs.json');
       expect(structure).toContain('config.yaml');
       expect(structure).toContain('file1.txt');
@@ -312,7 +311,7 @@ ${testRootDir}${path.sep}
         fileService,
       });
       expect(structure).not.toContain('ignored.txt');
-      expect(structure).toContain(`node_modules${path.sep}...`);
+      expect(structure).toContain(`node_modules${nodePath.sep}...`);
       expect(structure).not.toContain('logs.json');
     });
 
@@ -338,7 +337,7 @@ ${testRootDir}${path.sep}
       });
       expect(structure).toContain('ignored.txt');
       // node_modules is still ignored by default
-      expect(structure).toContain(`node_modules${path.sep}...`);
+      expect(structure).toContain(`node_modules${nodePath.sep}...`);
     });
   });
 });

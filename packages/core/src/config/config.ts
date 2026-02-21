@@ -9,14 +9,12 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { inspect } from 'node:util';
 import process from 'node:process';
-import type {
-  ContentGenerator,
-  ContentGeneratorConfig,
-} from '../core/contentGenerator.js';
 import {
   AuthType,
   createContentGenerator,
   createContentGeneratorConfig,
+  type ContentGenerator,
+  type ContentGeneratorConfig,
 } from '../core/contentGenerator.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
@@ -41,12 +39,12 @@ import { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
-import type { TelemetryTarget } from '../telemetry/index.js';
 import {
   initializeTelemetry,
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
   uiTelemetryService,
+  type TelemetryTarget,
 } from '../telemetry/index.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import { tokenLimit } from '../core/tokenLimits.js';
@@ -66,9 +64,16 @@ import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
-import type { FileSystemService } from '../services/fileSystemService.js';
-import { StandardFileSystemService } from '../services/fileSystemService.js';
-import { logRipgrepFallback, logFlashFallback } from '../telemetry/loggers.js';
+import {
+  StandardFileSystemService,
+  type FileSystemService,
+} from '../services/fileSystemService.js';
+import {
+  logRipgrepFallback,
+  logFlashFallback,
+  logApprovalModeSwitch,
+  logApprovalModeDuration,
+} from '../telemetry/loggers.js';
 import {
   RipgrepFallbackEvent,
   FlashFallbackEvent,
@@ -82,11 +87,11 @@ import type {
 import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
 import { OutputFormat } from '../output/types.js';
-import type {
-  ModelConfig,
-  ModelConfigServiceConfig,
+import {
+  ModelConfigService,
+  type ModelConfig,
+  type ModelConfigServiceConfig,
 } from '../services/modelConfigService.js';
-import { ModelConfigService } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import { ContextManager } from '../services/contextManager.js';
 import type { GenerateContentParameters } from '@google/genai';
@@ -103,26 +108,26 @@ import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
-import type { UserTierId } from '../code_assist/types.js';
-import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
-import type { AdminControlsSettings } from '../code_assist/types.js';
+import type {
+  UserTierId,
+  RetrieveUserQuotaResponse,
+  AdminControlsSettings,
+} from '../code_assist/types.js';
 import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
-import type { Experiments } from '../code_assist/experiments/experiments.js';
+import {
+  getExperiments,
+  type Experiments,
+} from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { AcknowledgedAgentsService } from '../agents/acknowledgedAgents.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentTool } from '../agents/subagent-tool.js';
-import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
-import {
-  logApprovalModeSwitch,
-  logApprovalModeDuration,
-} from '../telemetry/loggers.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath } from '../utils/paths.js';
 import { UserHintService } from './userHintService.js';
@@ -288,10 +293,10 @@ export interface ExtensionInstallMetadata {
   allowPreRelease?: boolean;
 }
 
-import type { FileFilteringOptions } from './constants.js';
 import {
   DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+  type FileFilteringOptions,
 } from './constants.js';
 import {
   DEFAULT_TOOL_PROTECTION_THRESHOLD,

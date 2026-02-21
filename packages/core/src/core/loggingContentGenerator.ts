@@ -16,8 +16,8 @@ import type {
   GenerateContentResponseUsageMetadata,
   GenerateContentResponse,
 } from '@google/genai';
-import type { ServerDetails } from '../telemetry/types.js';
 import {
+  type ServerDetails,
   ApiRequestEvent,
   ApiResponseEvent,
   ApiErrorEvent,

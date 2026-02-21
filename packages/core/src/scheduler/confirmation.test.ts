@@ -28,8 +28,11 @@ import {
 } from '../tools/tools.js';
 import type { SchedulerStateManager } from './state-manager.js';
 import type { ToolModificationHandler } from './tool-modifier.js';
-import type { ValidatingToolCall, WaitingToolCall } from './types.js';
-import { ROOT_SCHEDULER_ID } from './types.js';
+import {
+  type ValidatingToolCall,
+  type WaitingToolCall,
+  ROOT_SCHEDULER_ID,
+} from './types.js';
 import type { Config } from '../config/config.js';
 import { type EditorType } from '../utils/editor.js';
 import { randomUUID } from 'node:crypto';

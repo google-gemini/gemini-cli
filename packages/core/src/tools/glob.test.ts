@@ -4,8 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { GlobToolParams, GlobPath } from './glob.js';
-import { GlobTool, sortFileEntries } from './glob.js';
+import {
+  type GlobToolParams,
+  type GlobPath,
+  GlobTool,
+  sortFileEntries,
+} from './glob.js';
 import { partListUnionToString } from '../core/geminiRequest.js';
 import path from 'node:path';
 import { isSubpath } from '../utils/paths.js';

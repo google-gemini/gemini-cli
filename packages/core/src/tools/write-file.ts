@@ -13,18 +13,16 @@ import { WRITE_FILE_TOOL_NAME, WRITE_FILE_DISPLAY_NAME } from './tool-names.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 
-import type {
-  FileDiff,
-  ToolCallConfirmationDetails,
-  ToolEditConfirmationDetails,
-  ToolInvocation,
-  ToolLocation,
-  ToolResult,
-} from './tools.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
+  type FileDiff,
+  type ToolCallConfirmationDetails,
+  type ToolEditConfirmationDetails,
+  type ToolInvocation,
+  type ToolLocation,
+  type ToolResult,
   type ToolConfirmationOutcome,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';

@@ -67,18 +67,19 @@ import {
   type AnyDeclarativeTool,
   type AnyToolInvocation,
 } from '../tools/tools.js';
-import type {
-  ToolCallRequestInfo,
-  ValidatingToolCall,
-  SuccessfulToolCall,
-  ErroredToolCall,
-  CancelledToolCall,
-  CompletedToolCall,
-  ToolCallResponseInfo,
-  Status,
-  ToolCall,
+import {
+  type ToolCallRequestInfo,
+  type ValidatingToolCall,
+  type SuccessfulToolCall,
+  type ErroredToolCall,
+  type CancelledToolCall,
+  type CompletedToolCall,
+  type ToolCallResponseInfo,
+  type Status,
+  type ToolCall,
+  CoreToolCallStatus,
+  ROOT_SCHEDULER_ID,
 } from './types.js';
-import { CoreToolCallStatus, ROOT_SCHEDULER_ID } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import * as ToolUtils from '../utils/tool-utils.js';
 import type { EditorType } from '../utils/editor.js';

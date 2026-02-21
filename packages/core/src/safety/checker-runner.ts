@@ -11,8 +11,11 @@ import type {
   InProcessCheckerConfig,
   ExternalCheckerConfig,
 } from '../policy/types.js';
-import type { SafetyCheckInput, SafetyCheckResult } from './protocol.js';
-import { SafetyCheckDecision } from './protocol.js';
+import {
+  type SafetyCheckInput,
+  type SafetyCheckResult,
+  SafetyCheckDecision,
+} from './protocol.js';
 import type { CheckerRegistry } from './registry.js';
 import type { ContextBuilder } from './context-builder.js';
 import { z } from 'zod';

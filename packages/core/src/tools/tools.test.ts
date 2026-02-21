@@ -5,8 +5,13 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import type { ToolInvocation, ToolResult } from './tools.js';
-import { DeclarativeTool, hasCycleInSchema, Kind } from './tools.js';
+import {
+  type ToolInvocation,
+  type ToolResult,
+  DeclarativeTool,
+  hasCycleInSchema,
+  Kind,
+} from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { ReadFileTool } from './read-file.js';

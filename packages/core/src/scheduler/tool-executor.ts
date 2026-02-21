@@ -4,14 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ToolCallRequestInfo,
-  ToolCallResponseInfo,
-  ToolResult,
-  Config,
-  AnsiOutput,
-} from '../index.js';
 import {
+  type ToolCallRequestInfo,
+  type ToolCallResponseInfo,
+  type ToolResult,
+  type Config,
+  type AnsiOutput,
   ToolErrorType,
   ToolOutputTruncatedEvent,
   logToolOutputTruncated,
@@ -25,15 +23,15 @@ import {
   formatTruncatedToolOutput,
 } from '../utils/fileUtils.js';
 import { convertToFunctionResponse } from '../utils/generateContentResponseUtilities.js';
-import type {
-  CompletedToolCall,
-  ToolCall,
-  ExecutingToolCall,
-  ErroredToolCall,
-  SuccessfulToolCall,
-  CancelledToolCall,
+import {
+  type CompletedToolCall,
+  type ToolCall,
+  type ExecutingToolCall,
+  type ErroredToolCall,
+  type SuccessfulToolCall,
+  type CancelledToolCall,
+  CoreToolCallStatus,
 } from './types.js';
-import { CoreToolCallStatus } from './types.js';
 
 export interface ToolExecutionContext {
   call: ToolCall;

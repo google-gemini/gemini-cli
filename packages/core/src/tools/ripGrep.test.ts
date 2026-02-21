@@ -13,8 +13,12 @@ import {
   afterAll,
   vi,
 } from 'vitest';
-import type { RipGrepToolParams } from './ripGrep.js';
-import { canUseRipgrep, RipGrepTool, ensureRgPath } from './ripGrep.js';
+import {
+  type RipGrepToolParams,
+  canUseRipgrep,
+  RipGrepTool,
+  ensureRgPath,
+} from './ripGrep.js';
 import path from 'node:path';
 import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
@@ -23,8 +27,7 @@ import type { Config } from '../config/config.js';
 import { Storage } from '../config/storage.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
-import type { ChildProcess } from 'node:child_process';
-import { spawn } from 'node:child_process';
+import { type ChildProcess, spawn } from 'node:child_process';
 import { PassThrough, Readable } from 'node:stream';
 import EventEmitter from 'node:events';
 import { downloadRipGrep } from '@joshua.litt/get-ripgrep';

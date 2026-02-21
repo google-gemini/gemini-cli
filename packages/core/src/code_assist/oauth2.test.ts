@@ -4,9 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Credentials } from 'google-auth-library';
-import type { Mock } from 'vitest';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  type Credentials,
+  OAuth2Client,
+  Compute,
+  GoogleAuth,
+} from 'google-auth-library';
+import {
+  type Mock,
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+} from 'vitest';
 import {
   getOauthClient,
   resetOauthClientForTesting,
@@ -15,7 +27,6 @@ import {
   authEvents,
 } from './oauth2.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
-import { OAuth2Client, Compute, GoogleAuth } from 'google-auth-library';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import http from 'node:http';

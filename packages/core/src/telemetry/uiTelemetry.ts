@@ -9,16 +9,13 @@ import {
   EVENT_API_ERROR,
   EVENT_API_RESPONSE,
   EVENT_TOOL_CALL,
+  type ApiErrorEvent,
+  type ApiResponseEvent,
+  type ToolCallEvent,
+  type LlmRole,
 } from './types.js';
 
 import { ToolCallDecision } from './tool-call-decision.js';
-import type {
-  ApiErrorEvent,
-  ApiResponseEvent,
-  ToolCallEvent,
-} from './types.js';
-
-import type { LlmRole } from './types.js';
 
 export type UiEvent =
   | (ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE })
