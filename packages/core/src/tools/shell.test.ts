@@ -42,7 +42,7 @@ vi.mock('crypto');
 vi.mock('../utils/summarizer.js');
 
 import { initializeShellParsers } from '../utils/shell-utils.js';
-import { ShellTool } from './shell.js';
+import { ShellTool, OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
 import { debugLogger } from '../index.js';
 import { type Config } from '../config/config.js';
 import {
@@ -58,7 +58,6 @@ import * as crypto from 'node:crypto';
 import * as summarizer from '../utils/summarizer.js';
 import { ToolErrorType } from './tool-error.js';
 import { ToolConfirmationOutcome } from './tools.js';
-import { OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import {
@@ -775,6 +774,22 @@ describe('ShellTool', () => {
   });
 
   describe('getConfirmationDetails', () => {
+    it('should deduplicate root commands in confirmation details', async () => {
+      const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+      const command = 'git status && git diff && git log';
+      const invocation = shellTool.build({ command });
+
+      // @ts-expect-error - getConfirmationDetails is protected
+      const details = await invocation.getConfirmationDetails(
+        new AbortController().signal,
+      );
+
+      expect(details).not.toBe(false);
+      if (details && details.type === 'exec') {
+        expect(details.rootCommand).toBe('git');
+      }
+    });
+
     it('should annotate sub-commands with redirection correctly', async () => {
       const shellTool = new ShellTool(mockConfig, createMockMessageBus());
       const command = 'mkdir -p baz && echo "hello" > baz/test.md && ls';
