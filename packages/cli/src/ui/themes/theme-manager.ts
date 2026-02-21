@@ -20,9 +20,18 @@ import { SolarizedLight } from './solarized-light.js';
 import { XCode } from './xcode.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { Theme, ThemeType, ColorsTheme } from './theme.js';
-import type { CustomTheme } from '@google/gemini-cli-core';
-import { createCustomTheme, validateCustomTheme } from './theme.js';
+import {
+  type Theme,
+  type ThemeType,
+  type ColorsTheme,
+  createCustomTheme,
+  validateCustomTheme,
+} from './theme.js';
+import {
+  type CustomTheme,
+  debugLogger,
+  homedir,
+} from '@google/gemini-cli-core';
 import type { SemanticColors } from './semantic-tokens.js';
 import {
   interpolateColor,
@@ -34,7 +43,6 @@ import { ANSI } from './ansi.js';
 import { ANSILight } from './ansi-light.js';
 import { NoColorTheme } from './no-color.js';
 import process from 'node:process';
-import { debugLogger, homedir } from '@google/gemini-cli-core';
 
 export interface ThemeDisplay {
   name: string;

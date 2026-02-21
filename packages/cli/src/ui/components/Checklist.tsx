@@ -5,9 +5,9 @@
  */
 
 import type React from 'react';
+import { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { useMemo } from 'react';
 import { ChecklistItem, type ChecklistItemData } from './ChecklistItem.js';
 
 export interface ChecklistProps {

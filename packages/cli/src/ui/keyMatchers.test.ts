@@ -6,8 +6,10 @@
 
 import { describe, it, expect } from 'vitest';
 import { keyMatchers, Command, createKeyMatchers } from './keyMatchers.js';
-import type { KeyBindingConfig } from '../config/keyBindings.js';
-import { defaultKeyBindings } from '../config/keyBindings.js';
+import {
+  type KeyBindingConfig,
+  defaultKeyBindings,
+} from '../config/keyBindings.js';
 import type { Key } from './hooks/useKeypress.js';
 
 describe('keyMatchers', () => {

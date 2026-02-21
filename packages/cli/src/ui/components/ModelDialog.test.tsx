@@ -20,8 +20,9 @@ import {
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   AuthType,
+  type Config,
+  type ModelSlashCommandEvent,
 } from '@google/gemini-cli-core';
-import type { Config, ModelSlashCommandEvent } from '@google/gemini-cli-core';
 
 // Mock dependencies
 const mockGetDisplayString = vi.fn();

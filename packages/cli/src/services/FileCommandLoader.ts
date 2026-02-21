@@ -9,21 +9,18 @@ import path from 'node:path';
 import toml from '@iarna/toml';
 import { glob } from 'glob';
 import { z } from 'zod';
-import type { Config } from '@google/gemini-cli-core';
-import { Storage, coreEvents } from '@google/gemini-cli-core';
+import { type Config, Storage, coreEvents } from '@google/gemini-cli-core';
 import type { ICommandLoader } from './types.js';
-import type {
-  CommandContext,
-  SlashCommand,
-  SlashCommandActionReturn,
-} from '../ui/commands/types.js';
-import { CommandKind } from '../ui/commands/types.js';
-import { DefaultArgumentProcessor } from './prompt-processors/argumentProcessor.js';
-import type {
-  IPromptProcessor,
-  PromptPipelineContent,
-} from './prompt-processors/types.js';
 import {
+  type CommandContext,
+  type SlashCommand,
+  type SlashCommandActionReturn,
+  CommandKind,
+} from '../ui/commands/types.js';
+import { DefaultArgumentProcessor } from './prompt-processors/argumentProcessor.js';
+import {
+  type IPromptProcessor,
+  type PromptPipelineContent,
   SHORTHAND_ARGS_PLACEHOLDER,
   SHELL_INJECTION_TRIGGER,
   AT_FILE_INJECTION_TRIGGER,

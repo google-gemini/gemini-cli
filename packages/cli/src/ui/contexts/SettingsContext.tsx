@@ -5,13 +5,13 @@
  */
 
 import React, { useContext, useMemo, useSyncExternalStore } from 'react';
-import type {
-  LoadableSettingScope,
-  LoadedSettings,
-  LoadedSettingsSnapshot,
-  SettingsFile,
+import {
+  type LoadableSettingScope,
+  type LoadedSettings,
+  type LoadedSettingsSnapshot,
+  type SettingsFile,
+  SettingScope,
 } from '../../config/settings.js';
-import { SettingScope } from '../../config/settings.js';
 
 export const SettingsContext = React.createContext<LoadedSettings | undefined>(
   undefined,

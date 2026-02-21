@@ -7,8 +7,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
-import type { Config } from '@google/gemini-cli-core';
-import { debugLogger, spawnAsync, LlmRole } from '@google/gemini-cli-core';
+import {
+  type Config,
+  debugLogger,
+  spawnAsync,
+  LlmRole,
+} from '@google/gemini-cli-core';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
 import { TextInput } from '../shared/TextInput.js';

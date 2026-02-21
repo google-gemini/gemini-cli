@@ -5,8 +5,9 @@
  */
 
 import React, { useMemo } from 'react';
-import { Text, Box } from 'ink';
 import {
+  Text,
+  Box,
   type StyledChar,
   toStyledCharacters,
   styledCharsToString,

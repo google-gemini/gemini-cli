@@ -6,8 +6,7 @@
 
 /// <reference types="vitest/globals" />
 
-import type { MockInstance } from 'vitest';
-import { vi } from 'vitest';
+import { type MockInstance, vi } from 'vitest';
 import { TextOutput } from './textOutput.js';
 
 describe('TextOutput', () => {

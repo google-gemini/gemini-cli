@@ -7,8 +7,8 @@
 // File for 'gemini mcp list' command
 import type { CommandModule } from 'yargs';
 import { type MergedSettings, loadSettings } from '../../config/settings.js';
-import type { MCPServerConfig } from '@google/gemini-cli-core';
 import {
+  type MCPServerConfig,
   MCPServerStatus,
   createTransport,
   debugLogger,

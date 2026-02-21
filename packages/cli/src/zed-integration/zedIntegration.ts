@@ -4,15 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  Config,
-  GeminiChat,
-  ToolResult,
-  ToolCallConfirmationDetails,
-  FilterFilesOptions,
-  ConversationRecord,
-} from '@google/gemini-cli-core';
 import {
+  type Config,
+  type GeminiChat,
+  type ToolResult,
+  type ToolCallConfirmationDetails,
+  type FilterFilesOptions,
+  type ConversationRecord,
   CoreToolCallStatus,
   AuthType,
   logToolCall,
@@ -43,15 +41,17 @@ import { AcpFileSystemService } from './fileSystemService.js';
 import { getAcpErrorMessage } from './acpErrors.js';
 import { Readable, Writable } from 'node:stream';
 import type { Content, Part, FunctionCall } from '@google/genai';
-import type { LoadedSettings } from '../config/settings.js';
-import { SettingScope, loadSettings } from '../config/settings.js';
+import {
+  type LoadedSettings,
+  SettingScope,
+  loadSettings,
+} from '../config/settings.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
 
 import { randomUUID } from 'node:crypto';
-import type { CliArgs } from '../config/config.js';
-import { loadCliConfig } from '../config/config.js';
+import { type CliArgs, loadCliConfig } from '../config/config.js';
 import { runExitCleanup } from '../utils/cleanup.js';
 import {
   SessionSelector,

@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { TextBufferState, TextBufferAction } from './text-buffer.js';
 import {
+  type TextBufferState,
+  type TextBufferAction,
   getLineRangeOffsets,
   getPositionFromOffsets,
   replaceRangeInternal,

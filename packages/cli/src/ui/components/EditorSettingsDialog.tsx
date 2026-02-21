@@ -13,18 +13,18 @@ import {
   type EditorDisplay,
 } from '../editors/editorSettingsManager.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
-import type {
-  LoadableSettingScope,
-  LoadedSettings,
+import {
+  type LoadableSettingScope,
+  type LoadedSettings,
+  SettingScope,
 } from '../../config/settings.js';
-import { SettingScope } from '../../config/settings.js';
 import {
   type EditorType,
   isEditorAvailable,
   EDITOR_DISPLAY_NAMES,
+  coreEvents,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { coreEvents } from '@google/gemini-cli-core';
 
 interface EditorDialogProps {
   onSelect: (

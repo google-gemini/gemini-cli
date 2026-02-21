@@ -8,11 +8,11 @@ import type React from 'react';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import type {
-  LoadableSettingScope,
-  LoadedSettings,
+import {
+  type LoadableSettingScope,
+  type LoadedSettings,
+  SettingScope,
 } from '../../config/settings.js';
-import { SettingScope } from '../../config/settings.js';
 import type { AgentDefinition, AgentOverride } from '@google/gemini-cli-core';
 import { getCachedStringWidth } from '../utils/textUtils.js';
 import {

@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  SlashCommand,
-  SlashCommandActionReturn,
-  CommandContext,
-} from './types.js';
-import { CommandKind } from './types.js';
-import type { MessageActionReturn } from '@google/gemini-cli-core';
 import {
+  type SlashCommand,
+  type SlashCommandActionReturn,
+  type CommandContext,
+  CommandKind,
+} from './types.js';
+import {
+  type MessageActionReturn,
   DiscoveredMCPTool,
   getMCPDiscoveryState,
   getMCPServerStatus,

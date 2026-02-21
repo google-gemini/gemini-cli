@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  SlashCommand,
-  CommandContext,
-  SlashCommandActionReturn,
+import {
+  type SlashCommand,
+  type CommandContext,
+  type SlashCommandActionReturn,
+  CommandKind,
 } from './types.js';
-import { CommandKind } from './types.js';
 import { MessageType, type HistoryItemAgentsList } from '../types.js';
 import { SettingScope } from '../../config/settings.js';
 import { disableAgent, enableAgent } from '../../utils/agentSettings.js';

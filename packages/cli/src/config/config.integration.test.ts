@@ -17,8 +17,8 @@ import {
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { tmpdir } from 'node:os';
-import type { ConfigParameters } from '@google/gemini-cli-core';
 import {
+  type ConfigParameters,
   Config,
   DEFAULT_FILE_FILTERING_OPTIONS,
 } from '@google/gemini-cli-core';

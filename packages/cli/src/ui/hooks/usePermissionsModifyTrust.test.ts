@@ -16,9 +16,11 @@ import {
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { usePermissionsModifyTrust } from './usePermissionsModifyTrust.js';
-import { TrustLevel } from '../../config/trustedFolders.js';
+import {
+  TrustLevel,
+  type LoadedTrustedFolders,
+} from '../../config/trustedFolders.js';
 import type { LoadedSettings } from '../../config/settings.js';
-import type { LoadedTrustedFolders } from '../../config/trustedFolders.js';
 import { coreEvents } from '@google/gemini-cli-core';
 
 // Hoist mocks

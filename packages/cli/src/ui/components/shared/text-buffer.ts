@@ -30,8 +30,7 @@ import {
 import { parsePastedPaths } from '../../utils/clipboardUtils.js';
 import type { Key } from '../../contexts/KeypressContext.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
-import type { VimAction } from './vim-buffer-actions.js';
-import { handleVimAction } from './vim-buffer-actions.js';
+import { type VimAction, handleVimAction } from './vim-buffer-actions.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../../constants.js';
 
 export const LARGE_PASTE_LINE_THRESHOLD = 5;

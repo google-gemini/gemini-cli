@@ -14,12 +14,13 @@ import {
   useEffect,
 } from 'react';
 
-import type {
-  SessionMetrics,
-  ModelMetrics,
-  ToolCallStats,
+import {
+  type SessionMetrics,
+  type ModelMetrics,
+  type ToolCallStats,
+  uiTelemetryService,
+  sessionId,
 } from '@google/gemini-cli-core';
-import { uiTelemetryService, sessionId } from '@google/gemini-cli-core';
 
 export enum ToolCallDecision {
   ACCEPT = 'accept',

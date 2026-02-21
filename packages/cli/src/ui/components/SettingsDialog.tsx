@@ -10,12 +10,12 @@ import { Text } from 'ink';
 import { AsyncFzf } from 'fzf';
 import type { Key } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
-import type {
-  LoadableSettingScope,
-  LoadedSettings,
-  Settings,
+import {
+  type LoadableSettingScope,
+  type LoadedSettings,
+  type Settings,
+  SettingScope,
 } from '../../config/settings.js';
-import { SettingScope } from '../../config/settings.js';
 import { getScopeMessageForSetting } from '../../utils/dialogScopeUtils.js';
 import {
   getDialogSettingKeys,
@@ -37,8 +37,7 @@ import {
   type SettingsValue,
   TOGGLE_TYPES,
 } from '../../config/settingsSchema.js';
-import { coreEvents, debugLogger } from '@google/gemini-cli-core';
-import type { Config } from '@google/gemini-cli-core';
+import { coreEvents, debugLogger, type Config } from '@google/gemini-cli-core';
 
 import { useSearchBuffer } from '../hooks/useSearchBuffer.js';
 import {

@@ -10,8 +10,8 @@ import type {
   LoadedSettings,
 } from '../../config/settings.js';
 import { MessageType } from '../types.js';
-import type { EditorType } from '@google/gemini-cli-core';
 import {
+  type EditorType,
   allowEditorTypeInSandbox,
   hasValidEditorCommand,
   getEditorDisplayName,
