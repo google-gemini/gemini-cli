@@ -82,7 +82,7 @@ export class MCPOAuthTokenStorage implements TokenStorage {
       }
     } catch (error) {
       // File doesn't exist or is invalid, return empty map
-       
+
       if (!isErrnoException(error) || error.code !== 'ENOENT') {
         coreEvents.emitFeedback(
           'error',
@@ -237,7 +237,6 @@ export class MCPOAuthTokenStorage implements TokenStorage {
       const tokenFile = this.getTokenFilePath();
       await fs.unlink(tokenFile);
     } catch (error) {
-       
       if (!isErrnoException(error) || error.code !== 'ENOENT') {
         coreEvents.emitFeedback(
           'error',
