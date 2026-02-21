@@ -266,15 +266,34 @@ When creating a new skill from scratch, always run the `init_skill.cjs` script. 
 
 **Note:** Use the absolute path to the script as provided in the `available_resources` section.
 
+#### Choose Skill Location
+
+Before initializing, ask the user where they want the skill created:
+
+**Option 1: Local development (recommended for iteration)**
+- Creates skill in `.gemini/skills/` directory
+- Enables rapid testing with `/skills reload` command
+- Best for: Inner loop development, data analysis workflows, iterating on skill behavior
+- After creation, use `/skills reload` to test immediately without packaging
+
+**Option 2: Package for distribution**
+- Creates skill in a specified directory for packaging
+- Requires packaging step before use
+- Best for: Skills intended for sharing, distribution, or version control
+
 Usage:
 
 ```bash
+# For local development (Option 1)
+node <path-to-skill-creator>/scripts/init_skill.cjs <skill-name> --local
+
+# For packaging/distribution (Option 2)
 node <path-to-skill-creator>/scripts/init_skill.cjs <skill-name> --path <output-directory>
 ```
 
 The script:
 
-- Creates the skill directory at the specified path
+- Creates the skill directory at the specified location
 - Generates a SKILL.md template with proper frontmatter and TODO placeholders
 - Creates example resource directories: `scripts/`, `references/`, and `assets/`
 - Adds example files (`scripts/example_script.cjs`, `references/example_reference.md`, `assets/example_asset.txt`) that can be customized or deleted
@@ -323,9 +342,11 @@ Do not include any other fields in YAML frontmatter.
 
 Write instructions for using the skill and its bundled resources.
 
-### Step 5: Packaging a Skill
+### Step 5: Packaging a Skill (for distribution only)
 
-Once development of the skill is complete, it must be packaged into a distributable .skill file that gets shared with the user. The packaging process automatically validates the skill first (checking YAML and ensuring no TODOs remain) to ensure it meets all requirements:
+**Skip this step if the skill was created with `--local` flag.** Local skills in `.gemini/skills/` are immediately available after running `/skills reload` and do not need packaging.
+
+For skills intended for distribution, package them into a distributable .skill file. The packaging process automatically validates the skill first (checking YAML and ensuring no TODOs remain) to ensure it meets all requirements:
 
 **Note:** Use the absolute path to the script as provided in the `available_resources` section.
 
@@ -351,7 +372,19 @@ The packaging script will:
 
 If validation fails, the script will report the errors and exit without creating a package. Fix any validation errors and run the packaging command again.
 
-### Step 6: Installing and Reloading a Skill
+### Step 6: Enabling the Skill
+
+The process for enabling a skill depends on how it was created:
+
+#### For Local Skills (created with `--local`)
+
+Local skills in `.gemini/skills/` are immediately available after reloading:
+
+**Important:** Notify the user that they MUST manually execute the `/skills reload` command in their interactive Gemini CLI session to enable the skill. They can then verify by running `/skills list`.
+
+Note: You (the agent) cannot execute the `/skills reload` command yourself; it must be done by the user in an interactive instance of Gemini CLI. Do not attempt to run it on their behalf.
+
+#### For Packaged Skills (created with `--path`)
 
 Once the skill is packaged into a `.skill` file, offer to install it for the user. Ask whether they would like to install it locally in the current folder (workspace scope) or at the user level (user scope).
 

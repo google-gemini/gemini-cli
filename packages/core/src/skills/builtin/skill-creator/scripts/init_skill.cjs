@@ -11,9 +11,15 @@
  *
  * Usage:
  *     node init_skill.cjs <skill-name> --path <path>
+ *     node init_skill.cjs <skill-name> --local
  *
  * Examples:
  *     node init_skill.cjs my-new-skill --path skills/public
+ *     node init_skill.cjs my-new-skill --local
+ *
+ * Flags:
+ *     --path <path>   Create skill at specified path (for packaging/distribution)
+ *     --local         Create skill in .gemini/skills/ (for local development/testing)
  */
 
 const fs = require('node:fs');
@@ -169,13 +175,39 @@ function titleCase(name) {
 
 async function main() {
   const args = process.argv.slice(2);
-  if (args.length < 3 || args[1] !== '--path') {
+  
+  if (args.length < 2) {
     console.log('Usage: node init_skill.cjs <skill-name> --path <path>');
+    console.log('   or: node init_skill.cjs <skill-name> --local');
     process.exit(1);
   }
 
   const skillName = args[0];
-  const basePath = path.resolve(args[2]);
+  const flag = args[1];
+  
+  let basePath;
+  
+  if (flag === '--local') {
+    // Create in .gemini/skills/ directory relative to current working directory
+    basePath = path.resolve(process.cwd(), '.gemini', 'skills');
+    
+    // Ensure .gemini/skills directory exists
+    if (!fs.existsSync(basePath)) {
+      fs.mkdirSync(basePath, { recursive: true });
+    }
+  } else if (flag === '--path') {
+    if (args.length < 3) {
+      console.error('❌ Error: --path requires a directory argument');
+      console.log('Usage: node init_skill.cjs <skill-name> --path <path>');
+      process.exit(1);
+    }
+    basePath = path.resolve(args[2]);
+  } else {
+    console.error(`❌ Error: Unknown flag '${flag}'`);
+    console.log('Usage: node init_skill.cjs <skill-name> --path <path>');
+    console.log('   or: node init_skill.cjs <skill-name> --local');
+    process.exit(1);
+  }
 
   // Prevent path traversal
   if (
