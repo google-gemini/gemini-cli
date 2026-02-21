@@ -29,21 +29,7 @@ function isHeaderRecord(
 }
 
 function isBufferEncoding(value: unknown): value is BufferEncoding {
-  if (typeof value !== 'string') return false;
-  const normalized = value.toLowerCase();
-  return (
-    normalized === 'ascii' ||
-    normalized === 'utf8' ||
-    normalized === 'utf-8' ||
-    normalized === 'utf16le' ||
-    normalized === 'ucs2' ||
-    normalized === 'ucs-2' ||
-    normalized === 'base64' ||
-    normalized === 'base64url' ||
-    normalized === 'latin1' ||
-    normalized === 'binary' ||
-    normalized === 'hex'
-  );
+  return typeof value === 'string' && Buffer.isEncoding(value);
 }
 
 function isRequestOptions(value: unknown): value is http.RequestOptions {
@@ -515,7 +501,8 @@ export class ActivityLogger extends EventEmitter {
                   ),
           );
         }
-        return Function.prototype.apply.call(oldWrite, this, [chunk, ...etc]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-return
+        return (oldWrite as any).apply(this, [chunk, ...etc]);
       };
 
       req.end = function (
@@ -620,16 +607,22 @@ export class ActivityLogger extends EventEmitter {
     };
 
     Object.defineProperty(http, 'request', {
-      value: (...args: unknown[]) =>
-        wrapRequest(originalRequest, args, 'http:'),
+      value: (
+        url: string | URL | http.RequestOptions,
+        options?: http.RequestOptions | ((res: http.IncomingMessage) => void),
+        callback?: (res: http.IncomingMessage) => void,
+      ): http.ClientRequest => wrapRequest(originalRequest, [url, options, callback], 'http:'),
       writable: true,
       configurable: true,
     });
     Object.defineProperty(https, 'request', {
-      value: (...args: unknown[]) =>
-        wrapRequest(
+      value: (
+        url: string | URL | http.RequestOptions,
+        options?: http.RequestOptions | ((res: http.IncomingMessage) => void),
+        callback?: (res: http.IncomingMessage) => void,
+      ): http.ClientRequest => wrapRequest(
           originalHttpsRequest as typeof http.request,
-          args,
+          [url, options, callback],
           'https:',
         ),
       writable: true,
