@@ -111,7 +111,6 @@ export class FakeContentGenerator implements ContentGenerator {
   async countTokens(
     request: CountTokensParameters,
   ): Promise<CountTokensResponse> {
-     
     return this.getNextResponse('countTokens', request);
   }
 

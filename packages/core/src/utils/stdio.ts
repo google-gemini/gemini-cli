@@ -86,7 +86,6 @@ export function createWorkingStdio() {
   const inkStdout = new Proxy(process.stdout, {
     get(target, prop, receiver) {
       if (prop === 'write') {
-         
         return writeToStdout;
       }
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -103,7 +102,6 @@ export function createWorkingStdio() {
   const inkStderr = new Proxy(process.stderr, {
     get(target, prop, receiver) {
       if (prop === 'write') {
-         
         return writeToStderr;
       }
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment

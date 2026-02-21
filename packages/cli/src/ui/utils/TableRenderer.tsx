@@ -199,7 +199,6 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
         w + COLUMN_PADDING,
     );
 
-     
     return { wrappedHeaders, wrappedRows, adjustedWidths };
   }, [styledHeaders, styledRows, terminalWidth]);
   // Helper function to render a cell with proper width
