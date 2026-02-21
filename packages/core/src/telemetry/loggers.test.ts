@@ -10,6 +10,9 @@ import type {
   CompletedToolCall,
   ContentGeneratorConfig,
   ErroredToolCall,
+  MessageBus,
+} from '../index.js';
+import {
   CoreToolCallStatus,
   AuthType,
   EditTool,
@@ -17,11 +20,10 @@ import type {
   ToolConfirmationOutcome,
   ToolErrorType,
   ToolRegistry,
-  type MessageBus,
 } from '../index.js';
 import { OutputFormat } from '../output/types.js';
 import { logs } from '@opentelemetry/api-logs';
-import type { Config, type GeminiCLIExtension } from '../config/config.js';
+import type { Config, GeminiCLIExtension } from '../config/config.js';
 import {
   logApiError,
   logApiRequest,

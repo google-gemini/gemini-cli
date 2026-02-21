@@ -16,11 +16,13 @@ import {
 import { Task } from './task.js';
 import type {
   ToolCall,
+  Config,
+  ToolCallRequestInfo,
+  GitService,
+  CompletedToolCall,
+} from '@google/gemini-cli-core';
+import {
   GeminiEventType,
-  type Config,
-  type ToolCallRequestInfo,
-  type GitService,
-  type CompletedToolCall,
   ApprovalMode,
   ToolConfirmationOutcome,
 } from '@google/gemini-cli-core';

@@ -162,6 +162,7 @@ export class BaseLlmClient {
     );
 
     // If we are here, the content is valid (not empty and parsable).
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return JSON.parse(
       this.cleanJsonResponse(getResponseText(result)!.trim(), model),
     );

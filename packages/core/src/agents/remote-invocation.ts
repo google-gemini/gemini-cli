@@ -6,10 +6,10 @@
 
 import type {
   ToolConfirmationOutcome,
-  BaseToolInvocation,
-  type ToolResult,
-  type ToolCallConfirmationDetails,
+  ToolResult,
+  ToolCallConfirmationDetails,
 } from '../tools/tools.js';
+import { BaseToolInvocation } from '../tools/tools.js';
 import { DEFAULT_QUERY_STRING } from './types.js';
 import type {
   RemoteAgentInputs,

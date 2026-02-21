@@ -10,15 +10,17 @@ import * as dotenv from 'dotenv';
 
 import type {
   TelemetryTarget,
+  ConfigParameters,
+  ExtensionLoader,
+} from '@google/gemini-cli-core';
+import {
   AuthType,
   Config,
-  type ConfigParameters,
   FileDiscoveryService,
   ApprovalMode,
   loadServerHierarchicalMemory,
   GEMINI_DIR,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
-  type ExtensionLoader,
   startupProfiler,
   PREVIEW_GEMINI_MODEL,
   homedir,

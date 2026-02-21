@@ -17,9 +17,9 @@ import {
 
 import type {
   GenerateContentOptions,
-  BaseLlmClient,
-  type GenerateJsonOptions,
+  GenerateJsonOptions,
 } from './baseLlmClient.js';
+import { BaseLlmClient } from './baseLlmClient.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';

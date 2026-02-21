@@ -27,6 +27,7 @@ export function safeJsonStringify(
         }
         seen.add(value);
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return value;
     },
     space,
@@ -60,6 +61,7 @@ export function safeJsonStringifyBooleanValuesOnly(obj: any): string {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     if ((value as Config) !== null && !configSeen) {
       configSeen = true;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return value;
     }
     if (typeof value === 'boolean') {
