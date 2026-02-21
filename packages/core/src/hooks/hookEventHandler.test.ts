@@ -11,15 +11,16 @@ import type {
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HookEventHandler } from './hookEventHandler.js';
 import type { Config } from '../config/config.js';
-import type { HookConfig ,
+import type { HookConfig, HookExecutionResult } from './types.js';
+import {
+  HookEventName,
+  HookType,
   NotificationType,
   SessionStartSource,
-  type HookExecutionResult,
 } from './types.js';
 import type { HookPlanner } from './hookPlanner.js';
 import type { HookRunner } from './hookRunner.js';
 import type { HookAggregator } from './hookAggregator.js';
-import { HookEventName, HookType } from './types.js';
 
 // Mock debugLogger
 const mockDebugLogger = vi.hoisted(() => ({
