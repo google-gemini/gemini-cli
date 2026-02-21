@@ -5,6 +5,7 @@
  */
 
 import type { FunctionDeclaration } from '@google/genai';
+import { MAX_SUBPROCESS_OUTPUT_SIZE } from '../utils/constants.js';
 import type {
   AnyDeclarativeTool,
   ToolResult,
@@ -65,13 +66,32 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
     let error: Error | null = null;
     let code: number | null = null;
     let signal: NodeJS.Signals | null = null;
+    let sizeLimitExceeded = false;
+    let stdoutByteLength = 0;
+    let stderrByteLength = 0;
 
     await new Promise<void>((resolve) => {
+      let settled = false;
+
       const onStdout = (data: Buffer) => {
+        if (sizeLimitExceeded) return;
+        stdoutByteLength += data.length;
+        if (stdoutByteLength > MAX_SUBPROCESS_OUTPUT_SIZE) {
+          sizeLimitExceeded = true;
+          child.kill();
+          return;
+        }
         stdout += data?.toString();
       };
 
       const onStderr = (data: Buffer) => {
+        if (sizeLimitExceeded) return;
+        stderrByteLength += data.length;
+        if (stderrByteLength > MAX_SUBPROCESS_OUTPUT_SIZE) {
+          sizeLimitExceeded = true;
+          child.kill();
+          return;
+        }
         stderr += data?.toString();
       };
 
@@ -83,6 +103,8 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
         _code: number | null,
         _signal: NodeJS.Signals | null,
       ) => {
+        if (settled) return;
+        settled = true;
         code = _code;
         signal = _signal;
         cleanup();
@@ -104,6 +126,18 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
       child.on('error', onError);
       child.on('close', onClose);
     });
+
+    if (sizeLimitExceeded) {
+      const llmContent = `Error: Tool output exceeded maximum size of ${MAX_SUBPROCESS_OUTPUT_SIZE} bytes. The process was terminated.`;
+      return {
+        llmContent,
+        returnDisplay: llmContent,
+        error: {
+          message: llmContent,
+          type: ToolErrorType.DISCOVERED_TOOL_EXECUTION_ERROR,
+        },
+      };
+    }
 
     // if there is any error, non-zero exit code, signal, or stderr, return error details instead of stdout
     if (error || code !== 0 || signal || stderr) {

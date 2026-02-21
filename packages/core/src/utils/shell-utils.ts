@@ -13,6 +13,7 @@ import {
   spawnSync,
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
+import { MAX_SUBPROCESS_OUTPUT_SIZE } from './constants.js';
 import * as readline from 'node:readline';
 import type { Node, Tree } from 'web-tree-sitter';
 import { Language, Parser, Query } from 'web-tree-sitter';
@@ -747,16 +748,45 @@ export const spawnAsync = (
     const child = spawn(command, args, options);
     let stdout = '';
     let stderr = '';
+    let settled = false;
+    let stdoutByteLength = 0;
+    let stderrByteLength = 0;
 
-    child.stdout.on('data', (data) => {
+    child.stdout.on('data', (data: Buffer) => {
+      if (settled) return;
+      stdoutByteLength += data.length;
+      if (stdoutByteLength > MAX_SUBPROCESS_OUTPUT_SIZE) {
+        settled = true;
+        child.kill();
+        reject(
+          new Error(
+            `Command output exceeded maximum size of ${MAX_SUBPROCESS_OUTPUT_SIZE} bytes`,
+          ),
+        );
+        return;
+      }
       stdout += data.toString();
     });
 
-    child.stderr.on('data', (data) => {
+    child.stderr.on('data', (data: Buffer) => {
+      if (settled) return;
+      stderrByteLength += data.length;
+      if (stderrByteLength > MAX_SUBPROCESS_OUTPUT_SIZE) {
+        settled = true;
+        child.kill();
+        reject(
+          new Error(
+            `Command stderr exceeded maximum size of ${MAX_SUBPROCESS_OUTPUT_SIZE} bytes`,
+          ),
+        );
+        return;
+      }
       stderr += data.toString();
     });
 
     child.on('close', (code) => {
+      if (settled) return;
+      settled = true;
       if (code === 0) {
         resolve({ stdout, stderr });
       } else {
@@ -765,6 +795,8 @@ export const spawnAsync = (
     });
 
     child.on('error', (err) => {
+      if (settled) return;
+      settled = true;
       reject(err);
     });
   });
