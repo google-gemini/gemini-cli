@@ -421,7 +421,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           buffer={uiState.buffer}
           inputWidth={uiState.inputWidth}
           suggestionsWidth={uiState.suggestionsWidth}
-          onSubmit={uiActions.handleFinalSubmit}
+          onSubmit={(v) => void uiActions.handleFinalSubmit(v)}
           userMessages={uiState.userMessages}
           setBannerVisible={uiActions.setBannerVisible}
           onClearScreen={uiActions.handleClearScreen}

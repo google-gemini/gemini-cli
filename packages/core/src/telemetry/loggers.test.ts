@@ -133,7 +133,9 @@ describe('loggers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(sdk, 'isTelemetrySdkInitialized').mockReturnValue(true);
-    vi.spyOn(sdk, 'bufferTelemetryEvent').mockImplementation((cb) => cb());
+    vi.spyOn(sdk, 'bufferTelemetryEvent').mockImplementation((cb) => {
+      void Promise.resolve(cb());
+    });
     vi.spyOn(logs, 'getLogger').mockReturnValue(mockLogger);
     vi.spyOn(uiTelemetry.uiTelemetryService, 'addEvent').mockImplementation(
       mockUiEvent.addEvent,

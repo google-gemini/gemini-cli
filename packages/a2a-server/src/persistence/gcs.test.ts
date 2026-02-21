@@ -266,7 +266,7 @@ describe('GCSTaskStore', () => {
 
     it('should handle tar creation failure', async () => {
       mockFse.pathExists.mockImplementation(
-        async (path) =>
+        (path) =>
           !path.toString().includes('task-task1-workspace-test-uuid.tar.gz'),
       );
       const store = new GCSTaskStore(bucketName);

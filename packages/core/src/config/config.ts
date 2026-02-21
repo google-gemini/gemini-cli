@@ -2718,21 +2718,22 @@ export class Config {
     debugLogger.debug('Experiments loaded', summaryString);
   }
 
-  private onAgentsRefreshed = async () => {
-    if (this.toolRegistry) {
-      this.registerSubAgentTools(this.toolRegistry);
-    }
-    // Propagate updates to the active chat session
-    const client = this.getGeminiClient();
-    if (client?.isInitialized()) {
-      await client.setTools();
-      client.updateSystemInstruction();
-    } else {
-      debugLogger.debug(
-        '[Config] GeminiClient not initialized; skipping live prompt/tool refresh.',
-      );
-    }
-  };
+  private onAgentsRefreshed = () =>
+    void (async () => {
+      if (this.toolRegistry) {
+        this.registerSubAgentTools(this.toolRegistry);
+      }
+      // Propagate updates to the active chat session
+      const client = this.getGeminiClient();
+      if (client?.isInitialized()) {
+        await client.setTools();
+        client.updateSystemInstruction();
+      } else {
+        debugLogger.debug(
+          '[Config] GeminiClient not initialized; skipping live prompt/tool refresh.',
+        );
+      }
+    })();
 
   /**
    * Disposes of resources and removes event listeners.

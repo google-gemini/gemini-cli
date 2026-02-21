@@ -269,7 +269,7 @@ export function ThemeDialog({
             <RadioButtonSelect
               items={themeItems}
               initialIndex={safeInitialThemeIndex}
-              onSelect={handleThemeSelect}
+              onSelect={(name) => void handleThemeSelect(name)}
               onHighlight={handleThemeHighlight}
               isFocused={mode === 'theme'}
               maxItemsToShow={12}
@@ -379,7 +379,7 @@ def fibonacci(n):
         </Box>
       ) : (
         <ScopeSelector
-          onSelect={handleScopeSelect}
+          onSelect={(scope) => void handleScopeSelect(scope)}
           onHighlight={handleScopeHighlight}
           isFocused={mode === 'scope'}
           initialScope={selectedScope}

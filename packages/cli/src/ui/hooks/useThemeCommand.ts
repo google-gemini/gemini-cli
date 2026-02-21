@@ -17,7 +17,7 @@ import { useTerminalContext } from '../contexts/TerminalContext.js';
 
 interface UseThemeCommandReturn {
   isThemeDialogOpen: boolean;
-  openThemeDialog: () => void;
+  openThemeDialog: () => void | Promise<void>;
   closeThemeDialog: () => void;
   handleThemeSelect: (
     themeName: string,

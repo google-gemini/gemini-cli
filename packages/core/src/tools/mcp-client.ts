@@ -1548,18 +1548,21 @@ export async function connectToMcpServer(
   });
 
   let unlistenDirectories: Unsubscribe | undefined =
-    workspaceContext.onDirectoriesChanged(async () => {
-      try {
-        await mcpClient.notification({
-          method: 'notifications/roots/list_changed',
-        });
-      } catch (_) {
-        // If this fails, its almost certainly because the connection was closed
-        // and we should just stop listening for future directory changes.
-        unlistenDirectories?.();
-        unlistenDirectories = undefined;
-      }
-    });
+    workspaceContext.onDirectoriesChanged(
+      () =>
+        void (async () => {
+          try {
+            await mcpClient.notification({
+              method: 'notifications/roots/list_changed',
+            });
+          } catch (_) {
+            // If this fails, its almost certainly because the connection was closed
+            // and we should just stop listening for future directory changes.
+            unlistenDirectories?.();
+            unlistenDirectories = undefined;
+          }
+        })(),
+    );
 
   // Attempt to pro-actively unsubscribe if the mcp client closes. This API is
   // very brittle though so we don't have any guarantees, hence the try/catch

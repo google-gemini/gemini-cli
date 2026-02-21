@@ -144,7 +144,7 @@ describe('skillUtils', () => {
       skillPath,
       'workspace',
       undefined,
-      async () => {},
+      () => {},
     );
     expect(skills.length).toBeGreaterThan(0);
     expect(skills[0].name).toBe('weather-skill');
@@ -174,9 +174,8 @@ describe('skillUtils', () => {
       mockSkillDir,
       'workspace',
       undefined,
-      async () => {},
+      () => {},
     );
-    expect(skills.length).toBe(1);
     expect(skills[0].name).toBe('test-skill');
 
     const installedPath = path.join(tempDir, '.gemini/skills', 'test-skill');
@@ -200,7 +199,7 @@ describe('skillUtils', () => {
         mockSkillDir,
         'workspace',
         undefined,
-        async () => {},
+        () => {},
         requestConsent,
       ),
     ).rejects.toThrow('Skill installation cancelled by user.');

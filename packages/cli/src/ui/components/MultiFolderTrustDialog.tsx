@@ -170,7 +170,7 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
 
         <RadioButtonSelect
           items={options}
-          onSelect={handleSelect}
+          onSelect={(choice) => void handleSelect(choice)}
           isFocused={!submitted}
         />
       </Box>

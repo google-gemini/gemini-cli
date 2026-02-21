@@ -1441,7 +1441,7 @@ describe('CoreToolScheduler request queueing', () => {
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
     const pendingConfirmations: Array<
-      (outcome: ToolConfirmationOutcome) => void
+      (outcome: ToolConfirmationOutcome) => void | Promise<void>
     > = [];
 
     const scheduler = new CoreToolScheduler({
@@ -1514,7 +1514,7 @@ describe('CoreToolScheduler request queueing', () => {
 
     // Approve the first tool with ProceedAlways
     const firstConfirmation = pendingConfirmations[0];
-    firstConfirmation(ToolConfirmationOutcome.ProceedAlways);
+    void firstConfirmation(ToolConfirmationOutcome.ProceedAlways);
 
     // Wait for all tools to be completed
     await vi.waitFor(() => {

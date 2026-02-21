@@ -79,7 +79,7 @@ describe('<Scrollable />', () => {
   it('updates scroll position correctly when scrollBy is called multiple times in the same tick', async () => {
     let capturedEntry: ScrollProviderModule.ScrollableEntry | undefined;
     vi.spyOn(ScrollProviderModule, 'useScrollable').mockImplementation(
-      async (entry, isActive) => {
+      (entry, isActive) => {
         if (isActive) {
           capturedEntry = entry as ScrollProviderModule.ScrollableEntry;
         }
@@ -197,7 +197,7 @@ describe('<Scrollable />', () => {
 
         let capturedEntry: ScrollProviderModule.ScrollableEntry | undefined;
         vi.spyOn(ScrollProviderModule, 'useScrollable').mockImplementation(
-          async (entry, isActive) => {
+          (entry, isActive) => {
             if (isActive) {
               capturedEntry = entry as ScrollProviderModule.ScrollableEntry;
             }

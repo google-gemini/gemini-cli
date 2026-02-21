@@ -462,13 +462,15 @@ export const useSlashCommandProcessor = (
                   // Show logout confirmation dialog with Login/Exit options
                   setCustomDialog(
                     createElement(LogoutConfirmationDialog, {
-                      onSelect: async (choice: LogoutChoice) => {
+                      onSelect: (choice: LogoutChoice) => {
                         setCustomDialog(null);
                         if (choice === LogoutChoice.LOGIN) {
                           actions.openAuthDialog();
                         } else {
-                          await runExitCleanup();
-                          process.exit(0);
+                          void (async () => {
+                            await runExitCleanup();
+                            process.exit(0);
+                          })();
                         }
                       },
                     }),

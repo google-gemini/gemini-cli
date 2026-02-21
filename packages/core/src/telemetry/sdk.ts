@@ -93,8 +93,7 @@ let spanProcessor: BatchSpanProcessor | undefined;
 let logRecordProcessor: BatchLogRecordProcessor | undefined;
 let telemetryInitialized = false;
 let callbackRegistered = false;
-let authListener: ((newCredentials: JWTInput) => Promise<void>) | undefined =
-  undefined;
+let authListener: ((newCredentials: JWTInput) => void) | undefined = undefined;
 let keychainAvailabilityListener:
   | ((event: KeychainAvailabilityEvent) => void)
   | undefined = undefined;
@@ -191,10 +190,10 @@ export async function initializeTelemetry(
     // This is done only once.
     if (!callbackRegistered) {
       callbackRegistered = true;
-      authListener = async (newCredentials: JWTInput) => {
+      authListener = (newCredentials: JWTInput) => {
         if (config.getTelemetryEnabled() && config.getTelemetryUseCliAuth()) {
           debugLogger.log('Telemetry reinit with credentials.');
-          await initializeTelemetry(config, newCredentials);
+          void initializeTelemetry(config, newCredentials);
         }
       };
       authEvents.on('post_auth', authListener);

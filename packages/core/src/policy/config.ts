@@ -29,7 +29,6 @@ import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
-import { isNodeError } from '../utils/errors.js';
 
 import { isDirectorySecure } from '../utils/security.js';
 
@@ -396,144 +395,146 @@ interface TomlRule {
 export function createPolicyUpdater(
   policyEngine: PolicyEngine,
   messageBus: MessageBus,
-  storage: Storage,
 ) {
   // Use a sequential queue for persistence to avoid lost updates from concurrent events.
   let persistenceQueue = Promise.resolve();
 
   messageBus.subscribe(
     MessageBusType.UPDATE_POLICY,
-    async (message: UpdatePolicy) => {
-      const toolName = message.toolName;
+    (message: UpdatePolicy) =>
+      void (async () => {
+        const toolName = message.toolName;
 
-      if (message.commandPrefix) {
-        // Convert commandPrefix(es) to argsPatterns for in-memory rules
-        const patterns = buildArgsPatterns(undefined, message.commandPrefix);
-        for (const pattern of patterns) {
-          if (pattern) {
-            // Note: patterns from buildArgsPatterns are derived from escapeRegex,
-            // which is safe and won't contain ReDoS patterns.
-            policyEngine.addRule({
-              toolName,
-              decision: PolicyDecision.ALLOW,
-              priority: ALWAYS_ALLOW_PRIORITY,
-              argsPattern: new RegExp(pattern),
-              source: 'Dynamic (Confirmed)',
-            });
+        if (message.commandPrefix) {
+          // Convert commandPrefix(es) to argsPatterns for in-memory rules
+          const patterns = buildArgsPatterns(undefined, message.commandPrefix);
+          for (const pattern of patterns) {
+            if (pattern) {
+              // Note: patterns from buildArgsPatterns are derived from escapeRegex,
+              // which is safe and won't contain ReDoS patterns.
+              policyEngine.addRule({
+                toolName,
+                decision: PolicyDecision.ALLOW,
+                // User tier (2) + high priority (950/1000) = 2.95
+                // This ensures user "always allow" selections are high priority
+                // but still lose to admin policies (3.xxx) and settings excludes (200)
+                priority: 2.95,
+                argsPattern: new RegExp(pattern),
+                source: 'Dynamic (Confirmed)',
+              });
+            }
           }
-        }
-      } else {
-        if (message.argsPattern && !isSafeRegExp(message.argsPattern)) {
-          coreEvents.emitFeedback(
-            'error',
-            `Invalid or unsafe regular expression for tool ${toolName}: ${message.argsPattern}`,
-          );
-          return;
-        }
-
-        const argsPattern = message.argsPattern
-          ? new RegExp(message.argsPattern)
-          : undefined;
-
-        policyEngine.addRule({
-          toolName,
-          decision: PolicyDecision.ALLOW,
-          priority: ALWAYS_ALLOW_PRIORITY,
-          argsPattern,
-          source: 'Dynamic (Confirmed)',
-        });
-      }
-
-      if (message.persist) {
-        persistenceQueue = persistenceQueue.then(async () => {
-          try {
-            const workspacePoliciesDir = storage.getWorkspacePoliciesDir();
-            await fs.mkdir(workspacePoliciesDir, { recursive: true });
-            const policyFile = storage.getAutoSavedPolicyPath();
-
-            // Read existing file
-            let existingData: { rule?: TomlRule[] } = {};
-            try {
-              const fileContent = await fs.readFile(policyFile, 'utf-8');
-              const parsed = toml.parse(fileContent);
-              if (
-                typeof parsed === 'object' &&
-                parsed !== null &&
-                (!('rule' in parsed) || Array.isArray(parsed['rule']))
-              ) {
-                existingData = parsed as { rule?: TomlRule[] };
-              }
-            } catch (error) {
-              if (!isNodeError(error) || error.code !== 'ENOENT') {
-                debugLogger.warn(
-                  `Failed to parse ${policyFile}, overwriting with new policy.`,
-                  error,
-                );
-              }
-            }
-
-            // Initialize rule array if needed
-            if (!existingData.rule) {
-              existingData.rule = [];
-            }
-
-            // Create new rule object
-            const newRule: TomlRule = {};
-
-            if (message.mcpName) {
-              newRule.mcpName = message.mcpName;
-              // Extract simple tool name
-              const simpleToolName = toolName.startsWith(`${message.mcpName}__`)
-                ? toolName.slice(message.mcpName.length + 2)
-                : toolName;
-              newRule.toolName = simpleToolName;
-              newRule.decision = 'allow';
-              newRule.priority = 200;
-            } else {
-              newRule.toolName = toolName;
-              newRule.decision = 'allow';
-              newRule.priority = 100;
-            }
-
-            if (message.commandPrefix) {
-              newRule.commandPrefix = message.commandPrefix;
-            } else if (message.argsPattern) {
-              // message.argsPattern was already validated above
-              newRule.argsPattern = message.argsPattern;
-            }
-
-            // Add to rules
-            existingData.rule.push(newRule);
-
-            // Serialize back to TOML
-            // @iarna/toml stringify might not produce beautiful output but it handles escaping correctly
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            const newContent = toml.stringify(existingData as toml.JsonMap);
-
-            // Atomic write: write to a unique tmp file then rename to the target file.
-            // Using a unique suffix avoids race conditions where concurrent processes
-            // overwrite each other's temporary files, leading to ENOENT errors on rename.
-            const tmpSuffix = crypto.randomBytes(8).toString('hex');
-            const tmpFile = `${policyFile}.${tmpSuffix}.tmp`;
-
-            let handle: fs.FileHandle | undefined;
-            try {
-              // Use 'wx' to create the file exclusively (fails if exists) for security.
-              handle = await fs.open(tmpFile, 'wx');
-              await handle.writeFile(newContent, 'utf-8');
-            } finally {
-              await handle?.close();
-            }
-            await fs.rename(tmpFile, policyFile);
-          } catch (error) {
+        } else {
+          if (message.argsPattern && !isSafeRegExp(message.argsPattern)) {
             coreEvents.emitFeedback(
               'error',
-              `Failed to persist policy for ${toolName}`,
-              error,
+              `Invalid or unsafe regular expression for tool ${toolName}: ${message.argsPattern}`,
             );
+            return;
           }
-        });
-      }
-    },
+
+          const argsPattern = message.argsPattern
+            ? new RegExp(message.argsPattern)
+            : undefined;
+
+          policyEngine.addRule({
+            toolName,
+            decision: PolicyDecision.ALLOW,
+            // User tier (2) + high priority (950/1000) = 2.95
+            // This ensures user "always allow" selections are high priority
+            // but still lose to admin policies (3.xxx) and settings excludes (200)
+            priority: 2.95,
+            argsPattern,
+            source: 'Dynamic (Confirmed)',
+          });
+        }
+
+        if (message.persist) {
+          persistenceQueue = persistenceQueue.then(async () => {
+            try {
+              const userPoliciesDir = Storage.getUserPoliciesDir();
+              await fs.mkdir(userPoliciesDir, { recursive: true });
+              const policyFile = path.join(userPoliciesDir, 'auto-saved.toml');
+
+              // Read existing file
+              let existingData: { rule?: TomlRule[] } = {};
+              try {
+                const fileContent = await fs.readFile(policyFile, 'utf-8');
+                existingData = toml.parse(fileContent) as { rule?: TomlRule[] };
+              } catch (error) {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+                if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+                  debugLogger.warn(
+                    `Failed to parse ${policyFile}, overwriting with new policy.`,
+                    error,
+                  );
+                }
+              }
+
+              // Initialize rule array if needed
+              if (!existingData.rule) {
+                existingData.rule = [];
+              }
+
+              // Create new rule object
+              const newRule: TomlRule = {};
+
+              if (message.mcpName) {
+                newRule.mcpName = message.mcpName;
+                // Extract simple tool name
+                const simpleToolName = toolName.startsWith(
+                  `${message.mcpName}__`,
+                )
+                  ? toolName.slice(message.mcpName.length + 2)
+                  : toolName;
+                newRule.toolName = simpleToolName;
+                newRule.decision = 'allow';
+                newRule.priority = 200;
+              } else {
+                newRule.toolName = toolName;
+                newRule.decision = 'allow';
+                newRule.priority = 100;
+              }
+
+              if (message.commandPrefix) {
+                newRule.commandPrefix = message.commandPrefix;
+              } else if (message.argsPattern) {
+                // message.argsPattern was already validated above
+                newRule.argsPattern = message.argsPattern;
+              }
+
+              // Add to rules
+              existingData.rule.push(newRule);
+
+              // Serialize back to TOML
+              // @iarna/toml stringify might not produce beautiful output but it handles escaping correctly
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              const newContent = toml.stringify(existingData as toml.JsonMap);
+
+              // Atomic write: write to a unique tmp file then rename to the target file.
+              // Using a unique suffix avoids race conditions where concurrent processes
+              // overwrite each other's temporary files, leading to ENOENT errors on rename.
+              const tmpSuffix = crypto.randomBytes(8).toString('hex');
+              const tmpFile = `${policyFile}.${tmpSuffix}.tmp`;
+
+              let handle: fs.FileHandle | undefined;
+              try {
+                // Use 'wx' to create the file exclusively (fails if exists) for security.
+                handle = await fs.open(tmpFile, 'wx');
+                await handle.writeFile(newContent, 'utf-8');
+              } finally {
+                await handle?.close();
+              }
+              await fs.rename(tmpFile, policyFile);
+            } catch (error) {
+              coreEvents.emitFeedback(
+                'error',
+                `Failed to persist policy for ${toolName}`,
+                error,
+              );
+            }
+          });
+        }
+      })(),
   );
 }

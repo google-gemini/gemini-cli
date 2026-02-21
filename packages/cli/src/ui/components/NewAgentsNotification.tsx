@@ -106,7 +106,7 @@ export const NewAgentsNotification = ({
         ) : (
           <RadioButtonSelect
             items={options}
-            onSelect={handleSelect}
+            onSelect={(choice) => void handleSelect(choice)}
             isFocused={true}
           />
         )}

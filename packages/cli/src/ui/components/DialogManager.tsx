@@ -257,9 +257,11 @@ export const DialogManager = ({
         <SettingsDialog
           settings={settings}
           onSelect={() => uiActions.closeSettingsDialog()}
-          onRestartRequest={async () => {
-            await runExitCleanup();
-            process.exit(RELAUNCH_EXIT_CODE);
+          onRestartRequest={() => {
+            void (async () => {
+              await runExitCleanup();
+              process.exit(RELAUNCH_EXIT_CODE);
+            })();
           }}
           availableTerminalHeight={terminalHeight - staticExtraHeight}
           config={config}
@@ -284,12 +286,14 @@ export const DialogManager = ({
           definition={uiState.selectedAgentDefinition}
           settings={settings}
           onClose={uiActions.closeAgentConfigDialog}
-          onSave={async () => {
-            // Reload agent registry to pick up changes
-            const agentRegistry = config?.getAgentRegistry();
-            if (agentRegistry) {
-              await agentRegistry.reload();
-            }
+          onSave={() => {
+            void (async () => {
+              // Reload agent registry to pick up changes
+              const agentRegistry = config?.getAgentRegistry();
+              if (agentRegistry) {
+                await agentRegistry.reload();
+              }
+            })();
           }}
         />
       </Box>
@@ -309,7 +313,7 @@ export const DialogManager = ({
       <Box flexDirection="column">
         <ApiAuthDialog
           key={uiState.apiKeyDefaultValue}
-          onSubmit={uiActions.handleApiKeySubmit}
+          onSubmit={(v) => void uiActions.handleApiKeySubmit(v)}
           onCancel={uiActions.handleApiKeyCancel}
           error={uiState.authError}
           defaultValue={uiState.apiKeyDefaultValue}
@@ -359,7 +363,7 @@ export const DialogManager = ({
     return (
       <SessionBrowser
         config={config}
-        onResumeSession={uiActions.handleResumeSession}
+        onResumeSession={(s) => void uiActions.handleResumeSession(s)}
         onDeleteSession={uiActions.handleDeleteSession}
         onExit={uiActions.closeSessionBrowser}
       />

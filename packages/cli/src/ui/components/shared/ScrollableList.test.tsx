@@ -155,7 +155,7 @@ describe('ScrollableList Demo Behavior', () => {
           onAddItem={(add) => {
             addItem = add;
           }}
-          onRef={async (ref) => {
+          onRef={(ref) => {
             listRef = ref;
           }}
         />,

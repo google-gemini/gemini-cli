@@ -106,9 +106,9 @@ async function handlePromotion(config: Config) {
       DEFAULT_DEVTOOLS_HOST,
       DEFAULT_DEVTOOLS_PORT,
     );
-    addNetworkTransport(config, result.host, result.port, () =>
-      handlePromotion(config),
-    );
+    addNetworkTransport(config, result.host, result.port, () => {
+      void handlePromotion(config);
+    });
   } catch (err) {
     debugLogger.debug('Failed to promote to DevTools server:', err);
   }
@@ -136,7 +136,9 @@ export async function setupInitialActivityLogger(config: Config) {
         DEFAULT_DEVTOOLS_PORT,
       );
       if (existing) {
-        const onReconnectFailed = () => handlePromotion(config);
+        const onReconnectFailed = () => {
+          void handlePromotion(config);
+        };
         addNetworkTransport(
           config,
           DEFAULT_DEVTOOLS_HOST,
@@ -169,7 +171,9 @@ export function startDevToolsServer(config: Config): Promise<string> {
 }
 
 async function startDevToolsServerImpl(config: Config): Promise<string> {
-  const onReconnectFailed = () => handlePromotion(config);
+  const onReconnectFailed = () => {
+    void handlePromotion(config);
+  };
 
   // Probe for an existing DevTools server
   const existing = await probeDevTools(

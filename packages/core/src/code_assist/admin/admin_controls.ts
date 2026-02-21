@@ -178,28 +178,29 @@ function startAdminControlsPolling(
   stopAdminControlsPolling();
 
   pollingInterval = setInterval(
-    async () => {
-      try {
-        const rawSettings = await server.fetchAdminControls({
-          project,
-        });
+    () =>
+      void (async () => {
+        try {
+          const rawSettings = await server.fetchAdminControls({
+            project,
+          });
 
-        if (rawSettings.adminControlsApplicable !== true) {
-          stopAdminControlsPolling();
-          currentSettings = undefined;
-          return;
+          if (rawSettings.adminControlsApplicable !== true) {
+            stopAdminControlsPolling();
+            currentSettings = undefined;
+            return;
+          }
+
+          const newSettings = sanitizeAdminSettings(rawSettings);
+
+          if (!isDeepStrictEqual(newSettings, currentSettings)) {
+            currentSettings = newSettings;
+            onSettingsChanged(newSettings);
+          }
+        } catch (e) {
+          debugLogger.error('Failed to poll admin controls: ', e);
         }
-
-        const newSettings = sanitizeAdminSettings(rawSettings);
-
-        if (!isDeepStrictEqual(newSettings, currentSettings)) {
-          currentSettings = newSettings;
-          onSettingsChanged(newSettings);
-        }
-      } catch (e) {
-        debugLogger.error('Failed to poll admin controls: ', e);
-      }
-    },
+      })(),
     5 * 60 * 1000,
   ); // 5 minutes
 }

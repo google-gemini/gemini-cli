@@ -30,7 +30,7 @@ describe('<EnumSelector />', () => {
         options={LANGUAGE_OPTIONS}
         currentValue="en"
         isActive={true}
-        onValueChange={async () => {}}
+        onValueChange={() => {}}
       />,
     );
     await waitUntilReady();
@@ -44,7 +44,7 @@ describe('<EnumSelector />', () => {
         options={NUMERIC_OPTIONS}
         currentValue={2}
         isActive={true}
-        onValueChange={async () => {}}
+        onValueChange={() => {}}
       />,
     );
     await waitUntilReady();
@@ -58,7 +58,7 @@ describe('<EnumSelector />', () => {
         options={LANGUAGE_OPTIONS}
         currentValue="zh"
         isActive={false}
-        onValueChange={async () => {}}
+        onValueChange={() => {}}
       />,
     );
     await waitUntilReady();
@@ -75,7 +75,7 @@ describe('<EnumSelector />', () => {
         options={singleOption}
         currentValue="only"
         isActive={true}
-        onValueChange={async () => {}}
+        onValueChange={() => {}}
       />,
     );
     await waitUntilReady();
@@ -89,7 +89,7 @@ describe('<EnumSelector />', () => {
         options={[]}
         currentValue=""
         isActive={true}
-        onValueChange={async () => {}}
+        onValueChange={() => {}}
       />,
     );
     await waitUntilReady();
@@ -103,7 +103,7 @@ describe('<EnumSelector />', () => {
         options={LANGUAGE_OPTIONS}
         currentValue="invalid"
         isActive={true}
-        onValueChange={async () => {}}
+        onValueChange={() => {}}
       />,
     );
     await waitUntilReady();
@@ -119,7 +119,7 @@ describe('<EnumSelector />', () => {
           options={LANGUAGE_OPTIONS}
           currentValue="en"
           isActive={true}
-          onValueChange={async () => {}}
+          onValueChange={() => {}}
         />,
       );
     await waitUntilReady();
@@ -131,7 +131,7 @@ describe('<EnumSelector />', () => {
           options={LANGUAGE_OPTIONS}
           currentValue="zh"
           isActive={true}
-          onValueChange={async () => {}}
+          onValueChange={() => {}}
         />,
       );
     });
@@ -146,7 +146,7 @@ describe('<EnumSelector />', () => {
         options={LANGUAGE_OPTIONS}
         currentValue="en"
         isActive={true}
-        onValueChange={async () => {}}
+        onValueChange={() => {}}
       />,
     );
     await waitUntilReady();
@@ -164,7 +164,7 @@ describe('<EnumSelector />', () => {
         options={singleOption}
         currentValue="only"
         isActive={true}
-        onValueChange={async () => {}}
+        onValueChange={() => {}}
       />,
     );
     await waitUntilReady();

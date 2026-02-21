@@ -123,7 +123,7 @@ export function PermissionsModifyTrustDialog({
 
         <RadioButtonSelect
           items={TRUST_LEVEL_ITEMS}
-          onSelect={updateTrustLevel}
+          onSelect={(level) => void updateTrustLevel(level)}
           isFocused={true}
           initialIndex={initialIndex}
         />

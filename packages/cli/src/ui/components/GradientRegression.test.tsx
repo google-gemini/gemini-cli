@@ -80,7 +80,7 @@ describe('Gradient Crash Regression Tests', () => {
 
   it('<ModelDialog /> should not crash when theme.ui.gradient is empty', async () => {
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <ModelDialog onClose={async () => {}} />,
+      <ModelDialog onClose={() => {}} />,
       {
         width: 120,
       },

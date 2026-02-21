@@ -463,9 +463,9 @@ export class ShellExecutionService {
           handleExit(1, null);
         });
 
-        const abortHandler = async () => {
+        const abortHandler = () => {
           if (child.pid && !exited) {
-            await killProcessGroup({
+            void killProcessGroup({
               pid: child.pid,
               escalate: true,
               isExited: () => exited,
@@ -862,9 +862,9 @@ export class ShellExecutionService {
           },
         );
 
-        const abortHandler = async () => {
+        const abortHandler = () => {
           if (ptyProcess.pid && !exited) {
-            await killProcessGroup({
+            void killProcessGroup({
               // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               pid: ptyProcess.pid,
               escalate: true,

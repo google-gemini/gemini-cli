@@ -286,23 +286,24 @@ export class MCPOAuthProvider {
         let serverPort: number;
 
         const server = http.createServer(
-          async (req: http.IncomingMessage, res: http.ServerResponse) => {
-            try {
-              const url = new URL(req.url!, `http://localhost:${serverPort}`);
+          (req: http.IncomingMessage, res: http.ServerResponse) =>
+            void (async () => {
+              try {
+                const url = new URL(req.url!, `http://localhost:${serverPort}`);
 
-              if (url.pathname !== REDIRECT_PATH) {
-                res.writeHead(404);
-                res.end('Not found');
-                return;
-              }
+                if (url.pathname !== REDIRECT_PATH) {
+                  res.writeHead(404);
+                  res.end('Not found');
+                  return;
+                }
 
-              const code = url.searchParams.get('code');
-              const state = url.searchParams.get('state');
-              const error = url.searchParams.get('error');
+                const code = url.searchParams.get('code');
+                const state = url.searchParams.get('state');
+                const error = url.searchParams.get('error');
 
-              if (error) {
-                res.writeHead(HTTP_OK, { 'Content-Type': 'text/html' });
-                res.end(`
+                if (error) {
+                  res.writeHead(HTTP_OK, { 'Content-Type': 'text/html' });
+                  res.end(`
               <html>
                 <body>
                   <h1>Authentication Failed</h1>
@@ -312,28 +313,28 @@ export class MCPOAuthProvider {
                 </body>
               </html>
             `);
-                server.close();
-                reject(new Error(`OAuth error: ${error}`));
-                return;
-              }
+                  server.close();
+                  reject(new Error(`OAuth error: ${error}`));
+                  return;
+                }
 
-              if (!code || !state) {
-                res.writeHead(400);
-                res.end('Missing code or state parameter');
-                return;
-              }
+                if (!code || !state) {
+                  res.writeHead(400);
+                  res.end('Missing code or state parameter');
+                  return;
+                }
 
-              if (state !== expectedState) {
-                res.writeHead(400);
-                res.end('Invalid state parameter');
-                server.close();
-                reject(new Error('State mismatch - possible CSRF attack'));
-                return;
-              }
+                if (state !== expectedState) {
+                  res.writeHead(400);
+                  res.end('Invalid state parameter');
+                  server.close();
+                  reject(new Error('State mismatch - possible CSRF attack'));
+                  return;
+                }
 
-              // Send success response to browser
-              res.writeHead(HTTP_OK, { 'Content-Type': 'text/html' });
-              res.end(`
+                // Send success response to browser
+                res.writeHead(HTTP_OK, { 'Content-Type': 'text/html' });
+                res.end(`
             <html>
               <body>
                 <h1>Authentication Successful!</h1>
@@ -343,13 +344,13 @@ export class MCPOAuthProvider {
             </html>
           `);
 
-              server.close();
-              resolve({ code, state });
-            } catch (error) {
-              server.close();
-              reject(error);
-            }
-          },
+                server.close();
+                resolve({ code, state });
+              } catch (error) {
+                server.close();
+                reject(error);
+              }
+            })(),
         );
 
         server.on('error', (error) => {
