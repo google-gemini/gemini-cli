@@ -589,6 +589,24 @@ export const useSessionBrowserState = (
     return sortSessions(filtered, sortOrder, sortReverse);
   }, [sessions, searchQuery, sortOrder, sortReverse]);
 
+  // Skip the current session on initial load so the cursor starts on the
+  // first resumable item instead of a disabled one.
+  const hasInitializedActiveIndex = useRef(false);
+  useEffect(() => {
+    if (
+      !hasInitializedActiveIndex.current &&
+      filteredAndSortedSessions.length > 0
+    ) {
+      const firstSelectable = filteredAndSortedSessions.findIndex(
+        (s) => !s.isCurrentSession,
+      );
+      if (firstSelectable > 0) {
+        setActiveIndex(firstSelectable);
+      }
+      hasInitializedActiveIndex.current = true;
+    }
+  }, [filteredAndSortedSessions, setActiveIndex]);
+
   // Reset full content flag when search is cleared
   useEffect(() => {
     if (!searchQuery) {
@@ -714,16 +732,32 @@ export const useMoveSelection = (state: SessionBrowserState) => {
     totalSessions,
     activeIndex,
     scrollOffset,
+    filteredAndSortedSessions,
     setActiveIndex,
     setScrollOffset,
   } = state;
 
   return useCallback(
     (delta: number) => {
-      const newIndex = Math.max(
+      let newIndex = Math.max(
         0,
         Math.min(totalSessions - 1, activeIndex + delta),
       );
+
+      // Skip over the current session (disabled item) in the movement direction
+      const step = delta > 0 ? 1 : -1;
+      while (
+        newIndex >= 0 &&
+        newIndex < totalSessions &&
+        filteredAndSortedSessions[newIndex]?.isCurrentSession
+      ) {
+        newIndex += step;
+      }
+      // Clamp to valid range; if no valid index found, stay in place
+      if (newIndex < 0 || newIndex >= totalSessions) {
+        newIndex = activeIndex;
+      }
+
       setActiveIndex(newIndex);
 
       // Adjust scroll offset if needed
@@ -733,7 +767,14 @@ export const useMoveSelection = (state: SessionBrowserState) => {
         setScrollOffset(newIndex - SESSIONS_PER_PAGE + 1);
       }
     },
-    [totalSessions, activeIndex, scrollOffset, setActiveIndex, setScrollOffset],
+    [
+      totalSessions,
+      activeIndex,
+      scrollOffset,
+      filteredAndSortedSessions,
+      setActiveIndex,
+      setScrollOffset,
+    ],
   );
 };
 
