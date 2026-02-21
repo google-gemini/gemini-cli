@@ -16,7 +16,7 @@ import type {
   GenerateContentResponseUsageMetadata,
   GenerateContentResponse,
 } from '@google/genai';
-import type { ServerDetails } from '../telemetry/types.js';
+import type { ServerDetails, ContextBreakdown } from '../telemetry/types.js';
 import {
   ApiRequestEvent,
   ApiResponseEvent,
@@ -37,14 +37,112 @@ import { isStructuredError } from '../utils/quotaErrorDetection.js';
 import { runInDevTraceSpan, type SpanMetadata } from '../telemetry/trace.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorType } from '../utils/errors.js';
+import { MCP_QUALIFIED_NAME_SEPARATOR } from '../tools/mcp-tool.js';
 
 interface StructuredError {
   status: number;
 }
 
 /**
- * A decorator that wraps a ContentGenerator to add logging to API calls.
+ * Returns true if `name` matches the MCP qualified name format: "server__tool",
+ * i.e. exactly two non-empty parts separated by the MCP_QUALIFIED_NAME_SEPARATOR.
  */
+function isMcpToolName(name: string): boolean {
+  if (!name.includes(MCP_QUALIFIED_NAME_SEPARATOR)) return false;
+  const parts = name.split(MCP_QUALIFIED_NAME_SEPARATOR);
+  return parts.length === 2 && parts[0].length > 0 && parts[1].length > 0;
+}
+
+/**
+ * Rough estimate of token count from a JSON-serializable value.
+ * Uses ~4 characters per token as a heuristic. This is NOT real tokenization;
+ * it includes JSON serialization overhead (keys, quotes, braces) and assumes
+ * a uniform character-to-token ratio. Useful for relative size comparisons.
+ */
+function estimateTokens(value: unknown): number {
+  return Math.floor(JSON.stringify(value).length / 4);
+}
+
+/**
+ * Estimates the context breakdown for telemetry. All returned fields are
+ * additive (non-overlapping), so their sum approximates the total context size.
+ *
+ * - system_instructions: tokens from system instruction config
+ * - tool_definitions: tokens from non-MCP tool definitions
+ * - history: tokens from conversation history, excluding tool call/response parts
+ * - tool_calls: per-tool token counts for function call + response parts
+ * - mcp_servers: tokens from MCP tool definitions + MCP tool call/response parts
+ */
+export function estimateContextBreakdown(
+  contents: Content[],
+  config?: GenerateContentConfig,
+): ContextBreakdown {
+  let systemInstructions = 0;
+  let toolDefinitions = 0;
+  let history = 0;
+  let mcpServers = 0;
+  const toolCalls: Record<string, number> = {};
+
+  if (config?.systemInstruction) {
+    systemInstructions += estimateTokens(config.systemInstruction);
+  }
+
+  if (config?.tools) {
+    for (const tool of config.tools) {
+      const toolTokens = estimateTokens(tool);
+      if (
+        tool &&
+        typeof tool === 'object' &&
+        'functionDeclarations' in tool &&
+        tool.functionDeclarations
+      ) {
+        let mcpTokensInTool = 0;
+        for (const func of tool.functionDeclarations) {
+          if (func.name && isMcpToolName(func.name)) {
+            mcpTokensInTool += estimateTokens(func);
+          }
+        }
+        mcpServers += mcpTokensInTool;
+        toolDefinitions += toolTokens - mcpTokensInTool;
+      } else {
+        toolDefinitions += toolTokens;
+      }
+    }
+  }
+
+  for (const content of contents) {
+    let toolTokensInContent = 0;
+    for (const part of content.parts || []) {
+      if (part.functionCall) {
+        const name = part.functionCall.name || 'unknown';
+        const tokens = estimateTokens(part.functionCall);
+        toolCalls[name] = (toolCalls[name] || 0) + tokens;
+        if (isMcpToolName(name)) {
+          mcpServers += tokens;
+        }
+        toolTokensInContent += tokens;
+      } else if (part.functionResponse) {
+        const name = part.functionResponse.name || 'unknown';
+        const tokens = estimateTokens(part.functionResponse);
+        toolCalls[name] = (toolCalls[name] || 0) + tokens;
+        if (isMcpToolName(name)) {
+          mcpServers += tokens;
+        }
+        toolTokensInContent += tokens;
+      }
+    }
+    history += estimateTokens(content) - toolTokensInContent;
+  }
+
+  return {
+    system_instructions: systemInstructions,
+    tool_definitions: toolDefinitions,
+    history,
+    tool_calls: toolCalls,
+    mcp_servers: mcpServers,
+  };
+}
+
 export class LoggingContentGenerator implements ContentGenerator {
   constructor(
     private readonly wrapped: ContentGenerator,
@@ -134,27 +232,30 @@ export class LoggingContentGenerator implements ContentGenerator {
     generationConfig?: GenerateContentConfig,
     serverDetails?: ServerDetails,
   ): void {
-    logApiResponse(
-      this.config,
-      new ApiResponseEvent(
-        model,
-        durationMs,
-        {
-          prompt_id,
-          contents: requestContents,
-          generate_content_config: generationConfig,
-          server: serverDetails,
-        },
-        {
-          candidates: responseCandidates,
-          response_id: responseId,
-        },
-        this.config.getContentGeneratorConfig()?.authType,
-        usageMetadata,
-        responseText,
-        role,
-      ),
+    const event = new ApiResponseEvent(
+      model,
+      durationMs,
+      {
+        prompt_id,
+        contents: requestContents,
+        generate_content_config: generationConfig,
+        server: serverDetails,
+      },
+      {
+        candidates: responseCandidates,
+        response_id: responseId,
+      },
+      this.config.getContentGeneratorConfig()?.authType,
+      usageMetadata,
+      responseText,
+      role,
     );
+    event.usage.context_breakdown = estimateContextBreakdown(
+      requestContents,
+      generationConfig,
+    );
+
+    logApiResponse(this.config, event);
   }
 
   private _logApiError(
