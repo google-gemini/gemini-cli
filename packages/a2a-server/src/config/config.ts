@@ -8,17 +8,14 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
 
-import type { TelemetryTarget } from '@google/gemini-cli-core';
 import {
   AuthType,
   Config,
-  type ConfigParameters,
   FileDiscoveryService,
   ApprovalMode,
   loadServerHierarchicalMemory,
   GEMINI_DIR,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
-  type ExtensionLoader,
   startupProfiler,
   PREVIEW_GEMINI_MODEL,
   homedir,
@@ -26,6 +23,9 @@ import {
   fetchAdminControlsOnce,
   getCodeAssistServer,
   ExperimentFlags,
+  type TelemetryTarget,
+  type ConfigParameters,
+  type ExtensionLoader,
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
