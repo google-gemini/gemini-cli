@@ -9,6 +9,15 @@ import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import type { UserTierId } from '../code_assist/types.js';
 import { AuthType } from '../core/contentGenerator.js';
 
+function tryDecodeByteArray(s: string): string | null {
+  if (!/^\d+(,\d+)+$/.test(s)) return null;
+  try {
+    return String.fromCharCode(...s.split(',').map(Number));
+  } catch {
+    return null;
+  }
+}
+
 const RATE_LIMIT_ERROR_MESSAGE_USE_GEMINI =
   '\nPlease wait and try again later. To increase your limits, request a quota increase through AI Studio, or switch to another /auth method';
 const RATE_LIMIT_ERROR_MESSAGE_VERTEX =
@@ -40,6 +49,15 @@ export function parseAndFormatApiError(
   fallbackModel?: string,
 ): string {
   if (isStructuredError(error)) {
+    const decoded = tryDecodeByteArray(error.message);
+    if (decoded)
+      return parseAndFormatApiError(
+        decoded,
+        authType,
+        userTier,
+        currentModel,
+        fallbackModel,
+      );
     let text = `[API Error: ${error.message}]`;
     if (error.status === 429) {
       text += getRateLimitMessage(authType, fallbackModel);
@@ -49,9 +67,18 @@ export function parseAndFormatApiError(
 
   // The error message might be a string containing a JSON object.
   if (typeof error === 'string') {
+    const decoded = tryDecodeByteArray(error);
+    if (decoded)
+      return parseAndFormatApiError(
+        decoded,
+        authType,
+        userTier,
+        currentModel,
+        fallbackModel,
+      );
     const jsonStart = error.indexOf('{');
     if (jsonStart === -1) {
-      return `[API Error: ${error}]`; // Not a JSON error, return as is.
+      return `[API Error: ${error}]`;
     }
 
     const jsonString = error.substring(jsonStart);
