@@ -88,6 +88,8 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
         updateOutput('Subagent starting...\n');
       }
 
+      const verbose =
+        this.config.getAgentsSettings()?.verbose !== false;
       // Create an activity callback to bridge the executor's events to the
       // tool's streaming output.
       const onActivity = (activity: SubagentActivityEvent): void => {
@@ -98,6 +100,51 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
           typeof activity.data['text'] === 'string'
         ) {
           updateOutput(`🤖💭 ${activity.data['text']}`);
+          return;
+        }
+
+        if (!verbose) return;
+
+        switch (activity.type) {
+          case 'TOOL_CALL_START': {
+            const name = activity.data['name'];
+            const args = activity.data['args'];
+            let argsPreview = '';
+            if (args !== undefined) {
+              try {
+                const s = JSON.stringify(args);
+                argsPreview = ` ${s.slice(0, 80)}${s.length > 80 ? '…' : ''}`;
+              } catch {
+                argsPreview = ' [args]';
+              }
+            }
+            updateOutput(`Calling tool: ${String(name)}${argsPreview}\n`);
+            break;
+          }
+          case 'TOOL_CALL_END': {
+            const name = activity.data['name'];
+            const output = activity.data['output'];
+            const outputPreview =
+              typeof output === 'string'
+                ? output.slice(0, 200) + (output.length > 200 ? '…' : '')
+                : String(output ?? '');
+            updateOutput(`Tool ${String(name)} finished: ${outputPreview}\n`);
+            break;
+          }
+          case 'ERROR': {
+            const error = activity.data['error'];
+            const context = activity.data['context'];
+            const name = activity.data['name'];
+            const parts = ['Error'];
+            if (name) parts.push(`[${String(name)}]`);
+            if (context) parts.push(`(${String(context)})`);
+            parts.push(':');
+            parts.push(error !== undefined ? String(error) : 'Unknown error');
+            updateOutput(parts.join(' ') + '\n');
+            break;
+          }
+          default:
+            break;
         }
       };
 

@@ -960,6 +960,16 @@ const SETTINGS_SCHEMA = {
     description: 'Settings for subagents.',
     showInDialog: false,
     properties: {
+      verbose: {
+        type: 'boolean',
+        label: 'Subagent Verbose Mode',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: true,
+        description:
+          'When true, stream subagent thinking and action logs (thoughts, tool calls, errors) into the conversation for debugging. When false, only minimal output is shown.',
+        showInDialog: false,
+      },
       overrides: {
         type: 'object',
         label: 'Agent Overrides',

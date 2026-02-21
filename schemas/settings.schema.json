@@ -1084,6 +1084,13 @@
       "default": {},
       "type": "object",
       "properties": {
+        "verbose": {
+          "title": "Subagent Verbose Mode",
+          "description": "When true, stream subagent thinking and action logs (thoughts, tool calls, errors) into the conversation for debugging. When false, only minimal output is shown.",
+          "markdownDescription": "When true, stream subagent thinking and action logs (thoughts, tool calls, errors) into the conversation for debugging. When false, only minimal output is shown.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "overrides": {
           "title": "Agent Overrides",
           "description": "Override settings for specific agents, e.g. to disable the agent, set a custom model config, or run config.",
