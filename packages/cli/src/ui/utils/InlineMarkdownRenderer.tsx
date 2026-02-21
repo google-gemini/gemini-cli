@@ -10,6 +10,59 @@ import { theme } from '../semantic-colors.js';
 import { debugLogger } from '@google/gemini-cli-core';
 import { stripUnsafeCharacters } from './textUtils.js';
 
+// Regex constants defined at module level for performance (avoid recompilation)
+// Trailing characters to strip (common sentence-ending punctuation)
+// Excludes []{}>"' which can be valid parts of URLs
+const TRAILING_CHARS_REGEX = /[.,;:!?、。，；：！？‖‧…]/;
+const PARENS_REGEX = /[()（）]/g;
+
+/**
+ * Removes trailing punctuation from URLs while preserving balanced parentheses.
+ * Returns the cleaned URL and any stripped trailing punctuation.
+ *
+ * Examples:
+ * - "https://example.com." → { url: "https://example.com", trailing: "." }
+ * - "https://example.com。" → { url: "https://example.com", trailing: "。" }
+ * - "https://en.wikipedia.org/wiki/Foo_(bar)" → { url: "https://en.wikipedia.org/wiki/Foo_(bar)", trailing: "" }
+ * - "https://en.wikipedia.org/wiki/Foo_(bar))." → { url: "https://en.wikipedia.org/wiki/Foo_(bar)", trailing: ")." }
+ */
+export function stripTrailingPunctuation(url: string): {
+  url: string;
+  trailing: string;
+} {
+  // Count parentheses once upfront to avoid O(N²) complexity
+  const allParens = url.match(PARENS_REGEX) || [];
+  const openParens = allParens.filter((c) => c === '(' || c === '（').length;
+  let closeParens = allParens.length - openParens;
+
+  let i = url.length - 1;
+  while (i >= 0) {
+    const lastChar = url[i];
+
+    // Don't strip a closing parenthesis if it's part of a balanced pair
+    if (lastChar === ')' || lastChar === '）') {
+      if (openParens >= closeParens) {
+        break;
+      }
+      closeParens--;
+      i--;
+      continue;
+    }
+
+    if (TRAILING_CHARS_REGEX.test(lastChar)) {
+      i--;
+    } else {
+      break;
+    }
+  }
+
+  const splitIndex = i + 1;
+  return {
+    url: url.slice(0, splitIndex),
+    trailing: url.slice(splitIndex),
+  };
+}
+
 // Constants for Markdown parsing
 const BOLD_MARKER_LENGTH = 2; // For "**"
 const ITALIC_MARKER_LENGTH = 1; // For "*" or "_"
@@ -139,10 +192,12 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
           </Text>
         );
       } else if (fullMatch.match(/^https?:\/\//)) {
+        const { url: cleanUrl, trailing } = stripTrailingPunctuation(fullMatch);
         renderedNode = (
-          <Text key={key} color={theme.text.link}>
-            {fullMatch}
-          </Text>
+          <React.Fragment key={key}>
+            <Text color={theme.text.link}>{cleanUrl}</Text>
+            {trailing && <Text color={baseColor}>{trailing}</Text>}
+          </React.Fragment>
         );
       }
     } catch (e) {
