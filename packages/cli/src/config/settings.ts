@@ -573,10 +573,6 @@ export function loadEnvironment(
     relevantArgs.includes('-s') ||
     relevantArgs.includes('--sandbox');
 
-  if (trustResult.isTrusted !== true && !isSandboxed) {
-    return;
-  }
-
   // Cloud Shell environment variable handling
   if (process.env['CLOUD_SHELL'] === 'true') {
     setUpCloudShellEnvironment(envFilePath, isTrusted, isSandboxed);

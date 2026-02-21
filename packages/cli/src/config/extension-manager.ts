@@ -32,6 +32,7 @@ import {
   ExtensionUninstallEvent,
   ExtensionUpdateEvent,
   getErrorMessage,
+  getRealPath,
   logExtensionDisable,
   logExtensionEnable,
   logExtensionInstallEvent,
@@ -202,13 +203,11 @@ export class ExtensionManager extends ExtensionLoader {
       const extensionsDir = ExtensionStorage.getUserExtensionsDir();
       await fs.promises.mkdir(extensionsDir, { recursive: true });
 
-      if (
-        !path.isAbsolute(installMetadata.source) &&
-        (installMetadata.type === 'local' || installMetadata.type === 'link')
-      ) {
-        installMetadata.source = path.resolve(
-          this.workspaceDir,
-          installMetadata.source,
+      if (installMetadata.type === 'local' || installMetadata.type === 'link') {
+        installMetadata.source = getRealPath(
+          path.isAbsolute(installMetadata.source)
+            ? installMetadata.source
+            : path.resolve(this.workspaceDir, installMetadata.source),
         );
       }
 
