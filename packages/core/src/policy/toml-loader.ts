@@ -352,14 +352,15 @@ export async function loadPoliciesFromToml(
         // Transform rules
         const parsedRules: PolicyRule[] = (validationResult.data.rule ?? [])
           .flatMap((rule) => {
-            const argsPatterns = buildArgsPatterns(
+            const argsPatternInfos = buildArgsPatterns(
               rule.argsPattern,
               rule.commandPrefix,
               rule.commandRegex,
             );
 
             // For each argsPattern, expand toolName arrays
-            return argsPatterns.flatMap((argsPattern) => {
+            return argsPatternInfos.flatMap((info) => {
+              const { pattern: argsPattern, argName } = info;
               const toolNames: Array<string | undefined> = rule.toolName
                 ? Array.isArray(rule.toolName)
                   ? rule.toolName
@@ -383,6 +384,7 @@ export async function loadPoliciesFromToml(
                   decision: rule.decision,
                   priority: transformPriority(rule.priority, tier),
                   modes: rule.modes,
+                  argName,
                   allowRedirection: rule.allow_redirection,
                   source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,
                   denyMessage: rule.deny_message,
@@ -438,13 +440,14 @@ export async function loadPoliciesFromToml(
           validationResult.data.safety_checker ?? []
         )
           .flatMap((checker) => {
-            const argsPatterns = buildArgsPatterns(
+            const argsPatternInfos = buildArgsPatterns(
               checker.argsPattern,
               checker.commandPrefix,
               checker.commandRegex,
             );
 
-            return argsPatterns.flatMap((argsPattern) => {
+            return argsPatternInfos.flatMap((info) => {
+              const { pattern: argsPattern, argName } = info;
               const toolNames: Array<string | undefined> = checker.toolName
                 ? Array.isArray(checker.toolName)
                   ? checker.toolName
@@ -467,6 +470,7 @@ export async function loadPoliciesFromToml(
                   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                   checker: checker.checker as SafetyCheckerConfig,
                   modes: checker.modes,
+                  argName,
                   source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,
                 };
 

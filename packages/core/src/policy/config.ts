@@ -307,12 +307,13 @@ export async function createPolicyEngineConfig(
         if (toolName === SHELL_TOOL_NAME) {
           const patterns = buildArgsPatterns(undefined, args);
           for (const pattern of patterns) {
-            if (pattern) {
+            if (pattern.pattern) {
               rules.push({
                 toolName,
                 decision: PolicyDecision.ALLOW,
                 priority: ALLOWED_TOOLS_FLAG_PRIORITY,
-                argsPattern: new RegExp(pattern),
+                argsPattern: new RegExp(pattern.pattern),
+                argName: pattern.argName,
                 source: 'Settings (Tools Allowed)',
               });
             }
@@ -410,14 +411,15 @@ export function createPolicyUpdater(
         // Convert commandPrefix(es) to argsPatterns for in-memory rules
         const patterns = buildArgsPatterns(undefined, message.commandPrefix);
         for (const pattern of patterns) {
-          if (pattern) {
+          if (pattern.pattern) {
             // Note: patterns from buildArgsPatterns are derived from escapeRegex,
             // which is safe and won't contain ReDoS patterns.
             policyEngine.addRule({
               toolName,
               decision: PolicyDecision.ALLOW,
               priority: ALWAYS_ALLOW_PRIORITY,
-              argsPattern: new RegExp(pattern),
+              argsPattern: new RegExp(pattern.pattern),
+              argName: pattern.argName,
               source: 'Dynamic (Confirmed)',
             });
           }

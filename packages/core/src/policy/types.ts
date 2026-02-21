@@ -116,6 +116,13 @@ export interface PolicyRule {
   argsPattern?: RegExp;
 
   /**
+   * Optional name of a specific argument to match the argsPattern against.
+   * If provided, the argsPattern is tested against the value of this argument
+   * (as a string) rather than the full JSON-stringified arguments object.
+   */
+  argName?: string;
+
+  /**
    * The decision to make when this rule matches.
    */
   decision: PolicyDecision;
@@ -164,6 +171,13 @@ export interface SafetyCheckerRule {
    * Can be used for more fine-grained control.
    */
   argsPattern?: RegExp;
+
+  /**
+   * Optional name of a specific argument to match the argsPattern against.
+   * If provided, the argsPattern is tested against the value of this argument
+   * (as a string) rather than the full JSON-stringified arguments object.
+   */
+  argName?: string;
 
   /**
    * Priority of this checker. Higher numbers run first.

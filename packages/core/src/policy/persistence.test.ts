@@ -154,8 +154,9 @@ describe('createPolicyUpdater', () => {
     expect(addedRule).toBeDefined();
     expect(addedRule?.priority).toBe(ALWAYS_ALLOW_PRIORITY);
     expect(addedRule?.argsPattern).toEqual(
-      new RegExp(`"command":"git\\ status(?:[\\s"]|\\\\")`),
+      new RegExp(`^git\\ status(?:\\s|$)`),
     );
+    expect(addedRule?.argName).toBe('command');
 
     // Verify file written
     expect(fs.open).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/), 'wx');

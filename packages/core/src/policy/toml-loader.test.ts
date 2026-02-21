@@ -80,12 +80,10 @@ priority = 100
       expect(result.rules).toHaveLength(2);
       expect(result.rules[0].toolName).toBe('run_shell_command');
       expect(result.rules[1].toolName).toBe('run_shell_command');
-      expect(
-        result.rules[0].argsPattern?.test('{"command":"git status"}'),
-      ).toBe(true);
-      expect(result.rules[1].argsPattern?.test('{"command":"git log"}')).toBe(
-        true,
-      );
+      expect(result.rules[0].argName).toBe('command');
+      expect(result.rules[1].argName).toBe('command');
+      expect(result.rules[0].argsPattern?.test('git status')).toBe(true);
+      expect(result.rules[1].argsPattern?.test('git log')).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
@@ -99,15 +97,10 @@ priority = 100
 `);
 
       expect(result.rules).toHaveLength(1);
-      expect(
-        result.rules[0].argsPattern?.test('{"command":"git status"}'),
-      ).toBe(true);
-      expect(
-        result.rules[0].argsPattern?.test('{"command":"git log --all"}'),
-      ).toBe(true);
-      expect(
-        result.rules[0].argsPattern?.test('{"command":"git branch"}'),
-      ).toBe(false);
+      expect(result.rules[0].argName).toBe('command');
+      expect(result.rules[0].argsPattern?.test('git status')).toBe(true);
+      expect(result.rules[0].argsPattern?.test('git log --all')).toBe(true);
+      expect(result.rules[0].argsPattern?.test('git branch')).toBe(false);
       expect(result.errors).toHaveLength(0);
     });
 
@@ -121,10 +114,10 @@ priority = 100
 `);
 
       expect(result.rules).toHaveLength(1);
-      // The generated pattern is "command":"^git status
-      expect(
-        result.rules[0].argsPattern?.test('{"command":"git status"}'),
-      ).toBe(true);
+      const rule = result.rules[0];
+      expect(rule.argName).toBe('command');
+      expect(rule.argsPattern?.test('git status')).toBe(true);
+      expect(rule.argsPattern?.test('prefix git status')).toBe(false);
       expect(result.errors).toHaveLength(0);
     });
 
@@ -322,13 +315,10 @@ priority = 100
 `);
 
       expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].argName).toBe('command');
       // The regex should have escaped the * and .
-      expect(
-        result.rules[0].argsPattern?.test('{"command":"git log file.txt"}'),
-      ).toBe(false);
-      expect(
-        result.rules[0].argsPattern?.test('{"command":"git log *.txt"}'),
-      ).toBe(true);
+      expect(result.rules[0].argsPattern?.test('git log file.txt')).toBe(false);
+      expect(result.rules[0].argsPattern?.test('git log *.txt')).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
