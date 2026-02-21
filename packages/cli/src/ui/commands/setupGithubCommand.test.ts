@@ -14,6 +14,9 @@ import {
   setupGithubCommand,
   updateGitignore,
   GITHUB_WORKFLOW_PATHS,
+  isValidGitHubOwner,
+  isValidGitHubRepoName,
+  getOpenUrlsCommands,
 } from './setupGithubCommand.js';
 import type { CommandContext } from './types.js';
 import * as commandUtils from '../utils/commandUtils.js';
@@ -337,5 +340,108 @@ describe('updateGitignore', () => {
 
     writeFileSpy.mockRestore();
     consoleSpy.mockRestore();
+  });
+});
+
+describe('isValidGitHubOwner', () => {
+  it('returns true for valid owner names', () => {
+    expect(isValidGitHubOwner('google')).toBe(true);
+    expect(isValidGitHubOwner('google-github')).toBe(true);
+    expect(isValidGitHubOwner('abc-123')).toBe(true);
+    expect(isValidGitHubOwner('a')).toBe(true);
+    expect(isValidGitHubOwner('1')).toBe(true);
+    expect(isValidGitHubOwner('A-b-C-1-2-3')).toBe(true);
+  });
+
+  it('returns false for invalid owner names', () => {
+    expect(isValidGitHubOwner('-google')).toBe(false); // Starts with hyphen
+    expect(isValidGitHubOwner('google-')).toBe(false); // Ends with hyphen
+    expect(isValidGitHubOwner('google--github')).toBe(false); // Multiple hyphens
+    expect(isValidGitHubOwner('google_github')).toBe(false); // Underscore
+    expect(isValidGitHubOwner('google.github')).toBe(false); // Dot
+    expect(
+      isValidGitHubOwner(
+        'VeryLongNameThatIsOverThirtyNineCharactersLongAndShouldFail',
+      ),
+    ).toBe(false); // Too long
+  });
+});
+
+describe('isValidGitHubRepoName', () => {
+  it('returns true for valid repo names', () => {
+    expect(isValidGitHubRepoName('gemini-cli')).toBe(true);
+    expect(isValidGitHubRepoName('Gemini_CLI')).toBe(true);
+    expect(isValidGitHubRepoName('repo.name')).toBe(true);
+    expect(isValidGitHubRepoName('123')).toBe(true);
+    expect(isValidGitHubRepoName('a')).toBe(true);
+  });
+
+  it('returns false for invalid repo names', () => {
+    expect(isValidGitHubRepoName('.')).toBe(false);
+    expect(isValidGitHubRepoName('..')).toBe(false);
+    expect(isValidGitHubRepoName('repo/name')).toBe(false);
+    expect(isValidGitHubRepoName('repo\\name')).toBe(false);
+    expect(isValidGitHubRepoName('repo name')).toBe(false);
+  });
+});
+
+describe('getOpenUrlsCommands', () => {
+  const readmeUrl = 'https://readme.url';
+
+  it('returns only readme URL if repo info cannot be determined', () => {
+    vi.mocked(gitUtils.getGitHubRepoInfo).mockImplementationOnce(() => {
+      throw new Error('No repo info');
+    });
+    vi.mocked(commandUtils.getUrlOpenCommand).mockReturnValue('open');
+
+    const result = getOpenUrlsCommands(readmeUrl);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toBe('open "https://readme.url"');
+    expect(result[1]).toContain('Could not determine repository info');
+  });
+
+  it('returns only readme URL if in upstream repository', () => {
+    vi.mocked(gitUtils.getGitHubRepoInfo).mockReturnValue({
+      owner: 'google-gemini',
+      repo: 'gemini-cli',
+    });
+    vi.mocked(commandUtils.getUrlOpenCommand).mockReturnValue('open');
+
+    const result = getOpenUrlsCommands(readmeUrl);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toBe('open "https://readme.url"');
+    expect(result[1]).toContain(
+      'Secrets page skipped. (You are in the upstream repo',
+    );
+  });
+
+  it('returns only readme URL if repo info is invalid', () => {
+    vi.mocked(gitUtils.getGitHubRepoInfo).mockReturnValue({
+      owner: '-invalid-',
+      repo: 'repo',
+    });
+    vi.mocked(commandUtils.getUrlOpenCommand).mockReturnValue('open');
+
+    const result = getOpenUrlsCommands(readmeUrl);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toBe('open "https://readme.url"');
+    expect(result[1]).toContain(
+      'Secrets page skipped. (You are in the upstream repo or the repo info is invalid)',
+    );
+  });
+
+  it('returns both readme and secrets URL for a safe, non-upstream repo', () => {
+    vi.mocked(gitUtils.getGitHubRepoInfo).mockReturnValue({
+      owner: 'my-org',
+      repo: 'my-repo',
+    });
+    vi.mocked(commandUtils.getUrlOpenCommand).mockReturnValue('open');
+
+    const result = getOpenUrlsCommands(readmeUrl);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toBe('open "https://readme.url"');
+    expect(result[1]).toBe(
+      'open "https://github.com/my-org/my-repo/settings/secrets/actions"',
+    );
   });
 });
