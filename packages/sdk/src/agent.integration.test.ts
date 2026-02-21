@@ -149,6 +149,7 @@ describe('GeminiCliAgent Integration', () => {
         throw new Error('Dynamic instruction failure');
       },
       model: 'gemini-2.0-flash',
+      fakeResponses: getGoldenPath('agent-static-instructions'), // Use an existing valid response file to avoid TS errors and network calls
     });
 
     const session = agent.session();
