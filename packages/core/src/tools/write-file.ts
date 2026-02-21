@@ -9,7 +9,11 @@ import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import * as Diff from 'diff';
-import { WRITE_FILE_TOOL_NAME, WRITE_FILE_DISPLAY_NAME } from './tool-names.js';
+import {
+  WRITE_FILE_TOOL_NAME,
+  WRITE_FILE_DISPLAY_NAME,
+  EDIT_TOOL_NAME,
+} from './tool-names.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 
@@ -341,6 +345,11 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         content,
       );
 
+      const OVERWRITE_WARNING_LINE_THRESHOLD = 50;
+      const originalLineCount = originalContent
+        ? originalContent.split('\n').length
+        : 0;
+
       const llmSuccessMessageParts = [
         isNewFile
           ? `Successfully created and wrote to new file: ${this.resolvedPath}.`
@@ -352,6 +361,18 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         );
       }
 
+      // Warn the model when it overwrites a large existing file,
+      // steering it toward using the edit tool for future modifications.
+      const isLargeExistingFileOverwrite =
+        !isNewFile && originalLineCount >= OVERWRITE_WARNING_LINE_THRESHOLD;
+      if (isLargeExistingFileOverwrite) {
+        llmSuccessMessageParts.push(
+          `\n\n⚠️ WARNING: You just overwrote an existing file with ${originalLineCount} lines. ` +
+            `For modifying existing files, prefer the \`${EDIT_TOOL_NAME}\` tool to make surgical, targeted edits ` +
+            `instead of rewriting the entire file. Full-file rewrites risk introducing unintended changes ` +
+            `and removing important code. Use \`write_file\` only for creating new files.`,
+        );
+      }
       // Return a diff of the file before and after the write so that the agent
       // can avoid the need to spend a turn doing a verification read.
       const snippet = getDiffContextSnippet(
@@ -392,6 +413,12 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       return {
         llmContent: llmSuccessMessageParts.join(' '),
         returnDisplay: displayResult,
+        ...(isLargeExistingFileOverwrite && {
+          error: {
+            message: `Overwrote existing file with ${originalLineCount} lines. Prefer \`${EDIT_TOOL_NAME}\` for modifying existing files.`,
+            type: ToolErrorType.WRITE_FILE_OVERWROTE_EXISTING,
+          },
+        }),
       };
     } catch (error) {
       // Capture detailed error information for debugging

@@ -46,6 +46,15 @@ import { CoreToolCallStatus } from '../scheduler/types.js';
 import { ToolExecutor } from '../scheduler/tool-executor.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getPolicyDenialError } from '../scheduler/policy.js';
+import {
+  LS_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  READ_MANY_FILES_TOOL_NAME,
+  GREP_TOOL_NAME,
+  GLOB_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
+} from '../tools/tool-names.js';
 
 export type {
   ToolCall,
@@ -571,7 +580,10 @@ export class CoreToolScheduler {
 
   private async _processNextInQueue(signal: AbortSignal): Promise<void> {
     // If there's already a tool being processed, or the queue is empty, stop.
-    if (this.toolCalls.length > 0 || this.toolCallQueue.length === 0) {
+    if (this.toolCalls.length > 0) {
+      return;
+    }
+    if (this.toolCallQueue.length === 0) {
       return;
     }
 
@@ -649,6 +661,7 @@ export class CoreToolScheduler {
             reqInfo.callId,
             ToolConfirmationOutcome.ProceedAlways,
           );
+
           this.setStatusInternal(
             reqInfo.callId,
             CoreToolCallStatus.Scheduled,
@@ -938,6 +951,10 @@ export class CoreToolScheduler {
         );
         this.notifyToolCallsUpdate();
 
+        if (completedCall.status === CoreToolCallStatus.Success) {
+          this.recordReviewIfApplicable(completedCall);
+        }
+
         await this.checkAndNotifyCompletion(signal);
       }
     }
@@ -1085,5 +1102,67 @@ export class CoreToolScheduler {
         outcome,
       };
     });
+  }
+
+  private recordReviewIfApplicable(call: SuccessfulToolCall): void {
+    const tracker = this.config.getReviewTrackerService();
+    const { name, args } = call.request;
+
+    switch (name) {
+      case LS_TOOL_NAME:
+      case READ_FILE_TOOL_NAME:
+        if (typeof args['path'] === 'string') {
+          tracker.recordReview(args['path']);
+        }
+        break;
+      case READ_MANY_FILES_TOOL_NAME:
+        if (Array.isArray(args['include'])) {
+          args['include'].forEach((p) => {
+            if (typeof p === 'string') tracker.recordReview(p);
+          });
+        }
+        break;
+      case GREP_TOOL_NAME:
+        if (typeof args['SearchPath'] === 'string') {
+          tracker.recordReview(args['SearchPath']);
+        }
+        break;
+      case GLOB_TOOL_NAME:
+        if (typeof args['SearchDirectory'] === 'string') {
+          tracker.recordReview(args['SearchDirectory']);
+        }
+        break;
+      case WEB_FETCH_TOOL_NAME:
+        if (typeof args['url'] === 'string') {
+          tracker.recordReview(args['url']);
+        }
+        break;
+      case WEB_SEARCH_TOOL_NAME:
+        if (typeof args['query'] === 'string') {
+          tracker.recordReview(`Web Search: ${args['query']}`);
+        }
+        break;
+      default:
+        // Handle MCP tools or other potential viewing tools
+        if (name.includes('__')) {
+          // Heuristic: if it has 'read', 'list', 'get', 'view', 'fetch', 'search' in the name
+          const toolSubName = name.split('__')[1].toLowerCase();
+          const viewKeywords = [
+            'read',
+            'list',
+            'get',
+            'view',
+            'fetch',
+            'search',
+            'inspect',
+            'ls',
+          ];
+          if (viewKeywords.some((k) => toolSubName.includes(k))) {
+            // Record the whole request as a "review" observation
+            tracker.recordReview(`MCP Tool ${name}(${JSON.stringify(args)})`);
+          }
+        }
+        break;
+    }
   }
 }

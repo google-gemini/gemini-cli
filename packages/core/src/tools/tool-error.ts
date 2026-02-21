@@ -43,6 +43,9 @@ export enum ToolErrorType {
   EDIT_NO_CHANGE = 'edit_no_change',
   EDIT_NO_CHANGE_LLM_JUDGEMENT = 'edit_no_change_llm_judgement',
 
+  // Write-file guardrails
+  WRITE_FILE_OVERWROTE_EXISTING = 'write_file_overwrote_existing',
+
   // Glob-specific Errors
   GLOB_EXECUTION_ERROR = 'glob_execution_error',
 
