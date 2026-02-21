@@ -77,7 +77,37 @@ export function buildArgsPatterns(
   }
 
   if (commandRegex) {
-    return [`"command":"${commandRegex}`];
+    let pattern = commandRegex;
+
+    // 1. Handle ^ (Start Anchor)
+    // If the regex starts with ^, we remove it because the pattern is already
+    // implicitly anchored to the start of the command value by the prepended
+    // "command":" prefix. We only do this if it's not escaped.
+    if (pattern.startsWith('^')) {
+      pattern = pattern.slice(1);
+    }
+
+    // 2. Handle $ (End Anchor)
+    // If the regex ends with $, we replace it with "(?:,|\\}) to match the
+    // closing quote of the command value in the JSON-stringified arguments.
+    // We only do this if the $ is not escaped by an odd number of backslashes.
+    if (pattern.endsWith('$')) {
+      let backslashCount = 0;
+      for (let i = pattern.length - 2; i >= 0; i--) {
+        if (pattern[i] === '\\') {
+          backslashCount++;
+        } else {
+          break;
+        }
+      }
+
+      if (backslashCount % 2 === 0) {
+        // Anchor to the end of the JSON string value: " followed by , or }
+        pattern = pattern.slice(0, -1) + '"(?:,|\\})';
+      }
+    }
+
+    return [`"command":"${pattern}`];
   }
 
   return [argsPattern];
