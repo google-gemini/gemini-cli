@@ -42,7 +42,16 @@ export const QuotaDisplay: React.FC<QuotaDisplayProps> = ({
   });
 
   const resetInfo =
-    !terse && resetTime ? `, ${formatResetTime(resetTime)}` : '';
+    !terse && resetTime
+      ? (function (t) {
+          const formatted = formatResetTime(t);
+          const info =
+            formatted === 'Resetting...' || formatted === '< 1m'
+              ? formatted
+              : `resets in ${formatted}`;
+          return `, ${info}`;
+        })(resetTime)
+      : '';
 
   if (remaining === 0) {
     return (

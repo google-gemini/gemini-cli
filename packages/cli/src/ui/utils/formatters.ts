@@ -97,12 +97,35 @@ export function stripReferenceContent(text: string): string {
 
   return text.replace(pattern, '').trim();
 }
+const UNIX_SECONDS_THRESHOLD = 10_000_000_000;
 
-export const formatResetTime = (resetTime: string): string => {
-  const diff = new Date(resetTime).getTime() - Date.now();
-  if (diff <= 0) return '';
+export const formatResetTime = (
+  resetTime: string,
+  options: { capitalize?: boolean; includePrefix?: boolean } = {},
+): string => {
+  const { capitalize = false, includePrefix = true } = options;
+  let date = new Date(resetTime);
 
-  const totalMinutes = Math.ceil(diff / (1000 * 60));
+  // If invalid, try parsing as a number (unix timestamp)
+  if (isNaN(date.getTime())) {
+    const timestamp = parseInt(resetTime, 10);
+    if (!isNaN(timestamp)) {
+      // Heuristic: If the timestamp is less than 10^10, it is likely in seconds
+      // (as 10^10 ms is year 1970, while 10^10 s is year 2286).
+      date = new Date(
+        timestamp < UNIX_SECONDS_THRESHOLD ? timestamp * 1000 : timestamp,
+      );
+    }
+  }
+
+  if (isNaN(date.getTime())) {
+    return '';
+  }
+
+  const diff = date.getTime() - Date.now();
+  if (diff <= 0) return 'Resetting...';
+
+  const totalMinutes = Math.floor(diff / (1000 * 60));
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
 
@@ -113,11 +136,21 @@ export const formatResetTime = (resetTime: string): string => {
       unitDisplay: 'narrow',
     }).format(val);
 
+  let timeStr = '';
   if (hours > 0 && minutes > 0) {
-    return `resets in ${fmt(hours, 'hour')} ${fmt(minutes, 'minute')}`;
+    timeStr = `${fmt(hours, 'hour')} ${fmt(minutes, 'minute')}`;
   } else if (hours > 0) {
-    return `resets in ${fmt(hours, 'hour')}`;
+    timeStr = fmt(hours, 'hour');
+  } else if (minutes > 0) {
+    timeStr = fmt(minutes, 'minute');
+  } else {
+    timeStr = '< 1m';
   }
 
-  return `resets in ${fmt(minutes, 'minute')}`;
+  if (timeStr === '< 1m' || !includePrefix) {
+    return timeStr;
+  }
+
+  const prefix = capitalize ? 'Resets in ' : 'resets in ';
+  return `${prefix}${timeStr}`;
 };
