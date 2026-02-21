@@ -636,6 +636,7 @@ async function fetchCachedCredentials(): Promise<
   for (const keyFile of pathsToTry) {
     try {
       const keyFileString = await fs.readFile(keyFile, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return JSON.parse(keyFileString);
     } catch (error) {
       // Log specific error for debugging, but continue trying other paths

@@ -98,6 +98,7 @@ function resolveEnvVarsInObjectInternal<T>(
     visited.add(obj);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const result = obj.map((item) =>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       resolveEnvVarsInObjectInternal(item, visited, customEnv),
     ) as unknown as T;
     visited.delete(obj);
