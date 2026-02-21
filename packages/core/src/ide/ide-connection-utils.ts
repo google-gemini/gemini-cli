@@ -123,6 +123,7 @@ export async function getConnectionConfigFromFile(
       `gemini-ide-server-${pid}.json`,
     );
     const portFileContents = await fs.promises.readFile(portFile, 'utf8');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return JSON.parse(portFileContents);
   } catch (_) {
     // For newer extension versions, the file name matches the pattern
@@ -167,6 +168,7 @@ export async function getConnectionConfigFromFile(
   }
   const parsedContents = fileContents.map((content) => {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return JSON.parse(content);
     } catch (e) {
       logger.debug('Failed to parse JSON from config file: ', e);
@@ -196,6 +198,7 @@ export async function getConnectionConfigFromFile(
     if (fileIndex !== -1) {
       logger.debug(`Selected IDE connection file: ${matchingFiles[fileIndex]}`);
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return selected;
   }
 
@@ -213,6 +216,7 @@ export async function getConnectionConfigFromFile(
           `Selected IDE connection file (matched port from env): ${matchingFiles[fileIndex]}`,
         );
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return selected;
     }
   }
@@ -225,6 +229,7 @@ export async function getConnectionConfigFromFile(
       `Selected first valid IDE connection file: ${matchingFiles[fileIndex]}`,
     );
   }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return selected;
 }
 

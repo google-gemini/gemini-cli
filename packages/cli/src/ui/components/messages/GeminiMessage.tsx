@@ -12,6 +12,7 @@ import { theme } from '../../semantic-colors.js';
 import { SCREEN_READER_MODEL_PREFIX } from '../../textConstants.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
+import { OverflowProvider } from '../../contexts/OverflowContext.js';
 
 interface GeminiMessageProps {
   text: string;
@@ -31,7 +32,7 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({
   const prefixWidth = prefix.length;
 
   const isAlternateBuffer = useAlternateBuffer();
-  return (
+  const content = (
     <Box flexDirection="row">
       <Box width={prefixWidth}>
         <Text color={theme.text.accent} aria-label={SCREEN_READER_MODEL_PREFIX}>
@@ -60,5 +61,12 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({
         </Box>
       </Box>
     </Box>
+  );
+
+  return isAlternateBuffer ? (
+    /* Shadow the global provider to maintain isolation in ASB mode. */
+    <OverflowProvider>{content}</OverflowProvider>
+  ) : (
+    content
   );
 };
