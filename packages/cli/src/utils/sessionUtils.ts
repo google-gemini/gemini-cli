@@ -254,6 +254,7 @@ export const getAllSessionFiles = async (
       async (file): Promise<SessionFileEntry> => {
         const filePath = path.join(chatsDir, file);
         try {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const content: ConversationRecord = JSON.parse(
             await fs.readFile(filePath, 'utf8'),
           );
@@ -272,6 +273,12 @@ export const getAllSessionFiles = async (
 
           // Skip sessions that only contain system messages (info, error, warning)
           if (!hasUserOrAssistantMessage(content.messages)) {
+            return { fileName: file, sessionInfo: null };
+          }
+
+          // Skip subagent sessions - these are implementation details of a tool call
+          // and shouldn't be surfaced for resumption in the main agent history.
+          if (content.kind === 'subagent') {
             return { fileName: file, sessionInfo: null };
           }
 
@@ -498,6 +505,7 @@ export class SessionSelector {
     const sessionPath = path.join(chatsDir, sessionInfo.fileName);
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const sessionData: ConversationRecord = JSON.parse(
         await fs.readFile(sessionPath, 'utf8'),
       );

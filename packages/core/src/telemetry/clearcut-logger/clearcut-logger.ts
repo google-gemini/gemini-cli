@@ -716,6 +716,7 @@ export class ClearcutLogger {
         event.function_name === ASK_USER_TOOL_NAME &&
         event.metadata['ask_user']
       ) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const askUser = event.metadata['ask_user'];
         const askUserMapping: { [key: string]: EventMetadataKey } = {
           question_types: EventMetadataKey.GEMINI_CLI_ASK_USER_QUESTION_TYPES,
