@@ -139,6 +139,18 @@ describe('detectIde', () => {
     expect(detectIde(ideProcessInfoNoCode)).toBe(IDE_DEFINITIONS.antigravity);
   });
 
+  it('should not detect Antigravity from broad VSCODE_GIT_ASKPASS_MAIN substrings', () => {
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+    vi.stubEnv(
+      'VSCODE_GIT_ASKPASS_MAIN',
+      '/Applications/not-antigravity-build/askpass.sh',
+    );
+    vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('POSITRON', '');
+    expect(detectIde(ideProcessInfoNoCode)).toBe(IDE_DEFINITIONS.vscodefork);
+  });
+
   it('should detect Antigravity when TERM_PROGRAM is not vscode but env signal is present', () => {
     vi.stubEnv('TERM_PROGRAM', '');
     vi.stubEnv(

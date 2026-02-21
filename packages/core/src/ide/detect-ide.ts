@@ -44,13 +44,23 @@ function isJetBrains(): boolean {
     .includes('jetbrains');
 }
 
+function hasAntigravityPathSegment(path: string | undefined): boolean {
+  if (!path) {
+    return false;
+  }
+
+  const normalizedPath = path.toLowerCase().replace(/\\/g, '/');
+  const pathSegments = normalizedPath.split('/');
+  return pathSegments.some(
+    (segment) => segment === 'antigravity' || segment === 'antigravity.app',
+  );
+}
+
 function isAntigravityFromEnv(): boolean {
   return !!(
     process.env['ANTIGRAVITY_CLI_ALIAS'] ||
     process.env['TERM_PROGRAM'] === 'antigravity' ||
-    process.env['VSCODE_GIT_ASKPASS_MAIN']
-      ?.toLowerCase()
-      .includes('antigravity')
+    hasAntigravityPathSegment(process.env['VSCODE_GIT_ASKPASS_MAIN'])
   );
 }
 
