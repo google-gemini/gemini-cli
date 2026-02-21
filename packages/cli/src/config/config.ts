@@ -441,6 +441,264 @@ export interface LoadCliConfigOptions {
   };
 }
 
+/**
+ * Minimal config parameters — only what's needed for auth bootstrap.
+ */
+export interface MinimalConfigParameters {
+  cwd?: string;
+}
+
+/**
+ * Loads a lightweight Config for auth bootstrap without heavy initialization.
+ *
+ * Skips FileDiscoveryService, ExtensionManager, and memory loading so
+ * refreshAuth can run fast before we enter the sandbox.
+ *
+ * See TODO(jacobr) in gemini.tsx for context on why this exists.
+ */
+export async function loadMinimalCliConfig(
+  settings: MergedSettings,
+  sessionId: string,
+  argv: CliArgs,
+  params: MinimalConfigParameters = {},
+): Promise<Config> {
+  const { cwd = process.cwd() } = params;
+  const debugMode = isDebugMode(argv);
+  const loadedSettings = loadSettings(cwd);
+
+  if (argv.sandbox) {
+    process.env['GEMINI_SANDBOX'] = 'true';
+  }
+
+  if (settings.context?.fileName) {
+    setServerGeminiMdFilename(settings.context.fileName);
+  } else {
+    setServerGeminiMdFilename(getCurrentGeminiMdFilename());
+  }
+
+  // Resolve approval mode — duplicated from loadCliConfig for now,
+  // should be extracted into a shared helper in a follow-up.
+  let approvalMode: ApprovalMode;
+  const rawApprovalMode =
+    argv.approvalMode ||
+    (argv.yolo ? 'yolo' : undefined) ||
+    ((settings.general?.defaultApprovalMode as string) !== 'yolo'
+      ? settings.general?.defaultApprovalMode
+      : undefined);
+
+  if (rawApprovalMode) {
+    switch (rawApprovalMode) {
+      case 'yolo':
+        approvalMode = ApprovalMode.YOLO;
+        break;
+      case 'auto_edit':
+        approvalMode = ApprovalMode.AUTO_EDIT;
+        break;
+      case 'plan':
+        if (!(settings.experimental?.plan ?? false)) {
+          debugLogger.warn(
+            'Approval mode "plan" is only available when experimental.plan is enabled. Falling back to "default".',
+          );
+          approvalMode = ApprovalMode.DEFAULT;
+        } else {
+          approvalMode = ApprovalMode.PLAN;
+        }
+        break;
+      case 'default':
+        approvalMode = ApprovalMode.DEFAULT;
+        break;
+      default:
+        throw new Error(
+          `Invalid approval mode: ${rawApprovalMode}. Valid values are: yolo, auto_edit, plan, default`,
+        );
+    }
+  } else {
+    approvalMode = ApprovalMode.DEFAULT;
+  }
+
+  if (settings.security?.disableYoloMode || settings.admin?.secureModeEnabled) {
+    if (approvalMode === ApprovalMode.YOLO) {
+      if (settings.admin?.secureModeEnabled) {
+        debugLogger.error(
+          'YOLO mode is disabled by "secureModeEnabled" setting.',
+        );
+      } else {
+        debugLogger.error(
+          'YOLO mode is disabled by the "disableYolo" setting.',
+        );
+      }
+      throw new FatalConfigError(
+        getAdminErrorMessage('YOLO mode', undefined /* config */),
+      );
+    }
+  } else if (approvalMode === ApprovalMode.YOLO) {
+    debugLogger.warn(
+      'YOLO mode is enabled. All tool calls will be automatically approved.',
+    );
+  }
+
+  let telemetrySettings;
+  try {
+    telemetrySettings = await resolveTelemetrySettings({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      env: process.env as unknown as Record<string, string | undefined>,
+      settings: settings.telemetry,
+    });
+  } catch (err) {
+    if (err instanceof FatalConfigError) {
+      throw new FatalConfigError(
+        `Invalid telemetry configuration: ${err.message}.`,
+      );
+    }
+    throw err;
+  }
+
+  const interactive =
+    !!argv.promptInteractive ||
+    !!argv.experimentalAcp ||
+    (!isHeadlessMode({ prompt: argv.prompt, query: argv.query }) &&
+      !argv.isCommand);
+
+  const policyEngineConfig = await createPolicyEngineConfig(
+    settings,
+    approvalMode,
+  );
+  policyEngineConfig.nonInteractive = !interactive;
+
+  const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
+  const specifiedModel =
+    argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
+  const resolvedModel =
+    specifiedModel === GEMINI_MODEL_ALIAS_AUTO
+      ? defaultModel
+      : specifiedModel || defaultModel;
+
+  const sandboxConfig = await loadSandboxConfig(settings, argv);
+  const screenReader =
+    argv.screenReader !== undefined
+      ? argv.screenReader
+      : (settings.ui?.accessibility?.screenReader ?? false);
+
+  const ptyInfo = await getPty();
+
+  // Build the minimal Config — no file discovery, extensions, or memory.
+  return new Config({
+    sessionId,
+    clientVersion: await getVersion(),
+    embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
+    sandbox: sandboxConfig,
+    targetDir: cwd,
+    includeDirectoryTree: settings.context?.includeDirectoryTree ?? true,
+    includeDirectories: [],
+    loadMemoryFromIncludeDirectories: false,
+    debugMode,
+    question: argv.promptInteractive || argv.prompt || '',
+    coreTools: undefined,
+    allowedTools: undefined,
+    policyEngineConfig,
+    excludeTools: [],
+    toolDiscoveryCommand: undefined,
+    toolCallCommand: undefined,
+    mcpServerCommand: undefined,
+    mcpServers: {},
+    mcpEnablementCallbacks: undefined,
+    mcpEnabled: false,
+    extensionsEnabled: false,
+    agents: settings.agents,
+    adminSkillsEnabled: false,
+    allowedMcpServers: undefined,
+    blockedMcpServers: undefined,
+    blockedEnvironmentVariables:
+      settings.security?.environmentVariableRedaction?.blocked,
+    enableEnvironmentVariableRedaction:
+      settings.security?.environmentVariableRedaction?.enabled,
+    userMemory: '',
+    geminiMdFileCount: 0,
+    geminiMdFilePaths: [],
+    approvalMode,
+    disableYoloMode:
+      settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,
+    showMemoryUsage: settings.ui?.showMemoryUsage || false,
+    accessibility: {
+      ...settings.ui?.accessibility,
+      screenReader,
+    },
+    telemetry: telemetrySettings,
+    usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled,
+    fileFiltering: DEFAULT_FILE_FILTERING_OPTIONS,
+    checkpointing: settings.general?.checkpointing?.enabled,
+    proxy:
+      process.env['HTTPS_PROXY'] ||
+      process.env['https_proxy'] ||
+      process.env['HTTP_PROXY'] ||
+      process.env['http_proxy'],
+    cwd,
+    fileDiscoveryService: undefined,
+    bugCommand: settings.advanced?.bugCommand,
+    model: resolvedModel,
+    maxSessionTurns: settings.model?.maxSessionTurns,
+    experimentalZedIntegration: argv.experimentalAcp || false,
+    listExtensions: argv.listExtensions || false,
+    listSessions: argv.listSessions || false,
+    deleteSession: argv.deleteSession,
+    enabledExtensions: argv.extensions,
+    extensionLoader: undefined,
+    enableExtensionReloading: false,
+    enableAgents: settings.experimental?.enableAgents,
+    plan: settings.experimental?.plan,
+    enableEventDrivenScheduler: true,
+    skillsSupport: settings.skills?.enabled ?? true,
+    disabledSkills: settings.skills?.disabled,
+    experimentalJitContext: settings.experimental?.jitContext,
+    modelSteering: settings.experimental?.modelSteering,
+    toolOutputMasking: settings.experimental?.toolOutputMasking,
+    noBrowser: !!process.env['NO_BROWSER'],
+    summarizeToolOutput: settings.model?.summarizeToolOutput,
+    ideMode: settings.ide?.enabled ?? false,
+    disableLoopDetection: settings.model?.disableLoopDetection,
+    compressionThreshold: settings.model?.compressionThreshold,
+    folderTrust: false,
+    interactive,
+    trustedFolder: false,
+    useBackgroundColor: settings.ui?.useBackgroundColor,
+    useRipgrep: settings.tools?.useRipgrep,
+    enableInteractiveShell: settings.tools?.shell?.enableInteractiveShell,
+    shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
+    enableShellOutputEfficiency:
+      settings.tools?.shell?.enableShellOutputEfficiency ?? true,
+    skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
+    enablePromptCompletion: settings.general?.enablePromptCompletion,
+    truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
+    eventEmitter: coreEvents,
+    useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
+    output: {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
+    },
+    fakeResponses: argv.fakeResponses,
+    recordResponses: argv.recordResponses,
+    retryFetchErrors: settings.general?.retryFetchErrors,
+    ptyInfo: ptyInfo?.name,
+    disableLLMCorrection: settings.tools?.disableLLMCorrection,
+    rawOutput: argv.rawOutput,
+    acceptRawOutputRisk: argv.acceptRawOutputRisk,
+    modelConfigServiceConfig: settings.modelConfigs,
+    enableHooks: settings.hooksConfig.enabled,
+    enableHooksUI: settings.hooksConfig.enabled,
+    hooks: settings.hooks || {},
+    disabledHooks: settings.hooksConfig?.disabled || [],
+    projectHooks: {},
+    onModelChange: (model: string) => saveModelChange(loadedSettings, model),
+    onReload: async () => {
+      const refreshedSettings = loadSettings(cwd);
+      return {
+        disabledSkills: refreshedSettings.merged.skills.disabled,
+        agents: refreshedSettings.merged.agents,
+      };
+    },
+  });
+}
+
 export async function loadCliConfig(
   settings: MergedSettings,
   sessionId: string,

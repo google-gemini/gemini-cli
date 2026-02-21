@@ -7,7 +7,11 @@
 import React from 'react';
 import { render } from 'ink';
 import { AppContainer } from './ui/AppContainer.js';
-import { loadCliConfig, parseArguments } from './config/config.js';
+import {
+  loadCliConfig,
+  loadMinimalCliConfig,
+  parseArguments,
+} from './config/config.js';
 import * as cliConfig from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
@@ -437,9 +441,12 @@ export async function main() {
     }
   }
 
-  const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
-    projectHooks: settings.workspace.settings.hooks,
-  });
+  // Use the minimal config for auth bootstrap — skips heavy services.
+  const partialConfig = await loadMinimalCliConfig(
+    settings.merged,
+    sessionId,
+    argv,
+  );
   adminControlsListner.setConfig(partialConfig);
 
   // Refresh auth to fetch remote admin settings from CCPA and before entering
