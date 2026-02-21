@@ -269,6 +269,9 @@ describe('useGeminiStream', () => {
     getGlobalMemory: vi.fn(() => ''),
     getUserMemory: vi.fn(() => ''),
     getMessageBus: vi.fn(() => mockMessageBus),
+    isHeadlessModeActive: vi.fn(() => false),
+    exitHeadlessMode: vi.fn(),
+    enterHeadlessMode: vi.fn(),
     getBaseLlmClient: vi.fn(() => ({
       generateContent: vi.fn().mockResolvedValue({
         candidates: [
@@ -2078,6 +2081,62 @@ describe('useGeminiStream', () => {
       expect(mockMessageBus.publish).not.toHaveBeenCalledWith(
         expect.objectContaining({ correlationId: 'corr-call2' }),
       );
+    });
+  });
+
+  describe('headless mode', () => {
+    it('should auto-cancel pending tool confirmations when headless is active', async () => {
+      vi.mocked(mockConfig.isHeadlessModeActive).mockReturnValue(true);
+      const awaitingApprovalToolCalls: TrackedToolCall[] = [
+        createMockToolCall('replace', 'call1', 'edit'),
+      ];
+
+      renderTestHook(awaitingApprovalToolCalls);
+
+      await waitFor(() => {
+        expect(mockMessageBus.publish).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+            correlationId: 'corr-call1',
+            confirmed: false,
+            outcome: ToolConfirmationOutcome.Cancel,
+          }),
+        );
+      });
+    });
+
+    it('should exit headless mode after a run completes with no tool calls', async () => {
+      vi.mocked(mockConfig.isHeadlessModeActive).mockReturnValue(true);
+
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Done.',
+          };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: { reason: 'STOP', usageMetadata: undefined },
+          };
+        })(),
+      );
+
+      const { result } = renderHookWithDefaults();
+
+      await act(async () => {
+        await result.current.submitQuery('test');
+      });
+
+      await waitFor(() => {
+        expect(mockConfig.exitHeadlessMode).toHaveBeenCalled();
+        expect(mockAddItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.INFO,
+            text: 'Headless mode ended. Back to interactive.',
+          },
+          expect.any(Number),
+        );
+      });
     });
   });
 
