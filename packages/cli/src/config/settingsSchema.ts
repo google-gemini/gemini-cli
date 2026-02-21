@@ -965,7 +965,7 @@ const SETTINGS_SCHEMA = {
         label: 'Subagent Verbose Mode',
         category: 'Advanced',
         requiresRestart: false,
-        default: true,
+        default: false,
         description:
           'When true, stream subagent thinking and action logs (thoughts, tool calls, errors) into the conversation for debugging. When false, only minimal output is shown.',
         showInDialog: false,
