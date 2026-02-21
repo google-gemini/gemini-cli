@@ -83,6 +83,7 @@ export const getLatestGitHubRelease = async (
     if (!releaseTag) {
       throw new Error(`Response did not include tag_name field`);
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return releaseTag;
   } catch (_error) {
     debugLogger.debug(
