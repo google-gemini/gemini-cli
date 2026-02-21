@@ -5,6 +5,7 @@
  */
 
 import { spawn } from 'node:child_process';
+import { MAX_SUBPROCESS_OUTPUT_SIZE } from '../utils/constants.js';
 import type {
   HookConfig,
   HookInput,
@@ -259,7 +260,9 @@ export class HookRunner {
 
       let stdout = '';
       let stderr = '';
-      let timedOut = false;
+      let settled = false;
+      let stdoutByteLength = 0;
+      let stderrByteLength = 0;
 
       const shellConfig = getShellConfiguration();
       const command = this.expandCommand(
@@ -289,7 +292,8 @@ export class HookRunner {
 
       // Set up timeout
       const timeoutHandle = setTimeout(() => {
-        timedOut = true;
+        if (settled) return;
+        settled = true;
         child.kill('SIGTERM');
 
         // Force kill after 5 seconds
@@ -298,6 +302,16 @@ export class HookRunner {
             child.kill('SIGKILL');
           }
         }, 5000);
+
+        resolve({
+          hookConfig,
+          eventName,
+          success: false,
+          error: new Error(`Hook timed out after ${timeout}ms`),
+          stdout,
+          stderr,
+          duration: Date.now() - startTime,
+        });
       }, timeout);
 
       // Send input to stdin
@@ -324,31 +338,58 @@ export class HookRunner {
 
       // Collect stdout
       child.stdout?.on('data', (data: Buffer) => {
+        if (settled) return;
+        stdoutByteLength += data.length;
+        if (stdoutByteLength > MAX_SUBPROCESS_OUTPUT_SIZE) {
+          settled = true;
+          clearTimeout(timeoutHandle);
+          child.kill('SIGTERM');
+          resolve({
+            hookConfig,
+            eventName,
+            success: false,
+            error: new Error(
+              `Hook output exceeded maximum size of ${MAX_SUBPROCESS_OUTPUT_SIZE} bytes`,
+            ),
+            stdout,
+            stderr,
+            duration: Date.now() - startTime,
+          });
+          return;
+        }
         stdout += data.toString();
       });
 
       // Collect stderr
       child.stderr?.on('data', (data: Buffer) => {
+        if (settled) return;
+        stderrByteLength += data.length;
+        if (stderrByteLength > MAX_SUBPROCESS_OUTPUT_SIZE) {
+          settled = true;
+          clearTimeout(timeoutHandle);
+          child.kill('SIGTERM');
+          resolve({
+            hookConfig,
+            eventName,
+            success: false,
+            error: new Error(
+              `Hook stderr exceeded maximum size of ${MAX_SUBPROCESS_OUTPUT_SIZE} bytes`,
+            ),
+            stdout,
+            stderr,
+            duration: Date.now() - startTime,
+          });
+          return;
+        }
         stderr += data.toString();
       });
 
       // Handle process exit
       child.on('close', (exitCode) => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timeoutHandle);
         const duration = Date.now() - startTime;
-
-        if (timedOut) {
-          resolve({
-            hookConfig,
-            eventName,
-            success: false,
-            error: new Error(`Hook timed out after ${timeout}ms`),
-            stdout,
-            stderr,
-            duration,
-          });
-          return;
-        }
 
         // Parse output
         let output: HookOutput | undefined;
@@ -389,6 +430,8 @@ export class HookRunner {
 
       // Handle process errors
       child.on('error', (error) => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timeoutHandle);
         const duration = Date.now() - startTime;
 

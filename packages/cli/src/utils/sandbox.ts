@@ -11,7 +11,11 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { quote, parse } from 'shell-quote';
 import { promisify } from 'node:util';
-import type { Config, SandboxConfig } from '@google/gemini-cli-core';
+import {
+  type Config,
+  type SandboxConfig,
+  MAX_SUBPROCESS_OUTPUT_SIZE,
+} from '@google/gemini-cli-core';
 import {
   coreEvents,
   debugLogger,
@@ -729,8 +733,12 @@ async function imageExists(sandbox: string, image: string): Promise<boolean> {
     const checkProcess = spawn(sandbox, args);
 
     let stdoutData = '';
+    let stdoutByteLength = 0;
+
     if (checkProcess.stdout) {
-      checkProcess.stdout.on('data', (data) => {
+      checkProcess.stdout.on('data', (data: Buffer) => {
+        stdoutByteLength += data.length;
+        if (stdoutByteLength > MAX_SUBPROCESS_OUTPUT_SIZE) return;
         stdoutData += data.toString();
       });
     }
@@ -764,6 +772,7 @@ async function pullImage(
     const pullProcess = spawn(sandbox, args, { stdio: 'pipe' });
 
     let stderrData = '';
+    let stderrByteLength = 0;
 
     const onStdoutData = (data: Buffer) => {
       if (cliConfig?.getDebugMode() || process.env['DEBUG']) {
@@ -772,6 +781,8 @@ async function pullImage(
     };
 
     const onStderrData = (data: Buffer) => {
+      stderrByteLength += data.length;
+      if (stderrByteLength > MAX_SUBPROCESS_OUTPUT_SIZE) return;
       stderrData += data.toString();
       // eslint-disable-next-line no-console
       console.error(data.toString().trim()); // Show pull errors/info from the command itself
