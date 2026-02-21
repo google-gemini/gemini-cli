@@ -351,7 +351,7 @@ export const AdminControlsSettingsSchema = z.object({
 export type AdminControlsSettings = z.infer<typeof AdminControlsSettingsSchema>;
 
 export const FetchAdminControlsResponseSchema = z.object({
-  // TODO: deprecate once backend stops sending this field
+  /** @deprecated This field will be removed once the backend stops sending it. Use `strictModeDisabled` instead. */
   secureModeEnabled: z.boolean().optional(),
   strictModeDisabled: z.boolean().optional(),
   mcpSetting: McpSettingSchema.optional(),
