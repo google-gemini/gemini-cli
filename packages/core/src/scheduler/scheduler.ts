@@ -105,6 +105,13 @@ export class Scheduler {
   private isProcessing = false;
   private isCancelling = false;
   private readonly requestQueue: SchedulerQueueItem[] = [];
+  private readonly progressThrottles = new Map<
+    string,
+    {
+      timer: ReturnType<typeof setTimeout>;
+      pending: McpProgressPayload | null;
+    }
+  >();
 
   constructor(options: SchedulerOptions) {
     this.config = options.config;
@@ -127,19 +134,66 @@ export class Scheduler {
   }
 
   dispose(): void {
+    this.flushProgressThrottle();
     coreEvents.off(CoreEvent.McpProgress, this.handleMcpProgress);
   }
 
   private readonly handleMcpProgress = (payload: McpProgressPayload) => {
-    const callId = payload.callId;
-    this.state.updateStatus(callId, CoreToolCallStatus.Executing, {
-      progressMessage: payload.message,
-      progressPercent:
-        payload.total && payload.total > 0
-          ? (payload.progress / payload.total) * 100
-          : undefined,
-    });
+    const { callId } = payload;
+
+    const call = this.state.getToolCall(callId);
+    if (!call || call.status !== CoreToolCallStatus.Executing) {
+      return;
+    }
+
+    const existing = this.progressThrottles.get(callId);
+
+    if (!existing) {
+      this.applyProgress(payload);
+      const timer = setTimeout(() => {
+        const state = this.progressThrottles.get(callId);
+        this.progressThrottles.delete(callId);
+        if (state?.pending) {
+          this.applyProgress(state.pending);
+        }
+      }, 100);
+      this.progressThrottles.set(callId, { timer, pending: null });
+    } else {
+      existing.pending = payload;
+    }
   };
+
+  private applyProgress(payload: McpProgressPayload): void {
+    const currentCall = this.state.getToolCall(payload.callId);
+    if (!currentCall || currentCall.status !== CoreToolCallStatus.Executing) {
+      return;
+    }
+
+    const validTotal =
+      payload.total !== undefined &&
+      Number.isFinite(payload.total) &&
+      payload.total > 0
+        ? payload.total
+        : undefined;
+    this.state.updateStatus(payload.callId, CoreToolCallStatus.Executing, {
+      progressMessage: payload.message,
+      progressPercent: validTotal
+        ? Math.min(100, (payload.progress / validTotal) * 100)
+        : undefined,
+      progress: payload.progress,
+      progressTotal: validTotal,
+    });
+  }
+
+  private flushProgressThrottle(): void {
+    for (const [, state] of this.progressThrottles) {
+      clearTimeout(state.timer);
+      if (state.pending) {
+        this.applyProgress(state.pending);
+      }
+    }
+    this.progressThrottles.clear();
+  }
 
   private setupMessageBusListener(messageBus: MessageBus): void {
     if (Scheduler.subscribedMessageBuses.has(messageBus)) {
