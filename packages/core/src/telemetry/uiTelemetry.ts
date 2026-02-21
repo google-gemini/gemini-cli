@@ -16,9 +16,8 @@ import type {
   ApiErrorEvent,
   ApiResponseEvent,
   ToolCallEvent,
+  LlmRole,
 } from './types.js';
-
-import type { LlmRole } from './types.js';
 
 export type UiEvent =
   | (ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE })

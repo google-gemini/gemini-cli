@@ -14,19 +14,21 @@ import {
   type Mock,
 } from 'vitest';
 import { Task } from './task.js';
+import type {
+  ToolCall,
+  Config,
+  ToolCallRequestInfo,
+  GitService,
+  CompletedToolCall,
+} from '@google/gemini-cli-core';
 import {
   GeminiEventType,
-  type Config,
-  type ToolCallRequestInfo,
-  type GitService,
-  type CompletedToolCall,
   ApprovalMode,
   ToolConfirmationOutcome,
 } from '@google/gemini-cli-core';
 import { createMockConfig } from '../utils/testing_utils.js';
 import type { ExecutionEventBus, RequestContext } from '@a2a-js/sdk/server';
 import { CoderAgentEvent } from '../types.js';
-import type { ToolCall } from '@google/gemini-cli-core';
 
 const mockProcessRestorableToolCalls = vi.hoisted(() => vi.fn());
 

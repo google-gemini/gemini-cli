@@ -9,9 +9,8 @@ import { TraceExporter } from '@google-cloud/opentelemetry-cloud-trace-exporter'
 import { MetricExporter } from '@google-cloud/opentelemetry-cloud-monitoring-exporter';
 import { Logging } from '@google-cloud/logging';
 import type { Log } from '@google-cloud/logging';
-import { hrTimeToMilliseconds } from '@opentelemetry/core';
+import { hrTimeToMilliseconds, ExportResultCode } from '@opentelemetry/core';
 import type { ExportResult } from '@opentelemetry/core';
-import { ExportResultCode } from '@opentelemetry/core';
 import type {
   ReadableLogRecord,
   LogRecordExporter,
