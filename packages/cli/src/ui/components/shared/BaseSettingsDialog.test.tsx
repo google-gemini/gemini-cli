@@ -541,7 +541,9 @@ describe('BaseSettingsDialog', () => {
         rawValue: { foo: 'bar' },
         editValue: '{"foo":"bar"}',
       };
-      const { stdin } = renderDialog({ items: [objectItem] });
+      const { stdin } = await renderDialog({
+        items: [objectItem],
+      });
 
       // Enter edit mode and immediately commit
       await act(async () => {
