@@ -12,6 +12,8 @@ import type {
 
 export const MAX_FILES = 10;
 const MAX_SELECTED_TEXT_LENGTH = 16384; // 16 KiB limit
+/** Suffix appended when selected text is truncated; must stay in sync with core ideContext. */
+const TRUNCATION_SUFFIX = '... [TRUNCATED]';
 
 /**
  * Keeps track of the workspace state, including open files, cursor position, and selected text.
@@ -156,7 +158,10 @@ export class OpenFilesManager {
     let selectedText: string | undefined =
       editor.document.getText(editor.selection) || undefined;
     if (selectedText && selectedText.length > MAX_SELECTED_TEXT_LENGTH) {
-      selectedText = selectedText.substring(0, MAX_SELECTED_TEXT_LENGTH);
+      const maxContentLength =
+        MAX_SELECTED_TEXT_LENGTH - TRUNCATION_SUFFIX.length;
+      selectedText =
+        selectedText.substring(0, maxContentLength) + TRUNCATION_SUFFIX;
     }
     file.selectedText = selectedText;
   }

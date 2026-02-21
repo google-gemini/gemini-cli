@@ -11,8 +11,9 @@ compatible with both VS Code and VS Code forks.
   project's structure and content.
 
 - Selection Context: Gemini CLI can easily access your cursor's position and
-  selected text within the editor, giving it valuable context directly from your
-  current work.
+  selected text within the editor (up to 16KB; longer selections are truncated
+  with a `... [TRUNCATED]` indicator), giving it valuable context directly from
+  your current work.
 
 - Native Diffing: Seamlessly view, modify, and accept code changes suggested by
   Gemini CLI directly within the editor.
