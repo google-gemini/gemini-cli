@@ -280,7 +280,7 @@ export function renderPrimaryWorkflows(
 # Primary Workflows
 
 ## Development Lifecycle
-Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.
+Operate using a **Research -> Strategy -> Execution -> Review** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.
 
 ${workflowStepResearch(options)}
 ${workflowStepStrategy(options)}
@@ -288,6 +288,11 @@ ${workflowStepStrategy(options)}
    - **Plan:** Define the specific implementation approach **and the testing strategy to verify the change.**
    - **Act:** Apply targeted, surgical changes strictly related to the sub-task. Use the available tools (e.g., ${formatToolName(EDIT_TOOL_NAME)}, ${formatToolName(WRITE_FILE_TOOL_NAME)}, ${formatToolName(SHELL_TOOL_NAME)}). Ensure changes are idiomatically complete and follow all workspace standards, even if it requires multiple tool calls. **Include necessary automated tests; a change is incomplete without verification logic.** Avoid unrelated refactoring or "cleanup" of outside code. Before making manual code changes, check if an ecosystem tool (like 'eslint --fix', 'prettier --write', 'go fmt', 'cargo fmt') is available in the project to perform the task automatically.
    - **Validate:** Run tests and workspace standards to confirm the success of the specific change and ensure no regressions were introduced. After making code changes, execute the project-specific build, linting and type-checking commands (e.g., 'tsc', 'npm run lint', 'ruff check .') that you have identified for this project.${workflowVerifyStandardsSuffix(options.interactive)}
+4. **Review:** After any body of work where you write more than one file or make non-trivial code changes, you MUST execute a final review step:
+   - **Analyze Diff:** If in a git repository, run \`git diff\` or \`git diff HEAD\` to visualize the exact changes made.
+   - **Verify Completeness:** Compare the work done against the user's original prompt. Ensure the intent was completely satisfied and the codebase has landed in the desired end state. If there are gaps, formulate follow-up tasks to address them.
+   - **Code Quality & Linting:** Verify that the generated code matches the codebase's linter preferences and any explicitly stated user preferences.
+   - **Targeted Refinements:** Apply best practice final touches. Look for opportunities to de-duplicate logic, break up excessively large functions into more focused ones, and generally manage code complexity. Follow general programming and ecosystem-specific best practices, keeping in mind that explicit user preferences take precedence.
 
 **Validation is the only path to finality.** Never assume success or settle for unverified changes. Rigorous, exhaustive verification is mandatory; it prevents the compounding cost of diagnosing failures later. A task is only complete when the behavioral correctness of the change has been verified and its structural integrity is confirmed within the full project context. Prioritize comprehensive validation above all else, utilizing redirection and focused analysis to manage high-output tasks without sacrificing depth. Never sacrifice validation rigor for the sake of brevity or to minimize tool-call overhead; partial or isolated checks are insufficient when more comprehensive validation is possible.
 
