@@ -102,6 +102,7 @@ import { createPolicyUpdater } from './config/policy.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
 import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 import { TerminalProvider } from './ui/contexts/TerminalContext.js';
+import { OverflowProvider } from './ui/contexts/OverflowContext.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
@@ -238,17 +239,19 @@ export async function startInteractiveUI(
           >
             <TerminalProvider>
               <ScrollProvider>
-                <SessionStatsProvider>
-                  <VimModeProvider settings={settings}>
-                    <AppContainer
-                      config={config}
-                      startupWarnings={startupWarnings}
-                      version={version}
-                      resumedSessionData={resumedSessionData}
-                      initializationResult={initializationResult}
-                    />
-                  </VimModeProvider>
-                </SessionStatsProvider>
+                <OverflowProvider>
+                  <SessionStatsProvider>
+                    <VimModeProvider settings={settings}>
+                      <AppContainer
+                        config={config}
+                        startupWarnings={startupWarnings}
+                        version={version}
+                        resumedSessionData={resumedSessionData}
+                        initializationResult={initializationResult}
+                      />
+                    </VimModeProvider>
+                  </SessionStatsProvider>
+                </OverflowProvider>
               </ScrollProvider>
             </TerminalProvider>
           </MouseProvider>
