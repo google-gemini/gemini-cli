@@ -69,11 +69,27 @@ compatibility.
 
 To keep the CLI up to date:
 
-1. Update `trajectory_teleporter.ts` in the Antigravity workspace.
-2. Re-bundle using `esbuild` or a similar tool to produce a new
-   `trajectory_teleporter.min.js`.
-3. Copy the new `.min.js` into `packages/core/src/teleportation/`.
-4. Rebuild the Gemini CLI.
+1. Update `packages/core/src/teleportation/trajectory_teleporter.ts` with any
+   logic changes.
+2. To build a new minified bundle, you must run it from within the Antigravity
+   `Exafunction` workspace because it depends on the complex Protobuf schema
+   definitions there
+   (`exa/proto_ts/dist/exa/gemini_coder/proto/trajectory_pb.js`).
+3. If the Protobuf JS definitions haven't been generated in your `Exafunction`
+   project yet, build them first:
+   ```bash
+   pnpm --dir exa/proto_ts build
+   ```
+4. Inside the `Exafunction` project root, run:
+   ```bash
+   pnpm dlx esbuild /path/to/orions-belt/packages/core/src/teleportation/trajectory_teleporter.ts \
+     --bundle \
+     --minify \
+     --format=esm \
+     --platform=node \
+     --outfile=/path/to/orions-belt/packages/core/src/teleportation/trajectory_teleporter.min.js
+   ```
+5. Verify the new `trajectory_teleporter.min.js` works locally in the CLI.
 
 > [!TIP] In the long term, this logic could be moved to a shared NPM package
 > published from the Antigravity repository, allowing the Gemini CLI to stay
