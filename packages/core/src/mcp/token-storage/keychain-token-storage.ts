@@ -6,7 +6,11 @@
 
 import * as crypto from 'node:crypto';
 import { BaseTokenStorage } from './base-token-storage.js';
-import type { OAuthCredentials, SecretStorage } from './types.js';
+import {
+  type OAuthCredentials,
+  type SecretStorage,
+  OAuthCredentialsSchema,
+} from './types.js';
 import { coreEvents } from '../../utils/events.js';
 import { KeychainAvailabilityEvent } from '../../telemetry/types.js';
 
@@ -73,9 +77,8 @@ export class KeychainTokenStorage
         return null;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const credentials = JSON.parse(data) as OAuthCredentials;
-
+      const parsedData: unknown = JSON.parse(data);
+      const credentials = OAuthCredentialsSchema.parse(parsedData);
       if (this.isTokenExpired(credentials)) {
         return null;
       }
@@ -183,10 +186,10 @@ export class KeychainTokenStorage
 
       for (const cred of credentials) {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const data = JSON.parse(cred.password) as OAuthCredentials;
-          if (!this.isTokenExpired(data)) {
-            result.set(cred.account, data);
+          const parsedData: unknown = JSON.parse(cred.password);
+          const credentials = OAuthCredentialsSchema.parse(parsedData);
+          if (!this.isTokenExpired(credentials)) {
+            result.set(cred.account, credentials);
           }
         } catch (error) {
           coreEvents.emitFeedback(
@@ -228,8 +231,7 @@ export class KeychainTokenStorage
       try {
         await this.deleteCredentials(server);
       } catch (error) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        errors.push(error as Error);
+        errors.push(error instanceof Error ? error : new Error(String(error)));
       }
     }
 
