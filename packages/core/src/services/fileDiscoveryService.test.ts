@@ -494,5 +494,49 @@ describe('FileDiscoveryService', () => {
       const paths = service.getAllIgnoreFilePaths();
       expect(paths[0]).toBe(path.join(projectRoot, '.gitignore'));
     });
+
+    it('should exclude directories from getIgnoreFilePaths (#19868)', async () => {
+      // Create a directory that shares a name with a customIgnoreFilePaths entry
+      await fs.mkdir(path.join(projectRoot, 'node_modules'), {
+        recursive: true,
+      });
+
+      const service = new FileDiscoveryService(projectRoot, {
+        customIgnoreFilePaths: ['node_modules'],
+      });
+      const paths = service.getIgnoreFilePaths();
+
+      // node_modules/ is a directory, not a file — it should be excluded
+      expect(paths).not.toContain(path.join(projectRoot, 'node_modules'));
+    });
+
+    it('should exclude directories from getAllIgnoreFilePaths (#19868)', async () => {
+      await fs.mkdir(path.join(projectRoot, 'node_modules'), {
+        recursive: true,
+      });
+
+      const service = new FileDiscoveryService(projectRoot, {
+        customIgnoreFilePaths: ['node_modules'],
+      });
+      const paths = service.getAllIgnoreFilePaths();
+
+      expect(paths).not.toContain(path.join(projectRoot, 'node_modules'));
+      // .gitignore should still be present
+      expect(paths).toContain(path.join(projectRoot, '.gitignore'));
+    });
+
+    it('should not crash when customIgnoreFilePaths contains directory names (#19868)', async () => {
+      await fs.mkdir(path.join(projectRoot, 'node_modules'), {
+        recursive: true,
+      });
+      await fs.mkdir(path.join(projectRoot, 'temp'), { recursive: true });
+
+      // This is the exact user scenario from issue #19868
+      expect(() => {
+        new FileDiscoveryService(projectRoot, {
+          customIgnoreFilePaths: ['node_modules/', 'temp/', 'cache/'],
+        });
+      }).not.toThrow();
+    });
   });
 });
