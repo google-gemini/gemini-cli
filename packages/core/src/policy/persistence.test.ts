@@ -16,9 +16,21 @@ import { MessageBusType } from '../confirmation-bus/types.js';
 import { Storage, AUTO_SAVED_POLICY_FILENAME } from '../config/storage.js';
 import { ApprovalMode } from './types.js';
 import { vol, fs as memfs } from 'memfs';
+// Import after vi.mock so this resolves to the memfs replacement, enabling vi.spyOn on individual methods.
+import * as fs from 'node:fs/promises';
+import { coreEvents } from '../utils/events.js';
 
 // Use memfs for all fs operations in this test
 vi.mock('node:fs/promises', () => import('memfs').then((m) => m.fs.promises));
+
+/**
+ * Creates a Node.js-style error with a `code` property.
+ */
+function makeNodeError(message: string, code: string): NodeJS.ErrnoException {
+  const err = new Error(message) as NodeJS.ErrnoException;
+  err.code = code;
+  return err;
+}
 
 vi.mock('../config/storage.js');
 
@@ -243,6 +255,144 @@ decision = "deny"
     expect(content).toContain('toolName = "test_tool"');
   });
 
+
+  it('should include error details in feedback message on persistence failure', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    const workspacePoliciesDir = '/mock/project/.gemini/policies';
+    const policyFile = path.join(
+      workspacePoliciesDir,
+      AUTO_SAVED_POLICY_FILENAME,
+    );
+    vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
+      workspacePoliciesDir,
+    );
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
+    vi.spyOn(fs, 'mkdir').mockRejectedValue(new Error('Permission denied'));
+
+    const feedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      persist: true,
+    });
+
+    await vi.runAllTimersAsync();
+
+    expect(feedbackSpy).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('Permission denied'),
+      expect.any(Error),
+    );
+  });
+
+  it('should clean up tmp file on write failure', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    const workspacePoliciesDir = '/mock/project/.gemini/policies';
+    const policyFile = path.join(
+      workspacePoliciesDir,
+      AUTO_SAVED_POLICY_FILENAME,
+    );
+    vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
+      workspacePoliciesDir,
+    );
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
+    vi.spyOn(fs, 'mkdir').mockResolvedValue(undefined as never);
+    vi.spyOn(fs, 'readFile').mockRejectedValue(makeNodeError('ENOENT: no such file or directory', 'ENOENT'));
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockRejectedValue(new Error('Disk full')),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.spyOn(fs, 'open').mockResolvedValue(mockFileHandle as never);
+    vi.spyOn(fs, 'unlink').mockResolvedValue(undefined as never);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      persist: true,
+    });
+
+    await vi.runAllTimersAsync();
+
+    expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
+  });
+
+  it('should abort persistence on non-ENOENT read errors', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    const workspacePoliciesDir = '/mock/project/.gemini/policies';
+    const policyFile = path.join(
+      workspacePoliciesDir,
+      AUTO_SAVED_POLICY_FILENAME,
+    );
+    vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
+      workspacePoliciesDir,
+    );
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
+    vi.spyOn(fs, 'mkdir').mockResolvedValue(undefined as never);
+    vi.spyOn(fs, 'readFile').mockRejectedValue(makeNodeError('Permission denied', 'EACCES'));
+    const openSpy = vi.spyOn(fs, 'open');
+
+    const feedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      persist: true,
+    });
+
+    await vi.runAllTimersAsync();
+
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(feedbackSpy).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('Permission denied'),
+      expect.any(Error),
+    );
+  });
+
+  it('should fall back to copy+unlink when rename fails with EXDEV', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    const workspacePoliciesDir = '/mock/project/.gemini/policies';
+    const policyFile = path.join(
+      workspacePoliciesDir,
+      AUTO_SAVED_POLICY_FILENAME,
+    );
+    vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
+      workspacePoliciesDir,
+    );
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
+    vi.spyOn(fs, 'mkdir').mockResolvedValue(undefined as never);
+    vi.spyOn(fs, 'readFile').mockRejectedValue(makeNodeError('ENOENT: no such file or directory', 'ENOENT'));
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.spyOn(fs, 'open').mockResolvedValue(mockFileHandle as never);
+    vi.spyOn(fs, 'rename').mockRejectedValue(makeNodeError('EXDEV: cross-device link not permitted', 'EXDEV'));
+    vi.spyOn(fs, 'copyFile').mockResolvedValue(undefined as never);
+    vi.spyOn(fs, 'unlink').mockResolvedValue(undefined as never);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      persist: true,
+    });
+
+    await vi.runAllTimersAsync();
+
+    expect(fs.copyFile).toHaveBeenCalledWith(
+      expect.stringMatching(/\.tmp$/),
+      policyFile,
+    );
+    expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
+  });
+
   it('should include modes if provided', async () => {
     createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
@@ -279,7 +429,6 @@ modes = [ "autoEdit", "yolo" ]
     memfs.mkdirSync(dir, { recursive: true });
     memfs.writeFileSync(policyFile, existingContent);
 
-    // Now grant in DEFAULT mode, which should include [default, autoEdit, yolo]
     await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
       toolName: 'test_tool',
@@ -290,7 +439,6 @@ modes = [ "autoEdit", "yolo" ]
     await vi.advanceTimersByTimeAsync(100);
 
     const content = memfs.readFileSync(policyFile, 'utf-8') as string;
-    // Should NOT have two [[rule]] entries for test_tool
     const ruleCount = (content.match(/\[\[rule\]\]/g) || []).length;
     expect(ruleCount).toBe(1);
     expect(content).toContain('modes = [ "default", "autoEdit", "yolo" ]');
