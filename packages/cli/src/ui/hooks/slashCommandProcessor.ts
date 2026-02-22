@@ -254,7 +254,10 @@ export const useSlashCommandProcessor = (
         toggleShortcutsHelp: actions.toggleShortcutsHelp,
         getLastOutput: () => lastOutputRef.current,
         setLastOutput: (output: LastOutput) => {
-          lastOutputRef.current = output;
+          const trimmed = output.content.trim();
+          if (trimmed) {
+            lastOutputRef.current = { content: trimmed };
+          }
         },
       },
       session: {
@@ -461,9 +464,9 @@ export const useSlashCommandProcessor = (
                   };
                 case 'message':
                   // Store the output text so /copy can retrieve it later.
-                  lastOutputRef.current = {
+                  commandContext.ui.setLastOutput({
                     content: result.content,
-                  };
+                  });
                   addItem(
                     {
                       type:

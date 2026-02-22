@@ -1221,4 +1221,45 @@ describe('useSlashCommandProcessor', () => {
       );
     });
   });
+
+  describe('LastOutput tracking', () => {
+    it('should trim content when storing output', async () => {
+      const result = await setupProcessorHook();
+      act(() => {
+        result.current.commandContext.ui.setLastOutput({
+          content: '   hello world   ',
+        });
+      });
+      expect(result.current.commandContext.ui.getLastOutput()).toEqual({
+        content: 'hello world',
+      });
+    });
+
+    it('should not update if content is empty or whitespace-only', async () => {
+      const result = await setupProcessorHook();
+      act(() => {
+        result.current.commandContext.ui.setLastOutput({
+          content: 'initial',
+        });
+      });
+
+      act(() => {
+        result.current.commandContext.ui.setLastOutput({
+          content: '   ',
+        });
+      });
+      expect(result.current.commandContext.ui.getLastOutput()).toEqual({
+        content: 'initial',
+      });
+
+      act(() => {
+        result.current.commandContext.ui.setLastOutput({
+          content: '',
+        });
+      });
+      expect(result.current.commandContext.ui.getLastOutput()).toEqual({
+        content: 'initial',
+      });
+    });
+  });
 });
