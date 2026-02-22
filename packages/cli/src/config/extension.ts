@@ -42,14 +42,15 @@ export interface ExtensionUpdateInfo {
   updatedVersion: string;
 }
 
-const extensionInstallMetadataSchema = z.object({
-  source: z.string(),
-  type: z.enum(['git', 'local', 'link', 'github-release']),
-  releaseTag: z.string().optional(),
-  ref: z.string().optional(),
-  autoUpdate: z.boolean().optional(),
-  allowPreRelease: z.boolean().optional(),
-});
+const extensionInstallMetadataSchema: z.ZodType<ExtensionInstallMetadata> =
+  z.object({
+    source: z.string(),
+    type: z.enum(['git', 'local', 'link', 'github-release']),
+    releaseTag: z.string().optional(),
+    ref: z.string().optional(),
+    autoUpdate: z.boolean().optional(),
+    allowPreRelease: z.boolean().optional(),
+  });
 
 export function loadInstallMetadata(
   extensionDir: string,

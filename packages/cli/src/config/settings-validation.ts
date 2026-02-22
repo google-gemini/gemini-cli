@@ -10,6 +10,7 @@ import {
   type SettingDefinition,
   type SettingCollectionDefinition,
   SETTINGS_SCHEMA_DEFINITIONS,
+  type Settings,
 } from './settingsSchema.js';
 
 // Helper to build Zod schema from the JSON-schema-like definitions
@@ -279,11 +280,16 @@ export const settingsZodSchema = buildSettingsZodSchema();
  */
 export function validateSettings(data: unknown): {
   success: boolean;
-  data?: unknown;
+  data: Settings;
   error?: z.ZodError;
 } {
   const result = settingsZodSchema.safeParse(data);
-  return result;
+  return {
+    success: result.success,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    data: (result.success ? result.data : data) as Settings,
+    error: result.success ? undefined : result.error,
+  };
 }
 
 /**

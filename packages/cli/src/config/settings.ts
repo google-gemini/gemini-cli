@@ -690,7 +690,7 @@ export function loadSettings(
           });
         }
 
-        return { settings: settingsObject as Settings, rawJson: content };
+        return { settings: validationResult.data, rawJson: content };
       }
     } catch (error: unknown) {
       settingsErrors.push({
