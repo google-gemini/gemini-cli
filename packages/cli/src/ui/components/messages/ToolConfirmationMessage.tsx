@@ -21,7 +21,10 @@ import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
 import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
 import { MaxSizedBox, MINIMUM_MAX_HEIGHT } from '../shared/MaxSizedBox.js';
-import { sanitizeForDisplay } from '../../utils/textUtils.js';
+import {
+  sanitizeForDisplay,
+  stripUnsafeCharacters,
+} from '../../utils/textUtils.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
@@ -34,6 +37,12 @@ import {
 } from '../../textConstants.js';
 import { AskUserDialog } from '../AskUserDialog.js';
 import { ExitPlanModeDialog } from '../ExitPlanModeDialog.js';
+import { WarningMessage } from './WarningMessage.js';
+import {
+  getDeceptiveUrlDetails,
+  toUnicodeUrl,
+  type DeceptiveUrlDetails,
+} from '../../utils/urlSecurityUtils.js';
 
 export interface ToolConfirmationMessageProps {
   callId: string;
@@ -98,6 +107,37 @@ export const ToolConfirmationMessage: React.FC<
     (item: ToolConfirmationOutcome) => handleConfirm(item),
     [handleConfirm],
   );
+
+  const deceptiveUrlWarnings = useMemo(() => {
+    const urls: string[] = [];
+    if (confirmationDetails.type === 'info' && confirmationDetails.urls) {
+      urls.push(...confirmationDetails.urls);
+    } else if (confirmationDetails.type === 'exec') {
+      const commands =
+        confirmationDetails.commands && confirmationDetails.commands.length > 0
+          ? confirmationDetails.commands
+          : [confirmationDetails.command];
+      for (const cmd of commands) {
+        const matches = cmd.match(/https?:\/\/[^\s"'`<>;&|()]+/g);
+        if (matches) urls.push(...matches);
+      }
+    }
+
+    const uniqueUrls = Array.from(new Set(urls));
+    return uniqueUrls
+      .map(getDeceptiveUrlDetails)
+      .filter((d): d is DeceptiveUrlDetails => d !== null);
+  }, [confirmationDetails]);
+
+  const deceptiveUrlWarningText = useMemo(() => {
+    if (deceptiveUrlWarnings.length === 0) return null;
+    return `**Warning:** Deceptive URL(s) detected:\n\n${deceptiveUrlWarnings
+      .map(
+        (w) =>
+          `   **Original:** ${w.originalUrl}\n   **Actual Host (Punycode):** ${w.punycodeUrl}`,
+      )
+      .join('\n\n')}`;
+  }, [deceptiveUrlWarnings]);
 
   const getOptions = useCallback(() => {
     const options: Array<RadioSelectItem<ToolConfirmationOutcome>> = [];
@@ -235,6 +275,10 @@ export const ToolConfirmationMessage: React.FC<
       return undefined;
     }
 
+    if (handlesOwnUI) {
+      return availableTerminalHeight;
+    }
+
     // Calculate the vertical space (in lines) consumed by UI elements
     // surrounding the main body content.
     const PADDING_OUTER_Y = 2; // Main container has `padding={1}` (top & bottom).
@@ -253,12 +297,22 @@ export const ToolConfirmationMessage: React.FC<
       1; // Reserve one line for 'ShowMoreLines' hint
 
     return Math.max(availableTerminalHeight - surroundingElementsHeight, 1);
-  }, [availableTerminalHeight, getOptions]);
+  }, [availableTerminalHeight, getOptions, handlesOwnUI]);
 
-  const { question, bodyContent, options } = useMemo(() => {
+  const { question, bodyContent, options, securityWarnings } = useMemo<{
+    question: string;
+    bodyContent: React.ReactNode;
+    options: Array<RadioSelectItem<ToolConfirmationOutcome>>;
+    securityWarnings: React.ReactNode;
+  }>(() => {
     let bodyContent: React.ReactNode | null = null;
+    let securityWarnings: React.ReactNode | null = null;
     let question = '';
     const options = getOptions();
+
+    if (deceptiveUrlWarningText) {
+      securityWarnings = <WarningMessage text={deceptiveUrlWarningText} />;
+    }
 
     if (confirmationDetails.type === 'ask_user') {
       bodyContent = (
@@ -274,7 +328,12 @@ export const ToolConfirmationMessage: React.FC<
           availableHeight={availableBodyContentHeight()}
         />
       );
-      return { question: '', bodyContent, options: [] };
+      return {
+        question: '',
+        bodyContent,
+        options: [],
+        securityWarnings: null,
+      };
     }
 
     if (confirmationDetails.type === 'exit_plan_mode') {
@@ -300,7 +359,7 @@ export const ToolConfirmationMessage: React.FC<
           availableHeight={availableBodyContentHeight()}
         />
       );
-      return { question: '', bodyContent, options: [] };
+      return { question: '', bodyContent, options: [], securityWarnings: null };
     }
 
     if (confirmationDetails.type === 'edit') {
@@ -320,15 +379,15 @@ export const ToolConfirmationMessage: React.FC<
     } else if (confirmationDetails.type === 'mcp') {
       // mcp tool confirmation
       const mcpProps = confirmationDetails;
-      question = `Allow execution of MCP tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"?`;
+      question = `Allow execution of MCP tool "${sanitizeForDisplay(mcpProps.toolName)}" from server "${sanitizeForDisplay(mcpProps.serverName)}"?`;
     }
 
     if (confirmationDetails.type === 'edit') {
       if (!confirmationDetails.isModifying) {
         bodyContent = (
           <DiffRenderer
-            diffContent={confirmationDetails.fileDiff}
-            filename={confirmationDetails.fileName}
+            diffContent={stripUnsafeCharacters(confirmationDetails.fileDiff)}
+            filename={sanitizeForDisplay(confirmationDetails.fileName)}
             availableTerminalHeight={availableBodyContentHeight()}
             terminalWidth={terminalWidth}
           />
@@ -429,10 +488,10 @@ export const ToolConfirmationMessage: React.FC<
           {displayUrls && infoProps.urls && infoProps.urls.length > 0 && (
             <Box flexDirection="column" marginTop={1}>
               <Text color={theme.text.primary}>URLs to fetch:</Text>
-              {infoProps.urls.map((url) => (
-                <Text key={url}>
+              {infoProps.urls.map((urlString) => (
+                <Text key={urlString}>
                   {' '}
-                  - <RenderInline text={url} />
+                  - <RenderInline text={toUnicodeUrl(urlString)} />
                 </Text>
               ))}
             </Box>
@@ -445,19 +504,24 @@ export const ToolConfirmationMessage: React.FC<
 
       bodyContent = (
         <Box flexDirection="column">
-          <Text color={theme.text.link}>MCP Server: {mcpProps.serverName}</Text>
-          <Text color={theme.text.link}>Tool: {mcpProps.toolName}</Text>
+          <Text color={theme.text.link}>
+            MCP Server: {sanitizeForDisplay(mcpProps.serverName)}
+          </Text>
+          <Text color={theme.text.link}>
+            Tool: {sanitizeForDisplay(mcpProps.toolName)}
+          </Text>
         </Box>
       );
     }
 
-    return { question, bodyContent, options };
+    return { question, bodyContent, options, securityWarnings };
   }, [
     confirmationDetails,
     getOptions,
     availableBodyContentHeight,
     terminalWidth,
     handleConfirm,
+    deceptiveUrlWarningText,
   ]);
 
   if (confirmationDetails.type === 'edit') {
@@ -500,6 +564,12 @@ export const ToolConfirmationMessage: React.FC<
               {bodyContent}
             </MaxSizedBox>
           </Box>
+
+          {securityWarnings && (
+            <Box flexShrink={0} marginBottom={1}>
+              {securityWarnings}
+            </Box>
+          )}
 
           <Box marginBottom={1} flexShrink={0}>
             <Text color={theme.text.primary}>{question}</Text>

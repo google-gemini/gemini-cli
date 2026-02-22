@@ -7,6 +7,7 @@
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { MainContent } from './MainContent.js';
+import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Box, Text } from 'ink';
 import { act, useState, type JSX } from 'react';
@@ -18,6 +19,7 @@ import {
   type UIState,
 } from '../contexts/UIStateContext.js';
 import { CoreToolCallStatus } from '@google/gemini-cli-core';
+import { type IndividualToolCallDisplay } from '../types.js';
 
 // Mock dependencies
 vi.mock('../contexts/SettingsContext.js', async () => {
@@ -76,6 +78,209 @@ vi.mock('./shared/ScrollableList.js', () => ({
   SCROLL_TO_ITEM_END: 0,
 }));
 
+import { theme } from '../semantic-colors.js';
+import { type BackgroundShell } from '../hooks/shellReducer.js';
+
+describe('getToolGroupBorderAppearance', () => {
+  const mockBackgroundShells = new Map<number, BackgroundShell>();
+  const activeShellPtyId = 123;
+
+  it('returns default empty values for non-tool_group items', () => {
+    const item = { type: 'user' as const, text: 'Hello', id: 1 };
+    const result = getToolGroupBorderAppearance(
+      item,
+      null,
+      false,
+      [],
+      mockBackgroundShells,
+    );
+    expect(result).toEqual({ borderColor: '', borderDimColor: false });
+  });
+
+  it('inspects only the last pending tool_group item if current has no tools', () => {
+    const item = { type: 'tool_group' as const, tools: [], id: 1 };
+    const pendingItems = [
+      {
+        type: 'tool_group' as const,
+        tools: [
+          {
+            callId: '1',
+            name: 'some_tool',
+            description: '',
+            status: CoreToolCallStatus.Executing,
+            ptyId: undefined,
+            resultDisplay: undefined,
+            confirmationDetails: undefined,
+          } as IndividualToolCallDisplay,
+        ],
+      },
+      {
+        type: 'tool_group' as const,
+        tools: [
+          {
+            callId: '2',
+            name: 'other_tool',
+            description: '',
+            status: CoreToolCallStatus.Success,
+            ptyId: undefined,
+            resultDisplay: undefined,
+            confirmationDetails: undefined,
+          } as IndividualToolCallDisplay,
+        ],
+      },
+    ];
+
+    // Only the last item (Success) should be inspected, so hasPending = false.
+    // The previous item was Executing (pending) but it shouldn't be counted.
+    const result = getToolGroupBorderAppearance(
+      item,
+      null,
+      false,
+      pendingItems,
+      mockBackgroundShells,
+    );
+    expect(result).toEqual({
+      borderColor: theme.border.default,
+      borderDimColor: false,
+    });
+  });
+
+  it('returns default border for completed normal tools', () => {
+    const item = {
+      type: 'tool_group' as const,
+      tools: [
+        {
+          callId: '1',
+          name: 'some_tool',
+          description: '',
+          status: CoreToolCallStatus.Success,
+          ptyId: undefined,
+          resultDisplay: undefined,
+          confirmationDetails: undefined,
+        } as IndividualToolCallDisplay,
+      ],
+      id: 1,
+    };
+    const result = getToolGroupBorderAppearance(
+      item,
+      null,
+      false,
+      [],
+      mockBackgroundShells,
+    );
+    expect(result).toEqual({
+      borderColor: theme.border.default,
+      borderDimColor: false,
+    });
+  });
+
+  it('returns warning border for pending normal tools', () => {
+    const item = {
+      type: 'tool_group' as const,
+      tools: [
+        {
+          callId: '1',
+          name: 'some_tool',
+          description: '',
+          status: CoreToolCallStatus.Executing,
+          ptyId: undefined,
+          resultDisplay: undefined,
+          confirmationDetails: undefined,
+        } as IndividualToolCallDisplay,
+      ],
+      id: 1,
+    };
+    const result = getToolGroupBorderAppearance(
+      item,
+      null,
+      false,
+      [],
+      mockBackgroundShells,
+    );
+    expect(result).toEqual({
+      borderColor: theme.status.warning,
+      borderDimColor: true,
+    });
+  });
+
+  it('returns symbol border for executing shell commands', () => {
+    const item = {
+      type: 'tool_group' as const,
+      tools: [
+        {
+          callId: '1',
+          name: SHELL_COMMAND_NAME,
+          description: '',
+          status: CoreToolCallStatus.Executing,
+          ptyId: activeShellPtyId,
+          resultDisplay: undefined,
+          confirmationDetails: undefined,
+        } as IndividualToolCallDisplay,
+      ],
+      id: 1,
+    };
+    // While executing shell commands, it's dim false, border symbol
+    const result = getToolGroupBorderAppearance(
+      item,
+      activeShellPtyId,
+      true,
+      [],
+      mockBackgroundShells,
+    );
+    expect(result).toEqual({
+      borderColor: theme.ui.symbol,
+      borderDimColor: false,
+    });
+  });
+
+  it('returns symbol border and dims color for background executing shell command when another shell is active', () => {
+    const item = {
+      type: 'tool_group' as const,
+      tools: [
+        {
+          callId: '1',
+          name: SHELL_COMMAND_NAME,
+          description: '',
+          status: CoreToolCallStatus.Executing,
+          ptyId: 456, // Different ptyId, not active
+          resultDisplay: undefined,
+          confirmationDetails: undefined,
+        } as IndividualToolCallDisplay,
+      ],
+      id: 1,
+    };
+    const result = getToolGroupBorderAppearance(
+      item,
+      activeShellPtyId,
+      false,
+      [],
+      mockBackgroundShells,
+    );
+    expect(result).toEqual({
+      borderColor: theme.ui.symbol,
+      borderDimColor: true,
+    });
+  });
+
+  it('handles empty tools with active shell turn (isCurrentlyInShellTurn)', () => {
+    const item = { type: 'tool_group' as const, tools: [], id: 1 };
+
+    // active shell turn
+    const result = getToolGroupBorderAppearance(
+      item,
+      activeShellPtyId,
+      true,
+      [],
+      mockBackgroundShells,
+    );
+    // Since there are no tools to inspect, it falls back to empty pending, but isCurrentlyInShellTurn=true
+    // so it counts as pending shell.
+    expect(result.borderColor).toEqual(theme.ui.symbol);
+    // It shouldn't be dim because there are no tools to say it isEmbeddedShellFocused = false
+    expect(result.borderDimColor).toBe(false);
+  });
+});
+
 describe('MainContent', () => {
   const defaultMockUiState = {
     history: [
@@ -105,33 +310,39 @@ describe('MainContent', () => {
   });
 
   it('renders in normal buffer mode', async () => {
-    const { lastFrame } = renderWithProviders(<MainContent />, {
+    const { lastFrame, unmount } = renderWithProviders(<MainContent />, {
       uiState: defaultMockUiState as Partial<UIState>,
     });
     await waitFor(() => expect(lastFrame()).toContain('AppHeader(full)'));
     const output = lastFrame();
 
+    expect(output).toContain('AppHeader');
     expect(output).toContain('Hello');
     expect(output).toContain('Hi there');
+    unmount();
   });
 
   it('renders in alternate buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
-    const { lastFrame } = renderWithProviders(<MainContent />, {
-      uiState: defaultMockUiState as Partial<UIState>,
-    });
-    await waitFor(() => expect(lastFrame()).toContain('ScrollableList'));
-    const output = lastFrame();
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <MainContent />,
+      {
+        uiState: defaultMockUiState as Partial<UIState>,
+      },
+    );
+    await waitUntilReady();
 
+    const output = lastFrame();
     expect(output).toContain('AppHeader(full)');
     expect(output).toContain('Hello');
     expect(output).toContain('Hi there');
+    unmount();
   });
 
   it('renders minimal header in minimal mode (alternate buffer)', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
 
-    const { lastFrame } = renderWithProviders(<MainContent />, {
+    const { lastFrame, unmount } = renderWithProviders(<MainContent />, {
       uiState: {
         ...defaultMockUiState,
         cleanUiDetailsVisible: false,
@@ -143,6 +354,7 @@ describe('MainContent', () => {
     expect(output).toContain('AppHeader(minimal)');
     expect(output).not.toContain('AppHeader(full)');
     expect(output).toContain('Hello');
+    unmount();
   });
 
   it('restores full header details after toggle in alternate buffer mode', async () => {
@@ -200,15 +412,78 @@ describe('MainContent', () => {
 
   it('does not constrain height in alternate buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
-    const { lastFrame } = renderWithProviders(<MainContent />, {
-      uiState: defaultMockUiState as Partial<UIState>,
-    });
-    await waitFor(() => expect(lastFrame()).toContain('Hello'));
-    const output = lastFrame();
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <MainContent />,
+      {
+        uiState: defaultMockUiState as Partial<UIState>,
+      },
+    );
+    await waitUntilReady();
 
+    const output = lastFrame();
     expect(output).toContain('AppHeader(full)');
     expect(output).toContain('Hello');
     expect(output).toContain('Hi there');
+    unmount();
+  });
+
+  it('renders a split tool group without a gap between static and pending areas', async () => {
+    const toolCalls = [
+      {
+        callId: 'tool-1',
+        name: 'test-tool',
+        description: 'A tool for testing',
+        resultDisplay: 'Part 1',
+        status: CoreToolCallStatus.Success,
+      } as IndividualToolCallDisplay,
+    ];
+
+    const pendingToolCalls = [
+      {
+        callId: 'tool-2',
+        name: 'test-tool',
+        description: 'A tool for testing',
+        resultDisplay: 'Part 2',
+        status: CoreToolCallStatus.Success,
+      } as IndividualToolCallDisplay,
+    ];
+
+    const uiState = {
+      ...defaultMockUiState,
+      history: [
+        {
+          id: 1,
+          type: 'tool_group' as const,
+          tools: toolCalls,
+          borderBottom: false,
+        },
+      ],
+      pendingHistoryItems: [
+        {
+          type: 'tool_group' as const,
+          tools: pendingToolCalls,
+          borderTop: false,
+          borderBottom: true,
+        },
+      ],
+    };
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <MainContent />,
+      {
+        uiState: uiState as Partial<UIState>,
+      },
+    );
+    await waitUntilReady();
+
+    const output = lastFrame();
+    // Verify Part 1 and Part 2 are rendered.
+    expect(output).toContain('Part 1');
+    expect(output).toContain('Part 2');
+
+    // The snapshot will be the best way to verify there is no gap (empty line) between them.
+    expect(output).toMatchSnapshot();
+    unmount();
   });
 
   describe('MainContent Tool Output Height Logic', () => {
@@ -218,7 +493,8 @@ describe('MainContent', () => {
         isAlternateBuffer: true,
         embeddedShellFocused: true,
         constrainHeight: true,
-        shouldShowLine1: true,
+        shouldShowLine1: false,
+        staticAreaMaxItemHeight: 15,
       },
       {
         name: 'ASB mode - Unfocused shell',
@@ -226,6 +502,7 @@ describe('MainContent', () => {
         embeddedShellFocused: false,
         constrainHeight: true,
         shouldShowLine1: false,
+        staticAreaMaxItemHeight: 15,
       },
       {
         name: 'Normal mode - Constrained height',
@@ -233,13 +510,15 @@ describe('MainContent', () => {
         embeddedShellFocused: false,
         constrainHeight: true,
         shouldShowLine1: false,
+        staticAreaMaxItemHeight: 15,
       },
       {
         name: 'Normal mode - Unconstrained height',
         isAlternateBuffer: false,
         embeddedShellFocused: false,
         constrainHeight: false,
-        shouldShowLine1: false,
+        shouldShowLine1: true,
+        staticAreaMaxItemHeight: 15,
       },
     ];
 
@@ -250,6 +529,7 @@ describe('MainContent', () => {
         embeddedShellFocused,
         constrainHeight,
         shouldShowLine1,
+        staticAreaMaxItemHeight,
       }) => {
         vi.mocked(useAlternateBuffer).mockReturnValue(isAlternateBuffer);
         const ptyId = 123;
@@ -258,7 +538,7 @@ describe('MainContent', () => {
           history: [],
           pendingHistoryItems: [
             {
-              type: 'tool_group' as const,
+              type: 'tool_group',
               id: 1,
               tools: [
                 {
@@ -279,6 +559,7 @@ describe('MainContent', () => {
             },
           ],
           availableTerminalHeight: 30, // In ASB mode, focused shell should get ~28 lines
+          staticAreaMaxItemHeight,
           terminalHeight: 50,
           terminalWidth: 100,
           mainAreaWidth: 100,
@@ -297,10 +578,14 @@ describe('MainContent', () => {
           bannerVisible: false,
         };
 
-        const { lastFrame } = renderWithProviders(<MainContent />, {
-          uiState: uiState as Partial<UIState>,
-          useAlternateBuffer: isAlternateBuffer,
-        });
+        const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+          <MainContent />,
+          {
+            uiState: uiState as Partial<UIState>,
+            useAlternateBuffer: isAlternateBuffer,
+          },
+        );
+        await waitUntilReady();
 
         const output = lastFrame();
 
@@ -317,6 +602,7 @@ describe('MainContent', () => {
 
         // Snapshots for visual verification
         expect(output).toMatchSnapshot();
+        unmount();
       },
     );
   });

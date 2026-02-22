@@ -8,13 +8,9 @@ import type {
   ToolCallConfirmationDetails,
   ToolInvocation,
   ToolResult,
-} from './tools.js';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
-  Kind,
   ToolConfirmationOutcome,
 } from './tools.js';
+import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -27,14 +23,51 @@ import {
   logWebFetchFallbackAttempt,
   WebFetchFallbackAttemptEvent,
 } from '../telemetry/index.js';
+import { LlmRole } from '../telemetry/llmRole.js';
 import { WEB_FETCH_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { WEB_FETCH_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { LRUCache } from 'mnemonist';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
+
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 10;
+const hostRequestHistory = new LRUCache<string, number[]>(1000);
+
+function checkRateLimit(url: string): {
+  allowed: boolean;
+  waitTimeMs?: number;
+} {
+  try {
+    const hostname = new URL(url).hostname;
+    const now = Date.now();
+    const windowStart = now - RATE_LIMIT_WINDOW_MS;
+
+    let history = hostRequestHistory.get(hostname) || [];
+    // Clean up old timestamps
+    history = history.filter((timestamp) => timestamp > windowStart);
+
+    if (history.length >= MAX_REQUESTS_PER_WINDOW) {
+      // Calculate wait time based on the oldest timestamp in the current window
+      const oldestTimestamp = history[0];
+      const waitTimeMs = oldestTimestamp + RATE_LIMIT_WINDOW_MS - now;
+      hostRequestHistory.set(hostname, history); // Update cleaned history
+      return { allowed: false, waitTimeMs: Math.max(0, waitTimeMs) };
+    }
+
+    history.push(now);
+    hostRequestHistory.set(hostname, history);
+    return { allowed: true };
+  } catch (_e) {
+    // If URL parsing fails, we fallback to allowed (should be caught by parsePrompt anyway)
+    return { allowed: true };
+  }
+}
 
 /**
  * Parses a prompt to extract valid URLs and identify malformed ones.
@@ -189,6 +222,7 @@ ${textContent}
         { model: 'web-fetch-fallback' },
         [{ role: 'user', parts: [{ text: fallbackPrompt }] }],
         signal,
+        LlmRole.UTILITY_TOOL,
       );
       const resultText = getResponseText(result) || '';
       return {
@@ -244,14 +278,9 @@ ${textContent}
       title: `Confirm Web Fetch`,
       prompt: this.params.prompt,
       urls,
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          // No need to publish a policy update as the default policy for
-          // AUTO_EDIT already reflects always approving web-fetch.
-          this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
-        } else {
-          await this.publishPolicyUpdate(outcome);
-        }
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // Mode transitions (e.g. AUTO_EDIT) and policy updates are now
+        // handled centrally by the scheduler.
       },
     };
     return confirmationDetails;
@@ -261,6 +290,23 @@ ${textContent}
     const userPrompt = this.params.prompt;
     const { validUrls: urls } = parsePrompt(userPrompt);
     const url = urls[0];
+
+    // Enforce rate limiting
+    const rateLimitResult = checkRateLimit(url);
+    if (!rateLimitResult.allowed) {
+      const waitTimeSecs = Math.ceil((rateLimitResult.waitTimeMs || 0) / 1000);
+      const errorMessage = `Rate limit exceeded for host. Please wait ${waitTimeSecs} seconds before trying again.`;
+      debugLogger.warn(`[WebFetchTool] Rate limit exceeded for ${url}`);
+      return {
+        llmContent: `Error: ${errorMessage}`,
+        returnDisplay: `Error: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.WEB_FETCH_PROCESSING_ERROR,
+        },
+      };
+    }
+
     const isPrivate = isPrivateIp(url);
 
     if (isPrivate) {
@@ -278,6 +324,7 @@ ${textContent}
         { model: 'web-fetch' },
         [{ role: 'user', parts: [{ text: userPrompt }] }],
         signal, // Pass signal
+        LlmRole.UTILITY_TOOL,
       );
 
       debugLogger.debug(

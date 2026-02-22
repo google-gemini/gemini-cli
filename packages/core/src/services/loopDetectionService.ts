@@ -18,6 +18,7 @@ import {
   LoopDetectionDisabledEvent,
   LoopType,
   LlmLoopCheckEvent,
+  LlmRole,
 } from '../telemetry/types.js';
 import type { Config } from '../config/config.js';
 import {
@@ -554,6 +555,7 @@ export class LoopDetectionService {
         abortSignal: signal,
         promptId: this.promptId,
         maxAttempts: 2,
+        role: LlmRole.UTILITY_LOOP_DETECTOR,
       });
 
       if (

@@ -12,11 +12,13 @@ import {
   getDisplayString,
   type RetryAttemptPayload,
 } from '@google/gemini-cli-core';
+import type { LoadingPhrasesMode } from '../../config/settings.js';
 
 export interface UseLoadingIndicatorProps {
   streamingState: StreamingState;
   shouldShowFocusHint: boolean;
   retryStatus: RetryAttemptPayload | null;
+  loadingPhrasesMode?: LoadingPhrasesMode;
   customWittyPhrases?: string[];
 }
 
@@ -24,6 +26,7 @@ export const useLoadingIndicator = ({
   streamingState,
   shouldShowFocusHint,
   retryStatus,
+  loadingPhrasesMode,
   customWittyPhrases,
 }: UseLoadingIndicatorProps) => {
   const [timerResetKey, setTimerResetKey] = useState(0);
@@ -37,6 +40,7 @@ export const useLoadingIndicator = ({
     isPhraseCyclingActive,
     isWaiting,
     shouldShowFocusHint,
+    loadingPhrasesMode,
     customWittyPhrases,
   );
 

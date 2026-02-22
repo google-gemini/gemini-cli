@@ -2,7 +2,8 @@
 
 exports[`<MaxSizedBox /> > accounts for additionalHiddenLinesCount 1`] = `
 "... first 7 lines hidden ...
-Line 3"
+Line 3
+"
 `;
 
 exports[`<MaxSizedBox /> > clips a long single text child from the bottom 1`] = `
@@ -15,7 +16,8 @@ Line 6
 Line 7
 Line 8
 Line 9
-... last 21 lines hidden ..."
+... last 21 lines hidden ...
+"
 `;
 
 exports[`<MaxSizedBox /> > clips a long single text child from the top 1`] = `
@@ -28,7 +30,8 @@ Line 26
 Line 27
 Line 28
 Line 29
-Line 30"
+Line 30
+"
 `;
 
 exports[`<MaxSizedBox /> > does not leak content after hidden indicator with bottom overflow 1`] = `
@@ -36,44 +39,55 @@ exports[`<MaxSizedBox /> > does not leak content after hidden indicator with bot
 
  - Step 1: Do something important
  - Step 2: Do something important
-... last 18 lines hidden ..."
+... last 18 lines hidden ...
+"
 `;
 
 exports[`<MaxSizedBox /> > does not truncate when maxHeight is undefined 1`] = `
 "Line 1
-Line 2"
+Line 2
+"
 `;
 
 exports[`<MaxSizedBox /> > handles React.Fragment as a child 1`] = `
 "Line 1 from Fragment
 Line 2 from Fragment
-Line 3 direct child"
+Line 3 direct child
+"
 `;
 
 exports[`<MaxSizedBox /> > hides lines at the end when content exceeds maxHeight and overflowDirection is bottom 1`] = `
 "Line 1
-... last 2 lines hidden ..."
+... last 2 lines hidden ...
+"
 `;
 
 exports[`<MaxSizedBox /> > hides lines when content exceeds maxHeight 1`] = `
 "... first 2 lines hidden ...
-Line 3"
+Line 3
+"
 `;
 
-exports[`<MaxSizedBox /> > renders children without truncation when they fit 1`] = `"Hello, World!"`;
+exports[`<MaxSizedBox /> > renders children without truncation when they fit 1`] = `
+"Hello, World!
+"
+`;
 
 exports[`<MaxSizedBox /> > shows plural "lines" when more than one line is hidden 1`] = `
 "... first 2 lines hidden ...
-Line 3"
+Line 3
+"
 `;
 
 exports[`<MaxSizedBox /> > shows singular "line" when exactly one line is hidden 1`] = `
 "... first 1 line hidden ...
-Line 1"
+Line 1
+"
 `;
 
 exports[`<MaxSizedBox /> > wraps text that exceeds maxWidth 1`] = `
 "This is a
 long line
-of text"
+of text
+"
 `;

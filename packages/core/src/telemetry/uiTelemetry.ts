@@ -16,6 +16,7 @@ import type {
   ApiErrorEvent,
   ApiResponseEvent,
   ToolCallEvent,
+  LlmRole,
 } from './types.js';
 
 export type UiEvent =
@@ -36,6 +37,21 @@ export interface ToolCallStats {
   };
 }
 
+export interface RoleMetrics {
+  totalRequests: number;
+  totalErrors: number;
+  totalLatencyMs: number;
+  tokens: {
+    input: number;
+    prompt: number;
+    candidates: number;
+    total: number;
+    cached: number;
+    thoughts: number;
+    tool: number;
+  };
+}
+
 export interface ModelMetrics {
   api: {
     totalRequests: number;
@@ -51,6 +67,7 @@ export interface ModelMetrics {
     thoughts: number;
     tool: number;
   };
+  roles: Partial<Record<LlmRole, RoleMetrics>>;
 }
 
 export interface SessionMetrics {
@@ -74,6 +91,21 @@ export interface SessionMetrics {
   };
 }
 
+const createInitialRoleMetrics = (): RoleMetrics => ({
+  totalRequests: 0,
+  totalErrors: 0,
+  totalLatencyMs: 0,
+  tokens: {
+    input: 0,
+    prompt: 0,
+    candidates: 0,
+    total: 0,
+    cached: 0,
+    thoughts: 0,
+    tool: 0,
+  },
+});
+
 const createInitialModelMetrics = (): ModelMetrics => ({
   api: {
     totalRequests: 0,
@@ -89,6 +121,7 @@ const createInitialModelMetrics = (): ModelMetrics => ({
     thoughts: 0,
     tool: 0,
   },
+  roles: {},
 });
 
 const createInitialMetrics = (): SessionMetrics => ({
@@ -177,6 +210,25 @@ export class UiTelemetryService extends EventEmitter {
       0,
       modelMetrics.tokens.prompt - modelMetrics.tokens.cached,
     );
+
+    if (event.role) {
+      if (!modelMetrics.roles[event.role]) {
+        modelMetrics.roles[event.role] = createInitialRoleMetrics();
+      }
+      const roleMetrics = modelMetrics.roles[event.role]!;
+      roleMetrics.totalRequests++;
+      roleMetrics.totalLatencyMs += event.duration_ms;
+      roleMetrics.tokens.prompt += event.usage.input_token_count;
+      roleMetrics.tokens.candidates += event.usage.output_token_count;
+      roleMetrics.tokens.total += event.usage.total_token_count;
+      roleMetrics.tokens.cached += event.usage.cached_content_token_count;
+      roleMetrics.tokens.thoughts += event.usage.thoughts_token_count;
+      roleMetrics.tokens.tool += event.usage.tool_token_count;
+      roleMetrics.tokens.input = Math.max(
+        0,
+        roleMetrics.tokens.prompt - roleMetrics.tokens.cached,
+      );
+    }
   }
 
   private processApiError(event: ApiErrorEvent) {
@@ -184,6 +236,16 @@ export class UiTelemetryService extends EventEmitter {
     modelMetrics.api.totalRequests++;
     modelMetrics.api.totalErrors++;
     modelMetrics.api.totalLatencyMs += event.duration_ms;
+
+    if (event.role) {
+      if (!modelMetrics.roles[event.role]) {
+        modelMetrics.roles[event.role] = createInitialRoleMetrics();
+      }
+      const roleMetrics = modelMetrics.roles[event.role]!;
+      roleMetrics.totalRequests++;
+      roleMetrics.totalErrors++;
+      roleMetrics.totalLatencyMs += event.duration_ms;
+    }
   }
 
   private processToolCall(event: ToolCallEvent) {

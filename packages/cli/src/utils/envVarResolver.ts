@@ -23,6 +23,7 @@ export function resolveEnvVarsInString(
 ): string {
   const envVarRegex = /\$(?:(\w+)|{([^}]+)})/g; // Find $VAR_NAME or ${VAR_NAME}
   return value.replace(envVarRegex, (match, varName1, varName2) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const varName = varName1 || varName2;
     if (customEnv && typeof customEnv[varName] === 'string') {
       return customEnv[varName];
@@ -97,6 +98,7 @@ function resolveEnvVarsInObjectInternal<T>(
     visited.add(obj);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const result = obj.map((item) =>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       resolveEnvVarsInObjectInternal(item, visited, customEnv),
     ) as unknown as T;
     visited.delete(obj);

@@ -208,6 +208,8 @@ export interface ParsedLog {
     stdout?: string;
     stderr?: string;
     error?: string;
+    error_type?: string;
+    prompt_id?: string;
   };
   scopeMetrics?: {
     metrics: {
@@ -1051,6 +1053,7 @@ export class TestRig {
         args: string;
         success: boolean;
         duration_ms: number;
+        prompt_id?: string;
       };
     }[] = [];
 
@@ -1079,6 +1082,13 @@ export class TestRig {
         args = argsMatch[1];
       }
 
+      // Look for prompt_id in the context
+      let promptId = undefined;
+      const promptIdMatch = context.match(/prompt_id:\s*'([^']+)'/);
+      if (promptIdMatch) {
+        promptId = promptIdMatch[1];
+      }
+
       // Also try to find function_name to double-check
       // Updated regex to handle tool names with hyphens and underscores
       const nameMatch = context.match(/function_name:\s*'([\w-]+)'/);
@@ -1091,6 +1101,7 @@ export class TestRig {
           args: args,
           success: success,
           duration_ms: duration,
+          prompt_id: promptId,
         },
       });
     }
@@ -1138,6 +1149,7 @@ export class TestRig {
                       args: obj.attributes.function_args || '{}',
                       success: obj.attributes.success !== false,
                       duration_ms: obj.attributes.duration_ms || 0,
+                      prompt_id: obj.attributes.prompt_id,
                     },
                   });
                 }
@@ -1152,6 +1164,7 @@ export class TestRig {
                     args: obj.attributes.function_args,
                     success: obj.attributes.success,
                     duration_ms: obj.attributes.duration_ms,
+                    prompt_id: obj.attributes.prompt_id,
                   },
                 });
               }
@@ -1242,6 +1255,9 @@ export class TestRig {
         args: string;
         success: boolean;
         duration_ms: number;
+        prompt_id?: string;
+        error?: string;
+        error_type?: string;
       };
     }[] = [];
 
@@ -1258,6 +1274,9 @@ export class TestRig {
             args: logData.attributes.function_args ?? '{}',
             success: logData.attributes.success ?? false,
             duration_ms: logData.attributes.duration_ms ?? 0,
+            prompt_id: logData.attributes.prompt_id,
+            error: logData.attributes.error,
+            error_type: logData.attributes.error_type,
           },
         });
       }

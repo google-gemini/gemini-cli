@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
 import type { Config } from '@google/gemini-cli-core';
-import { debugLogger, spawnAsync } from '@google/gemini-cli-core';
+import { debugLogger, spawnAsync, LlmRole } from '@google/gemini-cli-core';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
 import { TextInput } from '../shared/TextInput.js';
@@ -137,6 +137,7 @@ export const TriageIssues = ({
           '--limit',
           String(limit),
         ]);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const issues: Issue[] = JSON.parse(stdout);
         if (issues.length === 0) {
           setState((s) => ({
@@ -223,6 +224,7 @@ Return a JSON object with:
         },
         abortSignal: abortControllerRef.current.signal,
         promptId: 'triage-issues',
+        role: LlmRole.UTILITY_TOOL,
       });
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

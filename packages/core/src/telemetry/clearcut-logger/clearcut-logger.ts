@@ -615,14 +615,17 @@ export class ClearcutLogger {
 
     // Add hardware information only to the start session event
     const cpus = os.cpus();
-    data.push(
-      {
+    if (cpus && cpus.length > 0) {
+      data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_INFO,
         value: cpus[0].model,
-      },
+      });
+    }
+
+    data.push(
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_CORES,
-        value: cpus.length.toString(),
+        value: os.availableParallelism().toString(),
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_RAM_TOTAL_GB,
@@ -713,6 +716,7 @@ export class ClearcutLogger {
         event.function_name === ASK_USER_TOOL_NAME &&
         event.metadata['ask_user']
       ) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const askUser = event.metadata['ask_user'];
         const askUserMapping: { [key: string]: EventMetadataKey } = {
           question_types: EventMetadataKey.GEMINI_CLI_ASK_USER_QUESTION_TYPES,

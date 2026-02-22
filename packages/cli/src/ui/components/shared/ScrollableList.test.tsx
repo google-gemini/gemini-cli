@@ -5,13 +5,13 @@
  */
 
 import { useState, useEffect, useRef, act } from 'react';
-import { render } from 'ink-testing-library';
+import { render } from '../../../test-utils/render.js';
 import { Box, Text } from 'ink';
 import { ScrollableList, type ScrollableListRef } from './ScrollableList.js';
 import { ScrollProvider } from '../../contexts/ScrollProvider.js';
 import { KeypressProvider } from '../../contexts/KeypressContext.js';
 import { MouseProvider } from '../../contexts/MouseContext.js';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { waitFor } from '../../../test-utils/async.js';
 
 vi.mock('../../contexts/UIStateContext.js', () => ({
@@ -133,10 +133,21 @@ const TestComponent = ({
   );
 };
 describe('ScrollableList Demo Behavior', () => {
+  beforeEach(() => {
+    vi.stubEnv('NODE_ENV', 'test');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('should scroll to bottom when new items are added and stop when scrolled up', async () => {
     let addItem: (() => void) | undefined;
     let listRef: ScrollableListRef<Item> | null = null;
-    let lastFrame: () => string | undefined;
+    let lastFrame: (options?: { allowEmpty?: boolean }) => string | undefined;
+    let waitUntilReady: () => Promise<void>;
+
+    let result: ReturnType<typeof render>;
 
     let result: ReturnType<typeof render>;
 
@@ -146,13 +157,16 @@ describe('ScrollableList Demo Behavior', () => {
           onAddItem={(add) => {
             addItem = add;
           }}
-          onRef={(ref) => {
+          onRef={async (ref) => {
             listRef = ref;
           }}
         />,
       );
       lastFrame = result.lastFrame;
+      waitUntilReady = result.waitUntilReady;
     });
+
+    await waitUntilReady!();
 
     // Initial render should show Item 1000
     expect(lastFrame!()).toContain('Item 1000');
@@ -162,6 +176,8 @@ describe('ScrollableList Demo Behavior', () => {
     await act(async () => {
       addItem?.();
     });
+    await waitUntilReady!();
+
     await waitFor(() => {
       expect(lastFrame!()).toContain('Count: 1001');
     });
@@ -172,6 +188,8 @@ describe('ScrollableList Demo Behavior', () => {
     await act(async () => {
       addItem?.();
     });
+    await waitUntilReady!();
+
     await waitFor(() => {
       expect(lastFrame!()).toContain('Count: 1002');
     });
@@ -182,14 +200,14 @@ describe('ScrollableList Demo Behavior', () => {
     await act(async () => {
       listRef?.scrollBy(-5);
     });
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    });
+    await waitUntilReady!();
 
     // Add item 1003 - should NOT be visible because we scrolled up
     await act(async () => {
       addItem?.();
     });
+    await waitUntilReady!();
+
     await waitFor(() => {
       expect(lastFrame!()).toContain('Count: 1003');
     });
@@ -249,11 +267,15 @@ describe('ScrollableList Demo Behavior', () => {
     };
 
     let lastFrame: () => string | undefined;
+    let waitUntilReady: () => Promise<void>;
     let result: ReturnType<typeof render>;
     await act(async () => {
       result = render(<StickyTestComponent />);
       lastFrame = result.lastFrame;
+      waitUntilReady = result.waitUntilReady;
     });
+
+    await waitUntilReady!();
 
     // Initially at top, should see Normal Item 1
     await waitFor(() => {
@@ -265,6 +287,7 @@ describe('ScrollableList Demo Behavior', () => {
     await act(async () => {
       listRef?.scrollBy(2);
     });
+    await waitUntilReady!();
 
     // Now Item 1 should be stuck
     await waitFor(() => {
@@ -278,6 +301,7 @@ describe('ScrollableList Demo Behavior', () => {
     await act(async () => {
       listRef?.scrollTo(10);
     });
+    await waitUntilReady!();
 
     await waitFor(() => {
       expect(lastFrame!()).not.toContain('[STICKY] Item 1');
@@ -287,6 +311,7 @@ describe('ScrollableList Demo Behavior', () => {
     await act(async () => {
       listRef?.scrollTo(0);
     });
+    await waitUntilReady!();
 
     // Should be normal again
     await waitFor(() => {
@@ -302,8 +327,9 @@ describe('ScrollableList Demo Behavior', () => {
   describe('Keyboard Navigation', () => {
     it('should handle scroll keys correctly', async () => {
       let listRef: ScrollableListRef<Item> | null = null;
-      let lastFrame: () => string | undefined;
+      let lastFrame: (options?: { allowEmpty?: boolean }) => string | undefined;
       let stdin: { write: (data: string) => void };
+      let waitUntilReady: () => Promise<void>;
 
       const items = Array.from({ length: 50 }, (_, i) => ({
         id: String(i),
@@ -334,7 +360,10 @@ describe('ScrollableList Demo Behavior', () => {
         );
         lastFrame = result.lastFrame;
         stdin = result.stdin;
+        waitUntilReady = result.waitUntilReady;
       });
+
+      await waitUntilReady!();
 
       // Initial state
       expect(lastFrame!()).toContain('Item 0');
@@ -345,6 +374,8 @@ describe('ScrollableList Demo Behavior', () => {
       await act(async () => {
         stdin.write('\x1b[b');
       });
+      await waitUntilReady!();
+
       await waitFor(() => {
         expect(listRef?.getScrollState()?.scrollTop).toBeGreaterThan(0);
       });
@@ -353,6 +384,8 @@ describe('ScrollableList Demo Behavior', () => {
       await act(async () => {
         stdin.write('\x1b[a');
       });
+      await waitUntilReady!();
+
       await waitFor(() => {
         expect(listRef?.getScrollState()?.scrollTop).toBe(0);
       });
@@ -361,6 +394,8 @@ describe('ScrollableList Demo Behavior', () => {
       await act(async () => {
         stdin.write('\x1b[6~');
       });
+      await waitUntilReady!();
+
       await waitFor(() => {
         // Height is 10, so should scroll ~10 units
         expect(listRef?.getScrollState()?.scrollTop).toBeGreaterThanOrEqual(9);
@@ -370,6 +405,8 @@ describe('ScrollableList Demo Behavior', () => {
       await act(async () => {
         stdin.write('\x1b[5~');
       });
+      await waitUntilReady!();
+
       await waitFor(() => {
         expect(listRef?.getScrollState()?.scrollTop).toBeLessThan(2);
       });
@@ -378,6 +415,8 @@ describe('ScrollableList Demo Behavior', () => {
       await act(async () => {
         stdin.write('\x1b[1;5F');
       });
+      await waitUntilReady!();
+
       await waitFor(() => {
         // Total 50 items, height 10. Max scroll ~40.
         expect(listRef?.getScrollState()?.scrollTop).toBeGreaterThan(30);
@@ -387,11 +426,15 @@ describe('ScrollableList Demo Behavior', () => {
       await act(async () => {
         stdin.write('\x1b[1;5H');
       });
+      await waitUntilReady!();
+
       await waitFor(() => {
         expect(listRef?.getScrollState()?.scrollTop).toBe(0);
       });
 
       await act(async () => {
+        // Let the scrollbar fade out animation finish
+        await new Promise((resolve) => setTimeout(resolve, 1600));
         result.unmount();
       });
     });
@@ -400,7 +443,8 @@ describe('ScrollableList Demo Behavior', () => {
   describe('Width Prop', () => {
     it('should apply the width prop to the container', async () => {
       const items = [{ id: '1', title: 'Item 1' }];
-      let lastFrame: () => string | undefined;
+      let lastFrame: (options?: { allowEmpty?: boolean }) => string | undefined;
+      let waitUntilReady: () => Promise<void>;
 
       let result: ReturnType<typeof render>;
       await act(async () => {
@@ -423,7 +467,10 @@ describe('ScrollableList Demo Behavior', () => {
           </MouseProvider>,
         );
         lastFrame = result.lastFrame;
+        waitUntilReady = result.waitUntilReady;
       });
+
+      await waitUntilReady!();
 
       await waitFor(() => {
         expect(lastFrame()).toContain('Item 1');
