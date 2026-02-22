@@ -47,9 +47,9 @@ export function TextInput({
       }
 
       if (keyMatchers[Command.SUBMIT](key) && onSubmit) {
-        const processedText = Object.entries(buffer.pastedContent ?? {}).reduce(
-          (t, [placeholder, content]) => t.split(placeholder).join(content),
-          text,
+        const processedText = text.replace(
+          /\[Pasted Text: \d+ (?:lines|chars)(?: #\d+)?\]/g,
+          (match) => buffer.pastedContent?.[match] ?? match,
         );
         onSubmit(processedText);
         return true;
