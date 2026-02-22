@@ -555,8 +555,15 @@ export class Task {
     old_string: string,
     new_string: string,
   ): Promise<string> {
+    // Validate path to prevent path traversal vulnerabilities
+    const resolvedPath = path.resolve(this.config.getTargetDir(), file_path);
+    const pathError = this.config.validatePathAccess(resolvedPath, 'read');
+    if (pathError) {
+      throw new Error(`Path validation failed: ${pathError}`);
+    }
+
     try {
-      const currentContent = await fs.readFile(file_path, 'utf8');
+      const currentContent = await fs.readFile(resolvedPath, 'utf8');
       return this._applyReplacement(
         currentContent,
         old_string,
