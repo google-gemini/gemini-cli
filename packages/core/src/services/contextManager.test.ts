@@ -21,6 +21,7 @@ vi.mock('../utils/memoryDiscovery.js', async (importOriginal) => {
     getEnvironmentMemoryPaths: vi.fn(),
     readGeminiMdFiles: vi.fn(),
     loadJitSubdirectoryMemory: vi.fn(),
+    deduplicatePathsByFileIdentity: vi.fn(),
     concatenateInstructions: vi
       .fn()
       .mockImplementation(actual.concatenateInstructions),
@@ -52,6 +53,10 @@ describe('ContextManager', () => {
     vi.clearAllMocks();
     vi.spyOn(coreEvents, 'emit');
     vi.mocked(memoryDiscovery.getExtensionMemoryPaths).mockReturnValue([]);
+    // default mock: deduplication returns paths as-is (no deduplication)
+    vi.mocked(
+      memoryDiscovery.deduplicatePathsByFileIdentity,
+    ).mockImplementation(async (paths: string[]) => paths);
   });
 
   describe('refresh', () => {
@@ -127,6 +132,49 @@ describe('ContextManager', () => {
       expect(memoryDiscovery.getEnvironmentMemoryPaths).not.toHaveBeenCalled();
       expect(contextManager.getEnvironmentMemory()).toBe('');
       expect(contextManager.getGlobalMemory()).toContain('Global Content');
+    });
+
+    it('should deduplicate files by file identity in case-insensitive filesystems', async () => {
+      const globalPaths = ['/home/user/.gemini/GEMINI.md'];
+      const envPaths = ['/app/gemini.md', '/app/GEMINI.md'];
+
+      vi.mocked(memoryDiscovery.getGlobalMemoryPaths).mockResolvedValue(
+        globalPaths,
+      );
+      vi.mocked(memoryDiscovery.getEnvironmentMemoryPaths).mockResolvedValue(
+        envPaths,
+      );
+
+      // mock deduplication to return deduplicated paths (simulating same file)
+      vi.mocked(
+        memoryDiscovery.deduplicatePathsByFileIdentity,
+      ).mockResolvedValue(['/home/user/.gemini/GEMINI.md', '/app/gemini.md']);
+
+      vi.mocked(memoryDiscovery.readGeminiMdFiles).mockResolvedValue([
+        { filePath: '/home/user/.gemini/GEMINI.md', content: 'Global Content' },
+        { filePath: '/app/gemini.md', content: 'Project Content' },
+      ]);
+
+      await contextManager.refresh();
+
+      expect(
+        memoryDiscovery.deduplicatePathsByFileIdentity,
+      ).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          '/home/user/.gemini/GEMINI.md',
+          '/app/gemini.md',
+          '/app/GEMINI.md',
+        ]),
+        false,
+      );
+      expect(memoryDiscovery.readGeminiMdFiles).toHaveBeenCalledWith(
+        ['/home/user/.gemini/GEMINI.md', '/app/gemini.md'],
+        false,
+        'tree',
+      );
+      expect(contextManager.getEnvironmentMemory()).toContain(
+        'Project Content',
+      );
     });
   });
 
