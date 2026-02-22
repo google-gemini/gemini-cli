@@ -127,7 +127,7 @@ export class Task {
     const serverStatuses = getAllMCPServerStatuses();
     const getToolParameterSchema = (
       tool: Pick<AnyDeclarativeTool, 'schema'>,
-    ): unknown => tool.schema.parametersJsonSchema ?? tool.schema.parameters;
+    ): unknown => tool.schema?.parametersJsonSchema ?? tool.schema?.parameters;
     const servers = Object.keys(mcpServers).map((serverName) => ({
       name: serverName,
       status: serverStatuses.get(serverName) || MCPServerStatus.DISCONNECTED,

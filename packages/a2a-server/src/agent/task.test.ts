@@ -317,6 +317,45 @@ describe('Task', () => {
         expectedSchema,
       );
     });
+
+    it('should tolerate tools with missing schema', async () => {
+      const toolWithMissingSchema = {
+        name: 'tool_with_missing_schema',
+        description: 'A tool without a schema object.',
+        schema: undefined,
+      };
+
+      const mockConfig = createMockConfig({
+        getToolRegistry: vi.fn().mockReturnValue({
+          getAllTools: vi.fn().mockReturnValue([toolWithMissingSchema]),
+          getToolsByServer: vi.fn().mockReturnValue([toolWithMissingSchema]),
+        }),
+        getMcpClientManager: vi.fn().mockReturnValue({
+          getMcpServers: vi.fn().mockReturnValue({ server1: {} }),
+        }),
+      });
+      const mockEventBus: ExecutionEventBus = {
+        publish: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeAllListeners: vi.fn(),
+        finished: vi.fn(),
+      };
+
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      const metadata = await task.getMetadata();
+
+      expect(metadata.mcpServers[0].tools[0].parameterSchema).toBeUndefined();
+      expect(metadata.availableTools[0].parameterSchema).toBeUndefined();
+    });
   });
 
   describe('acceptAgentMessage', () => {
