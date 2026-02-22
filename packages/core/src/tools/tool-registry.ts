@@ -55,8 +55,28 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
     _signal: AbortSignal,
     _updateOutput?: (output: string) => void,
   ): Promise<ToolResult> {
-    const callCommand = this.config.getToolCallCommand()!;
-    const child = spawn(callCommand, [this.originalToolName]);
+    const callCmd = this.config.getToolCallCommand()!;
+    const callCmdParts = parse(callCmd);
+
+    if (callCmdParts.length === 0) {
+      throw new Error(
+        `Tool call command is empty or contains only whitespace: "${callCmd}"`,
+      );
+    }
+
+    const commandParts = callCmdParts.map((part) => {
+      if (typeof part !== 'string') {
+        throw new Error(
+          `Tool call command contains unsupported shell operators (e.g., "|", "&&"): "${callCmd}"`,
+        );
+      }
+      return part;
+    });
+
+    const child = spawn(commandParts[0], [
+      ...commandParts.slice(1),
+      this.originalToolName,
+    ]);
     child.stdin.write(JSON.stringify(this.params));
     child.stdin.end();
 

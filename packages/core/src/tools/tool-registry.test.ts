@@ -674,6 +674,108 @@ describe('ToolRegistry', () => {
       const description = invocation.getDescription();
       expect(description).toBe(JSON.stringify(params));
     });
+
+    it('should parse callCommand with arguments correctly (fixes #19783)', async () => {
+      const discoveryCommand = 'my-discovery-command';
+      mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
+      // callCommand with multiple arguments — this was causing ENOENT before the fix
+      vi.spyOn(config, 'getToolCallCommand').mockReturnValue(
+        'python3 script.py --call',
+      );
+
+      const toolDeclaration: FunctionDeclaration = {
+        name: 'test-tool',
+        description: 'A test tool',
+        parametersJsonSchema: { type: 'object', properties: {} },
+      };
+
+      const mockSpawn = vi.mocked(spawn);
+      mockSpawn.mockReturnValueOnce(
+        createDiscoveryProcess([toolDeclaration]) as any,
+      );
+
+      await toolRegistry.discoverAllTools();
+      const discoveredTool = toolRegistry.getTool(
+        DISCOVERED_TOOL_PREFIX + 'test-tool',
+      );
+      expect(discoveredTool).toBeDefined();
+
+      mockSpawn.mockReturnValueOnce(createExecutionProcess(0) as any);
+
+      const invocation = (discoveredTool as DiscoveredTool).build({});
+      await invocation.execute(new AbortController().signal);
+
+      // Verify spawn was called with the PARSED command, not the full string
+      const lastSpawnCall =
+        mockSpawn.mock.calls[mockSpawn.mock.calls.length - 1];
+      expect(lastSpawnCall[0]).toBe('python3');
+      expect(lastSpawnCall[1]).toEqual(['script.py', '--call', 'test-tool']);
+    });
+
+    it('should parse simple callCommand without arguments correctly', async () => {
+      const discoveryCommand = 'my-discovery-command';
+      mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
+      vi.spyOn(config, 'getToolCallCommand').mockReturnValue('my-call-command');
+
+      const toolDeclaration: FunctionDeclaration = {
+        name: 'simple-tool',
+        description: 'A simple tool',
+        parametersJsonSchema: { type: 'object', properties: {} },
+      };
+
+      const mockSpawn = vi.mocked(spawn);
+      mockSpawn.mockReturnValueOnce(
+        createDiscoveryProcess([toolDeclaration]) as any,
+      );
+
+      await toolRegistry.discoverAllTools();
+      const discoveredTool = toolRegistry.getTool(
+        DISCOVERED_TOOL_PREFIX + 'simple-tool',
+      );
+      expect(discoveredTool).toBeDefined();
+
+      mockSpawn.mockReturnValueOnce(createExecutionProcess(0) as any);
+
+      const invocation = (discoveredTool as DiscoveredTool).build({});
+      await invocation.execute(new AbortController().signal);
+
+      // Verify spawn was called correctly for simple command
+      const lastSpawnCall =
+        mockSpawn.mock.calls[mockSpawn.mock.calls.length - 1];
+      expect(lastSpawnCall[0]).toBe('my-call-command');
+      expect(lastSpawnCall[1]).toEqual(['simple-tool']);
+    });
+
+    it('should throw an error if callCommand contains shell operators', async () => {
+      const discoveryCommand = 'my-discovery-command';
+      mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
+      // callCommand with a pipe operator — should be rejected
+      vi.spyOn(config, 'getToolCallCommand').mockReturnValue(
+        'my-command | grep foo',
+      );
+
+      const toolDeclaration: FunctionDeclaration = {
+        name: 'pipe-tool',
+        description: 'A tool with pipe in command',
+        parametersJsonSchema: { type: 'object', properties: {} },
+      };
+
+      const mockSpawn = vi.mocked(spawn);
+      mockSpawn.mockReturnValueOnce(
+        createDiscoveryProcess([toolDeclaration]) as any,
+      );
+
+      await toolRegistry.discoverAllTools();
+      const discoveredTool = toolRegistry.getTool(
+        DISCOVERED_TOOL_PREFIX + 'pipe-tool',
+      );
+      expect(discoveredTool).toBeDefined();
+
+      const invocation = (discoveredTool as DiscoveredTool).build({});
+      await expect(
+        invocation.execute(new AbortController().signal),
+      ).rejects.toThrow('unsupported shell operators');
+    });
   });
 });
 
