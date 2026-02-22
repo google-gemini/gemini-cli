@@ -635,12 +635,19 @@ export class GeminiChat {
       authType: this.config.getContentGeneratorConfig()?.authType,
       retryFetchErrors: this.config.getRetryFetchErrors(),
       signal: abortSignal,
-      maxAttempts: availabilityMaxAttempts,
+      initialDelayMs: this.config.getHighDemandRetry()?.initialDelayMs,
+      maxDelayMs: this.config.getHighDemandRetry()?.maxDelayMs,
+      maxAttempts:
+        this.config.getHighDemandRetry()?.maxAttempts ??
+        availabilityMaxAttempts,
       getAvailabilityContext,
       onRetry: (attempt, error, delayMs) => {
         coreEvents.emitRetryAttempt({
           attempt,
-          maxAttempts: availabilityMaxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+          maxAttempts:
+            this.config.getHighDemandRetry()?.maxAttempts ??
+            availabilityMaxAttempts ??
+            DEFAULT_MAX_ATTEMPTS,
           delayMs,
           error: error instanceof Error ? error.message : String(error),
           model: lastModelToUse,

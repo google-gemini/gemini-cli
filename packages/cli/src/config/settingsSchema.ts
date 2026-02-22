@@ -307,6 +307,44 @@ const SETTINGS_SCHEMA = {
           'Retry on "exception TypeError: fetch failed sending request" errors.',
         showInDialog: false,
       },
+      highDemandRetry: {
+        type: 'object',
+        label: 'High Demand Retry',
+        category: 'General',
+        requiresRestart: false,
+        default: {},
+        description:
+          'Controls retry behavior for transient API failures including 503 High Demand, other 5xx errors, and network errors.',
+        properties: {
+          maxAttempts: {
+            type: 'number',
+            label: 'Max Attempts',
+            category: 'General',
+            requiresRestart: false,
+            default: 3,
+            description:
+              'Maximum number of retry attempts for transient API failures (503 High Demand, 5xx, network errors).',
+          },
+          initialDelayMs: {
+            type: 'number',
+            label: 'Initial Delay (ms)',
+            category: 'General',
+            requiresRestart: false,
+            default: 5000,
+            description:
+              'Initial backoff delay in milliseconds before the first retry attempt for transient API failures.',
+          },
+          maxDelayMs: {
+            type: 'number',
+            label: 'Max Delay (ms)',
+            category: 'General',
+            requiresRestart: false,
+            default: 30000,
+            description:
+              'Maximum backoff delay cap in milliseconds between retry attempts for transient API failures.',
+          },
+        },
+      },
       debugKeystrokeLogging: {
         type: 'boolean',
         label: 'Debug Keystroke Logging',

@@ -390,7 +390,14 @@ export interface PolicyUpdateConfirmationRequest {
   policyDir: string;
   newHash: string;
 }
-
+export interface HighDemandRetrySettings {
+  /** Total retry attempts for 503 High Demand errors. */
+  maxAttempts?: number;
+  /** Base backoff delay in ms (default: 5000) */
+  initialDelayMs?: number;
+  /** Max backoff delay cap in ms (default: 30000) */
+  maxDelayMs?: number;
+}
 export interface ConfigParameters {
   sessionId: string;
   clientVersion?: string;
@@ -476,6 +483,7 @@ export interface ConfigParameters {
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
+  highDemandRetry?: HighDemandRetrySettings;
   enableShellOutputEfficiency?: boolean;
   shellToolInactivityTimeout?: number;
   fakeResponses?: string;
@@ -532,6 +540,7 @@ export class Config {
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
   readonly modelConfigService: ModelConfigService;
+  private readonly highDemandRetry: HighDemandRetrySettings;
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
   private readonly targetDir: string;
@@ -583,7 +592,6 @@ export class Config {
   private readonly noBrowser: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
-
   private _activeModel: string;
   private readonly maxSessionTurns: number;
   private readonly listSessions: boolean;
@@ -704,6 +712,7 @@ export class Config {
   private approvedPlanPath: string | undefined;
 
   constructor(params: ConfigParameters) {
+    this.highDemandRetry = params.highDemandRetry ?? {};
     this.sessionId = params.sessionId;
     this.clientVersion = params.clientVersion ?? 'unknown';
     this.approvedPlanPath = undefined;
@@ -1177,7 +1186,9 @@ export class Config {
   getSessionId(): string {
     return this.sessionId;
   }
-
+  getHighDemandRetry(): HighDemandRetrySettings {
+    return this.highDemandRetry;
+  }
   setSessionId(sessionId: string): void {
     this.sessionId = sessionId;
   }
