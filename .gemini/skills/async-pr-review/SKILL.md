@@ -7,6 +7,10 @@ description: Trigger this skill when the user wants to start an asynchronous PR 
 
 This skill provides a set of tools to asynchronously review a Pull Request. It will create a background job to run the project's preflight checks, execute Gemini-powered test plans, and perform a comprehensive code review using custom prompts.
 
+This is a prime example of composing Gemini CLI features:
+1.  **Headless Automation (`async-review.sh`)**: The script invokes `gemini` with `--approval-mode=yolo` and the `/review-frontend` custom command in the background.
+2.  **Agentic Evaluation (`check-async-review.sh`)**: The check script outputs clean JSON/text statuses for the agent to parse. The agent itself synthesizes the final assessment dynamically from the generated log files.
+
 ## Workflow
 
 1.  **Determine Action**: Establish whether the user wants to start a new async review or check the status of an existing one.
@@ -33,4 +37,7 @@ If the user wants to check the status or view the final assessment of a previous
     ```bash
     .gemini/skills/async-pr-review/scripts/check-async-review.sh <PR_NUMBER>
     ```
-3.  This script will launch a live status dashboard. Once all tasks are complete, it will automatically query a new instance of Gemini for a final assessment and provide a recommendation on whether to approve the PR. Let the script run in the user's terminal.
+3.  **Evaluate Output**: Read the output from the script.
+    *   If the output contains `STATUS: IN_PROGRESS`, tell the user which tasks are still running.
+    *   If the output contains `STATUS: COMPLETE`, use your file reading tools (`read_file`) to retrieve the contents of the `review.md` and `test-execution.log` files from the `LOG_DIR` specified in the output.
+    *   **Final Assessment**: Read those files, synthesize their results, and give the user a concise recommendation on whether the PR builds successfully, passes tests, and if you recommend they approve it based on the review.
