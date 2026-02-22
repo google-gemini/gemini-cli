@@ -21,6 +21,16 @@ import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import { Storage, AUTO_SAVED_POLICY_FILENAME } from '../config/storage.js';
 import { ApprovalMode } from './types.js';
+import { coreEvents } from '../utils/events.js';
+
+/**
+ * Creates a Node.js-style error with a `code` property.
+ */
+function makeNodeError(message: string, code: string): NodeJS.ErrnoException {
+  const err = new Error(message) as NodeJS.ErrnoException;
+  err.code = code;
+  return err;
+}
 
 vi.mock('node:fs/promises');
 vi.mock('../config/storage.js');
@@ -59,7 +69,7 @@ describe('createPolicyUpdater', () => {
     vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
     (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
     (fs.readFile as unknown as Mock).mockRejectedValue(
-      new Error('File not found'),
+      makeNodeError('ENOENT: no such file or directory', 'ENOENT'),
     ); // Simulate new file
 
     const mockFileHandle = {
@@ -126,7 +136,7 @@ describe('createPolicyUpdater', () => {
     vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
     (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
     (fs.readFile as unknown as Mock).mockRejectedValue(
-      new Error('File not found'),
+      makeNodeError('ENOENT: no such file or directory', 'ENOENT'),
     );
 
     const mockFileHandle = {
@@ -179,7 +189,7 @@ describe('createPolicyUpdater', () => {
     vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
     (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
     (fs.readFile as unknown as Mock).mockRejectedValue(
-      new Error('File not found'),
+      makeNodeError('ENOENT: no such file or directory', 'ENOENT'),
     );
 
     const mockFileHandle = {
@@ -225,7 +235,7 @@ describe('createPolicyUpdater', () => {
     vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
     (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
     (fs.readFile as unknown as Mock).mockRejectedValue(
-      new Error('File not found'),
+      makeNodeError('ENOENT: no such file or directory', 'ENOENT'),
     );
 
     const mockFileHandle = {
@@ -265,5 +275,157 @@ describe('createPolicyUpdater', () => {
     } catch {
       expect(writtenContent).toContain(`toolName = 'search"tool"'`);
     }
+  });
+
+  it('should include error details in feedback message on persistence failure', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    const workspacePoliciesDir = '/mock/project/.gemini/policies';
+    const policyFile = path.join(
+      workspacePoliciesDir,
+      AUTO_SAVED_POLICY_FILENAME,
+    );
+    vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
+      workspacePoliciesDir,
+    );
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
+    (fs.mkdir as unknown as Mock).mockRejectedValue(
+      new Error('Permission denied'),
+    );
+
+    const feedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      persist: true,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(feedbackSpy).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('Permission denied'),
+      expect.any(Error),
+    );
+  });
+
+  it('should clean up tmp file on write failure', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    const workspacePoliciesDir = '/mock/project/.gemini/policies';
+    const policyFile = path.join(
+      workspacePoliciesDir,
+      AUTO_SAVED_POLICY_FILENAME,
+    );
+    vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
+      workspacePoliciesDir,
+    );
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
+    (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
+    (fs.readFile as unknown as Mock).mockRejectedValue(
+      makeNodeError('ENOENT: no such file or directory', 'ENOENT'),
+    );
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockRejectedValue(new Error('Disk full')),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    (fs.open as unknown as Mock).mockResolvedValue(mockFileHandle);
+    (fs.unlink as unknown as Mock).mockResolvedValue(undefined);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      persist: true,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Should attempt to clean up the tmp file
+    expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
+  });
+
+  it('should abort persistence on non-ENOENT read errors', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    const workspacePoliciesDir = '/mock/project/.gemini/policies';
+    const policyFile = path.join(
+      workspacePoliciesDir,
+      AUTO_SAVED_POLICY_FILENAME,
+    );
+    vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
+      workspacePoliciesDir,
+    );
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
+    (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
+    // Simulate EACCES when reading the existing policy file
+    (fs.readFile as unknown as Mock).mockRejectedValue(
+      makeNodeError('Permission denied', 'EACCES'),
+    );
+
+    const feedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      persist: true,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Should NOT attempt to write a new file
+    expect(fs.open).not.toHaveBeenCalled();
+    // Should report the error with details
+    expect(feedbackSpy).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('Permission denied'),
+      expect.any(Error),
+    );
+  });
+
+  it('should fall back to copy+unlink when rename fails with EXDEV', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    const workspacePoliciesDir = '/mock/project/.gemini/policies';
+    const policyFile = path.join(
+      workspacePoliciesDir,
+      AUTO_SAVED_POLICY_FILENAME,
+    );
+    vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
+      workspacePoliciesDir,
+    );
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
+    (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
+    (fs.readFile as unknown as Mock).mockRejectedValue(
+      makeNodeError('ENOENT: no such file or directory', 'ENOENT'),
+    );
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    (fs.open as unknown as Mock).mockResolvedValue(mockFileHandle);
+    // Simulate cross-device link error
+    (fs.rename as unknown as Mock).mockRejectedValue(
+      makeNodeError('EXDEV: cross-device link not permitted', 'EXDEV'),
+    );
+    (fs.copyFile as unknown as Mock).mockResolvedValue(undefined);
+    (fs.unlink as unknown as Mock).mockResolvedValue(undefined);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      persist: true,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Should fall back to copy + unlink
+    expect(fs.copyFile).toHaveBeenCalledWith(
+      expect.stringMatching(/\.tmp$/),
+      policyFile,
+    );
+    expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
   });
 });
