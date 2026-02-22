@@ -1106,6 +1106,7 @@ describe('loggers', () => {
         new ToolRegistry(cfg1, {} as unknown as MessageBus),
 
       getUserMemory: () => 'user-memory',
+      isInteractive: () => false,
     } as unknown as Config;
 
     const mockGeminiClient = new GeminiClient(cfg2);
