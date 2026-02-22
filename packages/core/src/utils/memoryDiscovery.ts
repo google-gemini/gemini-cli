@@ -39,6 +39,103 @@ export interface GeminiFileContent {
   content: string | null;
 }
 
+/**
+ * Deduplicates file paths by file identity (device + inode) rather than string path.
+ * This is necessary on case-insensitive filesystems where different case variants
+ * of the same filename resolve to the same physical file but have different path strings.
+ *
+ * @param filePaths Array of file paths to deduplicate
+ * @param debugMode Whether to log debug information
+ * @returns Array of deduplicated file paths, keeping the first occurrence of each unique file
+ */
+export async function deduplicatePathsByFileIdentity(
+  filePaths: string[],
+  debugMode: boolean,
+): Promise<string[]> {
+  if (filePaths.length === 0) {
+    return [];
+  }
+
+  const fileIdentityMap = new Map<string, string>();
+  const deduplicatedPaths: string[] = [];
+
+  const CONCURRENT_LIMIT = 20;
+  const results: Array<{
+    path: string;
+    dev: bigint | number | null;
+    ino: bigint | number | null;
+  }> = [];
+
+  for (let i = 0; i < filePaths.length; i += CONCURRENT_LIMIT) {
+    const batch = filePaths.slice(i, i + CONCURRENT_LIMIT);
+    const batchPromises = batch.map(async (filePath) => {
+      try {
+        const stats = await fs.lstat(filePath);
+        return {
+          path: filePath,
+          dev: stats.dev,
+          ino: stats.ino,
+        };
+      } catch (error: unknown) {
+        if (debugMode) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          logger.debug(
+            `Could not stat file for deduplication: ${filePath}. Error: ${message}`,
+          );
+        }
+        return {
+          path: filePath,
+          dev: null,
+          ino: null,
+        };
+      }
+    });
+
+    const batchResults = await Promise.allSettled(batchPromises);
+    for (const result of batchResults) {
+      if (result.status === 'fulfilled') {
+        results.push(result.value);
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const error = result.reason;
+        const message = error instanceof Error ? error.message : String(error);
+        if (debugMode) {
+          logger.debug(
+            `Unexpected error during deduplication stat: ${message}`,
+          );
+        }
+      }
+    }
+  }
+
+  for (const { path, dev, ino } of results) {
+    if (dev !== null && ino !== null) {
+      const identityKey = `${dev.toString()}:${ino.toString()}`;
+      if (!fileIdentityMap.has(identityKey)) {
+        fileIdentityMap.set(identityKey, path);
+        deduplicatedPaths.push(path);
+        if (debugMode) {
+          logger.debug(
+            `Deduplication: keeping ${path} (dev: ${dev}, ino: ${ino})`,
+          );
+        }
+      } else {
+        const existingPath = fileIdentityMap.get(identityKey);
+        if (debugMode) {
+          logger.debug(
+            `Deduplication: skipping ${path} (same file as ${existingPath})`,
+          );
+        }
+      }
+    } else {
+      deduplicatedPaths.push(path);
+    }
+  }
+
+  return deduplicatedPaths;
+}
+
 async function findProjectRoot(startDir: string): Promise<string | null> {
   let currentDir = normalizePath(startDir);
   while (true) {
@@ -526,7 +623,7 @@ export async function loadServerHierarchicalMemory(
     Promise.resolve(getExtensionMemoryPaths(extensionLoader)),
   ]);
 
-  const allFilePaths = Array.from(
+  const allFilePathsStringDeduped = Array.from(
     new Set([
       ...discoveryResult.global,
       ...discoveryResult.project,
@@ -534,9 +631,27 @@ export async function loadServerHierarchicalMemory(
     ]),
   );
 
-  if (allFilePaths.length === 0) {
+  if (allFilePathsStringDeduped.length === 0) {
     if (debugMode)
       logger.debug('No GEMINI.md files found in hierarchy of the workspace.');
+    return {
+      memoryContent: { global: '', extension: '', project: '' },
+      fileCount: 0,
+      filePaths: [],
+    };
+  }
+
+  // deduplicate by file identity to handle case-insensitive filesystems
+  const allFilePaths = await deduplicatePathsByFileIdentity(
+    allFilePathsStringDeduped,
+    debugMode,
+  );
+
+  if (allFilePaths.length === 0) {
+    if (debugMode)
+      logger.debug(
+        'No unique GEMINI.md files found after deduplication by file identity.',
+      );
     return {
       memoryContent: { global: '', extension: '', project: '' },
       fileCount: 0,
@@ -654,7 +769,19 @@ export async function loadJitSubdirectoryMemory(
   );
 
   // Filter out already loaded paths
-  const newPaths = potentialPaths.filter((p) => !alreadyLoadedPaths.has(p));
+  const newPathsStringDeduped = potentialPaths.filter(
+    (p) => !alreadyLoadedPaths.has(p),
+  );
+
+  if (newPathsStringDeduped.length === 0) {
+    return { files: [] };
+  }
+
+  // deduplicate by file identity to handle case-insensitive filesystems
+  const newPaths = await deduplicatePathsByFileIdentity(
+    newPathsStringDeduped,
+    debugMode,
+  );
 
   if (newPaths.length === 0) {
     return { files: [] };
