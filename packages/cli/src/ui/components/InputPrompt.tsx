@@ -574,12 +574,18 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const handleInput = useCallback(
     (key: Key) => {
       // Ctrl+A (Home) / Ctrl+E (End)
-      if (key.name === 'home' || keyMatchers[Command.HOME](key)) {
-        buffer.move('home');
-        return true;
-      }
-      if (key.name === 'end' || keyMatchers[Command.END](key)) {
-        buffer.move('end');
+      const isHome =
+        key.name === 'home' ||
+        (key.ctrl && key.name === 'a') ||
+        keyMatchers[Command.HOME](key);
+      const isEnd =
+        key.name === 'end' ||
+        (key.ctrl && key.name === 'e') ||
+        keyMatchers[Command.END](key);
+
+      if (isHome || isEnd) {
+        setSuppressCompletion(true);
+        buffer.move(isHome ? 'home' : 'end');
         return true;
       }
       // Determine if this keypress is a history navigation command
