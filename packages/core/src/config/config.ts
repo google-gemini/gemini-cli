@@ -699,7 +699,7 @@ export class Config {
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
-  private lastModeSwitchTime: number = Date.now();
+  private lastModeSwitchTime: number = performance.now();
   readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
 
@@ -1799,12 +1799,11 @@ export class Config {
 
     const currentMode = this.getApprovalMode();
     if (currentMode !== mode) {
-      this.logCurrentModeDuration(this.getApprovalMode());
+      this.logCurrentModeDuration(currentMode);
       logApprovalModeSwitch(
         this,
         new ApprovalModeSwitchEvent(currentMode, mode),
       );
-      this.lastModeSwitchTime = Date.now();
     }
 
     this.policyEngine.setApprovalMode(mode);
@@ -1867,12 +1866,15 @@ export class Config {
    * Logs the duration of the current approval mode.
    */
   logCurrentModeDuration(mode: ApprovalMode): void {
-    const now = Date.now();
+    const now = performance.now();
     const duration = now - this.lastModeSwitchTime;
-    logApprovalModeDuration(
-      this,
-      new ApprovalModeDurationEvent(mode, duration),
-    );
+    if (duration > 0) {
+      logApprovalModeDuration(
+        this,
+        new ApprovalModeDurationEvent(mode, duration),
+      );
+    }
+    this.lastModeSwitchTime = now;
   }
 
   isYoloModeDisabled(): boolean {
