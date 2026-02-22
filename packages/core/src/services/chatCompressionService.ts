@@ -236,15 +236,13 @@ async function truncateHistoryToBudget(
 function sanitizeHistoryForSummarizer(history: Content[]): Content[] {
   return history.map((content) => ({
     ...content,
-    parts: content.parts?.map((part) => {
+    parts: (content.parts ?? []).map((part) => {
       if (part.functionResponse) {
-         
         const { parts: _nestedParts, ...cleanFR } =
-          part.functionResponse as // The `parts` field is added at runtime for Gemini 3 models and is
-          // not part of the official FunctionResponse type.
+          part.functionResponse as // not part of the official FunctionResponse type. // The `parts` field is added at runtime for Gemini 3 models and is
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           Record<string, any>;
-        return { functionResponse: cleanFR } as typeof part;
+        return { ...part, functionResponse: cleanFR };
       }
       return part;
     }),
@@ -373,10 +371,12 @@ export class ChatCompressionService {
       ? 'A previous <state_snapshot> exists in the history. You MUST integrate all still-relevant information from that snapshot into the new one, updating it with the more recent events. Do not lose established constraints or critical knowledge.'
       : 'Generate a new <state_snapshot> based on the provided history.';
 
+    const sanitizedHistory = sanitizeHistoryForSummarizer(historyForSummarizer);
+
     const summaryResponse = await config.getBaseLlmClient().generateContent({
       modelConfigKey: { model: modelStringToModelConfigAlias(model) },
       contents: [
-        ...sanitizeHistoryForSummarizer(historyForSummarizer),
+        ...sanitizedHistory,
         {
           role: 'user',
           parts: [
@@ -401,7 +401,7 @@ export class ChatCompressionService {
       .generateContent({
         modelConfigKey: { model: modelStringToModelConfigAlias(model) },
         contents: [
-          ...sanitizeHistoryForSummarizer(historyForSummarizer),
+          ...sanitizedHistory,
           {
             role: 'model',
             parts: [{ text: summary }],
