@@ -10,9 +10,12 @@ import type { UserTierId } from '../code_assist/types.js';
 import { AuthType } from '../core/contentGenerator.js';
 
 function tryDecodeByteArray(s: string): string | null {
-  if (!/^\d+(,\d+)+$/.test(s)) return null;
+  if (!/^\d+(,\d+)+$/.test(s)) {
+    return null;
+  }
   try {
-    return String.fromCharCode(...s.split(',').map(Number));
+    const bytes = new Uint8Array(s.split(',').map(Number));
+    return new TextDecoder().decode(bytes);
   } catch {
     return null;
   }
