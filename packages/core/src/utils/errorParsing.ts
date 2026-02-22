@@ -50,7 +50,7 @@ export function parseAndFormatApiError(
 ): string {
   if (isStructuredError(error)) {
     const decoded = tryDecodeByteArray(error.message);
-    if (decoded)
+    if (decoded) {
       return parseAndFormatApiError(
         decoded,
         authType,
@@ -58,6 +58,7 @@ export function parseAndFormatApiError(
         currentModel,
         fallbackModel,
       );
+    }
     let text = `[API Error: ${error.message}]`;
     if (error.status === 429) {
       text += getRateLimitMessage(authType, fallbackModel);
