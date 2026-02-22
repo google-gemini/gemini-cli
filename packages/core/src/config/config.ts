@@ -1475,14 +1475,6 @@ export class Config {
     }
   }
 
-  private isGemini3QuotaModel(modelId: string): boolean {
-    return (
-      modelId === PREVIEW_GEMINI_MODEL ||
-      modelId === PREVIEW_GEMINI_FLASH_MODEL ||
-      modelId === PREVIEW_GEMINI_3_1_MODEL
-    );
-  }
-
   async refreshUserQuota(): Promise<RetrieveUserQuotaResponse | undefined> {
     const codeAssistServer = getCodeAssistServer(this);
     if (!codeAssistServer || !codeAssistServer.projectId) {
@@ -1527,7 +1519,7 @@ export class Config {
           if (!b.modelId) {
             return false;
           }
-          return this.isGemini3QuotaModel(this.normalizeQuotaModelId(b.modelId));
+          return isPreviewModel(this.normalizeQuotaModelId(b.modelId));
         }) ?? false;
       this.setHasAccessToPreviewModel(hasAccess);
       return quota;
