@@ -113,9 +113,10 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
       child.on('close', onClose);
     });
 
-    // if there is a process error, non-zero exit code, or signal, return error details.
+    // if there is a process error, non-zero exit code (> 1), or signal, return error details.
     // stderr is no longer treated as a fatal error by itself to allow for progress streaming.
-    if (error || (code !== 0 && code !== null) || signal) {
+    // We allow code 1 as successful because many tools (e.g. grep, diff) use it for non-fatal status.
+    if (error || (code !== null && code > 1) || signal) {
       const llmContent = [
         `Stdout: ${stdout || '(empty)'}`,
         `Stderr: ${stderr || '(empty)'}`,
