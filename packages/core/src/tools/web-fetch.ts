@@ -171,7 +171,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
 
     const response = await retryWithBackoff(
       async () => {
-        const res = await fetchWithTimeout(fetchUrl, URL_FETCH_TIMEOUT_MS, signal);
+        const res = await fetchWithTimeout(fetchUrl, URL_FETCH_TIMEOUT_MS);
         if (!res.ok) {
           const error = new Error(
             `Request failed with status code ${res.status} ${res.statusText}`,
@@ -221,7 +221,11 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       const perUrlBudget = Math.floor(MAX_CONTENT_LENGTH / urls.length);
       for (const url of urls) {
         try {
-          const result = await this.executeFallbackForUrl(url, signal, perUrlBudget);
+          const result = await this.executeFallbackForUrl(
+            url,
+            signal,
+            perUrlBudget,
+          );
           allContent.push(`--- Content from ${url} ---\n${result.content}`);
           fetchedUrls.push(url);
         } catch (e) {
