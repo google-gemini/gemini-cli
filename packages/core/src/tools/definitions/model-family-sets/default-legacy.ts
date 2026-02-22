@@ -71,7 +71,8 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
           type: 'string',
         },
         content: {
-          description: 'The content to write to the file.',
+          description:
+            "The content to write to the file. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide complete literal content.",
           type: 'string',
         },
       },
@@ -332,7 +333,7 @@ A good instruction should concisely answer:
         },
         new_string: {
           description:
-            'The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
+            "The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide exact literal code.",
           type: 'string',
         },
         expected_replacements: {
