@@ -2782,7 +2782,7 @@ describe('AppContainer State Management', () => {
           unmount();
         });
 
-        it('should exit copy mode on any key press', async () => {
+        it('should exit copy mode on non-scroll key press', async () => {
           await setupCopyModeTest(isAlternateMode);
 
           // Enter copy mode
