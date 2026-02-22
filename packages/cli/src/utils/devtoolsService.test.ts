@@ -54,6 +54,7 @@ const mockDevToolsInstance = vi.hoisted(() => ({
   start: vi.fn(),
   stop: vi.fn(),
   getPort: vi.fn(),
+  getToken: vi.fn().mockReturnValue('test-token-abc123'),
 }));
 
 const mockActivityLoggerInstance = vi.hoisted(() => ({
@@ -155,6 +156,7 @@ describe('devtoolsService', () => {
         config,
         '127.0.0.1',
         25417,
+        '', // No token when connecting to existing server
         expect.any(Function),
       );
       expect(
@@ -223,6 +225,7 @@ describe('devtoolsService', () => {
         config,
         '127.0.0.1',
         25417,
+        'test-token-abc123',
         expect.any(Function),
       );
       expect(
@@ -364,6 +367,7 @@ describe('devtoolsService', () => {
         config,
         '127.0.0.1',
         25417,
+        '', // No token when connecting to existing winner
         expect.any(Function),
       );
     });
@@ -396,6 +400,7 @@ describe('devtoolsService', () => {
         config,
         '127.0.0.1',
         25418,
+        'test-token-abc123',
         expect.any(Function),
       );
     });
@@ -419,7 +424,7 @@ describe('devtoolsService', () => {
 
       // Extract onReconnectFailed callback
       const initCall = mockAddNetworkTransport.mock.calls[0];
-      const onReconnectFailed = initCall[3];
+      const onReconnectFailed = initCall[4];
       expect(onReconnectFailed).toBeDefined();
 
       // Trigger promotion MAX_PROMOTION_ATTEMPTS + 1 times

@@ -17,6 +17,7 @@ interface IDevTools {
   start(): Promise<string>;
   stop(): Promise<void>;
   getPort(): number;
+  getToken(): string;
 }
 
 const DEFAULT_DEVTOOLS_PORT = 25417;
@@ -60,16 +61,17 @@ function probeDevTools(host: string, port: number): Promise<boolean> {
 async function startOrJoinDevTools(
   defaultHost: string,
   defaultPort: number,
-): Promise<{ host: string; port: number }> {
+): Promise<{ host: string; port: number; token: string }> {
   const mod = await import('@google/gemini-cli-devtools');
   const devtools: IDevTools = mod.DevTools.getInstance();
   const url = await devtools.start();
   const actualPort = devtools.getPort();
+  const token = devtools.getToken();
 
   if (actualPort === defaultPort) {
     // We won the port — we are the server
     debugLogger.log(`DevTools available at: ${url}`);
-    return { host: defaultHost, port: actualPort };
+    return { host: defaultHost, port: actualPort, token };
   }
 
   // Lost the race — someone else has the default port.
@@ -80,12 +82,14 @@ async function startOrJoinDevTools(
     debugLogger.log(
       `DevTools (existing) at: http://${defaultHost}:${defaultPort}`,
     );
-    return { host: defaultHost, port: defaultPort };
+    // Connecting to an existing server — we don't have their token,
+    // but their server controls its own auth.
+    return { host: defaultHost, port: defaultPort, token: '' };
   }
 
   // Winner isn't responding (maybe also racing and failed) — keep ours
   debugLogger.log(`DevTools available at: ${url}`);
-  return { host: defaultHost, port: actualPort };
+  return { host: defaultHost, port: actualPort, token };
 }
 
 /**
@@ -106,7 +110,7 @@ async function handlePromotion(config: Config) {
       DEFAULT_DEVTOOLS_HOST,
       DEFAULT_DEVTOOLS_PORT,
     );
-    addNetworkTransport(config, result.host, result.port, () =>
+    addNetworkTransport(config, result.host, result.port, result.token, () =>
       handlePromotion(config),
     );
   } catch (err) {
@@ -141,6 +145,7 @@ export async function setupInitialActivityLogger(config: Config) {
           config,
           DEFAULT_DEVTOOLS_HOST,
           DEFAULT_DEVTOOLS_PORT,
+          '', // No token when connecting to an existing server
           onReconnectFailed,
         );
         ActivityLogger.getInstance().enableNetworkLogging();
@@ -179,6 +184,7 @@ async function startDevToolsServerImpl(config: Config): Promise<string> {
 
   let host = DEFAULT_DEVTOOLS_HOST;
   let port = DEFAULT_DEVTOOLS_PORT;
+  let token = '';
 
   if (existing) {
     debugLogger.log(
@@ -193,6 +199,7 @@ async function startDevToolsServerImpl(config: Config): Promise<string> {
       );
       host = result.host;
       port = result.port;
+      token = result.token;
     } catch (err) {
       debugLogger.debug('Failed to start DevTools:', err);
       throw err;
@@ -200,7 +207,7 @@ async function startDevToolsServerImpl(config: Config): Promise<string> {
   }
 
   // Promote the activity logger to use the network transport
-  addNetworkTransport(config, host, port, onReconnectFailed);
+  addNetworkTransport(config, host, port, token, onReconnectFailed);
   const capture = ActivityLogger.getInstance();
   capture.enableNetworkLogging();
 

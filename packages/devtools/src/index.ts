@@ -5,7 +5,7 @@
  */
 
 import http from 'node:http';
-import { randomUUID } from 'node:crypto';
+import crypto, { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { WebSocketServer, type WebSocket } from 'ws';
 import type {
@@ -49,6 +49,7 @@ export class DevTools extends EventEmitter {
   private sessions = new Map<string, SessionInfo>();
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private port = 25417;
+  private token = '';
   private static readonly DEFAULT_PORT = 25417;
   private static readonly MAX_PORT_RETRIES = 10;
 
@@ -137,6 +138,10 @@ export class DevTools extends EventEmitter {
     return this.port;
   }
 
+  getToken(): string {
+    return this.token;
+  }
+
   stop(): Promise<void> {
     return new Promise((resolve) => {
       if (this.heartbeatTimer) {
@@ -158,12 +163,27 @@ export class DevTools extends EventEmitter {
     });
   }
 
+  private parseTokenFromUrl(url: string): string | null {
+    try {
+      const parsed = new URL(url, `http://127.0.0.1:${this.port}`);
+      return parsed.searchParams.get('token');
+    } catch {
+      return null;
+    }
+  }
+
+  private isValidToken(requestToken: string | null): boolean {
+    if (!this.token) return true; // No token set (should not happen after start)
+    return requestToken === this.token;
+  }
+
   start(): Promise<string> {
     return new Promise((resolve, reject) => {
       if (this.server) {
         resolve(this.getUrl());
         return;
       }
+      this.token = crypto.randomBytes(32).toString('hex');
       this.server = http.createServer((req, res) => {
         // Only allow same-origin requests — the client is served from this
         // server so cross-origin access is unnecessary and would let arbitrary
@@ -173,11 +193,24 @@ export class DevTools extends EventEmitter {
           const allowed = `http://127.0.0.1:${this.port}`;
           if (origin === allowed) {
             res.setHeader('Access-Control-Allow-Origin', allowed);
+          } else {
+            // Reject cross-origin requests entirely
+            res.writeHead(403);
+            res.end('Forbidden');
+            return;
           }
         }
 
         // API routes
-        if (req.url === '/events') {
+        if (req.url?.startsWith('/events')) {
+          // Authenticate SSE connections via token query parameter
+          const requestToken = this.parseTokenFromUrl(req.url);
+          if (!this.isValidToken(requestToken)) {
+            res.writeHead(403);
+            res.end('Forbidden');
+            return;
+          }
+
           res.writeHead(200, {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
@@ -212,8 +245,13 @@ export class DevTools extends EventEmitter {
             this.off('session-update', onSession);
           });
         } else if (req.url === '/' || req.url === '/index.html') {
+          // Inject the auth token into the HTML so the client can authenticate
+          const html = INDEX_HTML.replace(
+            '__DEVTOOLS_AUTH_TOKEN__',
+            this.token,
+          );
           res.writeHead(200, { 'Content-Type': 'text/html' });
-          res.end(INDEX_HTML);
+          res.end(html);
         } else if (req.url === '/assets/main.js') {
           res.writeHead(200, { 'Content-Type': 'application/javascript' });
           res.end(CLIENT_JS);
@@ -255,7 +293,14 @@ export class DevTools extends EventEmitter {
 
     this.wss = new WebSocketServer({ server: this.server, path: '/ws' });
 
-    this.wss.on('connection', (ws: WebSocket) => {
+    this.wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
+      // Authenticate WebSocket connections via token query parameter
+      const requestToken = this.parseTokenFromUrl(req.url || '');
+      if (!this.isValidToken(requestToken)) {
+        ws.close(4001, 'Unauthorized');
+        return;
+      }
+
       let sessionId: string | null = null;
 
       ws.on('message', (data: Buffer) => {
