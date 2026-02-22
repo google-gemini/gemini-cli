@@ -249,3 +249,13 @@ export function isActiveModel(
     );
   }
 }
+/**
+ * Checks if the model supports audio/voice mode.
+ * * @param model The model name to check.
+ * @returns True if the model supports audio features.
+ */
+export function supportsAudio(model: string): boolean {
+  const resolved = resolveModel(model);
+  // Enable audio for Gemini 2.0 and Gemini 3 models
+  return isGemini2Model(resolved) || isGemini3Model(resolved);
+}
