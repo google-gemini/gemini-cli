@@ -84,18 +84,38 @@ export class CoderAgentExecutor implements AgentExecutor {
   private tasks: Map<string, TaskWrapper> = new Map();
   // Track tasks with an active execution loop.
   private executingTasks = new Set<string>();
+  // Cached server Config to avoid re-creating per-task (which re-fetches
+  // remote agent cards and may fail if peers are busy).
+  private serverConfig: Config | undefined;
 
-  constructor(private taskStore?: TaskStore) {}
+  constructor(private taskStore?: TaskStore, serverConfig?: Config) {
+    this.serverConfig = serverConfig;
+  }
+
+  getServerConfig(): Config | undefined {
+    return this.serverConfig;
+  }
+
+  private shouldCompleteOnTurnEnd(): boolean {
+    return process.env['A2A_AUTO_COMPLETE_ON_TURN_END'] === 'true';
+  }
 
   private async getConfig(
     agentSettings: AgentSettings,
     taskId: string,
   ): Promise<Config> {
+    // Reuse the server Config if available — it already has remote agents
+    // registered in its ToolRegistry (after /reload-agents). Creating a new
+    // Config per-task would re-fetch agent cards from peers, which can fail
+    // silently if peers are busy and leave tools unregistered.
+    if (this.serverConfig) {
+      return this.serverConfig;
+    }
     const workspaceRoot = setTargetDir(agentSettings);
     loadEnvironment(); // Will override any global env with workspace envs
     const settings = loadSettings(workspaceRoot);
     const extensions = loadExtensions(workspaceRoot);
-    return loadConfig(settings, new SimpleExtensionLoader(extensions), taskId);
+    return loadConfig(settings, new SimpleExtensionLoader(extensions), taskId, agentSettings);
   }
 
   /**
@@ -302,9 +322,121 @@ export class CoderAgentExecutor implements AgentExecutor {
     logger.info(
       `[CoderAgentExecutor] userMessage: ${JSON.stringify(userMessage)}`,
     );
-    eventBus.on('event', (event: AgentExecutionEvent) =>
-      logger.info('[EventBus event]: ', event),
-    );
+    let accumulated_text = '';
+    let thinking_text = '';
+    let tool_calls: any[] = [];
+    let content_blocks: Array<{ type: string, text?: string, toolCallIds?: string[] }> = [];
+    /** Tracks the last block type to merge adjacent blocks of the same type */
+    let lastBlockType: string | null = null;
+    let patch_seq = 0;
+    const start_time = Date.now();
+    const webhookUrl = process.env['TEAM_EVENT_WEBHOOK'];
+
+    eventBus.on('event', async (event: AgentExecutionEvent) => {
+      logger.info('[EventBus event]: ', event);
+      if (webhookUrl && event.kind === 'status-update' && event.status.message) {
+        try {
+          const msg = event.status.message;
+          let changed = false;
+          if (msg.parts) {
+            for (const part of msg.parts) {
+              if (part.kind === 'text') {
+                // Filter out raw functionResponse/functionCall JSON from content
+                // These are tool call data already handled via toolCalls array
+                const textStr = part.text;
+                const trimmed = textStr.trim();
+                if (trimmed.startsWith('{"functionResponse"') ||
+                  trimmed.startsWith('{"functionCall"') ||
+                  trimmed.startsWith('{"function_response"') ||
+                  trimmed.startsWith('{"function_call"') ||
+                  trimmed === 'Agent turn completed.' ||
+                  trimmed === 'Internal error: Task state lost or corrupted.') {
+                  continue; // Skip — handled by toolCalls
+                }
+                accumulated_text += textStr;
+                // Append to existing text block or create new one
+                if (lastBlockType === 'text' && content_blocks.length > 0) {
+                  content_blocks[content_blocks.length - 1].text = accumulated_text;
+                } else {
+                  content_blocks.push({ type: 'text', text: accumulated_text });
+                  lastBlockType = 'text';
+                }
+                changed = true;
+              } else if (part.kind === 'data') {
+                const data = part.data as any;
+                if (data && data.kind === 'thought') {
+                  // Ignore raw thought marker
+                } else if (data && data.subject !== undefined && data.description !== undefined) {
+                  const subject = data.subject || '';
+                  const description = data.description || '';
+                  const thoughtFragment = (subject ? `[${subject}]\n` : '') + description + '\n';
+                  thinking_text += thoughtFragment;
+                  // Append to existing thinking block or create new one
+                  if (lastBlockType === 'thinking' && content_blocks.length > 0) {
+                    content_blocks[content_blocks.length - 1].text = thinking_text;
+                  } else {
+                    content_blocks.push({ type: 'thinking', text: thinking_text });
+                    lastBlockType = 'thinking';
+                  }
+                  changed = true;
+                } else if (data && data.status && data.request) {
+                  const callId = data.request.callId;
+                  const existingIdx = tool_calls.findIndex((t: any) => t.toolCallId === callId);
+                  const callObj = {
+                    toolCallId: callId,
+                    title: data.tool?.name || data.request.name,
+                    kind: 'execute' as const,
+                    status: data.status === 'cancelled' ? 'failed' : data.status,
+                    rawInput: data.request.args,
+                    rawOutput: null as any,
+                    content: [],
+                    locations: [],
+                  };
+                  if (existingIdx >= 0) {
+                    // Preserve rawOutput if already set
+                    callObj.rawOutput = tool_calls[existingIdx].rawOutput;
+                    tool_calls[existingIdx] = callObj;
+                  } else {
+                    tool_calls.push(callObj);
+                    // Add tool_calls block for ordering
+                    content_blocks.push({ type: 'tool_calls', toolCallIds: [callId] });
+                    lastBlockType = 'tool_calls';
+                  }
+                  changed = true;
+                }
+              }
+            }
+          }
+          if (changed) {
+            const agentName = process.env['CODER_AGENT_NAME'] || 'unknown';
+            const patch = {
+              agentId: agentName,
+              turnSeq: 0,
+              patchSeq: patch_seq++,
+              content: accumulated_text,
+              thinking: thinking_text,
+              toolCalls: tool_calls,
+              contentBlocks: content_blocks,
+              input_tokens: 0,
+              output_tokens: 0,
+              total_tokens: 0,
+              durationMs: Date.now() - start_time,
+              contextId: contextId,
+              taskId: currentTask.id
+            };
+            const streamUrl = webhookUrl.replace('/events', '/stream_patch');
+            try {
+              await fetch(streamUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(patch)
+              });
+            } catch { }          }
+        } catch (e) {
+          logger.error('[CoderAgentExecutor] Error streaming patch:', e);
+        }
+      }
+    });
 
     const store = requestStorage.getStore();
     if (!store) {
@@ -315,8 +447,9 @@ export class CoderAgentExecutor implements AgentExecutor {
 
     const abortController = new AbortController();
     const abortSignal = abortController.signal;
+    const isAsyncFireAndForget = !!webhookUrl;
 
-    if (store) {
+    if (store && !isAsyncFireAndForget) {
       // Grab the raw socket from the request object
       const socket = store.req.socket;
       const onClientEnd = () => {
@@ -328,14 +461,17 @@ export class CoderAgentExecutor implements AgentExecutor {
         }
         // Clean up the listener to prevent memory leaks
         socket.removeListener('close', onClientEnd);
+        socket.removeListener('end', onClientEnd);
       };
 
-      // Listen on the socket's 'end' event (remote closed the connection)
+      // Listen on the socket's 'end' or 'close' event (remote closed the connection)
       socket.on('end', onClientEnd);
+      socket.on('close', onClientEnd);
 
       // It's also good practice to remove the listener if the task completes successfully
       abortSignal.addEventListener('abort', () => {
         socket.removeListener('end', onClientEnd);
+        socket.removeListener('close', onClientEnd);
       });
       logger.info(
         `[CoderAgentExecutor] Socket close handler set up for task ${taskId}.`,
@@ -497,6 +633,34 @@ export class CoderAgentExecutor implements AgentExecutor {
           logger.info(
             `[CoderAgentExecutor] Task ${taskId}: Found ${toolCallRequests.length} tool call requests. Scheduling as a batch.`,
           );
+          // Report tool calls to webhook for observability (fire-and-forget)
+          const webhookUrl = process.env['TEAM_EVENT_WEBHOOK'];
+          logger.info(`[CoderAgentExecutor] TEAM_EVENT_WEBHOOK=${webhookUrl ?? '(unset)'}`);
+          if (webhookUrl) {
+            for (const tcr of toolCallRequests) {
+              const agentName =
+                process.env['CODER_AGENT_NAME'] ||
+                process.env['CODER_AGENT_WORKSPACE_PATH']
+                  ?.split('/')
+                  .pop() ||
+                'unknown';
+              logger.info(`[CoderAgentExecutor] Webhook POST: ${agentName} → ${tcr.name}`);
+              fetch(webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  from: agentName,
+                  to: tcr.name,
+                  status: 'scheduled',
+                  task: tcr.args,
+                  contextId: currentTask.contextId || process.env['A2A_CONTEXT_ID'],
+                  taskId: currentTask.id
+                }),
+              }).catch(() => {
+                /* ignore webhook errors */
+              });
+            }
+          }
           await currentTask.scheduleToolCalls(toolCallRequests, abortSignal);
         }
 
@@ -513,6 +677,77 @@ export class CoderAgentExecutor implements AgentExecutor {
         const completedTools = currentTask.getAndClearCompletedTools();
 
         if (completedTools.length > 0) {
+          // Merge tool results (rawOutput) back into tool_calls array
+          for (const tc of completedTools) {
+            const resultText = tc.response?.responseParts
+              ?.map((p: any) => {
+                if (typeof p === 'string') return p;
+                if (Array.isArray(p)) return p.map((pp: any) => pp.text || JSON.stringify(pp)).join('');
+                return p.text || JSON.stringify(p);
+              })
+              .join('\n')
+              .slice(0, 4000) || '';
+            const existingIdx = tool_calls.findIndex((t: any) => t.toolCallId === tc.request.callId);
+            if (existingIdx >= 0) {
+              tool_calls[existingIdx] = {
+                ...tool_calls[existingIdx],
+                status: tc.status === 'cancelled' ? 'failed' : (tc.status || 'completed'),
+                rawOutput: resultText || null,
+              };
+            }
+          }
+          // Send immediate stream_patch so frontend receives rawOutput right away
+          // (the eventBus handler only fires on new LLM events, not on tool completion)
+          if (webhookUrl) {
+            const agentName = process.env['CODER_AGENT_NAME'] || 'unknown';
+            const resultPatch = {
+              agentId: agentName,
+              turnSeq: 0,
+              patchSeq: patch_seq++,
+              content: accumulated_text,
+              thinking: thinking_text,
+              toolCalls: tool_calls,
+              contentBlocks: content_blocks,
+              durationMs: Date.now() - start_time,
+              contextId: contextId,
+              taskId: currentTask.id,
+            };
+            const streamUrl = webhookUrl.replace('/events', '/stream_patch');
+            try {
+              await fetch(streamUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(resultPatch),
+              });
+            } catch { }
+          }
+          // Report tool results to webhook for DB persistence
+          if (webhookUrl) {
+            const agentName = process.env['CODER_AGENT_NAME'] || 'unknown';
+            for (const tc of completedTools) {
+              const resultText = tc.response?.responseParts
+                ?.map((p: any) => {
+                  if (typeof p === 'string') return p;
+                  if (Array.isArray(p)) return p.map((pp: any) => pp.text || JSON.stringify(pp)).join('');
+                  return p.text || JSON.stringify(p);
+                })
+                .join('\n')
+                .slice(0, 4000) || '';
+              fetch(webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  from: tc.request.name,
+                  to: agentName,
+                  status: tc.status,
+                  result: resultText,
+                  taskId,
+                  contextId,
+                }),
+              }).catch(() => { });
+            }
+          }
+
           // If all completed tool calls were canceled, manually add them to history and set state to input-required, final:true
           if (completedTools.every((tool) => tool.status === 'cancelled')) {
             logger.info(
@@ -535,6 +770,36 @@ export class CoderAgentExecutor implements AgentExecutor {
               `[CoderAgentExecutor] Task ${taskId}: Found ${completedTools.length} completed tool calls. Sending results back to LLM.`,
             );
 
+            // FLUSH state to DB as a complete turn before LLM resumes
+            if (webhookUrl && (accumulated_text || thinking_text || tool_calls.length > 0)) {
+              const agentName = process.env['CODER_AGENT_NAME'] || 'unknown';
+              const flushPatch = {
+                agentId: agentName,
+                content: accumulated_text,
+                thinking: thinking_text,
+                toolCalls: tool_calls,
+                contentBlocks: content_blocks,
+                durationMs: Date.now() - start_time,
+                final: true,
+                contextId: contextId,
+              };
+              const streamUrl = webhookUrl.replace('/events', '/stream_patch');
+              try {
+                await fetch(streamUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(flushPatch),
+                });
+              } catch { }
+              
+              // Reset accumulated state so the next LLM output starts a new DB row
+              accumulated_text = '';
+              thinking_text = '';
+              tool_calls = [];
+              content_blocks = [];
+              patch_seq = 0;
+            }
+
             agentEvents = currentTask.sendCompletedToolsToLlm(
               completedTools,
               abortSignal,
@@ -550,15 +815,49 @@ export class CoderAgentExecutor implements AgentExecutor {
       }
 
       logger.info(
-        `[CoderAgentExecutor] Task ${taskId}: Agent turn finished, setting to input-required.`,
+        `[CoderAgentExecutor] Task ${taskId}: Agent turn finished, finalizing terminal state.`,
       );
+
+      // Send final stream_patch with full accumulated content for DB persistence
+      if (webhookUrl && (accumulated_text || thinking_text || tool_calls.length > 0)) {
+        const agentName = process.env['CODER_AGENT_NAME'] || 'unknown';
+        const finalPatch = {
+          agentId: agentName,
+          content: accumulated_text,
+          thinking: thinking_text,
+          toolCalls: tool_calls,
+          contentBlocks: content_blocks,
+          durationMs: Date.now() - start_time,
+          final: true, // Signal to proxy: INSERT this as permanent DB record
+          contextId: contextId,
+        };
+        const streamUrl = webhookUrl.replace('/events', '/stream_patch');
+        try {
+          await fetch(streamUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(finalPatch),
+          });
+        } catch { /* ignore webhook errors */ }
+        logger.info(
+          `[CoderAgentExecutor] Task ${taskId}: Sent final stream_patch (c:${accumulated_text.length}B t:${thinking_text.length}B)`,
+        );
+      }
+
       const stateChange: StateChange = {
         kind: CoderAgentEvent.StateChangeEvent,
       };
+      const finalState = this.shouldCompleteOnTurnEnd()
+        ? 'completed'
+        : 'input-required';
+      const finalMessage = undefined; // Do not emit artificial text when task completes
+      logger.info(
+        `[CoderAgentExecutor] Task ${taskId}: publishing terminal state=${finalState}.`,
+      );
       currentTask.setTaskStateAndPublishUpdate(
-        'input-required',
+        finalState,
         stateChange,
-        undefined,
+        finalMessage,
         undefined,
         true,
       );

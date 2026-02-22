@@ -147,6 +147,14 @@ export async function parseArguments(
           type: 'boolean',
           description: 'Run in sandbox?',
         })
+        .option('config-dir', {
+          type: 'string',
+          description: 'Override the global GEMINI_CONFIG_DIR.',
+        })
+        .option('agents-dir', {
+          type: 'string',
+          description: 'Override the global GEMINI_AGENTS_DIR.',
+        })
 
         .option('yolo', {
           alias: 'y',
@@ -298,6 +306,13 @@ export async function parseArguments(
       throw new Error(msg);
     })
     .check((argv) => {
+      if (argv['configDir']) {
+        process.env['GEMINI_CONFIG_DIR'] = argv['configDir'] as string;
+      }
+      if (argv['agentsDir']) {
+        process.env['GEMINI_AGENTS_DIR'] = argv['agentsDir'] as string;
+      }
+
       // The 'query' positional can be a string (for one arg) or string[] (for multiple).
       // This guard safely checks if any positional argument was provided.
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

@@ -15,6 +15,10 @@ import { isHeadlessMode } from './headless.js';
  * Handles both interactive and non-interactive (headless) modes.
  */
 export async function getConsentForOauth(prompt: string): Promise<boolean> {
+  if (process.env['GEMINI_YOLO_MODE'] === 'true' || process.env['A2A_SERVER'] === 'true') {
+    return true;
+  }
+
   const finalPrompt = prompt + ' Opening authentication page in your browser. ';
 
   if (isHeadlessMode()) {

@@ -31,7 +31,7 @@ export class A2AClientManager {
   private clients = new Map<string, Client>();
   private agentCards = new Map<string, AgentCard>();
 
-  private constructor() {}
+  private constructor() { }
 
   /**
    * Gets the singleton instance of the A2AClientManager.
@@ -59,10 +59,21 @@ export class A2AClientManager {
    * @param authHandler Optional authentication handler to use for this agent.
    * @returns The loaded AgentCard.
    */
+
+
+  /**
+   * Loads an agent by fetching its AgentCard and caches the client.
+   * @param name The name to assign to the agent.
+   * @param agentCardUrl The full URL to the agent's card.
+   * @param authHandler Optional authentication handler to use for this agent.
+   * @param timeoutMs Optional timeout in milliseconds for the initial load.
+   * @returns The loaded AgentCard.
+   */
   async loadAgent(
     name: string,
     agentCardUrl: string,
     authHandler?: AuthenticationHandler,
+    timeoutMs?: number,
   ): Promise<AgentCard> {
     if (this.clients.has(name) && this.agentCards.has(name)) {
       throw new Error(`Agent with name '${name}' is already loaded.`);
@@ -73,7 +84,21 @@ export class A2AClientManager {
       fetchImpl = createAuthenticatingFetchWithRetry(fetch, authHandler);
     }
 
-    const resolver = new DefaultAgentCardResolver({ fetchImpl });
+    // Apply a timeout specifically for the initial load if requested
+    let loadFetchImpl = fetchImpl;
+    if (timeoutMs) {
+      loadFetchImpl = async (input, init) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(new Error(`Fetch timed out after ${timeoutMs}ms`)), timeoutMs);
+        try {
+          return await fetchImpl(input, { ...init, signal: controller.signal });
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      };
+    }
+
+    const resolver = new DefaultAgentCardResolver({ fetchImpl: loadFetchImpl });
 
     const options = ClientFactoryOptions.createFrom(
       ClientFactoryOptions.default,
@@ -86,18 +111,27 @@ export class A2AClientManager {
       },
     );
 
+    console.error(`[A2AClientManager] Attempting to load card for ${name} at ${agentCardUrl}`);
     const factory = new ClientFactory(options);
-    const client = await factory.createFromUrl(agentCardUrl, '');
-    const agentCard = await client.getAgentCard();
 
-    this.clients.set(name, client);
-    this.agentCards.set(name, agentCard);
+    try {
+      const client = await factory.createFromUrl(agentCardUrl, '');
+      console.error(`[A2AClientManager] Created client for ${name}. Fetching card...`);
+      const agentCard = await client.getAgentCard();
+      console.error(`[A2AClientManager] Successfully fetched card for ${name}`);
 
-    debugLogger.debug(
-      `[A2AClientManager] Loaded agent '${name}' from ${agentCardUrl}`,
-    );
+      this.clients.set(name, client);
+      this.agentCards.set(name, agentCard);
 
-    return agentCard;
+      debugLogger.debug(
+        `[A2AClientManager] Loaded agent '${name}' from ${agentCardUrl}`,
+      );
+
+      return agentCard;
+    } catch (e) {
+      console.error(`[A2AClientManager] Fatal error fetching ${name}: ${e}`);
+      throw e;
+    }
   }
 
   /**
@@ -120,7 +154,7 @@ export class A2AClientManager {
   async sendMessage(
     agentName: string,
     message: string,
-    options?: { contextId?: string; taskId?: string },
+    options?: { contextId?: string; taskId?: string; blocking?: boolean; pushNotificationUrl?: string },
   ): Promise<SendMessageResult> {
     const client = this.clients.get(agentName);
     if (!client) {
@@ -137,7 +171,8 @@ export class A2AClientManager {
         taskId: options?.taskId,
       },
       configuration: {
-        blocking: true,
+        blocking: options?.blocking ?? true,
+        pushNotificationConfig: options?.pushNotificationUrl ? { url: options.pushNotificationUrl } : undefined,
       },
     };
 

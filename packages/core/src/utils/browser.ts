@@ -12,6 +12,10 @@
  * @returns True if the tool should attempt to launch a browser.
  */
 export function shouldAttemptBrowserLaunch(): boolean {
+  if (process.env['A2A_SERVER'] === 'true' || process.env['GEMINI_YOLO_MODE'] === 'true') {
+    return true;
+  }
+  
   // A list of browser names that indicate we should not attempt to open a
   // web browser for the user.
   const browserBlocklist = ['www-browser'];

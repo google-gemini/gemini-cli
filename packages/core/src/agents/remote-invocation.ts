@@ -18,6 +18,7 @@ import type {
 } from './types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { A2AClientManager } from './a2a-client-manager.js';
+import { v4 as uuidv4 } from 'uuid';
 import {
   extractMessageText,
   extractTaskText,
@@ -44,9 +45,8 @@ export class ADCHandler implements AuthenticationHandler {
       }
       throw new Error('Failed to retrieve ADC access token.');
     } catch (e) {
-      const errorMessage = `Failed to get ADC token: ${
-        e instanceof Error ? e.message : String(e)
-      }`;
+      const errorMessage = `Failed to get ADC token: ${e instanceof Error ? e.message : String(e)
+        }`;
       debugLogger.log('ERROR', errorMessage);
       throw new Error(errorMessage);
     }
@@ -98,7 +98,12 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     }
     // Safe to pass strict object to super
     super(
-      { query },
+      { 
+        query, 
+        async: typeof params['async'] === 'boolean' ? params['async'] : undefined,
+        subscribe: typeof params['subscribe'] === 'boolean' ? params['subscribe'] : undefined,
+        sessionId: typeof params['sessionId'] === 'string' ? params['sessionId'] : undefined
+      },
       messageBus,
       _toolName ?? definition.name,
       _toolDisplayName ?? definition.displayName,
@@ -128,32 +133,66 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     // We assume the user has provided an access token via some mechanism (TODO),
     // or we rely on ADC.
     try {
-      const priorState = RemoteAgentInvocation.sessionState.get(
-        this.definition.name,
-      );
-      if (priorState) {
-        this.contextId = priorState.contextId;
-        this.taskId = priorState.taskId;
+      const isAsync = this.params.async === true;
+      
+      // Only reuse session state for synchronous conversational turns.
+      // Async tasks (parallel workers) should get a fresh context to avoid blocking each other
+      // and to allow the proxy to track them as separate sub-agent instances.
+      if (!isAsync) {
+        const priorState = RemoteAgentInvocation.sessionState.get(
+          this.definition.name,
+        );
+        if (priorState) {
+          this.contextId = priorState.contextId;
+          this.taskId = priorState.taskId;
+        }
       }
 
-      if (!this.clientManager.getClient(this.definition.name)) {
+      if (this.params.sessionId) {
+        this.contextId = this.params.sessionId;
+        this.taskId = undefined; // Force a new task in the requested session
+      }
+
+      const baseName = this.definition.name.replace(/_\d+$/, '');
+
+      if (!this.clientManager.getClient(baseName)) {
+        // Skip ADC authentication for localhost agents (team P2P mesh)
+        const agentUrl = this.definition.agentCardUrl ?? '';
+        const isLocalAgent = agentUrl.includes('localhost') || agentUrl.includes('127.0.0.1');
         await this.clientManager.loadAgent(
-          this.definition.name,
+          baseName,
           this.definition.agentCardUrl,
-          this.authHandler,
+          isLocalAgent ? undefined : this.authHandler,
         );
       }
 
       const message = this.params.query;
 
+      const isSubscribe = this.params.subscribe === true;
+      let pushNotificationUrl = process.env['A2A_WEBHOOK_URL'];
+
+      if (!this.contextId) {
+        this.contextId = uuidv4();
+      }
+
+      if (isAsync && isSubscribe && pushNotificationUrl) {        const callerName = process.env['CODER_AGENT_NAME'] || 'unknown';
+        pushNotificationUrl = `${pushNotificationUrl}?caller=${encodeURIComponent(callerName)}&callee=${encodeURIComponent(baseName)}`;
+      }
+
+      console.log(`[RemoteAgentInvocation] Calling sendMessage to ${baseName} (as ${this.definition.name}), async: ${isAsync}, subscribe: ${isSubscribe}`);
+      const startMs = Date.now();
       const response = await this.clientManager.sendMessage(
-        this.definition.name,
+        baseName,
         message,
         {
           contextId: this.contextId,
           taskId: this.taskId,
+          blocking: !isAsync,
+          pushNotificationUrl: isAsync ? pushNotificationUrl : undefined,
         },
       );
+      const elapsedMs = Date.now() - startMs;
+      console.log(`[RemoteAgentInvocation] sendMessage returned after ${elapsedMs}ms. Response kind: ${response.kind}`);
 
       // Extracts IDs, taskID will be undefined if the task is completed/failed/canceled.
       const { contextId, taskId } = extractIdsFromResponse(response);
@@ -167,12 +206,16 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       });
 
       // Extract the output text
-      const outputText =
-        response.kind === 'task'
+      let outputText: string;
+      if (isAsync) {
+        outputText = `작업이 백그라운드(비동기)로 제출되었습니다. (Task ID: ${taskId}, Session ID: ${this.contextId}).\n작업이 완료되면 시스템 알림(인터럽트)으로 결과를 받게 됩니다. 더 이상 결과를 기다리지 말고 즉시 다음 계획을 진행하세요.\n*참고: 이 백그라운드 워커와 같은 세션(Context)에서 추가 작업을 이어서 시키려면, 다음 호출 때 \`sessionId\` 파라미터로 "${this.contextId}"를 넘겨주세요.*`;
+      } else {
+        outputText = response.kind === 'task'
           ? extractTaskText(response)
           : response.kind === 'message'
             ? extractMessageText(response)
             : JSON.stringify(response);
+      }
 
       debugLogger.debug(
         `[RemoteAgent] Response from ${this.definition.name}:\n${JSON.stringify(response, null, 2)}`,

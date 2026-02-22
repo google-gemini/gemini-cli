@@ -26,6 +26,10 @@ class SessionUpdateCollector implements acp.Client {
   sessionUpdate = async (params: acp.SessionNotification) => {
     this.updates.push(params);
   };
+  extNotification = async (
+    _method: string,
+    _params: Record<string, unknown>,
+  ): Promise<void> => {};
 
   requestPermission = async (): Promise<acp.RequestPermissionResponse> => {
     throw new Error('unexpected');

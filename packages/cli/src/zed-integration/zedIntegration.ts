@@ -19,6 +19,7 @@ import {
   convertToFunctionResponse,
   ToolConfirmationOutcome,
   clearCachedCredentialFile,
+  clearOauthClientCache,
   isNodeError,
   getErrorMessage,
   isWithinRoot,
@@ -31,6 +32,8 @@ import {
   ReadManyFilesTool,
   REFERENCE_CONTENT_START,
   resolveModel,
+  DEFAULT_MODEL_CONFIGS,
+  VALID_GEMINI_MODELS,
   createWorkingStdio,
   startupProfiler,
   Kind,
@@ -396,6 +399,233 @@ export class GeminiAgent {
       throw new Error(`Session not found: ${params.sessionId}`);
     }
     return session.setMode(params.modeId);
+  }
+
+  async extMethod(method: string, params: Record<string, unknown>): Promise<Record<string, unknown>> {
+    switch (method) {
+      case '_agent/set_credentials': {
+        const apiKey = params['apiKey'] as string | undefined;
+        const useCcpa = params['useCcpa'] as boolean | undefined;
+
+        try {
+          if (apiKey) {
+            process.env['GEMINI_API_KEY'] = apiKey;
+            await this.config.refreshAuth(AuthType.USE_GEMINI);
+          } else if (useCcpa) {
+            process.env['USE_CCPA'] = 'true';
+            await clearCachedCredentialFile();
+            clearOauthClientCache();
+            await this.config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+          }
+          return { success: true };
+        } catch (e) {
+          debugLogger.error('[ACP/HTTP] set_credentials failed:', e);
+          return { success: false, error: String(e) };
+        }
+      }
+      case '_agent/capabilities': {
+        const allSkills = this.config.getSkillManager()?.getAllSkills() || [];
+        const skills = allSkills.map(s => ({
+          id: s.name,
+          name: s.name,
+          description: s.description,
+          location: s.location,
+          disabled: !!s.disabled,
+          isBuiltin: !!s.isBuiltin
+        }));
+
+        const mcpConfigs = this.config.getMcpClientManager()?.getMcpServers() || {};
+        const callbacks = this.config.getMcpEnablementCallbacks();
+        const mcps = await Promise.all(Object.entries(mcpConfigs).map(async ([name, mcpConfig]) => {
+          let disabled = false;
+          if (callbacks) {
+            const sessionDisabled = callbacks.isSessionDisabled(name);
+            const fileEnabled = await callbacks.isFileEnabled(name);
+            disabled = sessionDisabled || !fileEnabled;
+          }
+          return {
+            id: name,
+            name: name,
+            description: mcpConfig.description || `MCP Server: ${name}`,
+            disabled
+          };
+        }));
+
+        return { skills, mcps };
+      }
+      case '_agent/open_file': {
+        const targetPath = params['path'] as string | undefined;
+        if (targetPath) {
+          try {
+            const { exec } = await import('child_process');
+            const editor = process.env['EDITOR'] || 'code';
+            exec(`${editor} "${targetPath}"`, (err) => {
+              if (err) debugLogger.error(`[ACP] Failed to open file: ${err}`);
+            });
+          } catch (e) {
+            debugLogger.error(`[ACP] Failed to open file: ${e}`);
+          }
+        }
+        return { success: true };
+      }
+      case '_agent/skill/toggle': {
+        const skillName = params['name'] as string | undefined;
+        const enable = params['enable'] as boolean | undefined;
+        if (!skillName || enable === undefined) {
+          return { success: false, error: 'Missing name or enable param' };
+        }
+        
+        try {
+          const { enableSkill, disableSkill } = await import('../utils/skillSettings.js');
+          const { loadSettings, SettingScope } = await import('../config/settings.js');
+          const workspaceDir = process.cwd();
+          const settings = loadSettings(workspaceDir);
+          
+          if (enable) {
+            enableSkill(settings, skillName);
+          } else {
+            disableSkill(settings, skillName, SettingScope.User);
+          }
+          
+          await this.config.reloadSkills();
+          return { success: true };
+        } catch (e) {
+          debugLogger.error(`[ACP] Failed to toggle skill ${skillName}: ${e}`);
+          return { success: false, error: String(e) };
+        }
+      }
+      case '_agent/skill/create': {
+        const skillName = params['name'] as string | undefined;
+        if (!skillName) return { success: false, error: 'Missing name param' };
+        try {
+          const { Storage } = await import('@google/gemini-cli-core');
+          const path = await import('path');
+          const fs = await import('fs/promises');
+
+          const skillsDir = path.join(Storage.getGlobalAgentsDir() || path.join((await import('os')).homedir(), '.agents'), 'skills', skillName);          await fs.mkdir(skillsDir, { recursive: true });
+          
+          const skillPath = path.join(skillsDir, 'SKILL.md');
+          const defaultContent = `---
+description: A short description of what ${skillName} does.
+---
+
+# ${skillName}
+
+## Instructions
+Describe how the agent should use this skill here.
+
+## References
+- You can add URLs or local file paths here.
+`;
+          try {
+            await fs.access(skillPath);
+          } catch {
+            await fs.writeFile(skillPath, defaultContent, 'utf8');
+          }
+          
+          await this.config.reloadSkills();
+          return { success: true, path: skillPath };
+        } catch (e) {
+          debugLogger.error(`[ACP] Failed to create skill ${skillName}: ${e}`);
+          return { success: false, error: String(e) };
+        }
+      }
+      case '_agent/skill/delete': {
+        const skillName = params['name'] as string | undefined;
+        if (!skillName) return { success: false, error: 'Missing name param' };
+        try {
+          const { Storage } = await import('@google/gemini-cli-core');
+          const path = await import('path');
+          const fs = await import('fs/promises');
+          const skillsDir = path.join(Storage.getGlobalAgentsDir() || path.join((await import('os')).homedir(), '.agents'), 'skills', skillName);
+          await fs.rm(skillsDir, { recursive: true, force: true });
+          
+          await this.config.reloadSkills();
+          return { success: true };
+        } catch (e) {
+          debugLogger.error(`[ACP] Failed to delete skill ${skillName}: ${e}`);
+          return { success: false, error: String(e) };
+        }
+      }
+      case '_agent/mcp/delete': {
+        const mcpName = params['name'] as string | undefined;
+        if (!mcpName) return { success: false, error: 'Missing mcp name' };
+        try {
+          const { Storage } = await import('@google/gemini-cli-core');
+          const path = await import('path');
+          const fs = await import('fs/promises');
+          const settingsPath = path.join(Storage.getGlobalGeminiDir(), 'settings.json');          let settingsObj: any = {};
+          try {
+            const data = await fs.readFile(settingsPath, 'utf8');
+            settingsObj = JSON.parse(data);
+          } catch(e) {}
+          
+          if (settingsObj.mcp && settingsObj.mcp.servers && settingsObj.mcp.servers[mcpName]) {
+            delete settingsObj.mcp.servers[mcpName];
+            await fs.writeFile(settingsPath, JSON.stringify(settingsObj, null, 2), 'utf8');
+          }
+          return { success: true };
+        } catch (e) {
+          debugLogger.error(`[ACP] Failed to delete mcp ${mcpName}: ${e}`);
+          return { success: false, error: String(e) };
+        }
+      }
+      case '_agent/mcp/toggle': {
+        const mcpName = params['name'] as string | undefined;
+        const enable = params['enable'] as boolean | undefined;
+        if (!mcpName || enable === undefined) return { success: false, error: 'Missing mcp name or enable param' };
+        try {
+          const { Storage } = await import('@google/gemini-cli-core');
+          const path = await import('path');
+          const fs = await import('fs/promises');
+          const settingsPath = path.join(Storage.getGlobalGeminiDir(), 'mcp-server-enablement.json');          let settingsObj: any = {};
+          try {
+            const data = await fs.readFile(settingsPath, 'utf8');
+            settingsObj = JSON.parse(data);
+          } catch(e) {}
+
+          const normalizedName = mcpName.toLowerCase().trim();
+          if (enable) {
+            if (normalizedName in settingsObj) {
+              delete settingsObj[normalizedName];
+            }
+          } else {
+            settingsObj[normalizedName] = { enabled: false };
+          }
+          await fs.writeFile(settingsPath, JSON.stringify(settingsObj, null, 2), 'utf8');
+          return { success: true };
+        } catch (e) {
+          debugLogger.error(`[ACP] Failed to toggle mcp ${mcpName}: ${e}`);
+          return { success: false, error: String(e) };
+        }
+      }
+      case '_models/list': {
+        const models: Array<{id: string, name: string}> = [];
+        if (VALID_GEMINI_MODELS) {
+          for (const modelId of VALID_GEMINI_MODELS) {
+            const nameParts = modelId.split('-');
+            const capitalizedName = nameParts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+            models.push({ id: modelId, name: capitalizedName });
+          }
+        } else if (DEFAULT_MODEL_CONFIGS?.aliases) {
+          for (const [key, val] of Object.entries(DEFAULT_MODEL_CONFIGS.aliases)) {
+            if (key.startsWith('gemini-') && !key.endsWith('-base')) {
+              const modelId = (val as any).modelConfig?.model || key;
+              models.push({ id: modelId, name: key });
+            }
+          }
+        }
+        if (models.length === 0) {
+          models.push({ id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' });
+          models.push({ id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' });
+        }
+        
+        const uniqueModels = Array.from(new Map(models.map(m => [m.id, m])).values());
+        return { models: uniqueModels };
+      }
+      default:
+        throw new acp.RequestError(404, `Method not found: ${method}`);
+    }
   }
 }
 

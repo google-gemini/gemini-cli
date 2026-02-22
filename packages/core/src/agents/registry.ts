@@ -21,7 +21,7 @@ import {
   type ModelConfig,
   ModelConfigService,
 } from '../services/modelConfigService.js';
-import { PolicyDecision, PRIORITY_SUBAGENT_TOOL } from '../policy/types.js';
+import { ApprovalMode, PolicyDecision, PRIORITY_SUBAGENT_TOOL } from '../policy/types.js';
 
 /**
  * Returns the model config alias for a given agent definition.
@@ -42,7 +42,7 @@ export class AgentRegistry {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly allDefinitions = new Map<string, AgentDefinition<any>>();
 
-  constructor(private readonly config: Config) {}
+  constructor(private readonly config: Config) { }
 
   /**
    * Discovers and loads agents.
@@ -290,11 +290,16 @@ export class AgentRegistry {
     // Clean up any old dynamic policy for this tool (e.g. if we are overwriting an agent)
     policyEngine.removeRulesForTool(definition.name, 'AgentRegistry (Dynamic)');
 
+    // In YOLO mode, auto-approve remote agents to avoid blocking in headless
+    // environments (e.g. A2A servers) where no user is available to confirm.
+    const isYolo =
+      this.config.getApprovalMode() === ApprovalMode.YOLO;
+
     // Add the new dynamic policy
     policyEngine.addRule({
       toolName: definition.name,
       decision:
-        definition.kind === 'local'
+        definition.kind === 'local' || isYolo
           ? PolicyDecision.ALLOW
           : PolicyDecision.ASK_USER,
       priority: PRIORITY_SUBAGENT_TOOL,
@@ -354,14 +359,44 @@ export class AgentRegistry {
 
     // Log remote A2A agent registration for visibility.
     try {
+      // If we are currently running an A2A Server, skip fetching remote peers' agent cards.
+      // This prevents a mutual deadlock ring where 4 starting A2A servers all try to fetch
+      // each other's (not yet started) HTTP servers during Config.initialize().
+      if (this.config.isA2aServer()) {
+        if (this.config.getDebugMode()) {
+          debugLogger.log(
+            `[AgentRegistry] Registered remote agent '${definition.name}' (Card fetch deferred for A2A server mesh)`,
+          );
+        }
+        this.agents.set(definition.name, definition);
+        this.addAgentPolicy(definition);
+        return;
+      }
+
       const clientManager = A2AClientManager.getInstance();
-      // Use ADCHandler to ensure we can load agents hosted on secure platforms (e.g. Vertex AI)
-      const authHandler = new ADCHandler();
-      const agentCard = await clientManager.loadAgent(
-        definition.name,
-        definition.agentCardUrl,
-        authHandler,
-      );
+      // Try ADC first for secure platforms (e.g. Vertex AI), then fall back to
+      // unauthenticated fetch for local/private-network A2A servers.
+      let agentCard;
+      try {
+        const authHandler = new ADCHandler();
+        agentCard = await clientManager.loadAgent(
+          definition.name,
+          definition.agentCardUrl,
+          authHandler,
+          1000 // 1s timeout to prevent deadlocks during concurrent startup
+        );
+      } catch (adcError) {
+        debugLogger.warn(
+          `[AgentRegistry] ADC auth failed for "${definition.name}" (${definition.agentCardUrl}); retrying without auth`,
+          adcError,
+        );
+        agentCard = await clientManager.loadAgent(
+          definition.name,
+          definition.agentCardUrl,
+          undefined,
+          1000 // 1s timeout
+        );
+      }
       if (agentCard.skills && agentCard.skills.length > 0) {
         definition.description = agentCard.skills
           .map(

@@ -36,6 +36,7 @@ export async function loadConfig(
   settings: Settings,
   extensionLoader: ExtensionLoader,
   taskId: string,
+  agentSettings?: AgentSettings,
 ): Promise<Config> {
   const workspaceDir = process.cwd();
   const adcFilePath = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
@@ -59,7 +60,7 @@ export async function loadConfig(
 
   const configParams: ConfigParameters = {
     sessionId: taskId,
-    model: PREVIEW_GEMINI_MODEL,
+    model: agentSettings?.model || PREVIEW_GEMINI_MODEL,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: undefined, // Sandbox might not be relevant for a server-side agent
     targetDir: workspaceDir, // Or a specific directory the agent operates on
@@ -75,6 +76,7 @@ export async function loadConfig(
         : ApprovalMode.DEFAULT,
     mcpServers: settings.mcpServers,
     cwd: workspaceDir,
+    skillsSupport: true,
     telemetry: {
       enabled: settings.telemetry?.enabled,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -105,6 +107,9 @@ export async function loadConfig(
     interactive: true,
     enableInteractiveShell: true,
     ptyInfo: 'auto',
+    // Enable agent discovery so .gemini/agents/*.md peer files are loaded
+    // and remote agents are registered as callable tools.
+    enableAgents: true,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir, {
@@ -137,11 +142,14 @@ export async function loadConfig(
     initialConfig.getExperiments()?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
       ?.boolValue ?? false;
 
+  logger.info('[Config] adminControlsEnabled: ' + adminControlsEnabled);
+
   // Initialize final config parameters to the previous parameters.
   // If no admin controls are needed, these will be used as-is for the final
   // config.
   const finalConfigParams = { ...configParams };
   if (adminControlsEnabled) {
+    logger.info('[Config] Fetching admin controls...');
     const adminSettings = await fetchAdminControlsOnce(
       codeAssistServer,
       adminControlsEnabled,
@@ -163,11 +171,14 @@ export async function loadConfig(
 
   const config = new Config(finalConfigParams);
 
-  // Needed to initialize ToolRegistry, and git checkpointing if enabled
+  logger.info('[Config] Initializing config...');
   await config.initialize();
   startupProfiler.flush(config);
 
+  logger.info('[Config] Refreshing authentication...');
   await refreshAuthentication(config, adcFilePath, 'Config');
+
+  logger.info('[Config] Load complete.');
 
   return config;
 }
@@ -262,6 +273,6 @@ async function refreshAuthentication(
   } else {
     const errorMessage = `[${logPrefix}] Unable to set GeneratorConfig. Please provide a GEMINI_API_KEY or set USE_CCPA.`;
     logger.error(errorMessage);
-    throw new Error(errorMessage);
+    // Do not throw an error here, so the A2A server can boot up and receive _agent/set_credentials over ACP.
   }
 }

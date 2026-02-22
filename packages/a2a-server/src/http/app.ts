@@ -31,6 +31,7 @@ import {
   GitService,
 } from '@google/gemini-cli-core';
 import type { Command, CommandArgument } from '../commands/types.js';
+import { createAcpRouter } from './acp_handler.js';
 
 type CommandResponse = {
   name: string;
@@ -189,7 +190,7 @@ export async function createApp() {
       taskStoreForHandler = inMemoryTaskStore;
     }
 
-    const agentExecutor = new CoderAgentExecutor(taskStoreForExecutor);
+    const agentExecutor = new CoderAgentExecutor(taskStoreForExecutor, config);
 
     const context = { config, git, agentExecutor };
 
@@ -323,6 +324,33 @@ export async function createApp() {
       }
       res.json({ metadata: await wrapper.task.getMetadata() });
     });
+    expressApp.post('/reload-agents', async (_req, res) => {
+      try {
+        logger.info('[CoreAgent] Reloading agent registry...');
+        const agentRegistry = config.getAgentRegistry();
+        await agentRegistry.reload();
+        // Re-register the reloaded agents as tools so the LLM can invoke them
+        config.refreshSubAgentTools();
+        const agents = agentRegistry.getAllDefinitions();
+        const agentNames = agents.map((a) => a.name);
+        logger.info(
+          `[CoreAgent] Agent registry reloaded. Agents: ${agentNames.join(', ')}`,
+        );
+        res.status(200).json({ reloaded: true, agents: agentNames });
+      } catch (error) {
+        logger.error('[CoreAgent] Error reloading agents:', error);
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : 'Unknown error reloading agents';
+        res.status(500).json({ error: errorMessage });
+      }
+    });
+
+    // ACP/HTTP dual protocol endpoint — bridges AcpHttpAgent ↔ CoderAgentExecutor
+    const acpRouter = createAcpRouter(agentExecutor);
+    expressApp.use('/acp', acpRouter);
+
     return expressApp;
   } catch (error) {
     logger.error('[CoreAgent] Error during startup:', error);

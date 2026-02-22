@@ -355,7 +355,7 @@ export class MCPServerConfig {
     readonly targetAudience?: string,
     /* targetServiceAccount format: <service-account-name>@<project-num>.iam.gserviceaccount.com */
     readonly targetServiceAccount?: string,
-  ) {}
+  ) { }
 }
 
 export enum AuthProviderType {
@@ -617,6 +617,10 @@ export class Config {
     }
   }
 
+  isA2aServer(): boolean {
+    return process.env['A2A_SERVER'] === 'true';
+  }
+
   private readonly summarizeToolOutput:
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
@@ -675,10 +679,10 @@ export class Config {
   private readonly onModelChange: ((model: string) => void) | undefined;
   private readonly onReload:
     | (() => Promise<{
-        disabledSkills?: string[];
-        adminSkillsEnabled?: boolean;
-        agents?: AgentSettings;
-      }>)
+      disabledSkills?: string[];
+      adminSkillsEnabled?: boolean;
+      agents?: AgentSettings;
+    }>)
     | undefined;
 
   private readonly enableAgents: boolean;
@@ -1522,10 +1526,10 @@ export class Config {
 
   getRemainingQuotaForModel(modelId: string):
     | {
-        remainingAmount?: number;
-        remainingFraction?: number;
-        resetTime?: string;
-      }
+      remainingAmount?: number;
+      remainingFraction?: number;
+      resetTime?: string;
+    }
     | undefined {
     const bucket = this.lastRetrievedQuota?.buckets?.find(
       (b) => b.modelId === modelId,
@@ -2101,6 +2105,7 @@ export class Config {
   }
 
   isBrowserLaunchSuppressed(): boolean {
+    if (process.env['A2A_SERVER'] === 'true') return false;
     return this.getNoBrowser() || !shouldAttemptBrowserLaunch();
   }
 
@@ -2285,17 +2290,8 @@ export class Config {
    * getGemini31Launched instead.
    */
   getGemini31LaunchedSync(): boolean {
-    const authType = this.contentGeneratorConfig?.authType;
-    if (
-      authType === AuthType.USE_GEMINI ||
-      authType === AuthType.USE_VERTEX_AI
-    ) {
-      return true;
-    }
-    return (
-      this.experiments?.flags[ExperimentFlags.GEMINI_3_1_PRO_LAUNCHED]
-        ?.boolValue ?? false
-    );
+    // Force-enable Gemini 3.1 Pro — already rolled out for AI Ultra users
+    return true;
   }
 
   private async ensureExperimentsLoaded(): Promise<void> {
@@ -2440,7 +2436,7 @@ export class Config {
     return Math.min(
       // Estimate remaining context window in characters (1 token ~= 4 chars).
       4 *
-        (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
+      (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
       this.truncateToolOutputThreshold,
     );
   }
@@ -2608,18 +2604,47 @@ export class Config {
       agentsOverrides['cli_help']?.enabled !== false
     ) {
       const definitions = this.agentRegistry.getAllDefinitions();
+      debugLogger.log(
+        `[registerSubAgentTools] Found ${definitions.length} agent definitions: ${definitions.map((d) => `${d.name}(${d.kind})`).join(', ')}`,
+      );
 
       for (const definition of definitions) {
         try {
           const tool = new SubagentTool(definition, this, this.getMessageBus());
           registry.registerTool(tool);
+          debugLogger.log(
+            `[registerSubAgentTools] Registered tool: ${definition.name}`,
+          );
+
+          // For A2A remote agents, expose parallel copies to bypass LLM duplicate call limits
+          if (definition.kind === 'remote') {
+            for (let i = 1; i <= 3; i++) {
+              const cloneDef = { ...definition, name: `${definition.name}_${i}` };
+              const cloneTool = new SubagentTool(cloneDef, this, this.getMessageBus());
+              registry.registerTool(cloneTool);
+            }
+          }
         } catch (e: unknown) {
           debugLogger.warn(
             `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
           );
         }
       }
+    } else {
+      debugLogger.log(
+        `[registerSubAgentTools] Skipped: agents not enabled and built-in agents explicitly disabled`,
+      );
     }
+  }
+
+  /**
+   * Public API: Re-registers SubAgentTools for all agent definitions
+   * currently known to the AgentRegistry. Call this after
+   * `agentRegistry.reload()` so that newly discovered remote agents
+   * appear as tools the LLM can invoke.
+   */
+  refreshSubAgentTools(): void {
+    this.registerSubAgentTools(this.getToolRegistry());
   }
 
   /**

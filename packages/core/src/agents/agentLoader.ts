@@ -407,6 +407,18 @@ export function markdownToAgentDefinition(
           type: 'string',
           description: 'The task for the agent.',
         },
+        async: {
+          type: 'boolean',
+          description: 'If true, invokes the agent asynchronously and returns immediately. Recommended for tasks that can run in parallel or take a long time.',
+        },
+        subscribe: {
+          type: 'boolean',
+          description: 'If true, subscribes to the async task so that you receive an automatic callback via system interruption when the background task finishes. Requires async: true.',
+        },
+        sessionId: {
+          type: 'string',
+          description: 'Optional. To reuse or resume a specific conversational session with the agent, provide its session ID. Otherwise a new session is created or the latest one is reused automatically.',
+        },
       },
       // query is not required because it defaults to "Get Started!" if not provided
       required: [],

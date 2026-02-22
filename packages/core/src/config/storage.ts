@@ -42,6 +42,10 @@ export class Storage {
   }
 
   static getGlobalGeminiDir(): string {
+    const envDir = process.env['GEMINI_CONFIG_DIR'];
+    if (envDir) {
+      return envDir;
+    }
     const homeDir = homedir();
     if (!homeDir) {
       return path.join(os.tmpdir(), GEMINI_DIR);
@@ -50,6 +54,10 @@ export class Storage {
   }
 
   static getGlobalAgentsDir(): string {
+    const envDir = process.env['GEMINI_AGENTS_DIR'];
+    if (envDir) {
+      return envDir;
+    }
     const homeDir = homedir();
     if (!homeDir) {
       return '';

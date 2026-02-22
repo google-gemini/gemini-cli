@@ -1,0 +1,33 @@
+
+> @google/gemini-cli-a2a-server@0.30.0-nightly.20260210.a2174751d start /mnt/nvme0n1p2/workspace/monorepo/services/ilhae-agent/gemini-cli/packages/a2a-server
+> node dist/src/http/server.js
+
+[ERROR] 2026-02-22 01:06:50.796 AM -- Warning: unexpected file /home/tripleyoung/.gemini/extensions/extension-enablement.json in extensions directory.
+[INFO] 2026-02-22 01:06:50.797 AM -- Loading extension: chrome-devtools-mcp (version: latest)
+[INFO] 2026-02-22 01:06:50.797 AM -- Loading extension: context7 (version: 1.0.0)
+[INFO] 2026-02-22 01:06:50.797 AM -- Loading extension: ralph (version: 1.0.1)
+Ignore file not found: /mnt/nvme0n1p2/workspace/monorepo/services/ilhae-agent/gemini-cli/packages/a2a-server/.geminiignore, continue without it.
+[INFO] 2026-02-22 01:06:50.801 AM -- [Config] adminControlsEnabled: false
+[INFO] 2026-02-22 01:06:50.801 AM -- [Config] Initializing config...
+Ignore file not found: /mnt/nvme0n1p2/workspace/monorepo/services/ilhae-agent/gemini-cli/packages/a2a-server/.geminiignore, continue without it.
+Ignore file not found: /mnt/nvme0n1p2/workspace/monorepo/services/ilhae-agent/gemini-cli/packages/a2a-server/.geminiignore, continue without it.
+Ignore file not found: /mnt/nvme0n1p2/workspace/monorepo/services/ilhae-agent/gemini-cli/packages/a2a-server/.geminiignore, continue without it.
+[registerSubAgentTools] Found 2 agent definitions: codebase_investigator(local), cli_help(local)
+[registerSubAgentTools] Registered tool: codebase_investigator
+[registerSubAgentTools] Registered tool: cli_help
+Loading extension: chrome-devtools-mcp
+Loading extension: context7
+Loading extension: ralph
+Skipping MCP config for server with name "chrome-devtools" from extension "chrome-devtools-mcp" as it already exists.
+Skill "skill-creator" from "/home/tripleyoung/.gemini/skills/skill-creator/SKILL.md" is overriding the built-in skill.
+Hook registry initialized with 0 hook entries
+Hook system initialized successfully
+[STARTUP] StartupProfiler.flush() called with 1 phases
+[STARTUP] Recording metric for phase: discover_tools duration: 20.53683799999999
+[INFO] 2026-02-22 01:06:50.874 AM -- [Config] Refreshing authentication...
+[ERROR] 2026-02-22 01:06:50.874 AM -- [Config] Unable to set GeneratorConfig. Please provide a GEMINI_API_KEY or set USE_CCPA.
+[ERROR] 2026-02-22 01:06:50.874 AM -- [CoreAgent] Error during startup: [Config] Unable to set GeneratorConfig. Please provide a GEMINI_API_KEY or set USE_CCPA.
+{
+  "stack": "Error: [Config] Unable to set GeneratorConfig. Please provide a GEMINI_API_KEY or set USE_CCPA.\n    at refreshAuthentication (file:///mnt/nvme0n1p2/workspace/monorepo/services/ilhae-agent/gemini-cli/packages/a2a-server/dist/src/config/config.js:197:15)\n    at loadConfig (file:///mnt/nvme0n1p2/workspace/monorepo/services/ilhae-agent/gemini-cli/packages/a2a-server/dist/src/config/config.js:118:11)\n    at async createApp (file:///mnt/nvme0n1p2/workspace/monorepo/services/ilhae-agent/gemini-cli/packages/a2a-server/dist/src/http/app.js:117:24)\n    at async main (file:///mnt/nvme0n1p2/workspace/monorepo/services/ilhae-agent/gemini-cli/packages/a2a-server/dist/src/http/app.js:272:28)"
+}
+ ELIFECYCLE  Command failed with exit code 1.
