@@ -158,7 +158,8 @@ class WebFetchToolInvocation extends BaseToolInvocation<
 
   private async executeFallbackForUrl(
     url: string,
-    _signal: AbortSignal,
+    signal: AbortSignal,
+    perUrlBudget: number,
   ): Promise<{ content: string; error?: string }> {
     // Convert GitHub blob URL to raw URL
     let fetchUrl = url;
