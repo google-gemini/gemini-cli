@@ -1135,6 +1135,10 @@ export const useGeminiStream = (
       let geminiMessageBuffer = '';
       const toolCallRequests: ToolCallRequestInfo[] = [];
       for await (const event of stream) {
+        // Check for abort mid-stream to break out immediately
+        if (signal.aborted || turnCancelledRef.current) {
+          return StreamProcessingStatus.UserCancelled;
+        }
         if (
           event.type !== ServerGeminiEventType.Thought &&
           thoughtRef.current !== null
@@ -1339,6 +1343,10 @@ export const useGeminiStream = (
               );
 
               if (processingStatus === StreamProcessingStatus.UserCancelled) {
+                if (pendingHistoryItemRef.current) {
+                  addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+                  setPendingHistoryItem(null);
+                }
                 return;
               }
 
