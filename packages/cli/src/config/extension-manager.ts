@@ -307,6 +307,28 @@ Would you like to attempt to install via "git clone" instead?`,
         const destinationPath = new ExtensionStorage(
           newExtensionName,
         ).getExtensionDir();
+
+        // Create Backup
+        const backupPath = `${destinationPath}_backup`;
+        let backupCreated = false;
+
+        if (isUpdate) {
+          try {
+            const destExists = await fs.promises
+              .stat(destinationPath)
+              .then(() => true)
+              .catch(() => false);
+            if (destExists) {
+              await fs.promises.cp(destinationPath, backupPath, {
+                recursive: true,
+              });
+              backupCreated = true;
+            }
+          } catch (backupError) {
+            debugLogger.warn('Could not create extension backup:', backupError);
+          }
+        }
+
         let previousSettings: Record<string, string> | undefined;
         if (isUpdate) {
           previousSettings = await getEnvContents(
@@ -368,11 +390,28 @@ Would you like to attempt to install via "git clone" instead?`,
         );
         await fs.promises.writeFile(metadataPath, metadataString);
 
-        // TODO: Gracefully handle this call failing, we should back up the old
-        // extension prior to overwriting it and then restore and restart it.
-        extension = await this.loadExtension(destinationPath);
-        if (!extension) {
-          throw new Error(`Extension not found`);
+        // Restore Backup on Failure
+        try {
+          extension = await this.loadExtension(destinationPath);
+          if (!extension) {
+            throw new Error(`Extension not found`);
+          }
+        } catch (loadError) {
+          if (backupCreated) {
+            await fs.promises.rm(destinationPath, {
+              recursive: true,
+              force: true,
+            });
+            await fs.promises.rename(backupPath, destinationPath);
+            extension = await this.loadExtension(destinationPath);
+          }
+          throw loadError;
+        } finally {
+          if (backupCreated) {
+            await fs.promises
+              .rm(backupPath, { recursive: true, force: true })
+              .catch(() => {});
+          }
         }
         if (isUpdate) {
           await logExtensionUpdateEvent(
