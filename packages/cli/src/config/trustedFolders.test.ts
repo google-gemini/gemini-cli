@@ -501,7 +501,7 @@ describe('Trusted Folders', () => {
       const realDir = path.join(tempDir, 'real');
       const symlinkDir = path.join(tempDir, 'symlink');
       fs.mkdirSync(realDir);
-      fs.symlinkSync(realDir, symlinkDir, 'junction');
+      fs.symlinkSync(realDir, symlinkDir, process.platform === 'win32' ? 'junction' : 'dir');
 
       // Rule uses realpath
       const config = { [realDir]: TrustLevel.TRUST_FOLDER };
