@@ -638,8 +638,8 @@ export class GeminiChat {
       initialDelayMs: this.config.getHighDemandRetry()?.initialDelayMs,
       maxDelayMs: this.config.getHighDemandRetry()?.maxDelayMs,
       maxAttempts:
-        this.config.getHighDemandRetry()?.maxAttempts ??
-        availabilityMaxAttempts,
+        availabilityMaxAttempts ??
+        this.config.getHighDemandRetry()?.maxAttempts,
       getAvailabilityContext,
       onRetry: (attempt, error, delayMs) => {
         coreEvents.emitRetryAttempt({
