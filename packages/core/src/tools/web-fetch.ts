@@ -206,7 +206,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     }
 
     // Per-URL content budget is the total budget divided by number of URLs
-    textContent = textContent.substring(0, MAX_CONTENT_LENGTH);
+    textContent = textContent.substring(0, perUrlBudget);
     return { content: textContent };
   }
 
