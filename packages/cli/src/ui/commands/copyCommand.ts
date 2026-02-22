@@ -15,25 +15,8 @@ export const copyCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, _args): Promise<SlashCommandActionReturn | void> => {
-    // Prefer the last slash command output (e.g. /help, /tools) if available,
-    // otherwise fall back to the last model response from the chat history.
-    const lastSlashOutput = context.ui.getLastSlashCommandOutput();
-
-    const chat = context.services.config?.getGeminiClient()?.getChat();
-    const history = chat?.getHistory();
-
-    // Get the last message from the AI (model role)
-    const lastAiMessage = history
-      ? history.filter((item) => item.role === 'model').pop()
-      : undefined;
-
-    // Extract text from the AI message parts
-    const lastAiOutput = lastAiMessage?.parts
-      ?.filter((part) => part.text)
-      .map((part) => part.text)
-      .join('');
-
-    const textToCopy = lastSlashOutput ?? lastAiOutput;
+    const lastOutput = context.ui.getLastOutput();
+    const textToCopy = lastOutput?.content;
 
     if (!textToCopy) {
       return {

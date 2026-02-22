@@ -18,79 +18,25 @@ vi.mock('../utils/commandUtils.js', () => ({
 describe('copyCommand', () => {
   let mockContext: CommandContext;
   let mockCopyToClipboard: Mock;
-  let mockGetChat: Mock;
-  let mockGetHistory: Mock;
-  let mockGetLastSlashCommandOutput: Mock;
+  let mockGetLastOutput: Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
     mockCopyToClipboard = vi.mocked(copyToClipboard);
-    mockGetChat = vi.fn();
-    mockGetHistory = vi.fn();
-    mockGetLastSlashCommandOutput = vi.fn().mockReturnValue(undefined);
+    mockGetLastOutput = vi.fn().mockReturnValue(undefined);
 
     mockContext = createMockCommandContext({
-      services: {
-        config: {
-          getGeminiClient: () => ({
-            getChat: mockGetChat,
-          }),
-        },
-      },
       ui: {
-        getLastSlashCommandOutput: mockGetLastSlashCommandOutput,
+        getLastOutput: mockGetLastOutput,
       },
     });
-
-    mockGetChat.mockReturnValue({
-      getHistory: mockGetHistory,
-    });
   });
 
-  it('should return info message when no history is available', async () => {
+  it('should return info message when no output is available', async () => {
     if (!copyCommand.action) throw new Error('Command has no action');
 
-    mockGetChat.mockReturnValue(undefined);
-
-    const result = await copyCommand.action(mockContext, '');
-
-    expect(result).toEqual({
-      type: 'message',
-      messageType: 'info',
-      content: 'No output in history',
-    });
-
-    expect(mockCopyToClipboard).not.toHaveBeenCalled();
-  });
-
-  it('should return info message when history is empty', async () => {
-    if (!copyCommand.action) throw new Error('Command has no action');
-
-    mockGetHistory.mockReturnValue([]);
-
-    const result = await copyCommand.action(mockContext, '');
-
-    expect(result).toEqual({
-      type: 'message',
-      messageType: 'info',
-      content: 'No output in history',
-    });
-
-    expect(mockCopyToClipboard).not.toHaveBeenCalled();
-  });
-
-  it('should return info message when no AI messages are found in history', async () => {
-    if (!copyCommand.action) throw new Error('Command has no action');
-
-    const historyWithUserOnly = [
-      {
-        role: 'user',
-        parts: [{ text: 'Hello' }],
-      },
-    ];
-
-    mockGetHistory.mockReturnValue(historyWithUserOnly);
+    mockGetLastOutput.mockReturnValue(undefined);
 
     const result = await copyCommand.action(mockContext, '');
 
@@ -106,18 +52,11 @@ describe('copyCommand', () => {
   it('should copy last AI message to clipboard successfully', async () => {
     if (!copyCommand.action) throw new Error('Command has no action');
 
-    const historyWithAiMessage = [
-      {
-        role: 'user',
-        parts: [{ text: 'Hello' }],
-      },
-      {
-        role: 'model',
-        parts: [{ text: 'Hi there! How can I help you?' }],
-      },
-    ];
-
-    mockGetHistory.mockReturnValue(historyWithAiMessage);
+    mockGetLastOutput.mockReturnValue({
+      type: 'ai',
+      content: 'Hi there! How can I help you?',
+      timestamp: 1000,
+    });
     mockCopyToClipboard.mockResolvedValue(undefined);
 
     const result = await copyCommand.action(mockContext, '');
@@ -134,23 +73,20 @@ describe('copyCommand', () => {
     );
   });
 
-  it('should handle multiple text parts in AI message', async () => {
+  it('should copy last slash command output to clipboard successfully', async () => {
     if (!copyCommand.action) throw new Error('Command has no action');
 
-    const historyWithMultipleParts = [
-      {
-        role: 'model',
-        parts: [{ text: 'Part 1: ' }, { text: 'Part 2: ' }, { text: 'Part 3' }],
-      },
-    ];
-
-    mockGetHistory.mockReturnValue(historyWithMultipleParts);
+    mockGetLastOutput.mockReturnValue({
+      type: 'slash',
+      content: 'Slash command output',
+      timestamp: 2000,
+    });
     mockCopyToClipboard.mockResolvedValue(undefined);
 
     const result = await copyCommand.action(mockContext, '');
 
     expect(mockCopyToClipboard).toHaveBeenCalledWith(
-      'Part 1: Part 2: Part 3',
+      'Slash command output',
       expect.anything(),
     );
     expect(result).toEqual({
@@ -160,234 +96,50 @@ describe('copyCommand', () => {
     });
   });
 
-  it('should filter out non-text parts', async () => {
+  it('should copy whatever getLastOutput returns (most recent wins)', async () => {
     if (!copyCommand.action) throw new Error('Command has no action');
 
-    const historyWithMixedParts = [
-      {
-        role: 'model',
-        parts: [
-          { text: 'Text part' },
-          { image: 'base64data' }, // Non-text part
-          { text: ' more text' },
-        ],
-      },
-    ];
-
-    mockGetHistory.mockReturnValue(historyWithMixedParts);
-    mockCopyToClipboard.mockResolvedValue(undefined);
-
-    const result = await copyCommand.action(mockContext, '');
-
+    // Case 1: AI is more recent
+    mockGetLastOutput.mockReturnValue({
+      type: 'ai',
+      content: 'More recent AI response',
+      timestamp: 3000,
+    });
+    await copyCommand.action(mockContext, '');
     expect(mockCopyToClipboard).toHaveBeenCalledWith(
-      'Text part more text',
+      'More recent AI response',
       expect.anything(),
     );
-    expect(result).toEqual({
-      type: 'message',
-      messageType: 'info',
-      content: 'Last output copied to the clipboard',
+
+    // Case 2: Slash is more recent
+    mockGetLastOutput.mockReturnValue({
+      type: 'slash',
+      content: 'More recent slash output',
+      timestamp: 4000,
     });
-  });
-
-  it('should get the last AI message when multiple AI messages exist', async () => {
-    if (!copyCommand.action) throw new Error('Command has no action');
-
-    const historyWithMultipleAiMessages = [
-      {
-        role: 'model',
-        parts: [{ text: 'First AI response' }],
-      },
-      {
-        role: 'user',
-        parts: [{ text: 'User message' }],
-      },
-      {
-        role: 'model',
-        parts: [{ text: 'Second AI response' }],
-      },
-    ];
-
-    mockGetHistory.mockReturnValue(historyWithMultipleAiMessages);
-    mockCopyToClipboard.mockResolvedValue(undefined);
-
-    const result = await copyCommand.action(mockContext, '');
-
+    await copyCommand.action(mockContext, '');
     expect(mockCopyToClipboard).toHaveBeenCalledWith(
-      'Second AI response',
+      'More recent slash output',
       expect.anything(),
     );
-    expect(result).toEqual({
-      type: 'message',
-      messageType: 'info',
-      content: 'Last output copied to the clipboard',
-    });
   });
 
-  it('should handle clipboard copy error', async () => {
+  it('should handle clipboard errors gracefully', async () => {
     if (!copyCommand.action) throw new Error('Command has no action');
 
-    const historyWithAiMessage = [
-      {
-        role: 'model',
-        parts: [{ text: 'AI response' }],
-      },
-    ];
-
-    mockGetHistory.mockReturnValue(historyWithAiMessage);
-    const clipboardError = new Error('Clipboard access denied');
-    mockCopyToClipboard.mockRejectedValue(clipboardError);
+    mockGetLastOutput.mockReturnValue({
+      type: 'ai',
+      content: 'Some text',
+      timestamp: 1000,
+    });
+    mockCopyToClipboard.mockRejectedValue(new Error('Clipboard access denied'));
 
     const result = await copyCommand.action(mockContext, '');
 
     expect(result).toEqual({
       type: 'message',
       messageType: 'error',
-      content: `Failed to copy to the clipboard. ${clipboardError.message}`,
-    });
-
-    expect(mockCopyToClipboard).toHaveBeenCalledWith(
-      'AI response',
-      expect.anything(),
-    );
-  });
-
-  it('should handle non-Error clipboard errors', async () => {
-    if (!copyCommand.action) throw new Error('Command has no action');
-
-    const historyWithAiMessage = [
-      {
-        role: 'model',
-        parts: [{ text: 'AI response' }],
-      },
-    ];
-
-    mockGetHistory.mockReturnValue(historyWithAiMessage);
-    const rejectedValue = 'String error';
-    mockCopyToClipboard.mockRejectedValue(rejectedValue);
-
-    const result = await copyCommand.action(mockContext, '');
-
-    expect(result).toEqual({
-      type: 'message',
-      messageType: 'error',
-      content: `Failed to copy to the clipboard. ${rejectedValue}`,
-    });
-
-    expect(mockCopyToClipboard).toHaveBeenCalledWith(
-      'AI response',
-      expect.anything(),
-    );
-  });
-
-  it('should return info message when no text parts found in AI message and no slash output', async () => {
-    if (!copyCommand.action) throw new Error('Command has no action');
-
-    const historyWithEmptyParts = [
-      {
-        role: 'model',
-        parts: [{ image: 'base64data' }], // No text parts
-      },
-    ];
-
-    mockGetHistory.mockReturnValue(historyWithEmptyParts);
-    mockGetLastSlashCommandOutput.mockReturnValue(undefined);
-
-    const result = await copyCommand.action(mockContext, '');
-
-    expect(result).toEqual({
-      type: 'message',
-      messageType: 'info',
-      content: 'No output in history',
-    });
-
-    expect(mockCopyToClipboard).not.toHaveBeenCalled();
-  });
-
-  it('should handle unavailable config service', async () => {
-    if (!copyCommand.action) throw new Error('Command has no action');
-
-    const nullConfigContext = createMockCommandContext({
-      services: { config: null },
-    });
-
-    const result = await copyCommand.action(nullConfigContext, '');
-
-    expect(result).toEqual({
-      type: 'message',
-      messageType: 'info',
-      content: 'No output in history',
-    });
-
-    expect(mockCopyToClipboard).not.toHaveBeenCalled();
-  });
-
-  describe('slash command output', () => {
-    it('should copy last slash command output when no AI history exists', async () => {
-      if (!copyCommand.action) throw new Error('Command has no action');
-
-      mockGetChat.mockReturnValue(undefined);
-      mockGetLastSlashCommandOutput.mockReturnValue('/help output text');
-      mockCopyToClipboard.mockResolvedValue(undefined);
-
-      const result = await copyCommand.action(mockContext, '');
-
-      expect(result).toEqual({
-        type: 'message',
-        messageType: 'info',
-        content: 'Last output copied to the clipboard',
-      });
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(
-        '/help output text',
-        expect.anything(),
-      );
-    });
-
-    it('should prefer slash command output over AI history', async () => {
-      if (!copyCommand.action) throw new Error('Command has no action');
-
-      const historyWithAiMessage = [
-        { role: 'model', parts: [{ text: 'AI response' }] },
-      ];
-      mockGetHistory.mockReturnValue(historyWithAiMessage);
-      mockGetLastSlashCommandOutput.mockReturnValue('/tools output text');
-      mockCopyToClipboard.mockResolvedValue(undefined);
-
-      const result = await copyCommand.action(mockContext, '');
-
-      expect(result).toEqual({
-        type: 'message',
-        messageType: 'info',
-        content: 'Last output copied to the clipboard',
-      });
-      // Should copy the slash command output, not the AI response
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(
-        '/tools output text',
-        expect.anything(),
-      );
-    });
-
-    it('should fall back to AI history when no slash command output is set', async () => {
-      if (!copyCommand.action) throw new Error('Command has no action');
-
-      const historyWithAiMessage = [
-        { role: 'model', parts: [{ text: 'AI response' }] },
-      ];
-      mockGetHistory.mockReturnValue(historyWithAiMessage);
-      mockGetLastSlashCommandOutput.mockReturnValue(undefined);
-      mockCopyToClipboard.mockResolvedValue(undefined);
-
-      const result = await copyCommand.action(mockContext, '');
-
-      expect(result).toEqual({
-        type: 'message',
-        messageType: 'info',
-        content: 'Last output copied to the clipboard',
-      });
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(
-        'AI response',
-        expect.anything(),
-      );
+      content: 'Failed to copy to the clipboard. Clipboard access denied',
     });
   });
 });

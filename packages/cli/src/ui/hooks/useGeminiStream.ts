@@ -73,6 +73,7 @@ import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
 import { mapToDisplay as mapTrackedToolCallsToDisplay } from './toolMapping.js';
+import { type LastOutput } from '../commands/types.js';
 import {
   useToolScheduler,
   type TrackedToolCall,
@@ -195,6 +196,7 @@ export const useGeminiStream = (
   terminalHeight: number,
   isShellFocused?: boolean,
   consumeUserHint?: () => string | null,
+  setLastOutput?: (output: LastOutput) => void,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const [retryStatus, setRetryStatus] = useState<RetryAttemptPayload | null>(
@@ -1133,6 +1135,7 @@ export const useGeminiStream = (
       signal: AbortSignal,
     ): Promise<StreamProcessingStatus> => {
       let geminiMessageBuffer = '';
+      let fullAiResponseBuffer = '';
       const toolCallRequests: ToolCallRequestInfo[] = [];
       for await (const event of stream) {
         if (
@@ -1149,6 +1152,12 @@ export const useGeminiStream = (
             break;
           case ServerGeminiEventType.Content:
             setLastGeminiActivityTime(Date.now());
+            fullAiResponseBuffer += event.value;
+            setLastOutput?.({
+              type: 'ai',
+              content: fullAiResponseBuffer,
+              timestamp: Date.now(),
+            });
             geminiMessageBuffer = handleContentEvent(
               event.value,
               geminiMessageBuffer,
@@ -1249,6 +1258,7 @@ export const useGeminiStream = (
       pendingHistoryItemRef,
       setPendingHistoryItem,
       setThought,
+      setLastOutput,
     ],
   );
   const submitQuery = useCallback(

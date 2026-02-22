@@ -48,7 +48,11 @@ import type {
 } from '../types.js';
 import { MessageType } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
-import { type CommandContext, type SlashCommand } from '../commands/types.js';
+import {
+  type CommandContext,
+  type SlashCommand,
+  type LastOutput,
+} from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
@@ -145,10 +149,9 @@ export const useSlashCommandProcessor = (
     null,
   );
 
-  // Tracks the text content of the most recent slash command output so that
-  // /copy can access it even though slash command outputs never enter the
-  // Gemini chat history.
-  const lastSlashCommandOutputRef = useRef<string | undefined>(undefined);
+  // Tracks the most recent visible output (either from a slash command or an AI
+  // response) so that /copy can accurately capture the latest information.
+  const lastOutputRef = useRef<LastOutput | undefined>(undefined);
 
   const pendingHistoryItems = useMemo(() => {
     const items: HistoryItemWithoutId[] = [];
@@ -249,7 +252,10 @@ export const useSlashCommandProcessor = (
         removeComponent: () => setCustomDialog(null),
         toggleBackgroundShell: actions.toggleBackgroundShell,
         toggleShortcutsHelp: actions.toggleShortcutsHelp,
-        getLastSlashCommandOutput: () => lastSlashCommandOutputRef.current,
+        getLastOutput: () => lastOutputRef.current,
+        setLastOutput: (output: LastOutput) => {
+          lastOutputRef.current = output;
+        },
       },
       session: {
         stats: session.stats,
@@ -455,7 +461,11 @@ export const useSlashCommandProcessor = (
                   };
                 case 'message':
                   // Store the output text so /copy can retrieve it later.
-                  lastSlashCommandOutputRef.current = result.content;
+                  lastOutputRef.current = {
+                    type: 'slash',
+                    content: result.content,
+                    timestamp: Date.now(),
+                  };
                   addItem(
                     {
                       type:
