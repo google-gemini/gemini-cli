@@ -170,7 +170,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
 
     const response = await retryWithBackoff(
       async () => {
-        const res = await fetchWithTimeout(fetchUrl, URL_FETCH_TIMEOUT_MS);
+        const res = await fetchWithTimeout(fetchUrl, URL_FETCH_TIMEOUT_MS, signal);
         if (!res.ok) {
           const error = new Error(
             `Request failed with status code ${res.status} ${res.statusText}`,
@@ -182,6 +182,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       },
       {
         retryFetchErrors: this.config.getRetryFetchErrors(),
+        signal,
       },
     );
 
