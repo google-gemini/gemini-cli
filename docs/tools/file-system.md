@@ -119,10 +119,10 @@ context around the `old_string` to ensure it modifies the correct location.
   - `expected_replacements` (number, optional): Expected number of replacements.
     Defaults to 1.
 - **Behavior:**
-  - If the number of occurrences of `old_string` found in the file exceeds
-    `expected_replacements`, the replacement fails to prevent accidental
-    cascading replacements, and the language model is instructed to either
-    provide more specific context in `old_string` or explicitly increase
+  - If the number of occurrences of `old_string` found in the file does not match
+    `expected_replacements`, the replacement fails. This prevents both accidental
+    cascading replacements and incomplete changes. The language model is then
+    instructed to either provide a more specific `old_string` or to update
     `expected_replacements`.
 - **Confirmation:** Requires manual user approval.
 
