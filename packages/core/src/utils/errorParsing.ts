@@ -69,7 +69,7 @@ export function parseAndFormatApiError(
   // The error message might be a string containing a JSON object.
   if (typeof error === 'string') {
     const decoded = tryDecodeByteArray(error);
-    if (decoded)
+    if (decoded) {
       return parseAndFormatApiError(
         decoded,
         authType,
@@ -77,6 +77,7 @@ export function parseAndFormatApiError(
         currentModel,
         fallbackModel,
       );
+    }
     const jsonStart = error.indexOf('{');
     if (jsonStart === -1) {
       return `[API Error: ${error}]`;
