@@ -282,7 +282,7 @@ gemini
   quickly.
 - [**Authentication Setup**](./docs/get-started/authentication.md) - Detailed
   auth configuration.
-- [**Configuration Guide**](./docs/get-started/configuration.md) - Settings and
+- [**Configuration Guide**](./docs/reference/configuration.md) - Settings and
   customization.
 - [**Keyboard Shortcuts**](./docs/cli/keyboard-shortcuts.md) - Productivity
   tips.
@@ -329,8 +329,8 @@ gemini
 
 ### Troubleshooting & Support
 
-- [**Troubleshooting Guide**](./docs/troubleshooting.md) - Common issues and
-  solutions.
+- [**Troubleshooting Guide**](./docs/resources/troubleshooting.md) - Common
+  issues and solutions.
 - [**FAQ**](./docs/faq.md) - Frequently asked questions.
 - Use `/bug` command to report issues directly from the CLI.
 

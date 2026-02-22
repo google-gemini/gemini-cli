@@ -54,6 +54,7 @@ const mockDevToolsInstance = vi.hoisted(() => ({
   start: vi.fn(),
   stop: vi.fn(),
   getPort: vi.fn(),
+  getToken: vi.fn().mockReturnValue('mock-devtools-token'),
 }));
 
 const mockActivityLoggerInstance = vi.hoisted(() => ({
@@ -155,6 +156,7 @@ describe('devtoolsService', () => {
         config,
         '127.0.0.1',
         25417,
+        null,
         expect.any(Function),
       );
       expect(
@@ -223,6 +225,7 @@ describe('devtoolsService', () => {
         config,
         '127.0.0.1',
         25417,
+        'mock-devtools-token',
         expect.any(Function),
       );
       expect(
@@ -360,12 +363,8 @@ describe('devtoolsService', () => {
 
       expect(mockDevToolsInstance.stop).toHaveBeenCalled();
       expect(url).toBe('http://localhost:25417');
-      expect(mockAddNetworkTransport).toHaveBeenCalledWith(
-        config,
-        '127.0.0.1',
-        25417,
-        expect.any(Function),
-      );
+      // When we join the winner we do not have their token, so we cannot add transport
+      expect(mockAddNetworkTransport).not.toHaveBeenCalled();
     });
 
     it('keeps own server when winner is not responding', async () => {
@@ -396,6 +395,7 @@ describe('devtoolsService', () => {
         config,
         '127.0.0.1',
         25418,
+        'mock-devtools-token',
         expect.any(Function),
       );
     });
@@ -419,7 +419,7 @@ describe('devtoolsService', () => {
 
       // Extract onReconnectFailed callback
       const initCall = mockAddNetworkTransport.mock.calls[0];
-      const onReconnectFailed = initCall[3];
+      const onReconnectFailed = initCall[4];
       expect(onReconnectFailed).toBeDefined();
 
       // Trigger promotion MAX_PROMOTION_ATTEMPTS + 1 times

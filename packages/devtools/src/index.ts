@@ -5,8 +5,9 @@
  */
 
 import http from 'node:http';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
+import { parse as parseUrl } from 'node:url';
 import { WebSocketServer, type WebSocket } from 'ws';
 import type {
   NetworkLog,
@@ -49,6 +50,7 @@ export class DevTools extends EventEmitter {
   private sessions = new Map<string, SessionInfo>();
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private port = 25417;
+  private token = '';
   private static readonly DEFAULT_PORT = 25417;
   private static readonly MAX_PORT_RETRIES = 10;
 
@@ -137,6 +139,28 @@ export class DevTools extends EventEmitter {
     return this.port;
   }
 
+  /**
+   * Returns the shared secret token for this server instance.
+   * Only available after start(). Used by the CLI to authenticate WebSocket connections.
+   */
+  getToken(): string {
+    return this.token;
+  }
+
+  private validateToken(req: http.IncomingMessage): boolean {
+    const url = req.url ?? '';
+    const parsed = parseUrl(url, true);
+    const queryToken = parsed.query?.['token'];
+    const headerToken = req.headers.authorization
+      ?.replace(/^Bearer\s+/i, '')
+      .trim();
+    const provided =
+      (typeof queryToken === 'string' ? queryToken : null) ?? headerToken ?? '';
+    return (
+      this.token.length > 0 && provided.length > 0 && provided === this.token
+    );
+  }
+
   stop(): Promise<void> {
     return new Promise((resolve) => {
       if (this.heartbeatTimer) {
@@ -164,6 +188,7 @@ export class DevTools extends EventEmitter {
         resolve(this.getUrl());
         return;
       }
+      this.token = randomBytes(32).toString('hex');
       this.server = http.createServer((req, res) => {
         // Only allow same-origin requests — the client is served from this
         // server so cross-origin access is unnecessary and would let arbitrary
@@ -177,7 +202,12 @@ export class DevTools extends EventEmitter {
         }
 
         // API routes
-        if (req.url === '/events') {
+        if (req.url?.startsWith('/events')) {
+          if (!this.validateToken(req)) {
+            res.writeHead(403, { 'Content-Type': 'text/plain' });
+            res.end('Forbidden: missing or invalid token');
+            return;
+          }
           res.writeHead(200, {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
@@ -213,7 +243,11 @@ export class DevTools extends EventEmitter {
           });
         } else if (req.url === '/' || req.url === '/index.html') {
           res.writeHead(200, { 'Content-Type': 'text/html' });
-          res.end(INDEX_HTML);
+          const htmlWithToken = INDEX_HTML.replace(
+            '__DEVTOOLS_TOKEN_PLACEHOLDER__',
+            this.token,
+          );
+          res.end(htmlWithToken);
         } else if (req.url === '/assets/main.js') {
           res.writeHead(200, { 'Content-Type': 'application/javascript' });
           res.end(CLIENT_JS);
@@ -255,55 +289,62 @@ export class DevTools extends EventEmitter {
 
     this.wss = new WebSocketServer({ server: this.server, path: '/ws' });
 
-    this.wss.on('connection', (ws: WebSocket) => {
-      let sessionId: string | null = null;
+    this.wss.on(
+      'connection',
+      (ws: WebSocket, request: http.IncomingMessage) => {
+        if (!this.validateToken(request)) {
+          ws.close(4003, 'Forbidden: missing or invalid token');
+          return;
+        }
+        let sessionId: string | null = null;
 
-      ws.on('message', (data: Buffer) => {
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          const message = JSON.parse(data.toString());
+        ws.on('message', (data: Buffer) => {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            const message = JSON.parse(data.toString());
 
-          // Handle registration first
-          if (message.type === 'register') {
-            sessionId = String(message.sessionId);
-            if (!sessionId) return;
+            // Handle registration first
+            if (message.type === 'register') {
+              sessionId = String(message.sessionId);
+              if (!sessionId) return;
 
-            this.sessions.set(sessionId, {
-              sessionId,
-              ws,
-              lastPing: Date.now(),
-            });
-
-            // Notify session update
-            this.emit('session-update');
-
-            // Send registration acknowledgement
-            ws.send(
-              JSON.stringify({
-                type: 'registered',
+              this.sessions.set(sessionId, {
                 sessionId,
-                timestamp: Date.now(),
-              }),
-            );
-          } else if (sessionId) {
-            this.handleWebSocketMessage(sessionId, message);
+                ws,
+                lastPing: Date.now(),
+              });
+
+              // Notify session update
+              this.emit('session-update');
+
+              // Send registration acknowledgement
+              ws.send(
+                JSON.stringify({
+                  type: 'registered',
+                  sessionId,
+                  timestamp: Date.now(),
+                }),
+              );
+            } else if (sessionId) {
+              this.handleWebSocketMessage(sessionId, message);
+            }
+          } catch {
+            // Invalid WebSocket message
           }
-        } catch {
-          // Invalid WebSocket message
-        }
-      });
+        });
 
-      ws.on('close', () => {
-        if (sessionId) {
-          this.sessions.delete(sessionId);
-          this.emit('session-update');
-        }
-      });
+        ws.on('close', () => {
+          if (sessionId) {
+            this.sessions.delete(sessionId);
+            this.emit('session-update');
+          }
+        });
 
-      ws.on('error', () => {
-        // WebSocket error — no action needed
-      });
-    });
+        ws.on('error', () => {
+          // WebSocket error — no action needed
+        });
+      },
+    );
 
     // Heartbeat mechanism
     this.heartbeatTimer = setInterval(() => {

@@ -34,7 +34,7 @@ SOFTWARE.
 License text not found.
 
 ============================================================
-ajv@6.12.6
+ajv@6.14.0
 (https://github.com/ajv-validator/ajv.git)
 
 The MIT License (MIT)
@@ -2241,7 +2241,7 @@ THE SOFTWARE.
 
 
 ============================================================
-hono@4.11.9
+hono@4.12.1
 (git+https://github.com/honojs/hono.git)
 
 MIT License
