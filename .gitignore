@@ -62,5 +62,4 @@ gemini-debug.log
 .eslintcache
 evals/logs/
 
-.tracker/
-plans/
+
