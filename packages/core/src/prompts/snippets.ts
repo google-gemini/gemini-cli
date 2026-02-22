@@ -333,6 +333,8 @@ export function renderOperationalGuidelines(
 ## Interaction Details
 - **Help Command:** The user can use '/help' to display help information.
 - **Feedback:** To report a bug or provide feedback, please use the /bug command.
+${!options.interactive ? nonInteractiveFileWritingGuidance() : ''}
+${!options.interactive ? nonInteractiveProcessGuidance() : ''}
 ${!options.interactive ? nonInteractiveErrorRecovery() : ''}
 `.trim();
 }
@@ -675,6 +677,26 @@ function gitRepoKeepUserInformed(interactive: boolean): string {
     : '';
 }
 
+function nonInteractiveFileWritingGuidance(): string {
+  return `
+## File Creation (Non-Interactive)
+- **Prefer ${WRITE_FILE_TOOL_NAME} over shell heredocs** for creating or overwriting files. The ${WRITE_FILE_TOOL_NAME} tool is more reliable and avoids shell escaping issues.
+- Only use shell heredocs when you need to append to a file or when the content depends on shell variable expansion.
+- If you must use a heredoc, always use the full syntax: \`cat << 'EOF' > filename\` — never omit \`cat\`.`;
+}
+
+function nonInteractiveProcessGuidance(): string {
+  return `
+## Background Services (Non-Interactive)
+- To start a service that must persist across turns, use: \`nohup <command> > /tmp/<service>.log 2>&1 &\`
+- After starting, verify the process is running:
+  1. \`echo $!\` to capture the PID immediately after starting
+  2. \`sleep 1 && kill -0 <PID>\` to confirm it's still alive
+  3. Check the log file for startup errors: \`cat /tmp/<service>.log\`
+- If a service fails to start, check the log file before retrying.
+- For services that need time to initialize (databases, web servers), add a brief \`sleep 2\` and verify the port is open before proceeding.`;
+}
+
 function nonInteractiveErrorRecovery(): string {
   return `
 ## Error Recovery (Non-Interactive)
@@ -682,7 +704,30 @@ function nonInteractiveErrorRecovery(): string {
 - **Web fetch failures:** If web_fetch fails, try simplifying the prompt or use google_web_search as an alternative to find the information.
 - **Shell failures:** Check error codes and run diagnostic commands before retrying. For compilation errors, fix one issue at a time rather than attempting multiple fixes simultaneously.
 - **Maximum retries:** Attempt the same approach at most 2 times. If it fails twice, try an alternative strategy or tool.
-- **Avoid loops:** If you find yourself repeating the same sequence of actions, stop and reassess your approach.`;
+- **Avoid loops:** If you find yourself repeating the same sequence of actions, stop and reassess your approach.
+
+## Missing Commands / "command not found"
+- When a command is not found, install the package that provides it before retrying.
+- Use \`apt-get install -y <package>\` (Debian/Ubuntu) or \`yum install -y <package>\` (RHEL/CentOS).
+- Common mappings:
+  - pgrep, ps, pidof → procps
+  - ss → iproute2
+  - netstat, ifconfig → net-tools
+  - curl → curl
+  - jq → jq
+  - dig, nslookup → dnsutils (or bind-utils on RHEL)
+  - ip → iproute2
+  - lsof → lsof
+  - wget → wget
+  - tree → tree
+  - zip/unzip → zip / unzip
+- If you don't know the package name, try \`apt-cache search <command>\` or \`yum provides <command>\`.
+
+## Process Verification Without pgrep
+- If pgrep/ps are unavailable and you can't install them, verify processes using:
+  - \`ls /proc/[PID]\` to check if a PID is still running
+  - \`kill -0 <PID>\` to test if a process exists (returns 0 if it does)
+  - \`cat /proc/<PID>/cmdline\` to inspect what a process is running`;
 }
 
 function formatToolName(name: string): string {
