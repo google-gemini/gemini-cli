@@ -125,20 +125,23 @@ export class Task {
     const toolRegistry = this.config.getToolRegistry();
     const mcpServers = this.config.getMcpClientManager()?.getMcpServers() || {};
     const serverStatuses = getAllMCPServerStatuses();
+    const getToolParameterSchema = (
+      tool: Pick<AnyDeclarativeTool, 'schema'>,
+    ): unknown => tool.schema.parametersJsonSchema ?? tool.schema.parameters;
     const servers = Object.keys(mcpServers).map((serverName) => ({
       name: serverName,
       status: serverStatuses.get(serverName) || MCPServerStatus.DISCONNECTED,
       tools: toolRegistry.getToolsByServer(serverName).map((tool) => ({
         name: tool.name,
         description: tool.description,
-        parameterSchema: tool.schema.parameters,
+        parameterSchema: getToolParameterSchema(tool),
       })),
     }));
 
     const availableTools = toolRegistry.getAllTools().map((tool) => ({
       name: tool.name,
       description: tool.description,
-      parameterSchema: tool.schema.parameters,
+      parameterSchema: getToolParameterSchema(tool),
     }));
 
     const metadata: TaskMetadata = {

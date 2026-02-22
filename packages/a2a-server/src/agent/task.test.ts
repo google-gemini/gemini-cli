@@ -223,6 +223,98 @@ describe('Task', () => {
     });
   });
 
+  describe('getMetadata', () => {
+    it('should expose tool parameter schema from schema.parametersJsonSchema', async () => {
+      const expectedSchema = {
+        type: 'object',
+        properties: { query: { type: 'string' } },
+      };
+      const toolWithJsonSchema = {
+        name: 'tool_with_json_schema',
+        description: 'A tool that uses parametersJsonSchema.',
+        schema: { parametersJsonSchema: expectedSchema },
+      };
+
+      const mockConfig = createMockConfig({
+        getToolRegistry: vi.fn().mockReturnValue({
+          getAllTools: vi.fn().mockReturnValue([toolWithJsonSchema]),
+          getToolsByServer: vi.fn().mockReturnValue([toolWithJsonSchema]),
+        }),
+        getMcpClientManager: vi.fn().mockReturnValue({
+          getMcpServers: vi.fn().mockReturnValue({ server1: {} }),
+        }),
+      });
+      const mockEventBus: ExecutionEventBus = {
+        publish: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeAllListeners: vi.fn(),
+        finished: vi.fn(),
+      };
+
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      const metadata = await task.getMetadata();
+
+      expect(metadata.mcpServers[0].tools[0].parameterSchema).toEqual(
+        expectedSchema,
+      );
+      expect(metadata.availableTools[0].parameterSchema).toEqual(expectedSchema);
+    });
+
+    it('should fall back to schema.parameters when parametersJsonSchema is missing', async () => {
+      const expectedSchema = {
+        type: 'object',
+        properties: { path: { type: 'string' } },
+      };
+      const toolWithLegacySchema = {
+        name: 'tool_with_legacy_schema',
+        description: 'A tool that uses schema.parameters.',
+        schema: { parameters: expectedSchema },
+      };
+
+      const mockConfig = createMockConfig({
+        getToolRegistry: vi.fn().mockReturnValue({
+          getAllTools: vi.fn().mockReturnValue([toolWithLegacySchema]),
+          getToolsByServer: vi.fn().mockReturnValue([toolWithLegacySchema]),
+        }),
+        getMcpClientManager: vi.fn().mockReturnValue({
+          getMcpServers: vi.fn().mockReturnValue({ server1: {} }),
+        }),
+      });
+      const mockEventBus: ExecutionEventBus = {
+        publish: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeAllListeners: vi.fn(),
+        finished: vi.fn(),
+      };
+
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      const metadata = await task.getMetadata();
+
+      expect(metadata.mcpServers[0].tools[0].parameterSchema).toEqual(
+        expectedSchema,
+      );
+      expect(metadata.availableTools[0].parameterSchema).toEqual(expectedSchema);
+    });
+  });
+
   describe('acceptAgentMessage', () => {
     it('should set currentTraceId when event has traceId', async () => {
       const mockConfig = createMockConfig();
