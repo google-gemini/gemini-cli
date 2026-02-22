@@ -16,7 +16,6 @@ exports[`ToolConfirmationQueue > calculates availableContentHeight based on avai
 │   4. No, suggest changes (esc)                                               │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
- Press ctrl-o to show more lines
 "
 `;
 
@@ -107,7 +106,7 @@ exports[`ToolConfirmationQueue > renders expansion hint when content is long and
 │   4. No, suggest changes (esc)                                               │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
- Press ctrl-o to show more lines
+ Press Ctrl+O to show more lines
 "
 `;
 

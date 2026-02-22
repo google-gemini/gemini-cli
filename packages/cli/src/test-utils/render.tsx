@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render as inkRenderDirect, type Instance as InkInstance } from 'ink';
+import {
+  render as inkRenderDirect,
+  type Instance as InkInstance,
+  type RenderOptions,
+} from 'ink';
 import { EventEmitter } from 'node:events';
 import { Box } from 'ink';
 import type React from 'react';
@@ -31,6 +35,13 @@ import { type HistoryItemToolGroup, StreamingState } from '../ui/types.js';
 import { ToolActionsProvider } from '../ui/contexts/ToolActionsContext.js';
 import { AskUserActionsProvider } from '../ui/contexts/AskUserActionsContext.js';
 import { TerminalProvider } from '../ui/contexts/TerminalContext.js';
+import {
+  OverflowProvider,
+  useOverflowActions,
+  useOverflowState,
+  type OverflowActions,
+  type OverflowState,
+} from '../ui/contexts/OverflowContext.js';
 
 import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
@@ -68,6 +79,25 @@ type TerminalState = {
   rows: number;
 };
 
+type RenderMetrics = Parameters<NonNullable<RenderOptions['onRender']>>[0];
+
+interface InkRenderMetrics extends RenderMetrics {
+  output: string;
+  staticOutput?: string;
+}
+
+function isInkRenderMetrics(
+  metrics: RenderMetrics,
+): metrics is InkRenderMetrics {
+  const m = metrics as Record<string, unknown>;
+  return (
+    typeof m === 'object' &&
+    m !== null &&
+    'output' in m &&
+    typeof m['output'] === 'string'
+  );
+}
+
 class XtermStdout extends EventEmitter {
   private state: TerminalState;
   private pendingWrites = 0;
@@ -76,7 +106,6 @@ class XtermStdout extends EventEmitter {
   isTTY = true;
 
   private lastRenderOutput: string | undefined = undefined;
-  private lastRenderStaticContent: string | undefined = undefined;
 
   constructor(state: TerminalState, queue: { promise: Promise<void> }) {
     super();
@@ -109,7 +138,6 @@ class XtermStdout extends EventEmitter {
   clear = () => {
     this.state.terminal.reset();
     this.lastRenderOutput = undefined;
-    this.lastRenderStaticContent = undefined;
   };
 
   dispose = () => {
@@ -118,32 +146,22 @@ class XtermStdout extends EventEmitter {
 
   onRender = (staticContent: string, output: string) => {
     this.renderCount++;
-    this.lastRenderStaticContent = staticContent;
     this.lastRenderOutput = output;
     this.emit('render');
   };
 
   lastFrame = (options: { allowEmpty?: boolean } = {}) => {
-    let result: string;
-    // On Windows, xterm.js headless can sometimes have timing or rendering issues
-    // that lead to duplicated content or incorrect buffer state in tests.
-    // As a fallback, we can trust the raw output Ink provided during onRender.
-    if (os.platform() === 'win32') {
-      result =
-        (this.lastRenderStaticContent ?? '') + (this.lastRenderOutput ?? '');
-    } else {
-      const buffer = this.state.terminal.buffer.active;
-      const allLines: string[] = [];
-      for (let i = 0; i < buffer.length; i++) {
-        allLines.push(buffer.getLine(i)?.translateToString(true) ?? '');
-      }
-
-      const trimmed = [...allLines];
-      while (trimmed.length > 0 && trimmed[trimmed.length - 1] === '') {
-        trimmed.pop();
-      }
-      result = trimmed.join('\n');
+    const buffer = this.state.terminal.buffer.active;
+    const allLines: string[] = [];
+    for (let i = 0; i < buffer.length; i++) {
+      allLines.push(buffer.getLine(i)?.translateToString(true) ?? '');
     }
+
+    const trimmed = [...allLines];
+    while (trimmed.length > 0 && trimmed[trimmed.length - 1] === '') {
+      trimmed.pop();
+    }
+    const result = trimmed.join('\n');
 
     // Normalize for cross-platform snapshot stability:
     // Normalize any \r\n to \n
@@ -195,9 +213,7 @@ class XtermStdout extends EventEmitter {
       const currentFrame = stripAnsi(
         this.lastFrame({ allowEmpty: true }),
       ).trim();
-      const expectedFrame = stripAnsi(
-        (this.lastRenderStaticContent ?? '') + (this.lastRenderOutput ?? ''),
-      )
+      const expectedFrame = stripAnsi(this.lastRenderOutput ?? '')
         .trim()
         .replace(/\r\n/g, '\n');
 
@@ -326,6 +342,8 @@ export type RenderInstance = {
   lastFrame: (options?: { allowEmpty?: boolean }) => string;
   terminal: Terminal;
   waitUntilReady: () => Promise<void>;
+  capturedOverflowState: OverflowState | undefined;
+  capturedOverflowActions: OverflowActions | undefined;
 };
 
 const instances: InkInstance[] = [];
@@ -334,9 +352,16 @@ const instances: InkInstance[] = [];
 export const render = (
   tree: React.ReactElement,
   terminalWidth?: number,
-): RenderInstance => {
+): Omit<
+  RenderInstance,
+  'capturedOverflowState' | 'capturedOverflowActions'
+> => {
   const cols = terminalWidth ?? 100;
-  const rows = 40;
+  // We use 1000 rows to avoid windows with incorrect snapshots if a correct
+  // value was used (e.g. 40 rows). The alternatives to make things worse are
+  // windows unfortunately with odd duplicate content in the backbuffer
+  // which does not match actual behavior in xterm.js on windows.
+  const rows = 1000;
   const terminal = new Terminal({
     cols,
     rows,
@@ -367,8 +392,10 @@ export const render = (
       debug: false,
       exitOnCtrlC: false,
       patchConsole: false,
-      onRender: (metrics: { output: string; staticOutput?: string }) => {
-        stdout.onRender(metrics.staticOutput ?? '', metrics.output);
+      onRender: (metrics: RenderMetrics) => {
+        if (isInkRenderMetrics(metrics)) {
+          stdout.onRender(metrics.staticOutput ?? '', metrics.output);
+        }
       },
     });
   });
@@ -516,6 +543,7 @@ const mockUIActions: UIActions = {
   vimHandleInput: vi.fn(),
   handleIdePromptComplete: vi.fn(),
   handleFolderTrustSelect: vi.fn(),
+  setIsPolicyUpdateDialogOpen: vi.fn(),
   setConstrainHeight: vi.fn(),
   onEscapePromptChange: vi.fn(),
   refreshStatic: vi.fn(),
@@ -544,6 +572,16 @@ const mockUIActions: UIActions = {
   onHintSubmit: vi.fn(),
   handleRestart: vi.fn(),
   handleNewAgentsSelect: vi.fn(),
+};
+
+let capturedOverflowState: OverflowState | undefined;
+let capturedOverflowActions: OverflowActions | undefined;
+const ContextCapture: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  capturedOverflowState = useOverflowState();
+  capturedOverflowActions = useOverflowActions();
+  return <>{children}</>;
 };
 
 export const renderWithProviders = (
@@ -647,6 +685,9 @@ export const renderWithProviders = (
     .filter((item): item is HistoryItemToolGroup => item.type === 'tool_group')
     .flatMap((item) => item.tools);
 
+  capturedOverflowState = undefined;
+  capturedOverflowActions = undefined;
+
   const renderResult = render(
     <AppContext.Provider value={appState}>
       <ConfigContext.Provider value={config}>
@@ -659,35 +700,39 @@ export const renderWithProviders = (
                     value={finalUiState.streamingState}
                   >
                     <UIActionsContext.Provider value={finalUIActions}>
-                      <ToolActionsProvider
-                        config={config}
-                        toolCalls={allToolCalls}
-                      >
-                        <AskUserActionsProvider
-                          request={null}
-                          onSubmit={vi.fn()}
-                          onCancel={vi.fn()}
+                      <OverflowProvider>
+                        <ToolActionsProvider
+                          config={config}
+                          toolCalls={allToolCalls}
                         >
-                          <KeypressProvider>
-                            <MouseProvider
-                              mouseEventsEnabled={mouseEventsEnabled}
-                            >
-                              <TerminalProvider>
-                                <ScrollProvider>
-                                  <Box
-                                    width={terminalWidth}
-                                    flexShrink={0}
-                                    flexGrow={0}
-                                    flexDirection="column"
-                                  >
-                                    {component}
-                                  </Box>
-                                </ScrollProvider>
-                              </TerminalProvider>
-                            </MouseProvider>
-                          </KeypressProvider>
-                        </AskUserActionsProvider>
-                      </ToolActionsProvider>
+                          <AskUserActionsProvider
+                            request={null}
+                            onSubmit={vi.fn()}
+                            onCancel={vi.fn()}
+                          >
+                            <KeypressProvider>
+                              <MouseProvider
+                                mouseEventsEnabled={mouseEventsEnabled}
+                              >
+                                <TerminalProvider>
+                                  <ScrollProvider>
+                                    <ContextCapture>
+                                      <Box
+                                        width={terminalWidth}
+                                        flexShrink={0}
+                                        flexGrow={0}
+                                        flexDirection="column"
+                                      >
+                                        {component}
+                                      </Box>
+                                    </ContextCapture>
+                                  </ScrollProvider>
+                                </TerminalProvider>
+                              </MouseProvider>
+                            </KeypressProvider>
+                          </AskUserActionsProvider>
+                        </ToolActionsProvider>
+                      </OverflowProvider>
                     </UIActionsContext.Provider>
                   </StreamingContext.Provider>
                 </SessionStatsProvider>
@@ -702,6 +747,8 @@ export const renderWithProviders = (
 
   return {
     ...renderResult,
+    capturedOverflowState,
+    capturedOverflowActions,
     simulateClick: (col: number, row: number, button?: 0 | 1 | 2) =>
       simulateClick(renderResult.stdin, col, row, button),
   };

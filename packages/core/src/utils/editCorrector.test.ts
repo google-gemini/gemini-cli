@@ -5,8 +5,8 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Mock } from 'vitest';
-import { vi, describe, it, expect, beforeEach, type Mocked } from 'vitest';
+import type { Mock, Mocked } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import * as fs from 'node:fs';
 import { EDIT_TOOL_NAME } from '../tools/tool-names.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
