@@ -462,9 +462,7 @@ export const useSlashCommandProcessor = (
                 case 'message':
                   // Store the output text so /copy can retrieve it later.
                   lastOutputRef.current = {
-                    type: 'slash',
                     content: result.content,
-                    timestamp: Date.now(),
                   };
                   addItem(
                     {

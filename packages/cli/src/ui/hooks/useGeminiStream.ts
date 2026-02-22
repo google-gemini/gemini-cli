@@ -1154,9 +1154,7 @@ export const useGeminiStream = (
             setLastGeminiActivityTime(Date.now());
             fullAiResponseBuffer += event.value;
             setLastOutput?.({
-              type: 'ai',
               content: fullAiResponseBuffer,
-              timestamp: Date.now(),
             });
             geminiMessageBuffer = handleContentEvent(
               event.value,

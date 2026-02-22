@@ -26,9 +26,7 @@ import type {
 } from '../state/extensions.js';
 
 export interface LastOutput {
-  type: 'slash' | 'ai';
   content: string;
-  timestamp: number;
 }
 
 // Grouped dependencies for clarity and easier mocking

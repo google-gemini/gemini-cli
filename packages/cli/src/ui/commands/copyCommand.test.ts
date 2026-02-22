@@ -53,9 +53,7 @@ describe('copyCommand', () => {
     if (!copyCommand.action) throw new Error('Command has no action');
 
     mockGetLastOutput.mockReturnValue({
-      type: 'ai',
       content: 'Hi there! How can I help you?',
-      timestamp: 1000,
     });
     mockCopyToClipboard.mockResolvedValue(undefined);
 
@@ -77,9 +75,7 @@ describe('copyCommand', () => {
     if (!copyCommand.action) throw new Error('Command has no action');
 
     mockGetLastOutput.mockReturnValue({
-      type: 'slash',
       content: 'Slash command output',
-      timestamp: 2000,
     });
     mockCopyToClipboard.mockResolvedValue(undefined);
 
@@ -101,9 +97,7 @@ describe('copyCommand', () => {
 
     // Case 1: AI is more recent
     mockGetLastOutput.mockReturnValue({
-      type: 'ai',
       content: 'More recent AI response',
-      timestamp: 3000,
     });
     await copyCommand.action(mockContext, '');
     expect(mockCopyToClipboard).toHaveBeenCalledWith(
@@ -113,9 +107,7 @@ describe('copyCommand', () => {
 
     // Case 2: Slash is more recent
     mockGetLastOutput.mockReturnValue({
-      type: 'slash',
       content: 'More recent slash output',
-      timestamp: 4000,
     });
     await copyCommand.action(mockContext, '');
     expect(mockCopyToClipboard).toHaveBeenCalledWith(
@@ -128,9 +120,7 @@ describe('copyCommand', () => {
     if (!copyCommand.action) throw new Error('Command has no action');
 
     mockGetLastOutput.mockReturnValue({
-      type: 'ai',
       content: 'Some text',
-      timestamp: 1000,
     });
     mockCopyToClipboard.mockRejectedValue(new Error('Clipboard access denied'));
 
