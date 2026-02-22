@@ -27,7 +27,7 @@ import {
 } from '../utils/messageInspectors.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
-const TOOL_CALL_LOOP_THRESHOLD = 5;
+const TOOL_CALL_LOOP_THRESHOLD = 4;
 const CONTENT_LOOP_THRESHOLD = 10;
 const CONTENT_CHUNK_SIZE = 50;
 const MAX_HISTORY_LENGTH = 5000;
@@ -40,7 +40,7 @@ const LLM_LOOP_CHECK_HISTORY_COUNT = 20;
 /**
  * The number of turns that must pass in a single prompt before the LLM-based loop check is activated.
  */
-const LLM_CHECK_AFTER_TURNS = 30;
+const LLM_CHECK_AFTER_TURNS = 20;
 
 /**
  * The default interval, in number of turns, at which the LLM-based loop check is performed.
@@ -105,6 +105,7 @@ export class LoopDetectionService {
   // Tool call tracking
   private lastToolCallKey: string | null = null;
   private toolCallRepetitionCount: number = 0;
+  private recentToolCallKeys: string[] = [];
 
   // Content streaming tracking
   private streamContentHistory = '';
@@ -216,6 +217,53 @@ export class LoopDetectionService {
         ),
       );
       return true;
+    }
+
+    // Alternating pattern detection: track last 12 tool calls and detect
+    // when a pattern of 2-3 distinct calls repeats 3+ times.
+    this.recentToolCallKeys.push(key);
+    if (this.recentToolCallKeys.length > 12) {
+      this.recentToolCallKeys.shift();
+    }
+    if (this.detectAlternatingPattern()) {
+      logLoopDetected(
+        this.config,
+        new LoopDetectedEvent(
+          LoopType.CONSECUTIVE_IDENTICAL_TOOL_CALLS,
+          this.promptId,
+        ),
+      );
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Detects alternating patterns like A->B->A->B->A->B or A->B->C->A->B->C.
+   * Checks if a pattern of length 2 or 3 repeats at least 3 times at the
+   * end of the recent tool call history.
+   */
+  private detectAlternatingPattern(): boolean {
+    const keys = this.recentToolCallKeys;
+    // Check patterns of length 2 and 3
+    for (const patternLen of [2, 3]) {
+      const minRequired = patternLen * 3; // Need at least 3 repetitions
+      if (keys.length < minRequired) continue;
+
+      const pattern = keys.slice(keys.length - patternLen);
+      let repetitions = 1;
+      for (let i = keys.length - patternLen * 2; i >= 0; i -= patternLen) {
+        const segment = keys.slice(i, i + patternLen);
+        if (segment.every((k, idx) => k === pattern[idx])) {
+          repetitions++;
+        } else {
+          break;
+        }
+      }
+      if (repetitions >= 3) {
+        return true;
+      }
     }
     return false;
   }
@@ -613,6 +661,7 @@ export class LoopDetectionService {
   private resetToolCallCount(): void {
     this.lastToolCallKey = null;
     this.toolCallRepetitionCount = 0;
+    this.recentToolCallKeys = [];
   }
 
   private resetContentTracking(resetHistory = true): void {
