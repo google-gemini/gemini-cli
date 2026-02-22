@@ -693,7 +693,7 @@ describe('extensionsCommand', () => {
       await uninstallAction!(mockContext, '');
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.ERROR,
-        text: 'Usage: /extensions uninstall <extension-name>',
+        text: 'Usage: /extensions uninstall <extension-name> | --all',
       });
       expect(mockUninstallExtension).not.toHaveBeenCalled();
     });
@@ -722,6 +722,76 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.ERROR,
         text: `Failed to uninstall extension "${extensionName}": ${errorMessage}`,
+      });
+    });
+
+    it('should uninstall all extensions when --all flag is provided', async () => {
+      mockGetExtensions.mockReturnValue([
+        { name: 'ext1' },
+        { name: 'ext2' },
+        { name: 'ext3' },
+      ]);
+      mockUninstallExtension.mockResolvedValue(undefined);
+
+      await uninstallAction!(mockContext, '--all');
+
+      expect(mockGetExtensions).toHaveBeenCalled();
+      expect(mockUninstallExtension).toHaveBeenCalledTimes(3);
+      expect(mockUninstallExtension).toHaveBeenCalledWith('ext1', false);
+      expect(mockUninstallExtension).toHaveBeenCalledWith('ext2', false);
+      expect(mockUninstallExtension).toHaveBeenCalledWith('ext3', false);
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: 'Uninstalling all 3 extension(s)...',
+      });
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: 'Uninstall complete: 3 succeeded, 0 failed.',
+      });
+    });
+
+    it('should show message when --all flag is provided but no extensions installed', async () => {
+      mockGetExtensions.mockReturnValue([]);
+
+      await uninstallAction!(mockContext, '--all');
+
+      expect(mockGetExtensions).toHaveBeenCalled();
+      expect(mockUninstallExtension).not.toHaveBeenCalled();
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: 'No extensions installed.',
+      });
+    });
+
+    it('should handle partial failures when uninstalling all extensions', async () => {
+      mockGetExtensions.mockReturnValue([
+        { name: 'ext1' },
+        { name: 'ext2' },
+        { name: 'ext3' },
+      ]);
+      mockUninstallExtension
+        .mockResolvedValueOnce(undefined) // ext1 succeeds
+        .mockRejectedValueOnce(new Error('Uninstall failed')) // ext2 fails
+        .mockResolvedValueOnce(undefined); // ext3 succeeds
+
+      await uninstallAction!(mockContext, '--all');
+
+      expect(mockUninstallExtension).toHaveBeenCalledTimes(3);
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: 'Extension "ext1" uninstalled successfully.',
+      });
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.ERROR,
+        text: 'Failed to uninstall extension "ext2": Uninstall failed',
+      });
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: 'Extension "ext3" uninstalled successfully.',
+      });
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: 'Uninstall complete: 2 succeeded, 1 failed.',
       });
     });
   });

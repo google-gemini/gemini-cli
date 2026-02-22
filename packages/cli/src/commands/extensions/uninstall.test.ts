@@ -28,6 +28,7 @@ import { getErrorMessage } from '../../utils/errors.js';
 // Hoisted mocks - these survive vi.clearAllMocks()
 const mockUninstallExtension = vi.hoisted(() => vi.fn());
 const mockLoadExtensions = vi.hoisted(() => vi.fn());
+const mockGetExtensions = vi.hoisted(() => vi.fn());
 
 // Mock dependencies with hoisted functions
 vi.mock('../../config/extension-manager.js', async (importOriginal) => {
@@ -38,6 +39,7 @@ vi.mock('../../config/extension-manager.js', async (importOriginal) => {
     ExtensionManager: vi.fn().mockImplementation(() => ({
       uninstallExtension: mockUninstallExtension,
       loadExtensions: mockLoadExtensions,
+      getExtensions: mockGetExtensions,
       setRequestConsent: vi.fn(),
       setRequestSetting: vi.fn(),
     })),
@@ -93,6 +95,7 @@ describe('extensions uninstall command', () => {
   afterEach(() => {
     mockLoadExtensions.mockClear();
     mockUninstallExtension.mockClear();
+    mockGetExtensions.mockClear();
     vi.clearAllMocks();
   });
 
@@ -209,6 +212,94 @@ describe('extensions uninstall command', () => {
       mockCwd.mockRestore();
     });
 
+    it('should uninstall all extensions when --all flag is provided', async () => {
+      mockLoadExtensions.mockResolvedValue(undefined);
+      mockUninstallExtension.mockResolvedValue(undefined);
+      mockGetExtensions.mockReturnValue([
+        { name: 'ext1' },
+        { name: 'ext2' },
+        { name: 'ext3' },
+      ]);
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+
+      await handleUninstall({ all: true });
+
+      expect(mockGetExtensions).toHaveBeenCalled();
+      expect(mockUninstallExtension).toHaveBeenCalledTimes(3);
+      expect(mockUninstallExtension).toHaveBeenCalledWith('ext1', false);
+      expect(mockUninstallExtension).toHaveBeenCalledWith('ext2', false);
+      expect(mockUninstallExtension).toHaveBeenCalledWith('ext3', false);
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'Extension "ext1" successfully uninstalled.',
+      );
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'Extension "ext2" successfully uninstalled.',
+      );
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'Extension "ext3" successfully uninstalled.',
+      );
+      mockCwd.mockRestore();
+    });
+
+    it('should log message and return early when --all flag is provided but no extensions installed', async () => {
+      mockLoadExtensions.mockResolvedValue(undefined);
+      mockGetExtensions.mockReturnValue([]);
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+
+      await handleUninstall({ all: true });
+
+      expect(mockGetExtensions).toHaveBeenCalled();
+      expect(mockUninstallExtension).not.toHaveBeenCalled();
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'No extensions installed.',
+      );
+      mockCwd.mockRestore();
+    });
+
+    it('should handle partial failures when uninstalling all extensions', async () => {
+      mockLoadExtensions.mockResolvedValue(undefined);
+      mockGetExtensions.mockReturnValue([
+        { name: 'ext1' },
+        { name: 'ext2' },
+        { name: 'ext3' },
+      ]);
+      const error = new Error('Uninstall failed');
+      mockUninstallExtension
+        .mockResolvedValueOnce(undefined) // ext1 succeeds
+        .mockRejectedValueOnce(error) // ext2 fails
+        .mockResolvedValueOnce(undefined); // ext3 succeeds
+      mockGetErrorMessage.mockReturnValue('Uninstall failed');
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      const mockProcessExit = vi
+        .spyOn(process, 'exit')
+        .mockImplementation((() => {}) as (
+          code?: string | number | null | undefined,
+        ) => never);
+
+      await handleUninstall({ all: true });
+
+      expect(mockUninstallExtension).toHaveBeenCalledTimes(3);
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'Extension "ext1" successfully uninstalled.',
+      );
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'error',
+        'Failed to uninstall "ext2": Uninstall failed',
+      );
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'Extension "ext3" successfully uninstalled.',
+      );
+      expect(mockProcessExit).toHaveBeenCalledWith(1);
+      mockProcessExit.mockRestore();
+      mockCwd.mockRestore();
+    });
+
     it('should log an error message and exit with code 1 when initialization fails', async () => {
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
       const mockProcessExit = vi
@@ -236,13 +327,15 @@ describe('extensions uninstall command', () => {
     const command = uninstallCommand;
 
     it('should have correct command and describe', () => {
-      expect(command.command).toBe('uninstall <names..>');
+      expect(command.command).toBe('uninstall [<names..>] [--all]');
       expect(command.describe).toBe('Uninstalls one or more extensions.');
     });
 
     describe('builder', () => {
       interface MockYargs {
         positional: Mock;
+        option: Mock;
+        conflicts: Mock;
         check: Mock;
       }
 
@@ -250,11 +343,13 @@ describe('extensions uninstall command', () => {
       beforeEach(() => {
         yargsMock = {
           positional: vi.fn().mockReturnThis(),
+          option: vi.fn().mockReturnThis(),
+          conflicts: vi.fn().mockReturnThis(),
           check: vi.fn().mockReturnThis(),
         };
       });
 
-      it('should configure positional argument', () => {
+      it('should configure positional argument and all option', () => {
         (command.builder as (yargs: Argv) => Argv)(
           yargsMock as unknown as Argv,
         );
@@ -264,17 +359,41 @@ describe('extensions uninstall command', () => {
           type: 'string',
           array: true,
         });
+        expect(yargsMock.option).toHaveBeenCalledWith('all', {
+          describe: 'Uninstall all extensions.',
+          type: 'boolean',
+        });
+        expect(yargsMock.conflicts).toHaveBeenCalledWith('names', 'all');
         expect(yargsMock.check).toHaveBeenCalled();
       });
 
-      it('check function should throw for missing names', () => {
+      it('check function should throw when neither names nor --all is provided', () => {
         (command.builder as (yargs: Argv) => Argv)(
           yargsMock as unknown as Argv,
         );
         const checkCallback = yargsMock.check.mock.calls[0][0];
         expect(() => checkCallback({ names: [] })).toThrow(
-          'Please include at least one extension name to uninstall as a positional argument.',
+          'Either extension name(s) or --all must be provided.',
         );
+        expect(() => checkCallback({})).toThrow(
+          'Either extension name(s) or --all must be provided.',
+        );
+      });
+
+      it('check function should pass when names are provided', () => {
+        (command.builder as (yargs: Argv) => Argv)(
+          yargsMock as unknown as Argv,
+        );
+        const checkCallback = yargsMock.check.mock.calls[0][0];
+        expect(() => checkCallback({ names: ['ext1'] })).not.toThrow();
+      });
+
+      it('check function should pass when --all is provided', () => {
+        (command.builder as (yargs: Argv) => Argv)(
+          yargsMock as unknown as Argv,
+        );
+        const checkCallback = yargsMock.check.mock.calls[0][0];
+        expect(() => checkCallback({ all: true })).not.toThrow();
       });
     });
 

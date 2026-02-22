@@ -74,6 +74,7 @@ These are convenient shortcuts that map to specific models:
 | `gemini extensions install <source> --ref <ref>`   | Install from specific branch/tag/commit      | `gemini extensions install https://github.com/user/my-extension --ref develop` |
 | `gemini extensions install <source> --auto-update` | Install with auto-update enabled             | `gemini extensions install https://github.com/user/my-extension --auto-update` |
 | `gemini extensions uninstall <name>`               | Uninstall one or more extensions             | `gemini extensions uninstall my-extension`                                     |
+| `gemini extensions uninstall --all`                | Uninstall all extensions                     | `gemini extensions uninstall --all`                                            |
 | `gemini extensions list`                           | List all installed extensions                | `gemini extensions list`                                                       |
 | `gemini extensions update <name>`                  | Update a specific extension                  | `gemini extensions update my-extension`                                        |
 | `gemini extensions update --all`                   | Update all extensions                        | `gemini extensions update --all`                                               |
