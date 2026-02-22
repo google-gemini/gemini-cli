@@ -53,17 +53,29 @@ export const createMockSettings = (
 
   const loaded = new LoadedSettings(
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    (system as any) || { path: '', settings: {}, originalSettings: {} },
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    (systemDefaults as any) || { path: '', settings: {}, originalSettings: {} },
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    (user as any) || {
-      path: '',
-      settings: settingsOverrides,
-      originalSettings: settingsOverrides,
+    (system as any) || {
+      path: '/tmp/gemini_system_settings.json',
+      settings: {},
+      originalSettings: {},
     },
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    (workspace as any) || { path: '', settings: {}, originalSettings: {} },
+    (systemDefaults as any) || {
+      path: '/tmp/gemini_system_defaults.json',
+      settings: {},
+      originalSettings: {},
+    },
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    (user as any) || {
+      path: '/tmp/gemini_user_settings.json',
+      settings: settingsOverrides,
+      originalSettings: structuredClone(settingsOverrides),
+    },
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    (workspace as any) || {
+      path: '/tmp/gemini_workspace_settings.json',
+      settings: {},
+      originalSettings: {},
+    },
     isTrusted ?? true,
     errors || [],
   );

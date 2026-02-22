@@ -411,6 +411,13 @@ export class AgentRegistry {
       );
     }
 
+    if (overrides.preselectTools !== undefined) {
+      merged.toolConfig = {
+        ...(definition.toolConfig ?? { tools: [] }),
+        preselectTools: overrides.preselectTools,
+      };
+    }
+
     return merged;
   }
 

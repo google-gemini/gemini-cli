@@ -431,6 +431,7 @@ export class TestRig {
           // Nightly releases sometimes becomes out of sync with local code and
           // triggers auto-update, which causes tests to fail.
           disableAutoUpdate: true,
+          toolPreselection: false,
         },
         telemetry: {
           enabled: true,
@@ -961,6 +962,10 @@ export class TestRig {
       timeout,
       100,
     );
+  }
+
+  readTelemetryLogs(): any[] {
+    return this._readAndParseTelemetryLog();
   }
 
   async waitForToolCall(

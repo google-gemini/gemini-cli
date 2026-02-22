@@ -1,0 +1,3 @@
+{"method":"generateContent","response":{"candidates":[{"content":{"parts":[{"text":"{\"relevant_tools\": [\"list_directory\"]}"}]}}],"usageMetadata":{"promptTokenCount":100,"totalTokenCount":110}}}
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"functionCall":{"name":"list_directory","args":{"dir_path":"."}}}]},"index":0}],"usageMetadata":{"promptTokenCount":100,"totalTokenCount":110}}]}
+{"method":"generateContentStream","response":[{"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":"I listed the files."}]},"index":0}],"usageMetadata":{"promptTokenCount":200,"totalTokenCount":210}}]}
