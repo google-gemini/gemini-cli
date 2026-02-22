@@ -23,7 +23,7 @@ export class ResourceMismatchError extends Error {
  * OAuth authorization server metadata as per RFC 8414.
  */
 export interface OAuthAuthorizationServerMetadata {
-  issuer?: string;
+  issuer: string;
   authorization_endpoint: string;
   token_endpoint: string;
   token_endpoint_auth_methods_supported?: string[];
@@ -50,7 +50,7 @@ export interface OAuthProtectedResourceMetadata {
 }
 
 const OAuthAuthorizationServerMetadataSchema = z.object({
-  issuer: z.string().optional(),
+  issuer: z.string(),
   authorization_endpoint: z.string(),
   token_endpoint: z.string(),
   token_endpoint_auth_methods_supported: z.array(z.string()).optional(),
