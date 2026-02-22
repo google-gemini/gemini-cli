@@ -7,9 +7,11 @@ description: Trigger this skill when the user wants to start an asynchronous PR 
 
 This skill provides a set of tools to asynchronously review a Pull Request. It will create a background job to run the project's preflight checks, execute Gemini-powered test plans, and perform a comprehensive code review using custom prompts.
 
-This is a prime example of composing Gemini CLI features:
-1.  **Headless Automation (`async-review.sh`)**: The script invokes `gemini` with `--approval-mode=yolo` and the `/review-frontend` custom command in the background.
-2.  **Agentic Evaluation (`check-async-review.sh`)**: The check script outputs clean JSON/text statuses for the agent to parse. The agent itself synthesizes the final assessment dynamically from the generated log files.
+This skill is designed to showcase an advanced "Agentic Asynchronous Pattern":
+1.  **Native Background Shells vs Headless Inference**: While Gemini CLI can natively spawn and detach background shell commands (using the `run_shell_command` tool with `is_background: true`), a standard bash background job cannot perform LLM inference. To conduct AI-driven code reviews and test generation in the background, the shell script *must* invoke the `gemini` executable headlessly using `--approval-mode=yolo`. This offloads the AI tasks to independent worker agents.
+2.  **Dynamic Git Scoping**: The review scripts avoid hardcoded paths. They use `git rev-parse --show-toplevel` to automatically resolve the root of the user's current project.
+3.  **Ephemeral Worktrees**: Instead of checking out branches in the user's main workspace, the skill provisions temporary git worktrees in `.gemini/tmp/async-reviews/pr-<number>`. This prevents git lock conflicts and namespace pollution.
+4.  **Agentic Evaluation (`check-async-review.sh`)**: The check script outputs clean JSON/text statuses for the main agent to parse. The interactive agent itself synthesizes the final assessment dynamically from the generated log files.
 
 ## Workflow
 
@@ -22,11 +24,11 @@ This is a prime example of composing Gemini CLI features:
 If the user wants to start a new async PR review:
 
 1.  Ask the user for the PR number if they haven't provided it.
-2.  Execute the `async-review.sh` script, passing the PR number as the first argument:
+2.  Execute the `async-review.sh` script, passing the PR number as the first argument. Be sure to run it with the `is_background` flag set to true to ensure it immediately detaches.
     ```bash
     .gemini/skills/async-pr-review/scripts/async-review.sh <PR_NUMBER>
     ```
-3.  The script will start the review tasks in the background and print out the paths to the logs. Inform the user that the tasks have started successfully.
+3.  Inform the user that the tasks have started successfully and they can check the status later.
 
 ### Check Status
 

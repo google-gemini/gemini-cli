@@ -5,15 +5,16 @@ if [[ -z "$pr_number" ]]; then
   exit 1
 fi
 
-base_dir="$HOME/dev/main"
-pr_dir="$HOME/dev/pr-$pr_number"
-target_dir="$pr_dir/worktree"
-log_dir="$pr_dir/logs"
-
-if [[ ! -d "$base_dir" ]]; then
-  echo "❌ Base directory $base_dir not found."
+base_dir=$(git rev-parse --show-toplevel 2>/dev/null)
+if [[ -z "$base_dir" ]]; then
+  echo "❌ Must be run from within a git repository."
   exit 1
 fi
+
+# Use the repository's local .gemini/tmp directory for ephemeral worktrees and logs
+pr_dir="$base_dir/.gemini/tmp/async-reviews/pr-$pr_number"
+target_dir="$pr_dir/worktree"
+log_dir="$pr_dir/logs"
 
 cd "$base_dir" || exit 1
 echo "📡 Fetching PR #$pr_number..."
@@ -39,7 +40,8 @@ echo "  ↳ [1/3] Starting npm run preflight..."
 rm -f "$log_dir/preflight.exit"
 { npm run preflight > "$log_dir/preflight.log" 2>&1; echo $? > "$log_dir/preflight.exit"; } &
 
-GEMINI_CMD="$HOME/.gcli/nightly/node_modules/.bin/gemini"
+# Dynamically resolve gemini binary (fallback to your nightly path)
+GEMINI_CMD=$(which gemini || echo "$HOME/.gcli/nightly/node_modules/.bin/gemini")
 
 echo "  ↳ [2/3] Starting Gemini code review..."
 rm -f "$log_dir/review.exit"

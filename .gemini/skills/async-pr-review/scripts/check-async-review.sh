@@ -6,7 +6,13 @@ if [[ -z "$pr_number" ]]; then
   exit 1
 fi
 
-log_dir="$HOME/dev/pr-$pr_number/logs"
+base_dir=$(git rev-parse --show-toplevel 2>/dev/null)
+if [[ -z "$base_dir" ]]; then
+  echo "❌ Must be run from within a git repository."
+  exit 1
+fi
+
+log_dir="$base_dir/.gemini/tmp/async-reviews/pr-$pr_number/logs"
 
 if [[ ! -d "$log_dir" ]]; then
   echo "STATUS: NOT_FOUND"
