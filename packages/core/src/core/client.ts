@@ -17,8 +17,7 @@ import {
   getInitialChatHistory,
 } from '../utils/environmentContext.js';
 import type { ServerGeminiStreamEvent, ChatCompressionInfo } from './turn.js';
-import { CompressionStatus } from './turn.js';
-import { Turn, GeminiEventType } from './turn.js';
+import { CompressionStatus , Turn, GeminiEventType } from './turn.js';
 import type { Config } from '../config/config.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
@@ -796,7 +795,6 @@ export class GeminiClient {
       this.config.resetTurn();
 
       // Auto-activate matching skills based on user prompt.
-      // We only do this for the initial user prompt, not for tool call sequences.
       // request is a prompt sequence; we search for text parts in it.
       const promptText = partToString(request);
       const isInitialUserPrompt =
