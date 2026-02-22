@@ -51,6 +51,7 @@ const TomlCommandDefSchema = z.object({
     invalid_type_error: "The 'prompt' field must be a string.",
   }),
   description: z.string().optional(),
+  model: z.string().optional(),
 });
 
 /**
@@ -301,6 +302,7 @@ export class FileCommandLoader implements ICommandLoader {
           return {
             type: 'submit_prompt',
             content: [{ text: validDef.prompt }], // Fallback to unprocessed prompt
+            ...(validDef.model ? { modelOverride: validDef.model } : {}),
           };
         }
 
@@ -318,6 +320,7 @@ export class FileCommandLoader implements ICommandLoader {
           return {
             type: 'submit_prompt',
             content: processedContent,
+            ...(validDef.model ? { modelOverride: validDef.model } : {}),
           };
         } catch (e) {
           // Check if it's our specific error type

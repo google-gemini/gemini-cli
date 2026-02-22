@@ -45,7 +45,9 @@ function getPlatformArch() {
       shellcheck: 'darwin.aarch64',
     };
   }
-  throw new Error(`Unsupported platform/architecture: ${platform}/${arch}`);
+  // actionlint and shellcheck don't have Windows builds; return null so
+  // those linters are skipped gracefully.
+  return null;
 }
 
 const platformArch = getPlatformArch();
@@ -75,14 +77,16 @@ const yamllintCheck =
  * @type {{[linterName: string]: Linter}}
  */
 const LINTERS = {
-  actionlint: {
-    check: 'command -v actionlint',
-    installer: `
+  ...(platformArch
+    ? {
+        actionlint: {
+          check: 'command -v actionlint',
+          installer: `
       mkdir -p "${TEMP_DIR}/actionlint"
       curl -sSLo "${TEMP_DIR}/.actionlint.tgz" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_${platformArch.actionlint}.tar.gz"
       tar -xzf "${TEMP_DIR}/.actionlint.tgz" -C "${TEMP_DIR}/actionlint"
     `,
-    run: `
+          run: `
       actionlint \
         -color \
         -ignore 'SC2002:' \
@@ -90,15 +94,15 @@ const LINTERS = {
         -ignore 'SC2129:' \
         -ignore 'label ".+" is unknown'
     `,
-  },
-  shellcheck: {
-    check: 'command -v shellcheck',
-    installer: `
+        },
+        shellcheck: {
+          check: 'command -v shellcheck',
+          installer: `
       mkdir -p "${TEMP_DIR}/shellcheck"
       curl -sSLo "${TEMP_DIR}/.shellcheck.txz" "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.${platformArch.shellcheck}.tar.xz"
       tar -xf "${TEMP_DIR}/.shellcheck.txz" -C "${TEMP_DIR}/shellcheck" --strip-components=1
     `,
-    run: `
+          run: `
       git ls-files | grep -E '^([^.]+|.*\\.(sh|zsh|bash))' | xargs file --mime-type \
         | grep "text/x-shellscript" | awk '{ print substr($1, 1, length($1)-1) }' \
         | xargs shellcheck \
@@ -109,7 +113,9 @@ const LINTERS = {
           --format=gcc \
           --color=never | sed -e 's/note:/warning:/g' -e 's/style:/warning:/g'
     `,
-  },
+        },
+      }
+    : {}),
   yamllint: {
     check: yamllintCheck,
     installer: `
@@ -163,6 +169,10 @@ export function runESLint() {
 }
 
 export function runActionlint() {
+  if (!LINTERS.actionlint) {
+    console.log('\nSkipping actionlint (not supported on this platform).');
+    return;
+  }
   console.log('\nRunning actionlint...');
   if (!runCommand(LINTERS.actionlint.run)) {
     process.exit(1);
@@ -170,6 +180,10 @@ export function runActionlint() {
 }
 
 export function runShellcheck() {
+  if (!LINTERS.shellcheck) {
+    console.log('\nSkipping shellcheck (not supported on this platform).');
+    return;
+  }
   console.log('\nRunning shellcheck...');
   if (!runCommand(LINTERS.shellcheck.run)) {
     process.exit(1);

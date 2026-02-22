@@ -41,6 +41,11 @@ export interface LoadHistoryActionReturn<HistoryType = unknown> {
 export interface SubmitPromptActionReturn {
   type: 'submit_prompt';
   content: PartListUnion;
+  /**
+   * If set, temporarily overrides the active model for this prompt only.
+   * The previous model is restored after the response completes.
+   */
+  modelOverride?: string;
 }
 
 export type CommandActionReturn<HistoryType = unknown> =
