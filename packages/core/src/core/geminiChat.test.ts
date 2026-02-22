@@ -1315,11 +1315,11 @@ describe('GeminiChat', () => {
         }
       }).rejects.toThrow(InvalidStreamError);
 
-      // Should be called 2 times (initial + 1 retry)
+      // Should be called 3 times (initial + 2 retries)
       expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
-        2,
+        3,
       );
-      expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
+      expect(mockLogContentRetry).toHaveBeenCalledTimes(2);
       expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
 
       // History should still contain the user message.
