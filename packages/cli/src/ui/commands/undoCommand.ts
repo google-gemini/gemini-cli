@@ -6,6 +6,7 @@
 
 import { CommandKind, type SlashCommand } from './types.js';
 import { rewindConversation } from './rewindCommand.js';
+import { revertFileChanges } from '../utils/rewindFileOps.js';
 
 /**
  * The /undo command removes the last conversation turn (the most recent user
@@ -65,6 +66,7 @@ export const undoCommand: SlashCommand = {
       };
     }
 
+    await revertFileChanges(conversation, lastUserMessage.id);
     await rewindConversation(
       context,
       client,
