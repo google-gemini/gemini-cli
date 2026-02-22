@@ -333,6 +333,7 @@ export function renderOperationalGuidelines(
 ## Interaction Details
 - **Help Command:** The user can use '/help' to display help information.
 - **Feedback:** To report a bug or provide feedback, please use the /bug command.
+${!options.interactive ? nonInteractiveErrorRecovery() : ''}
 `.trim();
 }
 
@@ -672,6 +673,16 @@ function gitRepoKeepUserInformed(interactive: boolean): string {
     ? `
 - Keep the user informed and ask for clarification or confirmation where needed.`
     : '';
+}
+
+function nonInteractiveErrorRecovery(): string {
+  return `
+## Error Recovery (Non-Interactive)
+- **Don't blindly retry:** When a tool call fails, analyze the error before retrying. Do not immediately retry with the same arguments.
+- **Web fetch failures:** If web_fetch fails, try simplifying the prompt or use google_web_search as an alternative to find the information.
+- **Shell failures:** Check error codes and run diagnostic commands before retrying. For compilation errors, fix one issue at a time rather than attempting multiple fixes simultaneously.
+- **Maximum retries:** Attempt the same approach at most 2 times. If it fails twice, try an alternative strategy or tool.
+- **Avoid loops:** If you find yourself repeating the same sequence of actions, stop and reassess your approach.`;
 }
 
 function formatToolName(name: string): string {
