@@ -19,7 +19,7 @@ describe('policyCatalog', () => {
   it('returns preview chain when preview enabled', () => {
     const chain = getModelPolicyChain({ previewEnabled: true });
     expect(chain[0]?.model).toBe(PREVIEW_GEMINI_MODEL);
-    expect(chain).toHaveLength(2);
+    expect(chain).toHaveLength(4);
   });
 
   it('returns default chain when preview disabled', () => {
