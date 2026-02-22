@@ -202,7 +202,7 @@ export class DevTools extends EventEmitter {
         }
 
         // API routes
-        if (req.url?.startsWith('/events')) {
+        if (req.url && parseUrl(req.url).pathname === '/events') {
           if (!this.validateToken(req)) {
             res.writeHead(403, { 'Content-Type': 'text/plain' });
             res.end('Forbidden: missing or invalid token');
