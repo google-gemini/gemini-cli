@@ -28,6 +28,11 @@ export async function createCodeAssistContentGenerator(
       authClient,
       config.getValidationHandler(),
       httpOptions,
+      {
+        // For Google OAuth, do not force host GOOGLE_CLOUD_PROJECT unless
+        // Code Assist explicitly requires a user-provided project.
+        preferEnvProjectId: authType === AuthType.COMPUTE_ADC,
+      },
     );
     return new CodeAssistServer(
       authClient,

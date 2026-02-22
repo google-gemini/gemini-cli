@@ -131,6 +131,84 @@ describe('setupUser for existing user', () => {
       ProjectIdRequiredError,
     );
   });
+
+  it('should ignore env project on first pass when preferEnvProjectId=false', async () => {
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'test-project');
+    mockLoad.mockResolvedValue({
+      currentTier: mockPaidTier,
+      cloudaicompanionProject: 'server-project',
+    });
+
+    const userData = await setupUser(
+      {} as OAuth2Client,
+      undefined,
+      {},
+      { preferEnvProjectId: false },
+    );
+
+    expect(CodeAssistServer).toHaveBeenCalledWith(
+      {},
+      undefined,
+      {},
+      '',
+      undefined,
+      undefined,
+    );
+    expect(userData).toEqual({
+      projectId: 'server-project',
+      userTier: 'standard-tier',
+      userTierName: 'paid',
+    });
+  });
+
+  it('should fall back to env project when preferEnvProjectId=false and project is required', async () => {
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'test-project');
+
+    const fallbackLoad = vi.fn().mockResolvedValue({
+      currentTier: mockPaidTier,
+      cloudaicompanionProject: undefined,
+    });
+    vi.mocked(CodeAssistServer).mockImplementation((_, projectId) => {
+      if (!projectId) {
+        throw new ProjectIdRequiredError();
+      }
+      return {
+        loadCodeAssist: fallbackLoad,
+        onboardUser: mockOnboardUser,
+      } as unknown as CodeAssistServer;
+    });
+
+    const userData = await setupUser(
+      {} as OAuth2Client,
+      undefined,
+      {},
+      { preferEnvProjectId: false },
+    );
+
+    expect(CodeAssistServer).toHaveBeenNthCalledWith(
+      1,
+      {},
+      undefined,
+      {},
+      '',
+      undefined,
+      undefined,
+    );
+    expect(CodeAssistServer).toHaveBeenNthCalledWith(
+      2,
+      {},
+      'test-project',
+      {},
+      '',
+      undefined,
+      undefined,
+    );
+    expect(userData).toEqual({
+      projectId: 'test-project',
+      userTier: 'standard-tier',
+      userTierName: 'paid',
+    });
+  });
 });
 
 describe('setupUser for new user', () => {

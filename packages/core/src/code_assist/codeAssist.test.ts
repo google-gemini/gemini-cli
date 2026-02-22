@@ -65,6 +65,7 @@ describe('codeAssist', () => {
         mockAuthClient,
         mockValidationHandler,
         httpOptions,
+        { preferEnvProjectId: false },
       );
       expect(MockedCodeAssistServer).toHaveBeenCalledWith(
         mockAuthClient,
@@ -95,6 +96,7 @@ describe('codeAssist', () => {
         mockAuthClient,
         mockValidationHandler,
         httpOptions,
+        { preferEnvProjectId: true },
       );
       expect(MockedCodeAssistServer).toHaveBeenCalledWith(
         mockAuthClient,

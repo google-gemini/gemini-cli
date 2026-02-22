@@ -53,37 +53,42 @@ export interface UserData {
   userTierName?: string;
 }
 
-/**
- * Sets up the user by loading their Code Assist configuration and onboarding if needed.
- *
- * Tier eligibility:
- * - FREE tier: Eligibility is determined by the Code Assist server response.
- * - STANDARD tier: User is always eligible if they have a valid project ID.
- *
- * If no valid project ID is available (from env var or server response):
- * - Surfaces ineligibility reasons for the FREE tier from the server.
- * - Throws ProjectIdRequiredError if no ineligibility reasons are available.
- *
- * Handles VALIDATION_REQUIRED via the optional validation handler, allowing
- * retry, auth change, or cancellation.
- *
- * @param client - The authenticated client to use for API calls
- * @param validationHandler - Optional handler for account validation flow
- * @returns The user's project ID, tier ID, and tier name
- * @throws {ValidationRequiredError} If account validation is required
- * @throws {ProjectIdRequiredError} If no project ID is available and required
- * @throws {ValidationCancelledError} If user cancels validation
- * @throws {ChangeAuthRequestedError} If user requests to change auth method
- */
-export async function setupUser(
+export interface SetupUserOptions {
+  /**
+   * Whether to include GOOGLE_CLOUD_PROJECT/GOOGLE_CLOUD_PROJECT_ID in the
+   * initial Code Assist bootstrap request.
+   *
+   * Default: true.
+   */
+  preferEnvProjectId?: boolean;
+}
+
+function getEnvProjectId(): string | undefined {
+  return (
+    process.env['GOOGLE_CLOUD_PROJECT'] ||
+    process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
+    undefined
+  );
+}
+
+function shouldRetryWithEnvProjectId(
+  error: unknown,
+  preferEnvProjectId: boolean,
+  envProjectId: string | undefined,
+): boolean {
+  return (
+    !preferEnvProjectId &&
+    !!envProjectId &&
+    error instanceof ProjectIdRequiredError
+  );
+}
+
+async function setupUserWithProjectId(
   client: AuthClient,
+  projectId: string | undefined,
   validationHandler?: ValidationHandler,
   httpOptions: HttpOptions = {},
 ): Promise<UserData> {
-  const projectId =
-    process.env['GOOGLE_CLOUD_PROJECT'] ||
-    process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
-    undefined;
   const caServer = new CodeAssistServer(
     client,
     projectId,
@@ -196,6 +201,58 @@ export async function setupUser(
     userTier: tier.id,
     userTierName: tier.name,
   };
+}
+
+/**
+ * Sets up the user by loading their Code Assist configuration and onboarding if needed.
+ *
+ * Tier eligibility:
+ * - FREE tier: Eligibility is determined by the Code Assist server response.
+ * - STANDARD tier: User is always eligible if they have a valid project ID.
+ *
+ * If no valid project ID is available (from env var or server response):
+ * - Surfaces ineligibility reasons for the FREE tier from the server.
+ * - Throws ProjectIdRequiredError if no ineligibility reasons are available.
+ *
+ * Handles VALIDATION_REQUIRED via the optional validation handler, allowing
+ * retry, auth change, or cancellation.
+ *
+ * @param client - The authenticated client to use for API calls
+ * @param validationHandler - Optional handler for account validation flow
+ * @returns The user's project ID, tier ID, and tier name
+ * @throws {ValidationRequiredError} If account validation is required
+ * @throws {ProjectIdRequiredError} If no project ID is available and required
+ * @throws {ValidationCancelledError} If user cancels validation
+ * @throws {ChangeAuthRequestedError} If user requests to change auth method
+ */
+export async function setupUser(
+  client: AuthClient,
+  validationHandler?: ValidationHandler,
+  httpOptions: HttpOptions = {},
+  options: SetupUserOptions = {},
+): Promise<UserData> {
+  const envProjectId = getEnvProjectId();
+  const preferEnvProjectId = options.preferEnvProjectId ?? true;
+  const initialProjectId = preferEnvProjectId ? envProjectId : undefined;
+
+  try {
+    return await setupUserWithProjectId(
+      client,
+      initialProjectId,
+      validationHandler,
+      httpOptions,
+    );
+  } catch (error) {
+    if (shouldRetryWithEnvProjectId(error, preferEnvProjectId, envProjectId)) {
+      return setupUserWithProjectId(
+        client,
+        envProjectId,
+        validationHandler,
+        httpOptions,
+      );
+    }
+    throw error;
+  }
 }
 
 function throwIneligibleOrProjectIdError(res: LoadCodeAssistResponse): never {
