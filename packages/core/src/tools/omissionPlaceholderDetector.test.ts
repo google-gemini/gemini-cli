@@ -5,70 +5,59 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { detectOmissionPlaceholder } from './omissionPlaceholderDetector.js';
+import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 
-describe('detectOmissionPlaceholder', () => {
+describe('detectOmissionPlaceholders', () => {
   it('detects standalone placeholder lines', () => {
-    expect(detectOmissionPlaceholder('(rest of methods ...)')).toEqual({
-      found: true,
-      match: '(rest of methods ...)',
-    });
-    expect(detectOmissionPlaceholder('(rest of code ...)')).toEqual({
-      found: true,
-      match: '(rest of code ...)',
-    });
-    expect(detectOmissionPlaceholder('(unchanged code ...)')).toEqual({
-      found: true,
-      match: '(unchanged code ...)',
-    });
-    expect(detectOmissionPlaceholder('// rest of methods ...')).toEqual({
-      found: true,
-      match: '// rest of methods ...',
-    });
+    expect(detectOmissionPlaceholders('(rest of methods ...)')).toEqual([
+      'rest of methods ...',
+    ]);
+    expect(detectOmissionPlaceholders('(rest of code ...)')).toEqual([
+      'rest of code ...',
+    ]);
+    expect(detectOmissionPlaceholders('(unchanged code ...)')).toEqual([
+      'unchanged code ...',
+    ]);
+    expect(detectOmissionPlaceholders('// rest of methods ...')).toEqual([
+      'rest of methods ...',
+    ]);
   });
 
   it('detects case-insensitive placeholders', () => {
-    expect(detectOmissionPlaceholder('(Rest Of Methods ...)')).toEqual({
-      found: true,
-      match: '(Rest Of Methods ...)',
-    });
+    expect(detectOmissionPlaceholders('(Rest Of Methods ...)')).toEqual([
+      'rest of methods ...',
+    ]);
   });
 
-  it('detects placeholder lines inside larger multiline text', () => {
-    const text = `class Example {\n  methodA() {}\n  (rest of methods ...)\n}`;
-    expect(detectOmissionPlaceholder(text)).toEqual({
-      found: true,
-      match: '(rest of methods ...)',
-    });
+  it('detects multiple placeholder lines in one input', () => {
+    const text = `class Example {
+  run() {}
+  (rest of methods ...)
+  (unchanged code ...)
+}`;
+    expect(detectOmissionPlaceholders(text)).toEqual([
+      'rest of methods ...',
+      'unchanged code ...',
+    ]);
   });
 
   it('does not detect placeholders embedded in normal code', () => {
     expect(
-      detectOmissionPlaceholder(
+      detectOmissionPlaceholders(
         'const note = "(rest of methods ...)";\nconsole.log(note);',
       ),
-    ).toEqual({
-      found: false,
-    });
+    ).toEqual([]);
   });
 
-  it('does not detect text without ellipsis marker', () => {
-    expect(detectOmissionPlaceholder('(rest of methods)')).toEqual({
-      found: false,
-    });
+  it('does not detect omission phrase when inline in a comment', () => {
+    expect(
+      detectOmissionPlaceholders('return value; // rest of methods ...'),
+    ).toEqual([]);
   });
 
   it('does not detect unrelated ellipsis text', () => {
-    expect(detectOmissionPlaceholder('const message = "loading...";')).toEqual({
-      found: false,
-    });
-  });
-
-  it('does not detect omission phrase when it is inline code/comment context', () => {
-    expect(
-      detectOmissionPlaceholder('return value; // rest of methods ...'),
-    ).toEqual({
-      found: false,
-    });
+    expect(detectOmissionPlaceholders('const message = "loading...";')).toEqual(
+      [],
+    );
   });
 });

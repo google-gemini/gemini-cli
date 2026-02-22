@@ -4,13 +4,83 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export interface OmissionPlaceholderDetectionResult {
-  found: boolean;
-  match?: string;
+const OMITTED_PREFIXES = new Set([
+  'rest of',
+  'rest of method',
+  'rest of methods',
+  'rest of code',
+  'unchanged code',
+  'unchanged method',
+  'unchanged methods',
+]);
+
+function isAllDots(str: string): boolean {
+  if (str.length === 0) {
+    return false;
+  }
+  for (let i = 0; i < str.length; i++) {
+    if (str[i] !== '.') {
+      return false;
+    }
+  }
+  return true;
 }
 
-const STANDALONE_OMISSION_LINE_PATTERN =
-  /^(?:\/\/\s*)?\(?\s*(?:rest\s+of(?:\s+(?:methods?|code))?|unchanged\s+(?:code|methods?))\s*\.{3,}\s*\)?$/i;
+function normalizeWhitespace(input: string): string {
+  const segments: string[] = [];
+  let current = '';
+
+  for (const char of input) {
+    if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
+      if (current.length > 0) {
+        segments.push(current);
+        current = '';
+      }
+      continue;
+    }
+    current += char;
+  }
+
+  if (current.length > 0) {
+    segments.push(current);
+  }
+
+  return segments.join(' ');
+}
+
+function normalizePlaceholder(line: string): string | null {
+  let text = line.trim();
+  if (!text) {
+    return null;
+  }
+
+  if (text.startsWith('//')) {
+    text = text.slice(2).trim();
+  }
+
+  if (text.startsWith('(') && text.endsWith(')')) {
+    text = text.slice(1, -1).trim();
+  }
+
+  const ellipsisStart = text.indexOf('...');
+  if (ellipsisStart < 0) {
+    return null;
+  }
+
+  const prefixRaw = text.slice(0, ellipsisStart).trim().toLowerCase();
+  const suffixRaw = text.slice(ellipsisStart + 3).trim();
+  const prefix = normalizeWhitespace(prefixRaw);
+
+  if (!OMITTED_PREFIXES.has(prefix)) {
+    return null;
+  }
+
+  if (suffixRaw.length > 0 && !isAllDots(suffixRaw)) {
+    return null;
+  }
+
+  return `${prefix} ...`;
+}
 
 /**
  * Detects shorthand omission placeholders such as:
@@ -18,33 +88,19 @@ const STANDALONE_OMISSION_LINE_PATTERN =
  * - (rest of code ...)
  * - (unchanged code ...)
  * - // rest of methods ...
+ *
+ * Returns all placeholders found as normalized tokens.
  */
-export function detectOmissionPlaceholder(
-  text: string,
-): OmissionPlaceholderDetectionResult {
-  const lines = text.split(/\r?\n/);
+export function detectOmissionPlaceholders(text: string): string[] {
+  const lines = text.replaceAll('\r\n', '\n').split('\n');
+  const matches: string[] = [];
 
   for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line) {
-      continue;
-    }
-
-    if (!line.includes('...')) {
-      continue;
-    }
-
-    if (
-      !/rest\s+of/i.test(line) &&
-      !/unchanged\s+(?:code|methods?)/i.test(line)
-    ) {
-      continue;
-    }
-
-    if (STANDALONE_OMISSION_LINE_PATTERN.test(line)) {
-      return { found: true, match: line };
+    const normalized = normalizePlaceholder(rawLine);
+    if (normalized) {
+      matches.push(normalized);
     }
   }
 
-  return { found: false };
+  return matches;
 }

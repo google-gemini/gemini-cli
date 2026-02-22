@@ -321,17 +321,7 @@ describe('WriteFileTool', () => {
       );
     });
 
-    it('should allow content with ellipsis in a normal string literal', () => {
-      const params = {
-        file_path: path.join(rootDir, 'valid-content.ts'),
-        content: 'const note = "(rest of methods ...)";',
-      };
-      const invocation = tool.build(params);
-      expect(invocation).toBeDefined();
-      expect(invocation.params).toEqual(params);
-    });
-
-    it('should reject omission placeholder within multiline file content (regression #19858)', () => {
+    it('should throw an error when multiline content includes omission placeholders', () => {
       const params = {
         file_path: path.join(rootDir, 'service.ts'),
         content: `class Service {
@@ -345,6 +335,16 @@ describe('WriteFileTool', () => {
       expect(() => tool.build(params)).toThrow(
         "`content` contains an omission placeholder (for example 'rest of methods ...'). Provide complete file content.",
       );
+    });
+
+    it('should allow content with placeholder text in a normal string literal', () => {
+      const params = {
+        file_path: path.join(rootDir, 'valid-content.ts'),
+        content: 'const note = "(rest of methods ...)";',
+      };
+      const invocation = tool.build(params);
+      expect(invocation).toBeDefined();
+      expect(invocation.params).toEqual(params);
     });
   });
 
