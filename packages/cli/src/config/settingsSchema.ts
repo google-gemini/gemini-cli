@@ -302,7 +302,7 @@ const SETTINGS_SCHEMA = {
         label: 'Retry Fetch Errors',
         category: 'General',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Retry on "exception TypeError: fetch failed sending request" errors.',
         showInDialog: false,
