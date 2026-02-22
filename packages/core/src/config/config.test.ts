@@ -20,6 +20,7 @@ import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryT
 import {
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
+  uiTelemetryService,
 } from '../telemetry/index.js';
 import type { ContentGeneratorConfig } from '../core/contentGenerator.js';
 import {
@@ -33,7 +34,10 @@ import { ShellTool } from '../tools/shell.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
 import { RipGrepTool, canUseRipgrep } from '../tools/ripGrep.js';
-import { logRipgrepFallback } from '../telemetry/loggers.js';
+import {
+  logRipgrepFallback,
+  logApprovalModeDuration,
+} from '../telemetry/loggers.js';
 import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { ACTIVATE_SKILL_TOOL_NAME } from '../tools/tool-names.js';
@@ -130,6 +134,7 @@ vi.mock('../telemetry/loggers.js', async (importOriginal) => {
   return {
     ...actual,
     logRipgrepFallback: vi.fn(),
+    logApprovalModeDuration: vi.fn(),
   };
 });
 
@@ -201,14 +206,15 @@ vi.mock('../services/contextManager.js', () => ({
 
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { tokenLimit } from '../core/tokenLimits.js';
-import { uiTelemetryService } from '../telemetry/index.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import type { CodeAssistServer } from '../code_assist/server.js';
 import { ContextManager } from '../services/contextManager.js';
 import { UserTierId } from '../code_assist/types.js';
-import type { ModelConfigService } from '../services/modelConfigService.js';
-import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
+import type {
+  ModelConfigService,
+  ModelConfigServiceConfig,
+} from '../services/modelConfigService.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 
@@ -735,6 +741,42 @@ describe('Server Config (config.ts)', () => {
         expect(config.getUsageStatisticsEnabled()).toBe(enabled);
       },
     );
+  });
+
+  describe('Plan Settings', () => {
+    const testCases = [
+      {
+        name: 'should pass custom plan directory to storage',
+        planSettings: { directory: 'custom-plans' },
+        expected: 'custom-plans',
+      },
+      {
+        name: 'should call setCustomPlansDir with undefined if directory is not provided',
+        planSettings: {},
+        expected: undefined,
+      },
+      {
+        name: 'should call setCustomPlansDir with undefined if planSettings is not provided',
+        planSettings: undefined,
+        expected: undefined,
+      },
+    ];
+
+    testCases.forEach(({ name, planSettings, expected }) => {
+      it(`${name}`, () => {
+        const setCustomPlansDirSpy = vi.spyOn(
+          Storage.prototype,
+          'setCustomPlansDir',
+        );
+        new Config({
+          ...baseParams,
+          planSettings,
+        });
+
+        expect(setCustomPlansDirSpy).toHaveBeenCalledWith(expected);
+        setCustomPlansDirSpy.mockRestore();
+      });
+    });
   });
 
   describe('Telemetry Settings', () => {
@@ -1356,7 +1398,22 @@ describe('setApprovalMode with folder trust', () => {
     expect(updateSpy).toHaveBeenCalled();
   });
 
-  it('should not update system instruction when switching between non-Plan modes', () => {
+  it('should update system instruction when entering YOLO mode', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue({
+      getTool: vi.fn().mockReturnValue(undefined),
+      unregisterTool: vi.fn(),
+      registerTool: vi.fn(),
+    } as Partial<ToolRegistry> as ToolRegistry);
+    const updateSpy = vi.spyOn(config, 'updateSystemInstructionIfInitialized');
+
+    config.setApprovalMode(ApprovalMode.YOLO);
+
+    expect(updateSpy).toHaveBeenCalled();
+  });
+
+  it('should not update system instruction when switching between non-Plan/non-YOLO modes', () => {
     const config = new Config(baseParams);
     vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
     const updateSpy = vi.spyOn(config, 'updateSystemInstructionIfInitialized');
@@ -1364,6 +1421,84 @@ describe('setApprovalMode with folder trust', () => {
     config.setApprovalMode(ApprovalMode.AUTO_EDIT);
 
     expect(updateSpy).not.toHaveBeenCalled();
+  });
+
+  describe('approval mode duration logging', () => {
+    beforeEach(() => {
+      vi.mocked(logApprovalModeDuration).mockClear();
+    });
+
+    it('should initialize lastModeSwitchTime with performance.now() and log positive duration', () => {
+      const startTime = 1000;
+      const endTime = 5000;
+      const performanceSpy = vi.spyOn(performance, 'now');
+
+      performanceSpy.mockReturnValueOnce(startTime);
+      const config = new Config(baseParams);
+      vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+
+      performanceSpy.mockReturnValueOnce(endTime);
+      config.setApprovalMode(ApprovalMode.PLAN);
+
+      expect(logApprovalModeDuration).toHaveBeenCalledWith(
+        config,
+        expect.objectContaining({
+          mode: ApprovalMode.DEFAULT,
+          duration_ms: endTime - startTime,
+        }),
+      );
+      performanceSpy.mockRestore();
+    });
+
+    it('should skip logging if duration is zero or negative', () => {
+      const startTime = 5000;
+      const endTime = 4000;
+      const performanceSpy = vi.spyOn(performance, 'now');
+
+      performanceSpy.mockReturnValueOnce(startTime);
+      const config = new Config(baseParams);
+      vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+
+      performanceSpy.mockReturnValueOnce(endTime);
+      config.setApprovalMode(ApprovalMode.PLAN);
+
+      expect(logApprovalModeDuration).not.toHaveBeenCalled();
+      performanceSpy.mockRestore();
+    });
+
+    it('should update lastModeSwitchTime after logging to prevent double counting', () => {
+      const time1 = 1000;
+      const time2 = 3000;
+      const time3 = 6000;
+      const performanceSpy = vi.spyOn(performance, 'now');
+
+      performanceSpy.mockReturnValueOnce(time1);
+      const config = new Config(baseParams);
+      vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+
+      performanceSpy.mockReturnValueOnce(time2);
+      config.setApprovalMode(ApprovalMode.PLAN);
+      expect(logApprovalModeDuration).toHaveBeenCalledWith(
+        config,
+        expect.objectContaining({
+          mode: ApprovalMode.DEFAULT,
+          duration_ms: time2 - time1,
+        }),
+      );
+
+      vi.mocked(logApprovalModeDuration).mockClear();
+
+      performanceSpy.mockReturnValueOnce(time3);
+      config.setApprovalMode(ApprovalMode.YOLO);
+      expect(logApprovalModeDuration).toHaveBeenCalledWith(
+        config,
+        expect.objectContaining({
+          mode: ApprovalMode.PLAN,
+          duration_ms: time3 - time2,
+        }),
+      );
+      performanceSpy.mockRestore();
+    });
   });
 
   describe('registerCoreTools', () => {
@@ -2501,7 +2636,7 @@ describe('Plans Directory Initialization', () => {
 
     await config.initialize();
 
-    const plansDir = config.storage.getProjectTempPlansDir();
+    const plansDir = config.storage.getPlansDir();
     expect(fs.promises.mkdir).toHaveBeenCalledWith(plansDir, {
       recursive: true,
     });
@@ -2518,7 +2653,7 @@ describe('Plans Directory Initialization', () => {
 
     await config.initialize();
 
-    const plansDir = config.storage.getProjectTempPlansDir();
+    const plansDir = config.storage.getPlansDir();
     expect(fs.promises.mkdir).not.toHaveBeenCalledWith(plansDir, {
       recursive: true,
     });
@@ -2597,6 +2732,27 @@ describe('syncPlanModeTools', () => {
       ...baseParams,
       approvalMode: ApprovalMode.DEFAULT,
       plan: false,
+    });
+    const registry = new ToolRegistry(config, config.getMessageBus());
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue(registry);
+
+    const registerSpy = vi.spyOn(registry, 'registerTool');
+    vi.spyOn(registry, 'getTool').mockReturnValue(undefined);
+
+    config.syncPlanModeTools();
+
+    const { EnterPlanModeTool } = await import('../tools/enter-plan-mode.js');
+    const registeredTool = registerSpy.mock.calls.find(
+      (call) => call[0] instanceof EnterPlanModeTool,
+    );
+    expect(registeredTool).toBeUndefined();
+  });
+
+  it('should NOT register EnterPlanModeTool when in YOLO mode, even if plan is enabled', async () => {
+    const config = new Config({
+      ...baseParams,
+      approvalMode: ApprovalMode.YOLO,
+      plan: true,
     });
     const registry = new ToolRegistry(config, config.getMessageBus());
     vi.spyOn(config, 'getToolRegistry').mockReturnValue(registry);

@@ -9,6 +9,8 @@ import type { ToolInvocation, ToolResult } from './tools.js';
 import { DeclarativeTool, hasCycleInSchema, Kind } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { ReadFileTool } from './read-file.js';
+import { makeFakeConfig } from '../test-utils/config.js';
 
 class TestToolInvocation implements ToolInvocation<object, ToolResult> {
   constructor(
@@ -236,5 +238,32 @@ describe('hasCycleInSchema', () => {
 
   it('should return false for an empty schema', () => {
     expect(hasCycleInSchema({})).toBe(false);
+  });
+});
+
+describe('Tools Read-Only property', () => {
+  it('should have isReadOnly true for ReadFileTool', () => {
+    const config = makeFakeConfig();
+    const bus = createMockMessageBus();
+    const tool = new ReadFileTool(config, bus);
+    expect(tool.isReadOnly).toBe(true);
+  });
+
+  it('should derive isReadOnly from Kind', () => {
+    const bus = createMockMessageBus();
+    class MyTool extends DeclarativeTool<object, ToolResult> {
+      build(_params: object): ToolInvocation<object, ToolResult> {
+        throw new Error('Not implemented');
+      }
+    }
+
+    const mutator = new MyTool('m', 'M', 'd', Kind.Edit, {}, bus);
+    expect(mutator.isReadOnly).toBe(false);
+
+    const reader = new MyTool('r', 'R', 'd', Kind.Read, {}, bus);
+    expect(reader.isReadOnly).toBe(true);
+
+    const searcher = new MyTool('s', 'S', 'd', Kind.Search, {}, bus);
+    expect(searcher.isReadOnly).toBe(true);
   });
 });
