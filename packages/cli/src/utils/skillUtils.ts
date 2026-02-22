@@ -248,7 +248,8 @@ export async function linkSkill(
       await fs.rm(destPath, { recursive: true, force: true });
     }
 
-    await fs.symlink(skillSourceDir, destPath, 'dir');
+    const symlinkType = process.platform === 'win32' ? 'junction' : 'dir';
+    await fs.symlink(skillSourceDir, destPath, symlinkType);
     linkedSkills.push({ name: skillName, location: destPath });
   }
 
