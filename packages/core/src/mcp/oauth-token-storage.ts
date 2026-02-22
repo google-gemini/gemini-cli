@@ -9,7 +9,7 @@ import { coreEvents } from '../utils/events.js';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { Storage } from '../config/storage.js';
-import { getErrorMessage , isErrnoException } from '../utils/errors.js';
+import { getErrorMessage, isErrnoException } from '../utils/errors.js';
 import {
   type OAuthToken,
   type OAuthCredentials,
@@ -65,8 +65,8 @@ export class MCPOAuthTokenStorage implements TokenStorage {
     try {
       const tokenFile = this.getTokenFilePath();
       const data = await fs.readFile(tokenFile, 'utf-8');
-      const parsed_data: unknown = JSON.parse(data);
-      const tokens = OAuthCredentialsArraySchema.parse(parsed_data);
+      const parsedData: unknown = JSON.parse(data);
+      const tokens = OAuthCredentialsArraySchema.parse(parsedData);
 
       for (const credential of tokens) {
         tokenMap.set(credential.serverName, credential);

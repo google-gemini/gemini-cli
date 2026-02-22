@@ -117,7 +117,7 @@ function isAddressInfo(
     addr !== null &&
     typeof addr === 'object' &&
     'port' in addr &&
-    typeof (addr as { port?: unknown }).port === 'number'
+    typeof addr.port === 'number'
   );
 }
 
