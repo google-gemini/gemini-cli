@@ -13,6 +13,7 @@ import {
   readGeminiMdFiles,
   categorizeAndConcatenate,
   type GeminiFileContent,
+  deduplicatePathsByFileIdentity,
 } from '../utils/memoryDiscovery.js';
 import type { Config } from '../config/config.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
@@ -63,8 +64,14 @@ export class ContextManager {
     paths: { global: string[]; extension: string[]; project: string[] },
     debugMode: boolean,
   ) {
-    const allPaths = Array.from(
+    const allPathsStringDeduped = Array.from(
       new Set([...paths.global, ...paths.extension, ...paths.project]),
+    );
+
+    // deduplicate by file identity to handle case-insensitive filesystems
+    const allPaths = await deduplicatePathsByFileIdentity(
+      allPathsStringDeduped,
+      debugMode,
     );
 
     const allContents = await readGeminiMdFiles(
