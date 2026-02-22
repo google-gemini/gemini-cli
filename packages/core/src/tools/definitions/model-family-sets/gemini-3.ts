@@ -73,7 +73,8 @@ The user has the ability to modify \`content\`. If modified, this will be stated
           type: 'string',
         },
         content: {
-          description: 'The content to write to the file.',
+          description:
+            "The content to write to the file. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide complete literal content.",
           type: 'string',
         },
       },
@@ -310,7 +311,7 @@ The user has the ability to modify the \`new_string\` content. If modified, this
         },
         new_string: {
           description:
-            'The exact literal text to replace `old_string` with, unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
+            "The exact literal text to replace `old_string` with, unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide exact literal code.",
           type: 'string',
         },
         expected_replacements: {
