@@ -138,6 +138,17 @@ async function calculateExactReplacement(
   const normalizedReplace = new_string.replace(/\r\n/g, '\n');
 
   const exactOccurrences = normalizedCode.split(normalizedSearch).length - 1;
+  const expectedReplacements = params.expected_replacements ?? 1;
+
+  if (exactOccurrences > expectedReplacements) {
+    return {
+      newContent: currentContent,
+      occurrences: exactOccurrences,
+      finalOldString: normalizedSearch,
+      finalNewString: normalizedReplace,
+    };
+  }
+
   if (exactOccurrences > 0) {
     let modifiedCode = safeLiteralReplace(
       normalizedCode,
