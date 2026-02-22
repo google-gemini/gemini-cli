@@ -41,6 +41,7 @@ import type { Config } from '../config/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { z } from 'zod';
+import { getErrorMessage } from '../utils/errors.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
 import {
   logAgentStart,
@@ -1249,7 +1250,7 @@ describe('LocalAgentExecutor', () => {
       );
 
       await expect(executor.run({ goal: 'test' }, signal)).rejects.toThrow(
-        `Failed to create chat object: ${initError}`,
+        `Failed to create chat object: ${getErrorMessage(initError)}`,
       );
 
       // Ensure the error was reported via the activity callback
@@ -1257,7 +1258,7 @@ describe('LocalAgentExecutor', () => {
         expect.objectContaining({
           type: 'ERROR',
           data: expect.objectContaining({
-            error: `Error: Failed to create chat object: ${initError}`,
+            error: `Error: Failed to create chat object: ${getErrorMessage(initError)}`,
           }),
         }),
       );
