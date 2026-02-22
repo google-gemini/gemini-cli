@@ -178,6 +178,11 @@ export class PromptProvider {
           }),
           isPlanMode,
         ),
+        taskTracker: this.withSection(
+          'taskTracker',
+          () => ({}),
+          config.isTrackerEnabled(),
+        ),
         operationalGuidelines: this.withSection(
           'operationalGuidelines',
           () => ({

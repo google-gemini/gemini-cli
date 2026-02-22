@@ -15,7 +15,6 @@ export class TrackerService {
   private initialized = false;
 
   constructor(readonly trackerDir: string) {
-    console.log('trackerDir', trackerDir);
     this.tasksDir = trackerDir;
   }
 
