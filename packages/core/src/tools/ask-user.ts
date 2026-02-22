@@ -24,6 +24,13 @@ export interface AskUserParams {
   questions: Question[];
 }
 
+/**
+ * Maximum allowed length for a question header, as defined in the tool schema.
+ * Headers exceeding this limit are automatically truncated to prevent validation
+ * retry loops caused by the model generating overly long values.
+ */
+const MAX_HEADER_LENGTH = 16;
+
 export class AskUserTool extends BaseDeclarativeTool<
   AskUserParams,
   ToolResult
@@ -37,6 +44,24 @@ export class AskUserTool extends BaseDeclarativeTool<
       ASK_USER_DEFINITION.base.parametersJsonSchema,
       messageBus,
     );
+  }
+
+  /**
+   * Sanitizes params before schema validation to avoid retry loops.
+   * Truncates header values that exceed the maximum allowed length.
+   */
+  override validateToolParams(params: AskUserParams): string | null {
+    if (params.questions) {
+      for (const q of params.questions) {
+        if (
+          typeof q.header === 'string' &&
+          q.header.length > MAX_HEADER_LENGTH
+        ) {
+          q.header = q.header.slice(0, MAX_HEADER_LENGTH);
+        }
+      }
+    }
+    return super.validateToolParams(params);
   }
 
   protected override validateToolParamValues(

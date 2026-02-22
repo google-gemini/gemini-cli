@@ -103,17 +103,19 @@ describe('AskUserTool', () => {
       expect(result).toContain("must have required property 'header'");
     });
 
-    it('should return error if header exceeds max length', () => {
-      const result = tool.validateToolParams({
+    it('should silently truncate header that exceeds max length', () => {
+      const params = {
         questions: [
           {
             question: 'Test?',
             header: 'This is way too long',
-            type: QuestionType.CHOICE,
+            type: QuestionType.TEXT,
           },
         ],
-      });
-      expect(result).toContain('must NOT have more than 16 characters');
+      };
+      const result = tool.validateToolParams(params);
+      expect(result).toBeNull();
+      expect(params.questions[0].header).toBe('This is way too ');
     });
 
     it('should return error if options has fewer than 2 items', () => {
@@ -274,7 +276,7 @@ describe('AskUserTool', () => {
   });
 
   describe('validateBuildAndExecute', () => {
-    it('should hide validation errors from returnDisplay', async () => {
+    it('should truncate header and succeed rather than return a validation error', async () => {
       const params = {
         questions: [
           {
@@ -290,9 +292,9 @@ describe('AskUserTool', () => {
         new AbortController().signal,
       );
 
-      expect(result.error).toBeDefined();
-      expect(result.error?.type).toBe(ToolErrorType.INVALID_TOOL_PARAMS);
-      expect(result.returnDisplay).toBe('');
+      // Header should be truncated silently; no validation error.
+      expect(result.error).toBeUndefined();
+      expect(params.questions[0].header).toBe('This is way too ');
     });
 
     it('should NOT hide non-validation errors (if any were to occur)', async () => {
