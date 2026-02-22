@@ -2294,7 +2294,8 @@ describe('Config Quota & Preview Model Access', () => {
       vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
       const result = await config.refreshUserQuota();
       expect(result).toBeUndefined();
-      expect(config.getHasAccessToPreviewModel()).toBe(false);
+      // Never set => stays null (unknown); getter returns true so UI shows preview
+      expect(config.getHasAccessToPreviewModel()).toBe(true);
     });
 
     it('should return undefined if retrieveUserQuota fails', async () => {
@@ -2303,8 +2304,8 @@ describe('Config Quota & Preview Model Access', () => {
       );
       const result = await config.refreshUserQuota();
       expect(result).toBeUndefined();
-      // Should remain default (false)
-      expect(config.getHasAccessToPreviewModel()).toBe(false);
+      // Never set => stays null (unknown); getter returns true so UI shows preview
+      expect(config.getHasAccessToPreviewModel()).toBe(true);
     });
   });
 
@@ -2814,11 +2815,8 @@ describe('Model Persistence Bug Fix (#19864)', () => {
       mockContentConfig,
     );
     vi.mocked(createContentGenerator).mockResolvedValue(mockContentGenerator);
-    // CodeAssist server with no projectId: quota won't be fetched; we set hasAccessToPreviewModel so model isn't reset
-    vi.mocked(getCodeAssistServer).mockReturnValue({
-      projectId: undefined,
-    } as Partial<CodeAssistServer> as CodeAssistServer);
-
+    // getCodeAssistServer returns undefined by default, so refreshUserQuota() isn't called;
+    // hasAccessToPreviewModel stays null; reset only when === false, so we don't reset.
     const config = new Config(baseParams);
 
     // Verify initial model is the preview model
