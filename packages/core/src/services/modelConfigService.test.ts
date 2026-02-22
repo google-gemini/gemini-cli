@@ -671,6 +671,59 @@ describe('ModelConfigService', () => {
   });
 
   describe('custom aliases', () => {
+    it('should return merged alias names from aliases and customAliases', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {
+          'built-in-alias': {
+            modelConfig: { model: 'gemini-standard' },
+          },
+        },
+        customAliases: {
+          'custom-alias': {
+            modelConfig: { model: 'gemini-custom' },
+          },
+        },
+        overrides: [],
+      };
+      const service = new ModelConfigService(config);
+
+      expect(service.getAliases()).toEqual(['built-in-alias', 'custom-alias']);
+    });
+
+    it('should include runtime aliases in merged alias names', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {},
+        overrides: [],
+      };
+      const service = new ModelConfigService(config);
+      service.registerRuntimeModelConfig('runtime-alias', {
+        modelConfig: { model: 'gemini-runtime' },
+      });
+
+      expect(service.getAliases()).toEqual(['runtime-alias']);
+    });
+
+    it('should return custom alias names', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {},
+        customAliases: {
+          'my-custom-alias': {
+            modelConfig: { model: 'gemini-custom' },
+          },
+          'my-second-custom-alias': {
+            modelConfig: { model: 'gemini-custom-2' },
+          },
+        },
+        overrides: [],
+      };
+      const service = new ModelConfigService(config);
+
+      expect(service.getAliases()).toEqual([
+        'my-custom-alias',
+        'my-second-custom-alias',
+      ]);
+    });
+
     it('should resolve a custom alias', () => {
       const config: ModelConfigServiceConfig = {
         aliases: {},

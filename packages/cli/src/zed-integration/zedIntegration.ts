@@ -37,6 +37,11 @@ import {
   partListUnionToString,
   LlmRole,
   ApprovalMode,
+  VALID_GEMINI_MODELS,
+  getDisplayString,
+  isActiveModel,
+  isPreviewModel,
+  isProModel,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -230,6 +235,10 @@ export class GeminiAgent {
         availableModes: buildAvailableModes(config.isPlanEnabled()),
         currentModeId: config.getApprovalMode(),
       },
+      models: {
+        availableModels: buildAvailableModels(config),
+        currentModelId: config.getModel(),
+      },
     };
   }
 
@@ -285,6 +294,10 @@ export class GeminiAgent {
       modes: {
         availableModes: buildAvailableModes(config.isPlanEnabled()),
         currentModeId: config.getApprovalMode(),
+      },
+      models: {
+        availableModels: buildAvailableModels(config),
+        currentModelId: config.getModel(),
       },
     };
   }
@@ -388,6 +401,16 @@ export class GeminiAgent {
     return session.prompt(params);
   }
 
+  async unstable_setSessionModel(
+    params: acp.SetSessionModelRequest,
+  ): Promise<acp.SetSessionModelResponse> {
+    const session = this.sessions.get(params.sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${params.sessionId}`);
+    }
+    return session.setModel(params.modelId);
+  }
+
   async setSessionMode(
     params: acp.SetSessionModeRequest,
   ): Promise<acp.SetSessionModeResponse> {
@@ -416,6 +439,17 @@ export class Session {
 
     this.pendingPrompt.abort();
     this.pendingPrompt = null;
+  }
+
+  setModel(modelId: acp.ModelId): acp.SetSessionModelResponse {
+    const availableModels = buildAvailableModels(this.config);
+    const availableModelIds = new Set(availableModels.map((m) => m.modelId));
+
+    if (!availableModelIds.has(modelId)) {
+      throw new Error(`Invalid or unavailable model: ${modelId}`);
+    }
+    this.config.setModel(modelId);
+    return {};
   }
 
   setMode(modeId: acp.SessionModeId): acp.SetSessionModeResponse {
@@ -1337,4 +1371,94 @@ function buildAvailableModes(isPlanEnabled: boolean): acp.SessionMode[] {
   }
 
   return modes;
+}
+
+type ModelEntryKind = 'model' | 'alias';
+
+const MODEL_META_KIND_KEY = 'geminiCli/modelKind';
+const MODEL_META_RESOLVED_MODEL_KEY = 'geminiCli/resolvedModelId';
+
+function buildAvailableModels(config: Config): acp.ModelInfo[] {
+  const useGemini3_1 = config.getGemini31LaunchedSync();
+  const hasPreviewAccess = config.getHasAccessToPreviewModel();
+
+  const activeModelIds = Array.from(VALID_GEMINI_MODELS)
+    .filter((model) => isActiveModel(model, useGemini3_1))
+    .filter((model) => !isPreviewModel(model) || hasPreviewAccess);
+  const activeModelIdsSet = new Set(activeModelIds);
+
+  const modelInfos: acp.ModelInfo[] = activeModelIds.map((model) => ({
+    modelId: model,
+    name: getDisplayString(model),
+    description: getModelDescription(model),
+    _meta: createModelMeta('model', { resolvedModelId: model }),
+  }));
+
+  const aliases: acp.ModelInfo[] = [];
+  for (const alias of config.modelConfigService.getAliases()) {
+    if (VALID_GEMINI_MODELS.has(alias)) {
+      continue;
+    }
+
+    const resolvedModelId = resolveAliasToModel(alias, config, useGemini3_1);
+    if (!resolvedModelId) {
+      continue;
+    }
+
+    if (
+      VALID_GEMINI_MODELS.has(resolvedModelId) &&
+      !activeModelIdsSet.has(resolvedModelId)
+    ) {
+      continue;
+    }
+
+    aliases.push({
+      modelId: alias,
+      name: alias,
+      description: getAliasDescription(resolvedModelId),
+      _meta: createModelMeta('alias', { resolvedModelId }),
+    });
+  }
+
+  return [...aliases, ...modelInfos];
+}
+
+function resolveAliasToModel(
+  alias: string,
+  config: Config,
+  useGemini3_1: boolean,
+): string | null {
+  try {
+    const resolvedConfig = config.modelConfigService.getResolvedConfig({
+      model: alias,
+    });
+    return resolveModel(resolvedConfig.model, useGemini3_1);
+  } catch {
+    return null;
+  }
+}
+
+function getAliasDescription(resolvedModelId: string): string {
+  return `Alias for ${getDisplayString(resolvedModelId)}`;
+}
+
+function createModelMeta(
+  kind: ModelEntryKind,
+  options: {
+    resolvedModelId: string;
+  },
+): Record<string, unknown> {
+  const { resolvedModelId } = options;
+
+  return {
+    [MODEL_META_KIND_KEY]: kind,
+    [MODEL_META_RESOLVED_MODEL_KEY]: resolvedModelId,
+  };
+}
+
+function getModelDescription(model: string): string {
+  if (model.includes('flash-lite')) return 'Lite model for simple, fast tasks';
+  if (model.includes('flash')) return 'Fast, cost-effective model';
+  if (isProModel(model)) return 'High-intelligence model for complex tasks';
+  return '';
 }

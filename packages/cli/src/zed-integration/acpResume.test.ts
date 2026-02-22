@@ -53,6 +53,8 @@ describe('GeminiAgent Session Resume', () => {
     mockConfig = {
       refreshAuth: vi.fn().mockResolvedValue(undefined),
       initialize: vi.fn().mockResolvedValue(undefined),
+      getGemini31LaunchedSync: vi.fn().mockReturnValue(false),
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
       getFileSystemService: vi.fn(),
       setFileSystemService: vi.fn(),
       getGeminiClient: vi.fn().mockReturnValue({
@@ -63,8 +65,12 @@ describe('GeminiAgent Session Resume', () => {
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
       },
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
       getApprovalMode: vi.fn().mockReturnValue('default'),
       isPlanEnabled: vi.fn().mockReturnValue(false),
+      modelConfigService: {
+        getAliases: vi.fn().mockReturnValue([]),
+      },
     } as unknown as Mocked<Config>;
     mockSettings = {
       merged: {
@@ -152,7 +158,7 @@ describe('GeminiAgent Session Resume', () => {
       mcpServers: [],
     });
 
-    expect(response).toEqual({
+    expect(response).toMatchObject({
       modes: {
         availableModes: [
           {
@@ -173,7 +179,11 @@ describe('GeminiAgent Session Resume', () => {
         ],
         currentModeId: ApprovalMode.DEFAULT,
       },
+      models: {
+        currentModelId: 'gemini-pro',
+      },
     });
+    expect(response.models?.availableModels.length).toBeGreaterThan(0);
 
     // Verify resumeChat received the correct arguments
     expect(mockConfig.getGeminiClient().resumeChat).toHaveBeenCalledWith(

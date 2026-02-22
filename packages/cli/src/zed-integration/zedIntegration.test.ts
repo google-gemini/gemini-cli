@@ -26,6 +26,8 @@ import {
   type Config,
   type MessageBus,
   LlmRole,
+  type ConversationRecord,
+  DEFAULT_MODEL_CONFIGS,
 } from '@google/gemini-cli-core';
 import {
   SettingScope,
@@ -36,6 +38,11 @@ import { loadCliConfig, type CliArgs } from '../config/config.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { ApprovalMode } from '@google/gemini-cli-core/src/policy/types.js';
+import {
+  ModelConfigService,
+  type ModelConfigServiceConfig,
+} from '@google/gemini-cli-core/src/services/modelConfigService.js';
+import * as sessionUtils from '../utils/sessionUtils.js';
 
 vi.mock('../config/config.js', () => ({
   loadCliConfig: vi.fn(),
@@ -96,6 +103,14 @@ async function* createMockStream(items: any[]) {
   }
 }
 
+function setModelConfigService(
+  config: unknown,
+  modelConfig: ModelConfigServiceConfig,
+): void {
+  (config as { modelConfigService: ModelConfigService }).modelConfigService =
+    new ModelConfigService(modelConfig);
+}
+
 describe('GeminiAgent', () => {
   let mockConfig: Mocked<Awaited<ReturnType<typeof loadCliConfig>>>;
   let mockSettings: Mocked<LoadedSettings>;
@@ -107,6 +122,8 @@ describe('GeminiAgent', () => {
     mockConfig = {
       refreshAuth: vi.fn(),
       initialize: vi.fn(),
+      getGemini31LaunchedSync: vi.fn().mockReturnValue(false),
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
       getFileSystemService: vi.fn(),
       setFileSystemService: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
@@ -122,6 +139,7 @@ describe('GeminiAgent', () => {
       }),
       getApprovalMode: vi.fn().mockReturnValue('default'),
       isPlanEnabled: vi.fn().mockReturnValue(false),
+      modelConfigService: new ModelConfigService(DEFAULT_MODEL_CONFIGS),
     } as unknown as Mocked<Awaited<ReturnType<typeof loadCliConfig>>>;
     mockSettings = {
       merged: {
@@ -186,6 +204,164 @@ describe('GeminiAgent', () => {
     expect(loadCliConfig).toHaveBeenCalled();
     expect(mockConfig.initialize).toHaveBeenCalled();
     expect(mockConfig.getGeminiClient).toHaveBeenCalled();
+  });
+
+  it('should include model and alias metadata in availableModels', async () => {
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: 'test-key',
+    });
+    mockConfig.getHasAccessToPreviewModel = vi.fn().mockReturnValue(false);
+
+    setModelConfigService(mockConfig, {
+      ...DEFAULT_MODEL_CONFIGS,
+      aliases: {
+        ...DEFAULT_MODEL_CONFIGS.aliases,
+        'regular-model-alias': {
+          modelConfig: {
+            model: 'gemini-2.5-flash',
+          },
+        },
+      },
+      customAliases: {
+        'custom-model-alias': {
+          modelConfig: {
+            model: 'gemini-2.5-flash',
+          },
+        },
+      },
+    });
+
+    const response = await agent.newSession({
+      cwd: '/tmp',
+      mcpServers: [],
+    });
+    const availableModels = response.models?.availableModels ?? [];
+
+    const modelEntry = availableModels.find(
+      (model) => model.modelId === 'gemini-2.5-flash',
+    );
+    expect(modelEntry?._meta).toMatchObject({
+      'geminiCli/modelKind': 'model',
+      'geminiCli/resolvedModelId': 'gemini-2.5-flash',
+    });
+
+    const aliasEntry = availableModels.find(
+      (model) => model.modelId === 'custom-model-alias',
+    );
+    expect(aliasEntry?._meta).toMatchObject({
+      'geminiCli/modelKind': 'alias',
+      'geminiCli/resolvedModelId': 'gemini-2.5-flash',
+    });
+
+    const regularAliasEntry = availableModels.find(
+      (model) => model.modelId === 'regular-model-alias',
+    );
+    expect(regularAliasEntry?._meta).toMatchObject({
+      'geminiCli/modelKind': 'alias',
+      'geminiCli/resolvedModelId': 'gemini-2.5-flash',
+    });
+  });
+
+  it('should filter unavailable and unresolved aliases from availableModels', async () => {
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: 'test-key',
+    });
+    mockConfig.getHasAccessToPreviewModel = vi.fn().mockReturnValue(false);
+
+    setModelConfigService(mockConfig, {
+      ...DEFAULT_MODEL_CONFIGS,
+      aliases: {
+        ...DEFAULT_MODEL_CONFIGS.aliases,
+        'regular-model-alias': {
+          modelConfig: {
+            model: 'gemini-2.5-flash',
+          },
+        },
+        'preview-regular-alias': {
+          modelConfig: {
+            model: 'gemini-3-flash-preview',
+          },
+        },
+        'broken-regular-alias': {
+          extends: 'missing-parent',
+          modelConfig: {},
+        },
+      },
+      customAliases: {
+        'custom-model-alias': {
+          modelConfig: {
+            model: 'gemini-2.5-flash',
+          },
+        },
+        'preview-model-alias': {
+          modelConfig: {
+            model: 'gemini-3-flash-preview',
+          },
+        },
+        'broken-model-alias': {
+          extends: 'missing-parent',
+          modelConfig: {},
+        },
+      },
+    });
+
+    const response = await agent.newSession({
+      cwd: '/tmp',
+      mcpServers: [],
+    });
+    const availableModelIds = new Set(
+      (response.models?.availableModels ?? []).map((model) => model.modelId),
+    );
+
+    expect(availableModelIds.has('regular-model-alias')).toBe(true);
+    expect(availableModelIds.has('preview-regular-alias')).toBe(false);
+    expect(availableModelIds.has('broken-regular-alias')).toBe(false);
+    expect(availableModelIds.has('custom-model-alias')).toBe(true);
+    expect(availableModelIds.has('preview-model-alias')).toBe(false);
+    expect(availableModelIds.has('broken-model-alias')).toBe(false);
+  });
+
+  it('should include models in loadSession response', async () => {
+    const resumeChat = vi.fn().mockResolvedValue(undefined);
+    const sessionData: ConversationRecord = {
+      sessionId: 'test-session-id',
+      projectHash: 'test-project',
+      startTime: '2025-01-01T00:00:00.000Z',
+      lastUpdated: '2025-01-01T00:00:00.000Z',
+      messages: [],
+    };
+    const convertSpy = vi
+      .spyOn(sessionUtils, 'convertSessionToHistoryFormats')
+      .mockReturnValue({
+        uiHistory: [],
+        clientHistory: [],
+      });
+    const resolveSessionSpy = vi
+      .spyOn(sessionUtils.SessionSelector.prototype, 'resolveSession')
+      .mockResolvedValue({
+        sessionData,
+        sessionPath: '/tmp/session.json',
+        displayInfo: 'Session test',
+      });
+
+    mockConfig.getGeminiClient = vi.fn().mockReturnValue({
+      initialize: vi.fn().mockResolvedValue(undefined),
+      resumeChat,
+      getChat: vi.fn().mockReturnValue({}),
+    });
+
+    const response = await agent.loadSession({
+      sessionId: 'test-session-id',
+      cwd: '/tmp',
+      mcpServers: [],
+    });
+
+    expect(resumeChat).toHaveBeenCalled();
+    expect(response.models?.currentModelId).toBe('gemini-pro');
+    expect((response.models?.availableModels ?? []).length).toBeGreaterThan(0);
+
+    resolveSessionSpy.mockRestore();
+    convertSpy.mockRestore();
   });
 
   it('should return modes without plan mode when plan is disabled', async () => {
@@ -363,6 +539,32 @@ describe('GeminiAgent', () => {
     expect(result).toEqual({ stopReason: 'end_turn' });
   });
 
+  it('should delegate setModel to session', async () => {
+    await agent.newSession({ cwd: '/tmp', mcpServers: [] });
+    const session = (
+      agent as unknown as { sessions: Map<string, Session> }
+    ).sessions.get('test-session-id');
+    if (!session) throw new Error('Session not found');
+    session.setModel = vi.fn().mockReturnValue({});
+
+    const result = await agent.unstable_setSessionModel({
+      sessionId: 'test-session-id',
+      modelId: 'gemini-2.5-flash',
+    });
+
+    expect(session.setModel).toHaveBeenCalledWith('gemini-2.5-flash');
+    expect(result).toEqual({});
+  });
+
+  it('should throw error when setting model on non-existent session', async () => {
+    await expect(
+      agent.unstable_setSessionModel({
+        sessionId: 'unknown',
+        modelId: 'gemini-2.5-flash',
+      }),
+    ).rejects.toThrow('Session not found: unknown');
+  });
+
   it('should delegate setMode to session', async () => {
     await agent.newSession({ cwd: '/tmp', mcpServers: [] });
     const session = (
@@ -425,6 +627,8 @@ describe('Session', () => {
     mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
+      getGemini31LaunchedSync: vi.fn().mockReturnValue(false),
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getFileService: vi.fn().mockReturnValue({
         shouldIgnoreFile: vi.fn().mockReturnValue(false),
@@ -434,8 +638,10 @@ describe('Session', () => {
       getEnableRecursiveFileSearch: vi.fn().mockReturnValue(false),
       getDebugMode: vi.fn().mockReturnValue(false),
       getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
+      setModel: vi.fn().mockReturnValue({}),
       setApprovalMode: vi.fn(),
       isPlanEnabled: vi.fn().mockReturnValue(false),
+      modelConfigService: new ModelConfigService(DEFAULT_MODEL_CONFIGS),
     } as unknown as Mocked<Config>;
     mockConnection = {
       sessionUpdate: vi.fn(),
@@ -905,6 +1111,54 @@ describe('Session', () => {
         MockReadManyFilesTool.mock.results.length - 1
       ].value;
     expect(mockInstance.build).toHaveBeenCalled();
+  });
+
+  it('should set model on config', () => {
+    session.setModel('gemini-2.5-flash');
+    expect(mockConfig.setModel).toHaveBeenCalledWith('gemini-2.5-flash');
+  });
+
+  it('should allow setting a regular alias model', () => {
+    setModelConfigService(mockConfig, {
+      ...DEFAULT_MODEL_CONFIGS,
+      aliases: {
+        ...DEFAULT_MODEL_CONFIGS.aliases,
+        'regular-model-alias': {
+          modelConfig: { model: 'gemini-2.5-flash' },
+        },
+      },
+    });
+
+    session.setModel('regular-model-alias');
+    expect(mockConfig.setModel).toHaveBeenCalledWith('regular-model-alias');
+  });
+
+  it('should allow setting a custom alias model', () => {
+    setModelConfigService(mockConfig, {
+      ...DEFAULT_MODEL_CONFIGS,
+      customAliases: {
+        'custom-model-alias': {
+          modelConfig: { model: 'gemini-2.5-flash' },
+        },
+      },
+    });
+
+    session.setModel('custom-model-alias');
+    expect(mockConfig.setModel).toHaveBeenCalledWith('custom-model-alias');
+  });
+
+  it('should reject preview models in setModel when preview access is disabled', () => {
+    mockConfig.getHasAccessToPreviewModel = vi.fn().mockReturnValue(false);
+
+    expect(() => session.setModel('gemini-3-flash-preview')).toThrow(
+      'Invalid or unavailable model: gemini-3-flash-preview',
+    );
+  });
+
+  it('should reject auto model ids in setModel', () => {
+    expect(() => session.setModel('auto-gemini-3')).toThrow(
+      'Invalid or unavailable model: auto-gemini-3',
+    );
   });
 
   it('should set mode on config', () => {
