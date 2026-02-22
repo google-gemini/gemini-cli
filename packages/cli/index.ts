@@ -36,7 +36,22 @@ process.on('uncaughtException', (error) => {
 });
 
 main().catch(async (error) => {
-  await runExitCleanup();
+  // Set a timeout to force exit if cleanup hangs
+  const cleanupTimeout = setTimeout(() => {
+    writeToStderr('Cleanup timed out, forcing exit...\n');
+    process.exit(1);
+  }, 5000);
+  cleanupTimeout.unref(); // Don't keep the process alive just for the timeout
+
+  try {
+    await runExitCleanup();
+  } catch (cleanupError) {
+    writeToStderr(
+      `Error during final cleanup: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}\n`,
+    );
+  } finally {
+    clearTimeout(cleanupTimeout);
+  }
 
   if (error instanceof FatalError) {
     let errorMessage = error.message;
@@ -46,11 +61,17 @@ main().catch(async (error) => {
     writeToStderr(errorMessage + '\n');
     process.exit(error.exitCode);
   }
+
   writeToStderr('An unexpected critical error occurred:');
   if (error instanceof Error) {
     writeToStderr(error.stack + '\n');
   } else {
-    writeToStderr(String(error) + '\n');
+    // If it's not an Error instance, try to stringify it nicely
+    try {
+      writeToStderr(JSON.stringify(error, null, 2) + '\n');
+    } catch {
+      writeToStderr(String(error) + '\n');
+    }
   }
   process.exit(1);
 });
