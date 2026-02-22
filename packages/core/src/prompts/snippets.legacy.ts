@@ -33,7 +33,7 @@ export interface SystemPromptOptions {
   hookContext?: boolean;
   primaryWorkflows?: PrimaryWorkflowsOptions;
   planningWorkflow?: PlanningWorkflowOptions;
-  taskTracker?: TaskTrackerOptions;
+  taskTracker?: boolean;
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
   interactiveYoloMode?: boolean;
@@ -83,9 +83,6 @@ export interface PlanningWorkflowOptions {
   approvedPlanPath?: string;
 }
 
-export interface TaskTrackerOptions {
-}
-
 export interface AgentSkillOptions {
   name: string;
   description: string;
@@ -120,7 +117,7 @@ ${
     : renderPrimaryWorkflows(options.primaryWorkflows)
 }
 
-${renderTaskTracker(options.taskTracker)}
+${options.taskTracker ? renderTaskTracker() : ''}
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
 
@@ -396,8 +393,7 @@ ${trimmed}
   return `\n---\n\n<loaded_context>\n${sections.join('\n')}\n</loaded_context>`;
 }
 
-export function renderTaskTracker(options?: TaskTrackerOptions): string {
-  if (!options) return '';
+export function renderTaskTracker(): string {
   const trackerCreate = `\`${TRACKER_CREATE_TASK_TOOL_NAME}\``;
   const trackerList = `\`${TRACKER_LIST_TASKS_TOOL_NAME}\``;
   const trackerUpdate = `\`${TRACKER_UPDATE_TASK_TOOL_NAME}\``;
