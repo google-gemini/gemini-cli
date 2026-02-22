@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -1992,7 +1992,7 @@ describe('RipGrepTool', () => {
               data: {
                 path: { text: 'fileA.txt' },
                 line_number: 1,
-                lines: { text: 'Copyright 2025 Google LLC\n' },
+                lines: { text: 'Copyright 2026 Google LLC\n' },
               },
             }) +
             '\n' +
@@ -2020,7 +2020,7 @@ describe('RipGrepTool', () => {
       expect(result.llmContent).toContain('Found 1 match');
       expect(result.llmContent).toContain('fileA.txt');
       expect(result.llmContent).not.toContain('fileB.txt');
-      expect(result.llmContent).toContain('Copyright 2025 Google LLC');
+      expect(result.llmContent).toContain('Copyright 2026 Google LLC');
     });
   });
 });
