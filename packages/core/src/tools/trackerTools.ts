@@ -67,7 +67,6 @@ class TrackerInitInvocation extends BaseTrackerInvocation<
   }
 
   override async execute(_signal: AbortSignal): Promise<ToolResult> {
-    await this.service.ensureInitialized();
     return {
       llmContent: `Task tracker initialized successfully. Storage is ready at ${this.service.trackerDir}`,
       returnDisplay: 'Tracker initialized.',
