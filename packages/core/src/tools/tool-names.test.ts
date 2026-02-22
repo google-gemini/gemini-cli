@@ -69,10 +69,17 @@ describe('tool-names', () => {
 
     it('should reject invalid tool names', () => {
       expect(isValidToolName('')).toBe(false);
-      expect(isValidToolName('invalid-name')).toBe(false);
       expect(isValidToolName('server__')).toBe(false);
       expect(isValidToolName('__tool')).toBe(false);
       expect(isValidToolName('server__tool__extra')).toBe(false);
+      expect(isValidToolName('has spaces')).toBe(false);
+      expect(isValidToolName('special!chars')).toBe(false);
+    });
+
+    it('should validate MCP tool short names (slug format)', () => {
+      expect(isValidToolName('read_graph')).toBe(true);
+      expect(isValidToolName('kubectl_get')).toBe(true);
+      expect(isValidToolName('my-tool')).toBe(true);
     });
 
     it('should handle wildcards when allowed', () => {

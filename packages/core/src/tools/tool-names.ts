@@ -156,6 +156,8 @@ export function isValidToolName(
     return true;
   }
 
+  const slugRegex = /^[a-z0-9_-]+$/i;
+
   // MCP tools (format: server__tool)
   if (name.includes('__')) {
     const parts = name.split('__');
@@ -170,9 +172,12 @@ export function isValidToolName(
       return !!options.allowWildcards;
     }
 
-    // Basic slug validation for server and tool names
-    const slugRegex = /^[a-z0-9-_]+$/i;
     return slugRegex.test(server) && slugRegex.test(tool);
+  }
+
+  // Allow simple slug-format tool names (e.g., MCP tools referenced by short name)
+  if (slugRegex.test(name)) {
+    return true;
   }
 
   return false;
