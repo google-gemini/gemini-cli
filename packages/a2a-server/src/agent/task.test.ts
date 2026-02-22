@@ -266,7 +266,9 @@ describe('Task', () => {
       expect(metadata.mcpServers[0].tools[0].parameterSchema).toEqual(
         expectedSchema,
       );
-      expect(metadata.availableTools[0].parameterSchema).toEqual(expectedSchema);
+      expect(metadata.availableTools[0].parameterSchema).toEqual(
+        expectedSchema,
+      );
     });
 
     it('should fall back to schema.parameters when parametersJsonSchema is missing', async () => {
@@ -311,7 +313,9 @@ describe('Task', () => {
       expect(metadata.mcpServers[0].tools[0].parameterSchema).toEqual(
         expectedSchema,
       );
-      expect(metadata.availableTools[0].parameterSchema).toEqual(expectedSchema);
+      expect(metadata.availableTools[0].parameterSchema).toEqual(
+        expectedSchema,
+      );
     });
   });
 
