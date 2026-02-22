@@ -18,7 +18,7 @@
 // limitations under the License.
 
 import { execSync } from 'node:child_process';
-import { writeFileSync, existsSync, cpSync } from 'node:fs';
+import { writeFileSync, existsSync, cpSync, rmSync } from 'node:fs';
 import { join, basename } from 'node:path';
 
 if (!process.cwd().includes('packages')) {
@@ -39,6 +39,9 @@ if (packageName === 'core') {
   const docsSource = join(process.cwd(), '..', '..', 'docs');
   const docsTarget = join(process.cwd(), 'dist', 'docs');
   if (existsSync(docsSource)) {
+    if (existsSync(docsTarget)) {
+      rmSync(docsTarget, { recursive: true });
+    }
     cpSync(docsSource, docsTarget, { recursive: true, dereference: true });
     console.log('Copied documentation to dist/docs');
   }

@@ -17,7 +17,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { copyFileSync, existsSync, mkdirSync, cpSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, cpSync, rmSync } from 'node:fs';
 import { dirname, join, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { glob } from 'glob';
@@ -58,6 +58,9 @@ console.log(`Copied ${policyFiles.length} policy files to bundle/policies/`);
 const docsSrc = join(root, 'docs');
 const docsDest = join(bundleDir, 'docs');
 if (existsSync(docsSrc)) {
+  if (existsSync(docsDest)) {
+    rmSync(docsDest, { recursive: true });
+  }
   cpSync(docsSrc, docsDest, { recursive: true, dereference: true });
   console.log('Copied docs to bundle/docs/');
 }
@@ -66,6 +69,9 @@ if (existsSync(docsSrc)) {
 const builtinSkillsSrc = join(root, 'packages/core/src/skills/builtin');
 const builtinSkillsDest = join(bundleDir, 'builtin');
 if (existsSync(builtinSkillsSrc)) {
+  if (existsSync(builtinSkillsDest)) {
+    rmSync(builtinSkillsDest, { recursive: true });
+  }
   cpSync(builtinSkillsSrc, builtinSkillsDest, {
     recursive: true,
     dereference: true,
