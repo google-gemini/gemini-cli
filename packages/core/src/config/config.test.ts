@@ -2801,7 +2801,7 @@ describe('Model Persistence Bug Fix (#19864)', () => {
     model: PREVIEW_GEMINI_3_1_MODEL, // User saved preview model
   };
 
-  it('should NOT reset preview model for LOGIN_WITH_GOOGLE when refreshUserQuota is not called', async () => {
+  it('should NOT reset preview model for CodeAssist auth when refreshUserQuota is not called (no projectId)', async () => {
     const mockContentConfig = {
       authType: AuthType.LOGIN_WITH_GOOGLE,
     } as Partial<ContentGeneratorConfig> as ContentGeneratorConfig;
@@ -2814,15 +2814,17 @@ describe('Model Persistence Bug Fix (#19864)', () => {
       mockContentConfig,
     );
     vi.mocked(createContentGenerator).mockResolvedValue(mockContentGenerator);
+    // CodeAssist server with no projectId: quota won't be fetched; we set hasAccessToPreviewModel so model isn't reset
+    vi.mocked(getCodeAssistServer).mockReturnValue({
+      projectId: undefined,
+    } as Partial<CodeAssistServer> as CodeAssistServer);
 
     const config = new Config(baseParams);
 
     // Verify initial model is the preview model
     expect(config.getModel()).toBe(PREVIEW_GEMINI_3_1_MODEL);
 
-    // Call refreshAuth to simulate restart
-    // Note: getCodeAssistServer returns undefined by default in tests,
-    // so refreshUserQuota() won't be called
+    // Call refreshAuth to simulate restart (CodeAssist auth, no projectId)
     await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
 
     // Verify the model was NOT reset (bug fix)

@@ -1116,15 +1116,14 @@ export class Config {
       this.setHasAccessToPreviewModel(true);
     }
 
-    // Update model if user no longer has access to the preview model
-    // Only reset the model if we're certain the user doesn't have access.
-    // For LOGIN_WITH_GOOGLE, we rely on refreshUserQuota() to set hasAccessToPreviewModel.
-    // If refreshUserQuota() wasn't called (e.g., no projectId), we should not reset the model
-    // as the user may still have access through their subscription.
+    // Only reset the model when we know the user doesn't have preview access.
+    // We only know that after we've run refreshUserQuota() (i.e. we had projectId).
+    // When we couldn't fetch quota (no projectId), we don't reset — we don't assume
+    // either way; we preserve the saved model until we have definitive information.
     if (
-      !this.hasAccessToPreviewModel &&
       isPreviewModel(this.model) &&
-      authType !== AuthType.LOGIN_WITH_GOOGLE
+      !this.hasAccessToPreviewModel &&
+      codeAssistServer?.projectId
     ) {
       this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
     }
