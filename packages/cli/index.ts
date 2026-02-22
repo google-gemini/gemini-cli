@@ -65,12 +65,7 @@ main().catch(async (error) => {
   if (error instanceof Error) {
     writeToStderr(error.stack + '\n');
   } else {
-    // If it's not an Error instance, try to stringify it nicely
-    try {
-      writeToStderr(JSON.stringify(error, null, 2) + '\n');
-    } catch {
-      writeToStderr(String(error) + '\n');
-    }
+    writeToStderr(String(error) + '\n');
   }
   process.exit(1);
 });
