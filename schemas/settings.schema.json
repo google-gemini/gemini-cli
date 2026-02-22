@@ -491,6 +491,44 @@
       },
       "additionalProperties": false
     },
+    "experimental": {
+      "title": "Experimental",
+      "description": "Experimental features and capabilities.",
+      "markdownDescription": "Experimental features and capabilities.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "useAgentFactoryAll": {
+          "title": "Use Agent Factory (All)",
+          "description": "Enable Agent Factory for all supported execution paths.",
+          "markdownDescription": "Enable Agent Factory for all supported execution paths.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "useAgentFactorySdk": {
+          "title": "Use Agent Factory (SDK)",
+          "description": "Enable Agent Factory for the SDK execution path.",
+          "markdownDescription": "Enable Agent Factory for the SDK execution path.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "useAgentFactoryNonInteractive": {
+          "title": "Use Agent Factory (Non-Interactive)",
+          "description": "Enable Agent Factory for the non-interactive CLI execution path.",
+          "markdownDescription": "Enable Agent Factory for the non-interactive CLI execution path.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "useAgentFactoryInteractive": {
+          "title": "Use Agent Factory (Interactive)",
+          "description": "Enable Agent Factory for the interactive CLI execution path.",
+          "markdownDescription": "Enable Agent Factory for the interactive CLI execution path.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
     "telemetry": {
       "title": "Telemetry",
       "description": "Telemetry configuration.",

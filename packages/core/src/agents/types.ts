@@ -33,7 +33,8 @@ export type AgentEvent =
   | { type: 'tool_suite_start'; value: { count: number } }
   | { type: 'tool_suite_finish'; value: { responses: ToolCallResponseInfo[] } }
   | { type: 'thought'; value: string }
-  | { type: 'loop_detected'; value: { sessionId: string } };
+  | { type: 'loop_detected'; value: { sessionId: string } }
+  | { type: 'goal_completed'; value: { result: unknown } };
 
 /**
  * Configuration for an Agent.
@@ -58,6 +59,16 @@ export interface AgentConfig {
     loopDetection?: boolean;
     ideContext?: boolean;
   };
+  /**
+   * Optional tools available to the agent.
+   * If not specified, the agent uses all tools registered in the runtime.
+   */
+  toolConfig?: ToolConfig;
+  /**
+   * Optional configuration for the expected structured output.
+   * If specified, the agent will be provided with a `complete_task` tool.
+   */
+  outputConfig?: OutputConfig<z.ZodTypeAny>;
 }
 
 /**

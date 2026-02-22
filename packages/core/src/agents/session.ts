@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type Part } from '@google/genai';
+import { type Part, Type, type FunctionDeclaration, type Schema } from '@google/genai';
 import { type Config } from '../config/config.js';
 import { type GeminiClient } from '../core/client.js';
 import { type AgentEvent, type AgentConfig } from './types.js';
@@ -12,6 +12,8 @@ import { Scheduler } from '../scheduler/scheduler.js';
 import {
   ROOT_SCHEDULER_ID,
   type ToolCallRequestInfo,
+  type CompletedToolCall,
+  CoreToolCallStatus,
 } from '../scheduler/types.js';
 import { GeminiEventType, CompressionStatus } from '../core/turn.js';
 import { recordToolCallInteractions } from '../code_assist/telemetry.js';
@@ -21,6 +23,14 @@ import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { AgentTerminateMode } from './types.js';
 import type { ResumedSessionData } from '../services/chatRecordingService.js';
 import { convertSessionToClientHistory } from '../utils/sessionUtils.js';
+import { ToolRegistry } from '../tools/tool-registry.js';
+import { zodToJsonSchema } from 'zod-to-json-schema';
+import {
+  type AnyDeclarativeTool,
+  type AnyToolInvocation,
+} from '../tools/tools.js';
+
+const TASK_COMPLETE_TOOL_NAME = 'complete_task';
 
 /**
  * AgentSession manages the state of a conversation and orchestrates the agent
@@ -29,6 +39,7 @@ import { convertSessionToClientHistory } from '../utils/sessionUtils.js';
 export class AgentSession {
   private readonly client: GeminiClient;
   private readonly scheduler: Scheduler;
+  private readonly toolRegistry: ToolRegistry;
   private readonly compressionService: ChatCompressionService;
   private totalTurns = 0;
   private hasFailedCompressionAttempt = false;
@@ -38,15 +49,79 @@ export class AgentSession {
     private readonly config: AgentConfig,
     private readonly runtime: Config,
   ) {
+    // Initialize a scoped tool registry
+    this.toolRegistry = new ToolRegistry(
+      this.runtime,
+      this.runtime.getMessageBus(),
+    );
+    this.setupToolRegistry();
+
     // For now, we reuse the GeminiClient from the global config.
     this.client = this.runtime.getGeminiClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
     this.scheduler = new Scheduler({
       config: this.runtime,
       messageBus: this.runtime.getMessageBus(),
       getPreferredEditor: () => undefined,
       schedulerId: ROOT_SCHEDULER_ID,
-    });
+    } as any);
     this.compressionService = new ChatCompressionService();
+  }
+
+  private setupToolRegistry(): void {
+    const parentRegistry = this.runtime.getToolRegistry();
+    if (this.config.toolConfig) {
+      for (const toolRef of this.config.toolConfig.tools) {
+        if (typeof toolRef === 'string') {
+          const tool = parentRegistry.getTool(toolRef);
+          if (tool) {
+            this.toolRegistry.registerTool(tool);
+          }
+        } else if (
+          typeof toolRef === 'object' &&
+          'name' in toolRef &&
+          'build' in toolRef
+        ) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
+          this.toolRegistry.registerTool(
+            toolRef as unknown as AnyDeclarativeTool,
+          );
+        }
+      }
+    } else {
+      // If no tools specified, use all active tools from parent
+      for (const tool of parentRegistry.getAllTools()) {
+        this.toolRegistry.registerTool(tool);
+      }
+    }
+  }
+
+  private getFunctionDeclarations(): FunctionDeclaration[] {
+    const declarations = this.toolRegistry.getFunctionDeclarations();
+
+    // Add complete_task tool if outputConfig is provided
+    if (this.config.outputConfig) {
+      const jsonSchema = zodToJsonSchema(this.config.outputConfig.schema);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+      const { $schema, definitions, ...schema } = jsonSchema as any;
+
+      const completeTool: FunctionDeclaration = {
+        name: TASK_COMPLETE_TOOL_NAME,
+        description:
+          this.config.outputConfig.description ||
+          'Call this tool to submit your final answer and complete the task.',
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            [this.config.outputConfig.outputName]: schema as Schema,
+          },
+          required: [this.config.outputConfig.outputName],
+        },
+      };
+      declarations.push(completeTool);
+    }
+
+    return declarations;
   }
 
   /**
@@ -82,6 +157,7 @@ export class AgentSession {
     let terminationReason = AgentTerminateMode.GOAL;
     let terminationMessage: string | undefined = undefined;
     let terminationError: unknown | undefined = undefined;
+    let finalResult: unknown | undefined = undefined;
 
     try {
       while (maxTurns === -1 || this.totalTurns < maxTurns) {
@@ -93,6 +169,9 @@ export class AgentSession {
         this.totalTurns++;
         const promptId = `${this.sessionId}#${this.totalTurns}`;
 
+        // Update tools on the client so sendMessageStream sees them
+        await this.client.setTools(this.config.model);
+
         // Compression check (from LocalAgentExecutor / useGeminiStream patterns)
         if (this.config.capabilities?.compression) {
           await this.tryCompressChat(promptId);
@@ -102,8 +181,9 @@ export class AgentSession {
           currentInput,
           promptId,
           isContinuation ? undefined : input,
-          signal,
+          combinedSignal,
         );
+
 
         for await (const event of events) {
           yield event;
@@ -115,6 +195,81 @@ export class AgentSession {
         }
 
         if (toolCalls.length > 0) {
+          // Check for complete_task call
+          const completeTaskCall = toolCalls.find(
+            (tc) => tc.name === TASK_COMPLETE_TOOL_NAME,
+          );
+          if (completeTaskCall && this.config.outputConfig) {
+            const outputName = this.config.outputConfig.outputName;
+            const result = completeTaskCall.args[outputName];
+
+            // Validate result
+            const validation = this.config.outputConfig.schema.safeParse(result);
+            if (validation.success) {
+              finalResult = validation.data;
+              yield {
+                type: 'goal_completed',
+                value: { result: finalResult },
+              };
+
+              // Manually create a success response for complete_task to satisfy history
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
+              const response = {
+                status: CoreToolCallStatus.Success,
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
+                tool: undefined as unknown as AnyDeclarativeTool as any,
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
+                invocation: undefined as unknown as AnyToolInvocation as any,
+                response: {
+                  callId: completeTaskCall.callId,
+                  responseParts: [
+                    {
+                      functionResponse: {
+                        id: completeTaskCall.callId,
+                        name: TASK_COMPLETE_TOOL_NAME,
+                        response: { result: 'Task completed successfully.' },
+                      },
+                    },
+                  ],
+                  resultDisplay: 'Task completed successfully.',
+                  error: undefined,
+                  errorType: undefined,
+                  contentLength: 0,
+                },
+                durationMs: 0,
+                schedulerId: ROOT_SCHEDULER_ID,
+              } as unknown as CompletedToolCall;
+
+              // Add to history so model knows it finished
+              await this.client.addHistory({
+                role: 'user',
+                parts: response.response.responseParts,
+              });
+
+              terminationReason = AgentTerminateMode.GOAL;
+              break;
+            } else {
+              // Yield error and continue (model needs to fix output)
+              const errorMsg = `Output validation failed: ${JSON.stringify(validation.error.flatten())}`;
+              const errorParts: Part[] = [
+                {
+                  functionResponse: {
+                    id: completeTaskCall.callId,
+                    name: TASK_COMPLETE_TOOL_NAME,
+                    response: { error: errorMsg },
+                  },
+                },
+              ];
+              await this.client.addHistory({
+                role: 'user',
+                parts: errorParts,
+              });
+              currentInput = errorParts;
+              isContinuation = true;
+              continue;
+            }
+          }
+
           const results = await this.executeTools(toolCalls, signal);
           for await (const event of results.events) {
             yield event;
@@ -188,7 +343,8 @@ export class AgentSession {
         if (event.type === GeminiEventType.ToolCallRequest) {
           toolCalls.push(event.value);
         }
-        yield event as AgentEvent;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        yield event as unknown as AgentEvent;
       }
     };
 
@@ -210,6 +366,14 @@ export class AgentSession {
       type: 'tool_suite_start',
       value: { count: toolCalls.length },
     });
+
+    // We need to use our scoped tool registry.
+    // However, the current Scheduler doesn't take a ToolRegistry in its constructor.
+    // It uses the global registry from Config.
+    // To implement scoping correctly without changing Scheduler, we might need a ScopedConfig.
+    // For now, let's assume we can pass it or that we'll refactor Scheduler later.
+    // As a workaround, we'll manually execute tools or rely on the global registry if scoping is not yet strictly enforced.
+    // TODO: Support scoped ToolRegistry in Scheduler.
 
     const completedCalls = await this.scheduler.schedule(
       toolCalls,

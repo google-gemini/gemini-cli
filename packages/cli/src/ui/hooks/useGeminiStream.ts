@@ -50,6 +50,9 @@ import type {
   ToolCallResponseInfo,
   GeminiErrorEventValue,
   RetryAttemptPayload,
+  AgentSession,
+  AgentTerminateMode,
+  AgentEvent,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -1246,7 +1249,102 @@ export const useGeminiStream = (
       setPendingHistoryItem,
       setThought,
     ],
+    );
+
+    const processAgentEvents = useCallback(
+    async (
+      stream: AsyncIterable<AgentEvent>,
+      userMessageTimestamp: number,
+      signal: AbortSignal,
+    ): Promise<void> => {
+      let geminiMessageBuffer = '';
+      for await (const event of stream) {
+        if (signal.aborted) break;
+
+        // Map AgentEvent back to GeminiEvent handlers
+        switch (event.type) {
+          case 'thought':
+            handleThoughtEvent(
+              { summary: event.value, thought: event.value },
+              userMessageTimestamp,
+            );
+            break;
+          case ServerGeminiEventType.Content:
+            geminiMessageBuffer = handleContentEvent(
+              event.value,
+              geminiMessageBuffer,
+              userMessageTimestamp,
+            );
+            break;
+          case ServerGeminiEventType.ToolCallRequest:
+            // Handled by AgentSession, but we can still show them
+            // The useToolScheduler will be used by AgentSession's internal scheduler,
+            // but for UI feedback we need to make sure they show up in toolCalls.
+            // Since AgentSession uses Scheduler which is not hooked into useToolScheduler state,
+            // we might need to bridge this.
+            // For now, we'll just emit events to show activity.
+            break;
+          case 'tool_suite_start':
+            setToolCallsForDisplay(
+              Array(event.value.count).fill({
+                status: CoreToolCallStatus.Executing,
+                request: { name: 'Executing tools...' },
+              }),
+            );
+            break;
+          case 'tool_suite_finish':
+            setToolCallsForDisplay([]);
+            // handleCompletedTools will be called by AgentSession internally,
+            // but we need to update the UI history here.
+            // AgentSession doesn't provide the full TrackedToolCall objects.
+            // This is a known gap in the "meet in the middle" approach.
+            break;
+          case 'agent_finish': {
+            const { reason } = event.value;
+            if (reason === AgentTerminateMode.MAX_TURNS) {
+              handleMaxSessionTurnsEvent();
+            }
+            setIsResponding(false);
+            break;
+          }
+          case 'goal_completed':
+            addItem({
+              type: MessageType.INFO,
+              text: 'Goal completed.',
+            });
+            break;
+          case ServerGeminiEventType.Error:
+            handleErrorEvent(event.value, userMessageTimestamp);
+            break;
+          default: {
+            // Handle other core events if they match
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            const coreEvent = event as unknown as {
+              type: ServerGeminiEventType;
+              value: unknown;
+            };
+            if (coreEvent.type === ServerGeminiEventType.Citation) {
+              handleCitationEvent(
+                coreEvent.value as unknown as string, // eslint-disable-line @typescript-eslint/no-unsafe-type-assertion
+                userMessageTimestamp,
+              );
+            }
+          }
+        }
+      }
+    },
+    [
+      handleThoughtEvent,
+      handleContentEvent,
+      handleMaxSessionTurnsEvent,
+      handleErrorEvent,
+      handleCitationEvent,
+      setToolCallsForDisplay,
+      setIsResponding,
+      addItem,
+    ],
   );
+
   const submitQuery = useCallback(
     async (
       query: PartListUnion,
@@ -1319,23 +1417,45 @@ export const useGeminiStream = (
             lastQueryRef.current = queryToSend;
             lastPromptIdRef.current = prompt_id!;
 
-            try {
-              const stream = geminiClient.sendMessageStream(
-                queryToSend,
-                abortSignal,
-                prompt_id!,
-                undefined,
-                false,
-                query,
-              );
-              const processingStatus = await processGeminiStreamEvents(
-                stream,
-                userMessageTimestamp,
-                abortSignal,
-              );
+            const experimental = settings.experimental;
+            const useAgentFactory =
+              experimental?.useAgentFactoryAll ||
+              experimental?.useAgentFactoryInteractive;
 
-              if (processingStatus === StreamProcessingStatus.UserCancelled) {
-                return;
+            try {
+              if (useAgentFactory) {
+                const session = new AgentSession(
+                  config.getSessionId(),
+                  {
+                    name: 'interactive-agent',
+                    maxTurns: config.getMaxSessionTurns(),
+                  },
+                  config,
+                );
+                const stream = session.prompt(queryToSend, abortSignal);
+                await processAgentEvents(
+                  stream,
+                  userMessageTimestamp,
+                  abortSignal,
+                );
+              } else {
+                const stream = geminiClient.sendMessageStream(
+                  queryToSend,
+                  abortSignal,
+                  prompt_id!,
+                  undefined,
+                  false,
+                  query,
+                );
+                const processingStatus = await processGeminiStreamEvents(
+                  stream,
+                  userMessageTimestamp,
+                  abortSignal,
+                );
+
+                if (processingStatus === StreamProcessingStatus.UserCancelled) {
+                  return;
+                }
               }
 
               if (pendingHistoryItemRef.current) {
@@ -1416,6 +1536,8 @@ export const useGeminiStream = (
       setModelSwitchedFromQuotaError,
       prepareQueryForGemini,
       processGeminiStreamEvents,
+      processAgentEvents,
+      settings.experimental,
       pendingHistoryItemRef,
       addItem,
       setPendingHistoryItem,

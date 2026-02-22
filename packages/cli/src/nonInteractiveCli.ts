@@ -269,16 +269,22 @@ export async function runNonInteractive({
         query = processedQuery as Part[];
       }
 
-      if (config.isAgentsEnabled()) {
+      // --- Dispatch Loop ---
+      const experimental = settings.experimental;
+      const useAgentFactory =
+        experimental?.useAgentFactoryAll ||
+        experimental?.useAgentFactoryNonInteractive;
+
+      if (useAgentFactory) {
         await runAgentSessionFlow(
           loopContext,
-          { config, settings, input, prompt_id, resumedSessionData, query }, // API change: pass query
+          { config, settings, input, prompt_id, resumedSessionData, query },
           handleUserFeedback,
         );
       } else {
         await runLegacyManualLoop(
           loopContext,
-          { config, settings, input, prompt_id, resumedSessionData, query }, // API change: pass query
+          { config, settings, input, prompt_id, resumedSessionData, query },
           handleUserFeedback,
         );
       }

@@ -484,6 +484,10 @@ export interface ConfigParameters {
   disableLLMCorrection?: boolean;
   plan?: boolean;
   modelSteering?: boolean;
+  useAgentFactoryAll?: boolean;
+  useAgentFactorySdk?: boolean;
+  useAgentFactoryNonInteractive?: boolean;
+  useAgentFactoryInteractive?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
@@ -682,6 +686,11 @@ export class Config {
   readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
 
+  private readonly useAgentFactoryAll: boolean;
+  private readonly useAgentFactorySdk: boolean;
+  private readonly useAgentFactoryNonInteractive: boolean;
+  private readonly useAgentFactoryInteractive: boolean;
+
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
     this.clientVersion = params.clientVersion ?? 'unknown';
@@ -769,6 +778,12 @@ export class Config {
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.modelSteering = params.modelSteering ?? false;
+    this.useAgentFactoryAll = params.useAgentFactoryAll ?? false;
+    this.useAgentFactorySdk = params.useAgentFactorySdk ?? false;
+    this.useAgentFactoryNonInteractive =
+      params.useAgentFactoryNonInteractive ?? false;
+    this.useAgentFactoryInteractive =
+      params.useAgentFactoryInteractive ?? false;
     this.userHintService = new UserHintService(() =>
       this.isModelSteeringEnabled(),
     );
@@ -1519,6 +1534,27 @@ export class Config {
    *
    * May change over time.
    */
+  getExperimentalSetting(
+    key:
+      | 'useAgentFactoryAll'
+      | 'useAgentFactorySdk'
+      | 'useAgentFactoryNonInteractive'
+      | 'useAgentFactoryInteractive',
+  ): boolean {
+    switch (key) {
+      case 'useAgentFactoryAll':
+        return this.useAgentFactoryAll;
+      case 'useAgentFactorySdk':
+        return this.useAgentFactorySdk;
+      case 'useAgentFactoryNonInteractive':
+        return this.useAgentFactoryNonInteractive;
+      case 'useAgentFactoryInteractive':
+        return this.useAgentFactoryInteractive;
+      default:
+        return false;
+    }
+  }
+
   getExcludeTools(): Set<string> | undefined {
     // Right now this is present for backward compatibility with settings.json exclude
     const excludeToolsSet = new Set([...(this.excludeTools ?? [])]);

@@ -819,6 +819,12 @@ export async function loadCliConfig(
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     modelSteering: settings.experimental?.modelSteering,
+    useAgentFactoryAll: settings.experimental?.useAgentFactoryAll,
+    useAgentFactorySdk: settings.experimental?.useAgentFactorySdk,
+    useAgentFactoryNonInteractive:
+      settings.experimental?.useAgentFactoryNonInteractive,
+    useAgentFactoryInteractive:
+      settings.experimental?.useAgentFactoryInteractive,
     toolOutputMasking: settings.experimental?.toolOutputMasking,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
