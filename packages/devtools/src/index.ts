@@ -305,8 +305,8 @@ export class DevTools extends EventEmitter {
 
             // Handle registration first
             if (message.type === 'register') {
-              sessionId = String(message.sessionId);
-              if (!sessionId) return;
+            if (message.sessionId === undefined || message.sessionId === null) return;
+            sessionId = String(message.sessionId);
 
               this.sessions.set(sessionId, {
                 sessionId,
