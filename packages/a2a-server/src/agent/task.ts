@@ -521,7 +521,7 @@ export class Task {
     );
 
     if (tc.tool) {
-      serializableToolCall.tool = this._pickFields(
+      const toolFields = this._pickFields(
         tc.tool,
         'name',
         'displayName',
@@ -532,6 +532,7 @@ export class Task {
         'schema',
         'parameterSchema',
       );
+      serializableToolCall.tool = toolFields;
     }
 
     messageParts.push({
