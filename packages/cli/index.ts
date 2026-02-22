@@ -41,7 +41,6 @@ main().catch(async (error) => {
     writeToStderr('Cleanup timed out, forcing exit...\n');
     process.exit(1);
   }, 5000);
-  cleanupTimeout.unref(); // Don't keep the process alive just for the timeout
 
   try {
     await runExitCleanup();
