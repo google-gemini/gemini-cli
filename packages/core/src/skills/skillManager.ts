@@ -20,31 +20,21 @@ export class SkillManager {
   private activeSkillNames: Set<string> = new Set();
   private adminSkillsEnabled = true;
 
-  /**
-   * Clears all discovered skills.
-   */
   clearSkills(): void {
     this.skills = [];
   }
 
-  /**
-   * Sets administrative settings for skills.
-   */
+  //Sets administrative settings for skills.
   setAdminSettings(enabled: boolean): void {
     this.adminSkillsEnabled = enabled;
   }
 
-  /**
-   * Returns true if skills are enabled by the admin.
-   */
+  // Returns true if skills are enabled by the admin.
   isAdminEnabled(): boolean {
     return this.adminSkillsEnabled;
   }
 
-  /**
-   * Discovers skills from standard user and workspace locations, as well as extensions.
-   * Precedence: Extensions (lowest) -> User -> Workspace (highest).
-   */
+  // Discovers skills from standard user and workspace locations, as well as extensions.
   async discoverSkills(
     storage: Storage,
     extensions: GeminiCLIExtension[] = [],
@@ -66,7 +56,7 @@ export class SkillManager {
     const userSkills = await loadSkillsFromDir(Storage.getUserSkillsDir());
     this.addSkillsWithPrecedence(userSkills);
 
-    // 3.1 User agent skills alias (.agents/skills)
+    // User agent skills alias (.agents/skills)
     const userAgentSkills = await loadSkillsFromDir(
       Storage.getUserAgentSkillsDir(),
     );
@@ -92,9 +82,7 @@ export class SkillManager {
     this.addSkillsWithPrecedence(projectAgentSkills);
   }
 
-  /**
-   * Discovers built-in skills.
-   */
+  // Discovers built-in skills.
   private async discoverBuiltinSkills(): Promise<void> {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
     const builtinDir = path.join(__dirname, 'builtin');
@@ -108,9 +96,7 @@ export class SkillManager {
     this.addSkillsWithPrecedence(builtinSkills);
   }
 
-  /**
-   * Adds skills to the manager programmatically.
-   */
+  //Adds skills to the manager programmatically.
   addSkills(skills: SkillDefinition[]): void {
     this.addSkillsWithPrecedence(skills);
   }
@@ -140,9 +126,7 @@ export class SkillManager {
     this.skills = Array.from(skillMap.values());
   }
 
-  /**
-   * Returns the list of enabled discovered skills.
-   */
+  // Returns the list of enabled discovered skills.
   getSkills(): SkillDefinition[] {
     return this.skills.filter((s) => !s.disabled);
   }
@@ -155,23 +139,17 @@ export class SkillManager {
     return this.skills.filter((s) => !s.disabled && !s.isBuiltin);
   }
 
-  /**
-   * Returns all discovered skills, including disabled ones.
-   */
+  // Returns all discovered skills, including disabled ones.
   getAllSkills(): SkillDefinition[] {
     return this.skills;
   }
 
-  /**
-   * Filters discovered skills by name.
-   */
+  // Filters discovered skills by name.
   filterSkills(predicate: (skill: SkillDefinition) => boolean): void {
     this.skills = this.skills.filter(predicate);
   }
 
-  /**
-   * Sets the list of disabled skill names.
-   */
+  // Sets the list of disabled skill names.
   setDisabledSkills(disabledNames: string[]): void {
     const lowercaseDisabledNames = disabledNames.map((n) => n.toLowerCase());
     for (const skill of this.skills) {
@@ -181,9 +159,7 @@ export class SkillManager {
     }
   }
 
-  /**
-   * Reads the full content (metadata + body) of a skill by name.
-   */
+  // Reads the full content (metadata + body) of a skill by name.
   getSkill(name: string): SkillDefinition | null {
     const lowercaseName = name.toLowerCase();
     return (
@@ -191,23 +167,17 @@ export class SkillManager {
     );
   }
 
-  /**
-   * Activates a skill by name.
-   */
+  // Activates.
   activateSkill(name: string): void {
     this.activeSkillNames.add(name);
   }
 
-  /**
-   * Checks if a skill is active.
-   */
+  // Checks if a skill is active.
   isSkillActive(name: string): boolean {
     return this.activeSkillNames.has(name);
   }
 
-  /**
-   * Finds and returns the names of skills that match the provided prompt.
-   */
+  // Finds and returns the names of skills that match the provided prompt.
   findMatchingSkills(prompt: string): string[] {
     return SkillMatcher.findMatches(this.getSkills(), prompt);
   }

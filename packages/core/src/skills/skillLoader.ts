@@ -190,7 +190,7 @@ export async function loadSkillFromFile(
       return null;
     }
 
-    // Sanitize name for use as a filename/directory name (e.g. replace ':' with '-')
+    // Sanitize name for use as a filename/directory name.
     const sanitizedName = frontmatter.name.replace(/[:\\/<>*?"|]/g, '-');
 
     let compiledMatcher: RegExp | undefined;

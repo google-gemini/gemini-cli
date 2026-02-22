@@ -795,15 +795,32 @@ export class GeminiClient {
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
 
-      // Auto-activate matching skills based on user prompt
+      // Auto-activate matching skills based on user prompt.
+      // We only do this for the initial user prompt, not for tool call sequences.
+      // request is a prompt sequence; we search for text parts in it.
       const promptText = partToString(request);
-      const skillManager = this.config.getSkillManager();
-      const matchingSkillNames = skillManager.findMatchingSkills(promptText);
+      const isInitialUserPrompt =
+        Array.isArray(request) &&
+        request.some(
+          (p) => typeof p === 'object' && p !== null && 'text' in p && p.text,
+        );
+      if (isInitialUserPrompt || typeof request === 'string') {
+        const skillManager = this.config.getSkillManager();
+        const matchingSkillNames = skillManager.findMatchingSkills(promptText);
 
-      for (const skillName of matchingSkillNames) {
-        if (!skillManager.isSkillActive(skillName)) {
-          skillManager.activateSkill(skillName);
-          debugLogger.debug(`Auto-activated skill: ${skillName}`);
+        let activatedAny = false;
+        for (const skillName of matchingSkillNames) {
+          if (!skillManager.isSkillActive(skillName)) {
+            skillManager.activateSkill(skillName);
+            debugLogger.debug(`Auto-activated skill: ${skillName}`);
+            activatedAny = true;
+          }
+        }
+
+        // Critical: Update system instructions so the current turn's GeminiChat
+        // instance immediately picks up the newly activated skills.
+        if (activatedAny) {
+          this.updateSystemInstruction();
         }
       }
     }

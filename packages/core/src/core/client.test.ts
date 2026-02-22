@@ -271,6 +271,11 @@ describe('Gemini Client (client.ts)', () => {
       getActiveModel: vi.fn().mockReturnValue('test-model'),
       setActiveModel: vi.fn(),
       resetTurn: vi.fn(),
+      getSkillManager: vi.fn().mockReturnValue({
+        findMatchingSkills: vi.fn().mockReturnValue([]),
+        isSkillActive: vi.fn().mockReturnValue(false),
+        activateSkill: vi.fn(),
+      }),
       getModelAvailabilityService: vi
         .fn()
         .mockReturnValue(createAvailabilityServiceMock()),
