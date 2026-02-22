@@ -58,7 +58,9 @@ import type { PartUnion, Part as genAiPart } from '@google/genai';
 
 type UnionKeys<T> = T extends T ? keyof T : never;
 
-const VALID_CONFIRMATION_TYPES = [
+type ConfirmationType = ToolCallConfirmationDetails['type'];
+
+const VALID_CONFIRMATION_TYPES: readonly ConfirmationType[] = [
   'edit',
   'exec',
   'mcp',
