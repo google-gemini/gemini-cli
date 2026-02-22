@@ -1579,13 +1579,21 @@ conventions and context.
       - Location: `~/.gemini/<configured-context-filename>` (e.g.,
         `~/.gemini/GEMINI.md` in your user home directory).
       - Scope: Provides default instructions for all your projects.
-  2.  **Project root and ancestors context files:**
+  2.  **Extension context (read-only):**
+      - Location: Each enabled [extension](../extensions/reference.md) may
+        provide a context file (default `GEMINI.md`, or `contextFileName` in the
+        extension manifest). Paths are under the extension's installation
+        directory.
+      - Scope: Extension-provided instructions. This layer is read-only for
+        users (visible in `/memory show`; not editable via `/memory add` or
+        `save_memory`).
+  3.  **Project root and ancestors context files:**
       - Location: The CLI searches for the configured context file in the
         current working directory and then in each parent directory up to either
         the project root (identified by a `.git` folder) or your home directory.
       - Scope: Provides context relevant to the entire project or a significant
         portion of it.
-  3.  **Sub-directory context files (contextual/local):**
+  4.  **Sub-directory context files (contextual/local):**
       - Location: The CLI also scans for the configured context file in
         subdirectories _below_ the current working directory (respecting common
         ignore patterns like `node_modules`, `.git`, etc.). The breadth of this
@@ -1606,8 +1614,8 @@ conventions and context.
   - Use `/memory refresh` to force a re-scan and reload of all context files
     from all configured locations. This updates the AI's instructional context.
   - Use `/memory show` to display the combined instructional context currently
-    loaded, allowing you to verify the hierarchy and content being used by the
-    AI.
+    loaded (global, extension, and project layers), allowing you to verify the
+    hierarchy and content being used by the AI, including any extension context.
   - See the [Commands documentation](./commands.md#memory) for full details on
     the `/memory` command and its sub-commands (`show` and `refresh`).
 

@@ -19,13 +19,23 @@ order:
     - **Location:** `~/.gemini/GEMINI.md` (in your user home directory).
     - **Scope:** Provides default instructions for all your projects.
 
-2.  **Environment and workspace context files:**
+2.  **Extension context (read-only):**
+    - **Location:** [Installed extensions](../extensions/reference.md) can
+      provide a context file (default `GEMINI.md`, or a custom name via
+      `contextFileName` in the extension manifest). These files live inside each
+      extension's directory.
+    - **Scope:** Instructions provided by the extension (for example, tool usage
+      or conventions). This layer is read-only: you see it in `/memory show`,
+      but you cannot edit it via the CLI (for example, `/memory add` only
+      appends to global memory).
+
+3.  **Environment and workspace context files:**
     - **Location:** The CLI searches for `GEMINI.md` files in your configured
       workspace directories and their parent directories.
     - **Scope:** Provides context relevant to the projects you are currently
       working on.
 
-3.  **Just-in-time (JIT) context files:**
+4.  **Just-in-time (JIT) context files:**
     - **Location:** When a tool accesses a file or directory, the CLI
       automatically scans for `GEMINI.md` files in that directory and its
       ancestors up to a trusted root.
@@ -61,8 +71,9 @@ a TypeScript project:
 You can interact with the loaded context files by using the `/memory` command.
 
 - **`/memory show`**: Displays the full, concatenated content of the current
-  hierarchical memory. This lets you inspect the exact instructional context
-  being provided to the model.
+  hierarchical memory (global, extension, and project layers). This lets you
+  inspect the exact instructional context being provided to the model, including
+  any context from installed extensions.
 - **`/memory refresh`**: Forces a re-scan and reload of all `GEMINI.md` files
   from all configured locations.
 - **`/memory add <text>`**: Appends your text to your global

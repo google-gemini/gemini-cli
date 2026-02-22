@@ -17,7 +17,9 @@ global `GEMINI.md` file (typically located at `~/.gemini/GEMINI.md`).
 
 - **Storage:** Appends to the global context file in the user's home directory.
 - **Loading:** The stored facts are automatically included in the hierarchical
-  context system for all future sessions.
+  context system for all future sessions. The full
+  [context hierarchy](../cli/gemini-md.md) has global, extension (read-only),
+  and project layers; `save_memory` only appends to the global context file.
 - **Format:** Saves data as a bulleted list item within a dedicated Markdown
   section.
 
