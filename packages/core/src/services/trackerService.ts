@@ -12,15 +12,17 @@ import { TrackerTaskSchema, type TrackerTask } from './trackerTypes.js';
 export class TrackerService {
   private readonly tasksDir: string;
 
+  private initialized = false;
+
   constructor(readonly trackerDir: string) {
     this.tasksDir = trackerDir;
   }
 
-  /**
-   * Initializes the tracker storage if it doesn't exist.
-   */
-  async ensureInitialized(): Promise<void> {
-    await fs.mkdir(this.tasksDir, { recursive: true });
+  private async ensureInitialized(): Promise<void> {
+    if (!this.initialized) {
+      await fs.mkdir(this.tasksDir, { recursive: true });
+      this.initialized = true;
+    }
   }
 
   /**
@@ -49,6 +51,7 @@ export class TrackerService {
    * Reads a task by ID.
    */
   async getTask(id: string): Promise<TrackerTask | null> {
+    await this.ensureInitialized();
     const taskPath = path.join(this.tasksDir, `${id}.json`);
     try {
       const content = await fs.readFile(taskPath, 'utf8');

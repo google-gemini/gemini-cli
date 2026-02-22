@@ -26,12 +26,7 @@ describe('TrackerService', () => {
     await fs.rm(testTrackerDir, { recursive: true, force: true });
   });
 
-  it('should initialize the tracker directory', async () => {
-    await service.ensureInitialized();
-    const tasksDir = testTrackerDir;
-    const stats = await fs.stat(tasksDir);
-    expect(stats.isDirectory()).toBe(true);
-  });
+
 
   it('should create a task with a generated 6-char hex ID', async () => {
     const taskData: Omit<TrackerTask, 'id'> = {
