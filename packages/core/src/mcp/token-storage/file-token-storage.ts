@@ -12,16 +12,9 @@ import * as crypto from 'node:crypto';
 import { BaseTokenStorage } from './base-token-storage.js';
 import { type OAuthCredentials, OAuthCredentialsSchema } from './types.js';
 import { GEMINI_DIR, homedir } from '../../utils/paths.js';
-const OAuthCredentialsRecordSchema = z.record(OAuthCredentialsSchema);
+import { isErrnoException } from '../../utils/errors.js';
 
-function isErrnoException(e: unknown): e is NodeJS.ErrnoException {
-  return (
-    e !== null &&
-    typeof e === 'object' &&
-    'code' in e &&
-    typeof (e as { code?: unknown }).code === 'string'
-  );
-}
+const OAuthCredentialsRecordSchema = z.record(OAuthCredentialsSchema);
 
 export class FileTokenStorage extends BaseTokenStorage {
   private readonly tokenFilePath: string;
