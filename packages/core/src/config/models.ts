@@ -251,7 +251,7 @@ export function isActiveModel(
 }
 /**
  * Checks if the model supports audio/voice mode.
- * * @param model The model name to check.
+ * @param model The model name to check.
  * @returns True if the model supports audio features.
  */
 export function supportsAudio(model: string): boolean {
