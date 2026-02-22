@@ -68,7 +68,7 @@ describe('convertSessionToClientHistory', () => {
     ]);
   });
 
-  it('should correct map tool calls and their responses', () => {
+  it('should correctly map tool calls and their responses', () => {
     const messages: ConversationRecord['messages'] = [
       {
         id: 'msg1',
@@ -115,6 +115,32 @@ describe('convertSessionToClientHistory', () => {
               response: { output: 'file.txt' },
             },
           },
+        ],
+      },
+    ]);
+  });
+
+  it('should preserve multi-modal parts (inlineData)', () => {
+    const messages: ConversationRecord['messages'] = [
+      {
+        id: 'msg1',
+        type: 'user',
+        timestamp: '2024-01-01T10:00:00Z',
+        content: [
+          { text: 'Look at this image' },
+          { inlineData: { mimeType: 'image/png', data: 'base64data' } },
+        ],
+      },
+    ];
+
+    const history = convertSessionToClientHistory(messages);
+
+    expect(history).toEqual([
+      {
+        role: 'user',
+        parts: [
+          { text: 'Look at this image' },
+          { inlineData: { mimeType: 'image/png', data: 'base64data' } },
         ],
       },
     ]);

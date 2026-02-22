@@ -4,9 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type Part } from '@google/genai';
+import { type Part, type PartListUnion } from '@google/genai';
 import { type ConversationRecord } from '../services/chatRecordingService.js';
 import { partListUnionToString } from '../core/geminiRequest.js';
+
+/**
+ * Converts a PartListUnion into a normalized array of Part objects.
+ * This handles converting raw strings into { text: string } parts.
+ */
+function ensurePartArray(content: PartListUnion): Part[] {
+  if (Array.isArray(content)) {
+    return content.map((part) =>
+      typeof part === 'string' ? { text: part } : part,
+    );
+  }
+  if (typeof content === 'string') {
+    return [{ text: content }];
+  }
+  return [content];
+}
 
 /**
  * Converts session/conversation data into Gemini client history formats.
@@ -32,19 +48,21 @@ export function convertSessionToClientHistory(
 
       clientHistory.push({
         role: 'user',
-        parts: Array.isArray(msg.content)
-          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            (msg.content as Part[])
-          : [{ text: contentString }],
+        parts: ensurePartArray(msg.content),
       });
     } else if (msg.type === 'gemini') {
       const hasToolCalls = msg.toolCalls && msg.toolCalls.length > 0;
 
       if (hasToolCalls) {
         const modelParts: Part[] = [];
-        const contentString = partListUnionToString(msg.content);
-        if (msg.content && contentString.trim()) {
-          modelParts.push({ text: contentString });
+
+        // TODO: Revisit if we should preserve more than just Part metadata (e.g. thoughtSignatures)
+        // currently those are only required within an active loop turn which resume clears
+        // by forcing a new user text prompt.
+
+        // Preserve original parts to maintain multimodal integrity
+        if (msg.content) {
+          modelParts.push(...ensurePartArray(msg.content));
         }
 
         for (const toolCall of msg.toolCalls!) {
@@ -78,8 +96,7 @@ export function convertSessionToClientHistory(
                 },
               };
             } else if (Array.isArray(toolCall.result)) {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-              functionResponseParts.push(...(toolCall.result as Part[]));
+              functionResponseParts.push(...ensurePartArray(toolCall.result));
               continue;
             } else {
               responseData = toolCall.result;
@@ -96,12 +113,15 @@ export function convertSessionToClientHistory(
           });
         }
       } else {
-        const contentString = partListUnionToString(msg.content);
-        if (msg.content && contentString.trim()) {
-          clientHistory.push({
-            role: 'model',
-            parts: [{ text: contentString }],
-          });
+        if (msg.content) {
+          const parts = ensurePartArray(msg.content);
+
+          if (parts.length > 0) {
+            clientHistory.push({
+              role: 'model',
+              parts,
+            });
+          }
         }
       }
     }
