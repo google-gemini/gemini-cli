@@ -1291,6 +1291,16 @@ const SETTINGS_SCHEMA = {
         `,
         showInDialog: true,
       },
+      askUser: {
+        type: 'boolean',
+        label: 'Enable Ask User Tool',
+        category: 'Tools',
+        requiresRestart: true,
+        default: true,
+        description:
+          'Enable or disable the ask_user tool, which allows the model to ask clarifying questions during a session.',
+        showInDialog: true,
+      },
     },
   },
 

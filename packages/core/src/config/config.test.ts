@@ -941,6 +941,31 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('UseAskUser Configuration', () => {
+    it('should default useAskUser to true when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getUseAskUser()).toBe(true);
+    });
+
+    it('should set useAskUser to false when provided as false', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        useAskUser: false,
+      };
+      const config = new Config(params);
+      expect(config.getUseAskUser()).toBe(false);
+    });
+
+    it('should set useAskUser to true when provided as true', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        useAskUser: true,
+      };
+      const config = new Config(params);
+      expect(config.getUseAskUser()).toBe(true);
+    });
+  });
+
   describe('Event Driven Scheduler Configuration', () => {
     it('should default enableEventDrivenScheduler to true when not provided', () => {
       const config = new Config(baseParams);
