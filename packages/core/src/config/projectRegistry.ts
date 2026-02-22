@@ -59,6 +59,7 @@ export class ProjectRegistry {
 
     try {
       const content = await fs.promises.readFile(this.registryPath, 'utf8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return JSON.parse(content);
     } catch (e) {
       debugLogger.debug('Failed to load registry: ', e);
