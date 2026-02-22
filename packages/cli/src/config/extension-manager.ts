@@ -309,7 +309,7 @@ Would you like to attempt to install via "git clone" instead?`,
         ).getExtensionDir();
 
         // Create Backup
-        const backupPath = `${destinationPath}_backup`;
+        const backupPath = `${destinationPath}_backup_${randomUUID()}`;
         let backupCreated = false;
 
         if (isUpdate) {
@@ -398,12 +398,19 @@ Would you like to attempt to install via "git clone" instead?`,
           }
         } catch (loadError) {
           if (backupCreated) {
-            await fs.promises.rm(destinationPath, {
-              recursive: true,
-              force: true,
-            });
-            await fs.promises.rename(backupPath, destinationPath);
-            extension = await this.loadExtension(destinationPath);
+            try {
+              await fs.promises.rm(destinationPath, {
+                recursive: true,
+                force: true,
+              });
+              await fs.promises.rename(backupPath, destinationPath);
+              await this.loadExtension(destinationPath);
+            } catch (restoreError) {
+              debugLogger.error(
+                'Failed to restore extension from backup after update failure:',
+                restoreError,
+              );
+            }
           }
           throw loadError;
         } finally {
