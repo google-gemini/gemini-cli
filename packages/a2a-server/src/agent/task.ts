@@ -58,8 +58,7 @@ import type { PartUnion, Part as genAiPart } from '@google/genai';
 
 type UnionKeys<T> = T extends T ? keyof T : never;
 
-/** Valid confirmation detail types; single source of truth (must match ToolCallConfirmationDetails in core). */
-const TOOL_CONFIRMATION_DETAILS_TYPES = [
+const VALID_CONFIRMATION_TYPES = [
   'edit',
   'exec',
   'mcp',
@@ -81,9 +80,7 @@ function isToolCallConfirmationDetails(
   ) {
     return false;
   }
-  return (TOOL_CONFIRMATION_DETAILS_TYPES as readonly string[]).includes(
-    value.type,
-  );
+  return (VALID_CONFIRMATION_TYPES as readonly string[]).includes(value.type);
 }
 
 export class Task {
@@ -524,7 +521,7 @@ export class Task {
     );
 
     if (tc.tool) {
-      const toolFields = this._pickFields(
+      serializableToolCall.tool = this._pickFields(
         tc.tool,
         'name',
         'displayName',
@@ -535,7 +532,6 @@ export class Task {
         'schema',
         'parameterSchema',
       );
-      serializableToolCall.tool = toolFields;
     }
 
     messageParts.push({
