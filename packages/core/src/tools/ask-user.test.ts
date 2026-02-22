@@ -118,6 +118,25 @@ describe('AskUserTool', () => {
       expect(params.questions[0].header).toBe('This is way too ');
     });
 
+    it('should truncate at grapheme boundaries without corrupting multi-byte characters', () => {
+      // "Too long header" is 15 chars + flag emoji (🇺🇸 = 2 code points, 4 UTF-16 code units)
+      // Total .length = 19, exceeds MAX_HEADER_LENGTH (16).
+      // Plain slice(0, 16) would cut through the flag emoji's surrogate pair.
+      // Grapheme-aware truncation should drop the emoji entirely rather than corrupt it.
+      const params = {
+        questions: [
+          {
+            question: 'Test?',
+            header: 'Too long header🇺🇸',
+            type: QuestionType.TEXT,
+          },
+        ],
+      };
+      const result = tool.validateToolParams(params);
+      expect(result).toBeNull();
+      expect(params.questions[0].header).toBe('Too long header');
+    });
+
     it('should return error if options has fewer than 2 items', () => {
       const result = tool.validateToolParams({
         questions: [

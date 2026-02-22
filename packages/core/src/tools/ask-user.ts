@@ -31,6 +31,22 @@ export interface AskUserParams {
  */
 const MAX_HEADER_LENGTH = 16;
 
+/**
+ * Truncates a string to fit within a maximum number of UTF-16 code units
+ * (i.e. string.length) while respecting grapheme cluster boundaries.
+ * This avoids corrupting multi-byte Unicode characters (e.g. emojis,
+ * combining characters) that plain string.slice() could split mid-character.
+ */
+function truncateAtGraphemeBoundary(text: string, maxLength: number): string {
+  const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+  let result = '';
+  for (const { segment } of segmenter.segment(text)) {
+    if (result.length + segment.length > maxLength) break;
+    result += segment;
+  }
+  return result;
+}
+
 export class AskUserTool extends BaseDeclarativeTool<
   AskUserParams,
   ToolResult
@@ -57,7 +73,7 @@ export class AskUserTool extends BaseDeclarativeTool<
           typeof q.header === 'string' &&
           q.header.length > MAX_HEADER_LENGTH
         ) {
-          q.header = q.header.slice(0, MAX_HEADER_LENGTH);
+          q.header = truncateAtGraphemeBoundary(q.header, MAX_HEADER_LENGTH);
         }
       }
     }
