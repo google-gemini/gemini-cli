@@ -2213,6 +2213,21 @@ describe('Config Quota & Preview Model Access', () => {
       expect(config.getHasAccessToPreviewModel()).toBe(true);
     });
 
+    it('should update hasAccessToPreviewModel to true if quota includes non-preview Gemini 3 model IDs', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [
+          {
+            modelId: 'gemini-3-pro',
+            remainingAmount: '100',
+            remainingFraction: 1.0,
+          },
+        ],
+      });
+
+      await config.refreshUserQuota();
+      expect(config.getHasAccessToPreviewModel()).toBe(true);
+    });
+
     it('should update hasAccessToPreviewModel to false if quota does not include preview model', async () => {
       mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
         buckets: [
@@ -2262,6 +2277,30 @@ describe('Config Quota & Preview Model Access', () => {
       expect(pooled?.remaining).toBe(90);
       expect(pooled?.limit).toBe(150);
       expect((pooled?.remaining ?? 0) / (pooled?.limit ?? 1)).toBeCloseTo(0.6);
+    });
+
+    it('should normalize non-preview Gemini 3 quota buckets for auto-gemini-3 pooled quota', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [
+          {
+            modelId: 'gemini-3-pro',
+            remainingAmount: '20',
+            remainingFraction: 0.2,
+          },
+          {
+            modelId: 'gemini-3-flash',
+            remainingAmount: '80',
+            remainingFraction: 0.8,
+          },
+        ],
+      });
+
+      config.setModel('auto-gemini-3');
+      await config.refreshUserQuota();
+
+      expect(config.getHasAccessToPreviewModel()).toBe(true);
+      expect(config.getQuotaRemaining()).toBe(100);
+      expect(config.getQuotaLimit()).toBe(200);
     });
 
     it('should return undefined pooled quota for non-auto models', async () => {

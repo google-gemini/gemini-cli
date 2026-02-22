@@ -57,6 +57,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   isAutoModel,
   isPreviewModel,
+  PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
@@ -1461,6 +1462,27 @@ export class Config {
     this.hasAccessToPreviewModel = hasAccess;
   }
 
+  private normalizeQuotaModelId(modelId: string): string {
+    switch (modelId) {
+      case 'gemini-3-pro':
+        return PREVIEW_GEMINI_MODEL;
+      case 'gemini-3-flash':
+        return PREVIEW_GEMINI_FLASH_MODEL;
+      case 'gemini-3.1-pro':
+        return PREVIEW_GEMINI_3_1_MODEL;
+      default:
+        return modelId;
+    }
+  }
+
+  private isGemini3QuotaModel(modelId: string): boolean {
+    return (
+      modelId === PREVIEW_GEMINI_MODEL ||
+      modelId === PREVIEW_GEMINI_FLASH_MODEL ||
+      modelId === PREVIEW_GEMINI_3_1_MODEL
+    );
+  }
+
   async refreshUserQuota(): Promise<RetrieveUserQuotaResponse | undefined> {
     const codeAssistServer = getCodeAssistServer(this);
     if (!codeAssistServer || !codeAssistServer.projectId) {
@@ -1481,14 +1503,15 @@ export class Config {
             bucket.remainingAmount &&
             bucket.remainingFraction != null
           ) {
+            const quotaModelId = this.normalizeQuotaModelId(bucket.modelId);
             const remaining = parseInt(bucket.remainingAmount, 10);
             const limit =
               bucket.remainingFraction > 0
                 ? Math.round(remaining / bucket.remainingFraction)
-                : (this.modelQuotas.get(bucket.modelId)?.limit ?? 0);
+                : (this.modelQuotas.get(quotaModelId)?.limit ?? 0);
 
             if (!isNaN(remaining) && Number.isFinite(limit) && limit > 0) {
-              this.modelQuotas.set(bucket.modelId, {
+              this.modelQuotas.set(quotaModelId, {
                 remaining,
                 limit,
                 resetTime: bucket.resetTime,
@@ -1500,8 +1523,12 @@ export class Config {
       }
 
       const hasAccess =
-        quota.buckets?.some((b) => b.modelId && isPreviewModel(b.modelId)) ??
-        false;
+        quota.buckets?.some((b) => {
+          if (!b.modelId) {
+            return false;
+          }
+          return this.isGemini3QuotaModel(this.normalizeQuotaModelId(b.modelId));
+        }) ?? false;
       this.setHasAccessToPreviewModel(hasAccess);
       return quota;
     } catch (e) {
