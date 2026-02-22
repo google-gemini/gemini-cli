@@ -47,14 +47,18 @@ export function TextInput({
       }
 
       if (keyMatchers[Command.SUBMIT](key) && onSubmit) {
-        onSubmit(text);
+        const processedText = Object.entries(buffer.pastedContent ?? {}).reduce(
+          (t, [placeholder, content]) => t.split(placeholder).join(content),
+          text,
+        );
+        onSubmit(processedText);
         return true;
       }
 
       const handled = handleInput(key);
       return handled;
     },
-    [handleInput, onCancel, onSubmit, text],
+    [handleInput, onCancel, onSubmit, text, buffer.pastedContent],
   );
 
   useKeypress(handleKeyPress, { isActive: focus, priority: true });

@@ -298,6 +298,60 @@ describe('TextInput', () => {
     unmount();
   });
 
+  it('expands paste placeholder to real content on submit', async () => {
+    const placeholder = '[Pasted Text: 6 lines]';
+    const realContent = 'line1\nline2\nline3\nline4\nline5\nline6';
+    mockBuffer.text = placeholder;
+    (mockBuffer as unknown as Record<string, unknown>).pastedContent = {
+      [placeholder]: realContent,
+    };
+    const { waitUntilReady, unmount } = render(
+      <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
+    );
+    await waitUntilReady();
+    const keypressHandler = mockedUseKeypress.mock.calls[0][0];
+
+    await act(async () => {
+      keypressHandler({
+        name: 'return',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
+        sequence: '',
+      });
+    });
+    await waitUntilReady();
+
+    expect(onSubmit).toHaveBeenCalledWith(realContent);
+    unmount();
+  });
+
+  it('submits text unchanged when pastedContent is empty', async () => {
+    mockBuffer.text = 'normal text';
+    (mockBuffer as unknown as Record<string, unknown>).pastedContent = {};
+    const { waitUntilReady, unmount } = render(
+      <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
+    );
+    await waitUntilReady();
+    const keypressHandler = mockedUseKeypress.mock.calls[0][0];
+
+    await act(async () => {
+      keypressHandler({
+        name: 'return',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
+        sequence: '',
+      });
+    });
+    await waitUntilReady();
+
+    expect(onSubmit).toHaveBeenCalledWith('normal text');
+    unmount();
+  });
+
   it('calls onCancel on escape', async () => {
     vi.useFakeTimers();
     const { waitUntilReady, unmount } = render(
