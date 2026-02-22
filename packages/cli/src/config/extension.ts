@@ -11,6 +11,7 @@ import type {
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { z } from 'zod';
 import { INSTALL_METADATA_FILENAME } from './extensions/variables.js';
 import type { ExtensionSetting } from './extensions/extensionSettings.js';
 
@@ -41,15 +42,27 @@ export interface ExtensionUpdateInfo {
   updatedVersion: string;
 }
 
+const extensionInstallMetadataSchema = z.object({
+  source: z.string(),
+  type: z.enum(['git', 'local', 'link', 'github-release']),
+  releaseTag: z.string().optional(),
+  ref: z.string().optional(),
+  autoUpdate: z.boolean().optional(),
+  allowPreRelease: z.boolean().optional(),
+});
+
 export function loadInstallMetadata(
   extensionDir: string,
 ): ExtensionInstallMetadata | undefined {
   const metadataFilePath = path.join(extensionDir, INSTALL_METADATA_FILENAME);
   try {
     const configContent = fs.readFileSync(metadataFilePath, 'utf-8');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const metadata = JSON.parse(configContent) as ExtensionInstallMetadata;
-    return metadata;
+    const metadata: unknown = JSON.parse(configContent);
+    const result = extensionInstallMetadataSchema.safeParse(metadata);
+    if (!result.success) {
+      return undefined;
+    }
+    return result.data;
   } catch (_e) {
     return undefined;
   }
