@@ -607,6 +607,64 @@ function doIt() {
       };
       expect(tool.validateToolParams(params)).toMatch(/Path not in workspace/);
     });
+
+    it('should reject omission placeholder in new_string when old_string does not contain the same placeholder', () => {
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'test.txt'),
+        instruction: 'An instruction',
+        old_string: 'old content',
+        new_string: '(rest of methods ...)',
+      };
+      expect(tool.validateToolParams(params)).toBe(
+        "`new_string` contains an omission placeholder (for example 'rest of methods ...'). Provide exact literal replacement text.",
+      );
+    });
+
+    it('should allow omission placeholder when the same placeholder already exists in old_string', () => {
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'test.txt'),
+        instruction: 'An instruction',
+        old_string: '(rest of methods ...)',
+        new_string: '(rest of methods ...)',
+      };
+      expect(tool.validateToolParams(params)).toBeNull();
+    });
+
+    it('should allow normal code that contains ellipsis in a string literal', () => {
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'test.ts'),
+        instruction: 'Update string literal',
+        old_string: 'const msg = "old";',
+        new_string: 'const msg = "(rest of methods ...)";',
+      };
+      expect(tool.validateToolParams(params)).toBeNull();
+    });
+
+    it('should reject multiline omission placeholder edits that hide unchanged methods (regression #19858)', () => {
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'service.ts'),
+        instruction: 'Rename one method and keep rest unchanged',
+        old_string: `class Service {
+  run() {
+    return "run";
+  }
+
+  helper() {
+    return "helper";
+  }
+}`,
+        new_string: `class Service {
+  execute() {
+    return "run";
+  }
+
+  (rest of methods ...)
+}`,
+      };
+      expect(tool.validateToolParams(params)).toBe(
+        "`new_string` contains an omission placeholder (for example 'rest of methods ...'). Provide exact literal replacement text.",
+      );
+    });
   });
 
   describe('execute', () => {

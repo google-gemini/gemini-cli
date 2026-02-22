@@ -54,6 +54,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import levenshtein from 'fast-levenshtein';
 import { EDIT_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { detectOmissionPlaceholder } from './omissionPlaceholderDetector.js';
 
 const ENABLE_FUZZY_MATCH_RECOVERY = true;
 const FUZZY_MATCH_THRESHOLD = 0.1; // Allow up to 10% weighted difference
@@ -972,6 +973,24 @@ export class EditTool
       filePath = result.correctedPath;
     }
     params.file_path = filePath;
+
+    const newPlaceholderMatch = detectOmissionPlaceholder(params.new_string);
+    if (newPlaceholderMatch.found) {
+      const oldPlaceholderMatch = detectOmissionPlaceholder(params.old_string);
+      const normalizedNewPlaceholder = newPlaceholderMatch.match
+        ?.trim()
+        .toLowerCase();
+      const normalizedOldPlaceholder = oldPlaceholderMatch.match
+        ?.trim()
+        .toLowerCase();
+
+      if (
+        !oldPlaceholderMatch.found ||
+        normalizedOldPlaceholder !== normalizedNewPlaceholder
+      ) {
+        return "`new_string` contains an omission placeholder (for example 'rest of methods ...'). Provide exact literal replacement text.";
+      }
+    }
 
     return this.config.validatePathAccess(params.file_path);
   }
