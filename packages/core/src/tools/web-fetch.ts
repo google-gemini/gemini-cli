@@ -218,9 +218,10 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       const fetchedUrls: string[] = [];
       const errors: string[] = [];
 
+      const perUrlBudget = Math.floor(MAX_CONTENT_LENGTH / urls.length);
       for (const url of urls) {
         try {
-          const result = await this.executeFallbackForUrl(url, signal);
+          const result = await this.executeFallbackForUrl(url, signal, perUrlBudget);
           allContent.push(`--- Content from ${url} ---\n${result.content}`);
           fetchedUrls.push(url);
         } catch (e) {
