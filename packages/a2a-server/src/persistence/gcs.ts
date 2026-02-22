@@ -13,6 +13,7 @@ import { tmpdir } from '@google/gemini-cli-core';
 import { join } from 'node:path';
 import type { Task as SDKTask } from '@a2a-js/sdk';
 import type { TaskStore } from '@a2a-js/sdk/server';
+import { z } from 'zod';
 import { logger } from '../utils/logger.js';
 import { setTargetDir } from '../config/config.js';
 import { getPersistedState, type PersistedTaskMetadata } from '../types.js';
@@ -246,8 +247,12 @@ export class GCSTaskStore implements TaskStore {
       }
       const [compressedMetadata] = await metadataFile.download();
       const jsonData = gunzipSync(compressedMetadata).toString();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const loadedMetadata = JSON.parse(jsonData);
+      const rawMetadata: unknown = JSON.parse(jsonData);
+      const parsedMetadata = z.record(z.unknown()).safeParse(rawMetadata);
+      if (!parsedMetadata.success) {
+        throw new Error(`Task ${taskId} metadata is not a valid JSON object.`);
+      }
+      const loadedMetadata = parsedMetadata.data;
       logger.info(`Task ${taskId} metadata loaded from GCS.`);
 
       const persistedState = getPersistedState(loadedMetadata);
@@ -281,16 +286,20 @@ export class GCSTaskStore implements TaskStore {
         logger.info(`Task ${taskId} workspace archive not found in GCS.`);
       }
 
+      const contextIdResult = z
+        .string()
+        .safeParse(loadedMetadata['_contextId']);
+      const contextId =
+        (contextIdResult.success ? contextIdResult.data : '') || uuidv4();
+
       return {
         id: taskId,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        contextId: loadedMetadata._contextId || uuidv4(),
+        contextId,
         kind: 'task',
         status: {
           state: persistedState._taskState,
           timestamp: new Date().toISOString(),
         },
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         metadata: loadedMetadata,
         history: [],
         artifacts: [],

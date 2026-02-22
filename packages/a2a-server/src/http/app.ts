@@ -5,6 +5,7 @@
  */
 
 import express from 'express';
+import { z } from 'zod';
 
 import type { AgentCard, Message } from '@a2a-js/sdk';
 import {
@@ -91,8 +92,11 @@ async function handleExecuteCommand(
   },
 ) {
   logger.info('[CoreAgent] Received /executeCommand request: ', req.body);
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  const { command, args } = req.body;
+  const parsedBody = z.record(z.unknown()).safeParse(req.body);
+  if (!parsedBody.success) {
+    return res.status(400).json({ error: 'Invalid request body.' });
+  }
+  const { command, args } = parsedBody.data;
   try {
     if (typeof command !== 'string') {
       return res.status(400).json({ error: 'Invalid "command" field.' });
@@ -101,6 +105,13 @@ async function handleExecuteCommand(
     if (args && !Array.isArray(args)) {
       return res.status(400).json({ error: '"args" field must be an array.' });
     }
+    const safeArgsResult = z.array(z.string()).safeParse(args || []);
+    if (!safeArgsResult.success) {
+      return res
+        .status(400)
+        .json({ error: '"args" field must be an array of strings.' });
+    }
+    const safeArgs = safeArgsResult.data;
 
     const commandToExecute = commandRegistry.get(command);
 
@@ -130,13 +141,13 @@ async function handleExecuteCommand(
       };
       eventBus.on('event', eventHandler);
 
-      await commandToExecute.execute({ ...context, eventBus }, args ?? []);
+      await commandToExecute.execute({ ...context, eventBus }, safeArgs);
 
       eventBus.off('event', eventHandler);
       eventBus.finished();
       return res.end(); // Explicit return for streaming path
     } else {
-      const result = await commandToExecute.execute(context, args ?? []);
+      const result = await commandToExecute.execute(context, safeArgs);
       logger.info('[CoreAgent] Sending /executeCommand response: ', result);
       return res.status(200).json(result);
     }
@@ -215,8 +226,9 @@ export async function createApp() {
         const agentSettings = req.body.agentSettings as
           | AgentSettings
           | undefined;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const contextId = req.body.contextId || uuidv4();
+        const contextIdResult = z.string().safeParse(req.body.contextId);
+        const contextId =
+          (contextIdResult.success ? contextIdResult.data : '') || uuidv4();
         const wrapper = await agentExecutor.createTask(
           taskId,
           contextId,

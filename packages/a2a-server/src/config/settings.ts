@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { z } from 'zod';
 
 import {
   type MCPServerConfig,
@@ -121,14 +122,23 @@ export function loadSettings(workspaceDir: string): Settings {
 
 function resolveEnvVarsInString(value: string): string {
   const envVarRegex = /\$(?:(\w+)|{([^}]+)})/g; // Find $VAR_NAME or ${VAR_NAME}
-  return value.replace(envVarRegex, (match, varName1, varName2) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const varName = varName1 || varName2;
-    if (process && process.env && typeof process.env[varName] === 'string') {
-      return process.env[varName];
-    }
-    return match;
-  });
+  return value.replace(
+    envVarRegex,
+    (match: string, varName1: unknown, varName2: unknown) => {
+      const varNameResult = z.string().safeParse(varName1 || varName2);
+      if (varNameResult.success) {
+        const varName = varNameResult.data;
+        if (
+          process &&
+          process.env &&
+          typeof process.env[varName] === 'string'
+        ) {
+          return process.env[varName];
+        }
+      }
+      return match;
+    },
+  );
 }
 
 function resolveEnvVarsInObject<T>(obj: T): T {
