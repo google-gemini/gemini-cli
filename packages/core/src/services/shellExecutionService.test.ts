@@ -736,6 +736,37 @@ describe('ShellExecutionService', () => {
       );
     });
 
+    it('should use wsl.exe with bash when cwd is a WSL UNC path on Windows', async () => {
+      mockPlatform.mockReturnValue('win32');
+
+      const abortController = new AbortController();
+      const handle = await ShellExecutionService.execute(
+        'ls "foo bar"',
+        '\\\\wsl.localhost\\Ubuntu\\home\\ayush\\repo',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+
+      mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      await handle.result;
+
+      expect(mockPtySpawn).toHaveBeenCalledWith(
+        'wsl.exe',
+        [
+          '-d',
+          'Ubuntu',
+          '--cd',
+          '/home/ayush/repo',
+          'bash',
+          '-lc',
+          'shopt -u promptvars nullglob extglob nocaseglob dotglob; ls "foo bar"',
+        ],
+        expect.objectContaining({ cwd: undefined }),
+      );
+    });
+
     it('should use bash on Linux', async () => {
       mockPlatform.mockReturnValue('linux');
       await simulateExecution('ls "foo bar"', (pty) =>
