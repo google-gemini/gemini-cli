@@ -958,8 +958,13 @@ describe('Server Config (config.ts)', () => {
   });
 
   describe('Shell Tool Inactivity Timeout', () => {
-    it('should default to 300000ms (300 seconds) when not provided', () => {
+    it('should default to 600000ms (600 seconds) for non-interactive when not provided', () => {
       const config = new Config(baseParams);
+      expect(config.getShellToolInactivityTimeout()).toBe(600000);
+    });
+
+    it('should default to 300000ms (300 seconds) for interactive when not provided', () => {
+      const config = new Config({ ...baseParams, interactive: true });
       expect(config.getShellToolInactivityTimeout()).toBe(300000);
     });
 
