@@ -7,6 +7,7 @@
 import http from 'node:http';
 import crypto, { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
+import { parse as parseUrl } from 'node:url';
 import { WebSocketServer, type WebSocket } from 'ws';
 import type {
   NetworkLog,
@@ -163,18 +164,18 @@ export class DevTools extends EventEmitter {
     });
   }
 
-  private parseTokenFromUrl(url: string): string | null {
-    try {
-      const parsed = new URL(url, `http://127.0.0.1:${this.port}`);
-      return parsed.searchParams.get('token');
-    } catch {
-      return null;
-    }
-  }
-
-  private isValidToken(requestToken: string | null): boolean {
-    if (!this.token) return true; // No token set (should not happen after start)
-    return requestToken === this.token;
+  private validateToken(req: http.IncomingMessage): boolean {
+    const url = req.url ?? '';
+    const parsed = parseUrl(url, true);
+    const queryToken = parsed.query?.['token'];
+    const headerToken = req.headers.authorization
+      ?.replace(/^Bearer\s+/i, '')
+      .trim();
+    const provided =
+      (typeof queryToken === 'string' ? queryToken : null) ?? headerToken ?? '';
+    return (
+      this.token.length > 0 && provided.length > 0 && provided === this.token
+    );
   }
 
   start(): Promise<string> {
@@ -203,11 +204,10 @@ export class DevTools extends EventEmitter {
 
         // API routes
         if (req.url?.startsWith('/events')) {
-          // Authenticate SSE connections via token query parameter
-          const requestToken = this.parseTokenFromUrl(req.url);
-          if (!this.isValidToken(requestToken)) {
-            res.writeHead(403);
-            res.end('Forbidden');
+          // Authenticate SSE connections via token query parameter or Authorization header
+          if (!this.validateToken(req)) {
+            res.writeHead(403, { 'Content-Type': 'text/plain' });
+            res.end('Forbidden: missing or invalid token');
             return;
           }
 
@@ -293,62 +293,64 @@ export class DevTools extends EventEmitter {
 
     this.wss = new WebSocketServer({ server: this.server, path: '/ws' });
 
-    this.wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
-      // Authenticate WebSocket connections via token query parameter
-      const requestToken = this.parseTokenFromUrl(req.url || '');
-      if (!this.isValidToken(requestToken)) {
-        ws.close(4001, 'Unauthorized');
-        return;
-      }
+    this.wss.on(
+      'connection',
+      (ws: WebSocket, request: http.IncomingMessage) => {
+        // Authenticate WebSocket connections via token query parameter
+        if (!this.validateToken(request)) {
+          ws.close(4003, 'Forbidden: missing or invalid token');
+          return;
+        }
 
-      let sessionId: string | null = null;
+        let sessionId: string | null = null;
 
-      ws.on('message', (data: Buffer) => {
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          const message = JSON.parse(data.toString());
+        ws.on('message', (data: Buffer) => {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            const message = JSON.parse(data.toString());
 
-          // Handle registration first
-          if (message.type === 'register') {
-            sessionId = String(message.sessionId);
-            if (!sessionId) return;
+            // Handle registration first
+            if (message.type === 'register') {
+              sessionId = String(message.sessionId);
+              if (!sessionId) return;
 
-            this.sessions.set(sessionId, {
-              sessionId,
-              ws,
-              lastPing: Date.now(),
-            });
-
-            // Notify session update
-            this.emit('session-update');
-
-            // Send registration acknowledgement
-            ws.send(
-              JSON.stringify({
-                type: 'registered',
+              this.sessions.set(sessionId, {
                 sessionId,
-                timestamp: Date.now(),
-              }),
-            );
-          } else if (sessionId) {
-            this.handleWebSocketMessage(sessionId, message);
+                ws,
+                lastPing: Date.now(),
+              });
+
+              // Notify session update
+              this.emit('session-update');
+
+              // Send registration acknowledgement
+              ws.send(
+                JSON.stringify({
+                  type: 'registered',
+                  sessionId,
+                  timestamp: Date.now(),
+                }),
+              );
+            } else if (sessionId) {
+              this.handleWebSocketMessage(sessionId, message);
+            }
+          } catch {
+            // Invalid WebSocket message
           }
-        } catch {
-          // Invalid WebSocket message
-        }
-      });
+        });
 
-      ws.on('close', () => {
-        if (sessionId) {
-          this.sessions.delete(sessionId);
-          this.emit('session-update');
-        }
-      });
+        ws.on('close', () => {
+          if (sessionId) {
+            this.sessions.delete(sessionId);
+            this.emit('session-update');
+          }
+        });
 
-      ws.on('error', () => {
-        // WebSocket error — no action needed
-      });
-    });
+        ws.on('error', () => {
+          // WebSocket error — no action needed
+        });
+      },
+    );
 
     // Heartbeat mechanism
     this.heartbeatTimer = setInterval(() => {

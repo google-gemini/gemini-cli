@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger, tmpdir } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 import WebSocket from 'ws';
+import { writeFileSync, readFileSync, unlinkSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   initActivityLogger,
   addNetworkTransport,
@@ -28,12 +30,62 @@ let serverStartPromise: Promise<string> | null = null;
 let connectedUrl: string | null = null;
 
 /**
+ * Returns the file path where the auth token for a DevTools server on the given
+ * port is persisted. Other CLI instances read this file to authenticate.
+ */
+function getTokenFilePath(port: number): string {
+  return join(tmpdir(), `gemini-cli-devtools-${port}.token`);
+}
+
+/**
+ * Writes the token to disk with restricted permissions so other local CLI
+ * instances can read it and authenticate with the DevTools server.
+ */
+function writeTokenFile(port: number, token: string): void {
+  try {
+    writeFileSync(getTokenFilePath(port), token, { mode: 0o600 });
+  } catch {
+    debugLogger.debug('Failed to write DevTools token file');
+  }
+}
+
+/**
+ * Reads the token file for a DevTools server running on the given port.
+ * Returns the token string, or null if the file does not exist.
+ */
+function readTokenFile(port: number): string | null {
+  try {
+    return readFileSync(getTokenFilePath(port), 'utf-8').trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Removes the token file. Called during cleanup / server stop.
+ */
+function removeTokenFile(port: number): void {
+  try {
+    unlinkSync(getTokenFilePath(port));
+  } catch {
+    // Ignore — file may already be gone
+  }
+}
+
+/**
  * Probe whether a DevTools server is already listening on the given host:port.
  * Returns true if a WebSocket handshake succeeds within a short timeout.
+ * When token is provided, the probe authenticates; without it, only legacy
+ * (pre-auth) servers will accept the connection.
  */
-function probeDevTools(host: string, port: number): Promise<boolean> {
+function probeDevTools(
+  host: string,
+  port: number,
+  token?: string | null,
+): Promise<boolean> {
   return new Promise((resolve) => {
-    const ws = new WebSocket(`ws://${host}:${port}/ws`);
+    const query = token ? `?token=${encodeURIComponent(token)}` : '';
+    const ws = new WebSocket(`ws://${host}:${port}/ws${query}`);
     const timer = setTimeout(() => {
       ws.close();
       resolve(false);
@@ -61,33 +113,40 @@ function probeDevTools(host: string, port: number): Promise<boolean> {
 async function startOrJoinDevTools(
   defaultHost: string,
   defaultPort: number,
-): Promise<{ host: string; port: number; token: string }> {
+): Promise<{ host: string; port: number; token: string | null }> {
   const mod = await import('@google/gemini-cli-devtools');
-  const devtools: IDevTools = mod.DevTools.getInstance();
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- dynamic import; DevTools structurally matches IDevTools at runtime
+  const devtools = mod.DevTools.getInstance() as unknown as IDevTools;
   const url = await devtools.start();
   const actualPort = devtools.getPort();
   const token = devtools.getToken();
 
   if (actualPort === defaultPort) {
-    // We won the port — we are the server
+    // We won the port — we are the server.
+    // Persist the token so other CLI instances can authenticate.
+    writeTokenFile(actualPort, token);
     debugLogger.log(`DevTools available at: ${url}`);
     return { host: defaultHost, port: actualPort, token };
   }
 
   // Lost the race — someone else has the default port.
-  // Verify the winner is actually alive, then stop ours and connect to theirs.
-  const winnerAlive = await probeDevTools(defaultHost, defaultPort);
+  // Read their token from the shared token file.
+  const existingToken = readTokenFile(defaultPort);
+  const winnerAlive = await probeDevTools(
+    defaultHost,
+    defaultPort,
+    existingToken,
+  );
   if (winnerAlive) {
     await devtools.stop();
     debugLogger.log(
       `DevTools (existing) at: http://${defaultHost}:${defaultPort}`,
     );
-    // Connecting to an existing server — we don't have their token,
-    // but their server controls its own auth.
-    return { host: defaultHost, port: defaultPort, token: '' };
+    return { host: defaultHost, port: defaultPort, token: existingToken };
   }
 
-  // Winner isn't responding (maybe also racing and failed) — keep ours
+  // Winner isn’t responding — keep ours.
+  writeTokenFile(actualPort, token);
   debugLogger.log(`DevTools available at: ${url}`);
   return { host: defaultHost, port: actualPort, token };
 }
@@ -133,11 +192,14 @@ export async function setupInitialActivityLogger(config: Config) {
     // Start in buffering mode (no transport attached yet)
     initActivityLogger(config, { mode: 'buffer' });
 
-    // Eagerly probe for an existing DevTools server
+    // Eagerly probe for an existing DevTools server.
+    // Read the token file so we can authenticate if the server requires it.
     try {
+      const existingToken = readTokenFile(DEFAULT_DEVTOOLS_PORT);
       const existing = await probeDevTools(
         DEFAULT_DEVTOOLS_HOST,
         DEFAULT_DEVTOOLS_PORT,
+        existingToken,
       );
       if (existing) {
         const onReconnectFailed = () => handlePromotion(config);
@@ -145,7 +207,7 @@ export async function setupInitialActivityLogger(config: Config) {
           config,
           DEFAULT_DEVTOOLS_HOST,
           DEFAULT_DEVTOOLS_PORT,
-          '', // No token when connecting to an existing server
+          existingToken,
           onReconnectFailed,
         );
         ActivityLogger.getInstance().enableNetworkLogging();
@@ -176,15 +238,17 @@ export function startDevToolsServer(config: Config): Promise<string> {
 async function startDevToolsServerImpl(config: Config): Promise<string> {
   const onReconnectFailed = () => handlePromotion(config);
 
-  // Probe for an existing DevTools server
+  // Probe for an existing DevTools server (read token file to authenticate)
+  const existingToken = readTokenFile(DEFAULT_DEVTOOLS_PORT);
   const existing = await probeDevTools(
     DEFAULT_DEVTOOLS_HOST,
     DEFAULT_DEVTOOLS_PORT,
+    existingToken,
   );
 
   let host = DEFAULT_DEVTOOLS_HOST;
   let port = DEFAULT_DEVTOOLS_PORT;
-  let token = '';
+  let token: string | null = existingToken;
 
   if (existing) {
     debugLogger.log(
@@ -206,7 +270,9 @@ async function startDevToolsServerImpl(config: Config): Promise<string> {
     }
   }
 
-  // Promote the activity logger to use the network transport
+  // Promote the activity logger to use the network transport.
+  // Default is ALLOW: always attempt connection, even without a token.
+  // The server may accept (pre-auth) or reject (auth-enabled without shared token).
   addNetworkTransport(config, host, port, token, onReconnectFailed);
   const capture = ActivityLogger.getInstance();
   capture.enableNetworkLogging();
@@ -263,4 +329,5 @@ export function resetForTesting() {
   promotionAttempts = 0;
   serverStartPromise = null;
   connectedUrl = null;
+  removeTokenFile(DEFAULT_DEVTOOLS_PORT);
 }

@@ -617,7 +617,7 @@ function setupNetworkLogging(
   host: string,
   port: number,
   config: Config,
-  token: string,
+  token: string | null,
   onReconnectFailed?: () => void,
 ) {
   const transportBuffer: object[] = [];
@@ -630,7 +630,8 @@ function setupNetworkLogging(
 
   const connect = () => {
     try {
-      ws = new WebSocket(`ws://${host}:${port}/ws?token=${token}`);
+      const query = token ? `?token=${encodeURIComponent(token)}` : '';
+      ws = new WebSocket(`ws://${host}:${port}/ws${query}`);
 
       ws.on('open', () => {
         debugLogger.debug(`WebSocket connected to ${host}:${port}`);
@@ -855,7 +856,7 @@ export function initActivityLogger(
         mode: 'network';
         host: string;
         port: number;
-        token?: string;
+        token?: string | null;
         onReconnectFailed?: () => void;
       }
     | { mode: 'file'; filePath?: string }
@@ -870,7 +871,7 @@ export function initActivityLogger(
       options.host,
       options.port,
       config,
-      options.token || '',
+      options.token ?? null,
       options.onReconnectFailed,
     );
     capture.enableNetworkLogging();
@@ -890,7 +891,7 @@ export function addNetworkTransport(
   config: Config,
   host: string,
   port: number,
-  token: string,
+  token: string | null,
   onReconnectFailed?: () => void,
 ): void {
   const capture = ActivityLogger.getInstance();

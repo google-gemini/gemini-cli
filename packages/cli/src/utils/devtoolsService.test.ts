@@ -156,7 +156,7 @@ describe('devtoolsService', () => {
         config,
         '127.0.0.1',
         25417,
-        '', // No token when connecting to existing server
+        null, // No token when connecting to existing server
         expect.any(Function),
       );
       expect(
@@ -363,11 +363,12 @@ describe('devtoolsService', () => {
 
       expect(mockDevToolsInstance.stop).toHaveBeenCalled();
       expect(url).toBe('http://localhost:25417');
+      // Default is ALLOW — transport is added even without token (token file may not exist in tests)
       expect(mockAddNetworkTransport).toHaveBeenCalledWith(
         config,
         '127.0.0.1',
         25417,
-        '', // No token when connecting to existing winner
+        null, // No token file in tests
         expect.any(Function),
       );
     });
