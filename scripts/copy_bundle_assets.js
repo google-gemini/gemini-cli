@@ -58,9 +58,7 @@ console.log(`Copied ${policyFiles.length} policy files to bundle/policies/`);
 const docsSrc = join(root, 'docs');
 const docsDest = join(bundleDir, 'docs');
 if (existsSync(docsSrc)) {
-  if (existsSync(docsDest)) {
-    rmSync(docsDest, { recursive: true });
-  }
+  rmSync(docsDest, { recursive: true, force: true });
   cpSync(docsSrc, docsDest, { recursive: true, dereference: true });
   console.log('Copied docs to bundle/docs/');
 }
@@ -69,9 +67,7 @@ if (existsSync(docsSrc)) {
 const builtinSkillsSrc = join(root, 'packages/core/src/skills/builtin');
 const builtinSkillsDest = join(bundleDir, 'builtin');
 if (existsSync(builtinSkillsSrc)) {
-  if (existsSync(builtinSkillsDest)) {
-    rmSync(builtinSkillsDest, { recursive: true });
-  }
+  rmSync(builtinSkillsDest, { recursive: true, force: true });
   cpSync(builtinSkillsSrc, builtinSkillsDest, {
     recursive: true,
     dereference: true,
