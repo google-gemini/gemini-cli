@@ -34,6 +34,7 @@ import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
 import { shortcutsCommand } from '../ui/commands/shortcutsCommand.js';
 import { rewindCommand } from '../ui/commands/rewindCommand.js';
+import { undoCommand } from '../ui/commands/undoCommand.js';
 import { hooksCommand } from '../ui/commands/hooksCommand.js';
 import { ideCommand } from '../ui/commands/ideCommand.js';
 import { initCommand } from '../ui/commands/initCommand.js';
@@ -122,6 +123,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       shortcutsCommand,
       ...(this.config?.getEnableHooksUI() ? [hooksCommand] : []),
       rewindCommand,
+      undoCommand,
       await ideCommand(),
       initCommand,
       ...(isNightlyBuild ? [oncallCommand] : []),
