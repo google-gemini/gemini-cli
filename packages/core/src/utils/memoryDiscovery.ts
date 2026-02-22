@@ -56,6 +56,9 @@ export async function deduplicatePathsByFileIdentity(
     return [];
   }
 
+  // first deduplicate by string path to avoid redundant stat calls
+  const uniqueFilePaths = Array.from(new Set(filePaths));
+
   const fileIdentityMap = new Map<string, string>();
   const deduplicatedPaths: string[] = [];
 
@@ -66,11 +69,12 @@ export async function deduplicatePathsByFileIdentity(
     ino: bigint | number | null;
   }> = [];
 
-  for (let i = 0; i < filePaths.length; i += CONCURRENT_LIMIT) {
-    const batch = filePaths.slice(i, i + CONCURRENT_LIMIT);
+  for (let i = 0; i < uniqueFilePaths.length; i += CONCURRENT_LIMIT) {
+    const batch = uniqueFilePaths.slice(i, i + CONCURRENT_LIMIT);
     const batchPromises = batch.map(async (filePath) => {
       try {
-        const stats = await fs.lstat(filePath);
+        // use stat() instead of lstat() to follow symlinks and get target file identity
+        const stats = await fs.stat(filePath);
         return {
           path: filePath,
           dev: stats.dev,
@@ -81,7 +85,7 @@ export async function deduplicatePathsByFileIdentity(
           const message =
             error instanceof Error ? error.message : String(error);
           logger.debug(
-            `Could not stat file for deduplication: ${filePath}. Error: ${message}`,
+            `could not stat file for deduplication: ${filePath}. error: ${message}`,
           );
         }
         return {
@@ -102,7 +106,7 @@ export async function deduplicatePathsByFileIdentity(
         const message = error instanceof Error ? error.message : String(error);
         if (debugMode) {
           logger.debug(
-            `Unexpected error during deduplication stat: ${message}`,
+            `unexpected error during deduplication stat: ${message}`,
           );
         }
       }
@@ -117,14 +121,14 @@ export async function deduplicatePathsByFileIdentity(
         deduplicatedPaths.push(path);
         if (debugMode) {
           logger.debug(
-            `Deduplication: keeping ${path} (dev: ${dev}, ino: ${ino})`,
+            `deduplication: keeping ${path} (dev: ${dev}, ino: ${ino})`,
           );
         }
       } else {
         const existingPath = fileIdentityMap.get(identityKey);
         if (debugMode) {
           logger.debug(
-            `Deduplication: skipping ${path} (same file as ${existingPath})`,
+            `deduplication: skipping ${path} (same file as ${existingPath})`,
           );
         }
       }
@@ -768,20 +772,66 @@ export async function loadJitSubdirectoryMemory(
     debugMode,
   );
 
-  // Filter out already loaded paths
-  const newPathsStringDeduped = potentialPaths.filter(
-    (p) => !alreadyLoadedPaths.has(p),
-  );
-
-  if (newPathsStringDeduped.length === 0) {
+  if (potentialPaths.length === 0) {
     return { files: [] };
   }
 
   // deduplicate by file identity to handle case-insensitive filesystems
-  const newPaths = await deduplicatePathsByFileIdentity(
-    newPathsStringDeduped,
+  // this deduplicates within the current batch
+  const deduplicatedNewPaths = await deduplicatePathsByFileIdentity(
+    potentialPaths,
     debugMode,
   );
+
+  // get file identities of already loaded paths to compare against
+  const alreadyLoadedIdentities = new Set<string>();
+  if (alreadyLoadedPaths.size > 0) {
+    const CONCURRENT_LIMIT = 20;
+    const alreadyLoadedArray = Array.from(alreadyLoadedPaths);
+    const identityPromises: Array<Promise<void>> = [];
+
+    for (let i = 0; i < alreadyLoadedArray.length; i += CONCURRENT_LIMIT) {
+      const batch = alreadyLoadedArray.slice(i, i + CONCURRENT_LIMIT);
+      const batchPromises = batch.map(async (filePath) => {
+        try {
+          const stats = await fs.stat(filePath);
+          const identityKey = `${stats.dev.toString()}:${stats.ino.toString()}`;
+          alreadyLoadedIdentities.add(identityKey);
+        } catch {
+          // ignore errors - if we can't stat it, we can't deduplicate by identity
+        }
+      });
+      identityPromises.push(...batchPromises);
+    }
+    await Promise.allSettled(identityPromises);
+  }
+
+  // filter out paths that match already loaded files by identity
+  const newPaths: string[] = [];
+  const CONCURRENT_LIMIT = 20;
+  for (let i = 0; i < deduplicatedNewPaths.length; i += CONCURRENT_LIMIT) {
+    const batch = deduplicatedNewPaths.slice(i, i + CONCURRENT_LIMIT);
+    const batchPromises = batch.map(async (filePath) => {
+      try {
+        const stats = await fs.stat(filePath);
+        const identityKey = `${stats.dev.toString()}:${stats.ino.toString()}`;
+        if (!alreadyLoadedIdentities.has(identityKey)) {
+          return filePath;
+        }
+        if (debugMode) {
+          logger.debug(
+            `jit memory: skipping ${filePath} (already loaded with different case)`,
+          );
+        }
+        return null;
+      } catch {
+        // if we can't stat it, include it to be safe
+        return filePath;
+      }
+    });
+    const batchResults = await Promise.all(batchPromises);
+    newPaths.push(...batchResults.filter((p): p is string => p !== null));
+  }
 
   if (newPaths.length === 0) {
     return { files: [] };
