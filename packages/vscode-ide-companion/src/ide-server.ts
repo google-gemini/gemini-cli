@@ -9,6 +9,7 @@ import {
   CloseDiffRequestSchema,
   IdeContextNotificationSchema,
   OpenDiffRequestSchema,
+  AsExternalUriRequestSchema,
 } from '@google/gemini-cli-core/src/ide/types.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -473,6 +474,42 @@ const createMcpServer = (
           },
         ],
       };
+    },
+  );
+  server.registerTool(
+    'asExternalUri',
+    {
+      description:
+        '(IDE Tool) Resolve an external URI for a local URI. This is required for Remote Tunnels support.',
+      inputSchema: AsExternalUriRequestSchema.shape,
+    },
+    async ({ uri }: z.infer<typeof AsExternalUriRequestSchema>) => {
+      log(`Received asExternalUri request for uri: ${uri}`);
+      try {
+        const externalUri = await vscode.env.asExternalUri(
+          vscode.Uri.parse(uri),
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: externalUri.toString(),
+            },
+          ],
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        log(`Failed to resolve external URI: ${message}`);
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: message,
+            },
+          ],
+        };
+      }
     },
   );
   return server;

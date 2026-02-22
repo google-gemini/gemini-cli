@@ -46,6 +46,7 @@ import {
 } from '../utils/terminal.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import { getConsentForOauth } from '../utils/authConsent.js';
+import { IdeClient } from '../ide/ide-client.js';
 
 export const authEvents = new EventEmitter();
 
@@ -472,9 +473,19 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
   // type 'Desktop app' or 'Web application' (when using loopback flow) to mitigate
   // authorization code interception attacks.
   const redirectUri = `http://127.0.0.1:${port}/oauth2callback`;
+
+  // For Remote Tunnels, localhost is not reachable from the local browser.
+  // We use vscode.env.asExternalUri (via IdeClient) to resolve a reachable URI.
+  const ideClient = await IdeClient.getInstance();
+  const resolvedRedirectUri = await ideClient.asExternalUri(redirectUri);
+
+  if (resolvedRedirectUri !== redirectUri) {
+    debugLogger.log(`Resolved external URI for OAuth: ${resolvedRedirectUri}`);
+  }
+
   const state = crypto.randomBytes(32).toString('hex');
   const authUrl = client.generateAuthUrl({
-    redirect_uri: redirectUri,
+    redirect_uri: resolvedRedirectUri,
     access_type: 'offline',
     scope: OAUTH_SCOPE,
     state,
@@ -518,7 +529,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
           try {
             const { tokens } = await client.getToken({
               code: qs.get('code')!,
-              redirect_uri: redirectUri,
+              redirect_uri: resolvedRedirectUri,
             });
             client.setCredentials(tokens);
 
