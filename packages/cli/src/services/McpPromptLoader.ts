@@ -5,7 +5,12 @@
  */
 
 import type { Config } from '@google/gemini-cli-core';
-import { getErrorMessage, getMCPServerPrompts } from '@google/gemini-cli-core';
+import {
+  getErrorMessage,
+  getMCPServerPrompts,
+  debugLogger,
+  sanitizeMcpContent,
+} from '@google/gemini-cli-core';
 import type {
   CommandContext,
   SlashCommand,
@@ -123,8 +128,43 @@ export class McpPromptLoader implements ICommandLoader {
                 };
               }
 
-              const maybeContent = result.messages?.[0]?.content;
-              if (maybeContent.type !== 'text') {
+              const promptContent = result.messages
+                ?.map((msg) => {
+                  const { content } = msg;
+                  if (content.type === 'text') {
+                    return { text: sanitizeMcpContent(content.text) };
+                  }
+                  if (content.type === 'image') {
+                    return {
+                      inlineData: {
+                        mimeType: content.mimeType,
+                        data: content.data,
+                      },
+                    };
+                  }
+                  if (content.type === 'resource') {
+                    const { resource } = content;
+                    if ('text' in resource) {
+                      return { text: sanitizeMcpContent(resource.text) };
+                    }
+                    if ('blob' in resource) {
+                      return {
+                        inlineData: {
+                          mimeType:
+                            resource.mimeType || 'application/octet-stream',
+                          data: resource.blob,
+                        },
+                      };
+                    }
+                  }
+                  debugLogger.warn(
+                    `Unsupported MCP content type: ${JSON.stringify(content)}`,
+                  );
+                  return null;
+                })
+                .filter((p) => p !== null);
+
+              if (!promptContent || promptContent.length === 0) {
                 return {
                   type: 'message',
                   messageType: 'error',
@@ -135,7 +175,7 @@ export class McpPromptLoader implements ICommandLoader {
 
               return {
                 type: 'submit_prompt',
-                content: JSON.stringify(maybeContent.text),
+                content: promptContent,
               };
             } catch (error) {
               return {
