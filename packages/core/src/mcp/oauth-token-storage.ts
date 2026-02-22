@@ -9,7 +9,7 @@ import { coreEvents } from '../utils/events.js';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { Storage } from '../config/storage.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage , isErrnoException } from '../utils/errors.js';
 import {
   type OAuthToken,
   type OAuthCredentials,
@@ -23,15 +23,6 @@ import {
 } from './token-storage/index.js';
 
 export const OAuthCredentialsArraySchema = z.array(OAuthCredentialsSchema);
-
-function isErrnoException(e: unknown): e is NodeJS.ErrnoException {
-  return (
-    e !== null &&
-    typeof e === 'object' &&
-    'code' in e &&
-    typeof (e as { code?: unknown }).code === 'string'
-  );
-}
 
 /**
  * Class for managing MCP OAuth token storage and retrieval.

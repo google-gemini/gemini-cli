@@ -239,3 +239,12 @@ export function isAuthenticationError(error: unknown): boolean {
 
   return false;
 }
+
+export function isErrnoException(e: unknown): e is NodeJS.ErrnoException {
+  return (
+    e !== null &&
+    typeof e === 'object' &&
+    'code' in e &&
+    typeof (e as { code?: unknown }).code === 'string'
+  );
+}
