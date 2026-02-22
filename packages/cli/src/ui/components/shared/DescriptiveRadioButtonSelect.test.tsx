@@ -61,7 +61,7 @@ describe('DescriptiveRadioButtonSelect', () => {
     },
   ];
 
-  const renderComponent = (
+  const renderComponent = async (
     props: Partial<DescriptiveRadioButtonSelectProps<string>> = {},
   ) => {
     const defaultProps: DescriptiveRadioButtonSelectProps<string> = {
@@ -69,22 +69,25 @@ describe('DescriptiveRadioButtonSelect', () => {
       onSelect: mockOnSelect,
       ...props,
     };
-    return renderWithProviders(
+    const result = renderWithProviders(
       <DescriptiveRadioButtonSelect {...defaultProps} />,
     );
+    await result.waitUntilReady();
+    return result;
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should render correctly with default props', () => {
-    const { lastFrame } = renderComponent();
+  it('should render correctly with default props', async () => {
+    const { lastFrame, unmount } = await renderComponent();
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('should render correctly with custom props', () => {
-    const { lastFrame } = renderComponent({
+  it('should render correctly with custom props', async () => {
+    const { lastFrame, unmount } = await renderComponent({
       initialIndex: 1,
       isFocused: false,
       showScrollArrows: true,
@@ -93,5 +96,6 @@ describe('DescriptiveRadioButtonSelect', () => {
       onHighlight: mockOnHighlight,
     });
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 });

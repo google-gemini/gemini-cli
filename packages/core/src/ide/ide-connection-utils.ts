@@ -10,6 +10,7 @@ import * as os from 'node:os';
 import { EnvHttpProxyAgent } from 'undici';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
+import { isNodeError } from '../utils/errors.js';
 import { type IdeInfo } from './detect-ide.js';
 
 const logger = {
@@ -88,8 +89,10 @@ export function getStdioConfigFromEnv(): StdioConfig | undefined {
   let args: string[] = [];
   if (argsStr) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const parsedArgs = JSON.parse(argsStr);
       if (Array.isArray(parsedArgs)) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         args = parsedArgs;
       } else {
         logger.error(
@@ -103,6 +106,8 @@ export function getStdioConfigFromEnv(): StdioConfig | undefined {
 
   return { command, args };
 }
+
+const IDE_SERVER_FILE_REGEX = /^gemini-ide-server-(\d+)-\d+\.json$/;
 
 export async function getConnectionConfigFromFile(
   pid: number,
@@ -118,6 +123,7 @@ export async function getConnectionConfigFromFile(
       `gemini-ide-server-${pid}.json`,
     );
     const portFileContents = await fs.promises.readFile(portFile, 'utf8');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return JSON.parse(portFileContents);
   } catch (_) {
     // For newer extension versions, the file name matches the pattern
@@ -139,11 +145,15 @@ export async function getConnectionConfigFromFile(
     return undefined;
   }
 
-  const fileRegex = new RegExp(`^gemini-ide-server-${pid}-\\d+\\.json$`);
-  const matchingFiles = portFiles.filter((file) => fileRegex.test(file)).sort();
+  const matchingFiles = portFiles.filter((file) =>
+    IDE_SERVER_FILE_REGEX.test(file),
+  );
+
   if (matchingFiles.length === 0) {
     return undefined;
   }
+
+  sortConnectionFiles(matchingFiles, pid);
 
   let fileContents: string[];
   try {
@@ -158,6 +168,7 @@ export async function getConnectionConfigFromFile(
   }
   const parsedContents = fileContents.map((content) => {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return JSON.parse(content);
     } catch (e) {
       logger.debug('Failed to parse JSON from config file: ', e);
@@ -181,20 +192,92 @@ export async function getConnectionConfigFromFile(
   }
 
   if (validWorkspaces.length === 1) {
-    return validWorkspaces[0];
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const selected = validWorkspaces[0];
+    const fileIndex = parsedContents.indexOf(selected);
+    if (fileIndex !== -1) {
+      logger.debug(`Selected IDE connection file: ${matchingFiles[fileIndex]}`);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    return selected;
   }
 
   const portFromEnv = getPortFromEnv();
   if (portFromEnv) {
-    const matchingPort = validWorkspaces.find(
+    const matchingPortIndex = validWorkspaces.findIndex(
       (content) => String(content.port) === portFromEnv,
     );
-    if (matchingPort) {
-      return matchingPort;
+    if (matchingPortIndex !== -1) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const selected = validWorkspaces[matchingPortIndex];
+      const fileIndex = parsedContents.indexOf(selected);
+      if (fileIndex !== -1) {
+        logger.debug(
+          `Selected IDE connection file (matched port from env): ${matchingFiles[fileIndex]}`,
+        );
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+      return selected;
     }
   }
 
-  return validWorkspaces[0];
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const selected = validWorkspaces[0];
+  const fileIndex = parsedContents.indexOf(selected);
+  if (fileIndex !== -1) {
+    logger.debug(
+      `Selected first valid IDE connection file: ${matchingFiles[fileIndex]}`,
+    );
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+  return selected;
+}
+
+// Sort files to prioritize the one matching the target pid,
+// then by whether the process is still alive, then by newest (largest PID).
+function sortConnectionFiles(files: string[], targetPid: number) {
+  files.sort((a, b) => {
+    const aMatch = a.match(IDE_SERVER_FILE_REGEX);
+    const bMatch = b.match(IDE_SERVER_FILE_REGEX);
+    const aPid = aMatch ? parseInt(aMatch[1], 10) : 0;
+    const bPid = bMatch ? parseInt(bMatch[1], 10) : 0;
+
+    if (aPid === targetPid && bPid !== targetPid) {
+      return -1;
+    }
+    if (bPid === targetPid && aPid !== targetPid) {
+      return 1;
+    }
+
+    const aIsAlive = isPidAlive(aPid);
+    const bIsAlive = isPidAlive(bPid);
+
+    if (aIsAlive && !bIsAlive) {
+      return -1;
+    }
+    if (bIsAlive && !aIsAlive) {
+      return 1;
+    }
+
+    // Newest PIDs first as a heuristic
+    return bPid - aPid;
+  });
+}
+
+function isPidAlive(pid: number): boolean {
+  if (pid <= 0) {
+    return false;
+  }
+  // Assume the process is alive since checking would introduce significant overhead.
+  if (os.platform() === 'win32') {
+    return true;
+  }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return isNodeError(e) && e.code === 'EPERM';
+  }
 }
 
 export async function createProxyAwareFetch(ideServerHost: string) {
@@ -215,13 +298,19 @@ export async function createProxyAwareFetch(ideServerHost: string) {
     };
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const options = fetchOptions as unknown as import('undici').RequestInit;
-    const response = await fetchFn(url, options);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return new Response(response.body as ReadableStream<unknown> | null, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: [...response.headers.entries()],
-    });
+    try {
+      const response = await fetchFn(url, options);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return new Response(response.body as ReadableStream<unknown> | null, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: [...response.headers.entries()],
+      });
+    } catch (error) {
+      const urlString = typeof url === 'string' ? url : url.href;
+      logger.error(`IDE fetch failed for ${urlString}`, error);
+      throw error;
+    }
   };
 }
 

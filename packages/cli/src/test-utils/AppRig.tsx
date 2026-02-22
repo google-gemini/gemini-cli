@@ -74,6 +74,20 @@ class MockExtensionManager extends ExtensionLoader {
   setRequestSetting = vi.fn();
 }
 
+// Mock GeminiRespondingSpinner to disable animations (avoiding 'act()' warnings) without triggering screen reader mode.
+vi.mock('../ui/components/GeminiRespondingSpinner.js', async () => {
+  const React = await import('react');
+  const { Text } = await import('ink');
+  return {
+    GeminiSpinner: () => React.createElement(Text, null, '...'),
+    GeminiRespondingSpinner: ({
+      nonRespondingDisplay,
+    }: {
+      nonRespondingDisplay: string;
+    }) => React.createElement(Text, null, nonRespondingDisplay || '...'),
+  };
+});
+
 export interface AppRigOptions {
   fakeResponsesPath?: string;
   terminalWidth?: number;
@@ -203,13 +217,14 @@ export class AppRig {
   }
 
   private stubRefreshAuth() {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
     const gcConfig = this.config as any;
     gcConfig.refreshAuth = async (authMethod: AuthType) => {
       gcConfig.modelAvailabilityService.reset();
 
       const newContentGeneratorConfig = {
         authType: authMethod,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         proxy: gcConfig.getProxy(),
         apiKey: process.env['GEMINI_API_KEY'] || 'test-api-key',
       };
@@ -449,12 +464,11 @@ export class AppRig {
     this.lastAwaitedConfirmation = undefined;
   }
 
-  async addUserHint(_hint: string) {
+  async addUserHint(hint: string) {
     if (!this.config) throw new Error('AppRig not initialized');
-    // TODO(joshualitt): Land hints.
-    // await act(async () => {
-    //   this.config!.addUserHint(hint);
-    // });
+    await act(async () => {
+      this.config!.userHintService.addUserHint(hint);
+    });
   }
 
   getConfig(): Config {
@@ -488,7 +502,7 @@ export class AppRig {
 
   get lastFrame() {
     if (!this.renderResult) return '';
-    return stripAnsi(this.renderResult.lastFrame() || '');
+    return stripAnsi(this.renderResult.lastFrame({ allowEmpty: true }) || '');
   }
 
   getStaticOutput() {
