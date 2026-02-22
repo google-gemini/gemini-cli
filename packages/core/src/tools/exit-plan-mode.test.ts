@@ -389,8 +389,37 @@ Ask the user for specific feedback on how to improve the plan.`,
         ).rejects.toThrow(/Unexpected approval mode/);
       };
 
-      await testInvalidMode(ApprovalMode.YOLO);
       await testInvalidMode(ApprovalMode.PLAN);
+    });
+
+    it('should handle YOLO as a valid post-planning mode', async () => {
+      const planRelativePath = createPlanFile('test.md', '# Content');
+      const invocation = tool.build({ plan_path: planRelativePath });
+
+      const confirmDetails = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmDetails).not.toBe(false);
+      if (confirmDetails === false) return;
+
+      await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce, {
+        approved: true,
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      const result = await invocation.execute(new AbortController().signal);
+      const expectedPath = path.join(mockPlansDir, 'test.md');
+
+      expect(result).toEqual({
+        llmContent: `Plan approved. Switching to YOLO mode (all tools will run automatically).
+
+The approved implementation plan is stored at: ${expectedPath}
+Read and follow the plan strictly during implementation.`,
+        returnDisplay: `Plan approved: ${expectedPath}`,
+      });
+      expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
+        ApprovalMode.YOLO,
+      );
     });
   });
 

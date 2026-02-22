@@ -210,7 +210,12 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
         onSubmit={(answers) => {
           const answer = answers['0'];
           if (answer === ApprovalOption.Auto) {
-            onApprove(ApprovalMode.AUTO_EDIT);
+            const prePlanMode = config.getPrePlanApprovalMode();
+            onApprove(
+              prePlanMode === ApprovalMode.YOLO
+                ? ApprovalMode.YOLO
+                : ApprovalMode.AUTO_EDIT,
+            );
           } else if (answer === ApprovalOption.Manual) {
             onApprove(ApprovalMode.DEFAULT);
           } else if (answer) {

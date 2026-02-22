@@ -1423,6 +1423,42 @@ describe('setApprovalMode with folder trust', () => {
     expect(updateSpy).not.toHaveBeenCalled();
   });
 
+  it('should save the pre-plan approval mode when entering Plan mode from YOLO', () => {
+    const config = new Config({
+      ...baseParams,
+      approvalMode: ApprovalMode.YOLO,
+    });
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue({
+      getTool: vi.fn().mockReturnValue(undefined),
+      unregisterTool: vi.fn(),
+      registerTool: vi.fn(),
+    } as Partial<ToolRegistry> as ToolRegistry);
+
+    config.setApprovalMode(ApprovalMode.PLAN);
+
+    expect(config.getPrePlanApprovalMode()).toBe(ApprovalMode.YOLO);
+  });
+
+  it('should save the pre-plan approval mode when entering Plan mode from DEFAULT', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue({
+      getTool: vi.fn().mockReturnValue(undefined),
+      unregisterTool: vi.fn(),
+      registerTool: vi.fn(),
+    } as Partial<ToolRegistry> as ToolRegistry);
+
+    config.setApprovalMode(ApprovalMode.PLAN);
+
+    expect(config.getPrePlanApprovalMode()).toBe(ApprovalMode.DEFAULT);
+  });
+
+  it('should return null for getPrePlanApprovalMode when Plan mode was never entered', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+
+    expect(config.getPrePlanApprovalMode()).toBeNull();
   describe('approval mode duration logging', () => {
     beforeEach(() => {
       vi.mocked(logApprovalModeDuration).mockClear();

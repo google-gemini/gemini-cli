@@ -702,6 +702,7 @@ export class Config {
   private lastModeSwitchTime: number = performance.now();
   readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
+  private prePlanApprovalMode: ApprovalMode | null = null;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -1797,6 +1798,12 @@ export class Config {
     }
 
     const currentMode = this.getApprovalMode();
+
+    // Save the current mode before entering Plan mode so it can be restored.
+    if (mode === ApprovalMode.PLAN && currentMode !== ApprovalMode.PLAN) {
+      this.prePlanApprovalMode = currentMode;
+    }
+
     if (currentMode !== mode) {
       this.logCurrentModeDuration(currentMode);
       logApprovalModeSwitch(
@@ -2087,6 +2094,14 @@ export class Config {
 
   setApprovedPlanPath(path: string | undefined): void {
     this.approvedPlanPath = path;
+  }
+
+  /**
+   * Returns the approval mode that was active before entering Plan mode,
+   * or null if Plan mode was not entered during this session.
+   */
+  getPrePlanApprovalMode(): ApprovalMode | null {
+    return this.prePlanApprovalMode;
   }
 
   isAgentsEnabled(): boolean {
