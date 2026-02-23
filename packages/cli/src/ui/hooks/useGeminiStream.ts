@@ -1058,7 +1058,7 @@ export const useGeminiStream = (
 
   const handleChatCompressionEvent = useCallback(
     (
-      _eventValue: ServerGeminiChatCompressedEvent['value'],
+      eventValue: ServerGeminiChatCompressedEvent['value'],
       userMessageTimestamp: number,
     ) => {
       if (pendingHistoryItemRef.current) {
@@ -1066,21 +1066,26 @@ export const useGeminiStream = (
         setPendingHistoryItem(null);
       }
 
-      const rawThreshold = settings.merged.model?.compressionThreshold ?? 0.5;
-      const thresholdDisplay = `${Math.round(rawThreshold * 100)}%`;
+      const limit = tokenLimit(config.getModel());
+      const originalPercentage = Math.round(
+        ((eventValue?.originalTokenCount ?? 0) / limit) * 100,
+      );
+      const newPercentage = Math.round(
+        ((eventValue?.newTokenCount ?? 0) / limit) * 100,
+      );
 
       addItem(
         {
           type: MessageType.INFO,
-          text: `Context compressed`,
-          secondaryText: `at ${thresholdDisplay} threshold. Change this in /settings.`,
+          text: `Context compressed from ${originalPercentage}% to ${newPercentage}%`,
+          secondaryText: `. Change threshold in /settings.`,
           color: theme.status.warning,
           marginBottom: 1,
         } as HistoryItemInfo,
         userMessageTimestamp,
       );
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem, settings],
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem, config],
   );
 
   const handleMaxSessionTurnsEvent = useCallback(
