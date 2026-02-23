@@ -707,7 +707,8 @@ export function completeExtensions(
   }
   if (
     context.invocation?.name === 'disable' ||
-    context.invocation?.name === 'reload'
+    context.invocation?.name === 'reload' ||
+    context.invocation?.name === 'restart'
   ) {
     extensions = extensions.filter((ext) => ext.isActive);
   }

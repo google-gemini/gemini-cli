@@ -1032,6 +1032,18 @@ describe('extensionsCommand', () => {
       const suggestions = completeExtensions(mockContext, 'ext');
       expect(suggestions).toEqual(['ext1']);
     });
+
+    it('should suggest only enabled extension names for the restart command alias', async () => {
+      mockContext.invocation!.name = 'restart';
+      const mockExtensions = [
+        { name: 'ext1', isActive: true },
+        { name: 'ext2', isActive: false },
+      ] as GeminiCLIExtension[];
+      mockGetExtensions.mockReturnValue(mockExtensions);
+
+      const suggestions = completeExtensions(mockContext, 'ext');
+      expect(suggestions).toEqual(['ext1']);
+    });
   });
 
   describe('config', () => {
