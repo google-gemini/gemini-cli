@@ -41,9 +41,12 @@ export class A2AResultReassembler {
           const id = chunk.artifact.artifactId;
           const existing = this.artifacts.get(id);
           if (chunk.append && existing) {
-            existing.parts.push(...chunk.artifact.parts);
+            existing.parts = existing.parts.concat(chunk.artifact.parts);
           } else {
-            this.artifacts.set(id, { ...chunk.artifact });
+            this.artifacts.set(id, {
+              ...chunk.artifact,
+              parts: [...chunk.artifact.parts],
+            });
           }
         }
         break;
@@ -54,7 +57,10 @@ export class A2AResultReassembler {
         }
         if (chunk.artifacts) {
           for (const art of chunk.artifacts) {
-            this.artifacts.set(art.artifactId, { ...art });
+            this.artifacts.set(art.artifactId, {
+              ...art,
+              parts: [...art.parts],
+            });
           }
         }
         break;
