@@ -22,7 +22,10 @@ import {
   DEFAULT_OTLP_ENDPOINT,
   uiTelemetryService,
 } from '../telemetry/index.js';
-import type { ContentGeneratorConfig } from '../core/contentGenerator.js';
+import type {
+  ContentGeneratorConfig,
+  ContentGenerator,
+} from '../core/contentGenerator.js';
 import {
   AuthType,
   createContentGenerator,
@@ -44,7 +47,11 @@ import { ACTIVATE_SKILL_TOOL_NAME } from '../tools/tool-names.js';
 import type { SkillDefinition } from '../skills/skillLoader.js';
 import type { McpClientManager } from '../tools/mcp-client-manager.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
-import { DEFAULT_GEMINI_MODEL } from './models.js';
+import {
+  DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+} from './models.js';
 import { Storage } from './storage.js';
 
 vi.mock('fs', async (importOriginal) => {
@@ -2198,6 +2205,21 @@ describe('Config Quota & Preview Model Access', () => {
       expect(config.getHasAccessToPreviewModel()).toBe(true);
     });
 
+    it('should update hasAccessToPreviewModel to true if quota includes Gemini 3.1 preview model', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [
+          {
+            modelId: 'gemini-3.1-pro-preview',
+            remainingAmount: '100',
+            remainingFraction: 1.0,
+          },
+        ],
+      });
+
+      await config.refreshUserQuota();
+      expect(config.getHasAccessToPreviewModel()).toBe(true);
+    });
+
     it('should update hasAccessToPreviewModel to false if quota does not include preview model', async () => {
       mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
         buckets: [
@@ -2287,7 +2309,8 @@ describe('Config Quota & Preview Model Access', () => {
       vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
       const result = await config.refreshUserQuota();
       expect(result).toBeUndefined();
-      expect(config.getHasAccessToPreviewModel()).toBe(false);
+      // Never set => stays null (unknown); getter returns true so UI shows preview
+      expect(config.getHasAccessToPreviewModel()).toBe(true);
     });
 
     it('should return undefined if retrieveUserQuota fails', async () => {
@@ -2296,8 +2319,8 @@ describe('Config Quota & Preview Model Access', () => {
       );
       const result = await config.refreshUserQuota();
       expect(result).toBeUndefined();
-      // Should remain default (false)
-      expect(config.getHasAccessToPreviewModel()).toBe(false);
+      // Never set => stays null (unknown); getter returns true so UI shows preview
+      expect(config.getHasAccessToPreviewModel()).toBe(true);
     });
   });
 
@@ -2782,5 +2805,87 @@ describe('syncPlanModeTools', () => {
     config.syncPlanModeTools();
 
     expect(setToolsSpy).toHaveBeenCalled();
+  });
+});
+
+describe('Model Persistence Bug Fix (#19864)', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test-session',
+    cwd: '/tmp',
+    targetDir: '/path/to/target',
+    debugMode: false,
+    model: PREVIEW_GEMINI_3_1_MODEL, // User saved preview model
+  };
+
+  it('should NOT reset preview model for CodeAssist auth when refreshUserQuota is not called (no projectId)', async () => {
+    const mockContentConfig = {
+      authType: AuthType.LOGIN_WITH_GOOGLE,
+    } as Partial<ContentGeneratorConfig> as ContentGeneratorConfig;
+
+    const mockContentGenerator = {
+      generateContent: vi.fn(),
+    } as Partial<ContentGenerator> as ContentGenerator;
+
+    vi.mocked(createContentGeneratorConfig).mockResolvedValue(
+      mockContentConfig,
+    );
+    vi.mocked(createContentGenerator).mockResolvedValue(mockContentGenerator);
+    // getCodeAssistServer returns undefined by default, so refreshUserQuota() isn't called;
+    // hasAccessToPreviewModel stays null; reset only when === false, so we don't reset.
+    const config = new Config(baseParams);
+
+    // Verify initial model is the preview model
+    expect(config.getModel()).toBe(PREVIEW_GEMINI_3_1_MODEL);
+
+    // Call refreshAuth to simulate restart (CodeAssist auth, no projectId)
+    await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+
+    // Verify the model was NOT reset (bug fix)
+    expect(config.getModel()).toBe(PREVIEW_GEMINI_3_1_MODEL);
+    expect(config.getModel()).not.toBe(DEFAULT_GEMINI_MODEL_AUTO);
+  });
+
+  it('should NOT reset preview model for USE_GEMINI (hasAccessToPreviewModel is set to true)', async () => {
+    const mockContentConfig = {
+      authType: AuthType.USE_GEMINI,
+    } as Partial<ContentGeneratorConfig> as ContentGeneratorConfig;
+
+    const mockContentGenerator = {
+      generateContent: vi.fn(),
+    } as Partial<ContentGenerator> as ContentGenerator;
+
+    vi.mocked(createContentGeneratorConfig).mockResolvedValue(
+      mockContentConfig,
+    );
+    vi.mocked(createContentGenerator).mockResolvedValue(mockContentGenerator);
+
+    const config = new Config(baseParams);
+
+    // Verify initial model is the preview model
+    expect(config.getModel()).toBe(PREVIEW_GEMINI_3_1_MODEL);
+
+    // Call refreshAuth
+    await config.refreshAuth(AuthType.USE_GEMINI);
+
+    // For USE_GEMINI, hasAccessToPreviewModel should be set to true
+    // So the model should NOT be reset
+    expect(config.getModel()).toBe(PREVIEW_GEMINI_3_1_MODEL);
+    expect(config.getHasAccessToPreviewModel()).toBe(true);
+  });
+
+  it('should persist model when user selects it with persistMode=true', () => {
+    const onModelChange = vi.fn();
+    const config = new Config({
+      ...baseParams,
+      model: DEFAULT_GEMINI_MODEL_AUTO, // Initial model
+      onModelChange,
+    });
+
+    // User selects preview model with persist mode enabled
+    config.setModel(PREVIEW_GEMINI_3_1_MODEL, false); // isTemporary = false
+
+    // Verify onModelChange was called to persist the model
+    expect(onModelChange).toHaveBeenCalledWith(PREVIEW_GEMINI_3_1_MODEL);
+    expect(config.getModel()).toBe(PREVIEW_GEMINI_3_1_MODEL);
   });
 });
