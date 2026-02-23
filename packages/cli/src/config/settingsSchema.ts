@@ -287,16 +287,6 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      enablePromptCompletion: {
-        type: 'boolean',
-        label: 'Enable Prompt Completion',
-        category: 'General',
-        requiresRestart: true,
-        default: false,
-        description:
-          'Enable AI-powered prompt completion suggestions while typing.',
-        showInDialog: true,
-      },
       retryFetchErrors: {
         type: 'boolean',
         label: 'Retry Fetch Errors',
@@ -1701,6 +1691,16 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Enable model steering (user hints) to guide the model during tool execution.',
+        showInDialog: true,
+      },
+      directWebFetch: {
+        type: 'boolean',
+        label: 'Direct Web Fetch',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable web fetch behavior that bypasses LLM summarization.',
         showInDialog: true,
       },
     },
