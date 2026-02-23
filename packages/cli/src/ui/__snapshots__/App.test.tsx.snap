@@ -125,11 +125,10 @@ Tips for getting started:
 3. Create GEMINI.md files to customize your interactions with Gemini.
 4. /help for more information.
 HistoryItemDisplay
-╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Action Required                                                                                  │
-│                                                                                                  │
-│ ?  ls list directory                                                                             │
-│                                                                                                  │
+ Action Required
+
+ ?  ls list directory
+
 │ ls                                                                                               │
 │ Allow execution of: 'ls'?                                                                        │
 │                                                                                                  │
@@ -138,6 +137,7 @@ HistoryItemDisplay
 │   3. No, suggest changes (esc)                                                                   │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+
 
 
 

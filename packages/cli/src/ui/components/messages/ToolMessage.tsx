@@ -22,6 +22,7 @@ import {
 } from './ToolShared.js';
 import { type Config } from '@google/gemini-cli-core';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
+import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 
 export type { TextEmphasis };
 
@@ -66,6 +67,8 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
     embeddedShellFocused,
   );
 
+  const isAlternateBuffer = useAlternateBuffer();
+
   const isThisShellFocusable = checkIsShellFocusable(name, status, config);
 
   const { shouldShowFocusHint } = useFocusHint(
@@ -102,13 +105,13 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
       </StickyHeader>
       <Box
         width={terminalWidth}
-        borderStyle="round"
+        borderStyle={isAlternateBuffer ? undefined : 'round'}
         borderColor={borderColor}
         borderDimColor={borderDimColor}
         borderTop={false}
         borderBottom={false}
-        borderLeft={true}
-        borderRight={true}
+        borderLeft={!isAlternateBuffer}
+        borderRight={!isAlternateBuffer}
         paddingX={1}
         flexDirection="column"
       >

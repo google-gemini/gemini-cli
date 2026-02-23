@@ -142,13 +142,13 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
       <Box
         ref={contentRef}
         width={terminalWidth}
-        borderStyle="round"
+        borderStyle={isAlternateBuffer ? undefined : 'round'}
         borderColor={borderColor}
         borderDimColor={borderDimColor}
         borderTop={false}
         borderBottom={false}
-        borderLeft={true}
-        borderRight={true}
+        borderLeft={!isAlternateBuffer}
+        borderRight={!isAlternateBuffer}
         paddingX={1}
         flexDirection="column"
       >
