@@ -243,7 +243,7 @@ describe('ChatCompressionService', () => {
     // Threshold is 0.5 * 1000 = 500. 600 > 500, so it SHOULD compress.
     // Wait, the default threshold is 0.5.
     // Let's set it explicitly.
-    vi.mocked(mockConfig.getCompressionThreshold).mockResolvedValue(0.7);
+    vi.mocked(mockConfig.getCompressionThreshold).mockResolvedValue(70);
     // 600 < 700, so NOOP.
 
     const result = await service.compress(

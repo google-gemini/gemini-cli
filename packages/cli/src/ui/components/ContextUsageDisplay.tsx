@@ -11,20 +11,25 @@ import { getContextUsagePercentage } from '../utils/contextUsage.js';
 export const ContextUsageDisplay = ({
   promptTokenCount,
   model,
-  terminalWidth,
 }: {
   promptTokenCount: number;
   model: string;
-  terminalWidth: number;
 }) => {
   const percentage = getContextUsagePercentage(promptTokenCount, model);
-  const percentageLeft = ((1 - percentage) * 100).toFixed(0);
+  const percentageUsed = (percentage * 100).toFixed(0);
 
-  const label = terminalWidth < 100 ? '%' : '% context left';
+  let textColor = theme.text.secondary;
+  if (percentage >= 1.0) {
+    textColor = theme.status.error;
+  } else if (percentage >= 0.8) {
+    textColor = theme.status.warning;
+  }
+
+  const label = '% context used';
 
   return (
-    <Text color={theme.text.secondary}>
-      {percentageLeft}
+    <Text color={textColor}>
+      {percentageUsed}
       {label}
     </Text>
   );

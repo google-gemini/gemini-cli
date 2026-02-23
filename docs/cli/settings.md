@@ -60,7 +60,7 @@ they appear in the UI.
 | Hide CWD                             | `ui.footer.hideCWD`                    | Hide the current working directory path in the footer.                                                                                                            | `false`  |
 | Hide Sandbox Status                  | `ui.footer.hideSandboxStatus`          | Hide the sandbox status indicator in the footer.                                                                                                                  | `false`  |
 | Hide Model Info                      | `ui.footer.hideModelInfo`              | Hide the model name and context usage in the footer.                                                                                                              | `false`  |
-| Hide Context Window Percentage       | `ui.footer.hideContextPercentage`      | Hides the context window remaining percentage.                                                                                                                    | `true`   |
+| Hide Context Window Percentage       | `ui.footer.hideContextPercentage`      | Hides the context window usage percentage.                                                                                                                        | `true`   |
 | Hide Footer                          | `ui.hideFooter`                        | Hide the footer from the UI                                                                                                                                       | `false`  |
 | Show Memory Usage                    | `ui.showMemoryUsage`                   | Display memory usage information in the UI                                                                                                                        | `false`  |
 | Show Line Numbers                    | `ui.showLineNumbers`                   | Show line numbers in the chat.                                                                                                                                    | `true`   |
@@ -89,13 +89,13 @@ they appear in the UI.
 
 ### Model
 
-| UI Label                | Setting                      | Description                                                                            | Default     |
-| ----------------------- | ---------------------------- | -------------------------------------------------------------------------------------- | ----------- |
-| Model                   | `model.name`                 | The Gemini model to use for conversations.                                             | `undefined` |
-| Max Session Turns       | `model.maxSessionTurns`      | Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.      | `-1`        |
-| Compression Threshold   | `model.compressionThreshold` | The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3). | `0.5`       |
-| Disable Loop Detection  | `model.disableLoopDetection` | Disable automatic detection and prevention of infinite loops.                          | `false`     |
-| Skip Next Speaker Check | `model.skipNextSpeakerCheck` | Skip the next speaker check.                                                           | `true`      |
+| UI Label                      | Setting                      | Description                                                                       | Default     |
+| ----------------------------- | ---------------------------- | --------------------------------------------------------------------------------- | ----------- |
+| Model                         | `model.name`                 | The Gemini model to use for conversations.                                        | `undefined` |
+| Max Session Turns             | `model.maxSessionTurns`      | Maximum number of user/model/tool turns to keep in a session. -1 means unlimited. | `-1`        |
+| Context Compression Threshold | `model.compressionThreshold` | The percentage of context usage at which to trigger context compression (0-100).  | `50`        |
+| Disable Loop Detection        | `model.disableLoopDetection` | Disable automatic detection and prevention of infinite loops.                     | `false`     |
+| Skip Next Speaker Check       | `model.skipNextSpeakerCheck` | Skip the next speaker check.                                                      | `true`      |
 
 ### Context
 
