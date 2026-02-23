@@ -47,6 +47,7 @@ async function getProcessTableWindows(): Promise<Map<number, ProcessInfo>> {
 
     let processes: RawProcessInfo | RawProcessInfo[];
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       processes = JSON.parse(stdout);
     } catch (_e) {
       return processMap;
