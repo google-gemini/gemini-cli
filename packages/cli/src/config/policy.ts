@@ -18,6 +18,7 @@ import {
   type PolicyUpdateConfirmationRequest,
   writeToStderr,
   normalizePath,
+  resolveToRealPath,
 } from '@google/gemini-cli-core';
 import { type Settings } from './settings.js';
 
@@ -72,9 +73,10 @@ export async function resolveWorkspacePolicyState(options: {
 
     // If we are in the home directory (or rather, our target Gemini dir is the global one),
     // don't treat it as a workspace to avoid loading global policies twice.
+    // We use resolveToRealPath to handle cases where the home directory might be reached via a symlink.
     if (
-      normalizePath(storage.getGeminiDir()) ===
-      normalizePath(Storage.getGlobalGeminiDir())
+      normalizePath(resolveToRealPath(storage.getGeminiDir())) ===
+      normalizePath(resolveToRealPath(Storage.getGlobalGeminiDir()))
     ) {
       return { workspacePoliciesDir: undefined };
     }
