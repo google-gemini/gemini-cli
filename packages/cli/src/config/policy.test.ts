@@ -142,4 +142,20 @@ describe('resolveWorkspacePolicyState', () => {
       expect.stringContaining('Automatically accepting and loading'),
     );
   });
+
+  it('should not return workspace policies if cwd is the home directory', async () => {
+    const policiesDir = path.join(tempDir, '.gemini', 'policies');
+    fs.mkdirSync(policiesDir, { recursive: true });
+    fs.writeFileSync(path.join(policiesDir, 'policy.toml'), 'rules = []');
+
+    // Run from HOME directory (tempDir is mocked as HOME in beforeEach)
+    const result = await resolveWorkspacePolicyState({
+      cwd: tempDir,
+      trustedFolder: true,
+      interactive: true,
+    });
+
+    expect(result.workspacePoliciesDir).toBeUndefined();
+    expect(result.policyUpdateConfirmationRequest).toBeUndefined();
+  });
 });
