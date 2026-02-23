@@ -166,12 +166,14 @@ function runCommand(command, stdio = 'inherit') {
     const pythonBin = isWindows
       ? join(PYTHON_VENV_PATH, 'Scripts')
       : join(PYTHON_VENV_PATH, 'bin');
-    env.PATH = [
+    // Windows sometimes uses 'Path' instead of 'PATH'
+    const pathKey = 'Path' in env ? 'Path' : 'PATH';
+    env[pathKey] = [
       nodeBin,
       join(TEMP_DIR, 'actionlint'),
       join(TEMP_DIR, 'shellcheck'),
       pythonBin,
-      env.PATH,
+      env[pathKey],
     ].join(sep);
     execSync(command, { stdio, env, shell: true });
     return true;
