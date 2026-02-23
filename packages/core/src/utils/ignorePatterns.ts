@@ -84,7 +84,11 @@ export const PYTHON_EXCLUDES: string[] = ['**/*.pyc', '**/*.pyo'];
 /**
  * System and environment file patterns.
  */
-export const SYSTEM_FILE_EXCLUDES: string[] = ['**/.DS_Store', '**/.env'];
+export const SYSTEM_FILE_EXCLUDES: string[] = [
+  '**/.DS_Store',
+  '**/.env',
+  '**/Thumbs.db',
+];
 
 /**
  * Comprehensive file exclusion patterns combining all common ignore patterns.
