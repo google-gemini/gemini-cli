@@ -64,6 +64,7 @@ To start Plan Mode while using Gemini CLI:
 
 - **Natural Language:** Ask Gemini CLI to "start a plan for...". Gemini CLI
   calls the [`enter_plan_mode`] tool to switch modes.
+  > **Note:** This tool is not available when Gemini CLI is in [YOLO mode].
 
 ## How to use Plan Mode
 
