@@ -132,6 +132,35 @@ describe('Policy Engine Integration Tests', () => {
       ).toBe(PolicyDecision.ASK_USER);
     });
 
+    it('should handle global MCP wildcard (*) in settings', async () => {
+      const settings: Settings = {
+        mcp: {
+          allowed: ['*'],
+        },
+      };
+
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.DEFAULT,
+      );
+      const engine = new PolicyEngine(config);
+
+      // ANY tool with a server name should be allowed
+      expect(
+        (await engine.check({ name: 'mcp-server__tool' }, 'mcp-server'))
+          .decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'another-server__tool' }, 'another-server'))
+          .decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // Built-in tools should NOT be allowed by the MCP wildcard
+      expect(
+        (await engine.check({ name: 'run_shell_command' }, undefined)).decision,
+      ).toBe(PolicyDecision.ASK_USER);
+    });
+
     it('should correctly prioritize specific tool excludes over MCP server wildcards', async () => {
       const settings: Settings = {
         mcp: {
