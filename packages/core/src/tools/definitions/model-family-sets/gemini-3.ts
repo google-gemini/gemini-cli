@@ -63,18 +63,17 @@ export const GEMINI_3_SET: CoreToolSet = {
 
   write_file: {
     name: WRITE_FILE_TOOL_NAME,
-    description: `Writes content to a specified file in the local filesystem.
-The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
+    description: `Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use '${EDIT_TOOL_NAME}' for targeted edits to large files.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
         file_path: {
-          description: 'The path to the file to write to.',
+          description: 'Path to the file.',
           type: 'string',
         },
         content: {
           description:
-            "The content to write to the file. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide complete literal content.",
+            "The complete content to write. Provide the full file; do not use placeholders like '// ... rest of code'.",
           type: 'string',
         },
       },
@@ -327,14 +326,14 @@ The user has the ability to modify the \`new_string\` content. If modified, this
 
   google_web_search: {
     name: WEB_SEARCH_TOOL_NAME,
-    description:
-      'Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based on a query.',
+    description: `Performs a grounded Google Search to find information across the internet. Returns a synthesized answer with citations (e.g., [1]) and source URIs. Best for finding up-to-date documentation, troubleshooting obscure errors, or broad research. Use this when you don't have a specific URL. If a search result requires deeper analysis, follow up by using '${WEB_FETCH_TOOL_NAME}' on the provided URI.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'The search query to find information on the web.',
+          description:
+            "The search query. Supports natural language questions (e.g., 'Latest breaking changes in React 19') or specific technical queries.",
         },
       },
       required: ['query'],
@@ -344,13 +343,13 @@ The user has the ability to modify the \`new_string\` content. If modified, this
   web_fetch: {
     name: WEB_FETCH_TOOL_NAME,
     description:
-      "Processes content from URL(s), including local and private network addresses (e.g., localhost), embedded in a prompt. Include up to 20 URLs and instructions (e.g., summarize, extract specific data) directly in the 'prompt' parameter.",
+      "Analyzes and extracts information from up to 20 URLs. Ideal for documentation review, technical research, or reading raw code from GitHub. You can provide specific, complex instructions for the extraction (e.g., 'Summarize the breaking changes'). Provides cited answers based on the content. GitHub 'blob' URLs are automatically converted to raw versions for better processing. Supports HTTP/HTTPS only.",
     parametersJsonSchema: {
       type: 'object',
       properties: {
         prompt: {
           description:
-            'A comprehensive prompt that includes the URL(s) (up to 20) to fetch and specific instructions on how to process their content (e.g., "Summarize https://example.com/article and extract key points from https://another.com/data"). All URLs to be fetched must be valid and complete, starting with "http://" or "https://", and be fully-formed with a valid hostname (e.g., a domain name like "example.com" or an IP address). For example, "https://example.com" is valid, but "example.com" is not.',
+            'A string containing the URL(s) and your specific analysis instructions. Be clear about what information you want to find or summarize. Supports up to 20 URLs.',
           type: 'string',
         },
       },
@@ -430,21 +429,14 @@ Use this tool when the user's query implies needing the content of several files
 
   save_memory: {
     name: MEMORY_TOOL_NAME,
-    description: `
-Saves concise global user context (preferences, facts) for use across ALL workspaces.
-
-### CRITICAL: GLOBAL CONTEXT ONLY
-NEVER save workspace-specific context, local paths, or commands (e.g. "The entry point is src/index.js", "The test command is npm test"). These are local to the current workspace and must NOT be saved globally. EXCLUSIVELY for context relevant across ALL workspaces.
-
-- Use for "Remember X" or clear personal facts.
-- Do NOT use for session context.`,
+    description: `Persists global preferences or facts across ALL future sessions. Use this for recurring instructions like coding styles or tool aliases. Unlike '${WRITE_FILE_TOOL_NAME}', which is for project-specific files, this appends to a global memory file loaded in every workspace. If you are unsure whether a fact should be remembered globally, ask the user first. CRITICAL: Do not use for session-specific context or temporary data.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
         fact: {
           type: 'string',
           description:
-            'The specific fact or piece of information to remember. Should be a clear, self-contained statement.',
+            "A concise, global fact or preference (e.g., 'I prefer using tabs'). Do not include local paths or project-specific names.",
         },
       },
       required: ['fact'],
@@ -587,9 +579,8 @@ The agent did not use the todo list because this task could be completed by a ti
               },
               header: {
                 type: 'string',
-                maxLength: 16,
                 description:
-                  'MUST be 16 characters or fewer or the call will fail. Very short label displayed as a chip/tag. Use abbreviations: "Auth" not "Authentication", "Config" not "Configuration". Examples: "Auth method", "Library", "Approach", "Database".',
+                  'Very short label displayed as a chip/tag. Use abbreviations: "Auth" not "Authentication", "Config" not "Configuration". Examples: "Auth method", "Library", "Approach", "Database".',
               },
               type: {
                 type: 'string',
