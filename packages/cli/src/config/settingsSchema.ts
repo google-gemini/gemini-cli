@@ -515,13 +515,14 @@ const SETTINGS_SCHEMA = {
         description: 'Show warnings about terminal or OS compatibility issues.',
         showInDialog: true,
       },
-      hideTips: {
+      hideStarterTips: {
         type: 'boolean',
-        label: 'Hide Tips',
+        label: 'Hide Starter Tips',
         category: 'UI',
         requiresRestart: false,
         default: false,
-        description: 'Hide helpful tips in the UI',
+        description:
+          'Hide starter tips in the UI. Note: Tips automatically hide after 10 sessions.',
         showInDialog: true,
       },
       showShortcutsHint: {

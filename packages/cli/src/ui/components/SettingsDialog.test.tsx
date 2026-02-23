@@ -801,8 +801,8 @@ describe('SettingsDialog', () => {
     it('should show correct display values for settings with different states', async () => {
       const settings = createMockSettings({
         user: {
-          settings: { vimMode: true, hideTips: false },
-          originalSettings: { vimMode: true, hideTips: false },
+          settings: { vimMode: true, hideStarterTips: false },
+          originalSettings: { vimMode: true, hideStarterTips: false },
           path: '',
         },
         system: {
@@ -840,7 +840,7 @@ describe('SettingsDialog', () => {
       );
       await waitUntilReady();
 
-      // Toggle a non-restart-required setting (like hideTips)
+      // Toggle a non-restart-required setting (like hideStarterTips)
       await act(async () => {
         stdin.write(TerminalKeys.ENTER as string); // Enter - toggle current setting
       });
@@ -1624,7 +1624,7 @@ describe('SettingsDialog', () => {
           },
           ui: {
             hideWindowTitle: true,
-            hideTips: true,
+            hideStarterTips: true,
             showMemoryUsage: true,
             showLineNumbers: true,
             showCitations: true,
@@ -1770,7 +1770,7 @@ describe('SettingsDialog', () => {
           },
           ui: {
             hideWindowTitle: false,
-            hideTips: false,
+            hideStarterTips: false,
             showMemoryUsage: false,
             showLineNumbers: false,
             showCitations: false,

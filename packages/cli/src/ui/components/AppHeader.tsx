@@ -53,7 +53,7 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
       {settings.merged.ui.showUserIdentity !== false && (
         <UserIdentity config={config} />
       )}
-      {!(settings.merged.ui.hideTips || config.getScreenReader()) &&
+      {!(settings.merged.ui.hideStarterTips || config.getScreenReader()) &&
         showTips && <Tips config={config} />}
     </Box>
   );

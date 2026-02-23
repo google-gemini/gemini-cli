@@ -2043,6 +2043,39 @@ describe('Settings Loading and Merging', () => {
       );
     });
 
+    it('should migrate ui.hideTips to ui.hideStarterTips', () => {
+      const userSettingsContent = {
+        ui: {
+          hideTips: true,
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      migrateDeprecatedSettings(loadedSettings, true);
+
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'ui',
+        expect.objectContaining({ hideStarterTips: true }),
+      );
+      // Verify removal
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'ui',
+        expect.not.objectContaining({ hideTips: true }),
+      );
+    });
+
     it('should migrate enableLoadingPhrases: false to loadingPhrases: off', () => {
       const userSettingsContent = {
         ui: {
