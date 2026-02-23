@@ -49,6 +49,12 @@ Your command definition files must be written in the TOML format and use the
   does. This text will be displayed next to your command in the `/help` menu.
   **If you omit this field, a generic description will be generated from the
   filename.**
+- `model` (String): The name of a Gemini model to use when executing this
+  command (e.g., `"gemini-2.5-flash"`). This temporarily overrides the currently
+  active model for the duration of the command's response. After the response
+  completes, the previously selected model is automatically restored. This is
+  useful for commands that generate verbose output and don't require a pro-level
+  model.
 
 ## Handling arguments
 
@@ -266,6 +272,38 @@ Use the following best practices when providing your review:
 When you run `/review FileCommandLoader.ts`, the `@{docs/best-practices.md}`
 placeholder is replaced by the content of that file, and `{{args}}` is replaced
 by the text you provided, before the final prompt is sent to the model.
+
+### 5. Specifying a model with `model`
+
+You can pin a command to a specific model by adding the `model` field. This is
+particularly useful for commands that produce verbose output (like code recaps
+or documentation generation) where a lighter model is sufficient, saving your
+pro-model quota for more complex tasks.
+
+**Example (`recap.toml`):**
+
+```toml
+# In: ~/.gemini/commands/recap.toml
+
+description = "Recap the code and its features"
+model = "gemini-2.5-flash"
+
+prompt = """
+You are now acting as the lead architect on this project.
+
+{{args}}
+
+Your job is to recap the codebase to me, showing each individual file, its
+features and how they work. You can also discover updated context from
+`GEMINI.md` or any `.md` files in the project directory if available.
+
+Also discover new skills or tools as needed to recap the code.
+"""
+```
+
+When you run `/recap`, the CLI temporarily switches to `gemini-2.5-flash` for
+this request. After the response completes, the previously selected model is
+automatically restored.
 
 ---
 

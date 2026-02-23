@@ -400,6 +400,66 @@ describe('FileCommandLoader', () => {
     expect(command.description).toBe('My test command');
   });
 
+  it('passes modelOverride when model is specified in TOML', async () => {
+    const userCommandsDir = Storage.getUserCommandsDir();
+    mock({
+      [userCommandsDir]: {
+        'recap.toml':
+          'prompt = "Recap the code"\ndescription = "Recap"\nmodel = "gemini-2.5-flash"',
+      },
+    });
+
+    const loader = new FileCommandLoader(null);
+    const commands = await loader.loadCommands(signal);
+    const command = commands[0];
+    expect(command).toBeDefined();
+
+    const result = await command.action?.(
+      createMockCommandContext({
+        invocation: {
+          raw: '/recap',
+          name: 'recap',
+          args: '',
+        },
+      }),
+      '',
+    );
+    expect(result?.type).toBe('submit_prompt');
+    if (result?.type === 'submit_prompt') {
+      expect(result.content).toEqual([{ text: 'Recap the code' }]);
+      expect(result.modelOverride).toBe('gemini-2.5-flash');
+    }
+  });
+
+  it('does not include modelOverride when model is not specified', async () => {
+    const userCommandsDir = Storage.getUserCommandsDir();
+    mock({
+      [userCommandsDir]: {
+        'test.toml': 'prompt = "Test prompt"',
+      },
+    });
+
+    const loader = new FileCommandLoader(null);
+    const commands = await loader.loadCommands(signal);
+    const command = commands[0];
+    expect(command).toBeDefined();
+
+    const result = await command.action?.(
+      createMockCommandContext({
+        invocation: {
+          raw: '/test',
+          name: 'test',
+          args: '',
+        },
+      }),
+      '',
+    );
+    expect(result?.type).toBe('submit_prompt');
+    if (result?.type === 'submit_prompt') {
+      expect(result.modelOverride).toBeUndefined();
+    }
+  });
+
   it('should sanitize colons in filenames to prevent namespace conflicts', async () => {
     const userCommandsDir = Storage.getUserCommandsDir();
     mock({

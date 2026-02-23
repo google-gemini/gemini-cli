@@ -477,6 +477,11 @@ export interface ConsoleMessageItem {
 export interface SubmitPromptResult {
   type: 'submit_prompt';
   content: PartListUnion;
+  /**
+   * If set, temporarily overrides the active model for this prompt only.
+   * The previous model is restored after the response completes.
+   */
+  modelOverride?: string;
 }
 
 /**
