@@ -10,7 +10,6 @@ import {
   SETTINGS_SCHEMA_DEFINITIONS,
   type SettingCollectionDefinition,
   type SettingDefinition,
-  type SettingsJsonSchemaDefinition,
   type Settings,
   type SettingsSchema,
 } from './settingsSchema.js';
