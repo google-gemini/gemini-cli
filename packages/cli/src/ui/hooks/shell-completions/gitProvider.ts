@@ -7,6 +7,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { ShellCompletionProvider, CompletionResult } from './types.js';
+import { escapeShellPath } from '../useShellCompletion.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -74,7 +75,7 @@ export const gitProvider: ShellCompletionProvider = {
               .filter((b) => b.startsWith(partial))
               .map((b) => ({
                 label: b,
-                value: b,
+                value: escapeShellPath(b),
                 description: 'branch',
               })),
             exclusive: true,
