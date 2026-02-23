@@ -227,7 +227,7 @@ export async function getIdeProcessInfo(): Promise<{
 
   if (process.env['GEMINI_CLI_IDE_PID']) {
     const idePid = parseInt(process.env['GEMINI_CLI_IDE_PID'], 10);
-    if (!isNaN(idePid)) {
+    if (!isNaN(idePid) && idePid > 0) {
       if (platform === 'win32') {
         const processMap = await getProcessTableWindows();
         const proc = processMap.get(idePid);
