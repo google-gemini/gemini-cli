@@ -4,22 +4,26 @@ on:
   issues:
     types: ['opened', 'edited', 'reopened']
   schedule:
-    - cron: '0 * * * *'
+    - cron: '0 * * * *' # Runs every hour
   workflow_dispatch:
+
+concurrency:
+  group: label-workstream-rollup
+  cancel-in-progress: false
 
 jobs:
   labeler:
-    runs-on: 'ubuntu-latest'
+    name: Apply or Remove Workstream Rollup Label
+    runs-on: ubuntu-latest
     permissions:
-      issues: 'write'
+      issues: write
+
     steps:
-      - name: 'Check for Parent Workstream and Apply Label'
-        uses: 'actions/github-script@v7'
+      - name: 'Manage Workstream Rollup Label'
+        uses: actions/github-script@v7
         with:
           script: |
             const labelToAdd = 'workstream-rollup';
-
-            // Allow-list of parent issue URLs
             const allowedParentUrls = [
               'https://github.com/google-gemini/gemini-cli/issues/15374',
               'https://github.com/google-gemini/gemini-cli/issues/15456',
@@ -28,147 +32,165 @@ jobs:
               'https://github.com/google-gemini/gemini-cli/issues/17203'
             ];
 
-            // Single issue processing (for event triggers)
+            const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+            // ✅ Ensure the label exists
+            async function ensureLabelExists(owner, repo, name) {
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name });
+                console.log(`Label '${name}' already exists.`);
+              } catch (error) {
+                if (error.status === 404) {
+                  console.log(`Label '${name}' not found. Creating it...`);
+                  await github.rest.issues.createLabel({
+                    owner,
+                    repo,
+                    name,
+                    color: '0e8a16',
+                    description: 'Automatically applied to issues under approved workstream rollups'
+                  });
+                  console.log(`✅ Label '${name}' created.`);
+                } else {
+                  throw error;
+                }
+              }
+            }
+
+            // 🧩 Skip PRs
+            if (context.payload.issue && context.payload.issue.pull_request) {
+              console.log('Skipping pull request events.');
+              return;
+            }
+
+            async function checkAndLabel(issue, owner, repo) {
+              if (!issue) return;
+              const issueNumber = issue.number;
+              let isWorkstream = false;
+              let trace = [];
+
+              // Traverse parents
+              let currentParent = issue.parent;
+              while (currentParent) {
+                trace.push(currentParent.url);
+                if (allowedParentUrls.includes(currentParent.url)) {
+                  isWorkstream = true;
+                  break;
+                }
+                currentParent = currentParent.parent;
+              }
+
+              // Fetch labels for the issue
+              const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+                owner,
+                repo,
+                issue_number: issueNumber,
+              });
+
+              const hasLabel = labels.some(l => l.name === labelToAdd);
+
+              if (isWorkstream && !hasLabel) {
+                console.log(`✅ Adding '${labelToAdd}' to #${issueNumber} (trace: ${trace.join(' -> ')})`);
+                await ensureLabelExists(owner, repo, labelToAdd);
+                await github.rest.issues.addLabels({
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                  labels: [labelToAdd],
+                });
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                  body: `🏷️ Automatically labeled as **${labelToAdd}** because it belongs to an approved workstream rollup.`,
+                });
+              } else if (!isWorkstream && hasLabel) {
+                console.log(`🧹 Removing '${labelToAdd}' from #${issueNumber} (no longer in allowed rollups).`);
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                  name: labelToAdd,
+                });
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                  body: `🚫 Removed label **${labelToAdd}** because the issue no longer belongs to an approved workstream rollup.`,
+                });
+              } else {
+                console.log(`ℹ️ No change for issue #${issueNumber}. Workstream=${isWorkstream}`);
+              }
+            }
+
             async function processSingleIssue(owner, repo, number) {
               const query = `
                 query($owner:String!, $repo:String!, $number:Int!) {
                   repository(owner:$owner, name:$repo) {
                     issue(number:$number) {
                       number
-                      parent {
-                        url
-                        parent {
-                          url
-                          parent {
-                            url
-                            parent {
-                              url
-                              parent {
-                                url
-                              }
-                            }
-                          }
-                        }
-                      }
+                      parent { url parent { url parent { url parent { url parent { url } } } } }
                     }
                   }
                 }
               `;
-              try {
-                const result = await github.graphql(query, { owner, repo, number });
-
-                if (!result || !result.repository || !result.repository.issue) {
-                  console.log(`Issue #${number} not found or data missing.`);
-                  return;
-                }
-
-                const issue = result.repository.issue;
-                await checkAndLabel(issue, owner, repo);
-              } catch (error) {
-                console.error(`Failed to process issue #${number}:`, error);
-                throw error; // Re-throw to be caught by main execution
+              const result = await github.graphql(query, { owner, repo, number });
+              const issue = result?.repository?.issue;
+              if (!issue) {
+                console.log(`⚠️ Issue #${number} not found.`);
+                return;
               }
+              await checkAndLabel(issue, owner, repo);
             }
 
-            // Bulk processing (for schedule/dispatch)
             async function processAllOpenIssues(owner, repo) {
               const query = `
                 query($owner:String!, $repo:String!, $cursor:String) {
                   repository(owner:$owner, name:$repo) {
                     issues(first: 100, states: OPEN, after: $cursor) {
-                      pageInfo {
-                        hasNextPage
-                        endCursor
-                      }
+                      pageInfo { hasNextPage endCursor }
                       nodes {
                         number
-                        parent {
-                          url
-                          parent {
-                            url
-                            parent {
-                              url
-                              parent {
-                                url
-                                parent {
-                                  url
-                                }
-                              }
-                            }
-                          }
-                        }
+                        parent { url parent { url parent { url parent { url parent { url } } } } }
                       }
                     }
                   }
                 }
               `;
 
+              await ensureLabelExists(owner, repo, labelToAdd);
               let hasNextPage = true;
               let cursor = null;
 
               while (hasNextPage) {
-                try {
-                  const result = await github.graphql(query, { owner, repo, cursor });
+                const result = await github.graphql(query, { owner, repo, cursor });
+                const issues = result?.repository?.issues?.nodes || [];
 
-                  if (!result || !result.repository || !result.repository.issues) {
-                     console.error('Invalid response structure from GitHub API');
-                     break;
-                  }
-
-                  const issues = result.repository.issues.nodes || [];
-
-                  console.log(`Processing batch of ${issues.length} issues...`);
-                  for (const issue of issues) {
+                console.log(`🔍 Checking ${issues.length} open issues...`);
+                for (const issue of issues) {
+                  try {
                     await checkAndLabel(issue, owner, repo);
+                  } catch (e) {
+                    console.error(`⚠️ Failed on #${issue.number}:`, e);
                   }
-
-                  hasNextPage = result.repository.issues.pageInfo.hasNextPage;
-                  cursor = result.repository.issues.pageInfo.endCursor;
-                } catch (error) {
-                  console.error('Failed to fetch issues batch:', error);
-                  throw error; // Re-throw to be caught by main execution
                 }
+
+                hasNextPage = result.repository.issues.pageInfo.hasNextPage;
+                cursor = result.repository.issues.pageInfo.endCursor;
+                await sleep(1000); // prevent hitting rate limits
               }
             }
 
-            async function checkAndLabel(issue, owner, repo) {
-              if (!issue || !issue.parent) return;
-
-              let currentParent = issue.parent;
-              let tracedParents = [];
-              let matched = false;
-
-              while (currentParent) {
-                tracedParents.push(currentParent.url);
-
-                if (allowedParentUrls.includes(currentParent.url)) {
-                  console.log(`SUCCESS: Issue #${issue.number} is a descendant of ${currentParent.url}. Trace: ${tracedParents.join(' -> ')}. Adding label.`);
-                  await github.rest.issues.addLabels({
-                    owner,
-                    repo,
-                    issue_number: issue.number,
-                    labels: [labelToAdd]
-                  });
-                  matched = true;
-                  break;
-                }
-                currentParent = currentParent.parent;
-              }
-
-              if (!matched && context.eventName === 'issues') {
-                 console.log(`Issue #${issue.number} did not match any allowed workstreams. Trace: ${tracedParents.join(' -> ') || 'None'}.`);
-              }
-            }
-
-            // Main execution
             try {
+              const { owner, repo } = context.repo;
               if (context.eventName === 'issues') {
-                console.log(`Processing single issue #${context.payload.issue.number}...`);
-                await processSingleIssue(context.repo.owner, context.repo.repo, context.payload.issue.number);
+                const num = context.payload.issue.number;
+                console.log(`Processing single issue event for #${num}...`);
+                await processSingleIssue(owner, repo, num);
               } else {
-                console.log(`Running for event: ${context.eventName}. Processing all open issues...`);
-                await processAllOpenIssues(context.repo.owner, context.repo.repo);
+                console.log('Running scheduled/manual job — scanning all open issues.');
+                await processAllOpenIssues(owner, repo);
               }
-            } catch (error) {
-              core.setFailed(`Workflow failed: ${error.message}`);
+              console.log('🎉 Label rollup maintenance complete.');
+            } catch (err) {
+              core.setFailed(`Workflow failed: ${err.message}`);
             }
