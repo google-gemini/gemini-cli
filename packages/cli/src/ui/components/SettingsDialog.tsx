@@ -459,8 +459,8 @@ export function SettingsDialog({
 
   const footerContent = showRestartPrompt ? (
     <Text color={theme.status.warning}>
-      To see changes, Gemini CLI must be restarted. Press r to exit and apply
-      changes now.
+      Changes that require a restart have been modified. Press r to exit and
+      apply changes now.
     </Text>
   ) : null;
 
