@@ -120,8 +120,6 @@ describe('policyHelpers', () => {
       expect(chain[0]?.model).toBe('gemini-2.5-flash');
       expect(chain[1]?.model).toBe('gemini-2.5-pro');
     });
-<<<<<<< HEAD
-=======
 
     it('proactively returns Gemini 2.5 chain if Gemini 3 requested but user lacks access', () => {
       const config = createMockConfig({
@@ -156,7 +154,6 @@ describe('policyHelpers', () => {
       expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
       expect(chain[1]?.model).toBe('gemini-3-flash-preview');
     });
->>>>>>> aa9163da6 (feat(core): add policy chain support for Gemini 3.1 (#19991))
   });
 
   describe('buildFallbackPolicyContext', () => {

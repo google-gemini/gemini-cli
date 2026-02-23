@@ -25,6 +25,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
   isAutoModel,
+  isGemini3Model,
   resolveModel,
 } from '../config/models.js';
 import type { ModelSelectionResult } from './modelAvailabilityService.js';
@@ -56,19 +57,10 @@ export function resolvePolicyChain(
   );
   const isAutoPreferred = preferredModel ? isAutoModel(preferredModel) : false;
   const isAutoConfigured = isAutoModel(configuredModel);
+  const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? true;
 
   if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
     chain = getFlashLitePolicyChain();
-<<<<<<< HEAD
-  } else if (isAutoPreferred || isAutoConfigured) {
-    const previewEnabled =
-      preferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
-      configuredModel === PREVIEW_GEMINI_MODEL_AUTO;
-    chain = getModelPolicyChain({
-      previewEnabled,
-      userTier: config.getUserTier(),
-    });
-=======
   } else if (
     isGemini3Model(resolvedModel) ||
     isAutoPreferred ||
@@ -95,7 +87,6 @@ export function resolvePolicyChain(
         useCustomToolModel,
       });
     }
->>>>>>> aa9163da6 (feat(core): add policy chain support for Gemini 3.1 (#19991))
   } else {
     chain = createSingleModelChain(modelFromConfig);
   }
