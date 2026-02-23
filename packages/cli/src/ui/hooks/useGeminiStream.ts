@@ -1067,23 +1067,15 @@ export const useGeminiStream = (
       }
 
       const rawThreshold = settings.merged.model?.compressionThreshold ?? 0.5;
-      const thresholdDisplay = `${rawThreshold} (${Math.round(rawThreshold * 100)}%)`;
+      const thresholdDisplay = `${Math.round(rawThreshold * 100)}%`;
 
       addItem(
         {
           type: MessageType.INFO,
           text: `Context compressed`,
+          secondaryText: `at ${thresholdDisplay} threshold. Change this in /settings.`,
           color: theme.status.warning,
           marginBottom: 1,
-        } as HistoryItemInfo,
-        userMessageTimestamp,
-      );
-
-      addItem(
-        {
-          type: MessageType.INFO,
-          text: `Threshold: ${thresholdDisplay}. Change this in /settings.`,
-          color: theme.text.secondary,
         } as HistoryItemInfo,
         userMessageTimestamp,
       );

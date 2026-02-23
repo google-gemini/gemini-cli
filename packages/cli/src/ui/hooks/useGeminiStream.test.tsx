@@ -2417,19 +2417,8 @@ describe('useGeminiStream', () => {
           expect.objectContaining({
             type: MessageType.INFO,
             text: 'Context compressed',
+            secondaryText: 'at 50% threshold. Change this in /settings.',
             color: theme.status.warning,
-          }),
-          expect.any(Number),
-        );
-      });
-
-      // Check that the threshold detail message was added
-      await waitFor(() => {
-        expect(mockAddItem).toHaveBeenCalledWith(
-          expect.objectContaining({
-            type: MessageType.INFO,
-            text: 'Threshold: 0.5 (50%). Change this in /settings.',
-            color: theme.text.secondary,
           }),
           expect.any(Number),
         );
