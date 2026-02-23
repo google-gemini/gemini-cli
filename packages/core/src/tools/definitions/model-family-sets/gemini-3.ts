@@ -38,7 +38,7 @@ import {
 export const GEMINI_3_SET: CoreToolSet = {
   read_file: {
     name: READ_FILE_TOOL_NAME,
-    description: `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'start_line' and 'end_line' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
+    description: `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'start_line' and 'end_line' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, always prefer reading specific line ranges with 'start_line' and 'end_line' to minimize context usage.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -290,7 +290,8 @@ export const GEMINI_3_SET: CoreToolSet = {
 
   replace: {
     name: EDIT_TOOL_NAME,
-    description: `Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool requires providing significant context around the change to ensure precise targeting.
+    description: `Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. 
+CRITICAL: 'old_string' MUST be an exact literal match including whitespace and indentation. Always use 'read_file' with specific line ranges to verify the target content immediately before using this tool. 
 The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.`,
     parametersJsonSchema: {
       type: 'object',
