@@ -9,6 +9,22 @@ import type { CommandModule } from 'yargs';
 import { loadSettings, SettingScope } from '../../config/settings.js';
 import { debugLogger, type MCPServerConfig } from '@google/gemini-cli-core';
 import { exitCli } from '../utils.js';
+import { z } from 'zod';
+
+const addArgsSchema = z.object({
+  name: z.string(),
+  commandOrUrl: z.string(),
+  args: z.array(z.union([z.string(), z.number()])).optional(),
+  scope: z.enum(['user', 'project']).default('project'),
+  transport: z.enum(['stdio', 'sse', 'http']).default('stdio'),
+  env: z.array(z.string()).optional(),
+  header: z.array(z.string()).optional(),
+  timeout: z.number().optional(),
+  trust: z.boolean().optional(),
+  description: z.string().optional(),
+  'include-tools': z.array(z.string()).optional(),
+  'exclude-tools': z.array(z.string()).optional(),
+});
 
 async function addMcpServer(
   name: string,
@@ -219,32 +235,21 @@ export const addCommand: CommandModule = {
         }
       }),
   handler: async (argv) => {
+    const parsedArgs = addArgsSchema.parse(argv);
     await addMcpServer(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      argv['name'] as string,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      argv['commandOrUrl'] as string,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      argv['args'] as Array<string | number>,
+      parsedArgs.name,
+      parsedArgs.commandOrUrl,
+      parsedArgs.args,
       {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        scope: argv['scope'] as string,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        transport: argv['transport'] as string,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        env: argv['env'] as string[],
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        header: argv['header'] as string[],
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        timeout: argv['timeout'] as number | undefined,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        trust: argv['trust'] as boolean | undefined,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        description: argv['description'] as string | undefined,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        includeTools: argv['includeTools'] as string[] | undefined,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        excludeTools: argv['excludeTools'] as string[] | undefined,
+        scope: parsedArgs.scope,
+        transport: parsedArgs.transport,
+        env: parsedArgs.env,
+        header: parsedArgs.header,
+        timeout: parsedArgs.timeout,
+        trust: parsedArgs.trust,
+        description: parsedArgs.description,
+        includeTools: parsedArgs['include-tools'],
+        excludeTools: parsedArgs['exclude-tools'],
       },
     );
     await exitCli();

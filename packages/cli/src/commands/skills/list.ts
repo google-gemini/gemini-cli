@@ -10,18 +10,21 @@ import { loadSettings } from '../../config/settings.js';
 import { loadCliConfig, type CliArgs } from '../../config/config.js';
 import { exitCli } from '../utils.js';
 import chalk from 'chalk';
+import { z } from 'zod';
+
+const listArgsSchema = z.object({
+  all: z.boolean().default(false),
+});
 
 export async function handleList(args: { all?: boolean }) {
   const workspaceDir = process.cwd();
   const settings = loadSettings(workspaceDir);
 
+  const configArgs = z.custom<CliArgs>().parse({ debug: false });
   const config = await loadCliConfig(
     settings.merged,
     'skills-list-session',
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    {
-      debug: false,
-    } as Partial<CliArgs> as CliArgs,
+    configArgs,
     { cwd: workspaceDir },
   );
 
@@ -73,8 +76,8 @@ export const listCommand: CommandModule = {
       default: false,
     }),
   handler: async (argv) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    await handleList({ all: argv['all'] as boolean });
+    const parsedArgs = listArgsSchema.parse(argv);
+    await handleList({ all: parsedArgs.all });
     await exitCli();
   },
 };

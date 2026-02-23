@@ -15,6 +15,12 @@ import {
 } from '@google/gemini-cli-core';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { exitCli } from '../utils.js';
+import { z } from 'zod';
+
+const enableArgsSchema = z.object({
+  name: z.string(),
+  scope: z.enum(['user', 'workspace']).optional(),
+});
 import { McpServerEnablementManager } from '../../config/mcp/mcpServerEnablement.js';
 
 interface EnableArgs {
@@ -104,11 +110,10 @@ export const enableCommand: CommandModule = {
         return true;
       }),
   handler: async (argv) => {
+    const parsedArgs = enableArgsSchema.parse(argv);
     await handleEnable({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      name: argv['name'] as string,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      scope: argv['scope'] as string,
+      name: parsedArgs.name,
+      scope: parsedArgs.scope,
     });
     await exitCli();
   },

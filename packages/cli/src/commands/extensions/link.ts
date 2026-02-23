@@ -20,6 +20,12 @@ import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings } from '../../config/settings.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { exitCli } from '../utils.js';
+import { z } from 'zod';
+
+const linkArgsSchema = z.object({
+  path: z.string(),
+  consent: z.boolean().optional(),
+});
 
 interface InstallArgs {
   path: string;
@@ -78,11 +84,10 @@ export const linkCommand: CommandModule = {
       })
       .check((_) => true),
   handler: async (argv) => {
+    const parsedArgs = linkArgsSchema.parse(argv);
     await handleLink({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      path: argv['path'] as string,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      consent: argv['consent'] as boolean | undefined,
+      path: parsedArgs.path,
+      consent: parsedArgs.consent,
     });
     await exitCli();
   },
