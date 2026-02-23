@@ -289,13 +289,13 @@ export class BaseLlmClient {
         const activeModel = this.config.getActiveModel();
         if (activeModel !== initialActiveModel) {
           initialActiveModel = activeModel;
-          currentModel = activeModel;
           // Re-resolve config if model changed during retry
-          const { generateContentConfig } =
+          const { model: resolvedModel, generateContentConfig } =
             this.config.modelConfigService.getResolvedConfig({
               ...modelConfigKey,
               model: activeModel,
             });
+          currentModel = resolvedModel;
           currentGenerateContentConfig = generateContentConfig;
         }
         const finalConfig: GenerateContentConfig = {
