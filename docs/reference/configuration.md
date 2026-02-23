@@ -970,8 +970,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`experimental.directWebFetch`** (boolean):
-  - **Description:** Enable experimental web fetch behavior that bypasses LLM
-    summarization.
+  - **Description:** Enable web fetch behavior that bypasses LLM summarization.
   - **Default:** `false`
   - **Requires restart:** Yes
 
