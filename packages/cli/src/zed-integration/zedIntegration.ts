@@ -367,7 +367,10 @@ export class GeminiAgent {
       mcpServers: mergedMcpServers,
     };
 
-    const config = await loadCliConfig(settings, sessionId, this.argv, { cwd });
+    const config = await loadCliConfig(settings, sessionId, this.argv, {
+      cwd,
+      loadedSettings: currentSettings,
+    });
 
     return config;
   }

@@ -7,6 +7,7 @@
 import { AuthType } from '@google/gemini-cli-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { validateAuthMethod } from './auth.js';
+import type { MergedSettings } from './settings.js';
 
 vi.mock('./settings.js', () => ({
   loadEnvironment: vi.fn(),
@@ -94,6 +95,7 @@ describe('validateAuthMethod', () => {
     for (const [key, value] of Object.entries(envs)) {
       vi.stubEnv(key, value as string);
     }
-    expect(validateAuthMethod(authType)).toBe(expected);
+    const mockSettings = {} as MergedSettings;
+    expect(validateAuthMethod(authType, mockSettings)).toBe(expected);
   });
 });

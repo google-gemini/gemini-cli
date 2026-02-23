@@ -47,6 +47,7 @@ import {
 import {
   type Settings,
   type MergedSettings,
+  type LoadedSettings,
   saveModelChange,
   loadSettings,
 } from './settings.js';
@@ -439,6 +440,7 @@ export interface LoadCliConfigOptions {
   projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
     disabled?: string[];
   };
+  loadedSettings?: LoadedSettings;
 }
 
 export async function loadCliConfig(
@@ -447,10 +449,15 @@ export async function loadCliConfig(
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
 ): Promise<Config> {
-  const { cwd = process.cwd(), projectHooks } = options;
+  const {
+    cwd = process.cwd(),
+    projectHooks,
+    loadedSettings: providedLoadedSettings,
+  } = options;
   const debugMode = isDebugMode(argv);
 
-  const loadedSettings = loadSettings(cwd);
+  // Use provided loadedSettings if available, otherwise load them (for backward compatibility)
+  const loadedSettings = providedLoadedSettings ?? loadSettings(cwd);
 
   if (argv.sandbox) {
     process.env['GEMINI_SANDBOX'] = 'true';

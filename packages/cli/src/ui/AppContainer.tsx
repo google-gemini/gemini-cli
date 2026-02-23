@@ -846,17 +846,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
       const error = validateAuthMethod(
         settings.merged.security.auth.selectedType,
+        settings.merged,
       );
       if (error) {
         onAuthError(error);
       }
     }
-  }, [
-    settings.merged.security.auth.selectedType,
-    settings.merged.security.auth.enforcedType,
-    settings.merged.security.auth.useExternal,
-    onAuthError,
-  ]);
+  }, [settings.merged, onAuthError]);
 
   const { isModelDialogOpen, openModelDialog, closeModelDialog } =
     useModelCommand();

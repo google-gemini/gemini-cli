@@ -17,7 +17,7 @@ import { renderHook } from '../../test-utils/render.js';
 import { useAuthCommand, validateAuthMethodWithSettings } from './useAuth.js';
 import { AuthType, type Config } from '@google/gemini-cli-core';
 import { AuthState } from '../types.js';
-import type { LoadedSettings } from '../../config/settings.js';
+import type { LoadedSettings, MergedSettings } from '../../config/settings.js';
 import { waitFor } from '../../test-utils/async.js';
 
 // Mock dependencies
@@ -34,7 +34,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 });
 
 vi.mock('../../config/auth.js', () => ({
-  validateAuthMethod: (authType: AuthType) => mockValidateAuthMethod(authType),
+  validateAuthMethod: (authType: AuthType, settings: MergedSettings) =>
+    mockValidateAuthMethod(authType, settings),
 }));
 
 describe('useAuth', () => {
@@ -118,6 +119,7 @@ describe('useAuth', () => {
       expect(error).toBe('Validation Error');
       expect(mockValidateAuthMethod).toHaveBeenCalledWith(
         AuthType.LOGIN_WITH_GOOGLE,
+        settings.merged,
       );
     });
   });
