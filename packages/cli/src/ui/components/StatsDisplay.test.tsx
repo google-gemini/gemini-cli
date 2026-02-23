@@ -465,8 +465,8 @@ describe('<StatsDisplay />', () => {
       await waitUntilReady();
       const output = lastFrame();
 
-      expect(output).toContain('Usage remaining');
-      expect(output).toContain('75.0%');
+      expect(output).toContain('Usage');
+      expect(output).toContain('25.0% used');
       expect(output).toContain('resets in 1h 30m');
       expect(output).toMatchSnapshot();
 
@@ -521,8 +521,8 @@ describe('<StatsDisplay />', () => {
       await waitUntilReady();
       const output = lastFrame();
 
-      // (10 + 700) / (100 + 1000) = 710 / 1100 = 64.5%
-      expect(output).toContain('65% usage remaining');
+      // (1 - 710/1100) * 100 = 35.5%
+      expect(output).toContain('35% used');
       expect(output).toContain('Usage limit: 1,100');
       expect(output).toMatchSnapshot();
 
@@ -571,7 +571,7 @@ describe('<StatsDisplay />', () => {
 
       expect(output).toContain('gemini-2.5-flash');
       expect(output).toContain('-'); // for requests
-      expect(output).toContain('50.0%');
+      expect(output).toContain('50.0% used');
       expect(output).toContain('resets in 2h');
       expect(output).toMatchSnapshot();
 

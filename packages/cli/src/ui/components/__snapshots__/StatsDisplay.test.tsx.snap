@@ -163,12 +163,12 @@ exports[`<StatsDisplay /> > Quota Display > renders pooled quota information for
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
 │  auto Usage                                                                                      │
-│  65% usage remaining                                                                             │
+│  35% used                                                                                        │
 │  Usage limit: 1,100                                                                              │
 │  Usage limits span all sessions and reset daily.                                                 │
 │  For a full token breakdown, run \`/stats model\`.                                                 │
 │                                                                                                  │
-│  Model                       Reqs             Usage remaining                                    │
+│  Model                       Reqs                       Usage                                    │
 │  ────────────────────────────────────────────────────────────                                    │
 │  gemini-2.5-pro                 -                                                                │
 │  gemini-2.5-flash               -                                                                │
@@ -194,9 +194,9 @@ exports[`<StatsDisplay /> > Quota Display > renders quota information for unused
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
 │  Model Usage                                                                                     │
-│  Model                       Reqs             Usage remaining                                    │
+│  Model                       Reqs                       Usage                                    │
 │  ────────────────────────────────────────────────────────────                                    │
-│  gemini-2.5-flash               -          50.0% resets in 2h                                    │
+│  gemini-2.5-flash               -     50.0% used resets in 2h                                    │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
@@ -219,9 +219,9 @@ exports[`<StatsDisplay /> > Quota Display > renders quota information when quota
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
 │  Model Usage                                                                                     │
-│  Model                       Reqs             Usage remaining                                    │
+│  Model                       Reqs                       Usage                                    │
 │  ────────────────────────────────────────────────────────────                                    │
-│  gemini-2.5-pro                 1      75.0% resets in 1h 30m                                    │
+│  gemini-2.5-pro                 1 25.0% used resets in 1h 30m                                    │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "

@@ -9,9 +9,9 @@ import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { formatResetTime } from '../utils/formatters.js';
 import {
-  getStatusColor,
-  QUOTA_THRESHOLD_HIGH,
-  QUOTA_THRESHOLD_MEDIUM,
+  getUsedStatusColor,
+  QUOTA_USED_WARNING_THRESHOLD,
+  QUOTA_USED_CRITICAL_THRESHOLD,
 } from '../utils/displayUtils.js';
 
 interface QuotaStatsInfoProps {
@@ -31,10 +31,10 @@ export const QuotaStatsInfo: React.FC<QuotaStatsInfoProps> = ({
     return null;
   }
 
-  const percentage = (remaining / limit) * 100;
-  const color = getStatusColor(percentage, {
-    green: QUOTA_THRESHOLD_HIGH,
-    yellow: QUOTA_THRESHOLD_MEDIUM,
+  const usedPercentage = 100 - (remaining / limit) * 100;
+  const color = getUsedStatusColor(usedPercentage, {
+    warning: QUOTA_USED_WARNING_THRESHOLD,
+    critical: QUOTA_USED_CRITICAL_THRESHOLD,
   });
 
   return (
@@ -42,7 +42,7 @@ export const QuotaStatsInfo: React.FC<QuotaStatsInfoProps> = ({
       <Text color={color}>
         {remaining === 0
           ? `Limit reached`
-          : `${percentage.toFixed(0)}% usage remaining`}
+          : `${usedPercentage.toFixed(0)}% used`}
         {resetTime && `, ${formatResetTime(resetTime)}`}
       </Text>
       {showDetails && (

@@ -273,7 +273,7 @@ const ModelUsageTable: React.FC<{
             alignItems="flex-end"
           >
             <Text bold color={theme.text.primary}>
-              Usage remaining
+              Usage
             </Text>
           </Box>
         )}
@@ -361,7 +361,7 @@ const ModelUsageTable: React.FC<{
               row.bucket.remainingFraction != null &&
               row.bucket.resetTime && (
                 <Text color={theme.text.secondary} wrap="truncate-end">
-                  {(row.bucket.remainingFraction * 100).toFixed(1)}%{' '}
+                  {((1 - row.bucket.remainingFraction) * 100).toFixed(1)}% used{' '}
                   {formatResetTime(row.bucket.resetTime)}
                 </Text>
               )}

@@ -36,7 +36,7 @@ describe('QuotaDisplay', () => {
     unmount();
   });
 
-  it('should not render when usage > 20%', async () => {
+  it('should not render when usage < 80%', async () => {
     const { lastFrame, waitUntilReady, unmount } = render(
       <QuotaDisplay remaining={85} limit={100} />,
     );
@@ -45,7 +45,7 @@ describe('QuotaDisplay', () => {
     unmount();
   });
 
-  it('should render yellow when usage < 20%', async () => {
+  it('should render warning when used >= 80%', async () => {
     const { lastFrame, waitUntilReady, unmount } = render(
       <QuotaDisplay remaining={15} limit={100} />,
     );
@@ -54,7 +54,7 @@ describe('QuotaDisplay', () => {
     unmount();
   });
 
-  it('should render red when usage < 5%', async () => {
+  it('should render critical when used >= 95%', async () => {
     const { lastFrame, waitUntilReady, unmount } = render(
       <QuotaDisplay remaining={4} limit={100} />,
     );
