@@ -128,6 +128,7 @@ export class PromptProvider {
           name: s.name,
           description: s.description,
           location: s.location,
+          isBuiltin: s.isBuiltin,
         })),
       );
       basePrompt = applySubstitutions(
@@ -171,6 +172,7 @@ export class PromptProvider {
               name: s.name,
               description: s.description,
               location: s.location,
+              isBuiltin: s.isBuiltin,
             })),
           skills.length > 0,
         ),
@@ -241,7 +243,7 @@ export class PromptProvider {
       const getCoreSystemPrompt = activeSnippets.getCoreSystemPrompt as (
         options: snippets.SystemPromptOptions,
       ) => string;
-       
+
       basePrompt = getCoreSystemPrompt(options);
     }
 
@@ -269,7 +271,6 @@ export class PromptProvider {
 
     /* eslint-enable @typescript-eslint/no-unsafe-assignment */
     return sanitizedPrompt;
-     
   }
 
   getCompressionPrompt(config: Config): string {
@@ -279,7 +280,7 @@ export class PromptProvider {
     );
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
-     
+
     return activeSnippets.getCompressionPrompt();
   }
 

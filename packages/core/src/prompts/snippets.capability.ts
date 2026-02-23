@@ -56,8 +56,26 @@ export function getCoreSystemPrompt(
     '{{GIT_REPO_CONTEXT}}',
     renderGitRepo(options.gitRepo),
   );
+  prompt = prompt.replace(
+    '{{SANDBOX_CONTEXT}}',
+    renderSandbox(options.sandbox),
+  );
+  prompt = prompt.replace(
+    '{{YOLO_MODE_CONTEXT}}',
+    renderInteractiveYoloMode(options.interactiveYoloMode),
+  );
 
   return prompt.trim();
+}
+
+function renderSandbox(mode?: snippets.SandboxMode): string {
+  if (!mode || mode === 'outside') return '';
+  return `## Sandbox\nYou are in a ${mode} sandbox. Access to host resources and files outside the project is restricted. If a command fails with 'Operation not permitted', explain it might be due to sandboxing.`;
+}
+
+function renderInteractiveYoloMode(enabled?: boolean): string {
+  if (!enabled) return '';
+  return `## Autonomous Mode (YOLO)\nMinimal interruption requested. Use \`ask_user\` ONLY for critical architectural pivots or fundamental ambiguity. Otherwise, make expert decisions autonomously.`;
 }
 
 function renderSubAgents(subAgents?: snippets.SubAgentOptions[]): string {
@@ -70,22 +88,45 @@ function renderSubAgents(subAgents?: snippets.SubAgentOptions[]): string {
 
 function renderAvailableSkills(skills?: snippets.AgentSkillOptions[]): string {
   if (!skills || skills.length === 0) return '';
-  const available = skills
-    .map((s) => `- **${s.name}**: ${s.description}`)
-    .join('\n');
-  return `## Available Skills\nActivate with \`activate_skill\`:\n${available}`;
+
+  // Essential Workflows that we want to keep highly visible
+  const essentialNames = ['software-engineering', 'new-application'];
+  const essential = skills.filter((s) => essentialNames.includes(s.name));
+  const others = skills.filter((s) => !essentialNames.includes(s.name));
+
+  // Sort others: Workspace/User skills first, Built-ins last
+  const sortedOthers = [...others].sort((a, b) => {
+    if (a.isBuiltin && !b.isBuiltin) return 1;
+    if (!a.isBuiltin && b.isBuiltin) return -1;
+    return a.name.localeCompare(b.name);
+  });
+
+  const renderList = (list: snippets.AgentSkillOptions[]) =>
+    list.map((s) => `- **${s.name}**: ${s.description}`).join('\n');
+
+  let output = '';
+  if (essential.length > 0) {
+    output += `## Essential Workflows\nActivate these for core agent behaviors:\n${renderList(essential)}\n\n`;
+  }
+
+  if (sortedOthers.length > 0) {
+    output += `## Available Skills\nProactively activate a skill with \`activate_skill\` when a task matches its expertise. This provides specialized protocols and expert guidance.\n${renderList(sortedOthers)}`;
+  }
+
+  return output.trim();
 }
 
 function renderActivatedSkills(
   skills?: snippets.ActivatedSkillOptions[],
 ): string {
   if (!skills || skills.length === 0) return '';
-  return skills
+  const skillsXml = skills
     .map(
       (s) =>
-        `### <activated_skill name="${s.name}">\n${s.body}\n### </activated_skill>`,
+        `<activated_skill name="${s.name}">\n${s.body}\n</activated_skill>`,
     )
     .join('\n\n');
+  return `## Activated Skills\nFollow \`<activated_skill>\` instructions as expert guidance. These rules supersede general workflows.\n${skillsXml}`;
 }
 
 function renderHookContext(enabled?: boolean): string {

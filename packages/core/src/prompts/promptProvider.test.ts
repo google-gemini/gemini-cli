@@ -118,6 +118,65 @@ describe('PromptProvider', () => {
     );
   });
 
+  it('should include skill activation guidance and placeholders in capability variant', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+      PREVIEW_GEMINI_FLASH_MODEL,
+    );
+    vi.mocked(mockConfig.getSkillManager().getSkills).mockReturnValue([
+      {
+        name: 'software-engineering',
+        description: 'Expert guidance.',
+        location: '/path/to/skill',
+        body: 'Skill body',
+      },
+    ]);
+
+    const provider = new PromptProvider();
+    const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('## Essential Workflows');
+    expect(prompt).toContain('software-engineering');
+    expect(prompt).toContain(
+      'Use `activate_skill` to enable specialized expert guidance',
+    );
+  });
+
+  it('should sort available skills (workspace first) and elevate activated skills in capability variant', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+      PREVIEW_GEMINI_FLASH_MODEL,
+    );
+    vi.mocked(mockConfig.getSkillManager().getSkills).mockReturnValue([
+      {
+        name: 'builtin-skill',
+        description: 'Builtin description',
+        location: '/path/to/builtin',
+        isBuiltin: true,
+      },
+      {
+        name: 'workspace-skill',
+        description: 'Workspace description',
+        location: '/path/to/workspace',
+        isBuiltin: false,
+      },
+    ]);
+    vi.mocked(mockConfig.getSkillManager().isSkillActive).mockImplementation(
+      (name) => name === 'workspace-skill',
+    );
+
+    const provider = new PromptProvider();
+    const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+    // Activated skills should be before available skills in the Capabilities section
+    const activatedIndex = prompt.indexOf('## Activated Skills');
+    const availableIndex = prompt.indexOf('## Available Skills');
+    expect(activatedIndex).toBeLessThan(availableIndex);
+
+    // Workspace skill should be before built-in skill in Available Skills
+    const workspaceIndex = prompt.indexOf('workspace-skill', availableIndex);
+    const builtinIndex = prompt.indexOf('builtin-skill', availableIndex);
+    expect(workspaceIndex).toBeLessThan(builtinIndex);
+  });
+
   it('should handle multiple context filenames in user memory section', () => {
     vi.mocked(getAllGeminiMdFilenames).mockReturnValue([
       DEFAULT_CONTEXT_FILENAME,

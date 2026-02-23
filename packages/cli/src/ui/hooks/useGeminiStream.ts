@@ -961,6 +961,9 @@ export const useGeminiStream = (
         [FinishReason.SPII]:
           'Response stopped due to sensitive personally identifiable information.',
         [FinishReason.OTHER]: 'Response stopped for other reasons.',
+        [FinishReason.IMAGE_RECITATION]:
+          'Response stopped due to image recitation policy.',
+        [FinishReason.IMAGE_OTHER]: 'Response stopped for other image reasons.',
         [FinishReason.MALFORMED_FUNCTION_CALL]:
           'Response stopped due to malformed function call.',
         [FinishReason.IMAGE_SAFETY]:

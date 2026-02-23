@@ -85,6 +85,7 @@ export interface AgentSkillOptions {
   name: string;
   description: string;
   location: string;
+  isBuiltin?: boolean;
 }
 
 export interface SubAgentOptions {
