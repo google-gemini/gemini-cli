@@ -39,6 +39,107 @@ export interface GeminiFileContent {
   content: string | null;
 }
 
+/**
+ * Deduplicates file paths by file identity (device + inode) rather than string path.
+ * This is necessary on case-insensitive filesystems where different case variants
+ * of the same filename resolve to the same physical file but have different path strings.
+ *
+ * @param filePaths Array of file paths to deduplicate
+ * @param debugMode Whether to log debug information
+ * @returns Array of deduplicated file paths, keeping the first occurrence of each unique file
+ */
+export async function deduplicatePathsByFileIdentity(
+  filePaths: string[],
+  debugMode: boolean,
+): Promise<string[]> {
+  if (filePaths.length === 0) {
+    return [];
+  }
+
+  // first deduplicate by string path to avoid redundant stat calls
+  const uniqueFilePaths = Array.from(new Set(filePaths));
+
+  const fileIdentityMap = new Map<string, string>();
+  const deduplicatedPaths: string[] = [];
+
+  const CONCURRENT_LIMIT = 20;
+  const results: Array<{
+    path: string;
+    dev: bigint | number | null;
+    ino: bigint | number | null;
+  }> = [];
+
+  for (let i = 0; i < uniqueFilePaths.length; i += CONCURRENT_LIMIT) {
+    const batch = uniqueFilePaths.slice(i, i + CONCURRENT_LIMIT);
+    const batchPromises = batch.map(async (filePath) => {
+      try {
+        // use stat() instead of lstat() to follow symlinks and get target file identity
+        const stats = await fs.stat(filePath);
+        return {
+          path: filePath,
+          dev: stats.dev,
+          ino: stats.ino,
+        };
+      } catch (error: unknown) {
+        if (debugMode) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          logger.debug(
+            `could not stat file for deduplication: ${filePath}. error: ${message}`,
+          );
+        }
+        return {
+          path: filePath,
+          dev: null,
+          ino: null,
+        };
+      }
+    });
+
+    const batchResults = await Promise.allSettled(batchPromises);
+    for (const result of batchResults) {
+      if (result.status === 'fulfilled') {
+        results.push(result.value);
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const error = result.reason;
+        const message = error instanceof Error ? error.message : String(error);
+        if (debugMode) {
+          logger.debug(
+            `unexpected error during deduplication stat: ${message}`,
+          );
+        }
+      }
+    }
+  }
+
+  for (const { path, dev, ino } of results) {
+    if (dev !== null && ino !== null) {
+      const identityKey = `${dev.toString()}:${ino.toString()}`;
+      if (!fileIdentityMap.has(identityKey)) {
+        fileIdentityMap.set(identityKey, path);
+        deduplicatedPaths.push(path);
+        if (debugMode) {
+          logger.debug(
+            `deduplication: keeping ${path} (dev: ${dev}, ino: ${ino})`,
+          );
+        }
+      } else {
+        const existingPath = fileIdentityMap.get(identityKey);
+        if (debugMode) {
+          logger.debug(
+            `deduplication: skipping ${path} (same file as ${existingPath})`,
+          );
+        }
+      }
+    } else {
+      deduplicatedPaths.push(path);
+    }
+  }
+
+  return deduplicatedPaths;
+}
+
 async function findProjectRoot(startDir: string): Promise<string | null> {
   let currentDir = normalizePath(startDir);
   while (true) {
@@ -526,7 +627,7 @@ export async function loadServerHierarchicalMemory(
     Promise.resolve(getExtensionMemoryPaths(extensionLoader)),
   ]);
 
-  const allFilePaths = Array.from(
+  const allFilePathsStringDeduped = Array.from(
     new Set([
       ...discoveryResult.global,
       ...discoveryResult.project,
@@ -534,9 +635,27 @@ export async function loadServerHierarchicalMemory(
     ]),
   );
 
-  if (allFilePaths.length === 0) {
+  if (allFilePathsStringDeduped.length === 0) {
     if (debugMode)
       logger.debug('No GEMINI.md files found in hierarchy of the workspace.');
+    return {
+      memoryContent: { global: '', extension: '', project: '' },
+      fileCount: 0,
+      filePaths: [],
+    };
+  }
+
+  // deduplicate by file identity to handle case-insensitive filesystems
+  const allFilePaths = await deduplicatePathsByFileIdentity(
+    allFilePathsStringDeduped,
+    debugMode,
+  );
+
+  if (allFilePaths.length === 0) {
+    if (debugMode)
+      logger.debug(
+        'No unique GEMINI.md files found after deduplication by file identity.',
+      );
     return {
       memoryContent: { global: '', extension: '', project: '' },
       fileCount: 0,
@@ -653,8 +772,66 @@ export async function loadJitSubdirectoryMemory(
     debugMode,
   );
 
-  // Filter out already loaded paths
-  const newPaths = potentialPaths.filter((p) => !alreadyLoadedPaths.has(p));
+  if (potentialPaths.length === 0) {
+    return { files: [] };
+  }
+
+  // deduplicate by file identity to handle case-insensitive filesystems
+  // this deduplicates within the current batch
+  const deduplicatedNewPaths = await deduplicatePathsByFileIdentity(
+    potentialPaths,
+    debugMode,
+  );
+
+  // get file identities of already loaded paths to compare against
+  const alreadyLoadedIdentities = new Set<string>();
+  if (alreadyLoadedPaths.size > 0) {
+    const CONCURRENT_LIMIT = 20;
+    const alreadyLoadedArray = Array.from(alreadyLoadedPaths);
+    const identityPromises: Array<Promise<void>> = [];
+
+    for (let i = 0; i < alreadyLoadedArray.length; i += CONCURRENT_LIMIT) {
+      const batch = alreadyLoadedArray.slice(i, i + CONCURRENT_LIMIT);
+      const batchPromises = batch.map(async (filePath) => {
+        try {
+          const stats = await fs.stat(filePath);
+          const identityKey = `${stats.dev.toString()}:${stats.ino.toString()}`;
+          alreadyLoadedIdentities.add(identityKey);
+        } catch {
+          // ignore errors - if we can't stat it, we can't deduplicate by identity
+        }
+      });
+      identityPromises.push(...batchPromises);
+    }
+    await Promise.allSettled(identityPromises);
+  }
+
+  // filter out paths that match already loaded files by identity
+  const newPaths: string[] = [];
+  const CONCURRENT_LIMIT = 20;
+  for (let i = 0; i < deduplicatedNewPaths.length; i += CONCURRENT_LIMIT) {
+    const batch = deduplicatedNewPaths.slice(i, i + CONCURRENT_LIMIT);
+    const batchPromises = batch.map(async (filePath) => {
+      try {
+        const stats = await fs.stat(filePath);
+        const identityKey = `${stats.dev.toString()}:${stats.ino.toString()}`;
+        if (!alreadyLoadedIdentities.has(identityKey)) {
+          return filePath;
+        }
+        if (debugMode) {
+          logger.debug(
+            `jit memory: skipping ${filePath} (already loaded with different case)`,
+          );
+        }
+        return null;
+      } catch {
+        // if we can't stat it, include it to be safe
+        return filePath;
+      }
+    });
+    const batchResults = await Promise.all(batchPromises);
+    newPaths.push(...batchResults.filter((p): p is string => p !== null));
+  }
 
   if (newPaths.length === 0) {
     return { files: [] };
