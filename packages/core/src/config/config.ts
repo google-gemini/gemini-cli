@@ -291,6 +291,7 @@ export interface ExtensionInstallMetadata {
   allowPreRelease?: boolean;
 }
 
+import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import type { FileFilteringOptions } from './constants.js';
 import {
   DEFAULT_FILE_FILTERING_OPTIONS,
@@ -475,6 +476,7 @@ export interface ConfigParameters {
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
+  maxAttempts?: number;
   enableShellOutputEfficiency?: boolean;
   shellToolInactivityTimeout?: number;
   fakeResponses?: string;
@@ -655,6 +657,7 @@ export class Config {
   private readonly outputSettings: OutputSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
+  private readonly maxAttempts: number;
   private readonly enableShellOutputEfficiency: boolean;
   private readonly shellToolInactivityTimeout: number;
   readonly fakeResponses?: string;
@@ -876,6 +879,10 @@ export class Config {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
+    this.maxAttempts = Math.min(
+      params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+      DEFAULT_MAX_ATTEMPTS,
+    );
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.rawOutput = params.rawOutput ?? false;
     this.acceptRawOutputRisk = params.acceptRawOutputRisk ?? false;
@@ -2406,6 +2413,10 @@ export class Config {
 
   getRetryFetchErrors(): boolean {
     return this.retryFetchErrors;
+  }
+
+  getMaxAttempts(): number {
+    return this.maxAttempts;
   }
 
   getEnableShellOutputEfficiency(): boolean {
