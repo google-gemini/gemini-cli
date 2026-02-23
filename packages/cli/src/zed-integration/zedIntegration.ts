@@ -35,6 +35,7 @@ import {
   partListUnionToString,
   LlmRole,
   ApprovalMode,
+  convertSessionToClientHistory,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -53,10 +54,7 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { type CliArgs, loadCliConfig } from '../config/config.js';
 import { runExitCleanup } from '../utils/cleanup.js';
-import {
-  SessionSelector,
-  convertSessionToHistoryFormats,
-} from '../utils/sessionUtils.js';
+import { SessionSelector } from '../utils/sessionUtils.js';
 
 export async function runZedIntegration(
   config: Config,
@@ -258,9 +256,7 @@ export class GeminiAgent {
       config.setFileSystemService(acpFileSystemService);
     }
 
-    const { clientHistory } = convertSessionToHistoryFormats(
-      sessionData.messages,
-    );
+    const clientHistory = convertSessionToClientHistory(sessionData.messages);
 
     const geminiClient = config.getGeminiClient();
     await geminiClient.initialize();

@@ -20,6 +20,7 @@ import {
   type MessageRecord,
   CoreToolCallStatus,
   coreEvents,
+  convertSessionToClientHistory,
 } from '@google/gemini-cli-core';
 
 // Mock modules
@@ -157,7 +158,7 @@ describe('convertSessionToHistoryFormats', () => {
   it('should convert empty messages array', () => {
     const result = convertSessionToHistoryFormats([]);
     expect(result.uiHistory).toEqual([]);
-    expect(result.clientHistory).toEqual([]);
+    expect(convertSessionToClientHistory([])).toEqual([]);
   });
 
   it('should convert basic user and model messages', () => {
@@ -175,12 +176,13 @@ describe('convertSessionToHistoryFormats', () => {
       text: 'Hi there',
     });
 
-    expect(result.clientHistory).toHaveLength(2);
-    expect(result.clientHistory[0]).toEqual({
+    const clientHistory = convertSessionToClientHistory(messages);
+    expect(clientHistory).toHaveLength(2);
+    expect(clientHistory[0]).toEqual({
       role: 'user',
       parts: [{ text: 'Hello' }],
     });
-    expect(result.clientHistory[1]).toEqual({
+    expect(clientHistory[1]).toEqual({
       role: 'model',
       parts: [{ text: 'Hi there' }],
     });
@@ -203,8 +205,9 @@ describe('convertSessionToHistoryFormats', () => {
       text: 'User input',
     });
 
-    expect(result.clientHistory).toHaveLength(1);
-    expect(result.clientHistory[0]).toEqual({
+    const clientHistory = convertSessionToClientHistory(messages);
+    expect(clientHistory).toHaveLength(1);
+    expect(clientHistory[0]).toEqual({
       role: 'user',
       parts: [{ text: 'Expanded content' }],
     });
@@ -225,7 +228,7 @@ describe('convertSessionToHistoryFormats', () => {
       text: 'Help text',
     });
 
-    expect(result.clientHistory).toHaveLength(0);
+    expect(convertSessionToClientHistory(messages)).toHaveLength(0);
   });
 
   it('should handle tool calls and responses', () => {
@@ -264,12 +267,13 @@ describe('convertSessionToHistoryFormats', () => {
       ],
     });
 
-    expect(result.clientHistory).toHaveLength(3); // User, Model (call), User (response)
-    expect(result.clientHistory[0]).toEqual({
+    const clientHistory = convertSessionToClientHistory(messages);
+    expect(clientHistory).toHaveLength(3); // User, Model (call), User (response)
+    expect(clientHistory[0]).toEqual({
       role: 'user',
       parts: [{ text: 'What time is it?' }],
     });
-    expect(result.clientHistory[1]).toEqual({
+    expect(clientHistory[1]).toEqual({
       role: 'model',
       parts: [
         {
@@ -281,7 +285,7 @@ describe('convertSessionToHistoryFormats', () => {
         },
       ],
     });
-    expect(result.clientHistory[2]).toEqual({
+    expect(clientHistory[2]).toEqual({
       role: 'user',
       parts: [
         {

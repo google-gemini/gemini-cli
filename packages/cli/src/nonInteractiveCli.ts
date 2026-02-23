@@ -9,6 +9,7 @@ import {
   type ToolCallRequestInfo,
   type ResumedSessionData,
   type UserFeedbackPayload,
+  convertSessionToClientHistory,
   GeminiEventType,
   FatalInputError,
   promptIdContext,
@@ -33,7 +34,6 @@ import type { Content, Part } from '@google/genai';
 import readline from 'node:readline';
 import stripAnsi from 'strip-ansi';
 
-import { convertSessionToHistoryFormats } from './ui/hooks/useSessionBrowser.js';
 import { handleSlashCommand } from './nonInteractiveCliCommands.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
@@ -218,9 +218,9 @@ export async function runNonInteractive({
       // Initialize chat.  Resume if resume data is passed.
       if (resumedSessionData) {
         await geminiClient.resumeChat(
-          convertSessionToHistoryFormats(
+          convertSessionToClientHistory(
             resumedSessionData.conversation.messages,
-          ).clientHistory,
+          ),
           resumedSessionData,
         );
       }

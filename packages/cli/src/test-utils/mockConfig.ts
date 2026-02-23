@@ -131,7 +131,6 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getShellToolInactivityTimeout: vi.fn().mockReturnValue(300000),
     getShellExecutionConfig: vi.fn().mockReturnValue({}),
     setShellExecutionConfig: vi.fn(),
-    getEnablePromptCompletion: vi.fn().mockReturnValue(false),
     getEnableToolOutputTruncation: vi.fn().mockReturnValue(true),
     getTruncateToolOutputThreshold: vi.fn().mockReturnValue(1000),
     getTruncateToolOutputLines: vi.fn().mockReturnValue(100),

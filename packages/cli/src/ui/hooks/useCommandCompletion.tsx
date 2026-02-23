@@ -158,9 +158,7 @@ export function useCommandCompletion({
 
       // Check for prompt completion - only if enabled
       const trimmedText = buffer.text.trim();
-      const isPromptCompletionEnabled =
-        config?.getEnablePromptCompletion() ?? false;
-
+      const isPromptCompletionEnabled = false;
       if (
         isPromptCompletionEnabled &&
         trimmedText.length >= PROMPT_COMPLETION_MIN_LENGTH &&
@@ -181,7 +179,7 @@ export function useCommandCompletion({
         completionStart: -1,
         completionEnd: -1,
       };
-    }, [cursorRow, cursorCol, buffer.lines, buffer.text, config]);
+    }, [cursorRow, cursorCol, buffer.lines, buffer.text]);
 
   useAtCompletion({
     enabled: active && completionMode === CompletionMode.AT,
@@ -206,7 +204,6 @@ export function useCommandCompletion({
   const promptCompletion = usePromptCompletion({
     buffer,
     config,
-    enabled: active && completionMode === CompletionMode.PROMPT,
   });
 
   useEffect(() => {

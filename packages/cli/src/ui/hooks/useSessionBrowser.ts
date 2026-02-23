@@ -13,11 +13,10 @@ import {
   type ConversationRecord,
   type ResumedSessionData,
   coreEvents,
+  convertSessionToClientHistory,
 } from '@google/gemini-cli-core';
-import {
-  type SessionInfo,
-  convertSessionToHistoryFormats,
-} from '../../utils/sessionUtils.js';
+import type { SessionInfo } from '../../utils/sessionUtils.js';
+import { convertSessionToHistoryFormats } from '../../utils/sessionUtils.js';
 import type { Part } from '@google/genai';
 
 export { convertSessionToHistoryFormats };
@@ -80,7 +79,7 @@ export const useSessionBrowser = (
           );
           await onLoadHistory(
             historyData.uiHistory,
-            historyData.clientHistory,
+            convertSessionToClientHistory(conversation.messages),
             resumedSessionData,
           );
         } catch (error) {
