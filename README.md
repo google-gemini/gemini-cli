@@ -208,6 +208,23 @@ export GOOGLE_GENAI_USE_VERTEXAI=true
 gemini
 ```
 
+### Option 4: CoSi API (Proxy for Vertex AI)
+
+**✨ Best for:** Corporate users behind a CoSi API proxy
+
+**Benefits:**
+
+- **Proxy support**: Built-in support for CoSi API proxy headers (`x-api-key`)
+- **Corporate compliance**: Works with enterprise data loss prevention and
+  custom authentication methods
+
+```bash
+# Set your CoSi API Key and Proxy Base URL
+export COSI_API_KEY="YOUR_COSI_API_KEY"
+export COSI_BASE_URL="https://your-cosi-proxy-url.com"
+gemini
+```
+
 For Google Workspace accounts and other authentication methods, see the
 [authentication guide](./docs/get-started/authentication.md).
 

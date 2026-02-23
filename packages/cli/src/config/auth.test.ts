@@ -11,7 +11,12 @@ import { validateAuthMethod } from './auth.js';
 vi.mock('./settings.js', () => ({
   loadEnvironment: vi.fn(),
   loadSettings: vi.fn().mockReturnValue({
-    merged: vi.fn().mockReturnValue({}),
+    merged: {
+      general: {},
+      security: {
+        auth: {},
+      },
+    },
   }),
 }));
 
@@ -21,6 +26,8 @@ describe('validateAuthMethod', () => {
     vi.stubEnv('GOOGLE_CLOUD_PROJECT', undefined);
     vi.stubEnv('GOOGLE_CLOUD_LOCATION', undefined);
     vi.stubEnv('GOOGLE_API_KEY', undefined);
+    vi.stubEnv('COSI_API_KEY', undefined);
+    vi.stubEnv('COSI_BASE_URL', undefined);
   });
 
   afterEach(() => {
@@ -71,6 +78,31 @@ describe('validateAuthMethod', () => {
       authType: AuthType.USE_VERTEX_AI,
       envs: { GOOGLE_API_KEY: 'test-api-key' },
       expected: null,
+    },
+    {
+      description:
+        'should return null for USE_COSI_API if COSI_API_KEY and COSI_BASE_URL are set',
+      authType: AuthType.USE_COSI_API,
+      envs: { COSI_API_KEY: 'test-key', COSI_BASE_URL: 'https://cosi.proxy' },
+      expected: null,
+    },
+    {
+      description:
+        'should return an error message for USE_COSI_API if COSI_API_KEY is not set',
+      authType: AuthType.USE_COSI_API,
+      envs: {},
+      expected:
+        'When using CoSi API, you must specify the COSI_API_KEY environment variable.\n' +
+        'Update your environment and try again (no reload needed if using .env)!',
+    },
+    {
+      description:
+        'should return an error message for USE_COSI_API if COSI_BASE_URL is not set',
+      authType: AuthType.USE_COSI_API,
+      envs: { COSI_API_KEY: 'test-key' },
+      expected:
+        'When using CoSi API, you must specify either the COSI_BASE_URL environment variable or the general.cosiBaseUrl setting.\n' +
+        'Update your environment and try again!',
     },
     {
       description:

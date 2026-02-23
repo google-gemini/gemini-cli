@@ -76,6 +76,11 @@ export function AuthDialog({
       value: AuthType.USE_VERTEX_AI,
       key: AuthType.USE_VERTEX_AI,
     },
+    {
+      label: 'CoSi API',
+      value: AuthType.USE_COSI_API,
+      key: AuthType.USE_COSI_API,
+    },
   ];
 
   if (settings.merged.security.auth.enforcedType) {

@@ -11,6 +11,7 @@ import type {
   CountTokensParameters,
   EmbedContentResponse,
   EmbedContentParameters,
+  HttpOptions,
 } from '@google/genai';
 import { GoogleGenAI } from '@google/genai';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
@@ -55,6 +56,7 @@ export enum AuthType {
   LOGIN_WITH_GOOGLE = 'oauth-personal',
   USE_GEMINI = 'gemini-api-key',
   USE_VERTEX_AI = 'vertex-ai',
+  USE_COSI_API = 'cosi-api',
   LEGACY_CLOUD_SHELL = 'cloud-shell',
   COMPUTE_ADC = 'compute-default-credentials',
 }
@@ -63,11 +65,15 @@ export enum AuthType {
  * Detects the best authentication type based on environment variables.
  *
  * Checks in order:
- * 1. GOOGLE_GENAI_USE_GCA=true -> LOGIN_WITH_GOOGLE
- * 2. GOOGLE_GENAI_USE_VERTEXAI=true -> USE_VERTEX_AI
- * 3. GEMINI_API_KEY -> USE_GEMINI
+ * 1. COSI_API_KEY -> USE_COSI_API
+ * 2. GOOGLE_GENAI_USE_GCA=true -> LOGIN_WITH_GOOGLE
+ * 3. GOOGLE_GENAI_USE_VERTEXAI=true -> USE_VERTEX_AI
+ * 4. GEMINI_API_KEY -> USE_GEMINI
  */
 export function getAuthTypeFromEnv(): AuthType | undefined {
+  if (process.env['COSI_API_KEY']) {
+    return AuthType.USE_COSI_API;
+  }
   if (process.env['GOOGLE_GENAI_USE_GCA'] === 'true') {
     return AuthType.LOGIN_WITH_GOOGLE;
   }
@@ -82,6 +88,8 @@ export function getAuthTypeFromEnv(): AuthType | undefined {
 
 export type ContentGeneratorConfig = {
   apiKey?: string;
+  cosiApiKey?: string;
+  cosiBaseUrl?: string;
   vertexai?: boolean;
   authType?: AuthType;
   proxy?: string;
@@ -99,6 +107,9 @@ export async function createContentGeneratorConfig(
     process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
     undefined;
   const googleCloudLocation = process.env['GOOGLE_CLOUD_LOCATION'] || undefined;
+  const cosiApiKey = process.env['COSI_API_KEY'] || undefined;
+  const cosiBaseUrl =
+    process.env['COSI_BASE_URL'] || config?.getCosiBaseUrl() || undefined;
 
   const contentGeneratorConfig: ContentGeneratorConfig = {
     authType,
@@ -125,6 +136,14 @@ export async function createContentGeneratorConfig(
     (googleApiKey || (googleCloudProject && googleCloudLocation))
   ) {
     contentGeneratorConfig.apiKey = googleApiKey;
+    contentGeneratorConfig.vertexai = true;
+
+    return contentGeneratorConfig;
+  }
+
+  if (authType === AuthType.USE_COSI_API && cosiApiKey) {
+    contentGeneratorConfig.cosiApiKey = cosiApiKey;
+    contentGeneratorConfig.cosiBaseUrl = cosiBaseUrl;
     contentGeneratorConfig.vertexai = true;
 
     return contentGeneratorConfig;
@@ -168,7 +187,8 @@ export async function createContentGenerator(
     if (
       apiKeyAuthMechanism === 'bearer' &&
       (config.authType === AuthType.USE_GEMINI ||
-        config.authType === AuthType.USE_VERTEX_AI) &&
+        config.authType === AuthType.USE_VERTEX_AI ||
+        config.authType === AuthType.USE_COSI_API) &&
       config.apiKey
     ) {
       baseHeaders['Authorization'] = `Bearer ${config.apiKey}`;
@@ -191,7 +211,8 @@ export async function createContentGenerator(
 
     if (
       config.authType === AuthType.USE_GEMINI ||
-      config.authType === AuthType.USE_VERTEX_AI
+      config.authType === AuthType.USE_VERTEX_AI ||
+      config.authType === AuthType.USE_COSI_API
     ) {
       let headers: Record<string, string> = { ...baseHeaders };
       if (gcConfig?.getUsageStatisticsEnabled()) {
@@ -202,7 +223,13 @@ export async function createContentGenerator(
           'x-gemini-api-privileged-user-id': `${installationId}`,
         };
       }
-      const httpOptions = { headers };
+      if (config.authType === AuthType.USE_COSI_API && config.cosiApiKey) {
+        headers['x-api-key'] = config.cosiApiKey;
+      }
+      const httpOptions: HttpOptions = { headers };
+      if (config.authType === AuthType.USE_COSI_API && config.cosiBaseUrl) {
+        httpOptions.baseUrl = config.cosiBaseUrl;
+      }
 
       const googleGenAI = new GoogleGenAI({
         apiKey: config.apiKey === '' ? undefined : config.apiKey,

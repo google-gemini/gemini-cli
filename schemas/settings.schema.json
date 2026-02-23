@@ -88,6 +88,12 @@
           "default": false,
           "type": "boolean"
         },
+        "cosiBaseUrl": {
+          "title": "CoSi API Base URL",
+          "description": "The base URL for the CoSi API proxy.",
+          "markdownDescription": "The base URL for the CoSi API proxy.\n\n- Category: `General`\n- Requires restart: `yes`",
+          "type": "string"
+        },
         "checkpointing": {
           "title": "Checkpointing",
           "description": "Session checkpointing settings.",

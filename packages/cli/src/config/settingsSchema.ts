@@ -246,6 +246,15 @@ const SETTINGS_SCHEMA = {
           'Enable run-event notifications for action-required prompts and session completion. Currently macOS only.',
         showInDialog: true,
       },
+      cosiBaseUrl: {
+        type: 'string',
+        label: 'CoSi API Base URL',
+        category: 'General',
+        requiresRestart: true,
+        default: undefined as string | undefined,
+        description: 'The base URL for the CoSi API proxy.',
+        showInDialog: true,
+      },
       checkpointing: {
         type: 'object',
         label: 'Checkpointing',

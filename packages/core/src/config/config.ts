@@ -505,6 +505,7 @@ export interface ConfigParameters {
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
   agents?: AgentSettings;
+  cosiBaseUrl?: string;
   onReload?: () => Promise<{
     disabledSkills?: string[];
     adminSkillsEnabled?: boolean;
@@ -574,6 +575,7 @@ export class Config {
   private gitService: GitService | undefined = undefined;
   private readonly checkpointing: boolean;
   private readonly proxy: string | undefined;
+  private readonly cosiBaseUrl: string | undefined;
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private model: string;
@@ -772,6 +774,7 @@ export class Config {
     };
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
+    this.cosiBaseUrl = params.cosiBaseUrl;
     this.cwd = params.cwd ?? process.cwd();
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
@@ -2010,6 +2013,10 @@ export class Config {
 
   getProxy(): string | undefined {
     return this.proxy;
+  }
+
+  getCosiBaseUrl(): string | undefined {
+    return this.cosiBaseUrl;
   }
 
   getWorkingDir(): string {

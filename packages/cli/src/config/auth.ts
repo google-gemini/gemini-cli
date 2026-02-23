@@ -42,5 +42,22 @@ export function validateAuthMethod(authMethod: string): string | null {
     return null;
   }
 
+  if (authMethod === AuthType.USE_COSI_API) {
+    const settings = loadSettings().merged;
+    if (!process.env['COSI_API_KEY']) {
+      return (
+        'When using CoSi API, you must specify the COSI_API_KEY environment variable.\n' +
+        'Update your environment and try again (no reload needed if using .env)!'
+      );
+    }
+    if (!process.env['COSI_BASE_URL'] && !settings.general.cosiBaseUrl) {
+      return (
+        'When using CoSi API, you must specify either the COSI_BASE_URL environment variable or the general.cosiBaseUrl setting.\n' +
+        'Update your environment and try again!'
+      );
+    }
+    return null;
+  }
+
   return 'Invalid auth method selected.';
 }

@@ -10,6 +10,7 @@ import {
   createContentGenerator,
   AuthType,
   createContentGeneratorConfig,
+  getAuthTypeFromEnv,
 } from './contentGenerator.js';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { GoogleGenAI } from '@google/genai';
@@ -31,8 +32,47 @@ vi.mock('./fakeContentGenerator.js');
 const mockConfig = {
   getModel: vi.fn().mockReturnValue('gemini-pro'),
   getProxy: vi.fn().mockReturnValue(undefined),
+  getCosiBaseUrl: vi.fn().mockReturnValue(undefined),
   getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
 } as unknown as Config;
+
+describe('getAuthTypeFromEnv', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('should return USE_COSI_API if COSI_API_KEY is set', () => {
+    vi.stubEnv('COSI_API_KEY', 'test-key');
+    expect(getAuthTypeFromEnv()).toBe(AuthType.USE_COSI_API);
+  });
+
+  it('should return LOGIN_WITH_GOOGLE if GOOGLE_GENAI_USE_GCA is true', () => {
+    vi.stubEnv('GOOGLE_GENAI_USE_GCA', 'true');
+    expect(getAuthTypeFromEnv()).toBe(AuthType.LOGIN_WITH_GOOGLE);
+  });
+
+  it('should return USE_VERTEX_AI if GOOGLE_GENAI_USE_VERTEXAI is true', () => {
+    vi.stubEnv('GOOGLE_GENAI_USE_VERTEXAI', 'true');
+    expect(getAuthTypeFromEnv()).toBe(AuthType.USE_VERTEX_AI);
+  });
+
+  it('should return USE_GEMINI if GEMINI_API_KEY is set', () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
+    expect(getAuthTypeFromEnv()).toBe(AuthType.USE_GEMINI);
+  });
+
+  it('should return undefined if no auth env vars are set', () => {
+    expect(getAuthTypeFromEnv()).toBeUndefined();
+  });
+
+  it('should prioritize COSI_API_KEY over others', () => {
+    vi.stubEnv('COSI_API_KEY', 'cosi-key');
+    vi.stubEnv('GOOGLE_GENAI_USE_GCA', 'true');
+    vi.stubEnv('GOOGLE_GENAI_USE_VERTEXAI', 'true');
+    vi.stubEnv('GEMINI_API_KEY', 'gemini-key');
+    expect(getAuthTypeFromEnv()).toBe(AuthType.USE_COSI_API);
+  });
+});
 
 describe('createContentGenerator', () => {
   beforeEach(() => {
@@ -121,6 +161,7 @@ describe('createContentGenerator', () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
+      getCosiBaseUrl: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => true,
     } as unknown as Config;
 
@@ -187,6 +228,7 @@ describe('createContentGenerator', () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
+      getCosiBaseUrl: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
     } as unknown as Config;
 
@@ -233,6 +275,7 @@ describe('createContentGenerator', () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
+      getCosiBaseUrl: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
     } as unknown as Config;
 
@@ -266,6 +309,7 @@ describe('createContentGenerator', () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
+      getCosiBaseUrl: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
     } as unknown as Config;
 
@@ -338,6 +382,7 @@ describe('createContentGenerator', () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
+      getCosiBaseUrl: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
     } as unknown as Config;
 
@@ -371,6 +416,7 @@ describe('createContentGenerator', () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
+      getCosiBaseUrl: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
     } as unknown as Config;
 
@@ -408,6 +454,7 @@ describe('createContentGenerator', () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
+      getCosiBaseUrl: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
     } as unknown as Config;
 
@@ -446,6 +493,7 @@ describe('createContentGenerator', () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
+      getCosiBaseUrl: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
     } as unknown as Config;
 
@@ -475,6 +523,42 @@ describe('createContentGenerator', () => {
       apiVersion: 'v1alpha',
     });
   });
+
+  it('should create a GoogleGenAI content generator for CoSi API with x-api-key header and baseUrl', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getCosiBaseUrl: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+
+    await createContentGenerator(
+      {
+        cosiApiKey: 'cosi-test-key',
+        cosiBaseUrl: 'https://cosi.proxy',
+        vertexai: true,
+        authType: AuthType.USE_COSI_API,
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: undefined,
+      vertexai: true,
+      httpOptions: expect.objectContaining({
+        headers: expect.objectContaining({
+          'User-Agent': expect.any(String),
+          'x-api-key': 'cosi-test-key',
+        }),
+        baseUrl: 'https://cosi.proxy',
+      }),
+    });
+  });
 });
 
 describe('createContentGeneratorConfig', () => {
@@ -483,6 +567,7 @@ describe('createContentGeneratorConfig', () => {
     setModel: vi.fn(),
     flashFallbackHandler: vi.fn(),
     getProxy: vi.fn(),
+    getCosiBaseUrl: vi.fn(),
   } as unknown as Config;
 
   beforeEach(() => {
@@ -557,6 +642,28 @@ describe('createContentGeneratorConfig', () => {
       AuthType.USE_VERTEX_AI,
     );
     expect(config.apiKey).toBeUndefined();
+    expect(config.vertexai).toBeUndefined();
+  });
+
+  it('should configure for CoSi API using COSI_API_KEY when set', async () => {
+    vi.stubEnv('COSI_API_KEY', 'env-cosi-key');
+    vi.stubEnv('COSI_BASE_URL', 'https://cosi.proxy');
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.USE_COSI_API,
+    );
+    expect(config.cosiApiKey).toBe('env-cosi-key');
+    expect(config.cosiBaseUrl).toBe('https://cosi.proxy');
+    expect(config.vertexai).toBe(true);
+  });
+
+  it('should not configure for CoSi API if COSI_API_KEY is empty', async () => {
+    vi.stubEnv('COSI_API_KEY', '');
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.USE_COSI_API,
+    );
+    expect(config.cosiApiKey).toBeUndefined();
     expect(config.vertexai).toBeUndefined();
   });
 });

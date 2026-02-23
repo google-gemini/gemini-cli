@@ -34,6 +34,7 @@ function createLocalMockConfig(overrides: Partial<Config> = {}): Config {
 
 describe('validateNonInterActiveAuth', () => {
   let originalEnvGeminiApiKey: string | undefined;
+  let originalEnvCosiApiKey: string | undefined;
   let originalEnvVertexAi: string | undefined;
   let originalEnvGcp: string | undefined;
   let debugLoggerErrorSpy: ReturnType<typeof vi.spyOn>;
@@ -43,9 +44,11 @@ describe('validateNonInterActiveAuth', () => {
 
   beforeEach(() => {
     originalEnvGeminiApiKey = process.env['GEMINI_API_KEY'];
+    originalEnvCosiApiKey = process.env['COSI_API_KEY'];
     originalEnvVertexAi = process.env['GOOGLE_GENAI_USE_VERTEXAI'];
     originalEnvGcp = process.env['GOOGLE_GENAI_USE_GCA'];
     delete process.env['GEMINI_API_KEY'];
+    delete process.env['COSI_API_KEY'];
     delete process.env['GOOGLE_GENAI_USE_VERTEXAI'];
     delete process.env['GOOGLE_GENAI_USE_GCA'];
     debugLoggerErrorSpy = vi
@@ -86,6 +89,11 @@ describe('validateNonInterActiveAuth', () => {
       process.env['GEMINI_API_KEY'] = originalEnvGeminiApiKey;
     } else {
       delete process.env['GEMINI_API_KEY'];
+    }
+    if (originalEnvCosiApiKey !== undefined) {
+      process.env['COSI_API_KEY'] = originalEnvCosiApiKey;
+    } else {
+      delete process.env['COSI_API_KEY'];
     }
     if (originalEnvVertexAi !== undefined) {
       process.env['GOOGLE_GENAI_USE_VERTEXAI'] = originalEnvVertexAi;
@@ -143,6 +151,19 @@ describe('validateNonInterActiveAuth', () => {
 
   it('uses USE_GEMINI if GEMINI_API_KEY is set', async () => {
     process.env['GEMINI_API_KEY'] = 'fake-key';
+    const nonInteractiveConfig = createLocalMockConfig({});
+    await validateNonInteractiveAuth(
+      undefined,
+      undefined,
+      nonInteractiveConfig,
+      mockSettings,
+    );
+    expect(processExitSpy).not.toHaveBeenCalled();
+    expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
+  });
+
+  it('uses USE_COSI_API if COSI_API_KEY is set', async () => {
+    process.env['COSI_API_KEY'] = 'fake-cosi-key';
     const nonInteractiveConfig = createLocalMockConfig({});
     await validateNonInteractiveAuth(
       undefined,

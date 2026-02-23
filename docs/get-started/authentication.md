@@ -16,6 +16,7 @@ Select the authentication method that matches your situation in the table below:
 | Individual Google accounts                                             | [Login with Google](#login-google)                               | No, with exceptions                                         |
 | Organization users with a company, school, or Google Workspace account | [Login with Google](#login-google)                               | [Yes](#set-gcp)                                             |
 | AI Studio user with a Gemini API key                                   | [Use Gemini API Key](#gemini-api)                                | No                                                          |
+| CoSi API user (Vertex AI proxy)                                        | [CoSi API](#cosi-api)                                            | No                                                          |
 | Google Cloud Vertex AI user                                            | [Vertex AI](#vertex-ai)                                          | [Yes](#set-gcp)                                             |
 | [Headless mode](#headless)                                             | [Use Gemini API Key](#gemini-api) or<br> [Vertex AI](#vertex-ai) | No (for Gemini API Key)<br> [Yes](#set-gcp) (for Vertex AI) |
 
@@ -97,6 +98,45 @@ To authenticate and use Gemini CLI with a Gemini API key:
 > **Warning:** Treat API keys, especially for services like Gemini, as sensitive
 > credentials. Protect them to prevent unauthorized access and potential misuse
 > of the service under your account.
+
+## CoSi API <a id="cosi-api"></a>
+
+The CoSi API is a corporate proxy for Vertex AI that requires an additional
+`x-api-key` header and a custom base URL.
+
+To authenticate and use Gemini CLI with CoSi API:
+
+1.  Obtain your CoSi API key and the proxy base URL from your organization.
+
+2.  Set the `COSI_API_KEY` and `COSI_BASE_URL` environment variables. For
+    example:
+
+    ```bash
+    # Replace with your actual CoSi API key and proxy URL
+    export COSI_API_KEY="YOUR_COSI_API_KEY"
+    export COSI_BASE_URL="https://your-cosi-proxy-url.com"
+    ```
+
+    Alternatively, you can set the base URL in your `settings.json`:
+
+    ```json
+    {
+      "general": {
+        "cosiBaseUrl": "https://your-cosi-proxy-url.com"
+      }
+    }
+    ```
+
+    To make these settings persistent, see
+    [Persisting Environment Variables](#persisting-vars).
+
+3.  Start the CLI:
+
+    ```bash
+    gemini
+    ```
+
+4.  Select **CoSi API**.
 
 ## Use Vertex AI <a id="vertex-ai"></a>
 
@@ -310,6 +350,7 @@ If you have not already logged in with an authentication credential, you must
 configure authentication using environment variables:
 
 - [Use Gemini API Key](#gemini-api)
+- [CoSi API](#cosi-api)
 - [Vertex AI](#vertex-ai)
 
 ## What's next?

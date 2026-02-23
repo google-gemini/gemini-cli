@@ -126,6 +126,11 @@ their corresponding top-level category object in your `settings.json` file.
     and session completion. Currently macOS only.
   - **Default:** `false`
 
+- **`general.cosiBaseUrl`** (string):
+  - **Description:** The base URL for the CoSi API proxy.
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
 - **`general.checkpointing.enabled`** (boolean):
   - **Description:** Enable session checkpointing for recovery
   - **Default:** `false`
