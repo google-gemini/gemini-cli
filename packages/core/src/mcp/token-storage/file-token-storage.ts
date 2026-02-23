@@ -68,28 +68,6 @@ export class FileTokenStorage extends BaseTokenStorage {
     await fs.mkdir(dir, { recursive: true, mode: 0o700 });
   }
 
-  /**
-   * Handles a corrupted token file by backing it up and allowing a fresh start.
-   * This prevents users from being locked out when switching auth types or
-   * encountering genuine file corruption.
-   */
-  private async handleCorruptedFile(): Promise<void> {
-    try {
-      const backupPath = `${this.tokenFilePath}.backup-${Date.now()}`;
-      await fs.rename(this.tokenFilePath, backupPath);
-    } catch (error: unknown) {
-      // If backup fails, we log a warning but continue to not block the user
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const err = error as NodeJS.ErrnoException;
-      // Don't warn if the file was already gone (e.g., race condition)
-      if (err.code !== 'ENOENT') {
-        process.stderr.write(
-          `Warning: Failed to back up corrupted token file. Reason: ${err.message}. The old file may be overwritten.\n`,
-        );
-      }
-    }
-  }
-
   private async loadTokens(): Promise<Map<string, OAuthCredentials>> {
     try {
       const data = await fs.readFile(this.tokenFilePath, 'utf-8');
@@ -110,10 +88,11 @@ export class FileTokenStorage extends BaseTokenStorage {
         )
       ) {
         // Decryption failed - this can happen when switching between auth types
-        // or if the file is genuinely corrupted. Instead of throwing an error,
-        // we'll backup the corrupted file and start fresh to allow the user to continue.
-        await this.handleCorruptedFile();
-        return new Map();
+        // or if the file is genuinely corrupted.
+        throw new Error(
+          `Corrupted token file detected at: ${this.tokenFilePath}\n` +
+            `Please delete or rename this file to resolve the issue.`,
+        );
       }
       throw error;
     }

@@ -107,37 +107,23 @@ describe('FileTokenStorage', () => {
       expect(result).toEqual(credentials);
     });
 
-    it('should handle corrupted files gracefully by backing up and returning null', async () => {
+    it('should throw error with file path when file is corrupted', async () => {
       mockFs.readFile.mockResolvedValue('corrupted-data');
-      mockFs.rename.mockResolvedValue(undefined);
 
-      const result = await storage.getCredentials('test-server');
+      const error = await storage
+        .getCredentials('test-server')
+        .catch((e) => e as Error);
 
-      expect(result).toBeNull();
-      expect(mockFs.rename).toHaveBeenCalled();
-      const renameCall = mockFs.rename.mock.calls[0];
-      expect(renameCall[0]).toContain('mcp-oauth-tokens-v2.json');
-      expect(renameCall[1]).toContain('.backup-');
-    });
-
-    it('should handle corrupted file even if backup fails', async () => {
-      mockFs.readFile.mockResolvedValue('corrupted-data');
-      mockFs.rename.mockRejectedValue(new Error('Backup failed'));
-
-      const result = await storage.getCredentials('test-server');
-
-      expect(result).toBeNull();
-      expect(mockFs.rename).toHaveBeenCalled();
+      expect(error.message).toContain('Corrupted token file detected at:');
+      expect(error.message).toContain('mcp-oauth-tokens-v2.json');
+      expect(error.message).toContain('delete or rename');
     });
   });
 
   describe('auth type switching', () => {
-    it('should allow saving new credentials after encountering corrupted file', async () => {
+    it('should throw error when trying to save credentials with corrupted file', async () => {
       // Simulate corrupted file on first read
-      mockFs.readFile.mockResolvedValueOnce('corrupted-data');
-      mockFs.rename.mockResolvedValue(undefined);
-      mockFs.mkdir.mockResolvedValue(undefined);
-      mockFs.writeFile.mockResolvedValue(undefined);
+      mockFs.readFile.mockResolvedValue('corrupted-data');
 
       // Try to save new credentials (simulating switch from OAuth to API key)
       const newCredentials: OAuthCredentials = {
@@ -149,43 +135,14 @@ describe('FileTokenStorage', () => {
         updatedAt: Date.now(),
       };
 
-      // This should not throw - it should backup the corrupted file and save new credentials
-      await expect(
-        storage.setCredentials(newCredentials),
-      ).resolves.not.toThrow();
+      // Should throw error with file path
+      const error = await storage
+        .setCredentials(newCredentials)
+        .catch((e) => e as Error);
 
-      // Verify backup was created
-      expect(mockFs.rename).toHaveBeenCalled();
-      const renameCall = mockFs.rename.mock.calls[0];
-      expect(renameCall[0]).toContain('mcp-oauth-tokens-v2.json');
-      expect(renameCall[1]).toContain('.backup-');
-
-      // Verify new credentials were written
-      expect(mockFs.writeFile).toHaveBeenCalled();
-    });
-
-    it('should continue even if backup fails during corruption handling', async () => {
-      mockFs.readFile.mockResolvedValueOnce('corrupted-data');
-      mockFs.rename.mockRejectedValue(new Error('Permission denied'));
-      mockFs.mkdir.mockResolvedValue(undefined);
-      mockFs.writeFile.mockResolvedValue(undefined);
-
-      const newCredentials: OAuthCredentials = {
-        serverName: 'new-server',
-        token: {
-          accessToken: 'new-token',
-          tokenType: 'Bearer',
-        },
-        updatedAt: Date.now(),
-      };
-
-      // Should not throw even if backup fails
-      await expect(
-        storage.setCredentials(newCredentials),
-      ).resolves.not.toThrow();
-
-      // Verify we still tried to write new credentials
-      expect(mockFs.writeFile).toHaveBeenCalled();
+      expect(error.message).toContain('Corrupted token file detected at:');
+      expect(error.message).toContain('mcp-oauth-tokens-v2.json');
+      expect(error.message).toContain('delete or rename');
     });
   });
 
