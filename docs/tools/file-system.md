@@ -116,6 +116,14 @@ context around the `old_string` to ensure it modifies the correct location.
   - `instruction` (string, required): Semantic description of the change.
   - `old_string` (string, required): Exact literal text to find.
   - `new_string` (string, required): Exact literal text to replace with.
+  - `expected_replacements` (number, optional): Expected number of replacements.
+    Defaults to 1.
+- **Behavior:**
+  - If the number of occurrences of `old_string` found in the file does not match
+    `expected_replacements`, the replacement fails. This prevents both accidental
+    cascading replacements and incomplete changes. The language model is then
+    instructed to either provide a more specific `old_string` or to update
+    `expected_replacements`.
 - **Confirmation:** Requires manual user approval.
 
 ## Next steps
