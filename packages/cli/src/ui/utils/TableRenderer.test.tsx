@@ -427,7 +427,7 @@ describe('TableRenderer', () => {
     // We expect "123456" to be on a single line if width calculation is correct
     expect(output).toContain('123456');
     // Find the lines containing the data and check they don't have partial text
-    const dataLines = output!.split('\n').filter((l) => /123456/.test(l));
+    const dataLines = output.split('\n').filter((l) => /123456/.test(l));
     // Each row should have one line for the data containing "123456"
     expect(dataLines.length).toBe(3);
   });
@@ -484,9 +484,7 @@ describe('TableRenderer', () => {
     expect(output).toContain('Visit Bing (https://bing.com)');
     expect(output).toContain('Visit Yahoo (https://yahoo.com)');
     // Check that it didn't wrap for the first URL
-    const dataLine = output!
-      .split('\n')
-      .find((l) => l.includes('Visit Google'));
+    const dataLine = output.split('\n').find((l) => l.includes('Visit Google'));
     expect(dataLine).toContain('Visit Google (https://google.com)');
     expect(output).toMatchSnapshot();
   });
