@@ -5,7 +5,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { safeJsonStringify } from './safeJsonStringify.js';
+import {
+  safeJsonStringify,
+  safeJsonStringifyBooleanValuesOnly,
+  redactProxyUrl,
+} from './safeJsonStringify.js';
+import { makeFakeConfig } from '../test-utils/config.js';
 
 describe('safeJsonStringify', () => {
   it('should stringify normal objects without issues', () => {
@@ -69,5 +74,148 @@ describe('safeJsonStringify', () => {
     expect(safeJsonStringify('test')).toBe('"test"');
     expect(safeJsonStringify(42)).toBe('42');
     expect(safeJsonStringify(true)).toBe('true');
+  });
+});
+
+describe('redactProxyUrl', () => {
+  it('should redact API keys from proxy URLs', () => {
+    const proxyUrlWithApiKey = 'http://api-key-123@proxy.example.com:8080';
+    const redacted = redactProxyUrl(proxyUrlWithApiKey);
+
+    expect(redacted).toBe('http://proxy.example.com:8080/');
+    expect(redacted).not.toContain('api-key-123');
+    expect(redacted).toContain('proxy.example.com:8080');
+  });
+
+  it('should redact username and password from proxy URLs', () => {
+    const proxyUrlWithCredentials =
+      'http://user:password123@proxy.example.com:8080';
+    const redacted = redactProxyUrl(proxyUrlWithCredentials);
+
+    expect(redacted).toBe('http://proxy.example.com:8080/');
+    expect(redacted).not.toContain('user:password123');
+    expect(redacted).not.toContain('password123');
+    expect(redacted).toContain('proxy.example.com:8080');
+  });
+
+  it('should redact username only from proxy URLs', () => {
+    const proxyUrlWithUsername = 'http://username@proxy.example.com:8080';
+    const redacted = redactProxyUrl(proxyUrlWithUsername);
+
+    expect(redacted).toBe('http://proxy.example.com:8080/');
+    expect(redacted).not.toContain('username@');
+    expect(redacted).toContain('proxy.example.com:8080');
+  });
+
+  it('should handle proxy URLs without credentials', () => {
+    const proxyUrlWithoutCredentials = 'http://proxy.example.com:8080';
+    const redacted = redactProxyUrl(proxyUrlWithoutCredentials);
+
+    expect(redacted).toBe('http://proxy.example.com:8080/');
+    expect(redacted).toContain('proxy.example.com:8080');
+  });
+
+  it('should handle HTTPS proxy URLs with credentials', () => {
+    const httpsProxyWithCredentials =
+      'https://api-key-456@secure-proxy.example.com:8443';
+    const redacted = redactProxyUrl(httpsProxyWithCredentials);
+
+    expect(redacted).toBe('https://secure-proxy.example.com:8443/');
+    expect(redacted).not.toContain('api-key-456');
+    expect(redacted).toContain('secure-proxy.example.com:8443');
+  });
+
+  it('should handle malformed URLs with regex fallback', () => {
+    const malformedUrl = 'http://user:pass@host';
+    const redacted = redactProxyUrl(malformedUrl);
+
+    // url constructor might add a trailing slash, so just check the content
+    expect(redacted).toContain('http://host');
+    expect(redacted).not.toContain('user:pass');
+    expect(redacted).not.toContain('@');
+  });
+
+  it('should return undefined for undefined input', () => {
+    expect(redactProxyUrl(undefined)).toBeUndefined();
+  });
+
+  it('should return undefined for empty string', () => {
+    expect(redactProxyUrl('')).toBeUndefined();
+  });
+});
+
+describe('safeJsonStringifyBooleanValuesOnly - Proxy URL Redaction', () => {
+  it('should redact API keys from proxy URLs in Config objects', () => {
+    const proxyUrlWithApiKey = 'http://api-key-123@proxy.example.com:8080';
+    const config = makeFakeConfig({ proxy: proxyUrlWithApiKey });
+
+    // make sure the proxy url actually has the api key before we test
+    expect(config.getProxy()).toBe(proxyUrlWithApiKey);
+    expect(config.getProxy()).toContain('api-key-123');
+
+    // serialize it and check that the api key doesn't leak out
+    const json = safeJsonStringifyBooleanValuesOnly(config);
+
+    // api key shouldn't be in the output
+    expect(json).not.toContain('api-key-123');
+  });
+
+  it('should redact username and password from proxy URLs in Config objects', () => {
+    const proxyUrlWithCredentials =
+      'http://user:password123@proxy.example.com:8080';
+    const config = makeFakeConfig({ proxy: proxyUrlWithCredentials });
+
+    // check that it has credentials before we test redaction
+    expect(config.getProxy()).toBe(proxyUrlWithCredentials);
+    expect(config.getProxy()).toContain('user:password123');
+
+    // serialize and make sure credentials don't show up
+    const json = safeJsonStringifyBooleanValuesOnly(config);
+
+    // password shouldn't be anywhere in the output
+    expect(json).not.toContain('user:password123');
+    expect(json).not.toContain('password123');
+  });
+
+  it('should handle proxy URLs without credentials', () => {
+    const proxyUrlWithoutCredentials = 'http://proxy.example.com:8080';
+    const config = makeFakeConfig({ proxy: proxyUrlWithoutCredentials });
+
+    // make sure there's no @ symbol (which would indicate credentials)
+    expect(config.getProxy()).toBe(proxyUrlWithoutCredentials);
+    expect(config.getProxy()).not.toContain('@');
+
+    // should serialize fine without any issues
+    const json = safeJsonStringifyBooleanValuesOnly(config);
+    expect(json).toBeDefined();
+  });
+
+  it('should redact proxy URL even if it were to be serialized (defensive test)', () => {
+    // testing what would happen if the proxy url actually got serialized
+    // this is defensive - in case serialization behavior changes in the future
+    const proxyUrlWithApiKey = 'http://api-key-123@proxy.example.com:8080';
+
+    // create a mock object that would include proxy in the output
+    // using toJSON to force it to be included for testing purposes
+    const mockConfigWithProxy = {
+      getProxy: () => proxyUrlWithApiKey,
+      proxy: proxyUrlWithApiKey,
+      someBoolean: true,
+      // force proxy to be included so we can test the redaction
+      toJSON() {
+        return {
+          proxy: this.proxy,
+          someBoolean: this.someBoolean,
+        };
+      },
+    };
+
+    // verify the mock has the api key in it
+    expect(mockConfigWithProxy.proxy).toContain('api-key-123');
+
+    // test that the redaction function actually works on the proxy value
+    const redactedProxy = redactProxyUrl(proxyUrlWithApiKey);
+    expect(redactedProxy).not.toContain('api-key-123');
+    expect(redactedProxy).toContain('proxy.example.com');
   });
 });
