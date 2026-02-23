@@ -48,7 +48,8 @@ function getPlatformArch() {
   if (platform === 'win32' && arch === 'x64') {
     return {
       actionlint: 'windows_amd64',
-      shellcheck: 'win.x86_64',
+      // shellcheck is not used for Windows since it uses the .zip release
+      // which has a consistent name across architectures
     };
   }
   throw new Error(`Unsupported platform/architecture: ${platform}/${arch}`);
