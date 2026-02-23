@@ -76,8 +76,11 @@ The `toolName` in the rule must match the name of the tool being called.
 - **Codebase Investigator Agent** (`codebase_investigator`)
 - **Edit** (`replace`)
 - **Enter Plan Mode** (`enter_plan_mode`)
+- **Exit Plan Mode** (`exit_plan_mode`)
 - **FindFiles** (`glob`)
+- **Get Internal Docs** (`get_internal_docs`)
 - **GoogleSearch** (`google_web_search`)
+- **Read Many Files** (`read_many_files`)
 - **ReadFile** (`read_file`)
 - **ReadFolder** (`list_directory`)
 - **SaveMemory** (`save_memory`)
@@ -85,6 +88,7 @@ The `toolName` in the rule must match the name of the tool being called.
 - **Shell** (`run_shell_command`)
 - **WebFetch** (`web_fetch`)
 - **WriteFile** (`write_file`)
+- **Write Todos** (`write_todos`)
 
 #### Arguments pattern
 
