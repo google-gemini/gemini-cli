@@ -26,6 +26,13 @@ import { z, type ZodError } from 'zod';
 import { isNodeError } from '../utils/errors.js';
 
 /**
+ * Maximum Levenshtein distance to consider a name a likely typo of a built-in tool.
+ * Names further from all built-in tools are assumed to be intentional
+ * (e.g., dynamically registered agent tools) and are not warned about.
+ */
+const MAX_TYPO_DISTANCE = 3;
+
+/**
  * Schema for a single policy rule in the TOML file (before transformation).
  */
 const PolicyRuleSchema = z.object({
@@ -243,13 +250,6 @@ function validateShellCommandSyntax(
 
   return null;
 }
-
-/**
- * Maximum Levenshtein distance to consider a name a likely typo of a built-in tool.
- * Names further from all built-in tools are assumed to be intentional
- * (e.g., dynamically registered agent tools) and are not warned about.
- */
-const MAX_TYPO_DISTANCE = 3;
 
 /**
  * Validates that a tool name is recognized.
