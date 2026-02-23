@@ -439,6 +439,7 @@ export async function main() {
 
   const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
     projectHooks: settings.workspace.settings.hooks,
+    loadedSettings: settings,
   });
   adminControlsListner.setConfig(partialConfig);
 
@@ -454,6 +455,7 @@ export async function main() {
       ) {
         const err = validateAuthMethod(
           settings.merged.security.auth.selectedType,
+          settings.merged,
         );
         if (err) {
           throw new Error(err);
@@ -563,6 +565,7 @@ export async function main() {
     const loadConfigHandle = startupProfiler.start('load_cli_config');
     const config = await loadCliConfig(settings.merged, sessionId, argv, {
       projectHooks: settings.workspace.settings.hooks,
+      loadedSettings: settings,
     });
     loadConfigHandle?.end();
 
