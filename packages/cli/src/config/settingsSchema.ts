@@ -304,7 +304,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: 10,
         description:
-          'Maximum number of attempts for retrying failed API requests. Cannot exceed 10.',
+          'Maximum number of attempts for failed API requests. Cannot exceed 10.',
         showInDialog: true,
       },
       debugKeystrokeLogging: {
