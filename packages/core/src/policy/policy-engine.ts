@@ -102,6 +102,7 @@ function ruleMatches(
   stringifiedArgs: string | undefined,
   serverName: string | undefined,
   currentApprovalMode: ApprovalMode,
+  toolAnnotations?: Record<string, unknown>,
 ): boolean {
   // Check if rule applies to current approval mode
   if (rule.modes && rule.modes.length > 0) {
@@ -121,6 +122,18 @@ function ruleMatches(
       }
     } else if (toolCall.name !== rule.toolName) {
       return false;
+    }
+  }
+
+  // Check annotations if specified
+  if (rule.toolAnnotations) {
+    if (!toolAnnotations) {
+      return false;
+    }
+    for (const [key, value] of Object.entries(rule.toolAnnotations)) {
+      if (toolAnnotations[key] !== value) {
+        return false;
+      }
     }
   }
 
@@ -204,6 +217,7 @@ export class PolicyEngine {
     dir_path: string | undefined,
     allowRedirection?: boolean,
     rule?: PolicyRule,
+    toolAnnotations?: Record<string, unknown>,
   ): Promise<CheckResult> {
     if (!command) {
       return {
@@ -294,6 +308,7 @@ export class PolicyEngine {
         const subResult = await this.check(
           { name: toolName, args: { command: subCmd, dir_path } },
           serverName,
+          toolAnnotations,
         );
 
         // subResult.decision is already filtered through applyNonInteractiveMode by this.check()
@@ -351,6 +366,7 @@ export class PolicyEngine {
   async check(
     toolCall: FunctionCall,
     serverName: string | undefined,
+    toolAnnotations?: Record<string, unknown>,
   ): Promise<CheckResult> {
     let stringifiedArgs: string | undefined;
     // Compute stringified args once before the loop
@@ -403,7 +419,14 @@ export class PolicyEngine {
 
     for (const rule of this.rules) {
       const match = toolCallsToTry.some((tc) =>
-        ruleMatches(rule, tc, stringifiedArgs, serverName, this.approvalMode),
+        ruleMatches(
+          rule,
+          tc,
+          stringifiedArgs,
+          serverName,
+          this.approvalMode,
+          toolAnnotations,
+        ),
       );
 
       if (match) {
@@ -420,6 +443,7 @@ export class PolicyEngine {
             shellDirPath,
             rule.allowRedirection,
             rule,
+            toolAnnotations,
           );
           decision = shellResult.decision;
           if (shellResult.rule) {
@@ -446,6 +470,9 @@ export class PolicyEngine {
           this.defaultDecision,
           serverName,
           shellDirPath,
+          undefined,
+          undefined,
+          toolAnnotations,
         );
         decision = shellResult.decision;
         matchedRule = shellResult.rule;
@@ -464,6 +491,7 @@ export class PolicyEngine {
             stringifiedArgs,
             serverName,
             this.approvalMode,
+            toolAnnotations,
           )
         ) {
           debugLogger.debug(

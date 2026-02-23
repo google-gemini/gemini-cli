@@ -352,6 +352,38 @@ describe('Policy Engine Integration Tests', () => {
       ).toBe(PolicyDecision.DENY);
     });
 
+    it('should correctly match tool annotations', async () => {
+      const settings: Settings = {};
+
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.DEFAULT,
+      );
+
+      // Add a manual rule with annotations to the config
+      config.rules = config.rules || [];
+      config.rules.push({
+        toolAnnotations: { readOnlyHint: true },
+        decision: PolicyDecision.ALLOW,
+        priority: 10,
+      });
+
+      const engine = new PolicyEngine(config);
+
+      // A tool with readOnlyHint=true should be ALLOWED
+      const roCall = { name: 'some_tool', args: {} };
+      const roMeta = { readOnlyHint: true };
+      expect((await engine.check(roCall, undefined, roMeta)).decision).toBe(
+        PolicyDecision.ALLOW,
+      );
+
+      // A tool without the hint (or with false) should follow default decision (ASK_USER)
+      const rwMeta = { readOnlyHint: false };
+      expect((await engine.check(roCall, undefined, rwMeta)).decision).toBe(
+        PolicyDecision.ASK_USER,
+      );
+    });
+
     describe.each(['write_file', 'replace'])(
       'Plan Mode policy for %s',
       (toolName) => {
