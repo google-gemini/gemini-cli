@@ -109,7 +109,15 @@ describe('<ModelDialog />', () => {
     unmount();
   });
 
-  it('switches to "manual" view when "Manual" is selected', async () => {
+  it('switches to "manual" view when "Manual" is selected and uses getDisplayString for models', async () => {
+    mockGetDisplayString.mockImplementation((val: string) => {
+      if (val === DEFAULT_GEMINI_MODEL) return 'Formatted Pro Model';
+      if (val === DEFAULT_GEMINI_FLASH_MODEL) return 'Formatted Flash Model';
+      if (val === DEFAULT_GEMINI_FLASH_LITE_MODEL)
+        return 'Formatted Lite Model';
+      return val;
+    });
+
     const { lastFrame, stdin, waitUntilReady, unmount } =
       await renderComponent();
 
@@ -129,9 +137,9 @@ describe('<ModelDialog />', () => {
     // Should now show manual options
     await waitFor(() => {
       const output = lastFrame();
-      expect(output).toContain(DEFAULT_GEMINI_MODEL);
-      expect(output).toContain(DEFAULT_GEMINI_FLASH_MODEL);
-      expect(output).toContain(DEFAULT_GEMINI_FLASH_LITE_MODEL);
+      expect(output).toContain('Formatted Pro Model');
+      expect(output).toContain('Formatted Flash Model');
+      expect(output).toContain('Formatted Lite Model');
     });
     unmount();
   });
@@ -264,11 +272,16 @@ describe('<ModelDialog />', () => {
     unmount();
   });
 
-  it('shows the preferred manual model in the main view option', async () => {
+  it('shows the preferred manual model in the main view option using getDisplayString', async () => {
     mockGetModel.mockReturnValue(DEFAULT_GEMINI_MODEL);
+    mockGetDisplayString.mockImplementation((val: string) => {
+      if (val === DEFAULT_GEMINI_MODEL) return 'My Custom Model Display';
+      if (val === 'auto-gemini-2.5') return 'Auto (Gemini 2.5)';
+      return val;
+    });
     const { lastFrame, unmount } = await renderComponent();
 
-    expect(lastFrame()).toContain(`Manual (${DEFAULT_GEMINI_MODEL})`);
+    expect(lastFrame()).toContain('Manual (My Custom Model Display)');
     unmount();
   });
 

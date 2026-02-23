@@ -179,6 +179,7 @@ async function configureVSCodeStyle(
       await backupFile(keybindingsFile);
       try {
         const cleanContent = stripJsonComments(content);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const parsedContent = JSON.parse(cleanContent);
         if (!Array.isArray(parsedContent)) {
           return {
