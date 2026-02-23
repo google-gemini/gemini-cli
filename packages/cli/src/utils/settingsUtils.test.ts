@@ -24,7 +24,7 @@ import {
   getDialogSettingKeys,
   // Business logic utilities,
   TEST_ONLY,
-  isInScope,
+  isInSettingsScope,
   getDisplayValue,
 } from './settingsUtils.js';
 import {
@@ -488,15 +488,15 @@ describe('SettingsUtils', () => {
   });
 
   describe('Business Logic Utilities', () => {
-    describe('isInScope', () => {
+    describe('isInSettingsScope', () => {
       it('should return true for top-level settings that exist', () => {
         const settings = makeMockSettings({ ui: { requiresRestart: true } });
-        expect(isInScope('ui.requiresRestart', settings)).toBe(true);
+        expect(isInSettingsScope('ui.requiresRestart', settings)).toBe(true);
       });
 
       it('should return false for top-level settings that do not exist', () => {
         const settings = makeMockSettings({});
-        expect(isInScope('ui.requiresRestart', settings)).toBe(false);
+        expect(isInSettingsScope('ui.requiresRestart', settings)).toBe(false);
       });
 
       it('should return true for nested settings that exist', () => {
@@ -504,21 +504,21 @@ describe('SettingsUtils', () => {
           ui: { accessibility: { enableLoadingPhrases: true } },
         });
         expect(
-          isInScope('ui.accessibility.enableLoadingPhrases', settings),
+          isInSettingsScope('ui.accessibility.enableLoadingPhrases', settings),
         ).toBe(true);
       });
 
       it('should return false for nested settings that do not exist', () => {
         const settings = makeMockSettings({});
         expect(
-          isInScope('ui.accessibility.enableLoadingPhrases', settings),
+          isInSettingsScope('ui.accessibility.enableLoadingPhrases', settings),
         ).toBe(false);
       });
 
       it('should return false when parent exists but child does not', () => {
         const settings = makeMockSettings({ ui: { accessibility: {} } });
         expect(
-          isInScope('ui.accessibility.enableLoadingPhrases', settings),
+          isInSettingsScope('ui.accessibility.enableLoadingPhrases', settings),
         ).toBe(false);
       });
     });

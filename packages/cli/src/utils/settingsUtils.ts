@@ -255,7 +255,10 @@ export function getDialogSettingsByType(
   );
 }
 
-export function isInScope(key: string, scopeSettings: Settings): boolean {
+export function isInSettingsScope(
+  key: string,
+  scopeSettings: Settings,
+): boolean {
   const path = key.split('.');
   const value = getNestedValue(scopeSettings, path);
   return value !== undefined;
@@ -270,7 +273,7 @@ export function getDisplayValue(
   _mergedSettings: Settings,
 ): string {
   const definition = getSettingDefinition(key);
-  const existsInScope = isInScope(key, scopeSettings);
+  const existsInScope = isInSettingsScope(key, scopeSettings);
 
   let value: SettingsValue;
   if (existsInScope) {
@@ -296,7 +299,7 @@ export function getDisplayValue(
 /**Utilities for parsing Settings that can be inline edited by the user typing out values */
 function tryParseJsonStringArray(input: string): string[] | null {
   try {
-    const parsed = JSON.parse(input);
+    const parsed: unknown = JSON.parse(input);
     if (
       Array.isArray(parsed) &&
       parsed.every((item): item is string => typeof item === 'string')
