@@ -68,6 +68,24 @@ The `toolName` in the rule must match the name of the tool being called.
   wildcard. A `toolName` of `my-server__*` will match any tool from the
   `my-server` MCP.
 
+#### Available Gemini CLI Tools
+
+- **Activate Skill** (`activate_skill`)
+- **Ask User** (`ask_user`)
+- **CLI Help Agent** (`cli_help`)
+- **Codebase Investigator Agent** (`codebase_investigator`)
+- **Edit** (`replace`)
+- **Enter Plan Mode** (`enter_plan_mode`)
+- **FindFiles** (`glob`)
+- **GoogleSearch** (`google_web_search`)
+- **ReadFile** (`read_file`)
+- **ReadFolder** (`list_directory`)
+- **SaveMemory** (`save_memory`)
+- **SearchText** (`grep_search`)
+- **Shell** (`run_shell_command`)
+- **WebFetch** (`web_fetch`)
+- **WriteFile** (`write_file`)
+
 #### Arguments pattern
 
 If `argsPattern` is specified, the tool's arguments are converted to a stable
