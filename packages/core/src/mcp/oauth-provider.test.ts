@@ -266,6 +266,97 @@ describe('MCPOAuthProvider', () => {
       );
     });
 
+    it('should use JWT exp claim for expiresAt when access token is a JWT', async () => {
+      const futureExp = Math.floor(Date.now() / 1000) + 172800; // 48h from now
+      const jwtPayload = Buffer.from(
+        JSON.stringify({ exp: futureExp }),
+      ).toString('base64');
+      const jwtAccessToken = `header.${jwtPayload}.signature`;
+
+      const jwtTokenResponse = {
+        ...mockTokenResponse,
+        access_token: jwtAccessToken,
+        expires_in: 3600, // 1h — should be ignored in favour of JWT exp
+      };
+
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = { writeHead: vi.fn(), end: vi.fn() };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(jwtTokenResponse),
+          json: jwtTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.authenticate('test-server', mockConfig);
+
+      // expiresAt must equal JWT exp (in ms), not Date.now() + expires_in
+      expect(result?.expiresAt).toBe(futureExp * 1000);
+    });
+
+    it('should fall back to expires_in for expiresAt when access token is opaque', async () => {
+      const before = Date.now();
+
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = { writeHead: vi.fn(), end: vi.fn() };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+      // mockTokenResponse uses a plain opaque access_token string
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.authenticate('test-server', mockConfig);
+      const after = Date.now();
+
+      // expiresAt must be roughly Date.now() + expires_in (3600s)
+      expect(result?.expiresAt).toBeGreaterThanOrEqual(
+        before + mockTokenResponse.expires_in! * 1000,
+      );
+      expect(result?.expiresAt).toBeLessThanOrEqual(
+        after + mockTokenResponse.expires_in! * 1000,
+      );
+    });
+
     it('should handle OAuth discovery when no authorization URL provided', async () => {
       // Use a mutable config object
       const configWithoutAuth: MCPOAuthConfig = {
@@ -1448,6 +1539,55 @@ describe('MCPOAuthProvider', () => {
       expect(tokenStorage.saveToken).toHaveBeenCalledWith(
         'test-server',
         expect.objectContaining({ accessToken: 'new_access_token' }),
+        'test-client-id',
+        'https://auth.example.com/token',
+        undefined,
+      );
+    });
+
+    it('should use JWT exp claim for expiresAt when refreshing token', async () => {
+      const futureExp = Math.floor(Date.now() / 1000) + 172800; // 48h from now
+      const jwtPayload = Buffer.from(
+        JSON.stringify({ exp: futureExp }),
+      ).toString('base64');
+      const jwtAccessToken = `header.${jwtPayload}.signature`;
+
+      const expiredCredentials = {
+        serverName: 'test-server',
+        token: { ...mockToken, expiresAt: Date.now() - 3600000 },
+        clientId: 'test-client-id',
+        tokenUrl: 'https://auth.example.com/token',
+        updatedAt: Date.now(),
+      };
+
+      const tokenStorage = new MCPOAuthTokenStorage();
+      vi.mocked(tokenStorage.getCredentials).mockResolvedValue(
+        expiredCredentials,
+      );
+      vi.mocked(tokenStorage.isTokenExpired).mockReturnValue(true);
+
+      const refreshResponse = {
+        access_token: jwtAccessToken,
+        token_type: 'Bearer',
+        expires_in: 3600, // 1h — should be ignored in favour of JWT exp
+        refresh_token: 'new_refresh_token',
+      };
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(refreshResponse),
+          json: refreshResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      await authProvider.getValidToken('test-server', mockConfig);
+
+      expect(tokenStorage.saveToken).toHaveBeenCalledWith(
+        'test-server',
+        expect.objectContaining({ expiresAt: futureExp * 1000 }),
         'test-client-id',
         'https://auth.example.com/token',
         undefined,
