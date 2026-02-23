@@ -16,16 +16,9 @@ import {
 } from 'vitest';
 import { handleInstall, installCommand } from './install.js';
 import yargs from 'yargs';
-import type {
-  FolderTrustDiscoveryService,
-  debugLogger,
-  type GeminiCLIExtension,
-} from '@google/gemini-cli-core';
-import type {
-  inferInstallMetadata} from '../../config/extension-manager.js';
-import {
-  ExtensionManager
-} from '../../config/extension-manager.js';
+import * as core from '@google/gemini-cli-core';
+import type { inferInstallMetadata } from '../../config/extension-manager.js';
+import { ExtensionManager } from '../../config/extension-manager.js';
 import type {
   promptForConsentNonInteractive,
   requestConsentNonInteractive,
@@ -56,7 +49,7 @@ const mockIsWorkspaceTrusted: Mock<typeof isWorkspaceTrusted> = vi.hoisted(() =>
 const mockLoadTrustedFolders: Mock<typeof loadTrustedFolders> = vi.hoisted(() =>
   vi.fn(),
 );
-const mockDiscover: Mock<typeof FolderTrustDiscoveryService.discover> =
+const mockDiscover: Mock<typeof core.FolderTrustDiscoveryService.discover> =
   vi.hoisted(() => vi.fn());
 
 vi.mock('../../config/extensions/consent.js', () => ({
@@ -121,8 +114,8 @@ describe('handleInstall', () => {
   let processSpy: MockInstance;
 
   beforeEach(() => {
-    debugLogSpy = vi.spyOn(debugLogger, 'log');
-    debugErrorSpy = vi.spyOn(debugLogger, 'error');
+    debugLogSpy = vi.spyOn(core.debugLogger, 'log');
+    debugErrorSpy = vi.spyOn(core.debugLogger, 'error');
     processSpy = vi
       .spyOn(process, 'exit')
       .mockImplementation(() => undefined as never);
@@ -175,8 +168,8 @@ describe('handleInstall', () => {
   });
 
   function createMockExtension(
-    overrides: Partial<GeminiCLIExtension> = {},
-  ): GeminiCLIExtension {
+    overrides: Partial<core.GeminiCLIExtension> = {},
+  ): core.GeminiCLIExtension {
     return {
       name: 'mock-extension',
       version: '1.0.0',
