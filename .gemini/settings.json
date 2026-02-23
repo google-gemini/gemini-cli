@@ -1,6 +1,5 @@
 {
   "experimental": {
-    "enableAgents": true,
     "toolOutputMasking": {
       "enabled": true
     },

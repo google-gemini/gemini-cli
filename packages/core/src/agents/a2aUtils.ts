@@ -12,6 +12,8 @@ import type {
   DataPart,
   FilePart,
   Artifact,
+  TaskState,
+  TaskStatusUpdateEvent,
 } from '@a2a-js/sdk';
 import type { SendMessageResult } from './a2a-client-manager.js';
 
@@ -197,22 +199,16 @@ function isFilePart(part: Part): part is FilePart {
   return part.kind === 'file';
 }
 
+function isStatusUpdateEvent(
+  result: SendMessageResult,
+): result is TaskStatusUpdateEvent {
+  return result.kind === 'status-update';
+}
+
 /**
  * Returns true if the given state is a terminal state for a task.
  */
-export function isTerminalState(
-  state:
-    | 'submitted'
-    | 'working'
-    | 'input-required'
-    | 'completed'
-    | 'canceled'
-    | 'failed'
-    | 'rejected'
-    | 'auth-required'
-    | 'unknown'
-    | undefined,
-): boolean {
+export function isTerminalState(state: TaskState | undefined): boolean {
   return (
     state === 'completed' ||
     state === 'failed' ||
@@ -245,10 +241,11 @@ export function extractIdsFromResponse(result: SendMessageResult): {
       if (isTerminalState(result.status?.state)) {
         clearTaskId = true;
       }
-    } else if (kind === 'status-update') {
+    } else if (isStatusUpdateEvent(result)) {
       taskId = result.taskId;
       contextId = result.contextId;
-      if (isTerminalState(result.status?.state)) {
+      // Also check for 'final' flag if present in the event
+      if (result.final || isTerminalState(result.status?.state)) {
         clearTaskId = true;
       }
     }
@@ -272,7 +269,7 @@ export function extractAnyText(result: SendMessageResult): string {
     if (kind === 'artifact-update' && 'artifact' in result) {
       return extractPartsText(result.artifact.parts);
     }
-    if (kind === 'status-update' && result.status?.message) {
+    if (isStatusUpdateEvent(result) && result.status?.message) {
       return extractMessageText(result.status.message);
     }
   }

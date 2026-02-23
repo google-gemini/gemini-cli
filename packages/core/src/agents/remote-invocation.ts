@@ -158,7 +158,6 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
 
       const reassembler = new A2AResultReassembler();
       let finalResponse: SendMessageResult | undefined;
-      const terminalTaskIds = new Set<string>();
 
       for await (const chunk of stream) {
         if (_signal.aborted) {
@@ -183,10 +182,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
 
         if (clearTaskId) {
           this.taskId = undefined;
-          if (newTaskId) {
-            terminalTaskIds.add(newTaskId);
-          }
-        } else if (newTaskId && !terminalTaskIds.has(newTaskId)) {
+        } else if (newTaskId) {
           this.taskId = newTaskId;
         }
       }
