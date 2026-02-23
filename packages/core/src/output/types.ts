@@ -33,6 +33,7 @@ export enum JsonStreamEventType {
   TOOL_RESULT = 'tool_result',
   ERROR = 'error',
   RESULT = 'result',
+  THOUGHT = 'thought',
 }
 
 export interface BaseJsonStreamEvent {
@@ -88,6 +89,11 @@ export interface StreamStats {
   tool_calls: number;
 }
 
+export interface ThoughtEvent extends BaseJsonStreamEvent {
+  type: JsonStreamEventType.THOUGHT;
+  content: string;
+}
+
 export interface ResultEvent extends BaseJsonStreamEvent {
   type: JsonStreamEventType.RESULT;
   status: 'success' | 'error';
@@ -104,4 +110,5 @@ export type JsonStreamEvent =
   | ToolUseEvent
   | ToolResultEvent
   | ErrorEvent
+  | ThoughtEvent
   | ResultEvent;
