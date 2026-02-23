@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  *
- * Core agentic loop for Gemini Cowork — Phase 3 (MCP · Memory · Self-Healing · Telemetry).
+ * Core agentic loop for Gemini Cowork — Phase 5 (Self-Optimization · Security · Collaboration).
  *
  * ReAct (Reasoning + Acting) cycle
  * ─────────────────────────────────
@@ -18,21 +18,17 @@
  *        └────────────────────────────────┘
  *                   (next iteration)
  *
- * Phase 2 additions
+ * Phase 2 additions  — multimodal, long context, live search, log monitor
+ * Phase 3 additions  — MCP, persistent memory, self-healing, telemetry
+ * Phase 4 additions  — config, sandbox, multi-agent, dashboard, dry-run
+ * Phase 5 additions
  * ─────────────────
- *   • ProjectIndexer  : feeds the full codebase into Gemini's 2M context window.
- *   • Vision          : `screenshot_and_analyze` for UI / CSS debugging.
- *   • Google Search   : grounded web lookup for docs / library updates.
- *   • LogMonitor      : streams live process output to the agent.
- *   • Dynamic routing : Think() inspects the goal for UI / search / monitoring
- *                       keywords and selects the appropriate tool automatically.
- *
- * Phase 3 additions
- * ─────────────────
- *   • MCPManager      : connect to any MCP server (stdio / SSE); `mcp_call` tool.
- *   • MemoryRetriever : RAG-based persistent vector memory injected into Think.
- *   • SelfHealer      : autonomous Fix-Test-Repeat loop after code changes.
- *   • Tracer          : structured telemetry → .cowork/traces/*.json + *.md.
+ *   • Redactor        : scrubs secrets / PII before any text is sent to the LLM.
+ *   • AuditLog        : SHA-256-chained tamper-proof record of every action.
+ *   • ContextPruner   : removes redundant blocks from the 2M-token context.
+ *   • ModelTier       : auto-selects Flash vs Pro by task complexity.
+ *   • FeedbackCollector: records correction pairs for few-shot improvement.
+ *   • ReviewerSuggester: post-edit CODEOWNERS-aware reviewer recommendations.
  */
 
 import { readdir, readFile } from 'node:fs/promises';
@@ -57,6 +53,14 @@ import type { MCPServerConfig } from '../mcp/client.js';
 import { SelfHealer } from './self-healer.js';
 import { dryRunWriteFile, dryRunShellRun } from '../tools/dry-run.js';
 import type { DashboardServer } from '../dashboard/server.js';
+import { Redactor } from '../security/redactor.js';
+import { AuditLog } from '../security/audit-log.js';
+import { ContextPruner, ModelTier } from './optimizer.js';
+import { FeedbackCollector } from '../feedback/collector.js';
+import {
+  CodeownersParser,
+  ReviewerSuggester,
+} from '../collaboration/codeowners.js';
 import {
   ReadFileInputSchema,
   ScreenshotAnalyzeInputSchema,
@@ -115,6 +119,33 @@ export interface CoworkerOptions {
    * Think / Act / Observe event is streamed to the web dashboard in real time.
    */
   dashboard?: DashboardServer;
+
+  // ── Phase 5 ────────────────────────────────────────────────────────────────
+  /**
+   * When `true` (default), API keys, JWTs, emails and other secrets are
+   * automatically redacted from all text before it is used in prompts or logs.
+   */
+  redact?: boolean;
+  /**
+   * When `true`, every file write, shell command, and MCP call is appended to
+   * a SHA-256-chained audit log at `.cowork/audit.ndjson`.
+   */
+  securityAudit?: boolean;
+  /**
+   * When `true`, the ProjectIndexer context document is pruned before
+   * injection into the Think step to reduce token consumption.
+   */
+  pruneContext?: boolean;
+  /**
+   * Path to the feedback JSONL dataset used for few-shot prompting.
+   * Defaults to `<projectRoot>/.cowork/feedback.jsonl`.
+   */
+  feedbackPath?: string;
+  /**
+   * When `true`, the agent checks CODEOWNERS after writing files and logs
+   * reviewer recommendations in the Observe step.
+   */
+  codeownersAware?: boolean;
 }
 
 /** A single step recorded in the agent's history. */
@@ -175,8 +206,8 @@ const PHASE_LABEL: Record<AgentStep['phase'], string> = {
 
 const BANNER = [
   chalk.cyan('╔══════════════════════════════════════════════════╗'),
-  chalk.cyan('║   Gemini Cowork  ─  Agentic Loop  v0.3           ║'),
-  chalk.cyan('║   MCP · Memory · Self-Heal · Telemetry           ║'),
+  chalk.cyan('║   Gemini Cowork  ─  Agentic Loop  v0.5           ║'),
+  chalk.cyan('║   Security · Self-Optimize · Team Collab          ║'),
   chalk.cyan('╚══════════════════════════════════════════════════╝'),
 ].join('\n');
 
@@ -233,6 +264,14 @@ export class Coworker {
   // Phase 4 — dry-run + dashboard
   private readonly dryRun: boolean;
   private readonly dashboard: DashboardServer | null;
+  // Phase 5 — security, optimization, collaboration
+  private readonly redactor: Redactor | null;
+  private readonly auditLog: AuditLog | null;
+  private readonly pruner: ContextPruner | null;
+  private readonly modelTier: ModelTier;
+  private readonly feedbackCollector: FeedbackCollector | null;
+  private readonly codeownersAware: boolean;
+  private readonly writtenFiles: string[] = [];
 
   /** Backwards-compatible overload: `new Coworker(root?, maxIterations?)`. */
   constructor(projectRoot?: string, maxIterations?: number);
@@ -249,6 +288,11 @@ export class Coworker {
     let mcpServers: MCPServerConfig[] = [];
     let dryRun = false;
     let dashboard: DashboardServer | null = null;
+    let redact = true;
+    let securityAudit = false;
+    let pruneContext = false;
+    let feedbackPath: string | undefined;
+    let codeownersAware = false;
 
     if (typeof rootOrOpts === 'string' || rootOrOpts === undefined) {
       projectRoot = rootOrOpts ?? process.cwd();
@@ -261,6 +305,11 @@ export class Coworker {
       mcpServers = rootOrOpts.mcpServers ?? [];
       dryRun = rootOrOpts.dryRun ?? false;
       dashboard = rootOrOpts.dashboard ?? null;
+      redact = rootOrOpts.redact ?? true;
+      securityAudit = rootOrOpts.securityAudit ?? false;
+      pruneContext = rootOrOpts.pruneContext ?? false;
+      feedbackPath = rootOrOpts.feedbackPath;
+      codeownersAware = rootOrOpts.codeownersAware ?? false;
     }
 
     this.maxIterations = maxIterations;
@@ -294,6 +343,29 @@ export class Coworker {
     // ── Phase 4 ──────────────────────────────────────────────────────────────
     this.dryRun = dryRun;
     this.dashboard = dashboard;
+
+    // ── Phase 5 ──────────────────────────────────────────────────────────────
+    this.redactor = redact ? new Redactor() : null;
+    this.pruner = pruneContext ? new ContextPruner() : null;
+    this.modelTier = new ModelTier();
+    this.codeownersAware = codeownersAware;
+
+    if (securityAudit) {
+      const sessionId = `cowork-${Date.now().toString(36)}`;
+      this.auditLog = new AuditLog(
+        join(projectRoot, '.cowork', 'audit.ndjson'),
+        sessionId,
+      );
+    } else {
+      this.auditLog = null;
+    }
+
+    if (feedbackPath || useMemory) {
+      const path = feedbackPath ?? join(projectRoot, '.cowork', 'feedback.jsonl');
+      this.feedbackCollector = new FeedbackCollector(path);
+    } else {
+      this.feedbackCollector = null;
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -438,6 +510,30 @@ export class Coworker {
     await new Promise<void>((r) => setTimeout(r, 200)); // model latency placeholder
     spinner.stop();
 
+    // ── Phase 5: model tier decision ──────────────────────────────────────────
+    const tierDecision = this.modelTier.select(null, this.memory.goal);
+    if (tierDecision.complexityScore >= 0.55) {
+      this.tracer?.record({
+        phase: 'think',
+        content: `ModelTier: ${tierDecision.model} — ${tierDecision.reason}`,
+      });
+    }
+
+    // ── Phase 5: context pruning ───────────────────────────────────────────
+    if (this.pruner && this.memory.contextSummary && iteration === 1) {
+      const pruneResult = this.pruner.prune(
+        this.memory.contextSummary,
+        this.memory.goal,
+      );
+      if (pruneResult.savedTokens > 1_000) {
+        this.memory.contextSummary = pruneResult.text;
+        this.tracer?.record({
+          phase: 'think',
+          content: `ContextPruner: removed ${pruneResult.removedBlocks} blocks, saved ~${pruneResult.savedTokens.toLocaleString()} tokens`,
+        });
+      }
+    }
+
     // ── Phase 3: retrieve relevant past memories ───────────────────────────
     let memoryContext = '';
     if (this.memoryRetriever) {
@@ -445,6 +541,20 @@ export class Coworker {
         memoryContext = await this.memoryRetriever.retrieve(this.memory.goal, 3);
       } catch {
         // non-fatal — continue without memory context
+      }
+    }
+
+    // ── Phase 5: few-shot examples from past corrections ──────────────────
+    let fewShotContext = '';
+    if (this.feedbackCollector) {
+      try {
+        const examples = await this.feedbackCollector.buildFewShotExamples(
+          this.memory.goal,
+          3,
+        );
+        fewShotContext = this.feedbackCollector.formatAsSystemPrompt(examples);
+      } catch {
+        // non-fatal
       }
     }
 
@@ -456,7 +566,8 @@ export class Coworker {
 
     const thinkContent =
       `Iteration ${iteration}\n          ${context}\n          Last obs : ${lastObservation.slice(0, 150)}` +
-      (memoryContext ? `\n\n${memoryContext}` : '');
+      (memoryContext ? `\n\n${memoryContext}` : '') +
+      (fewShotContext ? `\n\n${fewShotContext}` : '');
 
     this.record('think', thinkContent);
     this.tracer?.record({ phase: 'think', iteration, content: thinkContent });
@@ -622,12 +733,29 @@ export class Coworker {
           result = this.dryRun
             ? await dryRunWriteFile(toolCall.input.path, toolCall.input.content)
             : await executeWriteFile(toolCall.input);
+          // Phase 5: track for CODEOWNERS analysis + audit log.
+          if (!this.dryRun) {
+            this.writtenFiles.push(toolCall.input.path);
+            await this.auditLog?.record({
+              action: 'write_file',
+              path: toolCall.input.path,
+              detail: `${toolCall.input.content.length} bytes written`,
+            });
+          }
           break;
         case 'shell_run':
           // Dry-run: show command preview instead of running.
           result = this.dryRun
             ? dryRunShellRun(toolCall.input.command, toolCall.input.cwd)
             : await executeShellRun(toolCall.input);
+          // Phase 5: audit log.
+          if (!this.dryRun) {
+            await this.auditLog?.record({
+              action: 'shell_run',
+              command: toolCall.input.command,
+              detail: toolCall.input.cwd,
+            });
+          }
           break;
         case 'screenshot_and_analyze':
           result = await executeScreenshotAndAnalyze(toolCall.input);
@@ -639,6 +767,11 @@ export class Coworker {
           result = await executeLogMonitor(toolCall.input);
           break;
         case 'mcp_call': {
+          await this.auditLog?.record({
+            action: 'mcp_call',
+            mcpTool: toolCall.input.qualifiedName,
+            detail: JSON.stringify(toolCall.input.args ?? {}),
+          });
           if (!this.mcp) {
             result = { output: '', error: 'No MCP servers are configured.' };
           } else {
@@ -731,10 +864,16 @@ export class Coworker {
    */
   private observe(result: ToolResult): void {
     const MAX_PREVIEW = 400;
+
+    // Phase 5: redact sensitive values from tool output before logging.
+    const safeOutput = this.redactor
+      ? this.redactor.redact(result.output).text
+      : result.output;
+
     const preview =
-      result.output.length > MAX_PREVIEW
-        ? `${result.output.slice(0, MAX_PREVIEW)}… (${result.output.length} chars total)`
-        : result.output || '(empty)';
+      safeOutput.length > MAX_PREVIEW
+        ? `${safeOutput.slice(0, MAX_PREVIEW)}… (${safeOutput.length} chars total)`
+        : safeOutput || '(empty)';
 
     const observation = result.error
       ? `ERROR: ${result.error}\nOUTPUT: ${preview}`
@@ -743,6 +882,29 @@ export class Coworker {
     this.record('observe', observation);
     this.tracer?.record({ phase: 'observe', content: observation, output: preview });
     this.dashboard?.emit({ type: 'observe', content: observation });
+  }
+
+  /**
+   * Phase 5: After writing files, check CODEOWNERS and surface reviewer
+   * recommendations in the agent's observation log.
+   */
+  private async observeCodeowners(): Promise<void> {
+    if (!this.codeownersAware || this.writtenFiles.length === 0) return;
+
+    try {
+      const parser = new CodeownersParser();
+      const rules = await parser.loadFromProject(this.memory.projectRoot);
+      if (rules.length === 0) return;
+
+      const suggester = new ReviewerSuggester(rules);
+      const recs = suggester.analyze(this.writtenFiles, this.memory.projectRoot);
+      const formatted = suggester.format(recs);
+
+      this.record('observe', `CODEOWNERS:\n${formatted}`);
+      this.tracer?.record({ phase: 'observe', content: `CODEOWNERS reviewer suggestions:\n${formatted}` });
+    } catch {
+      // non-fatal
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -771,6 +933,12 @@ export class Coworker {
     this.tracer?.startSession(goal);
     this.tracer?.record({ phase: 'session_start', content: `Goal: ${goal}` });
     this.dashboard?.emit({ type: 'session_start', content: `Goal: ${goal}` });
+
+    // ── Phase 5: audit session start ─────────────────────────────────────────
+    await this.auditLog?.record({
+      action: 'session_start',
+      detail: `Goal: ${goal.slice(0, 200)}`,
+    });
 
     // ── Phase 3: connect MCP servers ─────────────────────────────────────────
     if (this.mcp && this.mcpServers.length > 0) {
@@ -834,6 +1002,15 @@ export class Coworker {
 
       // ── Phase 4: dashboard session end ────────────────────────────────────
       this.dashboard?.emit({ type: 'session_end', content: `Outcome: ${outcome}` });
+
+      // ── Phase 5: CODEOWNERS reviewer suggestions ──────────────────────────
+      await this.observeCodeowners();
+
+      // ── Phase 5: audit session end ────────────────────────────────────────
+      await this.auditLog?.record({
+        action: 'session_end',
+        detail: `outcome=${outcome} steps=${this.memory.history.length} filesWritten=${this.writtenFiles.length}`,
+      });
 
       // ── Phase 3: disconnect MCP servers ──────────────────────────────────
       await this.mcp?.dispose().catch(() => undefined);

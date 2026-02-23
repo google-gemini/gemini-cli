@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cowork",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Gemini Cowork — AI agentic coding tool built on gemini-cli",
   "license": "Apache-2.0",
   "repository": {
