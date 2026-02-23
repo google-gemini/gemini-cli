@@ -783,11 +783,32 @@ function createTransportRequestInit(
   mcpServerConfig: MCPServerConfig,
   headers: Record<string, string>,
 ): RequestInit {
+  // Merge configured headers and runtime headers (e.g. Authorization)
+  const mergedHeaders: Record<string, string> = {
+    ...(mcpServerConfig.headers ?? {}),
+    ...headers,
+  };
+
+  // If user already provided an Accept header (any casing), respect it.
+  const hasAccept = Object.keys(mergedHeaders).some(
+    (k) => k.toLowerCase() === 'accept',
+  );
+
+  if (!hasAccept) {
+    // Determine appropriate Accept header based on configured transport.
+    // For Streamable HTTP (httpUrl, explicit type 'http', or url without type)
+    // the MCP spec requires the client to accept both JSON and SSE.
+    let acceptValue = 'application/json, text/event-stream';
+
+    if (mcpServerConfig.type === 'sse') {
+      acceptValue = 'text/event-stream';
+    }
+
+    mergedHeaders['Accept'] = acceptValue;
+  }
+
   return {
-    headers: {
-      ...mcpServerConfig.headers,
-      ...headers,
-    },
+    headers: mergedHeaders,
   };
 }
 

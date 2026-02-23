@@ -1444,7 +1444,9 @@ describe('mcp-client', () => {
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
         expect(transport).toMatchObject({
           _url: new URL('http://test-server'),
-          _requestInit: { headers: {} },
+          _requestInit: {
+            headers: { Accept: 'application/json, text/event-stream' },
+          },
         });
       });
 
@@ -1463,7 +1465,10 @@ describe('mcp-client', () => {
         expect(transport).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: {
-            headers: { Authorization: 'derp' },
+            headers: {
+              Authorization: 'derp',
+              Accept: 'application/json, text/event-stream',
+            },
           },
         });
       });
@@ -1482,7 +1487,9 @@ describe('mcp-client', () => {
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
         expect(transport).toMatchObject({
           _url: new URL('http://test-server'),
-          _requestInit: { headers: {} },
+          _requestInit: {
+            headers: { Accept: 'application/json, text/event-stream' },
+          },
         });
       });
 
@@ -1501,7 +1508,10 @@ describe('mcp-client', () => {
         expect(transport).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: {
-            headers: { Authorization: 'derp' },
+            headers: {
+              Authorization: 'derp',
+              Accept: 'application/json, text/event-stream',
+            },
           },
         });
       });
@@ -1520,7 +1530,9 @@ describe('mcp-client', () => {
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
         expect(transport).toMatchObject({
           _url: new URL('http://test-server'),
-          _requestInit: { headers: {} },
+          _requestInit: {
+            headers: { Accept: 'application/json, text/event-stream' },
+          },
         });
       });
 
@@ -1538,7 +1550,9 @@ describe('mcp-client', () => {
         expect(transport).toBeInstanceOf(SSEClientTransport);
         expect(transport).toMatchObject({
           _url: new URL('http://test-server'),
-          _requestInit: { headers: {} },
+          _requestInit: {
+            headers: { Accept: 'text/event-stream' },
+          },
         });
       });
 
@@ -1555,7 +1569,9 @@ describe('mcp-client', () => {
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
         expect(transport).toMatchObject({
           _url: new URL('http://test-server'),
-          _requestInit: { headers: {} },
+          _requestInit: {
+            headers: { Accept: 'application/json, text/event-stream' },
+          },
         });
       });
 
@@ -1575,7 +1591,10 @@ describe('mcp-client', () => {
         expect(transport).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: {
-            headers: { Authorization: 'Bearer token' },
+            headers: {
+              Authorization: 'Bearer token',
+              Accept: 'application/json, text/event-stream',
+            },
           },
         });
       });
@@ -1596,7 +1615,7 @@ describe('mcp-client', () => {
         expect(transport).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: {
-            headers: { 'X-API-Key': 'key123' },
+            headers: { 'X-API-Key': 'key123', Accept: 'text/event-stream' },
           },
         });
       });
@@ -1616,7 +1635,49 @@ describe('mcp-client', () => {
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
         expect(transport).toMatchObject({
           _url: new URL('http://test-server-http'),
-          _requestInit: { headers: {} },
+          _requestInit: {
+            headers: { Accept: 'application/json, text/event-stream' },
+          },
+        });
+      });
+
+      it('user-provided Accept header is preserved', async () => {
+        const transport = await createTransport(
+          'test-server',
+          {
+            httpUrl: 'http://test-server',
+            headers: { Accept: 'custom/accept-type' },
+          },
+          false,
+          EMPTY_CONFIG,
+        );
+
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server'),
+          _requestInit: {
+            headers: { Accept: 'custom/accept-type' },
+          },
+        });
+      });
+
+      it('user-provided Accept header (lowercase) is preserved', async () => {
+        const transport = await createTransport(
+          'test-server',
+          {
+            httpUrl: 'http://test-server',
+            headers: { accept: 'custom/accept-type-lowercase' },
+          },
+          false,
+          EMPTY_CONFIG,
+        );
+
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server'),
+          _requestInit: {
+            headers: { accept: 'custom/accept-type-lowercase' },
+          },
         });
       });
     });
