@@ -3201,10 +3201,10 @@ describe('Policy Engine Integration in loadCliConfig', () => {
     vi.restoreAllMocks();
   });
 
-  it('should pass merged allowed tools from CLI and settings to createPolicyEngineConfig', async () => {
+  it('should pass merged allowed tools from CLI, tools.allowed, and tools.trusted to createPolicyEngineConfig', async () => {
     process.argv = ['node', 'script.js', '--allowed-tools', 'cli-tool'];
     const settings = createTestMergedSettings({
-      tools: { allowed: ['settings-tool'] },
+      tools: { allowed: ['settings-tool'], trusted: ['save_memory'] },
     });
     const argv = await parseArguments(createTestMergedSettings());
 
@@ -3213,7 +3213,7 @@ describe('Policy Engine Integration in loadCliConfig', () => {
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.objectContaining({
         tools: expect.objectContaining({
-          allowed: expect.arrayContaining(['cli-tool']),
+          allowed: expect.arrayContaining(['cli-tool', 'save_memory']),
         }),
       }),
       expect.anything(),

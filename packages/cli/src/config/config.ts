@@ -632,7 +632,12 @@ export async function loadCliConfig(
     (!isHeadlessMode({ prompt: argv.prompt, query: argv.query }) &&
       !argv.isCommand);
 
-  const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
+  const deprecatedAllowedTools =
+    argv.allowedTools || settings.tools?.allowed || [];
+  const trustedTools = settings.tools?.trusted || [];
+  const allowedTools = [
+    ...new Set([...deprecatedAllowedTools, ...trustedTools]),
+  ];
   const allowedToolsSet = new Set(allowedTools);
 
   // In non-interactive mode, exclude tools that require a prompt.

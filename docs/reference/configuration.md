@@ -749,6 +749,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`tools.trusted`** (array):
+  - **Description:** Tool names that bypass the confirmation dialog. Use this
+    for trusted workflows (for example ["save_memory"]).
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
 - **`tools.exclude`** (array):
   - **Description:** Tool names to exclude from discovery.
   - **Default:** `undefined`

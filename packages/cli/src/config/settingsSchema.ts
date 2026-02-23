@@ -1217,6 +1217,19 @@ const SETTINGS_SCHEMA = {
         showInDialog: false,
         items: { type: 'string' },
       },
+      trusted: {
+        type: 'array',
+        label: 'Trusted Tools',
+        category: 'Tools',
+        requiresRestart: true,
+        default: undefined as string[] | undefined,
+        description: oneLine`
+          Tool names that bypass the confirmation dialog.
+          Use this for trusted workflows (for example ["save_memory"]).
+        `,
+        showInDialog: false,
+        items: { type: 'string' },
+      },
       exclude: {
         type: 'array',
         label: 'Exclude Tools',

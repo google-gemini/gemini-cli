@@ -1267,6 +1267,15 @@
             "type": "string"
           }
         },
+        "trusted": {
+          "title": "Trusted Tools",
+          "description": "Tool names that bypass the confirmation dialog. Use this for trusted workflows (for example [\"save_memory\"]).",
+          "markdownDescription": "Tool names that bypass the confirmation dialog. Use this for trusted workflows (for example [\"save_memory\"]).\n\n- Category: `Tools`\n- Requires restart: `yes`",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "exclude": {
           "title": "Exclude Tools",
           "description": "Tool names to exclude from discovery.",
