@@ -112,13 +112,36 @@ export function SearchableList<T extends GenericListItem>({
     isFocused: true,
     showNumbers: false,
     wrapAround: true,
+    priority: true,
   });
+
+  const [scrollOffsetState, setScrollOffsetState] = React.useState(0);
+
+  // Compute effective scroll offset during render to avoid visual flicker
+  let scrollOffset = scrollOffsetState;
+
+  if (activeIndex < scrollOffset) {
+    scrollOffset = activeIndex;
+  } else if (activeIndex >= scrollOffset + maxItemsToShow) {
+    scrollOffset = activeIndex - maxItemsToShow + 1;
+  }
+
+  const maxScroll = Math.max(0, filteredItems.length - maxItemsToShow);
+  if (scrollOffset > maxScroll) {
+    scrollOffset = maxScroll;
+  }
+
+  // Update state to match derived value if it changed
+  if (scrollOffsetState !== scrollOffset) {
+    setScrollOffsetState(scrollOffset);
+  }
 
   // Reset selection to top when items change if requested
   const prevItemsRef = React.useRef(filteredItems);
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (resetSelectionOnItemsChange && filteredItems !== prevItemsRef.current) {
       setActiveIndex(0);
+      setScrollOffsetState(0);
     }
     prevItemsRef.current = filteredItems;
   }, [filteredItems, setActiveIndex, resetSelectionOnItemsChange]);
@@ -135,14 +158,6 @@ export function SearchableList<T extends GenericListItem>({
     { isActive: true },
   );
 
-  const scrollOffset = Math.max(
-    0,
-    Math.min(
-      activeIndex - Math.floor(maxItemsToShow / 2),
-      Math.max(0, filteredItems.length - maxItemsToShow),
-    ),
-  );
-
   const visibleItems = filteredItems.slice(
     scrollOffset,
     scrollOffset + maxItemsToShow,
@@ -153,21 +168,22 @@ export function SearchableList<T extends GenericListItem>({
     isActive: boolean,
     labelWidth: number,
   ) => (
-    <Box flexDirection="column">
-      <Text
-        color={isActive ? theme.status.success : theme.text.primary}
-        bold={isActive}
-      >
-        {isActive ? '> ' : '  '}
-        {item.label.padEnd(labelWidth)}
-      </Text>
-      {item.description && (
-        <Box marginLeft={2}>
+    <Box flexDirection="row" alignItems="flex-start">
+      <Box minWidth={2} flexShrink={0}>
+        <Text color={isActive ? theme.status.success : theme.text.secondary}>
+          {isActive ? '●' : ''}
+        </Text>
+      </Box>
+      <Box flexDirection="column" flexGrow={1} minWidth={0}>
+        <Text color={isActive ? theme.status.success : theme.text.primary}>
+          {item.label.padEnd(labelWidth)}
+        </Text>
+        {item.description && (
           <Text color={theme.text.secondary} wrap="truncate-end">
             {item.description}
           </Text>
-        </Box>
-      )}
+        )}
+      </Box>
     </Box>
   );
 
@@ -204,16 +220,28 @@ export function SearchableList<T extends GenericListItem>({
             <Text color={theme.text.secondary}>No items found.</Text>
           </Box>
         ) : (
-          visibleItems.map((item, index) => {
-            const isSelected = activeIndex === scrollOffset + index;
-            return (
-              <Box key={item.key} marginBottom={1}>
-                {renderItem
-                  ? renderItem(item, isSelected, maxLabelWidth)
-                  : defaultRenderItem(item, isSelected, maxLabelWidth)}
+          <>
+            {filteredItems.length > maxItemsToShow && (
+              <Box marginX={1}>
+                <Text color={theme.text.secondary}>▲</Text>
               </Box>
-            );
-          })
+            )}
+            {visibleItems.map((item, index) => {
+              const isSelected = activeIndex === scrollOffset + index;
+              return (
+                <Box key={item.key} marginBottom={1} marginX={1}>
+                  {renderItem
+                    ? renderItem(item, isSelected, maxLabelWidth)
+                    : defaultRenderItem(item, isSelected, maxLabelWidth)}
+                </Box>
+              );
+            })}
+            {filteredItems.length > maxItemsToShow && (
+              <Box marginX={1}>
+                <Text color={theme.text.secondary}>▼</Text>
+              </Box>
+            )}
+          </>
         )}
       </Box>
 

@@ -41,8 +41,9 @@ export async function createPolicyEngineConfig(
 export function createPolicyUpdater(
   policyEngine: PolicyEngine,
   messageBus: MessageBus,
+  storage: Storage,
 ) {
-  return createCorePolicyUpdater(policyEngine, messageBus);
+  return createCorePolicyUpdater(policyEngine, messageBus, storage);
 }
 
 export interface WorkspacePolicyState {

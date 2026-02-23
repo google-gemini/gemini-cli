@@ -75,7 +75,7 @@ export class XcodeMcpBridgeFixTransport
     // We can cast because we verified 'result' is in response,
     // but TS might still be picky if the type is a strict union.
     // Let's treat it safely.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
     const result = response.result as any;
 
     // Check if we have content but missing structuredContent
@@ -85,12 +85,15 @@ export class XcodeMcpBridgeFixTransport
       result.content.length > 0 &&
       !result.structuredContent
     ) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const firstItem = result.content[0];
       if (firstItem.type === 'text' && typeof firstItem.text === 'string') {
         try {
           // Attempt to parse the text as JSON
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const parsed = JSON.parse(firstItem.text);
           // If successful, populate structuredContent
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           result.structuredContent = parsed;
         } catch (_) {
           // Ignored: Content is likely plain text, not JSON.

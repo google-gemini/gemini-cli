@@ -12,7 +12,7 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import { getCompressionPrompt } from '../core/prompts.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { logChatCompression } from '../telemetry/loggers.js';
-import { makeChatCompressionEvent } from '../telemetry/types.js';
+import { makeChatCompressionEvent, LlmRole } from '../telemetry/types.js';
 import {
   saveTruncatedToolOutput,
   formatTruncatedToolOutput,
@@ -29,9 +29,9 @@ import {
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL,
 } from '../config/models.js';
 import { PreCompressTrigger } from '../hooks/types.js';
-import { LlmRole } from '../telemetry/types.js';
 
 /**
  * Default threshold for compression token count as a fraction of the model's
@@ -101,6 +101,7 @@ export function findCompressSplitPoint(
 export function modelStringToModelConfigAlias(model: string): string {
   switch (model) {
     case PREVIEW_GEMINI_MODEL:
+    case PREVIEW_GEMINI_3_1_MODEL:
       return 'chat-compression-3-pro';
     case PREVIEW_GEMINI_FLASH_MODEL:
       return 'chat-compression-3-flash';

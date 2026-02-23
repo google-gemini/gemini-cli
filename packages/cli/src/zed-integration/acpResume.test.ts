@@ -26,6 +26,7 @@ import {
   SessionSelector,
   convertSessionToHistoryFormats,
 } from '../utils/sessionUtils.js';
+import { convertSessionToClientHistory } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
 
 vi.mock('../config/config.js', () => ({
@@ -65,6 +66,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       SYSTEM: 'system',
       TOOL: 'tool',
     },
+    convertSessionToClientHistory: vi.fn(),
   };
 });
 
@@ -168,9 +170,11 @@ describe('GeminiAgent Session Resume', () => {
       { role: 'model', parts: [{ text: 'Hi there' }] },
     ];
     (convertSessionToHistoryFormats as unknown as Mock).mockReturnValue({
-      clientHistory: mockClientHistory,
       uiHistory: [],
     });
+    (convertSessionToClientHistory as unknown as Mock).mockReturnValue(
+      mockClientHistory,
+    );
 
     const response = await agent.loadSession({
       sessionId,

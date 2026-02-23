@@ -13,6 +13,7 @@ import {
   getAllMCPServerStatuses,
   MCPServerStatus,
   isNodeError,
+  getErrorMessage,
   parseAndFormatApiError,
   safeLiteralReplace,
   DEFAULT_GUI_EDITOR,
@@ -30,8 +31,7 @@ import {
   EDIT_TOOL_NAMES,
   processRestorableToolCalls,
 } from '@google/gemini-cli-core';
-import type { RequestContext } from '@a2a-js/sdk/server';
-import { type ExecutionEventBus } from '@a2a-js/sdk/server';
+import type { RequestContext, ExecutionEventBus } from '@a2a-js/sdk/server';
 import type {
   TaskStatusUpdateEvent,
   TaskArtifactUpdateEvent,
@@ -728,16 +728,17 @@ export class Task {
         // Block scope for lexical declaration
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const errorEvent = event as ServerGeminiErrorEvent; // Type assertion
-        const errorMessage =
-          errorEvent.value?.error.message ?? 'Unknown error from LLM stream';
+        const errorMessage = errorEvent.value?.error
+          ? getErrorMessage(errorEvent.value.error)
+          : 'Unknown error from LLM stream';
         logger.error(
           '[Task] Received error event from LLM stream:',
           errorMessage,
         );
 
         let errMessage = `Unknown error from LLM stream: ${JSON.stringify(event)}`;
-        if (errorEvent.value) {
-          errMessage = parseAndFormatApiError(errorEvent.value);
+        if (errorEvent.value?.error) {
+          errMessage = parseAndFormatApiError(errorEvent.value.error);
         }
         this.cancelPendingTools(`LLM stream error: ${errorMessage}`);
         this.setTaskStateAndPublishUpdate(

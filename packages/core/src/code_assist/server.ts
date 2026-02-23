@@ -7,7 +7,6 @@
 import type { AuthClient } from 'google-auth-library';
 import type {
   CodeAssistGlobalUserSettingResponse,
-  GoogleRpcResponse,
   LoadCodeAssistRequest,
   LoadCodeAssistResponse,
   LongRunningOperationResponse,
@@ -36,6 +35,7 @@ import type {
   GenerateContentResponse,
 } from '@google/genai';
 import * as readline from 'node:readline';
+import { Readable } from 'node:stream';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import { UserTierId } from './types.js';
 import type {
@@ -295,7 +295,7 @@ export class CodeAssistServer implements ContentGenerator {
     req: object,
     signal?: AbortSignal,
   ): Promise<T> {
-    const res = await this.client.request({
+    const res = await this.client.request<T>({
       url: this.getMethodUrl(method),
       method: 'POST',
       headers: {
@@ -306,15 +306,14 @@ export class CodeAssistServer implements ContentGenerator {
       body: JSON.stringify(req),
       signal,
     });
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return res.data as T;
+    return res.data;
   }
 
   private async makeGetRequest<T>(
     url: string,
     signal?: AbortSignal,
   ): Promise<T> {
-    const res = await this.client.request({
+    const res = await this.client.request<T>({
       url,
       method: 'GET',
       headers: {
@@ -324,8 +323,7 @@ export class CodeAssistServer implements ContentGenerator {
       responseType: 'json',
       signal,
     });
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return res.data as T;
+    return res.data;
   }
 
   async requestGet<T>(method: string, signal?: AbortSignal): Promise<T> {
@@ -341,7 +339,7 @@ export class CodeAssistServer implements ContentGenerator {
     req: object,
     signal?: AbortSignal,
   ): Promise<AsyncGenerator<T>> {
-    const res = await this.client.request({
+    const res = await this.client.request<AsyncIterable<unknown>>({
       url: this.getMethodUrl(method),
       method: 'POST',
       params: {
@@ -358,8 +356,7 @@ export class CodeAssistServer implements ContentGenerator {
 
     return (async function* (): AsyncGenerator<T> {
       const rl = readline.createInterface({
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        input: res.data as NodeJS.ReadableStream,
+        input: Readable.from(res.data),
         crlfDelay: Infinity, // Recognizes '\r\n' and '\n' as line breaks
       });
 
@@ -371,8 +368,7 @@ export class CodeAssistServer implements ContentGenerator {
           if (bufferedLines.length === 0) {
             continue; // no data to yield
           }
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          yield JSON.parse(bufferedLines.join('\n')) as T;
+          yield JSON.parse(bufferedLines.join('\n'));
           bufferedLines = []; // Reset the buffer after yielding
         }
         // Ignore other lines like comments or id fields
@@ -397,23 +393,43 @@ export class CodeAssistServer implements ContentGenerator {
   }
 }
 
-function isVpcScAffectedUser(error: unknown): boolean {
-  if (error && typeof error === 'object' && 'response' in error) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const gaxiosError = error as {
-      response?: {
-        data?: unknown;
+interface VpcScErrorResponse {
+  response: {
+    data: {
+      error: {
+        details: unknown[];
       };
     };
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const response = gaxiosError.response?.data as
-      | GoogleRpcResponse
-      | undefined;
-    if (Array.isArray(response?.error?.details)) {
-      return response.error.details.some(
-        (detail) => detail.reason === 'SECURITY_POLICY_VIOLATED',
-      );
-    }
+  };
+}
+
+function isVpcScErrorResponse(error: unknown): error is VpcScErrorResponse {
+  return (
+    !!error &&
+    typeof error === 'object' &&
+    'response' in error &&
+    !!error.response &&
+    typeof error.response === 'object' &&
+    'data' in error.response &&
+    !!error.response.data &&
+    typeof error.response.data === 'object' &&
+    'error' in error.response.data &&
+    !!error.response.data.error &&
+    typeof error.response.data.error === 'object' &&
+    'details' in error.response.data.error &&
+    Array.isArray(error.response.data.error.details)
+  );
+}
+
+function isVpcScAffectedUser(error: unknown): boolean {
+  if (isVpcScErrorResponse(error)) {
+    return error.response.data.error.details.some(
+      (detail: unknown) =>
+        detail &&
+        typeof detail === 'object' &&
+        'reason' in detail &&
+        detail.reason === 'SECURITY_POLICY_VIOLATED',
+    );
   }
   return false;
 }
