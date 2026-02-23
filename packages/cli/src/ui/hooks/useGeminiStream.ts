@@ -1058,23 +1058,37 @@ export const useGeminiStream = (
 
   const handleChatCompressionEvent = useCallback(
     (
-      eventValue: ServerGeminiChatCompressedEvent['value'],
+      _eventValue: ServerGeminiChatCompressedEvent['value'],
       userMessageTimestamp: number,
     ) => {
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
       }
-      return addItem({
-        type: 'info',
-        text:
-          `IMPORTANT: This conversation exceeded the compression threshold. ` +
-          `A compressed context will be sent for future messages (compressed from: ` +
-          `${eventValue?.originalTokenCount ?? 'unknown'} to ` +
-          `${eventValue?.newTokenCount ?? 'unknown'} tokens).`,
-      });
+
+      const rawThreshold = settings.merged.model?.compressionThreshold ?? 0.5;
+      const thresholdDisplay = `${rawThreshold} (${Math.round(rawThreshold * 100)}%)`;
+
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: `Context compressed`,
+          color: theme.status.warning,
+          marginBottom: 1,
+        },
+        userMessageTimestamp,
+      );
+
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: `Threshold: ${thresholdDisplay}. Change this in /settings.`,
+          color: theme.text.secondary,
+        },
+        userMessageTimestamp,
+      );
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem],
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem, settings],
   );
 
   const handleMaxSessionTurnsEvent = useCallback(

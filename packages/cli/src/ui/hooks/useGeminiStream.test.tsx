@@ -50,6 +50,7 @@ import { MessageType, StreamingState } from '../types.js';
 
 import type { LoadedSettings } from '../../config/settings.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
+import { theme } from '../semantic-colors.js';
 
 // --- MOCKS ---
 const mockSendMessageStream = vi
@@ -2385,6 +2386,53 @@ describe('useGeminiStream', () => {
       // Check that onCancelSubmit was called
       await waitFor(() => {
         expect(onCancelSubmitSpy).toHaveBeenCalledWith(true);
+      });
+    });
+
+    it('should add informational messages when ChatCompressed event is received', async () => {
+      // Setup mock to return a stream with ChatCompressed event
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.ChatCompressed,
+            value: {
+              originalTokenCount: 1000,
+              newTokenCount: 500,
+              compressionStatus: 'compressed',
+            },
+          };
+        })(),
+      );
+
+      const { result } = renderHookWithDefaults();
+
+      // Submit a query
+      await act(async () => {
+        await result.current.submitQuery('Test compression');
+      });
+
+      // Check that the succinct info message was added
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.INFO,
+            text: 'Context compressed',
+            color: theme.status.warning,
+          }),
+          expect.any(Number),
+        );
+      });
+
+      // Check that the threshold detail message was added
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.INFO,
+            text: 'Threshold: 0.5 (50%). Change this in /settings.',
+            color: theme.text.secondary,
+          }),
+          expect.any(Number),
+        );
       });
     });
 
