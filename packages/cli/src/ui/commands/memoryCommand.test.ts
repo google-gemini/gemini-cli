@@ -63,7 +63,7 @@ describe('memoryCommand', () => {
   let mockContext: CommandContext;
 
   const getSubCommand = (
-    name: 'show' | 'add' | 'refresh' | 'list',
+    name: 'show' | 'add' | 'reload' | 'list',
   ): SlashCommand => {
     const subCommand = memoryCommand.subCommands?.find(
       (cmd) => cmd.name === name,
@@ -206,7 +206,7 @@ describe('memoryCommand', () => {
     });
   });
 
-  describe('/memory refresh', () => {
+  describe('/memory reload', () => {
     let refreshCommand: SlashCommand;
     let mockSetUserMemory: Mock;
     let mockSetGeminiMdFileCount: Mock;
@@ -214,7 +214,7 @@ describe('memoryCommand', () => {
     let mockContextManagerRefresh: Mock;
 
     beforeEach(() => {
-      refreshCommand = getSubCommand('refresh');
+      refreshCommand = getSubCommand('reload');
       mockSetUserMemory = vi.fn();
       mockSetGeminiMdFileCount = vi.fn();
       mockSetGeminiMdFilePaths = vi.fn();

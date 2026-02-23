@@ -312,9 +312,9 @@ const schemaCommand: SlashCommand = {
 };
 
 const refreshCommand: SlashCommand = {
-  name: 'refresh',
-  altNames: ['reload'],
-  description: 'Restarts MCP servers',
+  name: 'reload',
+  altNames: ['refresh'],
+  description: 'Reloads MCP servers',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (

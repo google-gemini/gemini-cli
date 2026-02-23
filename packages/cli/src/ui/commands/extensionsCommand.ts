@@ -176,7 +176,7 @@ async function restartAction(
   if (!all && names?.length === 0) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: 'Usage: /extensions restart <extension-names>|--all',
+      text: 'Usage: /extensions reload <extension-names>|--all',
     });
     return Promise.resolve();
   }
@@ -707,7 +707,7 @@ export function completeExtensions(
   }
   if (
     context.invocation?.name === 'disable' ||
-    context.invocation?.name === 'restart'
+    context.invocation?.name === 'reload'
   ) {
     extensions = extensions.filter((ext) => ext.isActive);
   }
@@ -803,8 +803,9 @@ const exploreExtensionsCommand: SlashCommand = {
 };
 
 const restartCommand: SlashCommand = {
-  name: 'restart',
-  description: 'Restart all extensions',
+  name: 'reload',
+  altNames: ['restart'],
+  description: 'Reload all extensions',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: restartAction,
