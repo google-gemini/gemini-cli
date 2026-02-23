@@ -58,6 +58,7 @@ export function recursivelyHydrateStrings<T>(
   if (Array.isArray(obj)) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return obj.map((item) =>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       recursivelyHydrateStrings(item, values),
     ) as unknown as T;
   }
