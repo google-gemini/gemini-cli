@@ -13,13 +13,14 @@ import {
   useMemo,
 } from 'react';
 
-interface OverflowState {
+export interface OverflowState {
   overflowingIds: ReadonlySet<string>;
 }
 
-interface OverflowActions {
+export interface OverflowActions {
   addOverflowingId: (id: string) => void;
   removeOverflowingId: (id: string) => void;
+  reset: () => void;
 }
 
 const OverflowStateContext = createContext<OverflowState | undefined>(
@@ -63,6 +64,10 @@ export const OverflowProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   }, []);
 
+  const reset = useCallback(() => {
+    setOverflowingIds(new Set());
+  }, []);
+
   const stateValue = useMemo(
     () => ({
       overflowingIds,
@@ -74,8 +79,9 @@ export const OverflowProvider: React.FC<{ children: React.ReactNode }> = ({
     () => ({
       addOverflowingId,
       removeOverflowingId,
+      reset,
     }),
-    [addOverflowingId, removeOverflowingId],
+    [addOverflowingId, removeOverflowingId, reset],
   );
 
   return (

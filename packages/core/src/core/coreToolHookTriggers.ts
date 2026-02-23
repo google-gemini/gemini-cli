@@ -6,11 +6,14 @@
 
 import { type McpToolContext, BeforeToolHookOutput } from '../hooks/types.js';
 import type { Config } from '../config/config.js';
-import type { ToolResult, AnyDeclarativeTool } from '../tools/tools.js';
+import type {
+  ToolResult,
+  AnyDeclarativeTool,
+  AnyToolInvocation,
+} from '../tools/tools.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { AnsiOutput, ShellExecutionConfig } from '../index.js';
-import type { AnyToolInvocation } from '../tools/tools.js';
 import { ShellToolInvocation } from '../tools/shell.js';
 import { DiscoveredMCPToolInvocation } from '../tools/mcp-tool.js';
 
