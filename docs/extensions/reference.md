@@ -209,8 +209,8 @@ agent definition files (`.md`) to an `agents/` directory in your extension root.
 ### <a id="policy-engine"></a>Policy Engine
 
 Extensions can contribute policy rules and safety checkers to the Gemini CLI
-[Policy Engine](../admin/policy-engine.md). These rules are defined in a TOML
-file and take effect when the extension is activated.
+[Policy Engine](../reference/policy-engine.md). These rules are defined in a
+TOML file and take effect when the extension is activated.
 
 To add policies, specify the file path in your `gemini-extension.json`:
 
