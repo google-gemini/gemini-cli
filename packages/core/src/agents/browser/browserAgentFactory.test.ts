@@ -73,10 +73,10 @@ describe('browserAgentFactory', () => {
         overrides: {
           browser_agent: {
             enabled: true,
-            customConfig: {
-              headless: false,
-            },
           },
+        },
+        browser: {
+          headless: false,
         },
       },
     });
@@ -160,11 +160,11 @@ describe('browserAgentFactory', () => {
           overrides: {
             browser_agent: {
               enabled: true,
-              customConfig: {
-                headless: false,
-                visualModel: 'gemini-2.5-flash-preview',
-              },
             },
+          },
+          browser: {
+            headless: false,
+            visualModel: 'gemini-2.5-flash-preview',
           },
         },
       });
@@ -185,11 +185,11 @@ describe('browserAgentFactory', () => {
           overrides: {
             browser_agent: {
               enabled: true,
-              customConfig: {
-                headless: false,
-                visualModel: 'gemini-2.5-flash-preview',
-              },
             },
+          },
+          browser: {
+            headless: false,
+            visualModel: 'gemini-2.5-flash-preview',
           },
         },
       });

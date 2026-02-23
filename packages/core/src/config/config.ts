@@ -202,16 +202,11 @@ export interface AgentOverride {
   modelConfig?: ModelConfig;
   runConfig?: AgentRunConfig;
   enabled?: boolean;
-  /**
-   * Agent-specific custom configuration.
-   * Each agent defines and documents its own customConfig structure.
-   * Example: browser_agent uses BrowserAgentCustomConfig for sessionMode, headless, etc.
-   */
-  customConfig?: Record<string, unknown>;
 }
 
 export interface AgentSettings {
   overrides?: Record<string, AgentOverride>;
+  browser?: BrowserAgentCustomConfig;
 }
 
 export interface CustomTheme {
@@ -281,7 +276,7 @@ export interface BrowserAgentCustomConfig {
   /** Run browser in headless mode. Default: false */
   headless?: boolean;
   /** Path to Chrome profile directory for session persistence. */
-  chromeProfilePath?: string;
+  profilePath?: string;
   /** Model override for the visual agent. */
   visualModel?: string;
 }
@@ -2539,15 +2534,14 @@ export class Config {
     customConfig: BrowserAgentCustomConfig;
   } {
     const override = this.getAgentOverride('browser_agent');
-    const customConfig = (override?.customConfig ??
-      {}) as BrowserAgentCustomConfig;
+    const customConfig = this.getAgentsSettings()?.browser ?? {};
     return {
       enabled: override?.enabled ?? false,
       model: override?.modelConfig?.model,
       customConfig: {
         sessionMode: customConfig.sessionMode ?? 'persistent',
         headless: customConfig.headless ?? false,
-        chromeProfilePath: customConfig.chromeProfilePath,
+        profilePath: customConfig.profilePath,
         visualModel: customConfig.visualModel,
       },
     };

@@ -32,10 +32,11 @@ describe('BrowserAgentInvocation', () => {
         overrides: {
           browser_agent: {
             enabled: true,
-            customConfig: {
-              headless: false,
-            },
           },
+        },
+        browser: {
+          headless: false,
+          sessionMode: 'isolated',
         },
       },
     });

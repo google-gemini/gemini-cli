@@ -1086,6 +1086,43 @@
           "additionalProperties": {
             "$ref": "#/$defs/AgentOverride"
           }
+        },
+        "browser": {
+          "title": "Browser Agent",
+          "description": "Settings specific to the browser agent.",
+          "markdownDescription": "Settings specific to the browser agent.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "sessionMode": {
+              "title": "Browser Session Mode",
+              "description": "Session mode: 'persistent', 'isolated', or 'existing'.",
+              "markdownDescription": "Session mode: 'persistent', 'isolated', or 'existing'.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `persistent`",
+              "default": "persistent",
+              "type": "string",
+              "enum": ["persistent", "isolated", "existing"]
+            },
+            "headless": {
+              "title": "Browser Headless",
+              "description": "Run browser in headless mode.",
+              "markdownDescription": "Run browser in headless mode.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "profilePath": {
+              "title": "Browser Profile Path",
+              "description": "Path to browser profile directory for session persistence.",
+              "markdownDescription": "Path to browser profile directory for session persistence.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+              "type": "string"
+            },
+            "visualModel": {
+              "title": "Browser Visual Model",
+              "description": "Model override for the visual agent.",
+              "markdownDescription": "Model override for the visual agent.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -2092,11 +2129,6 @@
         "enabled": {
           "type": "boolean",
           "description": "Whether to enable the agent."
-        },
-        "customConfig": {
-          "type": "object",
-          "description": "Agent-specific custom configuration. Each agent defines its own schema.",
-          "additionalProperties": true
         }
       }
     },

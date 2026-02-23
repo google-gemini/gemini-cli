@@ -964,6 +964,60 @@ const SETTINGS_SCHEMA = {
           ref: 'AgentOverride',
         },
       },
+      browser: {
+        type: 'object',
+        label: 'Browser Agent',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: {},
+        description: 'Settings specific to the browser agent.',
+        showInDialog: false,
+        properties: {
+          sessionMode: {
+            type: 'enum',
+            label: 'Browser Session Mode',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: 'persistent',
+            description:
+              "Session mode: 'persistent', 'isolated', or 'existing'.",
+            showInDialog: true,
+            options: [
+              { value: 'persistent', label: 'Persistent' },
+              { value: 'isolated', label: 'Isolated' },
+              { value: 'existing', label: 'Existing' },
+            ],
+          },
+          headless: {
+            type: 'boolean',
+            label: 'Browser Headless',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description: 'Run browser in headless mode.',
+            showInDialog: true,
+          },
+          profilePath: {
+            type: 'string',
+            label: 'Browser Profile Path',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as string | undefined,
+            description:
+              'Path to browser profile directory for session persistence.',
+            showInDialog: true,
+          },
+          visualModel: {
+            type: 'string',
+            label: 'Browser Visual Model',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as string | undefined,
+            description: 'Model override for the visual agent.',
+            showInDialog: true,
+          },
+        },
+      },
     },
   },
 
@@ -2274,12 +2328,6 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
       enabled: {
         type: 'boolean',
         description: 'Whether to enable the agent.',
-      },
-      customConfig: {
-        type: 'object',
-        description:
-          'Agent-specific custom configuration. Each agent defines its own schema.',
-        additionalProperties: true,
       },
     },
   },

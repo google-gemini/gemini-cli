@@ -259,11 +259,8 @@ export class BrowserManager {
     if (browserConfig.customConfig.headless) {
       mcpArgs.push('--headless');
     }
-    if (browserConfig.customConfig.chromeProfilePath) {
-      mcpArgs.push(
-        '--userDataDir',
-        browserConfig.customConfig.chromeProfilePath,
-      );
+    if (browserConfig.customConfig.profilePath) {
+      mcpArgs.push('--userDataDir', browserConfig.customConfig.profilePath);
     }
 
     debugLogger.log(
@@ -343,7 +340,7 @@ export class BrowserManager {
             `To fix this:\n` +
             `  1. Close all Chrome windows using this profile, OR\n` +
             `  2. Set sessionMode to "isolated" in settings.json to use a temporary profile, OR\n` +
-            `  3. Set chromeProfilePath in settings.json to use a different profile directory`,
+            `  3. Set profilePath in settings.json to use a different profile directory`,
         );
       }
       // existing mode — shouldn't normally hit this, but handle gracefully

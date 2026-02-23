@@ -56,10 +56,10 @@ describe('BrowserManager', () => {
         overrides: {
           browser_agent: {
             enabled: true,
-            customConfig: {
-              headless: false,
-            },
           },
+        },
+        browser: {
+          headless: false,
         },
       },
     });
@@ -165,10 +165,10 @@ describe('BrowserManager', () => {
           overrides: {
             browser_agent: {
               enabled: true,
-              customConfig: {
-                headless: true,
-              },
             },
+          },
+          browser: {
+            headless: true,
           },
         },
       });
@@ -182,16 +182,16 @@ describe('BrowserManager', () => {
       });
     });
 
-    it('should pass chromeProfilePath as --userDataDir when configured', async () => {
+    it('should pass profilePath as --userDataDir when configured', async () => {
       const profileConfig = makeFakeConfig({
         agents: {
           overrides: {
             browser_agent: {
               enabled: true,
-              customConfig: {
-                chromeProfilePath: '/path/to/profile',
-              },
             },
+          },
+          browser: {
+            profilePath: '/path/to/profile',
           },
         },
       });
@@ -211,10 +211,10 @@ describe('BrowserManager', () => {
           overrides: {
             browser_agent: {
               enabled: true,
-              customConfig: {
-                sessionMode: 'isolated',
-              },
             },
+          },
+          browser: {
+            sessionMode: 'isolated',
           },
         },
       });
@@ -234,10 +234,10 @@ describe('BrowserManager', () => {
           overrides: {
             browser_agent: {
               enabled: true,
-              customConfig: {
-                sessionMode: 'existing',
-              },
             },
+          },
+          browser: {
+            sessionMode: 'existing',
           },
         },
       });
@@ -268,10 +268,10 @@ describe('BrowserManager', () => {
           overrides: {
             browser_agent: {
               enabled: true,
-              customConfig: {
-                sessionMode: 'existing',
-              },
             },
+          },
+          browser: {
+            sessionMode: 'existing',
           },
         },
       });

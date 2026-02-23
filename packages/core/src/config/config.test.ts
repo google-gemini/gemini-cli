@@ -1333,7 +1333,7 @@ describe('Server Config (config.ts)', () => {
       expect(browserConfig.model).toBeUndefined();
       expect(browserConfig.customConfig.sessionMode).toBe('persistent');
       expect(browserConfig.customConfig.headless).toBe(false);
-      expect(browserConfig.customConfig.chromeProfilePath).toBeUndefined();
+      expect(browserConfig.customConfig.profilePath).toBeUndefined();
       expect(browserConfig.customConfig.visualModel).toBeUndefined();
     });
 
@@ -1345,13 +1345,13 @@ describe('Server Config (config.ts)', () => {
             browser_agent: {
               enabled: true,
               modelConfig: { model: 'custom-model' },
-              customConfig: {
-                sessionMode: 'existing',
-                headless: true,
-                chromeProfilePath: '/path/to/profile',
-                visualModel: 'custom-visual-model',
-              },
             },
+          },
+          browser: {
+            sessionMode: 'existing',
+            headless: true,
+            profilePath: '/path/to/profile',
+            visualModel: 'custom-visual-model',
           },
         },
       };
@@ -1362,9 +1362,7 @@ describe('Server Config (config.ts)', () => {
       expect(browserConfig.model).toBe('custom-model');
       expect(browserConfig.customConfig.sessionMode).toBe('existing');
       expect(browserConfig.customConfig.headless).toBe(true);
-      expect(browserConfig.customConfig.chromeProfilePath).toBe(
-        '/path/to/profile',
-      );
+      expect(browserConfig.customConfig.profilePath).toBe('/path/to/profile');
       expect(browserConfig.customConfig.visualModel).toBe(
         'custom-visual-model',
       );
@@ -1377,10 +1375,10 @@ describe('Server Config (config.ts)', () => {
           overrides: {
             browser_agent: {
               enabled: true,
-              customConfig: {
-                headless: true,
-              },
             },
+          },
+          browser: {
+            headless: true,
           },
         },
       };
