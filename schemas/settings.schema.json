@@ -121,13 +121,6 @@
           },
           "additionalProperties": false
         },
-        "enablePromptCompletion": {
-          "title": "Enable Prompt Completion",
-          "description": "Enable AI-powered prompt completion suggestions while typing.",
-          "markdownDescription": "Enable AI-powered prompt completion suggestions while typing.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
-        },
         "retryFetchErrors": {
           "title": "Retry Fetch Errors",
           "description": "Retry on \"exception TypeError: fetch failed sending request\" errors.",
