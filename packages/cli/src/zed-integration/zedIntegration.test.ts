@@ -26,6 +26,7 @@ import {
   type Config,
   type MessageBus,
   LlmRole,
+  type MCPServerConfig,
 } from '@google/gemini-cli-core';
 import {
   SettingScope,
@@ -426,6 +427,7 @@ describe('Session', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      getMcpServers: vi.fn(),
       getFileService: vi.fn().mockReturnValue({
         shouldIgnoreFile: vi.fn().mockReturnValue(false),
       }),
@@ -448,6 +450,24 @@ describe('Session', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('should send available commands', async () => {
+    await session.sendAvailableCommands();
+
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'available_commands_update',
+          availableCommands: expect.arrayContaining([
+            expect.objectContaining({ name: 'status' }),
+            expect.objectContaining({ name: 'mcp' }),
+            expect.objectContaining({ name: '$commit' }),
+            expect.objectContaining({ name: '$review-pr' }),
+          ]),
+        }),
+      }),
+    );
   });
 
   it('should handle prompt with text response', async () => {
@@ -475,6 +495,163 @@ describe('Session', () => {
       },
     });
     expect(result).toEqual({ stopReason: 'end_turn' });
+  });
+
+  it('should handle /status command directly with newlines', async () => {
+    mockConfig.getActiveModel.mockReturnValue('gemini-1.5-pro-test');
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: '/status\nTell me more' }],
+    });
+
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'agent_message_chunk',
+        }),
+      }),
+    );
+    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
+  });
+  it('should handle /status command directly', async () => {
+    mockConfig.getActiveModel.mockReturnValue('gemini-1.5-pro-test');
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: '/status' }],
+    });
+
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'agent_message_chunk',
+          content: expect.objectContaining({
+            type: 'text',
+            text: expect.stringContaining('gemini-1.5-pro-test'),
+          }),
+        }),
+      }),
+    );
+    expect(result).toEqual({ stopReason: 'end_turn' });
+    // Chat should not be called
+    expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
+  });
+
+  it('should handle /mcp command directly', async () => {
+    mockConfig.getMcpServers.mockReturnValue({
+      'test-mcp': {},
+    } as Record<string, MCPServerConfig>);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: '/mcp' }],
+    });
+
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'agent_message_chunk',
+          content: expect.objectContaining({
+            type: 'text',
+            text: expect.stringContaining('`test-mcp`'),
+          }),
+        }),
+      }),
+    );
+    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
+  });
+
+  it('should intercept $commit command and mutate prompt', async () => {
+    const stream = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          candidates: [{ content: { parts: [{ text: 'Committing...' }] } }],
+        },
+      },
+    ]);
+    mockChat.sendMessageStream.mockResolvedValue(stream);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      // Should replace `$commit` with the instruction
+      prompt: [{ type: 'text', text: '$commit my cool changes' }],
+    });
+
+    expect(mockChat.sendMessageStream).toHaveBeenCalledWith(
+      expect.anything(),
+      // The prompt text should be modified to include the commit instruction
+      expect.arrayContaining([
+        expect.objectContaining({
+          text: 'Create a git commit based on the current changes using the tools available. my cool changes',
+        }),
+      ]),
+      expect.anything(),
+      expect.any(AbortSignal),
+      LlmRole.MAIN,
+    );
+  });
+
+  it('should intercept $commit command with leading spaces and case insensitivity', async () => {
+    const stream = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          candidates: [{ content: { parts: [{ text: 'Committing...' }] } }],
+        },
+      },
+    ]);
+    mockChat.sendMessageStream.mockResolvedValue(stream);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      // Should replace `$commit` with the instruction
+      prompt: [{ type: 'text', text: '   \n$cOmMiT my cool changes' }],
+    });
+
+    expect(mockChat.sendMessageStream).toHaveBeenCalledWith(
+      expect.anything(),
+      // The prompt text should be modified to include the commit instruction
+      expect.arrayContaining([
+        expect.objectContaining({
+          text: 'Create a git commit based on the current changes using the tools available. my cool changes',
+        }),
+      ]),
+      expect.anything(),
+      expect.any(AbortSignal),
+      LlmRole.MAIN,
+    );
+  });
+
+  it('should intercept $review-pr command and mutate prompt', async () => {
+    const stream = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          candidates: [{ content: { parts: [{ text: 'Reviewing...' }] } }],
+        },
+      },
+    ]);
+    mockChat.sendMessageStream.mockResolvedValue(stream);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: '$review-pr' }],
+    });
+
+    expect(mockChat.sendMessageStream).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.arrayContaining([
+        expect.objectContaining({
+          text: 'Review the current pull request using the tools available.',
+        }),
+      ]),
+      expect.anything(),
+      expect.any(AbortSignal),
+      LlmRole.MAIN,
+    );
   });
 
   it('should handle tool calls', async () => {
