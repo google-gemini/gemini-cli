@@ -317,9 +317,12 @@ export async function runNonInteractive({
 
           if (event.type === GeminiEventType.Thought) {
             const thought = event.value;
-            const content = thought.subject
+            const rawContent = thought.subject
               ? `${thought.subject}: ${thought.description}`
               : thought.description;
+            const isRawThought =
+              config.getRawOutput() || config.getAcceptRawOutputRisk();
+            const content = isRawThought ? rawContent : stripAnsi(rawContent);
             if (streamFormatter) {
               streamFormatter.emitEvent({
                 type: JsonStreamEventType.THOUGHT,
