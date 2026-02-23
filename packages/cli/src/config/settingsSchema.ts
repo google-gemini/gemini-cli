@@ -297,6 +297,16 @@ const SETTINGS_SCHEMA = {
           'Retry on "exception TypeError: fetch failed sending request" errors.',
         showInDialog: false,
       },
+      maxAttempts: {
+        type: 'number',
+        label: 'Max Chat Model Attempts',
+        category: 'General',
+        requiresRestart: false,
+        default: 10,
+        description:
+          'Maximum number of attempts for requests to the main chat model. Cannot exceed 10.',
+        showInDialog: true,
+      },
       debugKeystrokeLogging: {
         type: 'boolean',
         label: 'Debug Keystroke Logging',
