@@ -547,7 +547,7 @@ A good instruction should concisely answer:
         "type": "string",
       },
       "new_string": {
-        "description": "The exact literal text to replace \`old_string\` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.",
+        "description": "The exact literal text to replace \`old_string\` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide exact literal code.",
         "type": "string",
       },
       "old_string": {
@@ -665,7 +665,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
   "parametersJsonSchema": {
     "properties": {
       "content": {
-        "description": "The content to write to the file.",
+        "description": "The content to write to the file. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide complete literal content.",
         "type": "string",
       },
       "file_path": {
@@ -1312,7 +1312,7 @@ The user has the ability to modify the \`new_string\` content. If modified, this
         "type": "string",
       },
       "new_string": {
-        "description": "The exact literal text to replace \`old_string\` with, unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.",
+        "description": "The exact literal text to replace \`old_string\` with, unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide exact literal code.",
         "type": "string",
       },
       "old_string": {
@@ -1429,7 +1429,7 @@ The user has the ability to modify \`content\`. If modified, this will be stated
   "parametersJsonSchema": {
     "properties": {
       "content": {
-        "description": "The content to write to the file.",
+        "description": "The content to write to the file. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide complete literal content.",
         "type": "string",
       },
       "file_path": {
