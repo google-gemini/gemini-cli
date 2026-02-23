@@ -8,19 +8,9 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { isSubpath } from './paths.js';
 import { debugLogger } from './debugLogger.js';
+import { createSimpleLogger } from './simpleLogger.js';
 
-// Simple console logger for import processing
-const logger = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  debug: (...args: any[]) =>
-    debugLogger.debug('[DEBUG] [ImportProcessor]', ...args),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  warn: (...args: any[]) =>
-    debugLogger.warn('[WARN] [ImportProcessor]', ...args),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  error: (...args: any[]) =>
-    debugLogger.error('[ERROR] [ImportProcessor]', ...args),
-};
+const logger = createSimpleLogger('ImportProcessor', debugLogger);
 
 /**
  * Interface for tracking import processing state to prevent circular imports

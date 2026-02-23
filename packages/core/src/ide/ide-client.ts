@@ -31,13 +31,9 @@ import {
   createProxyAwareFetch,
   type StdioConfig,
 } from './ide-connection-utils.js';
+import { createSimpleLogger } from '../utils/simpleLogger.js';
 
-const logger = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  debug: (...args: any[]) => debugLogger.debug('[DEBUG] [IDEClient]', ...args),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  error: (...args: any[]) => debugLogger.error('[ERROR] [IDEClient]', ...args),
-};
+const logger = createSimpleLogger('IDEClient', debugLogger);
 
 export type DiffUpdateResult =
   | {
