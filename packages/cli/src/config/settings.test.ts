@@ -141,16 +141,15 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     }
   };
 
-  // Create a smarter mock for isWorkspaceSameAsGlobalStorage
-  vi.spyOn(
-    actual.Storage.prototype,
-    'isWorkspaceSameAsGlobalStorage',
-  ).mockImplementation(function (this: Storage) {
-    const target = testResolve(pathMod.dirname(this.getGeminiDir()));
-    // Pick up the mocked home directory specifically from the 'os' mock
-    const home = testResolve(os.homedir());
-    return actual.normalizePath(target) === actual.normalizePath(home);
-  });
+  // Create a smarter mock for isWorkspaceHomeDir
+  vi.spyOn(actual.Storage.prototype, 'isWorkspaceHomeDir').mockImplementation(
+    function (this: Storage) {
+      const target = testResolve(pathMod.dirname(this.getGeminiDir()));
+      // Pick up the mocked home directory specifically from the 'os' mock
+      const home = testResolve(os.homedir());
+      return actual.normalizePath(target) === actual.normalizePath(home);
+    },
+  );
 
   return {
     ...actual,
@@ -1518,8 +1517,8 @@ describe('Settings Loading and Merging', () => {
       });
 
       // Force the storage check to return true for this specific test
-      const isWorkspaceSameAsGlobalStorageSpy = vi
-        .spyOn(Storage.prototype, 'isWorkspaceSameAsGlobalStorage')
+      const isWorkspaceHomeDirSpy = vi
+        .spyOn(Storage.prototype, 'isWorkspaceHomeDir')
         .mockReturnValue(true);
 
       (mockFsExistsSync as Mock).mockImplementation(
@@ -1538,7 +1537,7 @@ describe('Settings Loading and Merging', () => {
         );
         expect(settings.workspace.settings).toEqual({});
       } finally {
-        isWorkspaceSameAsGlobalStorageSpy.mockRestore();
+        isWorkspaceHomeDirSpy.mockRestore();
       }
     });
   });

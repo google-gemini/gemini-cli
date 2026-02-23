@@ -696,7 +696,7 @@ export function loadSettings(
     settings: {} as Settings,
     rawJson: undefined,
   };
-  if (!storage.isWorkspaceSameAsGlobalStorage()) {
+  if (!storage.isWorkspaceHomeDir()) {
     workspaceResult = load(workspaceSettingsPath);
   }
 
@@ -784,13 +784,11 @@ export function loadSettings(
       readOnly: false,
     },
     {
-      path: storage.isWorkspaceSameAsGlobalStorage()
-        ? ''
-        : workspaceSettingsPath,
+      path: storage.isWorkspaceHomeDir() ? '' : workspaceSettingsPath,
       settings: workspaceSettings,
       originalSettings: workspaceOriginalSettings,
       rawJson: workspaceResult.rawJson,
-      readOnly: storage.isWorkspaceSameAsGlobalStorage(),
+      readOnly: storage.isWorkspaceHomeDir(),
     },
     isTrusted,
     settingsErrors,

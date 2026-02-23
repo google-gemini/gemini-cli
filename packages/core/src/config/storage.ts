@@ -147,7 +147,7 @@ export class Storage {
    * Checks if the current workspace storage location is the same as the global/user storage location.
    * This handles symlinks and platform-specific path normalization.
    */
-  isWorkspaceSameAsGlobalStorage(): boolean {
+  isWorkspaceHomeDir(): boolean {
     return (
       normalizePath(resolveToRealPath(this.targetDir)) ===
       normalizePath(resolveToRealPath(homedir()))
