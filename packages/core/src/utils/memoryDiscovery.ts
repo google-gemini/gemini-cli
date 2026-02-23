@@ -19,20 +19,9 @@ import { debugLogger } from './debugLogger.js';
 import type { Config } from '../config/config.js';
 import type { HierarchicalMemory } from '../config/memory.js';
 import { CoreEvent, coreEvents } from './events.js';
+import { createSimpleLogger } from './simpleLogger.js';
 
-// Simple console logger, similar to the one previously in CLI's config.ts
-// TODO: Integrate with a more robust server-side logger if available/appropriate.
-const logger = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  debug: (...args: any[]) =>
-    debugLogger.debug('[DEBUG] [MemoryDiscovery]', ...args),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  warn: (...args: any[]) =>
-    debugLogger.warn('[WARN] [MemoryDiscovery]', ...args),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  error: (...args: any[]) =>
-    debugLogger.error('[ERROR] [MemoryDiscovery]', ...args),
-};
+const logger = createSimpleLogger('MemoryDiscovery', debugLogger);
 
 export interface GeminiFileContent {
   filePath: string;

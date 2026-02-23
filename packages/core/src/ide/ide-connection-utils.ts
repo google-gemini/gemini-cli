@@ -12,15 +12,9 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import { type IdeInfo } from './detect-ide.js';
+import { createSimpleLogger } from '../utils/simpleLogger.js';
 
-const logger = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  debug: (...args: any[]) =>
-    debugLogger.debug('[DEBUG] [IDEConnectionUtils]', ...args),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  error: (...args: any[]) =>
-    debugLogger.error('[ERROR] [IDEConnectionUtils]', ...args),
-};
+const logger = createSimpleLogger('IDEConnectionUtils', debugLogger);
 
 export type StdioConfig = {
   command: string;

@@ -29,6 +29,8 @@ function isHeaderRecord(
   return !Array.isArray(h);
 }
 
+type WriteCallback = (error: Error | null | undefined) => void;
+
 export interface NetworkLog {
   id: string;
   timestamp: number;
@@ -364,9 +366,9 @@ export class ActivityLogger extends EventEmitter {
 
     const wrapRequest = (
       originalFn: typeof http.request,
-      args: unknown[],
+      args: Parameters<typeof http.request>,
       protocol: string,
-    ) => {
+    ): http.ClientRequest => {
       const firstArg = args[0];
       let options: http.RequestOptions | string | URL;
       if (typeof firstArg === 'string') {
@@ -383,7 +385,6 @@ export class ActivityLogger extends EventEmitter {
       } else if (options instanceof URL) {
         url = options.href;
       } else {
-        // Some callers pass URL-like objects that include href
         const href =
           'href' in options && typeof options.href === 'string'
             ? options.href
@@ -393,9 +394,9 @@ export class ActivityLogger extends EventEmitter {
           `${protocol}//${options.hostname || options.host || 'localhost'}${options.path || '/'}`;
       }
 
-      if (url.includes('127.0.0.1') || url.includes('localhost'))
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-        return originalFn.apply(http, args as any);
+      if (url.includes('127.0.0.1') || url.includes('localhost')) {
+        return originalFn.apply(http, args);
+      }
 
       const rawHeaders =
         typeof options === 'object' &&
@@ -410,54 +411,69 @@ export class ActivityLogger extends EventEmitter {
 
       if (headers[ACTIVITY_ID_HEADER]) {
         delete headers[ACTIVITY_ID_HEADER];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-        return originalFn.apply(http, args as any);
+        return originalFn.apply(http, args);
       }
 
       const id = Math.random().toString(36).substring(7);
       this.requestStartTimes.set(id, Date.now());
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-      const req = originalFn.apply(http, args as any);
+      const req = originalFn.apply(http, args);
       const requestChunks: Buffer[] = [];
 
-      const oldWrite = req.write;
-      const oldEnd = req.end;
+      const oldWrite = req.write.bind(req);
+      const oldEnd = req.end.bind(req);
 
-      req.write = function (chunk: unknown, ...etc: unknown[]) {
+      req.write = function (
+        chunk: unknown,
+        encodingOrCallback?: BufferEncoding | WriteCallback,
+        callback?: WriteCallback,
+      ): boolean {
         if (chunk) {
-          const encoding =
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            typeof etc[0] === 'string' ? (etc[0] as BufferEncoding) : undefined;
+          const enc =
+            typeof encodingOrCallback === 'string'
+              ? encodingOrCallback
+              : undefined;
           requestChunks.push(
             Buffer.isBuffer(chunk)
               ? chunk
               : typeof chunk === 'string'
-                ? Buffer.from(chunk, encoding)
+                ? Buffer.from(chunk, enc)
                 : Buffer.from(
                     chunk instanceof Uint8Array ? chunk : String(chunk),
                   ),
           );
         }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-        return oldWrite.apply(this, [chunk, ...etc] as any);
+        if (typeof encodingOrCallback === 'function') {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          return oldWrite(chunk as string | Uint8Array, encodingOrCallback);
+        }
+        if (encodingOrCallback !== undefined) {
+          return oldWrite(
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            chunk as string | Uint8Array,
+            encodingOrCallback,
+            callback,
+          );
+        }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        return oldWrite(chunk as string | Uint8Array);
       };
 
       req.end = function (
-        this: http.ClientRequest,
-        chunk: unknown,
-        ...etc: unknown[]
-      ) {
-        if (chunk && typeof chunk !== 'function') {
-          const encoding =
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            typeof etc[0] === 'string' ? (etc[0] as BufferEncoding) : undefined;
+        chunkOrCallback?: unknown,
+        encoding?: BufferEncoding | (() => void),
+        callback?: () => void,
+      ): http.ClientRequest {
+        if (chunkOrCallback && typeof chunkOrCallback !== 'function') {
+          const enc = typeof encoding === 'string' ? encoding : undefined;
           requestChunks.push(
-            Buffer.isBuffer(chunk)
-              ? chunk
-              : typeof chunk === 'string'
-                ? Buffer.from(chunk, encoding)
+            Buffer.isBuffer(chunkOrCallback)
+              ? chunkOrCallback
+              : typeof chunkOrCallback === 'string'
+                ? Buffer.from(chunkOrCallback, enc)
                 : Buffer.from(
-                    chunk instanceof Uint8Array ? chunk : String(chunk),
+                    chunkOrCallback instanceof Uint8Array
+                      ? chunkOrCallback
+                      : String(chunkOrCallback),
                   ),
           );
         }
@@ -472,8 +488,28 @@ export class ActivityLogger extends EventEmitter {
           body,
           pending: true,
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-return
-        return (oldEnd as any).apply(this, [chunk, ...etc]);
+        if (typeof chunkOrCallback === 'function') {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          return oldEnd(chunkOrCallback as () => void);
+        }
+        if (typeof encoding === 'function') {
+          return oldEnd(
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            chunkOrCallback as string | Uint8Array,
+
+            encoding as () => void,
+          );
+        }
+        if (encoding !== undefined) {
+          return oldEnd(
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            chunkOrCallback as string | Uint8Array,
+            encoding,
+            callback,
+          );
+        }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        return oldEnd(chunkOrCallback as string | Uint8Array);
       };
 
       req.on('response', (res: http.IncomingMessage) => {
@@ -484,7 +520,6 @@ export class ActivityLogger extends EventEmitter {
           const chunkBuffer = Buffer.from(chunk);
           responseChunks.push(chunkBuffer);
 
-          // Emit chunk update for streaming
           self.safeEmitNetwork({
             id,
             pending: true,
@@ -545,12 +580,18 @@ export class ActivityLogger extends EventEmitter {
       return req;
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-    (http as any).request = (...args: unknown[]) =>
-      wrapRequest(originalRequest, args, 'http:');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-    (https as any).request = (...args: unknown[]) =>
-      wrapRequest(originalHttpsRequest as typeof http.request, args, 'https:');
+    const createPatchedRequest = (
+      originalFn: typeof http.request,
+      protocol: string,
+    ): typeof http.request =>
+      Object.assign(
+        (...args: Parameters<typeof http.request>) =>
+          wrapRequest(originalFn, args, protocol),
+        originalFn,
+      );
+
+    http.request = createPatchedRequest(originalRequest, 'http:');
+    https.request = createPatchedRequest(originalHttpsRequest, 'https:');
   }
 
   logConsole(payload: ConsoleLogPayload) {
