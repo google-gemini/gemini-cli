@@ -2390,6 +2390,7 @@ describe('useGeminiStream', () => {
     });
 
     it('should add informational messages when ChatCompressed event is received', async () => {
+      vi.mocked(tokenLimit).mockReturnValue(10000);
       // Setup mock to return a stream with ChatCompressed event
       mockSendMessageStream.mockReturnValue(
         (async function* () {

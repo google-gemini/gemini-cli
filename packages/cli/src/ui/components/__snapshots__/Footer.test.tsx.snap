@@ -11,7 +11,7 @@ exports[`<Footer /> > displays the usage indicator when usage is low 1`] = `
 `;
 
 exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders complete footer in narrow terminal (baseline narrow) > complete-footer-narrow 1`] = `
-" ...s/to/make/it/long       no sandbox       /model gemini-pro 0% context used
+" ...s/to/make/it/long             no sandbox              /model gemini-pro 0%
 "
 `;
 
