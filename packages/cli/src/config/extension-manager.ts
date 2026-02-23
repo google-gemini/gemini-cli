@@ -51,6 +51,12 @@ import {
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
   CoreToolCallStatus,
+  EXTENSION_POLICY_TIER,
+  loadPoliciesFromToml,
+  PolicyDecision,
+  ApprovalMode,
+  type PolicyRule,
+  type SafetyCheckerRule,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
@@ -752,6 +758,78 @@ Would you like to attempt to install via "git clone" instead?`,
         recursivelyHydrateStrings(skill, hydrationContext),
       );
 
+      let rules: PolicyRule[] | undefined;
+      let checkers: SafetyCheckerRule[] | undefined;
+
+      if (config.policies) {
+        const policyPath = path.join(effectiveExtensionPath, config.policies);
+        if (fs.existsSync(policyPath)) {
+          const result = await loadPoliciesFromToml(
+            [policyPath],
+            () => EXTENSION_POLICY_TIER,
+          );
+          rules = result.rules;
+          checkers = result.checkers;
+
+          // Prefix source with extension name to avoid collisions
+          if (rules) {
+            rules = rules.filter((rule) => {
+              // Security: Extensions are not allowed to automatically approve tool calls.
+              // We ignore any rule that is ALLOW.
+              if (rule.decision === PolicyDecision.ALLOW) {
+                debugLogger.warn(
+                  `[ExtensionManager] Extension "${config.name}" attempted to contribute an ALLOW rule for tool "${rule.toolName}". Ignoring this rule for security.`,
+                );
+                return false;
+              }
+
+              // Security: Extensions are not allowed to contribute YOLO mode rules.
+              if (rule.modes?.includes(ApprovalMode.YOLO)) {
+                debugLogger.warn(
+                  `[ExtensionManager] Extension "${config.name}" attempted to contribute a rule for YOLO mode. Ignoring this rule for security.`,
+                );
+                return false;
+              }
+
+              rule.source = `Extension (${config.name}): ${rule.source}`;
+              return true;
+            });
+          }
+
+          if (checkers) {
+            checkers = checkers.filter((checker) => {
+              // Security: Extensions are not allowed to contribute YOLO mode checkers.
+              if (checker.modes?.includes(ApprovalMode.YOLO)) {
+                debugLogger.warn(
+                  `[ExtensionManager] Extension "${config.name}" attempted to contribute a safety checker for YOLO mode. Ignoring this checker for security.`,
+                );
+                return false;
+              }
+
+              checker.source = `Extension (${config.name}): ${checker.source}`;
+              return true;
+            });
+          }
+          if (checkers) {
+            for (const checker of checkers) {
+              checker.source = `Extension (${config.name}): ${checker.source}`;
+            }
+          }
+
+          if (result.errors.length > 0) {
+            for (const error of result.errors) {
+              debugLogger.warn(
+                `[ExtensionManager] Error loading policies from ${config.name}: ${error.message}`,
+              );
+            }
+          }
+        } else {
+          debugLogger.warn(
+            `[ExtensionManager] Policy file not found for ${config.name}: ${policyPath}`,
+          );
+        }
+      }
+
       const agentLoadResult = await loadAgentsFromDirectory(
         path.join(effectiveExtensionPath, 'agents'),
       );
@@ -785,6 +863,8 @@ Would you like to attempt to install via "git clone" instead?`,
         skills,
         agents: agentLoadResult.agents,
         themes: config.themes,
+        rules,
+        checkers,
       };
       this.loadedExtensions = [...this.loadedExtensions, extension];
 

@@ -120,7 +120,8 @@ The manifest file defines the extension's behavior and configuration.
     }
   },
   "contextFileName": "GEMINI.md",
-  "excludeTools": ["run_shell_command"]
+  "excludeTools": ["run_shell_command"],
+  "policies": "policies.toml"
 }
 ```
 
@@ -135,6 +136,8 @@ The manifest file defines the extension's behavior and configuration.
   also be an array of strings to load multiple context files.
 - `excludeTools`: An array of tools to block from the model. You can restrict
   specific arguments, such as `run_shell_command(rm -rf)`.
+- `policies`: An optional path to a policy TOML file relative to the extension
+  root. See [Policy Engine](#policy-engine) for more information.
 - `themes`: An optional list of themes provided by the extension. See
   [Themes](../cli/themes.md) for more information.
 
@@ -202,6 +205,48 @@ skill definitions in a `skills/` directory. For example,
 
 Provide [sub-agents](../core/subagents.md) that users can delegate tasks to. Add
 agent definition files (`.md`) to an `agents/` directory in your extension root.
+
+### <a id="policy-engine"></a>Policy Engine
+
+Extensions can contribute policy rules and safety checkers to the Gemini CLI
+[Policy Engine](../admin/policy-engine.md). These rules are defined in a TOML
+file and take effect when the extension is activated.
+
+To add policies, specify the file path in your `gemini-extension.json`:
+
+```json
+{
+  "name": "my-secure-extension",
+  "version": "1.0.0",
+  "policies": "policies.toml"
+}
+```
+
+Rules contributed by extensions run in the **Extension Tier** (Tier 2). This
+tier has higher priority than the default rules but lower priority than
+workspace-specific or user-defined policies.
+
+> **Warning:** For security, Gemini CLI ignores any `allow` decisions or `yolo`
+> mode configurations in extension policies. This ensures that an extension
+> cannot automatically approve tool calls or bypass security measures without
+> your confirmation.
+
+**Example `policies.toml`**
+
+```toml
+[[rule]]
+toolName = "my_server__dangerous_tool"
+decision = "ask_user"
+priority = 100
+
+[[safety_checker]]
+toolName = "my_server__write_data"
+priority = 200
+[safety_checker.checker]
+type = "in-process"
+name = "allowed-path"
+required_context = ["environment"]
+```
 
 ### Themes
 
