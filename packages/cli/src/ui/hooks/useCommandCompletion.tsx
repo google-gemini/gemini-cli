@@ -120,6 +120,9 @@ export function useCommandCompletion({
           completionStart: tokenInfo.start,
           completionEnd: tokenInfo.end,
           shellTokenIsCommand: tokenInfo.isFirstToken,
+          shellTokens: tokenInfo.tokens,
+          shellCursorIndex: tokenInfo.cursorIndex,
+          shellCommandToken: tokenInfo.commandToken,
         };
       }
       return {
@@ -128,6 +131,9 @@ export function useCommandCompletion({
         completionStart: cursorCol,
         completionEnd: cursorCol,
         shellTokenIsCommand: currentLine.trim().length === 0,
+        shellTokens: [''],
+        shellCursorIndex: 0,
+        shellCommandToken: '',
       };
     }
 
@@ -168,6 +174,9 @@ export function useCommandCompletion({
           completionStart: pathStart,
           completionEnd: end,
           shellTokenIsCommand: false,
+          shellTokens: [],
+          shellCursorIndex: -1,
+          shellCommandToken: '',
         };
       }
     }
@@ -180,6 +189,9 @@ export function useCommandCompletion({
         completionStart: 0,
         completionEnd: currentLine.length,
         shellTokenIsCommand: false,
+        shellTokens: [],
+        shellCursorIndex: -1,
+        shellCommandToken: '',
       };
     }
 
@@ -198,6 +210,9 @@ export function useCommandCompletion({
         completionStart: 0,
         completionEnd: trimmedText.length,
         shellTokenIsCommand: false,
+        shellTokens: [],
+        shellCursorIndex: -1,
+        shellCommandToken: '',
       };
     }
 
@@ -207,6 +222,9 @@ export function useCommandCompletion({
       completionStart: -1,
       completionEnd: -1,
       shellTokenIsCommand: false,
+      shellTokens: [],
+      shellCursorIndex: -1,
+      shellCommandToken: '',
     };
   }, [cursorRow, cursorCol, buffer.lines, buffer.text, shellModeActive]);
 
@@ -230,10 +248,29 @@ export function useCommandCompletion({
     setIsPerfectMatch,
   });
 
+  const { shellTokens, shellCursorIndex, shellCommandToken } = useMemo(() => {
+    if (!shellModeActive) {
+      return { shellTokens: [], shellCursorIndex: -1, shellCommandToken: '' };
+    }
+    const currentLine = buffer.lines[cursorRow] || '';
+    const tokenInfo = getTokenAtCursor(currentLine, cursorCol);
+    if (!tokenInfo) {
+      return { shellTokens: [''], shellCursorIndex: 0, shellCommandToken: '' };
+    }
+    return {
+      shellTokens: tokenInfo.tokens,
+      shellCursorIndex: tokenInfo.cursorIndex,
+      shellCommandToken: tokenInfo.commandToken,
+    };
+  }, [buffer.lines, cursorRow, cursorCol, shellModeActive]);
+
   useShellCompletion({
     enabled: active && completionMode === CompletionMode.SHELL,
     query: query || '',
     isCommandPosition: shellTokenIsCommand,
+    tokens: shellTokens,
+    cursorIndex: shellCursorIndex,
+    commandToken: shellCommandToken,
     cwd,
     setSuggestions,
     setIsLoadingSuggestions,

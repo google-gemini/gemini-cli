@@ -16,8 +16,16 @@ import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
 
 describe('useShellCompletion utilities', () => {
   describe('getTokenAtCursor', () => {
-    it('should return null for empty line', () => {
-      expect(getTokenAtCursor('', 0)).toBeNull();
+    it('should return empty token struct for empty line', () => {
+      expect(getTokenAtCursor('', 0)).toEqual({
+        token: '',
+        start: 0,
+        end: 0,
+        isFirstToken: true,
+        tokens: [''],
+        cursorIndex: 0,
+        commandToken: '',
+      });
     });
 
     it('should extract the first token at cursor position 0', () => {
@@ -27,6 +35,9 @@ describe('useShellCompletion utilities', () => {
         start: 0,
         end: 3,
         isFirstToken: true,
+        tokens: ['git', 'status'],
+        cursorIndex: 0,
+        commandToken: 'git',
       });
     });
 
@@ -37,6 +48,9 @@ describe('useShellCompletion utilities', () => {
         start: 4,
         end: 10,
         isFirstToken: false,
+        tokens: ['git', 'status'],
+        cursorIndex: 1,
+        commandToken: 'git',
       });
     });
 
@@ -47,6 +61,9 @@ describe('useShellCompletion utilities', () => {
         start: 4,
         end: 10,
         isFirstToken: false,
+        tokens: ['git', 'status'],
+        cursorIndex: 1,
+        commandToken: 'git',
       });
     });
 
@@ -57,6 +74,9 @@ describe('useShellCompletion utilities', () => {
         start: 4,
         end: 16,
         isFirstToken: false,
+        tokens: ['cat', 'my file.txt'],
+        cursorIndex: 1,
+        commandToken: 'cat',
       });
     });
 
@@ -67,6 +87,9 @@ describe('useShellCompletion utilities', () => {
         start: 4,
         end: 17,
         isFirstToken: false,
+        tokens: ['cat', 'my file.txt'],
+        cursorIndex: 1,
+        commandToken: 'cat',
       });
     });
 
@@ -77,6 +100,9 @@ describe('useShellCompletion utilities', () => {
         start: 4,
         end: 17,
         isFirstToken: false,
+        tokens: ['cat', 'my file.txt'],
+        cursorIndex: 1,
+        commandToken: 'cat',
       });
     });
 
@@ -87,6 +113,9 @@ describe('useShellCompletion utilities', () => {
         start: 4,
         end: 4,
         isFirstToken: false,
+        tokens: ['git', ''],
+        cursorIndex: 1,
+        commandToken: 'git',
       });
     });
 
@@ -97,6 +126,9 @@ describe('useShellCompletion utilities', () => {
         start: 4,
         end: 12,
         isFirstToken: false,
+        tokens: ['git', 'checkout', 'main'],
+        cursorIndex: 1,
+        commandToken: 'git',
       });
     });
 

@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 import { debugLogger } from '@google/gemini-cli-core';
+import { getArgumentCompletions } from './shell-completions/index.js';
 
 /**
  * Maximum number of suggestions to return to avoid freezing the React Ink UI.
@@ -47,13 +48,19 @@ export interface TokenInfo {
   end: number;
   /** Whether this is the first token (command position). */
   isFirstToken: boolean;
+  /** The fully built list of tokens parsing the string. */
+  tokens: string[];
+  /** The index in the tokens list where the cursor lies. */
+  cursorIndex: number;
+  /** The command token (always tokens[0] if length > 0, otherwise empty string) */
+  commandToken: string;
 }
 
 export function getTokenAtCursor(
   line: string,
   cursorCol: number,
 ): TokenInfo | null {
-  const tokens: Array<{ token: string; start: number; end: number }> = [];
+  const tokensInfo: Array<{ token: string; start: number; end: number }> = [];
   let i = 0;
 
   while (i < line.length) {
@@ -112,22 +119,36 @@ export function getTokenAtCursor(
       i++;
     }
 
-    tokens.push({ token, start: tokenStart, end: i });
+    tokensInfo.push({ token, start: tokenStart, end: i });
   }
 
-  if (tokens.length === 0) {
-    return null;
+  const rawTokens = tokensInfo.map((t) => t.token);
+  const commandToken = rawTokens.length > 0 ? rawTokens[0] : '';
+
+  if (tokensInfo.length === 0) {
+    return {
+      token: '',
+      start: cursorCol,
+      end: cursorCol,
+      isFirstToken: true,
+      tokens: [''],
+      cursorIndex: 0,
+      commandToken: '',
+    };
   }
 
   // Find the token that contains or is immediately adjacent to the cursor
-  for (let idx = 0; idx < tokens.length; idx++) {
-    const t = tokens[idx];
+  for (let idx = 0; idx < tokensInfo.length; idx++) {
+    const t = tokensInfo[idx];
     if (cursorCol >= t.start && cursorCol <= t.end) {
       return {
         token: t.token,
         start: t.start,
         end: t.end,
         isFirstToken: idx === 0,
+        tokens: rawTokens,
+        cursorIndex: idx,
+        commandToken,
       };
     }
   }
@@ -138,7 +159,10 @@ export function getTokenAtCursor(
     token: '',
     start: cursorCol,
     end: cursorCol,
-    isFirstToken: tokens.length === 0,
+    isFirstToken: tokensInfo.length === 0,
+    tokens: [...rawTokens, ''],
+    cursorIndex: rawTokens.length,
+    commandToken,
   };
 }
 
@@ -323,6 +347,12 @@ export interface UseShellCompletionProps {
   query: string;
   /** Whether the token is in command position (first word). */
   isCommandPosition: boolean;
+  /** The full list of parsed tokens */
+  tokens: string[];
+  /** The cursor index in the full list of parsed tokens */
+  cursorIndex: number;
+  /** The root command token */
+  commandToken: string;
   /** The current working directory for path resolution. */
   cwd: string;
   /** Callback to set suggestions on the parent state. */
@@ -335,6 +365,9 @@ export function useShellCompletion({
   enabled,
   query,
   isCommandPosition,
+  tokens,
+  cursorIndex,
+  commandToken,
   cwd,
   setSuggestions,
   setIsLoadingSuggestions,
@@ -395,7 +428,31 @@ export function useShellCompletion({
             description: 'command',
           }));
       } else {
-        results = await resolvePathCompletions(query, cwd, signal);
+        const argumentCompletions = await getArgumentCompletions(
+          commandToken,
+          tokens,
+          cursorIndex,
+          cwd,
+          signal,
+        );
+
+        if (signal.aborted) return;
+
+        if (argumentCompletions?.exclusive) {
+          results = argumentCompletions.suggestions;
+        } else {
+          const pathSuggestions = await resolvePathCompletions(
+            query,
+            cwd,
+            signal,
+          );
+          if (signal.aborted) return;
+
+          results = [
+            ...(argumentCompletions?.suggestions ?? []),
+            ...pathSuggestions,
+          ].slice(0, MAX_SHELL_SUGGESTIONS);
+        }
       }
 
       if (signal.aborted) return;
@@ -424,6 +481,9 @@ export function useShellCompletion({
     enabled,
     query,
     isCommandPosition,
+    tokens,
+    cursorIndex,
+    commandToken,
     cwd,
     setSuggestions,
     setIsLoadingSuggestions,
