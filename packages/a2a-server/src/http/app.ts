@@ -7,8 +7,8 @@
 import express from 'express';
 
 import type { AgentCard, Message } from '@a2a-js/sdk';
+import type { TaskStore } from '@a2a-js/sdk/server';
 import {
-  type TaskStore,
   DefaultRequestHandler,
   InMemoryTaskStore,
   DefaultExecutionEventBus,
@@ -25,13 +25,9 @@ import { loadConfig, loadEnvironment, setTargetDir } from '../config/config.js';
 import { loadSettings } from '../config/settings.js';
 import { loadExtensions } from '../config/extension.js';
 import { commandRegistry } from '../commands/command-registry.js';
-import {
-  debugLogger,
-  SimpleExtensionLoader,
-  GitService,
-} from '@google/gemini-cli-core';
+import { debugLogger, SimpleExtensionLoader } from '@google/gemini-cli-core';
 import type { Command, CommandArgument } from '../commands/types.js';
-import { createAcpRouter } from './acp_handler.js';
+import { GitService } from '@google/gemini-cli-core';
 
 type CommandResponse = {
   name: string;
@@ -92,7 +88,6 @@ async function handleExecuteCommand(
   },
 ) {
   logger.info('[CoreAgent] Received /executeCommand request: ', req.body);
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const { command, args } = req.body;
   try {
     if (typeof command !== 'string') {
@@ -190,7 +185,7 @@ export async function createApp() {
       taskStoreForHandler = inMemoryTaskStore;
     }
 
-    const agentExecutor = new CoderAgentExecutor(taskStoreForExecutor, config);
+    const agentExecutor = new CoderAgentExecutor(taskStoreForExecutor);
 
     const context = { config, git, agentExecutor };
 
@@ -216,7 +211,6 @@ export async function createApp() {
         const agentSettings = req.body.agentSettings as
           | AgentSettings
           | undefined;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const contextId = req.body.contextId || uuidv4();
         const wrapper = await agentExecutor.createTask(
           taskId,
@@ -324,6 +318,7 @@ export async function createApp() {
       }
       res.json({ metadata: await wrapper.task.getMetadata() });
     });
+
     expressApp.post('/reload-agents', async (_req, res) => {
       try {
         logger.info('[CoreAgent] Reloading agent registry...');
@@ -347,9 +342,102 @@ export async function createApp() {
       }
     });
 
-    // ACP/HTTP dual protocol endpoint — bridges AcpHttpAgent ↔ CoderAgentExecutor
-    const acpRouter = createAcpRouter(agentExecutor);
-    expressApp.use('/acp', acpRouter);
+    // --- Raw ACP HTTP Bridge logic ---
+    let childProcess: import('child_process').ChildProcess | null = null;
+    let sseClients: express.Response[] = [];
+
+    const spawnAcpBridge = () => {
+        if (childProcess) return;
+        const spawnArgs = ['--experimental-acp'];
+        const model = (process.env['CODER_AGENT_MODEL'] || process.env['GEMINI_MODEL'] || '').trim();
+        if (model) spawnArgs.push('--model', model);
+        const env = { ...process.env, A2A_SERVER: 'true', GEMINI_YOLO_MODE: 'true' };
+
+        logger.info(`Spawning gemini ${spawnArgs.join(' ')} for ACP bridging`);
+        const cp = require('child_process');
+        const readline = require('readline');
+        const path = require('path');
+        const bundlePath = path.resolve(__dirname, '../../../bundle/gemini.js');
+
+        childProcess = cp.spawn(process.execPath, [bundlePath, ...spawnArgs], {
+            stdio: ['pipe', 'pipe', 'inherit'],
+            env
+        });
+
+        childProcess?.on('error', (err: Error) => {
+            logger.error(`Failed to spawn ACP child process: ${err.message}`);
+        });
+
+        if (childProcess?.stdout) {
+            const rl = readline.createInterface({ input: childProcess.stdout });
+            rl.on('line', (line: string) => {
+                if (!line.trim()) return;
+                try {
+                    const data = JSON.parse(line);
+                    const ssePayload = `data: ${JSON.stringify(data)}\n\n`;
+                    for (const client of sseClients) {
+                        client.write(ssePayload);
+                    }
+                } catch (e) {
+                    logger.error("Invalid JSON from child:", line);
+                }
+            });
+        }
+
+        childProcess?.on('exit', () => {
+            logger.info("ACP Child process exited");
+            childProcess = null;
+            for (const client of sseClients) {
+                client.end();
+            }
+            sseClients = [];
+        });
+    };
+
+    // Eagerly spawn it so there's no cold start
+    spawnAcpBridge();
+
+    expressApp.get('/.well-known/agent-card.json', (req, res) => {
+      res.status(200).json({ "name": "gemini-acp-bridge", "capabilities": {} });
+    });
+
+    expressApp.post('/shutdown', (req, res) => {
+      logger.info("Received /shutdown request");
+      if (childProcess) childProcess.kill();
+      res.status(200).send("OK");
+      setTimeout(() => process.exit(0), 100);
+    });
+
+    expressApp.post('/acp', (req, res) => {
+      if (!childProcess || !childProcess.stdin) {
+        return res.status(500).json({ error: "Agent not connected" });
+      }
+      const payload = JSON.stringify(req.body) + "\n";
+      childProcess.stdin.write(payload);
+      return res.status(200).send("");
+    });
+
+    expressApp.get('/acp/stream', (req, res) => {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      });
+      res.write(': connected\n\n');
+      sseClients.push(res);
+
+      const keepAliveInterval = setInterval(() => {
+          res.write(': keepalive\n\n');
+      }, 15000);
+
+      spawnAcpBridge();
+
+      req.on('close', () => {
+          clearInterval(keepAliveInterval);
+          sseClients = sseClients.filter(c => c !== res);
+          logger.info("An SSE client disconnected. Active clients: " + sseClients.length);
+      });
+    });
 
     return expressApp;
   } catch (error) {

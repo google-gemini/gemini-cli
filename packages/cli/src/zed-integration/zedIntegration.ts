@@ -167,14 +167,25 @@ export class GeminiAgent {
     cwd,
     mcpServers,
   }: acp.NewSessionRequest): Promise<acp.NewSessionResponse> {
+    const t0 = performance.now();
     const sessionId = randomUUID();
     const loadedSettings = loadSettings(cwd);
-    const config = await this.newSessionConfig(
-      sessionId,
-      cwd,
-      mcpServers,
-      loadedSettings,
-    );
+
+    let config: Config;
+    let reusedConfig = false;
+    if (mcpServers.length === 0 && (!cwd || cwd === this.config.getProjectRoot())) {
+      config = this.config;
+      config.setSessionId(sessionId);
+      reusedConfig = true;
+    } else {
+      config = await this.newSessionConfig(
+        sessionId,
+        cwd,
+        mcpServers,
+        loadedSettings,
+      );
+    }
+    const t1 = performance.now();
 
     const authType =
       loadedSettings.merged.security.auth.selectedType || AuthType.USE_GEMINI;
@@ -201,6 +212,7 @@ export class GeminiAgent {
         `Authentication failed: ${e instanceof Error ? e.stack : e}`,
       );
     }
+    const t2 = performance.now();
 
     if (!isAuthenticated) {
       throw new acp.RequestError(
@@ -219,13 +231,19 @@ export class GeminiAgent {
       config.setFileSystemService(acpFileSystemService);
     }
 
-    await config.initialize();
-    startupProfiler.flush(config);
+    if (!reusedConfig) {
+      await config.initialize();
+      startupProfiler.flush(config);
+    }
+    const t3 = performance.now();
 
     const geminiClient = config.getGeminiClient();
     const chat = await geminiClient.startChat();
     const session = new Session(sessionId, chat, config, this.connection);
     this.sessions.set(sessionId, session);
+    const t4 = performance.now();
+
+    console.log(`[Profile] newSession total: ${(t4 - t0).toFixed(2)}ms (newConfig: ${(t1 - t0).toFixed(2)}ms, auth: ${(t2 - t1).toFixed(2)}ms, initConfig(MCP): ${(t3 - t2).toFixed(2)}ms, startChat: ${(t4 - t3).toFixed(2)}ms, reused: ${reusedConfig})`);
 
     return {
       sessionId,
@@ -233,6 +251,11 @@ export class GeminiAgent {
         availableModes: buildAvailableModes(config.isPlanEnabled()),
         currentModeId: config.getApprovalMode(),
       },
+      models: {
+        availableModels: buildAvailableModels(),
+        currentModelId: config.getModel(),
+      },
+      configOptions: buildAvailableConfigOptions()
     };
   }
 
@@ -241,15 +264,25 @@ export class GeminiAgent {
     cwd,
     mcpServers,
   }: acp.LoadSessionRequest): Promise<acp.LoadSessionResponse> {
+    const t0 = performance.now();
     const config = await this.initializeSessionConfig(
       sessionId,
       cwd,
       mcpServers,
     );
+    const t1 = performance.now();
 
     const sessionSelector = new SessionSelector(config);
-    const { sessionData, sessionPath } =
-      await sessionSelector.resolveSession(sessionId);
+    let sessionData: any;
+    let sessionPath: string | undefined;
+    try {
+      const result = await sessionSelector.resolveSession(sessionId);
+      sessionData = result.sessionData;
+      sessionPath = result.sessionPath;
+    } catch (e) {
+      debugLogger.warn(`Session not found on disk, creating empty session for: ${sessionId}`);
+    }
+    const t2 = performance.now();
 
     if (this.clientCapabilities?.fs) {
       const acpFileSystemService = new AcpFileSystemService(
@@ -261,16 +294,22 @@ export class GeminiAgent {
       config.setFileSystemService(acpFileSystemService);
     }
 
-    const { clientHistory } = convertSessionToHistoryFormats(
-      sessionData.messages,
-    );
-
     const geminiClient = config.getGeminiClient();
     await geminiClient.initialize();
-    await geminiClient.resumeChat(clientHistory, {
-      conversation: sessionData,
-      filePath: sessionPath,
-    });
+    const t3 = performance.now();
+    
+    if (sessionData && sessionPath) {
+      const { clientHistory } = convertSessionToHistoryFormats(
+        sessionData.messages,
+      );
+      await geminiClient.resumeChat(clientHistory, {
+        conversation: sessionData,
+        filePath: sessionPath,
+      });
+    } else {
+      await geminiClient.startChat();
+    }
+    const t4 = performance.now();
 
     const session = new Session(
       sessionId,
@@ -280,15 +319,25 @@ export class GeminiAgent {
     );
     this.sessions.set(sessionId, session);
 
-    // Stream history back to client
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    session.streamHistory(sessionData.messages);
+    if (sessionData) {
+      // Stream history back to client
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      session.streamHistory(sessionData.messages);
+    }
+    const t5 = performance.now();
+
+    console.log(`[Profile] loadSession total: ${(t5 - t0).toFixed(2)}ms (initConfig: ${(t1 - t0).toFixed(2)}ms, resolve: ${(t2 - t1).toFixed(2)}ms, geminiInit: ${(t3 - t2).toFixed(2)}ms, resumeChat: ${(t4 - t3).toFixed(2)}ms, sessionWrap: ${(t5 - t4).toFixed(2)}ms)`);
 
     return {
       modes: {
         availableModes: buildAvailableModes(config.isPlanEnabled()),
         currentModeId: config.getApprovalMode(),
       },
+      models: {
+        availableModels: buildAvailableModels(),
+        currentModelId: config.getModel(),
+      },
+      configOptions: buildAvailableConfigOptions()
     };
   }
 
@@ -297,28 +346,40 @@ export class GeminiAgent {
     cwd: string,
     mcpServers: acp.McpServer[],
   ): Promise<Config> {
+    const t0 = performance.now();
     const selectedAuthType = this.settings.merged.security.auth.selectedType;
     if (!selectedAuthType) {
       throw acp.RequestError.authRequired();
     }
 
-    // 1. Create config WITHOUT initializing it (no MCP servers started yet)
-    const config = await this.newSessionConfig(sessionId, cwd, mcpServers);
+    // Try to reuse the global pre-warmed config if there are no session-specific MCP servers
+    // and the CWD is the same (or we don't strictly care about strictly bounding the CWD for MCPs)
+    let config: Config;
+    let reusedConfig = false;
+    if (mcpServers.length === 0 && (!cwd || cwd === this.config.getProjectRoot())) {
+      config = this.config;
+      config.setSessionId(sessionId);
+      reusedConfig = true;
+    } else {
+      config = await this.newSessionConfig(sessionId, cwd, mcpServers);
+    }
+    const t1 = performance.now();
 
-    // 2. Authenticate BEFORE initializing configuration or starting MCP servers.
-    // This satisfies the security requirement to verify the user before executing
-    // potentially unsafe server definitions.
     try {
       await config.refreshAuth(selectedAuthType);
     } catch (e) {
       debugLogger.error(`Authentication failed: ${e}`);
       throw acp.RequestError.authRequired();
     }
+    const t2 = performance.now();
 
-    // 3. Now that we are authenticated, it is safe to initialize the config
-    // which starts the MCP servers and other heavy resources.
-    await config.initialize();
-    startupProfiler.flush(config);
+    if (!reusedConfig) {
+      await config.initialize();
+      startupProfiler.flush(config);
+    }
+    const t3 = performance.now();
+    
+    console.log(`[Profile] initializeSessionConfig total: ${(t3 - t0).toFixed(2)}ms (newConfig: ${(t1 - t0).toFixed(2)}ms, auth: ${(t2 - t1).toFixed(2)}ms, initConfig(MCP): ${(t3 - t2).toFixed(2)}ms, reused: ${reusedConfig})`);
 
     return config;
   }
@@ -383,6 +444,17 @@ export class GeminiAgent {
     await session.cancelPendingPrompt();
   }
 
+  async clearSession(
+    params: acp.ClearSessionRequest,
+  ): Promise<acp.ClearSessionResponse> {
+    const session = this.sessions.get(params.sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${params.sessionId}`);
+    }
+    await session.clear(params.preserveSummary);
+    return {};
+  }
+
   async prompt(params: acp.PromptRequest): Promise<acp.PromptResponse> {
     const session = this.sessions.get(params.sessionId);
     if (!session) {
@@ -399,6 +471,57 @@ export class GeminiAgent {
       throw new Error(`Session not found: ${params.sessionId}`);
     }
     return session.setMode(params.modeId);
+  }
+
+  async unstable_forkSession(params: acp.ForkSessionRequest): Promise<acp.ForkSessionResponse> {
+    throw new acp.RequestError(404, 'Not Implemented: session/fork is not yet supported');
+  }
+
+  async unstable_resumeSession(params: acp.ResumeSessionRequest): Promise<acp.ResumeSessionResponse> {
+    throw new acp.RequestError(404, 'Not Implemented: session/resume is not yet supported');
+  }
+
+  async unstable_listSessions(params: acp.ListSessionsRequest): Promise<acp.ListSessionsResponse> {
+    const sessionSelector = new SessionSelector(this.config);
+    const sessions = await sessionSelector.listSessions();
+
+    const mappedSessions = sessions.map((s) => {
+      // Create a clean display string without the markdown block and extra spacing
+      const cleanedMessage = s.firstUserMessage
+        ? s.firstUserMessage.replace(/```[\s\S]*?```/g, '[Code Block]').replace(/\s+/g, ' ').trim()
+        : 'Empty session';
+
+      const title = cleanedMessage.length > 120 
+        ? cleanedMessage.substring(0, 117) + '...'
+        : cleanedMessage;
+
+      return {
+        sessionId: s.id,
+        title,
+        updatedAt: s.lastUpdated,
+        cwd: this.config.getTargetDir()
+      };
+    });
+
+    return {
+      sessions: mappedSessions
+    };
+  }
+
+  async unstable_setSessionModel(params: acp.SetSessionModelRequest): Promise<acp.SetSessionModelResponse | void> {
+    const session = this.sessions.get(params.sessionId);
+    if (!session) {
+      throw new acp.RequestError(404, `Session not found: ${params.sessionId}`);
+    }
+    session.setModel(params.modelId);
+  }
+
+  async setSessionConfigOption(params: acp.SetSessionConfigOptionRequest): Promise<acp.SetSessionConfigOptionResponse> {
+    const session = this.sessions.get(params.sessionId);
+    if (!session) {
+      throw new acp.RequestError(404, `Session not found: ${params.sessionId}`);
+    }
+    return session.setConfigOption(params.configId, params.value);
   }
 
   async extMethod(method: string, params: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -638,7 +761,6 @@ export class Session {
     private readonly config: Config,
     private readonly connection: acp.AgentSideConnection,
   ) {}
-
   async cancelPendingPrompt(): Promise<void> {
     if (!this.pendingPrompt) {
       throw new Error('Not currently generating');
@@ -646,6 +768,21 @@ export class Session {
 
     this.pendingPrompt.abort();
     this.pendingPrompt = null;
+  }
+
+  async clear(preserveSummary?: string | null): Promise<void> {
+    this.chat.setHistory([]);
+    if (preserveSummary) {
+      this.chat.addHistory({
+        role: 'user',
+        parts: [{ text: preserveSummary }],
+      });
+      // Also add an empty model response so the turn ends correctly
+      this.chat.addHistory({
+        role: 'model',
+        parts: [{ text: 'Context cleared and summary preserved.' }],
+      });
+    }
   }
 
   setMode(modeId: acp.SessionModeId): acp.SetSessionModeResponse {
@@ -657,6 +794,26 @@ export class Session {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     this.config.setApprovalMode(mode.id as ApprovalMode);
     return {};
+  }
+
+  setModel(modelId: string): void {
+    // Determine if the model exists in our known aliases/models
+    const isKnownModel = buildAvailableModels().some(m => m.modelId === modelId);
+    if (!isKnownModel) {
+      // It might be a custom or fallback model; we still allow setting it,
+      // but maybe warn or just proceed since models might be dynamically loaded.
+      debugLogger.warn(`Setting unknown or unverified model: ${modelId}`);
+    }
+    // Make it the active model for this session
+    this.config.setModel(modelId, false);
+  }
+
+  setConfigOption(configId: string, value: unknown): acp.SetSessionConfigOptionResponse {
+    // In the future, this will handle custom CLI session configuration
+    debugLogger.warn(`Received request to set config option ${configId} to ${String(value)} - Not supported yet`);
+    return {
+      configOptions: buildAvailableConfigOptions()
+    };
   }
 
   async streamHistory(messages: ConversationRecord['messages']): Promise<void> {
@@ -1597,4 +1754,33 @@ function buildAvailableModes(isPlanEnabled: boolean): acp.SessionMode[] {
   }
 
   return modes;
+}
+
+function buildAvailableModels(): acp.ModelInfo[] {
+  const models: acp.ModelInfo[] = [];
+  if (VALID_GEMINI_MODELS) {
+    for (const modelId of VALID_GEMINI_MODELS) {
+      const nameParts = modelId.split('-');
+      const capitalizedName = nameParts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+      models.push({ modelId: modelId, name: capitalizedName });
+    }
+  } else if (DEFAULT_MODEL_CONFIGS?.aliases) {
+    for (const [key, val] of Object.entries(DEFAULT_MODEL_CONFIGS.aliases)) {
+      if (key.startsWith('gemini-') && !key.endsWith('-base')) {
+        const modelId = (val as any).modelConfig?.model || key;
+        models.push({ modelId: modelId, name: key });
+      }
+    }
+  }
+  if (models.length === 0) {
+    models.push({ modelId: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' });
+    models.push({ modelId: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' });
+  }
+
+  return Array.from(new Map(models.map((m) => [m.modelId, m])).values());
+}
+
+function buildAvailableConfigOptions(): acp.SessionConfigOption[] {
+  // Not used right now, but returns empty structure to satisfy ACP
+  return [];
 }
