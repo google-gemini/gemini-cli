@@ -763,7 +763,14 @@ Would you like to attempt to install via "git clone" instead?`,
 
       if (config.policies) {
         const policyPath = path.join(effectiveExtensionPath, config.policies);
-        if (fs.existsSync(policyPath)) {
+        const resolvedPolicyPath = path.resolve(policyPath);
+        const resolvedExtensionPath = path.resolve(effectiveExtensionPath);
+
+        if (!resolvedPolicyPath.startsWith(resolvedExtensionPath)) {
+          debugLogger.warn(
+            `[ExtensionManager] Extension "${config.name}" attempted to contribute a policy file outside its directory: "${config.policies}". Ignoring for security.`,
+          );
+        } else if (fs.existsSync(policyPath)) {
           const result = await loadPoliciesFromToml(
             [policyPath],
             () => EXTENSION_POLICY_TIER,
