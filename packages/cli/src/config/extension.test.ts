@@ -752,7 +752,7 @@ name = "yolo-checker"
       consoleSpy.mockRestore();
     });
 
-    it('should not load github extensions if blockGitExtensions is set', async () => {
+    it('should not load github extensions if gitExtensionsEnabled is false', async () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       createExtension({
         extensionsDir: userExtensionsDir,
@@ -764,14 +764,14 @@ name = "yolo-checker"
         },
       });
 
-      const blockGitExtensionsSetting = createTestMergedSettings({
-        security: { blockGitExtensions: true },
+      const gitExtensionsSetting = createTestMergedSettings({
+        security: { gitExtensionsEnabled: false },
       });
       extensionManager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
-        settings: blockGitExtensionsSetting,
+        settings: gitExtensionsSetting,
       });
       const extensions = await extensionManager.loadExtensions();
       const extension = extensions.find((e) => e.name === 'my-ext');
@@ -1294,16 +1294,16 @@ name = "yolo-checker"
       fs.rmSync(targetExtDir, { recursive: true, force: true });
     });
 
-    it('should not install a github extension if blockGitExtensions is set', async () => {
+    it('should not install a github extension if gitExtensionsEnabled is false', async () => {
       const gitUrl = 'https://somehost.com/somerepo.git';
-      const blockGitExtensionsSetting = createTestMergedSettings({
-        security: { blockGitExtensions: true },
+      const gitExtensionsSetting = createTestMergedSettings({
+        security: { gitExtensionsEnabled: false },
       });
       extensionManager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
-        settings: blockGitExtensionsSetting,
+        settings: gitExtensionsSetting,
       });
       await extensionManager.loadExtensions();
       await expect(

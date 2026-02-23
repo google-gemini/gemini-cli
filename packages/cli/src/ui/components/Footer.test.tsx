@@ -153,7 +153,7 @@ describe('<Footer />', () => {
         settings: createMockSettings({
           ui: {
             footer: {
-              hideContextPercentage: false,
+              contextPercentage: true,
             },
           },
         }),
@@ -258,7 +258,7 @@ describe('<Footer />', () => {
         settings: createMockSettings({
           ui: {
             footer: {
-              hideContextPercentage: false,
+              contextPercentage: true,
             },
           },
         }),
@@ -370,7 +370,7 @@ describe('<Footer />', () => {
           settings: createMockSettings({
             ui: {
               footer: {
-                hideContextPercentage: false,
+                contextPercentage: true,
               },
             },
           }),
@@ -390,9 +390,9 @@ describe('<Footer />', () => {
           settings: createMockSettings({
             ui: {
               footer: {
-                hideCWD: true,
-                hideSandboxStatus: true,
-                hideModelInfo: true,
+                cwd: false,
+                sandboxStatus: false,
+                modelInfo: false,
               },
             },
           }),
@@ -412,9 +412,9 @@ describe('<Footer />', () => {
           settings: createMockSettings({
             ui: {
               footer: {
-                hideCWD: false,
-                hideSandboxStatus: false,
-                hideModelInfo: true,
+                cwd: true,
+                sandboxStatus: true,
+                modelInfo: false,
               },
             },
           }),
@@ -434,9 +434,9 @@ describe('<Footer />', () => {
           settings: createMockSettings({
             ui: {
               footer: {
-                hideCWD: true,
-                hideSandboxStatus: false,
-                hideModelInfo: true,
+                cwd: false,
+                sandboxStatus: true,
+                modelInfo: false,
               },
             },
           }),
@@ -447,7 +447,7 @@ describe('<Footer />', () => {
       unmount();
     });
 
-    it('hides the context percentage when hideContextPercentage is true', async () => {
+    it('hides the context percentage when contextPercentage is false', async () => {
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <Footer />,
         {
@@ -456,7 +456,7 @@ describe('<Footer />', () => {
           settings: createMockSettings({
             ui: {
               footer: {
-                hideContextPercentage: true,
+                contextPercentage: false,
               },
             },
           }),
@@ -467,7 +467,7 @@ describe('<Footer />', () => {
       expect(lastFrame()).not.toMatch(/\d+% context left/);
       unmount();
     });
-    it('shows the context percentage when hideContextPercentage is false', async () => {
+    it('shows the context percentage when contextPercentage is true', async () => {
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <Footer />,
         {
@@ -476,7 +476,7 @@ describe('<Footer />', () => {
           settings: createMockSettings({
             ui: {
               footer: {
-                hideContextPercentage: false,
+                contextPercentage: true,
               },
             },
           }),
@@ -496,7 +496,7 @@ describe('<Footer />', () => {
           settings: createMockSettings({
             ui: {
               footer: {
-                hideContextPercentage: false,
+                contextPercentage: true,
               },
             },
           }),

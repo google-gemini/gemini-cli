@@ -199,8 +199,8 @@ describe('SettingsSchema', () => {
         getSettingsSchema().ui.properties.showMemoryUsage.showInDialog,
       ).toBe(true);
       expect(
-        getSettingsSchema().ui.properties.footer.properties
-          .hideContextPercentage.showInDialog,
+        getSettingsSchema().ui.properties.footer.properties.contextPercentage
+          .showInDialog,
       ).toBe(true);
       expect(getSettingsSchema().general.properties.vimMode.showInDialog).toBe(
         true,
@@ -211,18 +211,14 @@ describe('SettingsSchema', () => {
       expect(
         getSettingsSchema().general.properties.enableAutoUpdate.showInDialog,
       ).toBe(true);
-      expect(
-        getSettingsSchema().ui.properties.hideWindowTitle.showInDialog,
-      ).toBe(true);
-      expect(getSettingsSchema().ui.properties.hideTips.showInDialog).toBe(
+      expect(getSettingsSchema().ui.properties.windowTitle.showInDialog).toBe(
         true,
       );
+      expect(getSettingsSchema().ui.properties.tips.showInDialog).toBe(true);
       expect(
         getSettingsSchema().ui.properties.showShortcutsHint.showInDialog,
       ).toBe(true);
-      expect(getSettingsSchema().ui.properties.hideBanner.showInDialog).toBe(
-        true,
-      );
+      expect(getSettingsSchema().ui.properties.banner.showInDialog).toBe(true);
       expect(
         getSettingsSchema().privacy.properties.usageStatisticsEnabled
           .showInDialog,

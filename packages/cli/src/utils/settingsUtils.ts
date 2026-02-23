@@ -470,7 +470,9 @@ export function getDisplayValue(
 
   let valueString = String(value);
 
-  if (definition?.type === 'enum' && definition.options) {
+  if (definition?.type === 'boolean') {
+    valueString = value === true ? 'On' : 'Off';
+  } else if (definition?.type === 'enum' && definition.options) {
     const option = definition.options?.find((option) => option.value === value);
     valueString = option?.label ?? `${value}`;
   }

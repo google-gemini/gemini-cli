@@ -249,6 +249,7 @@ export function SettingsDialog({
       return {
         key,
         label: definition?.label || key,
+        category: definition?.category,
         description: definition?.description,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         type: type as 'boolean' | 'number' | 'string' | 'enum',
@@ -621,6 +622,7 @@ export function SettingsDialog({
       const HELP_TEXT_HEIGHT = 1;
       const RESTART_PROMPT_HEIGHT = showRestartPrompt ? 1 : 0;
       const ITEM_HEIGHT = 3; // Label + description + spacing
+      const HEADER_HEIGHT = 2; // Category Label + spacing
 
       const currentAvailableHeight = availableTerminalHeight - DIALOG_PADDING;
 
@@ -632,13 +634,18 @@ export function SettingsDialog({
         HELP_TEXT_HEIGHT +
         RESTART_PROMPT_HEIGHT;
 
+      // Estimate average number of items per category to account for headers
+      // In the default schema, we have about 10 categories for ~30 settings shown in dialog.
+      // So roughly 1 header per 3 items.
+      const EFFECTIVE_ITEM_HEIGHT = ITEM_HEIGHT + HEADER_HEIGHT / 3;
+
       // Calculate max items with scope selector
       const heightWithScope = baseFixedHeight + SCOPE_SECTION_HEIGHT;
       const availableForItemsWithScope =
         currentAvailableHeight - heightWithScope;
       const maxItemsWithScope = Math.max(
         1,
-        Math.floor(availableForItemsWithScope / ITEM_HEIGHT),
+        Math.floor(availableForItemsWithScope / EFFECTIVE_ITEM_HEIGHT),
       );
 
       // Calculate max items without scope selector
@@ -646,7 +653,7 @@ export function SettingsDialog({
         currentAvailableHeight - baseFixedHeight;
       const maxItemsWithoutScope = Math.max(
         1,
-        Math.floor(availableForItemsWithoutScope / ITEM_HEIGHT),
+        Math.floor(availableForItemsWithoutScope / EFFECTIVE_ITEM_HEIGHT),
       );
 
       // In small terminals, hide scope selector if it would allow more items to show

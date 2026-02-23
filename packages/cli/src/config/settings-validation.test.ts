@@ -35,7 +35,7 @@ describe('settings-validation', () => {
       const invalidSettings = {
         model: {
           name: {
-            skipNextSpeakerCheck: true,
+            nextSpeakerCheck: false,
           },
         },
       };
@@ -116,10 +116,10 @@ describe('settings-validation', () => {
       const validSettings = {
         ui: {
           theme: 'dark',
-          hideWindowTitle: true,
+          windowTitle: false,
           footer: {
-            hideCWD: false,
-            hideModelInfo: true,
+            cwd: true,
+            modelInfo: false,
           },
         },
         tools: {
@@ -305,7 +305,7 @@ describe('settings-validation', () => {
       const invalidSettings = {
         model: {
           name: {
-            skipNextSpeakerCheck: true,
+            nextSpeakerCheck: false,
           },
         },
       };

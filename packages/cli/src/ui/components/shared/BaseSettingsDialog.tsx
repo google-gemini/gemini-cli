@@ -30,6 +30,8 @@ export interface SettingsDialogItem {
   key: string;
   /** Display label */
   label: string;
+  /** Optional category for grouping */
+  category?: string;
   /** Optional description below label */
   description?: string;
   /** Item type for determining interaction behavior */
@@ -485,6 +487,11 @@ export function BaseSettingsDialog({
               const isActive =
                 focusSection === 'settings' && activeIndex === globalIndex;
 
+              const previousItem =
+                globalIndex > 0 ? items[globalIndex - 1] : undefined;
+              const showCategoryHeader =
+                item.category && item.category !== previousItem?.category;
+
               // Compute display value with edit mode cursor
               let displayValue: string;
               if (editingKey === item.key) {
@@ -514,6 +521,27 @@ export function BaseSettingsDialog({
 
               return (
                 <React.Fragment key={item.key}>
+                  {showCategoryHeader && (
+                    <Box
+                      marginX={1}
+                      marginBottom={1}
+                      marginTop={idx === 0 ? 0 : 1}
+                      flexDirection="row"
+                      alignItems="center"
+                      height={1}
+                    >
+                      <Text bold>{item.category} </Text>
+                      <Box
+                        flexGrow={1}
+                        borderStyle="single"
+                        borderTop
+                        borderBottom={false}
+                        borderLeft={false}
+                        borderRight={false}
+                        borderColor={theme.border.default}
+                      />
+                    </Box>
+                  )}
                   <Box marginX={1} flexDirection="row" alignItems="flex-start">
                     <Box minWidth={2} flexShrink={0}>
                       <Text

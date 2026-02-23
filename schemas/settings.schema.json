@@ -53,7 +53,7 @@
           "type": "boolean"
         },
         "defaultApprovalMode": {
-          "title": "Default Approval Mode",
+          "title": "Approval Mode",
           "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.",
           "markdownDescription": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `default`",
           "default": "default",
@@ -68,21 +68,21 @@
           "type": "boolean"
         },
         "enableAutoUpdate": {
-          "title": "Enable Auto Update",
+          "title": "Auto Update",
           "description": "Enable automatic updates.",
           "markdownDescription": "Enable automatic updates.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
         "enableAutoUpdateNotification": {
-          "title": "Enable Auto Update Notification",
+          "title": "Auto Update Notification",
           "description": "Enable update notification prompts.",
           "markdownDescription": "Enable update notification prompts.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
         "enableNotifications": {
-          "title": "Enable Notifications",
+          "title": "Notifications",
           "description": "Enable run-event notifications for action-required prompts and session completion. Currently macOS only.",
           "markdownDescription": "Enable run-event notifications for action-required prompts and session completion. Currently macOS only.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
@@ -96,7 +96,7 @@
           "type": "object",
           "properties": {
             "enabled": {
-              "title": "Enable Checkpointing",
+              "title": "Checkpointing",
               "description": "Enable session checkpointing for recovery",
               "markdownDescription": "Enable session checkpointing for recovery\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `false`",
               "default": false,
@@ -156,14 +156,14 @@
           "type": "object",
           "properties": {
             "enabled": {
-              "title": "Enable Session Cleanup",
+              "title": "Session Cleanup",
               "description": "Enable automatic session cleanup",
               "markdownDescription": "Enable automatic session cleanup\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
               "default": false,
               "type": "boolean"
             },
             "maxAge": {
-              "title": "Keep chat history",
+              "title": "Chat History Period",
               "description": "Automatically delete chats older than this time period (e.g., \"30d\", \"7d\", \"24h\", \"1w\")",
               "markdownDescription": "Automatically delete chats older than this time period (e.g., \"30d\", \"7d\", \"24h\", \"1w\")\n\n- Category: `General`\n- Requires restart: `no`",
               "type": "string"
@@ -249,11 +249,11 @@
             "$ref": "#/$defs/CustomTheme"
           }
         },
-        "hideWindowTitle": {
-          "title": "Hide Window Title",
-          "description": "Hide the window title bar",
-          "markdownDescription": "Hide the window title bar\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+        "windowTitle": {
+          "title": "Window Title",
+          "description": "Show the window title bar",
+          "markdownDescription": "Show the window title bar\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "inlineThinkingMode": {
@@ -265,7 +265,7 @@
           "enum": ["off", "full"]
         },
         "showStatusInTitle": {
-          "title": "Show Thoughts in Title",
+          "title": "Thoughts in Title",
           "description": "Show Gemini CLI model thoughts in the terminal window title during the working phase",
           "markdownDescription": "Show Gemini CLI model thoughts in the terminal window title during the working phase\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
@@ -279,45 +279,45 @@
           "type": "boolean"
         },
         "showHomeDirectoryWarning": {
-          "title": "Show Home Directory Warning",
+          "title": "Home Directory Warning",
           "description": "Show a warning when running Gemini CLI in the home directory.",
           "markdownDescription": "Show a warning when running Gemini CLI in the home directory.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
         "showCompatibilityWarnings": {
-          "title": "Show Compatibility Warnings",
+          "title": "Compatibility Warnings",
           "description": "Show warnings about terminal or OS compatibility issues.",
           "markdownDescription": "Show warnings about terminal or OS compatibility issues.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
-        "hideTips": {
-          "title": "Hide Tips",
-          "description": "Hide helpful tips in the UI",
-          "markdownDescription": "Hide helpful tips in the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+        "tips": {
+          "title": "Tips",
+          "description": "Show helpful tips in the UI",
+          "markdownDescription": "Show helpful tips in the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "showShortcutsHint": {
-          "title": "Show Shortcuts Hint",
+          "title": "Shortcuts Hint",
           "description": "Show the \"? for shortcuts\" hint above the input.",
           "markdownDescription": "Show the \"? for shortcuts\" hint above the input.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
-        "hideBanner": {
-          "title": "Hide Banner",
-          "description": "Hide the application banner",
-          "markdownDescription": "Hide the application banner\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+        "banner": {
+          "title": "Banner",
+          "description": "Show the application banner",
+          "markdownDescription": "Show the application banner\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
-        "hideContextSummary": {
-          "title": "Hide Context Summary",
-          "description": "Hide the context summary (GEMINI.md, MCP servers) above the input.",
-          "markdownDescription": "Hide the context summary (GEMINI.md, MCP servers) above the input.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+        "contextSummary": {
+          "title": "Context Summary",
+          "description": "Show the context summary (GEMINI.md, MCP servers) above the input.",
+          "markdownDescription": "Show the context summary (GEMINI.md, MCP servers) above the input.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "footer": {
@@ -327,88 +327,88 @@
           "default": {},
           "type": "object",
           "properties": {
-            "hideCWD": {
-              "title": "Hide CWD",
-              "description": "Hide the current working directory path in the footer.",
-              "markdownDescription": "Hide the current working directory path in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-              "default": false,
-              "type": "boolean"
-            },
-            "hideSandboxStatus": {
-              "title": "Hide Sandbox Status",
-              "description": "Hide the sandbox status indicator in the footer.",
-              "markdownDescription": "Hide the sandbox status indicator in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-              "default": false,
-              "type": "boolean"
-            },
-            "hideModelInfo": {
-              "title": "Hide Model Info",
-              "description": "Hide the model name and context usage in the footer.",
-              "markdownDescription": "Hide the model name and context usage in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-              "default": false,
-              "type": "boolean"
-            },
-            "hideContextPercentage": {
-              "title": "Hide Context Window Percentage",
-              "description": "Hides the context window remaining percentage.",
-              "markdownDescription": "Hides the context window remaining percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+            "cwd": {
+              "title": "CWD",
+              "description": "Show the current working directory path in the footer.",
+              "markdownDescription": "Show the current working directory path in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
+              "type": "boolean"
+            },
+            "sandboxStatus": {
+              "title": "Sandbox Status",
+              "description": "Show the sandbox status indicator in the footer.",
+              "markdownDescription": "Show the sandbox status indicator in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
+            "modelInfo": {
+              "title": "Model Info",
+              "description": "Show the model name and context usage in the footer.",
+              "markdownDescription": "Show the model name and context usage in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
+            "contextPercentage": {
+              "title": "Context Window Percentage",
+              "description": "Shows the context window remaining percentage.",
+              "markdownDescription": "Shows the context window remaining percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+              "default": false,
               "type": "boolean"
             }
           },
           "additionalProperties": false
         },
-        "hideFooter": {
-          "title": "Hide Footer",
-          "description": "Hide the footer from the UI",
-          "markdownDescription": "Hide the footer from the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+        "footerEnabled": {
+          "title": "Footer",
+          "description": "Show the footer in the UI",
+          "markdownDescription": "Show the footer in the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "showMemoryUsage": {
-          "title": "Show Memory Usage",
+          "title": "Memory Usage",
           "description": "Display memory usage information in the UI",
           "markdownDescription": "Display memory usage information in the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
         "showLineNumbers": {
-          "title": "Show Line Numbers",
+          "title": "Line Numbers",
           "description": "Show line numbers in the chat.",
           "markdownDescription": "Show line numbers in the chat.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
         "showCitations": {
-          "title": "Show Citations",
+          "title": "Citations",
           "description": "Show citations for generated text in the chat.",
           "markdownDescription": "Show citations for generated text in the chat.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
         "showModelInfoInChat": {
-          "title": "Show Model Info In Chat",
+          "title": "Model Info In Chat",
           "description": "Show the model name in the chat for each model turn.",
           "markdownDescription": "Show the model name in the chat for each model turn.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
         "showUserIdentity": {
-          "title": "Show User Identity",
+          "title": "User Identity",
           "description": "Show the logged-in user's identity (e.g. email) in the UI.",
           "markdownDescription": "Show the logged-in user's identity (e.g. email) in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
         "useAlternateBuffer": {
-          "title": "Use Alternate Screen Buffer",
+          "title": "Alternate Screen Buffer",
           "description": "Use an alternate screen buffer for the UI, preserving shell history.",
           "markdownDescription": "Use an alternate screen buffer for the UI, preserving shell history.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
         "useBackgroundColor": {
-          "title": "Use Background Color",
+          "title": "Background Color",
           "description": "Whether to use background colors in the UI.",
           "markdownDescription": "Whether to use background colors in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
@@ -422,7 +422,7 @@
           "type": "boolean"
         },
         "showSpinner": {
-          "title": "Show Spinner",
+          "title": "Spinner",
           "description": "Show the spinner during operations.",
           "markdownDescription": "Show the spinner during operations.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
@@ -489,14 +489,14 @@
       "type": "object",
       "properties": {
         "enabled": {
-          "title": "IDE Mode",
+          "title": "IDE",
           "description": "Enable IDE integration mode.",
           "markdownDescription": "Enable IDE integration mode.\n\n- Category: `IDE`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
         "hasSeenNudge": {
-          "title": "Has Seen IDE Integration Nudge",
+          "title": "IDE Integration Nudge",
           "description": "Whether the user has seen the IDE integration nudge.",
           "markdownDescription": "Whether the user has seen the IDE integration nudge.\n\n- Category: `IDE`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
@@ -513,7 +513,7 @@
       "type": "object",
       "properties": {
         "usageStatisticsEnabled": {
-          "title": "Enable Usage Statistics",
+          "title": "Usage Statistics",
           "description": "Enable collection of usage statistics",
           "markdownDescription": "Enable collection of usage statistics\n\n- Category: `Privacy`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
@@ -582,18 +582,18 @@
           "default": 0.5,
           "type": "number"
         },
-        "disableLoopDetection": {
-          "title": "Disable Loop Detection",
-          "description": "Disable automatic detection and prevention of infinite loops.",
-          "markdownDescription": "Disable automatic detection and prevention of infinite loops.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+        "loopDetection": {
+          "title": "Loop Detection",
+          "description": "Enable automatic detection and prevention of infinite loops.",
+          "markdownDescription": "Enable automatic detection and prevention of infinite loops.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
-        "skipNextSpeakerCheck": {
-          "title": "Skip Next Speaker Check",
-          "description": "Skip the next speaker check.",
-          "markdownDescription": "Skip the next speaker check.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `true`",
-          "default": true,
+        "nextSpeakerCheck": {
+          "title": "Next Speaker Check",
+          "description": "Enable the next speaker check.",
+          "markdownDescription": "Enable the next speaker check.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
           "type": "boolean"
         }
       },
@@ -1187,14 +1187,14 @@
           "type": "string"
         },
         "includeDirectoryTree": {
-          "title": "Include Directory Tree",
+          "title": "Directory Tree",
           "description": "Whether to include the directory tree of the current working directory in the initial request to the model.",
           "markdownDescription": "Whether to include the directory tree of the current working directory in the initial request to the model.\n\n- Category: `Context`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
         "discoveryMaxDirs": {
-          "title": "Memory Discovery Max Dirs",
+          "title": "Discovery Max Dirs",
           "description": "Maximum number of directories to search for memory.",
           "markdownDescription": "Maximum number of directories to search for memory.\n\n- Category: `Context`\n- Requires restart: `no`\n- Default: `200`",
           "default": 200,
@@ -1211,7 +1211,7 @@
           }
         },
         "loadMemoryFromIncludeDirectories": {
-          "title": "Load Memory From Include Directories",
+          "title": "Memory From Include Directories",
           "description": "Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.",
           "markdownDescription": "Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.\n\n- Category: `Context`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
@@ -1225,28 +1225,28 @@
           "type": "object",
           "properties": {
             "respectGitIgnore": {
-              "title": "Respect .gitignore",
+              "title": ".gitignore",
               "description": "Respect .gitignore files when searching.",
               "markdownDescription": "Respect .gitignore files when searching.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
             "respectGeminiIgnore": {
-              "title": "Respect .geminiignore",
+              "title": ".geminiignore",
               "description": "Respect .geminiignore files when searching.",
               "markdownDescription": "Respect .geminiignore files when searching.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
             "enableRecursiveFileSearch": {
-              "title": "Enable Recursive File Search",
+              "title": "Recursive File Search",
               "description": "Enable recursive file search functionality when completing @ references in the prompt.",
               "markdownDescription": "Enable recursive file search functionality when completing @ references in the prompt.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
             "enableFuzzySearch": {
-              "title": "Enable Fuzzy Search",
+              "title": "Fuzzy Search",
               "description": "Enable fuzzy search when searching for files.",
               "markdownDescription": "Enable fuzzy search when searching for files.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
@@ -1289,7 +1289,7 @@
           "type": "object",
           "properties": {
             "enableInteractiveShell": {
-              "title": "Enable Interactive Shell",
+              "title": "Interactive Shell",
               "description": "Use node-pty for an interactive shell experience. Fallback to child_process still applies.",
               "markdownDescription": "Use node-pty for an interactive shell experience. Fallback to child_process still applies.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
@@ -1303,7 +1303,7 @@
               "type": "string"
             },
             "showColor": {
-              "title": "Show Color",
+              "title": "Color",
               "description": "Show color in shell output.",
               "markdownDescription": "Show color in shell output.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `false`",
               "default": false,
@@ -1317,7 +1317,7 @@
               "type": "number"
             },
             "enableShellOutputEfficiency": {
-              "title": "Enable Shell Output Efficiency",
+              "title": "Shell Output Efficiency",
               "description": "Enable shell output efficiency optimizations for better performance.",
               "markdownDescription": "Enable shell output efficiency optimizations for better performance.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
@@ -1366,7 +1366,7 @@
           "type": "string"
         },
         "useRipgrep": {
-          "title": "Use Ripgrep",
+          "title": "Ripgrep",
           "description": "Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.",
           "markdownDescription": "Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
@@ -1379,11 +1379,11 @@
           "default": 40000,
           "type": "number"
         },
-        "disableLLMCorrection": {
-          "title": "Disable LLM Correction",
-          "description": "Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.",
-          "markdownDescription": "Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `true`",
-          "default": true,
+        "llmCorrection": {
+          "title": "LLM Correction",
+          "description": "Enable LLM-based error correction for edit tools. When enabled, tools will attempt to self-correct if exact string matches are not found.",
+          "markdownDescription": "Enable LLM-based error correction for edit tools. When enabled, tools will attempt to self-correct if exact string matches are not found.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
           "type": "boolean"
         }
       },
@@ -1437,31 +1437,31 @@
       "default": {},
       "type": "object",
       "properties": {
-        "disableYoloMode": {
-          "title": "Disable YOLO Mode",
-          "description": "Disable YOLO mode, even if enabled by a flag.",
-          "markdownDescription": "Disable YOLO mode, even if enabled by a flag.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+        "yoloModeAllowed": {
+          "title": "YOLO Mode",
+          "description": "Allow YOLO mode to be used.",
+          "markdownDescription": "Allow YOLO mode to be used.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "enablePermanentToolApproval": {
-          "title": "Allow Permanent Tool Approval",
+          "title": "Permanent Tool Approval",
           "description": "Enable the \"Allow for all future sessions\" option in tool confirmation dialogs.",
           "markdownDescription": "Enable the \"Allow for all future sessions\" option in tool confirmation dialogs.\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
-        "blockGitExtensions": {
-          "title": "Blocks extensions from Git",
-          "description": "Blocks installing and loading extensions from Git.",
-          "markdownDescription": "Blocks installing and loading extensions from Git.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+        "gitExtensionsEnabled": {
+          "title": "Git Extensions",
+          "description": "Allow installing and loading extensions from Git.",
+          "markdownDescription": "Allow installing and loading extensions from Git.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "allowedExtensions": {
           "title": "Extension Source Regex Allowlist",
-          "description": "List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting.",
-          "markdownDescription": "List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `[]`",
+          "description": "List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the gitExtensionsEnabled setting.",
+          "markdownDescription": "List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the gitExtensionsEnabled setting.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `[]`",
           "default": [],
           "type": "array",
           "items": {
@@ -1513,7 +1513,7 @@
               }
             },
             "enabled": {
-              "title": "Enable Environment Variable Redaction",
+              "title": "Environment Variable Redaction",
               "description": "Enable redaction of environment variables that may contain secrets.",
               "markdownDescription": "Enable redaction of environment variables that may contain secrets.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
               "default": false,
@@ -1542,7 +1542,7 @@
               "type": "string"
             },
             "useExternal": {
-              "title": "Use External Auth",
+              "title": "External Auth",
               "description": "Whether to use an external authentication flow.",
               "markdownDescription": "Whether to use an external authentication flow.\n\n- Category: `Security`\n- Requires restart: `yes`",
               "type": "boolean"
@@ -1614,7 +1614,7 @@
           "type": "object",
           "properties": {
             "enabled": {
-              "title": "Enable Tool Output Masking",
+              "title": "Tool Output Masking",
               "description": "Enables tool output masking to save tokens.",
               "markdownDescription": "Enables tool output masking to save tokens.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
@@ -1645,7 +1645,7 @@
           "additionalProperties": false
         },
         "enableAgents": {
-          "title": "Enable Agents",
+          "title": "Agents",
           "description": "Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents",
           "markdownDescription": "Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
@@ -1687,14 +1687,14 @@
           "type": "boolean"
         },
         "useOSC52Paste": {
-          "title": "Use OSC 52 Paste",
+          "title": "OSC 52 Paste",
           "description": "Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).",
           "markdownDescription": "Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
         "useOSC52Copy": {
-          "title": "Use OSC 52 Copy",
+          "title": "OSC 52 Copy",
           "description": "Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).",
           "markdownDescription": "Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
@@ -1803,7 +1803,7 @@
       "type": "object",
       "properties": {
         "enabled": {
-          "title": "Enable Agent Skills",
+          "title": "Agent Skills",
           "description": "Enable Agent Skills.",
           "markdownDescription": "Enable Agent Skills.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
@@ -1830,7 +1830,7 @@
       "type": "object",
       "properties": {
         "enabled": {
-          "title": "Enable Hooks",
+          "title": "Hooks",
           "description": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.",
           "markdownDescription": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,

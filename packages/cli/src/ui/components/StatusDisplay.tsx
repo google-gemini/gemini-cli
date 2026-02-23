@@ -14,11 +14,11 @@ import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
 import { HookStatusDisplay } from './HookStatusDisplay.js';
 
 interface StatusDisplayProps {
-  hideContextSummary: boolean;
+  forceHideContextSummary: boolean;
 }
 
 export const StatusDisplay: React.FC<StatusDisplayProps> = ({
-  hideContextSummary,
+  forceHideContextSummary,
 }) => {
   const uiState = useUIState();
   const settings = useSettings();
@@ -35,7 +35,10 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
     return <HookStatusDisplay activeHooks={uiState.activeHooks} />;
   }
 
-  if (!settings.merged.ui.hideContextSummary && !hideContextSummary) {
+  const showContextSummary =
+    settings.merged.ui.contextSummary && !forceHideContextSummary;
+
+  if (showContextSummary) {
     return (
       <ContextSummaryDisplay
         ideContext={uiState.ideContextState}

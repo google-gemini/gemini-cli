@@ -58,7 +58,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const { showApprovalModeIndicator } = uiState;
   const showUiDetails = uiState.cleanUiDetailsVisible;
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
-  const hideContextSummary =
+  const forceHideContextSummary =
     suggestionsVisible && suggestionsPosition === 'above';
 
   const hasPendingToolConfirmation = useMemo(
@@ -143,7 +143,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const hasMinimalStatusBleedThrough = shouldShowToast(uiState);
 
   const showMinimalContextBleedThrough =
-    !settings.merged.ui.footer.hideContextPercentage &&
+    settings.merged.ui.footer.contextPercentage &&
     isContextUsageHigh(
       uiState.sessionStats.lastPromptTokenCount,
       typeof uiState.currentModel === 'string'
@@ -338,7 +338,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         {showUiDetails && (
           <Box
             justifyContent={
-              settings.merged.ui.hideContextSummary
+              !settings.merged.ui.contextSummary
                 ? 'flex-start'
                 : 'space-between'
             }
@@ -410,7 +410,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
               alignItems={isNarrow ? 'flex-start' : 'flex-end'}
             >
               {!showLoadingIndicator && (
-                <StatusDisplay hideContextSummary={hideContextSummary} />
+                <StatusDisplay
+                  forceHideContextSummary={forceHideContextSummary}
+                />
               )}
             </Box>
           </Box>
@@ -470,7 +472,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       )}
 
       {showUiDetails &&
-        !settings.merged.ui.hideFooter &&
+        settings.merged.ui.footerEnabled &&
         !isScreenReaderEnabled && <Footer />}
     </Box>
   );

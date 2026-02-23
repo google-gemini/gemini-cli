@@ -313,7 +313,7 @@ describe('SettingsDialog', () => {
       expect(output).toContain('Vim Mode');
       expect(output).toContain('Enable Vim keybindings');
       // 'general.enableAutoUpdate' has description 'Enable automatic updates.'
-      expect(output).toContain('Enable Auto Update');
+      expect(output).toContain('Auto Update');
       expect(output).toContain('Enable automatic updates.');
       unmount();
     });
@@ -351,7 +351,7 @@ describe('SettingsDialog', () => {
       await waitUntilReady();
 
       await waitFor(() => {
-        expect(lastFrame()).toContain('Enable Auto Update');
+        expect(lastFrame()).toContain('Auto Update');
       });
 
       // Navigate up
@@ -796,13 +796,13 @@ describe('SettingsDialog', () => {
     it('should show correct display values for settings with different states', async () => {
       const settings = createMockSettings({
         user: {
-          settings: { vimMode: true, hideTips: false },
-          originalSettings: { vimMode: true, hideTips: false },
+          settings: { vimMode: true, tips: true },
+          originalSettings: { vimMode: true, tips: true },
           path: '',
         },
         system: {
-          settings: { hideWindowTitle: true },
-          originalSettings: { hideWindowTitle: true },
+          settings: { windowTitle: false },
+          originalSettings: { windowTitle: false },
           path: '',
         },
         workspace: {
@@ -835,7 +835,7 @@ describe('SettingsDialog', () => {
       );
       await waitUntilReady();
 
-      // Toggle a non-restart-required setting (like hideTips)
+      // Toggle a non-restart-required setting (like tips)
       await act(async () => {
         stdin.write(TerminalKeys.ENTER as string); // Enter - toggle current setting
       });
@@ -884,8 +884,8 @@ describe('SettingsDialog', () => {
     it('should show correct values for inherited settings', async () => {
       const settings = createMockSettings({
         system: {
-          settings: { vimMode: true, hideWindowTitle: false },
-          originalSettings: { vimMode: true, hideWindowTitle: false },
+          settings: { vimMode: true, windowTitle: true },
+          originalSettings: { vimMode: true, windowTitle: true },
           path: '',
         },
       });
@@ -1495,7 +1495,7 @@ describe('SettingsDialog', () => {
 
       await waitFor(() => {
         expect(lastFrame()).toContain('yolo');
-        expect(lastFrame()).toContain('Disable YOLO Mode');
+        expect(lastFrame()).toContain('YOLO Mode');
       });
 
       unmount();
@@ -1586,7 +1586,7 @@ describe('SettingsDialog', () => {
       await waitFor(() => {
         expect(lastFrame()).toContain('nonexistentsetting');
         expect(lastFrame()).not.toContain('Vim Mode'); // Should not contain any settings
-        expect(lastFrame()).not.toContain('Enable Auto Update'); // Should not contain any settings
+        expect(lastFrame()).not.toContain('Auto Update'); // Should not contain any settings
       });
 
       unmount();
@@ -1617,8 +1617,8 @@ describe('SettingsDialog', () => {
             debugKeystrokeLogging: true,
           },
           ui: {
-            hideWindowTitle: true,
-            hideTips: true,
+            windowTitle: false,
+            tips: false,
             showMemoryUsage: true,
             showLineNumbers: true,
             showCitations: true,
@@ -1662,7 +1662,7 @@ describe('SettingsDialog', () => {
           },
           ui: {
             showMemoryUsage: true,
-            hideWindowTitle: false,
+            windowTitle: true,
           },
           tools: {
             truncateToolOutputThreshold: 50000,
@@ -1672,7 +1672,7 @@ describe('SettingsDialog', () => {
           },
           model: {
             maxSessionTurns: 100,
-            skipNextSpeakerCheck: false,
+            nextSpeakerCheck: true,
           },
         },
         systemSettings: {},
@@ -1746,7 +1746,7 @@ describe('SettingsDialog', () => {
           },
           model: {
             maxSessionTurns: 50,
-            skipNextSpeakerCheck: true,
+            nextSpeakerCheck: false,
           },
         },
         systemSettings: {},
@@ -1762,8 +1762,8 @@ describe('SettingsDialog', () => {
             debugKeystrokeLogging: false,
           },
           ui: {
-            hideWindowTitle: false,
-            hideTips: false,
+            windowTitle: true,
+            tips: true,
             showMemoryUsage: false,
             showLineNumbers: false,
             showCitations: false,

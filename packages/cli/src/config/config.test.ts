@@ -1318,12 +1318,12 @@ describe('Approval mode tool exclusion logic', () => {
     expect(excludedTools).not.toContain(WRITE_FILE_TOOL_NAME); // Should be allowed in auto_edit
   });
 
-  it('should throw an error if YOLO mode is attempted when disableYoloMode is true', async () => {
+  it('should throw an error if YOLO mode is attempted when yoloModeAllowed is false', async () => {
     process.argv = ['node', 'script.js', '--yolo'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
       security: {
-        disableYoloMode: true,
+        yoloModeAllowed: false,
       },
     });
 
@@ -1352,7 +1352,7 @@ describe('Approval mode tool exclusion logic', () => {
   it('should fall back to default approval mode if plan mode is requested but not enabled', async () => {
     process.argv = ['node', 'script.js'];
     const settings = createTestMergedSettings({
-      general: {
+      tools: {
         defaultApprovalMode: 'plan',
       },
       experimental: {
@@ -1367,7 +1367,7 @@ describe('Approval mode tool exclusion logic', () => {
   it('should allow plan approval mode if experimental plan is enabled', async () => {
     process.argv = ['node', 'script.js'];
     const settings = createTestMergedSettings({
-      general: {
+      tools: {
         defaultApprovalMode: 'plan',
       },
       experimental: {
@@ -2710,7 +2710,7 @@ describe('loadCliConfig approval mode', () => {
     it('should use approvalMode from settings when no CLI flags are set', async () => {
       process.argv = ['node', 'script.js'];
       const settings = createTestMergedSettings({
-        general: { defaultApprovalMode: 'auto_edit' },
+        tools: { defaultApprovalMode: 'auto_edit' },
       });
       const argv = await parseArguments(settings);
       const config = await loadCliConfig(settings, 'test-session', argv);
@@ -2722,7 +2722,7 @@ describe('loadCliConfig approval mode', () => {
     it('should prioritize --approval-mode flag over settings', async () => {
       process.argv = ['node', 'script.js', '--approval-mode', 'auto_edit'];
       const settings = createTestMergedSettings({
-        general: { defaultApprovalMode: 'default' },
+        tools: { defaultApprovalMode: 'default' },
       });
       const argv = await parseArguments(settings);
       const config = await loadCliConfig(settings, 'test-session', argv);
@@ -2734,7 +2734,7 @@ describe('loadCliConfig approval mode', () => {
     it('should prioritize --yolo flag over settings', async () => {
       process.argv = ['node', 'script.js', '--yolo'];
       const settings = createTestMergedSettings({
-        general: { defaultApprovalMode: 'auto_edit' },
+        tools: { defaultApprovalMode: 'auto_edit' },
       });
       const argv = await parseArguments(settings);
       const config = await loadCliConfig(settings, 'test-session', argv);
@@ -2744,7 +2744,7 @@ describe('loadCliConfig approval mode', () => {
     it('should respect plan mode from settings when experimental.plan is enabled', async () => {
       process.argv = ['node', 'script.js'];
       const settings = createTestMergedSettings({
-        general: { defaultApprovalMode: 'plan' },
+        tools: { defaultApprovalMode: 'plan' },
         experimental: { plan: true },
       });
       const argv = await parseArguments(settings);
@@ -2755,7 +2755,7 @@ describe('loadCliConfig approval mode', () => {
     it('should throw error if plan mode is in settings but experimental.plan is disabled', async () => {
       process.argv = ['node', 'script.js'];
       const settings = createTestMergedSettings({
-        general: { defaultApprovalMode: 'plan' },
+        tools: { defaultApprovalMode: 'plan' },
         experimental: { plan: false },
       });
       const argv = await parseArguments(settings);
@@ -3356,7 +3356,7 @@ describe('Policy Engine Integration in loadCliConfig', () => {
   });
 });
 
-describe('loadCliConfig disableYoloMode', () => {
+describe('loadCliConfig yoloModeAllowed', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
@@ -3377,17 +3377,17 @@ describe('loadCliConfig disableYoloMode', () => {
     process.argv = ['node', 'script.js', '--approval-mode=auto_edit'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
-      security: { disableYoloMode: true },
+      security: { yoloModeAllowed: false },
     });
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getApprovalMode()).toBe(ApprovalMode.AUTO_EDIT);
   });
 
-  it('should throw if YOLO mode is attempted when disableYoloMode is true', async () => {
+  it('should throw if YOLO mode is attempted when yoloModeAllowed is false', async () => {
     process.argv = ['node', 'script.js', '--yolo'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
-      security: { disableYoloMode: true },
+      security: { yoloModeAllowed: false },
     });
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
       'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
@@ -3440,7 +3440,7 @@ describe('loadCliConfig secureModeEnabled', () => {
     );
   });
 
-  it('should set disableYoloMode to true when secureModeEnabled is true', async () => {
+  it('should set disableYoloMode to true in core config when secureModeEnabled is true', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({

@@ -177,7 +177,7 @@ export class ExtensionManager extends ExtensionLoader {
     } else if (
       (installMetadata.type === 'git' ||
         installMetadata.type === 'github-release') &&
-      this.settings.security.blockGitExtensions
+      !this.settings.security.gitExtensionsEnabled
     ) {
       throw new Error(
         'Installing extensions from remote sources is disallowed by your current settings.',
@@ -655,7 +655,7 @@ Would you like to attempt to install via "git clone" instead?`,
     } else if (
       (installMetadata?.type === 'git' ||
         installMetadata?.type === 'github-release') &&
-      this.settings.security.blockGitExtensions
+      !this.settings.security.gitExtensionsEnabled
     ) {
       debugLogger.warn(
         `Failed to load extension ${extensionDir}. Extensions from remote sources is disallowed by your current settings.`,

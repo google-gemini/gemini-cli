@@ -640,7 +640,8 @@ export const AppContainer = (props: AppContainerProps) => {
 
   useEffect(() => {
     if (
-      !(settings.merged.ui.hideBanner || config.getScreenReader()) &&
+      settings.merged.ui.banner &&
+      !config.getScreenReader() &&
       bannerVisible &&
       bannerText
     ) {
@@ -1916,8 +1917,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
   );
 
   useEffect(() => {
-    // Respect hideWindowTitle settings
-    if (settings.merged.ui.hideWindowTitle) return;
+    // Respect windowTitle settings
+    if (!settings.merged.ui.windowTitle) return;
 
     const paddedTitle = computeTerminalTitle({
       streamingState,
@@ -1944,7 +1945,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     shouldShowSilentWorkingTitle,
     settings.merged.ui.showStatusInTitle,
     settings.merged.ui.dynamicWindowTitle,
-    settings.merged.ui.hideWindowTitle,
+    settings.merged.ui.windowTitle,
     config,
     stdout,
   ]);

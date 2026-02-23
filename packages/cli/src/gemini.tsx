@@ -817,7 +817,7 @@ export async function main() {
 }
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
-  if (!settings.merged.ui.hideWindowTitle) {
+  if (settings.merged.ui.windowTitle) {
     // Initial state before React loop starts
     const windowTitle = computeTerminalTitle({
       streamingState: StreamingState.Idle,

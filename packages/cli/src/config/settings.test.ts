@@ -503,21 +503,21 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.security?.folderTrust?.enabled).toBe(true); // System setting should be used
     });
 
-    it('should not allow user or workspace to override system disableYoloMode', () => {
+    it('should not allow user or workspace to override system yoloModeAllowed', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const userSettingsContent = {
         security: {
-          disableYoloMode: false,
+          yoloModeAllowed: true,
         },
       };
       const workspaceSettingsContent = {
         security: {
-          disableYoloMode: false, // This should be ignored
+          yoloModeAllowed: true, // This should be ignored
         },
       };
       const systemSettingsContent = {
         security: {
-          disableYoloMode: true,
+          yoloModeAllowed: false,
         },
       };
 
@@ -534,7 +534,7 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.security?.disableYoloMode).toBe(true); // System setting should be used
+      expect(settings.merged.security?.yoloModeAllowed).toBe(false); // System setting should be used
     });
 
     it.each([
@@ -1948,9 +1948,8 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
-      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
-      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-      setValueSpy.mockClear();
+      const loadedSettings = createMockSettings(userSettingsContent);
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
 
       migrateDeprecatedSettings(loadedSettings, true);
 
@@ -1972,8 +1971,8 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
-      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
-      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      const loadedSettings = createMockSettings(userSettingsContent);
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
 
       migrateDeprecatedSettings(loadedSettings, true);
 
@@ -1985,7 +1984,7 @@ describe('Settings Loading and Merging', () => {
       );
     });
 
-    it('should migrate tools.approvalMode to general.defaultApprovalMode', () => {
+    it('should migrate tools.approvalMode to tools.defaultApprovalMode', () => {
       const userSettingsContent = {
         tools: {
           approvalMode: 'plan',
@@ -2000,14 +1999,14 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
-      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
-      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      const loadedSettings = createMockSettings(userSettingsContent);
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
 
       migrateDeprecatedSettings(loadedSettings, true);
 
       expect(setValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
-        'general',
+        'tools',
         expect.objectContaining({ defaultApprovalMode: 'plan' }),
       );
 
@@ -2019,20 +2018,42 @@ describe('Settings Loading and Merging', () => {
       );
     });
 
-    it('should migrate all 4 inverted boolean settings', () => {
+    it('should migrate all inverted boolean settings to positive logic', () => {
       const userSettingsContent = {
         general: {
           disableAutoUpdate: false,
           disableUpdateNag: true,
         },
+        ui: {
+          hideWindowTitle: true,
+          hideTips: false,
+          hideBanner: true,
+          hideContextSummary: false,
+          hideFooter: true,
+          footer: {
+            hideCWD: true,
+            hideSandboxStatus: false,
+            hideModelInfo: true,
+            hideContextPercentage: false,
+          },
+          accessibility: {
+            disableLoadingPhrases: true,
+          },
+        },
+        model: {
+          disableLoopDetection: true,
+          skipNextSpeakerCheck: false,
+        },
+        tools: {
+          disableLLMCorrection: true,
+        },
+        security: {
+          yoloModeAllowed: false,
+          blockGitExtensions: false,
+        },
         context: {
           fileFiltering: {
             disableFuzzySearch: false,
-          },
-        },
-        ui: {
-          accessibility: {
-            disableLoadingPhrases: true,
           },
         },
       };
@@ -2045,49 +2066,77 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
-      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
-      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      const loadedSettings = createMockSettings(userSettingsContent);
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
 
       migrateDeprecatedSettings(loadedSettings, true);
 
-      // Check that general settings were migrated with inverted values
+      // Verify general migrations
       expect(setValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
         'general',
-        expect.objectContaining({ enableAutoUpdate: true }),
-      );
-      expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
-        'general',
-        expect.objectContaining({ enableAutoUpdateNotification: false }),
-      );
-
-      // Check context.fileFiltering was migrated
-      expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
-        'context',
         expect.objectContaining({
-          fileFiltering: expect.objectContaining({ enableFuzzySearch: true }),
+          enableAutoUpdate: true,
+          enableAutoUpdateNotification: false,
         }),
       );
 
-      // Check ui.accessibility was migrated
+      // Verify UI migrations
       expect(setValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
         'ui',
         expect.objectContaining({
-          accessibility: expect.objectContaining({
-            enableLoadingPhrases: false,
+          windowTitle: false,
+          tips: true,
+          banner: false,
+          contextSummary: true,
+          footerEnabled: false,
+          footer: expect.objectContaining({
+            cwd: false,
+            sandboxStatus: true,
+            modelInfo: false,
+            contextPercentage: true,
           }),
         }),
       );
 
-      // Check that enableLoadingPhrases: false was further migrated to loadingPhrases: 'off'
+      // Verify model migrations
       expect(setValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
-        'ui',
+        'model',
         expect.objectContaining({
-          loadingPhrases: 'off',
+          loopDetection: false,
+          nextSpeakerCheck: true,
+        }),
+      );
+
+      // Verify tools migrations
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'tools',
+        expect.objectContaining({
+          llmCorrection: false,
+        }),
+      );
+
+      // Verify security migrations
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'security',
+        expect.objectContaining({
+          yoloModeAllowed: false,
+          gitExtensionsEnabled: true,
+        }),
+      );
+
+      // Verify context migrations
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'context',
+        expect.objectContaining({
+          fileFiltering: expect.objectContaining({
+            enableFuzzySearch: true,
+          }),
         }),
       );
     });
@@ -2339,8 +2388,8 @@ describe('Settings Loading and Merging', () => {
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
       // Verify it was migrated in memory
-      expect(settings.system.settings.agents?.overrides).toMatchObject({
-        codebase_investigator: {
+      expect(settings.system.settings.experimental).toMatchObject({
+        codebaseInvestigator: {
           enabled: true,
         },
       });
@@ -2360,7 +2409,7 @@ describe('Settings Loading and Merging', () => {
       );
     });
 
-    it('should migrate experimental agent settings to agents overrides', () => {
+    it('should migrate experimental agent settings to new experimental keys', () => {
       const userSettingsContent = {
         experimental: {
           codebaseInvestigatorSettings: {
@@ -2387,9 +2436,9 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
-      // Verify migration to agents.overrides
-      expect(settings.user.settings.agents?.overrides).toMatchObject({
-        codebase_investigator: {
+      // Verify migration to new experimental keys
+      expect(settings.user.settings.experimental).toMatchObject({
+        codebaseInvestigator: {
           enabled: true,
           runConfig: {
             maxTurns: 15,
@@ -2404,7 +2453,7 @@ describe('Settings Loading and Merging', () => {
             },
           },
         },
-        cli_help: {
+        cliHelp: {
           enabled: false,
         },
       });
@@ -2988,120 +3037,120 @@ MALICIOUS_VAR=allowed-because-trusted
       });
     });
   });
-});
 
-describe('LoadedSettings Isolation and Serializability', () => {
-  let loadedSettings: LoadedSettings;
+  describe('LoadedSettings Isolation and Serializability', () => {
+    let loadedSettings: LoadedSettings;
 
-  interface TestData {
-    a: {
-      b: number;
-    };
-  }
-
-  beforeEach(() => {
-    vi.resetAllMocks();
-
-    // Create a minimal LoadedSettings instance
-    const emptyScope = {
-      path: '/mock/settings.json',
-      settings: {},
-      originalSettings: {},
-    } as unknown as SettingsFile;
-
-    loadedSettings = new LoadedSettings(
-      emptyScope, // system
-      emptyScope, // systemDefaults
-      { ...emptyScope }, // user
-      emptyScope, // workspace
-      true, // isTrusted
-    );
-  });
-
-  describe('setValue Isolation', () => {
-    it('should isolate state between settings and originalSettings', () => {
-      const complexValue: TestData = { a: { b: 1 } };
-      loadedSettings.setValue(SettingScope.User, 'test', complexValue);
-
-      const userSettings = loadedSettings.forScope(SettingScope.User);
-      const settingsValue = (userSettings.settings as Record<string, unknown>)[
-        'test'
-      ] as TestData;
-      const originalValue = (
-        userSettings.originalSettings as Record<string, unknown>
-      )['test'] as TestData;
-
-      // Verify they are equal but different references
-      expect(settingsValue).toEqual(complexValue);
-      expect(originalValue).toEqual(complexValue);
-      expect(settingsValue).not.toBe(complexValue);
-      expect(originalValue).not.toBe(complexValue);
-      expect(settingsValue).not.toBe(originalValue);
-
-      // Modify the in-memory setting object
-      settingsValue.a.b = 2;
-
-      // originalSettings should NOT be affected
-      expect(originalValue.a.b).toBe(1);
-    });
-
-    it('should not share references between settings and originalSettings (original servers test)', () => {
-      const mcpServers = {
-        'test-server': { command: 'echo' },
+    interface TestData {
+      a: {
+        b: number;
       };
+    }
 
-      loadedSettings.setValue(SettingScope.User, 'mcpServers', mcpServers);
+    beforeEach(() => {
+      vi.resetAllMocks();
 
-      // Modify the original object
-      delete (mcpServers as Record<string, unknown>)['test-server'];
+      // Create a minimal LoadedSettings instance
+      const emptyScope = {
+        path: '/mock/settings.json',
+        settings: {},
+        originalSettings: {},
+      } as unknown as SettingsFile;
 
-      // The settings in LoadedSettings should still have the server
-      const userSettings = loadedSettings.forScope(SettingScope.User);
-      expect(
-        (userSettings.settings.mcpServers as Record<string, unknown>)[
-          'test-server'
-        ],
-      ).toBeDefined();
-      expect(
-        (userSettings.originalSettings.mcpServers as Record<string, unknown>)[
-          'test-server'
-        ],
-      ).toBeDefined();
-
-      // They should also be different objects from each other
-      expect(userSettings.settings.mcpServers).not.toBe(
-        userSettings.originalSettings.mcpServers,
+      loadedSettings = new LoadedSettings(
+        emptyScope, // system
+        emptyScope, // systemDefaults
+        { ...emptyScope }, // user
+        emptyScope, // workspace
+        true, // isTrusted
       );
     });
-  });
 
-  describe('setValue Serializability', () => {
-    it('should preserve Map/Set types (via structuredClone)', () => {
-      const mapValue = { myMap: new Map([['key', 'value']]) };
-      loadedSettings.setValue(SettingScope.User, 'test', mapValue);
+    describe('setValue Isolation', () => {
+      it('should isolate state between settings and originalSettings', () => {
+        const complexValue: TestData = { a: { b: 1 } };
+        loadedSettings.setValue(SettingScope.User, 'test', complexValue);
 
-      const userSettings = loadedSettings.forScope(SettingScope.User);
-      const settingsValue = (userSettings.settings as Record<string, unknown>)[
-        'test'
-      ] as { myMap: Map<string, string> };
+        const userSettings = loadedSettings.forScope(SettingScope.User);
+        const settingsValue = (
+          userSettings.settings as Record<string, unknown>
+        )['test'] as TestData;
+        const originalValue = (
+          userSettings.originalSettings as Record<string, unknown>
+        )['test'] as TestData;
 
-      // Map is preserved by structuredClone
-      expect(settingsValue.myMap).toBeInstanceOf(Map);
-      expect(settingsValue.myMap.get('key')).toBe('value');
+        // Verify they are equal but different references
+        expect(settingsValue).toEqual(complexValue);
+        expect(originalValue).toEqual(complexValue);
+        expect(settingsValue).not.toBe(complexValue);
+        expect(originalValue).not.toBe(complexValue);
+        expect(settingsValue).not.toBe(originalValue);
 
-      // But it should be a different reference
-      expect(settingsValue.myMap).not.toBe(mapValue.myMap);
+        // Modify the in-memory setting object
+        settingsValue.a.b = 2;
+
+        // originalSettings should NOT be affected
+        expect(originalValue.a.b).toBe(1);
+      });
+
+      it('should not share references between settings and originalSettings (original servers test)', () => {
+        const mcpServers = {
+          'test-server': { command: 'echo' },
+        };
+
+        loadedSettings.setValue(SettingScope.User, 'mcpServers', mcpServers);
+
+        // Modify the original object
+        delete (mcpServers as Record<string, unknown>)['test-server'];
+
+        // The settings in LoadedSettings should still have the server
+        const userSettings = loadedSettings.forScope(SettingScope.User);
+        expect(
+          (userSettings.settings.mcpServers as Record<string, unknown>)[
+            'test-server'
+          ],
+        ).toBeDefined();
+        expect(
+          (userSettings.originalSettings.mcpServers as Record<string, unknown>)[
+            'test-server'
+          ],
+        ).toBeDefined();
+
+        // They should also be different objects from each other
+        expect(userSettings.settings.mcpServers).not.toBe(
+          userSettings.originalSettings.mcpServers,
+        );
+      });
     });
 
-    it('should handle circular references (structuredClone supports them, but deepMerge may not)', () => {
-      const circular: Record<string, unknown> = { a: 1 };
-      circular['self'] = circular;
+    describe('setValue Serializability', () => {
+      it('should preserve Map/Set types (via structuredClone)', () => {
+        const mapValue = { myMap: new Map([['key', 'value']]) };
+        loadedSettings.setValue(SettingScope.User, 'test', mapValue);
 
-      // structuredClone(circular) works, but LoadedSettings.setValue calls
-      // computeMergedSettings() -> customDeepMerge() which blows up on circularity.
-      expect(() => {
-        loadedSettings.setValue(SettingScope.User, 'test', circular);
-      }).toThrow(/Maximum call stack size exceeded/);
+        const userSettings = loadedSettings.forScope(SettingScope.User);
+        const settingsValue = (
+          userSettings.settings as Record<string, unknown>
+        )['test'] as { myMap: Map<string, string> };
+
+        // Map is preserved by structuredClone
+        expect(settingsValue.myMap).toBeInstanceOf(Map);
+        expect(settingsValue.myMap.get('key')).toBe('value');
+
+        // But it should be a different reference
+        expect(settingsValue.myMap).not.toBe(mapValue.myMap);
+      });
+
+      it('should handle circular references (structuredClone supports them, but deepMerge may not)', () => {
+        const circular: Record<string, unknown> = { a: 1 };
+        circular['self'] = circular;
+
+        // structuredClone(circular) works, but LoadedSettings.setValue calls
+        // computeMergedSettings() -> customDeepMerge() which blows up on circularity.
+        expect(() => {
+          loadedSettings.setValue(SettingScope.User, 'test', circular);
+        }).toThrow(/Maximum call stack size exceeded/);
+      });
     });
   });
 });
