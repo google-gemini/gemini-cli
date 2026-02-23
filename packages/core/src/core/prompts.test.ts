@@ -89,9 +89,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
-        getProjectTempPlansDir: vi
-          .fn()
-          .mockReturnValue('/tmp/project-temp/plans'),
+        getPlansDir: vi.fn().mockReturnValue('/tmp/project-temp/plans'),
       },
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
@@ -218,6 +216,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).not.toContain('No sub-agents are currently available.');
     expect(prompt).toContain('# Core Mandates');
     expect(prompt).toContain('- **Conventions:**');
+    expect(prompt).toContain('- **User Hints:**');
     expect(prompt).toContain('# Outside of Sandbox');
     expect(prompt).toContain('# Final Reminder');
     expect(prompt).toMatchSnapshot();
@@ -227,6 +226,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
     const prompt = getCoreSystemPrompt(mockConfig);
     expect(prompt).toContain('You are Gemini CLI, an interactive CLI agent'); // Check for core content
+    expect(prompt).toContain('- **User Hints:**');
     expect(prompt).toContain('No Chitchat:');
     expect(prompt).toMatchSnapshot();
   });
@@ -507,9 +507,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
           ApprovalMode.PLAN,
         );
-        vi.mocked(mockConfig.storage.getProjectTempPlansDir).mockReturnValue(
-          '/tmp/plans',
-        );
+        vi.mocked(mockConfig.storage.getPlansDir).mockReturnValue('/tmp/plans');
       });
 
       it('should include approved plan path when set in config', () => {

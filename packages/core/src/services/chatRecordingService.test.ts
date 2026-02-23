@@ -86,6 +86,21 @@ describe('ChatRecordingService', () => {
       expect(files[0]).toMatch(/^session-.*-test-ses\.json$/);
     });
 
+    it('should include the conversation kind when specified', () => {
+      chatRecordingService.initialize(undefined, 'subagent');
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'ping',
+        model: 'm',
+      });
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const conversation = JSON.parse(
+        fs.readFileSync(sessionFile, 'utf8'),
+      ) as ConversationRecord;
+      expect(conversation.kind).toBe('subagent');
+    });
+
     it('should resume from an existing session if provided', () => {
       const chatsDir = path.join(testTempDir, 'chats');
       fs.mkdirSync(chatsDir, { recursive: true });
@@ -743,6 +758,38 @@ describe('ChatRecordingService', () => {
       expect(result).toHaveLength(2);
       expect(result[0].text).toBe('Prefix metadata or text');
       expect(result[1].functionResponse!.id).toBe(callId);
+    });
+  });
+
+  describe('ENOENT (missing directory) handling', () => {
+    it('should ensure directory exists before writing conversation file', () => {
+      chatRecordingService.initialize();
+
+      const mkdirSyncSpy = vi.spyOn(fs, 'mkdirSync');
+      const writeFileSyncSpy = vi.spyOn(fs, 'writeFileSync');
+
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Hello after dir cleanup',
+        model: 'gemini-pro',
+      });
+
+      // mkdirSync should be called with the parent directory and recursive option
+      const conversationFile = chatRecordingService.getConversationFilePath()!;
+      expect(mkdirSyncSpy).toHaveBeenCalledWith(
+        path.dirname(conversationFile),
+        { recursive: true },
+      );
+
+      // mkdirSync should be called before writeFileSync
+      const mkdirCallOrder = mkdirSyncSpy.mock.invocationCallOrder;
+      const writeCallOrder = writeFileSyncSpy.mock.invocationCallOrder;
+      const lastMkdir = mkdirCallOrder[mkdirCallOrder.length - 1];
+      const lastWrite = writeCallOrder[writeCallOrder.length - 1];
+      expect(lastMkdir).toBeLessThan(lastWrite);
+
+      mkdirSyncSpy.mockRestore();
+      writeFileSyncSpy.mockRestore();
     });
   });
 });

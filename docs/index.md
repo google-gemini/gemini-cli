@@ -30,6 +30,8 @@ User-focused guides and tutorials for daily development workflows.
 
 - **[File management](./cli/tutorials/file-management.md):** How to work with
   local files and directories.
+- **[Get started with Agent skills](./cli/tutorials/skills-getting-started.md):**
+  Getting started with specialized expertise.
 - **[Manage context and memory](./cli/tutorials/memory-management.md):**
   Managing persistent instructions and facts.
 - **[Execute shell commands](./cli/tutorials/shell-commands.md):** Executing
@@ -40,46 +42,14 @@ User-focused guides and tutorials for daily development workflows.
   complex workflows.
 - **[Web search and fetch](./cli/tutorials/web-tools.md):** Searching and
   fetching content from the web.
-- **[Get started with skills](./cli/tutorials/skills-getting-started.md):**
-  Getting started with specialized expertise.
+- **[Set up an MCP server](./cli/tutorials/mcp-setup.md):** Set up an MCP
+  server.
+- **[Automate tasks](./cli/tutorials/automation.md):** Automate tasks.
 
 ## Features
 
-Technical reference documentation for each capability of Gemini CLI.
+Technical documentation for each capability of Gemini CLI.
 
-- **[/about](./cli/commands.md#about):** About Gemini CLI.
-- **[/auth](./get-started/authentication.md):** Authentication.
-- **[/bug](./cli/commands.md#bug):** Report a bug.
-- **[/chat](./cli/commands.md#chat):** Chat history.
-- **[/clear](./cli/commands.md#clear):** Clear screen.
-- **[/compress](./cli/commands.md#compress):** Compress context.
-- **[/copy](./cli/commands.md#copy):** Copy output.
-- **[/directory](./cli/commands.md#directory-or-dir):** Manage workspace.
-- **[/docs](./cli/commands.md#docs):** Open documentation.
-- **[/editor](./cli/commands.md#editor):** Select editor.
-- **[/extensions](./extensions/index.md):** Manage extensions.
-- **[/help](./cli/commands.md#help-or):** Show help.
-- **[/hooks](./hooks/index.md):** Hooks.
-- **[/ide](./ide-integration/index.md):** IDE integration.
-- **[/init](./cli/commands.md#init):** Initialize context.
-- **[/mcp](./tools/mcp-server.md):** MCP servers.
-- **[/memory](./cli/commands.md#memory):** Manage memory.
-- **[/model](./cli/model.md):** Model selection.
-- **[/policies](./cli/commands.md#policies):** Manage policies.
-- **[/privacy](./cli/commands.md#privacy):** Privacy notice.
-- **[/quit](./cli/commands.md#quit-or-exit):** Exit CLI.
-- **[/restore](./cli/checkpointing.md):** Restore files.
-- **[/resume](./cli/commands.md#resume):** Resume session.
-- **[/rewind](./cli/rewind.md):** Rewind.
-- **[/settings](./cli/settings.md):** Settings.
-- **[/setup-github](./cli/commands.md#setup-github):** GitHub setup.
-- **[/shells](./cli/commands.md#shells-or-bashes):** Manage processes.
-- **[/skills](./cli/skills.md):** Agent skills.
-- **[/stats](./cli/commands.md#stats):** Session statistics.
-- **[/terminal-setup](./cli/commands.md#terminal-setup):** Terminal keybindings.
-- **[/theme](./cli/themes.md):** Themes.
-- **[/tools](./cli/commands.md#tools):** List tools.
-- **[/vim](./cli/commands.md#vim):** Vim mode.
 - **[Activate skill (tool)](./tools/activate-skill.md):** Internal mechanism for
   loading expert procedures.
 - **[Ask user (tool)](./tools/ask-user.md):** Internal dialog system for
@@ -92,8 +62,12 @@ Technical reference documentation for each capability of Gemini CLI.
   lookup for CLI features.
 - **[Memory (tool)](./tools/memory.md):** Storage details for persistent facts.
 - **[Model routing](./cli/model-routing.md):** Automatic fallback resilience.
-- **[Plan mode (experimental)](./cli/plan-mode.md):** Use a safe, read-only mode
-  for planning complex changes.
+- **[Plan mode 🧪](./cli/plan-mode.md):** Use a safe, read-only mode for
+  planning complex changes.
+- **[Subagents 🧪](./core/subagents.md):** Using specialized agents for specific
+  tasks.
+- **[Remote subagents 🧪](./core/remote-agents.md):** Connecting to and using
+  remote agents.
 - **[Sandboxing](./cli/sandbox.md):** Isolate tool execution.
 - **[Shell (tool)](./tools/shell.md):** Detailed system execution parameters.
 - **[Telemetry](./cli/telemetry.md):** Usage and performance metric details.
@@ -127,20 +101,42 @@ Settings and customization options for Gemini CLI.
 
 Deep technical documentation and API specifications.
 
-- **[Architecture overview](./architecture.md):** System design and components.
-- **[Command reference](./cli/commands.md):** Detailed slash command guide.
-- **[Configuration reference](./get-started/configuration.md):** Settings and
+- **[Command reference](./reference/commands.md):** Detailed slash command
+  guide.
+- **[Configuration reference](./reference/configuration.md):** Settings and
   environment variables.
-- **[Core concepts](./core/concepts.md):** Fundamental terminology and
-  definitions.
-- **[Keyboard shortcuts](./cli/keyboard-shortcuts.md):** Productivity tips.
-- **[Policy engine](./core/policy-engine.md):** Fine-grained execution control.
+- **[Keyboard shortcuts](./reference/keyboard-shortcuts.md):** Productivity
+  tips.
+- **[Memory import processor](./reference/memport.md):** How Gemini CLI
+  processes memory from various sources.
+- **[Policy engine](./reference/policy-engine.md):** Fine-grained execution
+  control.
+- **[Tools API](./reference/tools-api.md):** The API for defining and using
+  tools.
 
 ## Resources
 
 Support, release history, and legal information.
 
-- **[FAQ](./faq.md):** Answers to frequently asked questions.
+- **[FAQ](./resources/faq.md):** Answers to frequently asked questions.
 - **[Changelogs](./changelogs/index.md):** Highlights and notable changes.
-- **[Quota and pricing](./quota-and-pricing.md):** Limits and billing details.
-- **[Terms and privacy](./tos-privacy.md):** Official notices and terms.
+- **[Quota and pricing](./resources/quota-and-pricing.md):** Limits and billing
+  details.
+- **[Terms and privacy](./resources/tos-privacy.md):** Official notices and
+  terms.
+
+## Development
+
+- **[Contribution guide](/docs/contributing):** How to contribute to Gemini CLI.
+- **[Integration testing](./integration-tests.md):** Running integration tests.
+- **[Issue and PR automation](./issue-and-pr-automation.md):** Automation for
+  issues and pull requests.
+- **[Local development](./local-development.md):** Setting up a local
+  development environment.
+- **[NPM package structure](./npm.md):** The structure of the NPM packages.
+
+## Releases
+
+- **[Release notes](./changelogs/index.md):** Release notes for all versions.
+- **[Stable release](./changelogs/latest.md):** The latest stable release.
+- **[Preview release](./changelogs/preview.md):** The latest preview release.

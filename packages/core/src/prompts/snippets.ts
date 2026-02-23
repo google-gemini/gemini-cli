@@ -192,7 +192,7 @@ Use the following guidelines to optimize your search and read patterns.
 - **Searching:** utilize search tools like ${GREP_TOOL_NAME} and ${GLOB_TOOL_NAME} with a conservative result count (\`total_max_matches\`) and a narrow scope (\`include\` and \`exclude\` parameters).
 - **Searching and editing:** utilize search tools like ${GREP_TOOL_NAME} with a conservative result count and a narrow scope. Use \`context\`, \`before\`, and/or \`after\` to request enough context to avoid the need to read the file before editing matches.
 - **Understanding:** minimize turns needed to understand a file. It's most efficient to read small files in their entirety.
-- **Large files:** utilize search tools like ${GREP_TOOL_NAME} and/or ${READ_FILE_TOOL_NAME} called in parallel with an offset and a limit to reduce the impact on context. Minmize extra turns, unless unavoidable due to the file being too large.
+- **Large files:** utilize search tools like ${GREP_TOOL_NAME} and/or ${READ_FILE_TOOL_NAME} called in parallel with 'start_line' and 'end_line' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
 
@@ -204,6 +204,7 @@ Use the following guidelines to optimize your search and read patterns.
 - **Expertise & Intent Alignment:** Provide proactive technical opinions grounded in research while strictly adhering to the user's intended workflow. Distinguish between **Directives** (unambiguous requests for action or implementation) and **Inquiries** (requests for analysis, advice, or observations). Assume all requests are Inquiries unless they contain an explicit instruction to perform a task. For Inquiries, your scope is strictly limited to research and analysis; you may propose a solution or strategy, but you MUST NOT modify files until a corresponding Directive is issued. Do not initiate implementation based on observations of bugs or statements of fact. Once an Inquiry is resolved, or while waiting for a Directive, stop and wait for the next user instruction. ${options.interactive ? 'For Directives, only clarify if critically underspecified; otherwise, work autonomously.' : 'For Directives, you must work autonomously as no further user input is available.'} You should only seek user intervention if you have exhausted all possible routes or if a proposed solution would take the workspace in a significantly different architectural direction.
 - **Proactiveness:** When executing a Directive, persist through errors and obstacles by diagnosing failures in the execution phase and, if necessary, backtracking to the research or strategy phases to adjust your approach until a successful, verified outcome is achieved. Fulfill the user's request thoroughly, including adding tests when adding features or fixing bugs. Take reasonable liberties to fulfill broad goals while staying within the requested scope; however, prioritize simplicity and the removal of redundant logic over providing "just-in-case" alternatives that diverge from the established path.
 - **Testing:** ALWAYS search for and update related tests after making a code change. You must add a new test case to the existing test file (if one exists) or create a new test file to verify your changes.${mandateConflictResolution(options.hasHierarchicalMemory)}
+- **User Hints:** During execution, the user may provide real-time hints (marked as "User hint:" or "User hints:"). Treat these as high-priority but scope-preserving course corrections: apply the minimal plan change needed, keep unaffected user tasks active, and never cancel/skip tasks unless cancellation is explicit for those tasks. Hints may add new tasks, modify one or more tasks, cancel specific tasks, or provide extra context only. If scope is ambiguous, ask for clarification before dropping work.
 - ${mandateConfirm(options.interactive)}
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}
@@ -459,7 +460,7 @@ ${options.planModeToolsList}
 </available_tools>
 
 ## Rules
-1. **Read-Only:** You cannot modify source code. You may ONLY use read-only tools to explore, and you can only write to \`${options.plansDir}/\`.
+1. **Read-Only:** You cannot modify source code. You may ONLY use read-only tools to explore, and you can only write to \`${options.plansDir}/\`. If the user asks you to modify source code directly, you MUST explain that you are in Plan Mode and must first create a detailed plan in the plans directory and get approval before any source code changes can be made.
 2. **Efficiency:** Autonomously combine discovery and drafting phases to minimize conversational turns. If the request is ambiguous, use ${formatToolName(ASK_USER_TOOL_NAME)} to clarify. Otherwise, explore the codebase and write the draft in one fluid motion.
 3. **Inquiries and Directives:** Distinguish between Inquiries and Directives to minimize unnecessary planning.
    - **Inquiries:** If the request is an **Inquiry** (e.g., "How does X work?"), use read-only tools to explore and answer directly in your chat response. DO NOT create a plan or call ${formatToolName(
@@ -467,6 +468,9 @@ ${options.planModeToolsList}
    )}.
    - **Directives:** If the request is a **Directive** (e.g., "Fix bug Y"), follow the workflow below to create and approve a plan.
 4. **Plan Storage:** Save plans as Markdown (.md) using descriptive filenames (e.g., \`feature-x.md\`).
+5. **Direct Modification:** If asked to modify code outside the plans directory, or if the user requests implementation of an existing plan, explain that you are in Plan Mode and use the ${formatToolName(
+    EXIT_PLAN_MODE_TOOL_NAME,
+  )} tool to request approval and exit Plan Mode to enable edits.
 
 ## Required Plan Structure
 When writing the plan file, you MUST include the following structure:

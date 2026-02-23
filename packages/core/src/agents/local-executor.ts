@@ -33,6 +33,7 @@ import {
 import {
   AgentStartEvent,
   AgentFinishEvent,
+  LlmRole,
   RecoveryAttemptEvent,
 } from '../telemetry/types.js';
 import type {
@@ -47,6 +48,7 @@ import {
   DEFAULT_MAX_TURNS,
   DEFAULT_MAX_TIME_MINUTES,
 } from './types.js';
+import { getErrorMessage } from '../utils/errors.js';
 import { templateString } from './utils.js';
 import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
@@ -59,7 +61,7 @@ import { getVersion } from '../utils/version.js';
 import { getToolCallContext } from '../utils/toolCallContext.js';
 import { scheduleAgentTools } from './agent-scheduler.js';
 import { DeadlineTimer } from '../utils/deadlineTimer.js';
-import { LlmRole } from '../telemetry/types.js';
+import { formatUserHintsForModel } from '../utils/fastAckHelper.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -463,45 +465,82 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       const query = this.definition.promptConfig.query
         ? templateString(this.definition.promptConfig.query, augmentedInputs)
         : DEFAULT_QUERY_STRING;
-      let currentMessage: Content = { role: 'user', parts: [{ text: query }] };
 
-      while (true) {
-        // Check for termination conditions like max turns.
-        const reason = this.checkTermination(turnCounter, maxTurns);
-        if (reason) {
-          terminateReason = reason;
-          break;
-        }
+      const pendingHintsQueue: string[] = [];
+      const hintListener = (hint: string) => {
+        pendingHintsQueue.push(hint);
+      };
+      // Capture the index of the last hint before starting to avoid re-injecting old hints.
+      // NOTE: Hints added AFTER this point will be broadcast to all currently running
+      // local agents via the listener below.
+      const startIndex =
+        this.runtimeContext.userHintService.getLatestHintIndex();
+      this.runtimeContext.userHintService.onUserHint(hintListener);
 
-        // Check for timeout or external abort.
-        if (combinedSignal.aborted) {
-          // Determine which signal caused the abort.
-          terminateReason = deadlineTimer.signal.aborted
-            ? AgentTerminateMode.TIMEOUT
-            : AgentTerminateMode.ABORTED;
-          break;
-        }
+      try {
+        const initialHints =
+          this.runtimeContext.userHintService.getUserHintsAfter(startIndex);
+        const formattedInitialHints = formatUserHintsForModel(initialHints);
 
-        const turnResult = await this.executeTurn(
-          chat,
-          currentMessage,
-          turnCounter++,
-          combinedSignal,
-          deadlineTimer.signal,
-          onWaitingForConfirmation,
-        );
+        let currentMessage: Content = formattedInitialHints
+          ? {
+              role: 'user',
+              parts: [{ text: formattedInitialHints }, { text: query }],
+            }
+          : { role: 'user', parts: [{ text: query }] };
 
-        if (turnResult.status === 'stop') {
-          terminateReason = turnResult.terminateReason;
-          // Only set finalResult if the turn provided one (e.g., error or goal).
-          if (turnResult.finalResult) {
-            finalResult = turnResult.finalResult;
+        while (true) {
+          // Check for termination conditions like max turns.
+          const reason = this.checkTermination(turnCounter, maxTurns);
+          if (reason) {
+            terminateReason = reason;
+            break;
           }
-          break; // Exit the loop for *any* stop reason.
-        }
 
-        // If status is 'continue', update message for the next loop
-        currentMessage = turnResult.nextMessage;
+          // Check for timeout or external abort.
+          if (combinedSignal.aborted) {
+            // Determine which signal caused the abort.
+            terminateReason = deadlineTimer.signal.aborted
+              ? AgentTerminateMode.TIMEOUT
+              : AgentTerminateMode.ABORTED;
+            break;
+          }
+
+          const turnResult = await this.executeTurn(
+            chat,
+            currentMessage,
+            turnCounter++,
+            combinedSignal,
+            deadlineTimer.signal,
+            onWaitingForConfirmation,
+          );
+
+          if (turnResult.status === 'stop') {
+            terminateReason = turnResult.terminateReason;
+            // Only set finalResult if the turn provided one (e.g., error or goal).
+            if (turnResult.finalResult) {
+              finalResult = turnResult.finalResult;
+            }
+            break; // Exit the loop for *any* stop reason.
+          }
+
+          // If status is 'continue', update message for the next loop
+          currentMessage = turnResult.nextMessage;
+
+          // Check for new user steering hints collected via subscription
+          if (pendingHintsQueue.length > 0) {
+            const hintsToProcess = [...pendingHintsQueue];
+            pendingHintsQueue.length = 0;
+            const formattedHints = formatUserHintsForModel(hintsToProcess);
+            if (formattedHints) {
+              // Append hints to the current message (next turn)
+              currentMessage.parts ??= [];
+              currentMessage.parts.unshift({ text: formattedHints });
+            }
+          }
+        }
+      } finally {
+        this.runtimeContext.userHintService.offUserHint(hintListener);
       }
 
       // === UNIFIED RECOVERY BLOCK ===
@@ -651,6 +690,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         chat.setHistory(newHistory);
         this.hasFailedCompressionAttempt = false;
       }
+    } else if (info.compressionStatus === CompressionStatus.CONTENT_TRUNCATED) {
+      if (newHistory) {
+        chat.setHistory(newHistory);
+        // Do NOT reset hasFailedCompressionAttempt.
+        // We only truncated content because summarization previously failed.
+        // We want to keep avoiding expensive summarization calls.
+      }
     }
   }
 
@@ -781,16 +827,19 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         systemInstruction,
         [{ functionDeclarations: tools }],
         startHistory,
+        undefined,
+        undefined,
+        'subagent',
       );
-    } catch (error) {
+    } catch (e: unknown) {
       await reportError(
-        error,
+        e,
         `Error initializing Gemini chat for agent ${this.definition.name}.`,
         startHistory,
         'startChat',
       );
       // Re-throw as a more specific error after reporting.
-      throw new Error(`Failed to create chat object: ${error}`);
+      throw new Error(`Failed to create chat object: ${getErrorMessage(e)}`);
     }
   }
 
@@ -880,6 +929,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
               continue;
             }
 
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             const validatedOutput = validationResult.data;
             if (this.definition.processOutput) {
               submittedOutput = this.definition.processOutput(validatedOutput);

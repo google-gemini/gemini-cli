@@ -14,7 +14,7 @@ import {
   BaseToolInvocation,
   Kind,
   type ToolCallConfirmationDetails,
-  ToolConfirmationOutcome,
+  type ToolConfirmationOutcome,
   type ToolEditConfirmationDetails,
   type ToolInvocation,
   type ToolLocation,
@@ -30,6 +30,7 @@ import { ApprovalMode } from '../policy/types.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
 
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
+import { getDiffContextSnippet } from './diff-utils.js';
 import {
   type ModifiableDeclarativeTool,
   type ModifyContext,
@@ -37,10 +38,11 @@ import {
 import { IdeClient } from '../ide/ide-client.js';
 import { FixLLMEditWithInstruction } from '../utils/llm-edit-fixer.js';
 import { safeLiteralReplace, detectLineEnding } from '../utils/textUtils.js';
-import { EditStrategyEvent } from '../telemetry/types.js';
-import { logEditStrategy } from '../telemetry/loggers.js';
-import { EditCorrectionEvent } from '../telemetry/types.js';
-import { logEditCorrectionEvent } from '../telemetry/loggers.js';
+import { EditStrategyEvent, EditCorrectionEvent } from '../telemetry/types.js';
+import {
+  logEditStrategy,
+  logEditCorrectionEvent,
+} from '../telemetry/loggers.js';
 
 import { correctPath } from '../utils/pathCorrector.js';
 import {
@@ -52,6 +54,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import levenshtein from 'fast-levenshtein';
 import { EDIT_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 
 const ENABLE_FUZZY_MATCH_RECOVERY = true;
 const FUZZY_MATCH_THRESHOLD = 0.1; // Allow up to 10% weighted difference
@@ -135,6 +138,17 @@ async function calculateExactReplacement(
   const normalizedReplace = new_string.replace(/\r\n/g, '\n');
 
   const exactOccurrences = normalizedCode.split(normalizedSearch).length - 1;
+  const expectedReplacements = params.expected_replacements ?? 1;
+
+  if (exactOccurrences > expectedReplacements) {
+    return {
+      newContent: currentContent,
+      occurrences: exactOccurrences,
+      finalOldString: normalizedSearch,
+      finalNewString: normalizedReplace,
+    };
+  }
+
   if (exactOccurrences > 0) {
     let modifiedCode = safeLiteralReplace(
       normalizedCode,
@@ -725,14 +739,9 @@ class EditToolInvocation
       fileDiff,
       originalContent: editData.currentContent,
       newContent: editData.newContent,
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          // No need to publish a policy update as the default policy for
-          // AUTO_EDIT already reflects always approving edit.
-          this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
-        } else {
-          await this.publishPolicyUpdate(outcome);
-        }
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // Mode transitions (e.g. AUTO_EDIT) and policy updates are now
+        // handled centrally by the scheduler.
 
         if (ideConfirmation) {
           const result = await ideConfirmation;
@@ -876,6 +885,16 @@ class EditToolInvocation
           ? `Created new file: ${this.params.file_path} with provided content.`
           : `Successfully modified file: ${this.params.file_path} (${editData.occurrences} replacements).`,
       ];
+
+      // Return a diff of the file before and after the write so that the agent
+      // can avoid the need to spend a turn doing a verification read.
+      const snippet = getDiffContextSnippet(
+        editData.currentContent ?? '',
+        finalContent,
+        5,
+      );
+      llmSuccessMessageParts.push(`Here is the updated code:
+${snippet}`);
       const fuzzyFeedback = getFuzzyMatchFeedback(editData);
       if (fuzzyFeedback) {
         llmSuccessMessageParts.push(fuzzyFeedback);
@@ -965,6 +984,19 @@ export class EditTool
       filePath = result.correctedPath;
     }
     params.file_path = filePath;
+
+    const newPlaceholders = detectOmissionPlaceholders(params.new_string);
+    if (newPlaceholders.length > 0) {
+      const oldPlaceholders = new Set(
+        detectOmissionPlaceholders(params.old_string),
+      );
+
+      for (const placeholder of newPlaceholders) {
+        if (!oldPlaceholders.has(placeholder)) {
+          return "`new_string` contains an omission placeholder (for example 'rest of methods ...'). Provide exact literal replacement text.";
+        }
+      }
+    }
 
     return this.config.validatePathAccess(params.file_path);
   }

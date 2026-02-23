@@ -36,7 +36,7 @@ available combinations.
 | Delete from the cursor to the start of the line. | `Ctrl + U`                                                       |
 | Clear all text in the input field.               | `Ctrl + C`                                                       |
 | Delete the previous word.                        | `Ctrl + Backspace`<br />`Alt + Backspace`<br />`Ctrl + W`        |
-| Delete the next word.                            | `Ctrl + Delete`<br />`Alt + Delete`                              |
+| Delete the next word.                            | `Ctrl + Delete`<br />`Alt + Delete`<br />`Alt + D`               |
 | Delete the character to the left.                | `Backspace`<br />`Ctrl + H`                                      |
 | Delete the character to the right.               | `Delete`<br />`Ctrl + D`                                         |
 | Undo the most recent text edit.                  | `Cmd + Z (no Shift)`<br />`Alt + Z (no Shift)`                   |
@@ -61,7 +61,7 @@ available combinations.
 | Show the next entry in history.              | `Ctrl + N (no Shift)` |
 | Start reverse search through history.        | `Ctrl + R`            |
 | Submit the selected reverse-search match.    | `Enter (no Ctrl)`     |
-| Accept a suggestion while reverse searching. | `Tab`                 |
+| Accept a suggestion while reverse searching. | `Tab (no Shift)`      |
 | Browse and rewind previous interactions.     | `Double Esc`          |
 
 #### Navigation
@@ -79,7 +79,7 @@ available combinations.
 
 | Action                                  | Keys                                               |
 | --------------------------------------- | -------------------------------------------------- |
-| Accept the inline suggestion.           | `Tab`<br />`Enter (no Ctrl)`                       |
+| Accept the inline suggestion.           | `Tab (no Shift)`<br />`Enter (no Ctrl)`            |
 | Move to the previous completion option. | `Up Arrow (no Shift)`<br />`Ctrl + P (no Shift)`   |
 | Move to the next completion option.     | `Down Arrow (no Shift)`<br />`Ctrl + N (no Shift)` |
 | Expand an inline suggestion.            | `Right Arrow`                                      |

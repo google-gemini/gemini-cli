@@ -122,6 +122,25 @@ const KEY_INFO_MAP: Record<
   '[8^': { name: 'end', ctrl: true },
 };
 
+// Numpad keys in Application Keypad Mode (SS3 sequences)
+const NUMPAD_MAP: Record<string, string> = {
+  Oj: '*',
+  Ok: '+',
+  Om: '-',
+  Oo: '/',
+  Op: '0',
+  Oq: '1',
+  Or: '2',
+  Os: '3',
+  Ot: '4',
+  Ou: '5',
+  Ov: '6',
+  Ow: '7',
+  Ox: '8',
+  Oy: '9',
+  On: '.',
+};
+
 const kUTF16SurrogateThreshold = 0x10000; // 2 ** 16
 function charLengthAt(str: string, i: number): number {
   if (str.length <= i) {
@@ -141,6 +160,7 @@ const MAC_ALT_KEY_CHARACTER_MAP: Record<string, string> = {
   '\u00B5': 'm', // "µ" toggle markup view
   '\u03A9': 'z', // "Ω" Option+z
   '\u00B8': 'Z', // "¸" Option+Shift+z
+  '\u2202': 'd', // "∂" delete word forward
 };
 
 function nonKeyboardEventFilter(
@@ -537,18 +557,27 @@ function* emitKeys(
           insertable = true;
         }
       } else {
-        name = 'undefined';
-        if (
-          (ctrl || cmd || alt) &&
-          (code.endsWith('u') || code.endsWith('~'))
-        ) {
-          // CSI-u or tilde-coded functional keys: ESC [ <code> ; <mods> (u|~)
-          const codeNumber = parseInt(code.slice(1, -1), 10);
+        const numpadChar = NUMPAD_MAP[code];
+        if (numpadChar) {
+          name = numpadChar;
+          if (!ctrl && !cmd && !alt) {
+            sequence = numpadChar;
+            insertable = true;
+          }
+        } else {
+          name = 'undefined';
           if (
-            codeNumber >= 'a'.charCodeAt(0) &&
-            codeNumber <= 'z'.charCodeAt(0)
+            (ctrl || cmd || alt) &&
+            (code.endsWith('u') || code.endsWith('~'))
           ) {
-            name = String.fromCharCode(codeNumber);
+            // CSI-u or tilde-coded functional keys: ESC [ <code> ; <mods> (u|~)
+            const codeNumber = parseInt(code.slice(1, -1), 10);
+            if (
+              codeNumber >= 'a'.charCodeAt(0) &&
+              codeNumber <= 'z'.charCodeAt(0)
+            ) {
+              name = String.fromCharCode(codeNumber);
+            }
           }
         }
       }
