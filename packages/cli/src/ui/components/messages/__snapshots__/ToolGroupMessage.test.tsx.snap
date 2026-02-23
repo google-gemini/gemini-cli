@@ -55,13 +55,13 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 
 "╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool-1 Description 1. This is a long description that will need to b… │
 │──────────────────────────────────────────────────────────────────────────│
-│                                                                          │                       ▄
+│ line5                                                                    │                       █
+│                                                                          │                       █
 │ ✓  tool-2 Description 2                                                  │                       █
 │                                                                          │                       █
 │ line1                                                                    │                       █
 │ line2                                                                    │                       █
 ╰──────────────────────────────────────────────────────────────────────────╯                       █
-                                                                                                   █
 "
 `;
 
@@ -111,12 +111,12 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call with output
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders two tool groups where only the last line of the previous group is visible 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────╮
+"╰──────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool-2 Description 2                                                  │
-│                                                                          │
-│ line1                                                                    │                       ▄
+│                                                                          │                       ▄
+│ line1                                                                    │                       █
 ╰──────────────────────────────────────────────────────────────────────────╯                       █
-                                                                                                   █
 "
 `;
 

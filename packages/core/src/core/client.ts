@@ -17,7 +17,7 @@ import {
   getInitialChatHistory,
 } from '../utils/environmentContext.js';
 import type { ServerGeminiStreamEvent, ChatCompressionInfo } from './turn.js';
-import { CompressionStatus , Turn, GeminiEventType } from './turn.js';
+import { CompressionStatus, Turn, GeminiEventType } from './turn.js';
 import type { Config } from '../config/config.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';

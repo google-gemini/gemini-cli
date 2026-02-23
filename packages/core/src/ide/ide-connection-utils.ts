@@ -89,8 +89,10 @@ export function getStdioConfigFromEnv(): StdioConfig | undefined {
   let args: string[] = [];
   if (argsStr) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const parsedArgs = JSON.parse(argsStr);
       if (Array.isArray(parsedArgs)) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         args = parsedArgs;
       } else {
         logger.error(
@@ -121,6 +123,7 @@ export async function getConnectionConfigFromFile(
       `gemini-ide-server-${pid}.json`,
     );
     const portFileContents = await fs.promises.readFile(portFile, 'utf8');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return JSON.parse(portFileContents);
   } catch (_) {
     // For newer extension versions, the file name matches the pattern
@@ -165,6 +168,7 @@ export async function getConnectionConfigFromFile(
   }
   const parsedContents = fileContents.map((content) => {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return JSON.parse(content);
     } catch (e) {
       logger.debug('Failed to parse JSON from config file: ', e);
@@ -188,11 +192,13 @@ export async function getConnectionConfigFromFile(
   }
 
   if (validWorkspaces.length === 1) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const selected = validWorkspaces[0];
     const fileIndex = parsedContents.indexOf(selected);
     if (fileIndex !== -1) {
       logger.debug(`Selected IDE connection file: ${matchingFiles[fileIndex]}`);
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return selected;
   }
 
@@ -202,6 +208,7 @@ export async function getConnectionConfigFromFile(
       (content) => String(content.port) === portFromEnv,
     );
     if (matchingPortIndex !== -1) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const selected = validWorkspaces[matchingPortIndex];
       const fileIndex = parsedContents.indexOf(selected);
       if (fileIndex !== -1) {
@@ -209,10 +216,12 @@ export async function getConnectionConfigFromFile(
           `Selected IDE connection file (matched port from env): ${matchingFiles[fileIndex]}`,
         );
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return selected;
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const selected = validWorkspaces[0];
   const fileIndex = parsedContents.indexOf(selected);
   if (fileIndex !== -1) {
@@ -220,6 +229,7 @@ export async function getConnectionConfigFromFile(
       `Selected first valid IDE connection file: ${matchingFiles[fileIndex]}`,
     );
   }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return selected;
 }
 

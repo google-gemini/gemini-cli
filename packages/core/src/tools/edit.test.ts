@@ -607,6 +607,53 @@ function doIt() {
       };
       expect(tool.validateToolParams(params)).toMatch(/Path not in workspace/);
     });
+
+    it('should reject omission placeholder in new_string when old_string does not contain that placeholder', () => {
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'test.txt'),
+        instruction: 'An instruction',
+        old_string: 'old content',
+        new_string: '(rest of methods ...)',
+      };
+      expect(tool.validateToolParams(params)).toBe(
+        "`new_string` contains an omission placeholder (for example 'rest of methods ...'). Provide exact literal replacement text.",
+      );
+    });
+
+    it('should reject new_string when it contains an additional placeholder not present in old_string', () => {
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'test.txt'),
+        instruction: 'An instruction',
+        old_string: '(rest of methods ...)',
+        new_string: `(rest of methods ...)
+(unchanged code ...)`,
+      };
+      expect(tool.validateToolParams(params)).toBe(
+        "`new_string` contains an omission placeholder (for example 'rest of methods ...'). Provide exact literal replacement text.",
+      );
+    });
+
+    it('should allow omission placeholders when all are already present in old_string', () => {
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'test.txt'),
+        instruction: 'An instruction',
+        old_string: `(rest of methods ...)
+(unchanged code ...)`,
+        new_string: `(unchanged code ...)
+(rest of methods ...)`,
+      };
+      expect(tool.validateToolParams(params)).toBeNull();
+    });
+
+    it('should allow normal code that contains placeholder text in a string literal', () => {
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'test.ts'),
+        instruction: 'Update string literal',
+        old_string: 'const msg = "old";',
+        new_string: 'const msg = "(rest of methods ...)";',
+      };
+      expect(tool.validateToolParams(params)).toBeNull();
+    });
   });
 
   describe('execute', () => {
