@@ -957,10 +957,13 @@ export class GeminiClient {
           () => currentAttemptModel,
         );
 
+      let initialActiveModel = this.config.getActiveModel();
+
       const apiCall = () => {
         // AvailabilityService
         const active = this.config.getActiveModel();
-        if (active !== currentAttemptModel) {
+        if (active !== initialActiveModel) {
+          initialActiveModel = active;
           currentAttemptModel = active;
           // Re-resolve config if model changed
           const newConfig = this.config.modelConfigService.getResolvedConfig({

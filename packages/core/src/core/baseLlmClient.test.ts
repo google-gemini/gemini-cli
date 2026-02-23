@@ -36,14 +36,6 @@ import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils
 
 vi.mock('../utils/errorReporting.js');
 vi.mock('../telemetry/loggers.js');
-vi.mock('../availability/policyHelpers.js', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../availability/policyHelpers.js')>();
-  return {
-    ...actual,
-    resolvePolicyChain: vi.fn(),
-  };
-});
 vi.mock('../utils/errors.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../utils/errors.js')>();
   return {
