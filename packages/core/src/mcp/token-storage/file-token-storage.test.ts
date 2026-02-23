@@ -17,6 +17,7 @@ vi.mock('node:fs', () => ({
     writeFile: vi.fn(),
     unlink: vi.fn(),
     mkdir: vi.fn(),
+    rename: vi.fn(),
   },
 }));
 
@@ -38,6 +39,7 @@ describe('FileTokenStorage', () => {
     writeFile: ReturnType<typeof vi.fn>;
     unlink: ReturnType<typeof vi.fn>;
     mkdir: ReturnType<typeof vi.fn>;
+    rename: ReturnType<typeof vi.fn>;
   };
   const existingCredentials: OAuthCredentials = {
     serverName: 'existing-server',
@@ -105,12 +107,48 @@ describe('FileTokenStorage', () => {
       expect(result).toEqual(credentials);
     });
 
-    it('should throw error for corrupted files', async () => {
+    it('should throw error with file path when file is corrupted', async () => {
       mockFs.readFile.mockResolvedValue('corrupted-data');
 
-      await expect(storage.getCredentials('test-server')).rejects.toThrow(
-        'Token file corrupted',
-      );
+      try {
+        await storage.getCredentials('test-server');
+        expect.fail('Expected error to be thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        const err = error as Error;
+        expect(err.message).toContain('Corrupted token file detected at:');
+        expect(err.message).toContain('mcp-oauth-tokens-v2.json');
+        expect(err.message).toContain('delete or rename');
+      }
+    });
+  });
+
+  describe('auth type switching', () => {
+    it('should throw error when trying to save credentials with corrupted file', async () => {
+      // Simulate corrupted file on first read
+      mockFs.readFile.mockResolvedValue('corrupted-data');
+
+      // Try to save new credentials (simulating switch from OAuth to API key)
+      const newCredentials: OAuthCredentials = {
+        serverName: 'new-auth-server',
+        token: {
+          accessToken: 'new-api-key',
+          tokenType: 'ApiKey',
+        },
+        updatedAt: Date.now(),
+      };
+
+      // Should throw error with file path
+      try {
+        await storage.setCredentials(newCredentials);
+        expect.fail('Expected error to be thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        const err = error as Error;
+        expect(err.message).toContain('Corrupted token file detected at:');
+        expect(err.message).toContain('mcp-oauth-tokens-v2.json');
+        expect(err.message).toContain('delete or rename');
+      }
     });
   });
 
