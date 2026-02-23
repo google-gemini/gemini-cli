@@ -88,6 +88,10 @@ type Keybinding = {
   args?: { text?: string };
 };
 
+function isKeybinding(kb: unknown): kb is Keybinding {
+  return typeof kb === 'object' && kb !== null;
+}
+
 /**
  * Checks if a keybindings array contains our specific binding for a given key.
  */
@@ -96,11 +100,11 @@ function hasOurBinding(
   key: 'shift+enter' | 'ctrl+enter',
 ): boolean {
   return keybindings.some((kb) => {
-    const binding = kb as Keybinding;
+    if (!isKeybinding(kb)) return false;
     return (
-      binding.key === key &&
-      binding.command === 'workbench.action.terminal.sendSequence' &&
-      binding.args?.text === VSCODE_SHIFT_ENTER_SEQUENCE
+      kb.key === key &&
+      kb.command === 'workbench.action.terminal.sendSequence' &&
+      kb.args?.text === VSCODE_SHIFT_ENTER_SEQUENCE
     );
   });
 }
@@ -254,7 +258,7 @@ async function configureVSCodeStyle(
     } catch {
       // File doesn't exist, will create new one
     }
-   
+
     const targetBindings = [
       {
         key: 'shift+enter',
@@ -296,23 +300,17 @@ async function configureVSCodeStyle(
 
     const results = targetBindings.map((target) => {
       const hasOurBinding = keybindings.some((kb) => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const binding = kb as {
-          command?: string;
-          args?: { text?: string };
-          key?: string;
-        };
+        if (!isKeybinding(kb)) return false;
         return (
-          binding.key === target.key &&
-          binding.command === target.command &&
-          binding.args?.text === target.args.text
+          kb.key === target.key &&
+          kb.command === target.command &&
+          kb.args?.text === target.args.text
         );
       });
 
       const existingBinding = keybindings.find((kb) => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const binding = kb as { key?: string };
-        return binding.key === target.key;
+        if (!isKeybinding(kb)) return false;
+        return kb.key === target.key;
       });
 
       return {
