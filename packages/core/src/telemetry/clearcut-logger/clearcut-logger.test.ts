@@ -372,6 +372,48 @@ describe('ClearcutLogger', () => {
       });
     });
 
+    it('should redact API keys from proxy URLs in getConfigJson', () => {
+      const proxyUrlWithApiKey = 'http://api-key-123@proxy.example.com:8080';
+      const { logger, loggerConfig } = setup({
+        config: {
+          proxy: proxyUrlWithApiKey,
+        },
+      });
+
+      // make sure the proxy url actually has the api key in it before we test
+      expect(loggerConfig.getProxy()).toBe(proxyUrlWithApiKey);
+      expect(loggerConfig.getProxy()).toContain('api-key-123');
+
+      const configJson = logger?.getConfigJson();
+      expect(configJson).toBeDefined();
+
+      // the serialized json shouldn't have the api key in it
+      // note: the function only serializes booleans so the proxy url won't actually
+      // be in the output, but we're checking that if it were, it'd be redacted
+      expect(configJson).not.toContain('api-key-123');
+    });
+
+    it('should redact credentials from proxy URLs with username and password', () => {
+      const proxyUrlWithCredentials =
+        'http://user:password123@proxy.example.com:8080';
+      const { logger, loggerConfig } = setup({
+        config: {
+          proxy: proxyUrlWithCredentials,
+        },
+      });
+
+      // check that the proxy url has credentials before we test redaction
+      expect(loggerConfig.getProxy()).toBe(proxyUrlWithCredentials);
+      expect(loggerConfig.getProxy()).toContain('user:password123');
+
+      const configJson = logger?.getConfigJson();
+      expect(configJson).toBeDefined();
+
+      // make sure the password doesn't show up in the serialized output
+      expect(configJson).not.toContain('user:password123');
+      expect(configJson).not.toContain('password123');
+    });
+
     it('logs the GPU information (single GPU)', async () => {
       vi.mocked(si.graphics).mockResolvedValueOnce({
         controllers: [{ model: 'Single GPU' }],
