@@ -325,7 +325,7 @@ export function SettingsDialog({
       const type: SettingsType = definition?.type ?? 'string';
       const parsed = parseEditedValue(type, newValue);
 
-      if (!parsed) {
+      if (parsed === null) {
         return;
       }
 
