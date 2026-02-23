@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -3201,10 +3201,10 @@ describe('Policy Engine Integration in loadCliConfig', () => {
     vi.restoreAllMocks();
   });
 
-  it('should pass merged allowed tools from CLI and settings to createPolicyEngineConfig', async () => {
+  it('should prioritize CLI allowed tools over settings.tools.allowed and settings.tools.trusted', async () => {
     process.argv = ['node', 'script.js', '--allowed-tools', 'cli-tool'];
     const settings = createTestMergedSettings({
-      tools: { allowed: ['settings-tool'] },
+      tools: { allowed: ['settings-tool'], trusted: ['save_memory'] },
     });
     const argv = await parseArguments(createTestMergedSettings());
 
@@ -3213,7 +3213,26 @@ describe('Policy Engine Integration in loadCliConfig', () => {
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.objectContaining({
         tools: expect.objectContaining({
-          allowed: expect.arrayContaining(['cli-tool']),
+          allowed: ['cli-tool'],
+        }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('should merge settings.tools.allowed and settings.tools.trusted when CLI allowed tools are not provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      tools: { allowed: ['settings-tool'], trusted: ['save_memory'] },
+    });
+    const argv = await parseArguments(createTestMergedSettings());
+
+    await loadCliConfig(settings, 'test-session', argv);
+
+    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tools: expect.objectContaining({
+          allowed: expect.arrayContaining(['settings-tool', 'save_memory']),
         }),
       }),
       expect.anything(),
