@@ -37,9 +37,8 @@ import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils
 vi.mock('../utils/errorReporting.js');
 vi.mock('../telemetry/loggers.js');
 vi.mock('../availability/policyHelpers.js', async (importOriginal) => {
-  const actual = await importOriginal<
-    typeof import('../availability/policyHelpers.js')
-  >();
+  const actual =
+    await importOriginal<typeof import('../availability/policyHelpers.js')>();
   return {
     ...actual,
     resolvePolicyChain: vi.fn(),
@@ -715,15 +714,15 @@ describe('BaseLlmClient', () => {
       //    setActiveModel(fallbackModel) -> activeModel = fallbackModel.
       //    returns fallbackModel.
       // 5. apiCall() runs. getActiveModel() === fallbackModel. call(fallbackModel). returns 'final-response'.
-      
+
       vi.mocked(retryWithBackoff).mockImplementation(async (fn) => {
         // First call
-        let res = await fn();
+        let res = (await fn()) as GenerateContentResponse;
         if (res.candidates?.[0]?.content?.parts?.[0]?.text === '') {
           // Second call
           activeModel = fallbackModel;
           mockConfig.setActiveModel(fallbackModel);
-          res = await fn();
+          res = (await fn()) as GenerateContentResponse;
         }
         mockAvailabilityService.markHealthy(activeModel);
         return res;
@@ -738,7 +737,9 @@ describe('BaseLlmClient', () => {
 
       expect(result).toEqual(createMockResponse('final-response'));
       expect(mockConfig.setActiveModel).toHaveBeenCalledWith(fallbackModel);
-      expect(mockAvailabilityService.markHealthy).toHaveBeenCalledWith(fallbackModel);
+      expect(mockAvailabilityService.markHealthy).toHaveBeenCalledWith(
+        fallbackModel,
+      );
     });
 
     it('should consume sticky attempt if selection has attempts', async () => {
