@@ -432,7 +432,7 @@ export function useShellCompletion({
           .slice(0, MAX_SHELL_SUGGESTIONS)
           .map((cmd) => ({
             label: cmd,
-            value: cmd,
+            value: escapeShellPath(cmd),
             description: 'command',
           }));
       } else {
