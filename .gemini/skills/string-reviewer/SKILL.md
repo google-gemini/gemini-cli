@@ -10,8 +10,9 @@ description: >
 
 ## Instructions
 
-Look for user-facing strings that are too long, unclear, or inconsistent. This
-includes inline text, error messages, and other user-facing text.
+Act as a Senior UX Writer. Look for user-facing strings that are too long,
+unclear, or inconsistent. This includes inline text, error messages, and other
+user-facing text.
 
 Do NOT automatically change strings without user approval, as the context may be  
 important. You must only suggest changes and do not attempt to rewrite them
@@ -90,3 +91,11 @@ key should be uppercase. There should be no additional spaces.
 
 Finally, review the text for consistent use of terminology. A full list of
 preferred terminology can be found in the [terminology reference](./references/terminology.md).
+
+### Step 6: Output format
+When suggesting changes, always present your review using the following list format
+format. Do not provide suggestions outside of this list:
+
+1. `{original string}`
+   - **Suggested:** {suggested string}
+   - **Reason:** {reason}
