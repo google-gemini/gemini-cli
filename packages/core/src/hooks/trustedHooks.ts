@@ -34,6 +34,7 @@ export class TrustedHooksManager {
     try {
       if (fs.existsSync(this.configPath)) {
         const content = fs.readFileSync(this.configPath, 'utf-8');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         this.trustedHooks = JSON.parse(content);
       }
     } catch (error) {
