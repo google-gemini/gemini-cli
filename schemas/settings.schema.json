@@ -1629,6 +1629,13 @@
           "markdownDescription": "Enable model steering (user hints) to guide the model during tool execution.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
+        },
+        "directWebFetch": {
+          "title": "Direct Web Fetch",
+          "description": "Enable web fetch behavior that bypasses LLM summarization.",
+          "markdownDescription": "Enable web fetch behavior that bypasses LLM summarization.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false

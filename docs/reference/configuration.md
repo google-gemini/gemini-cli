@@ -969,6 +969,11 @@ their corresponding top-level category object in your `settings.json` file.
     during tool execution.
   - **Default:** `false`
 
+- **`experimental.directWebFetch`** (boolean):
+  - **Description:** Enable web fetch behavior that bypasses LLM summarization.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 #### `skills`
 
 - **`skills.enabled`** (boolean):
