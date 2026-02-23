@@ -444,8 +444,9 @@ on GitHub.
   explore command. ([pr](https://github.com/google-gemini/gemini-cli/pull/11846)
   by [@JayadityaGit](https://github.com/JayadityaGit)).
 - **Configurable compression:** Users can modify the context compression
-  threshold in `/settings` (0-100 percentage). The default has been made more
-  proactive ([pr](https://github.com/google-gemini/gemini-cli/pull/12317) by
+  threshold in `/settings` (decimal with percentage display). The default has
+  been made more proactive
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/12317) by
   [@scidomino](https://github.com/scidomino)).
 - **API key authentication:** Users can now securely enter and store their
   Gemini API key via a new dialog, eliminating the need for environment

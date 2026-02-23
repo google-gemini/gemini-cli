@@ -930,10 +930,9 @@ const SETTINGS_SCHEMA = {
         label: 'Context Compression Threshold',
         category: 'Model',
         requiresRestart: true,
-        default: 50 as number,
-        unit: '%',
+        default: 0.5 as number,
         description:
-          'The percentage of context usage at which to trigger context compression (0-100).',
+          'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
         showInDialog: true,
       },
       disableLoopDetection: {

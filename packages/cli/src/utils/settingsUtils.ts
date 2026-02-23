@@ -475,6 +475,10 @@ export function getDisplayValue(
     valueString = option?.label ?? `${value}`;
   }
 
+  if (key === 'model.compressionThreshold' && typeof value === 'number') {
+    valueString = `${value} (${Math.round(value * 100)}%)`;
+  }
+
   if (definition?.unit) {
     valueString = `${valueString}${definition.unit}`;
   }

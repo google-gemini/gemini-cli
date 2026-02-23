@@ -577,9 +577,9 @@
         },
         "compressionThreshold": {
           "title": "Context Compression Threshold",
-          "description": "The percentage of context usage at which to trigger context compression (0-100).",
-          "markdownDescription": "The percentage of context usage at which to trigger context compression (0-100).\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `50` (50%)",
-          "default": 50,
+          "description": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).",
+          "markdownDescription": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `0.5`",
+          "default": 0.5,
           "type": "number"
         },
         "disableLoopDetection": {
