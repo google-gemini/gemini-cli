@@ -214,7 +214,9 @@ export function applyModelSelection(
     generateContentConfig = fallbackResolved.generateContentConfig;
   }
 
-  config.setActiveModel(finalModel);
+  if (modelConfigKey.isChatModel) {
+    config.setActiveModel(finalModel);
+  }
 
   if (selection.attempts && options.consumeAttempt !== false) {
     config.getModelAvailabilityService().consumeStickyAttempt(finalModel);
