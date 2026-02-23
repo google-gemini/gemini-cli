@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import 'vitest';
 import {
   vi,
   describe,
@@ -43,6 +42,7 @@ import { InstallationManager } from '../../utils/installationManager.js';
 
 import si from 'systeminformation';
 import type { Systeminformation } from 'systeminformation';
+import * as os from 'node:os';
 
 interface CustomMatchers<R = unknown> {
   toHaveMetadataValue: ([key, value]: [EventMetadataKey, string]) => R;
@@ -120,6 +120,7 @@ vi.mock('node:os', async (importOriginal) => {
   return {
     ...actual,
     cpus: vi.fn(() => [{ model: 'Intel(R) Core(TM) i9-9980HK CPU @ 2.40GHz' }]),
+    availableParallelism: vi.fn(() => 8),
     totalmem: vi.fn(() => 32 * 1024 * 1024 * 1024),
   };
 });
@@ -436,6 +437,26 @@ describe('ClearcutLogger', () => {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_GPU_INFO,
         value: 'FAILED',
       });
+    });
+
+    it('handles empty os.cpus() gracefully', async () => {
+      const { logger, loggerConfig } = setup({});
+      vi.mocked(os.cpus).mockReturnValueOnce([]);
+
+      await logger?.logStartSessionEvent(new StartSessionEvent(loggerConfig));
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const metadata = event?.event_metadata[0];
+
+      const cpuInfoEntry = metadata?.find(
+        (m) => m.gemini_cli_key === EventMetadataKey.GEMINI_CLI_CPU_INFO,
+      );
+      expect(cpuInfoEntry).toBeUndefined();
+
+      const cpuCoresEntry = metadata?.find(
+        (m) => m.gemini_cli_key === EventMetadataKey.GEMINI_CLI_CPU_CORES,
+      );
+      expect(cpuCoresEntry?.value).toBe('8');
     });
 
     type SurfaceDetectionTestCase = {

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mapCoreStatusToDisplayStatus, mapToDisplay } from './toolMapping.js';
+import { mapToDisplay } from './toolMapping.js';
 import {
   type AnyDeclarativeTool,
   type AnyToolInvocation,
@@ -20,7 +20,7 @@ import {
   type CancelledToolCall,
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
-import { ToolCallStatus } from '../types.js';
+import { ToolCallStatus, mapCoreStatusToDisplayStatus } from '../types.js';
 
 describe('toolMapping', () => {
   beforeEach(() => {
@@ -131,7 +131,7 @@ describe('toolMapping', () => {
           name: 'Test Tool',
           description: 'Calling test_tool with args...',
           renderOutputAsMarkdown: true,
-          status: ToolCallStatus.Success,
+          status: CoreToolCallStatus.Success,
           resultDisplay: 'Success output',
           outputFile: '/tmp/output.txt',
         }),
@@ -151,7 +151,7 @@ describe('toolMapping', () => {
       const result = mapToDisplay(toolCall);
       const displayTool = result.tools[0];
 
-      expect(displayTool.status).toBe(ToolCallStatus.Executing);
+      expect(displayTool.status).toBe(CoreToolCallStatus.Executing);
       expect(displayTool.resultDisplay).toBe('Loading...');
       expect(displayTool.ptyId).toBe(12345);
     });
@@ -178,7 +178,7 @@ describe('toolMapping', () => {
       const result = mapToDisplay(toolCall);
       const displayTool = result.tools[0];
 
-      expect(displayTool.status).toBe(ToolCallStatus.Confirming);
+      expect(displayTool.status).toBe(CoreToolCallStatus.AwaitingApproval);
       expect(displayTool.confirmationDetails).toEqual(confirmationDetails);
     });
 
@@ -221,7 +221,7 @@ describe('toolMapping', () => {
       const result = mapToDisplay(toolCall);
       const displayTool = result.tools[0];
 
-      expect(displayTool.status).toBe(ToolCallStatus.Error);
+      expect(displayTool.status).toBe(CoreToolCallStatus.Error);
       expect(displayTool.name).toBe('test_tool'); // falls back to request.name
       expect(displayTool.description).toBe('{"arg1":"val1"}'); // falls back to stringified args
       expect(displayTool.resultDisplay).toBe('Tool not found');
@@ -243,7 +243,7 @@ describe('toolMapping', () => {
       const result = mapToDisplay(toolCall);
       const displayTool = result.tools[0];
 
-      expect(displayTool.status).toBe(ToolCallStatus.Canceled);
+      expect(displayTool.status).toBe(CoreToolCallStatus.Cancelled);
       expect(displayTool.resultDisplay).toBe('User cancelled');
     });
 
@@ -273,7 +273,7 @@ describe('toolMapping', () => {
 
       const result = mapToDisplay(toolCall);
       expect(result.tools[0].resultDisplay).toBeUndefined();
-      expect(result.tools[0].status).toBe(ToolCallStatus.Pending);
+      expect(result.tools[0].status).toBe(CoreToolCallStatus.Scheduled);
     });
   });
 });

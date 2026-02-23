@@ -165,7 +165,10 @@ export interface SummarizeToolOutputSettings {
   tokenBudget?: number;
 }
 
+export type LoadingPhrasesMode = 'tips' | 'witty' | 'all' | 'off';
+
 export interface AccessibilitySettings {
+  /** @deprecated Use ui.loadingPhrases instead. */
   enableLoadingPhrases?: boolean;
   screenReader?: boolean;
 }
@@ -182,6 +185,9 @@ export interface SessionRetentionSettings {
 
   /** Minimum retention period (safety limit, defaults to "1d") */
   minRetention?: string;
+
+  /** INTERNAL: Whether the user has acknowledged the session retention warning */
+  warningAcknowledged?: boolean;
 }
 
 export interface SettingsError {
@@ -794,11 +800,11 @@ export function loadSettings(
       readOnly: false,
     },
     {
-      path: workspaceSettingsPath,
+      path: realWorkspaceDir === realHomeDir ? '' : workspaceSettingsPath,
       settings: workspaceSettings,
       originalSettings: workspaceOriginalSettings,
       rawJson: workspaceResult.rawJson,
-      readOnly: false,
+      readOnly: realWorkspaceDir === realHomeDir,
     },
     isTrusted,
     settingsErrors,
@@ -924,6 +930,22 @@ export function migrateDeprecatedSettings(
           if (!settingsFile.readOnly) {
             anyModified = true;
           }
+        }
+
+        // Migrate enableLoadingPhrases: false → loadingPhrases: 'off'
+        const enableLP = newAccessibility['enableLoadingPhrases'];
+        if (
+          typeof enableLP === 'boolean' &&
+          newUi['loadingPhrases'] === undefined
+        ) {
+          if (!enableLP) {
+            newUi['loadingPhrases'] = 'off';
+            loadedSettings.setValue(scope, 'ui', newUi);
+            if (!settingsFile.readOnly) {
+              anyModified = true;
+            }
+          }
+          foundDeprecated.push('ui.accessibility.enableLoadingPhrases');
         }
       }
     }

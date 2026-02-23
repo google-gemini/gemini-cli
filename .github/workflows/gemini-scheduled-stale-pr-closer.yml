@@ -23,12 +23,10 @@ jobs:
     steps:
       - name: 'Generate GitHub App Token'
         id: 'generate_token'
-        uses: 'actions/create-github-app-token@v1'
+        uses: 'actions/create-github-app-token@v2'
         with:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'
-          owner: '${{ github.repository_owner }}'
-          repositories: 'gemini-cli'
 
       - name: 'Process Stale PRs'
         uses: 'actions/github-script@v7'

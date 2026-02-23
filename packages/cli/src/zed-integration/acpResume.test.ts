@@ -15,12 +15,18 @@ import {
 } from 'vitest';
 import { GeminiAgent } from './zedIntegration.js';
 import * as acp from '@agentclientprotocol/sdk';
-import { AuthType, type Config } from '@google/gemini-cli-core';
+import {
+  ApprovalMode,
+  AuthType,
+  type Config,
+  CoreToolCallStatus,
+} from '@google/gemini-cli-core';
 import { loadCliConfig, type CliArgs } from '../config/config.js';
 import {
   SessionSelector,
   convertSessionToHistoryFormats,
 } from '../utils/sessionUtils.js';
+import { convertSessionToClientHistory } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
 
 vi.mock('../config/config.js', () => ({
@@ -34,6 +40,15 @@ vi.mock('../utils/sessionUtils.js', async (importOriginal) => {
     ...actual,
     SessionSelector: vi.fn(),
     convertSessionToHistoryFormats: vi.fn(),
+  };
+});
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    convertSessionToClientHistory: vi.fn(),
   };
 });
 
@@ -58,6 +73,8 @@ describe('GeminiAgent Session Resume', () => {
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
       },
+      getApprovalMode: vi.fn().mockReturnValue('default'),
+      isPlanEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Config>;
     mockSettings = {
       merged: {
@@ -98,7 +115,7 @@ describe('GeminiAgent Session Resume', () => {
               id: 'call-1',
               name: 'test_tool',
               displayName: 'Test Tool',
-              status: 'success',
+              status: CoreToolCallStatus.Success,
               resultDisplay: 'Tool output',
             },
           ],
@@ -111,7 +128,7 @@ describe('GeminiAgent Session Resume', () => {
               id: 'call-2',
               name: 'write_file',
               displayName: 'Write File',
-              status: 'error',
+              status: CoreToolCallStatus.Error,
               resultDisplay: 'Permission denied',
             },
           ],
@@ -135,9 +152,11 @@ describe('GeminiAgent Session Resume', () => {
       { role: 'model', parts: [{ text: 'Hi there' }] },
     ];
     (convertSessionToHistoryFormats as unknown as Mock).mockReturnValue({
-      clientHistory: mockClientHistory,
       uiHistory: [],
     });
+    (convertSessionToClientHistory as unknown as Mock).mockReturnValue(
+      mockClientHistory,
+    );
 
     const response = await agent.loadSession({
       sessionId,
@@ -145,7 +164,28 @@ describe('GeminiAgent Session Resume', () => {
       mcpServers: [],
     });
 
-    expect(response).toEqual({});
+    expect(response).toEqual({
+      modes: {
+        availableModes: [
+          {
+            id: ApprovalMode.DEFAULT,
+            name: 'Default',
+            description: 'Prompts for approval',
+          },
+          {
+            id: ApprovalMode.AUTO_EDIT,
+            name: 'Auto Edit',
+            description: 'Auto-approves edit tools',
+          },
+          {
+            id: ApprovalMode.YOLO,
+            name: 'YOLO',
+            description: 'Auto-approves all tools',
+          },
+        ],
+        currentModeId: ApprovalMode.DEFAULT,
+      },
+    });
 
     // Verify resumeChat received the correct arguments
     expect(mockConfig.getGeminiClient().resumeChat).toHaveBeenCalledWith(

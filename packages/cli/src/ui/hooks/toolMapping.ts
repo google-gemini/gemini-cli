@@ -6,41 +6,15 @@
 
 import {
   type ToolCall,
-  type Status as CoreStatus,
   type SerializableConfirmationDetails,
   type ToolResultDisplay,
   debugLogger,
   CoreToolCallStatus,
-  checkExhaustive,
 } from '@google/gemini-cli-core';
 import {
-  ToolCallStatus,
   type HistoryItemToolGroup,
   type IndividualToolCallDisplay,
 } from '../types.js';
-
-export function mapCoreStatusToDisplayStatus(
-  coreStatus: CoreStatus,
-): ToolCallStatus {
-  switch (coreStatus) {
-    case CoreToolCallStatus.Validating:
-      return ToolCallStatus.Pending;
-    case CoreToolCallStatus.AwaitingApproval:
-      return ToolCallStatus.Confirming;
-    case CoreToolCallStatus.Executing:
-      return ToolCallStatus.Executing;
-    case CoreToolCallStatus.Success:
-      return ToolCallStatus.Success;
-    case CoreToolCallStatus.Cancelled:
-      return ToolCallStatus.Canceled;
-    case CoreToolCallStatus.Error:
-      return ToolCallStatus.Error;
-    case CoreToolCallStatus.Scheduled:
-      return ToolCallStatus.Pending;
-    default:
-      return checkExhaustive(coreStatus);
-  }
-}
 
 /**
  * Transforms `ToolCall` objects into `HistoryItemToolGroup` objects for UI
@@ -49,10 +23,15 @@ export function mapCoreStatusToDisplayStatus(
  */
 export function mapToDisplay(
   toolOrTools: ToolCall[] | ToolCall,
-  options: { borderTop?: boolean; borderBottom?: boolean } = {},
+  options: {
+    borderTop?: boolean;
+    borderBottom?: boolean;
+    borderColor?: string;
+    borderDimColor?: boolean;
+  } = {},
 ): HistoryItemToolGroup {
   const toolCalls = Array.isArray(toolOrTools) ? toolOrTools : [toolOrTools];
-  const { borderTop, borderBottom } = options;
+  const { borderTop, borderBottom, borderColor, borderDimColor } = options;
 
   const toolDisplays = toolCalls.map((call): IndividualToolCallDisplay => {
     let description: string;
@@ -80,6 +59,8 @@ export function mapToDisplay(
     let outputFile: string | undefined = undefined;
     let ptyId: number | undefined = undefined;
     let correlationId: string | undefined = undefined;
+    let progressMessage: string | undefined = undefined;
+    let progressPercent: number | undefined = undefined;
 
     switch (call.status) {
       case CoreToolCallStatus.Success:
@@ -98,6 +79,8 @@ export function mapToDisplay(
       case CoreToolCallStatus.Executing:
         resultDisplay = call.liveOutput;
         ptyId = call.pid;
+        progressMessage = call.progressMessage;
+        progressPercent = call.progressPercent;
         break;
       case CoreToolCallStatus.Scheduled:
       case CoreToolCallStatus.Validating:
@@ -115,12 +98,15 @@ export function mapToDisplay(
 
     return {
       ...baseDisplayProperties,
-      status: mapCoreStatusToDisplayStatus(call.status),
+      status: call.status,
       resultDisplay,
       confirmationDetails,
       outputFile,
       ptyId,
       correlationId,
+      progressMessage,
+      progressPercent,
+      approvalMode: call.approvalMode,
     };
   });
 
@@ -129,5 +115,7 @@ export function mapToDisplay(
     tools: toolDisplays,
     borderTop,
     borderBottom,
+    borderColor,
+    borderDimColor,
   };
 }

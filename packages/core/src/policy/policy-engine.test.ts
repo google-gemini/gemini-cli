@@ -2373,4 +2373,89 @@ describe('PolicyEngine', () => {
       );
     });
   });
+
+  describe('removeRulesByTier', () => {
+    it('should remove rules matching a specific tier', () => {
+      engine.addRule({
+        toolName: 'rule1',
+        decision: PolicyDecision.ALLOW,
+        priority: 1.1,
+      });
+      engine.addRule({
+        toolName: 'rule2',
+        decision: PolicyDecision.ALLOW,
+        priority: 1.5,
+      });
+      engine.addRule({
+        toolName: 'rule3',
+        decision: PolicyDecision.ALLOW,
+        priority: 2.1,
+      });
+      engine.addRule({
+        toolName: 'rule4',
+        decision: PolicyDecision.ALLOW,
+        priority: 0.5,
+      });
+      engine.addRule({ toolName: 'rule5', decision: PolicyDecision.ALLOW }); // priority undefined -> 0
+
+      expect(engine.getRules()).toHaveLength(5);
+
+      engine.removeRulesByTier(1);
+
+      const rules = engine.getRules();
+      expect(rules).toHaveLength(3);
+      expect(rules.some((r) => r.toolName === 'rule1')).toBe(false);
+      expect(rules.some((r) => r.toolName === 'rule2')).toBe(false);
+      expect(rules.some((r) => r.toolName === 'rule3')).toBe(true);
+      expect(rules.some((r) => r.toolName === 'rule4')).toBe(true);
+      expect(rules.some((r) => r.toolName === 'rule5')).toBe(true);
+    });
+
+    it('should handle removing tier 0 rules (including undefined priority)', () => {
+      engine.addRule({
+        toolName: 'rule1',
+        decision: PolicyDecision.ALLOW,
+        priority: 0.5,
+      });
+      engine.addRule({ toolName: 'rule2', decision: PolicyDecision.ALLOW }); // defaults to 0
+      engine.addRule({
+        toolName: 'rule3',
+        decision: PolicyDecision.ALLOW,
+        priority: 1.5,
+      });
+
+      expect(engine.getRules()).toHaveLength(3);
+
+      engine.removeRulesByTier(0);
+
+      const rules = engine.getRules();
+      expect(rules).toHaveLength(1);
+      expect(rules[0].toolName).toBe('rule3');
+    });
+  });
+
+  describe('removeCheckersByTier', () => {
+    it('should remove checkers matching a specific tier', () => {
+      engine.addChecker({
+        checker: { type: 'external', name: 'c1' },
+        priority: 1.1,
+      });
+      engine.addChecker({
+        checker: { type: 'external', name: 'c2' },
+        priority: 1.9,
+      });
+      engine.addChecker({
+        checker: { type: 'external', name: 'c3' },
+        priority: 2.5,
+      });
+
+      expect(engine.getCheckers()).toHaveLength(3);
+
+      engine.removeCheckersByTier(1);
+
+      const checkers = engine.getCheckers();
+      expect(checkers).toHaveLength(1);
+      expect(checkers[0].priority).toBe(2.5);
+    });
+  });
 });

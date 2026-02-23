@@ -192,6 +192,8 @@ export class ToolExecutor {
       tool: call.tool,
       invocation: call.invocation,
       durationMs: startTime ? Date.now() - startTime : undefined,
+      startTime,
+      endTime: Date.now(),
       outcome: call.outcome,
     };
   }
@@ -263,6 +265,8 @@ export class ToolExecutor {
       response: successResponse,
       invocation: call.invocation,
       durationMs: startTime ? Date.now() - startTime : undefined,
+      startTime,
+      endTime: Date.now(),
       outcome: call.outcome,
     };
   }
@@ -287,6 +291,8 @@ export class ToolExecutor {
       response,
       tool: call.tool,
       durationMs: startTime ? Date.now() - startTime : undefined,
+      startTime,
+      endTime: Date.now(),
       outcome: call.outcome,
     };
   }

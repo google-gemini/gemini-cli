@@ -111,6 +111,24 @@ priority = 100
       expect(result.errors).toHaveLength(0);
     });
 
+    it('should NOT match if ^ is used in commandRegex because it matches against full JSON', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^git status"
+decision = "allow"
+priority = 100
+`);
+
+      expect(result.rules).toHaveLength(1);
+      // The generated pattern is "command":"^git status
+      // This will NOT match '{"command":"git status"}' because of the '{"' at the start.
+      expect(
+        result.rules[0].argsPattern?.test('{"command":"git status"}'),
+      ).toBe(false);
+      expect(result.errors).toHaveLength(0);
+    });
+
     it('should expand toolName array', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
@@ -210,14 +228,18 @@ modes = ["autoEdit"]
 `,
       );
 
-      const getPolicyTier = (_dir: string) => 2; // Tier 2
-      const result = await loadPoliciesFromToml([tempDir], getPolicyTier);
+      const getPolicyTier2 = (_dir: string) => 2; // Tier 2
+      const result2 = await loadPoliciesFromToml([tempDir], getPolicyTier2);
 
-      expect(result.rules).toHaveLength(1);
-      expect(result.rules[0].toolName).toBe('tier2-tool');
-      expect(result.rules[0].modes).toEqual(['autoEdit']);
-      expect(result.rules[0].source).toBe('User: tier2.toml');
-      expect(result.errors).toHaveLength(0);
+      expect(result2.rules).toHaveLength(1);
+      expect(result2.rules[0].toolName).toBe('tier2-tool');
+      expect(result2.rules[0].modes).toEqual(['autoEdit']);
+      expect(result2.rules[0].source).toBe('Workspace: tier2.toml');
+
+      const getPolicyTier3 = (_dir: string) => 3; // Tier 3
+      const result3 = await loadPoliciesFromToml([tempDir], getPolicyTier3);
+      expect(result3.rules[0].source).toBe('User: tier2.toml');
+      expect(result3.errors).toHaveLength(0);
     });
 
     it('should handle TOML parse errors', async () => {
@@ -340,6 +362,21 @@ priority = -1
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0].fileName).toBe('invalid.toml');
       expect(result.errors[0].errorType).toBe('schema_validation');
+    });
+
+    it('should transform safety checker priorities based on tier', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[safety_checker]]
+toolName = "write_file"
+priority = 100
+[safety_checker.checker]
+type = "in-process"
+name = "allowed-path"
+`);
+
+      expect(result.checkers).toHaveLength(1);
+      expect(result.checkers[0].priority).toBe(1.1); // tier 1 + 100/1000
+      expect(result.checkers[0].source).toBe('Default: test.toml');
     });
   });
 

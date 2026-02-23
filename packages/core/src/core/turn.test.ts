@@ -14,6 +14,7 @@ import type { GenerateContentResponse, Part, Content } from '@google/genai';
 import { reportError } from '../utils/errorReporting.js';
 import type { GeminiChat } from './geminiChat.js';
 import { InvalidStreamError, StreamEventType } from './geminiChat.js';
+import { LlmRole } from '../telemetry/types.js';
 
 const mockSendMessageStream = vi.fn();
 const mockGetHistory = vi.fn();
@@ -102,6 +103,7 @@ describe('Turn', () => {
         reqParts,
         'prompt-id-1',
         expect.any(AbortSignal),
+        LlmRole.MAIN,
         undefined,
       );
 
@@ -259,7 +261,10 @@ describe('Turn', () => {
       const errorEvent = events[0] as ServerGeminiErrorEvent;
       expect(errorEvent.type).toBe(GeminiEventType.Error);
       expect(errorEvent.value).toEqual({
-        error: { message: 'API Error', status: undefined },
+        error: {
+          message: 'API Error',
+          status: undefined,
+        },
       });
       expect(turn.getDebugResponses().length).toBe(0);
       expect(reportError).toHaveBeenCalledWith(

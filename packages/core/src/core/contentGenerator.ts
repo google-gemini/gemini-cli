@@ -24,6 +24,7 @@ import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { parseCustomHeaders } from '../utils/customHeaderUtils.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
+import type { LlmRole } from '../telemetry/llmRole.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -32,11 +33,13 @@ export interface ContentGenerator {
   generateContent(
     request: GenerateContentParameters,
     userPromptId: string,
+    role: LlmRole,
   ): Promise<GenerateContentResponse>;
 
   generateContentStream(
     request: GenerateContentParameters,
     userPromptId: string,
+    role: LlmRole,
   ): Promise<AsyncGenerator<GenerateContentResponse>>;
 
   countTokens(request: CountTokensParameters): Promise<CountTokensResponse>;
@@ -143,7 +146,12 @@ export async function createContentGenerator(
       return new LoggingContentGenerator(fakeGenerator, gcConfig);
     }
     const version = await getVersion();
-    const model = resolveModel(gcConfig.getModel());
+    const model = resolveModel(
+      gcConfig.getModel(),
+      config.authType === AuthType.USE_GEMINI ||
+        config.authType === AuthType.USE_VERTEX_AI ||
+        ((await gcConfig.getGemini31Launched?.()) ?? false),
+    );
     const customHeadersEnv =
       process.env['GEMINI_CLI_CUSTOM_HEADERS'] || undefined;
     const userAgent = `GeminiCLI/${version}/${model} (${process.platform}; ${process.arch})`;

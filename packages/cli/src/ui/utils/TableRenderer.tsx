@@ -23,6 +23,7 @@ import {
   INK_SUPPORTED_NAMES,
   INK_NAME_TO_HEX_MAP,
 } from '../themes/color-utils.js';
+import { stripUnsafeCharacters } from './textUtils.js';
 
 interface TableRendererProps {
   headers: string[];
@@ -242,7 +243,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   const styledHeaders = useMemo(
     () =>
       headers.map((header) =>
-        parseMarkdownToStyledChars(header, theme.text.link),
+        parseMarkdownToStyledChars(stripUnsafeCharacters(header), theme.text.link),
       ),
     [headers],
   );
@@ -250,7 +251,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   const styledRows = useMemo(
     () =>
       rows.map((row) =>
-        row.map((cell) => parseMarkdownToStyledChars(cell, theme.text.primary)),
+        row.map((cell) => parseMarkdownToStyledChars(stripUnsafeCharacters(cell), theme.text.primary)),
       ),
     [rows],
   );
@@ -372,7 +373,11 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     const wrappedRows = styledRows.map((row) => wrapAndProcessRow(row));
 
     // Use the TIGHTEST widths that fit the wrapped content + padding
-    const adjustedWidths = actualColumnWidths.map((w) => w + COLUMN_PADDING);
+    const adjustedWidths = actualColumnWidths.map(
+      (w) =>
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+        w + COLUMN_PADDING,
+    );
 
     return { wrappedHeaders, wrappedRows, adjustedWidths };
   }, [styledHeaders, styledRows, terminalWidth]);
@@ -423,6 +428,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     isHeader = false,
   ): React.ReactNode => {
     const renderedCells = cells.map((cell, index) => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const width = adjustedWidths[index] || 0;
       return renderCell(cell, width, isHeader);
     });

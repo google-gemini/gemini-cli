@@ -29,7 +29,7 @@ import {
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
 } from '../tools/tool-names.js';
-import { resolveModel, isPreviewModel } from '../config/models.js';
+import { resolveModel, supportsModernFeatures } from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
 
@@ -58,9 +58,12 @@ export class PromptProvider {
     const enabledToolNames = new Set(toolNames);
     const approvedPlanPath = config.getApprovedPlanPath();
 
-    const desiredModel = resolveModel(config.getActiveModel());
-    const isGemini3 = isPreviewModel(desiredModel);
-    const activeSnippets = isGemini3 ? snippets : legacySnippets;
+    const desiredModel = resolveModel(
+      config.getActiveModel(),
+      config.getGemini31LaunchedSync?.() ?? false,
+    );
+    const isModernModel = supportsModernFeatures(desiredModel);
+    const activeSnippets = isModernModel ? snippets : legacySnippets;
     const contextFilenames = getAllGeminiMdFilenames();
 
     // --- Context Gathering ---
@@ -108,7 +111,7 @@ export class PromptProvider {
         basePrompt,
         config,
         skillsPrompt,
-        isGemini3,
+        isModernModel,
       );
     } else {
       // --- Standard Composition ---
@@ -125,7 +128,6 @@ export class PromptProvider {
         })),
         coreMandates: this.withSection('coreMandates', () => ({
           interactive: interactiveMode,
-          isGemini3,
           hasSkills: skills.length > 0,
           hasHierarchicalMemory,
           contextFilenames,
@@ -173,7 +175,7 @@ export class PromptProvider {
           'planningWorkflow',
           () => ({
             planModeToolsList,
-            plansDir: config.storage.getProjectTempPlansDir(),
+            plansDir: config.storage.getPlansDir(),
             approvedPlanPath: config.getApprovedPlanPath(),
           }),
           isPlanMode,
@@ -182,7 +184,6 @@ export class PromptProvider {
           'operationalGuidelines',
           () => ({
             interactive: interactiveMode,
-            isGemini3,
             enableShellEfficiency: config.getEnableShellOutputEfficiency(),
             interactiveShellEnabled: config.isInteractiveShellEnabled(),
           }),
@@ -198,7 +199,7 @@ export class PromptProvider {
           () => ({ interactive: interactiveMode }),
           isGitRepository(process.cwd()) ? true : false,
         ),
-        finalReminder: isGemini3
+        finalReminder: isModernModel
           ? undefined
           : this.withSection('finalReminder', () => ({
               readFileToolName: READ_FILE_TOOL_NAME,
@@ -233,9 +234,12 @@ export class PromptProvider {
   }
 
   getCompressionPrompt(config: Config): string {
-    const desiredModel = resolveModel(config.getActiveModel());
-    const isGemini3 = isPreviewModel(desiredModel);
-    const activeSnippets = isGemini3 ? snippets : legacySnippets;
+    const desiredModel = resolveModel(
+      config.getActiveModel(),
+      config.getGemini31LaunchedSync?.() ?? false,
+    );
+    const isModernModel = supportsModernFeatures(desiredModel);
+    const activeSnippets = isModernModel ? snippets : legacySnippets;
     return activeSnippets.getCompressionPrompt();
   }
 

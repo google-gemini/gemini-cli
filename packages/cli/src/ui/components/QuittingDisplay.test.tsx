@@ -39,15 +39,17 @@ describe('QuittingDisplay', () => {
     mockUseTerminalSize.mockReturnValue({ rows: 20, columns: 80 });
   });
 
-  it('renders nothing when no quitting messages', () => {
+  it('renders nothing when no quitting messages', async () => {
     mockUseUIState.mockReturnValue({
       quittingMessages: null,
     } as unknown as UIState);
-    const { lastFrame } = render(<QuittingDisplay />);
-    expect(lastFrame()).toBe('');
+    const { lastFrame, waitUntilReady, unmount } = render(<QuittingDisplay />);
+    await waitUntilReady();
+    expect(lastFrame({ allowEmpty: true })).toBe('');
+    unmount();
   });
 
-  it('renders quitting messages', () => {
+  it('renders quitting messages', async () => {
     const mockMessages = [
       { id: '1', type: 'user', content: 'Goodbye' },
       { id: '2', type: 'model', content: 'See you later' },
@@ -56,8 +58,10 @@ describe('QuittingDisplay', () => {
       quittingMessages: mockMessages,
       constrainHeight: false,
     } as unknown as UIState);
-    const { lastFrame } = render(<QuittingDisplay />);
+    const { lastFrame, waitUntilReady, unmount } = render(<QuittingDisplay />);
+    await waitUntilReady();
     expect(lastFrame()).toContain('Goodbye');
     expect(lastFrame()).toContain('See you later');
+    unmount();
   });
 });

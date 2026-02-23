@@ -5,19 +5,20 @@
 #
 # Priority bands (tiers):
 # - Default policies (TOML): 1 + priority/1000 (e.g., priority 100 → 1.100)
-# - User policies (TOML): 2 + priority/1000 (e.g., priority 100 → 2.100)
-# - Admin policies (TOML): 3 + priority/1000 (e.g., priority 100 → 3.100)
+# - Workspace policies (TOML): 2 + priority/1000 (e.g., priority 100 → 2.100)
+# - User policies (TOML): 3 + priority/1000 (e.g., priority 100 → 3.100)
+# - Admin policies (TOML): 4 + priority/1000 (e.g., priority 100 → 4.100)
 #
-# This ensures Admin > User > Default hierarchy is always preserved,
+# This ensures Admin > User > Workspace > Default hierarchy is always preserved,
 # while allowing user-specified priorities to work within each tier.
 #
-# Settings-based and dynamic rules (all in user tier 2.x):
-#   2.95: Tools that the user has selected as "Always Allow" in the interactive UI
-#   2.9:  MCP servers excluded list (security: persistent server blocks)
-#   2.4:  Command line flag --exclude-tools (explicit temporary blocks)
-#   2.3:  Command line flag --allowed-tools (explicit temporary allows)
-#   2.2:  MCP servers with trust=true (persistent trusted servers)
-#   2.1:  MCP servers allowed list (persistent general server allows)
+# Settings-based and dynamic rules (all in user tier 3.x):
+#   3.95: Tools that the user has selected as "Always Allow" in the interactive UI
+#   3.9:  MCP servers excluded list (security: persistent server blocks)
+#   3.4:  Command line flag --exclude-tools (explicit temporary blocks)
+#   3.3:  Command line flag --allowed-tools (explicit temporary allows)
+#   3.2:  MCP servers with trust=true (persistent trusted servers)
+#   3.1:  MCP servers allowed list (persistent general server allows)
 #
 # TOML policy priorities (before transformation):
 #   10: Write tools default to ASK_USER (becomes 1.010 in default tier)
@@ -54,3 +55,11 @@ decision = "allow"
 priority = 70
 modes = ["plan"]
 argsPattern = "\"file_path\":\"[^\"]+/\\.gemini/tmp/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+/plans/[a-zA-Z0-9_-]+\\.md\""
+
+# Explicitly Deny other write operations in Plan mode with a clear message.
+[[rule]]
+toolName = ["write_file", "edit"]
+decision = "deny"
+priority = 65
+modes = ["plan"]
+deny_message = "You are in Plan Mode and cannot modify source code. You may ONLY use write_file or replace to save plans to the designated plans directory as .md files."
