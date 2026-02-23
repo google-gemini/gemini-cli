@@ -1589,6 +1589,151 @@ describe('runNonInteractive', () => {
     expect(sanitizedOutput).toMatchSnapshot();
   });
 
+  it('should emit thought events in stream-json mode', async () => {
+    vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
+      OutputFormat.STREAM_JSON,
+    );
+    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+      MOCK_SESSION_METRICS,
+    );
+
+    const events: ServerGeminiStreamEvent[] = [
+      {
+        type: GeminiEventType.Thought,
+        value: { subject: 'Planning', description: 'Considering the answer.' },
+      },
+      { type: GeminiEventType.Content, value: 'The answer is 42.' },
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'What is the meaning of life?',
+      prompt_id: 'prompt-id-thought-stream',
+    });
+
+    const output = getWrittenOutput();
+    const lines = output
+      .trim()
+      .split('\n')
+      .map((l) => JSON.parse(l));
+    const thoughtEvents = lines.filter((e) => e.type === 'thought');
+    expect(thoughtEvents).toHaveLength(1);
+    expect(thoughtEvents[0].content).toBe('Planning: Considering the answer.');
+  });
+
+  it('should include thoughts in JSON output', async () => {
+    vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+      MOCK_SESSION_METRICS,
+    );
+
+    const events: ServerGeminiStreamEvent[] = [
+      {
+        type: GeminiEventType.Thought,
+        value: {
+          subject: 'Analyzing',
+          description: 'Breaking down the query.',
+        },
+      },
+      {
+        type: GeminiEventType.Thought,
+        value: { subject: '', description: 'Simple thought without subject.' },
+      },
+      { type: GeminiEventType.Content, value: 'Hello World' },
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Test input',
+      prompt_id: 'prompt-id-thought-json',
+    });
+
+    const output = getWrittenOutput();
+    const parsed = JSON.parse(output);
+    expect(parsed.response).toBe('Hello World');
+    expect(parsed.thoughts).toEqual([
+      'Analyzing: Breaking down the query.',
+      'Simple thought without subject.',
+    ]);
+  });
+
+  it('should write thoughts to stderr in text mode', async () => {
+    vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.TEXT);
+
+    const events: ServerGeminiStreamEvent[] = [
+      {
+        type: GeminiEventType.Thought,
+        value: { subject: 'Reflecting', description: 'On the question.' },
+      },
+      { type: GeminiEventType.Content, value: 'Response text' },
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Test input',
+      prompt_id: 'prompt-id-thought-text',
+    });
+
+    expect(processStderrSpy).toHaveBeenCalledWith(
+      'Thinking: Reflecting: On the question.\n',
+    );
+    expect(getWrittenOutput()).toBe('Response text\n');
+  });
+
+  it('should omit thoughts from JSON output when none occur', async () => {
+    vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+      MOCK_SESSION_METRICS,
+    );
+
+    const events: ServerGeminiStreamEvent[] = [
+      { type: GeminiEventType.Content, value: 'No thoughts here' },
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Test input',
+      prompt_id: 'prompt-id-no-thoughts',
+    });
+
+    const output = getWrittenOutput();
+    const parsed = JSON.parse(output);
+    expect(parsed.response).toBe('No thoughts here');
+    expect(parsed.thoughts).toBeUndefined();
+  });
+
   it('should handle EPIPE error gracefully', async () => {
     const events: ServerGeminiStreamEvent[] = [
       { type: GeminiEventType.Content, value: 'Hello' },

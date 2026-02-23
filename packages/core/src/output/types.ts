@@ -21,6 +21,7 @@ export interface JsonError {
 export interface JsonOutput {
   session_id?: string;
   response?: string;
+  thoughts?: string[];
   stats?: SessionMetrics;
   error?: JsonError;
 }

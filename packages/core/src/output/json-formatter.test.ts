@@ -331,4 +331,79 @@ describe('JsonFormatter', () => {
     expect(parsed.error.message).toBe('Error\x07 with\x08 control\x0B chars');
     expect(() => JSON.parse(formatted)).not.toThrow();
   });
+
+  it('should include thoughts when provided', () => {
+    const formatter = new JsonFormatter();
+    const response = 'The answer is 42.';
+    const thoughts = [
+      'Analyzing the question: Considering philosophical implications.',
+      'The user wants a brief answer.',
+    ];
+    const formatted = formatter.format(
+      undefined,
+      response,
+      undefined,
+      undefined,
+      thoughts,
+    );
+    const parsed = JSON.parse(formatted);
+    expect(parsed).toEqual({
+      response,
+      thoughts,
+    });
+  });
+
+  it('should omit thoughts when array is empty', () => {
+    const formatter = new JsonFormatter();
+    const response = 'Simple response.';
+    const formatted = formatter.format(
+      undefined,
+      response,
+      undefined,
+      undefined,
+      [],
+    );
+    const parsed = JSON.parse(formatted);
+    expect(parsed).toEqual({ response });
+    expect(parsed.thoughts).toBeUndefined();
+  });
+
+  it('should include thoughts with response, stats, and session ID', () => {
+    const formatter = new JsonFormatter();
+    const response = 'Full response.';
+    const sessionId = 'test-session';
+    const stats: SessionMetrics = {
+      models: {},
+      tools: {
+        totalCalls: 0,
+        totalSuccess: 0,
+        totalFail: 0,
+        totalDurationMs: 0,
+        totalDecisions: {
+          accept: 0,
+          reject: 0,
+          modify: 0,
+          auto_accept: 0,
+        },
+        byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
+      },
+    };
+    const thoughts = ['Planning the response.'];
+    const formatted = formatter.format(
+      sessionId,
+      response,
+      stats,
+      undefined,
+      thoughts,
+    );
+    const parsed = JSON.parse(formatted);
+    expect(parsed.session_id).toBe(sessionId);
+    expect(parsed.response).toBe(response);
+    expect(parsed.thoughts).toEqual(thoughts);
+    expect(parsed.stats).toEqual(stats);
+  });
 });

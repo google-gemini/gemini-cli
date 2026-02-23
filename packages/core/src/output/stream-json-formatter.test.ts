@@ -13,6 +13,7 @@ import type {
   ToolUseEvent,
   ToolResultEvent,
   ErrorEvent,
+  ThoughtEvent,
   ResultEvent,
 } from './types.js';
 import type { SessionMetrics } from '../telemetry/uiTelemetry.js';
@@ -181,6 +182,19 @@ describe('StreamJsonFormatter', () => {
           duration_ms: 1200,
           tool_calls: 0,
         },
+      };
+
+      const result = formatter.formatEvent(event);
+
+      expect(result).toBe(JSON.stringify(event) + '\n');
+      expect(JSON.parse(result.trim())).toEqual(event);
+    });
+
+    it('should format thought event', () => {
+      const event: ThoughtEvent = {
+        type: JsonStreamEventType.THOUGHT,
+        timestamp: '2025-10-10T12:00:00.000Z',
+        content: 'Planning: Considering the best approach.',
       };
 
       const result = formatter.formatEvent(event);

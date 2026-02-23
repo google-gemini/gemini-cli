@@ -309,22 +309,27 @@ export async function runNonInteractive({
         );
 
         let responseText = '';
+        const thoughts: string[] = [];
         for await (const event of responseStream) {
           if (abortController.signal.aborted) {
             handleCancellationError(config);
           }
 
           if (event.type === GeminiEventType.Thought) {
+            const thought = event.value;
+            const content = thought.subject
+              ? `${thought.subject}: ${thought.description}`
+              : thought.description;
             if (streamFormatter) {
-              const thought = event.value;
-              const content = thought.subject
-                ? `${thought.subject}: ${thought.description}`
-                : thought.description;
               streamFormatter.emitEvent({
                 type: JsonStreamEventType.THOUGHT,
                 timestamp: new Date().toISOString(),
                 content,
               });
+            } else if (config.getOutputFormat() === OutputFormat.JSON) {
+              thoughts.push(content);
+            } else {
+              process.stderr.write(`Thinking: ${content}\n`);
             }
           } else if (event.type === GeminiEventType.Content) {
             const isRaw =
@@ -497,7 +502,13 @@ export async function runNonInteractive({
               const formatter = new JsonFormatter();
               const stats = uiTelemetryService.getMetrics();
               textOutput.write(
-                formatter.format(config.getSessionId(), responseText, stats),
+                formatter.format(
+                  config.getSessionId(),
+                  responseText,
+                  stats,
+                  undefined,
+                  thoughts,
+                ),
               );
             } else {
               textOutput.ensureTrailingNewline(); // Ensure a final newline
@@ -521,7 +532,13 @@ export async function runNonInteractive({
             const formatter = new JsonFormatter();
             const stats = uiTelemetryService.getMetrics();
             textOutput.write(
-              formatter.format(config.getSessionId(), responseText, stats),
+              formatter.format(
+                config.getSessionId(),
+                responseText,
+                stats,
+                undefined,
+                thoughts,
+              ),
             );
           } else {
             textOutput.ensureTrailingNewline(); // Ensure a final newline

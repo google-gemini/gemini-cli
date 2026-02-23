@@ -14,6 +14,7 @@ export class JsonFormatter {
     response?: string,
     stats?: SessionMetrics,
     error?: JsonError,
+    thoughts?: string[],
   ): string {
     const output: JsonOutput = {};
 
@@ -23,6 +24,10 @@ export class JsonFormatter {
 
     if (response !== undefined) {
       output.response = stripAnsi(response);
+    }
+
+    if (thoughts && thoughts.length > 0) {
+      output.thoughts = thoughts;
     }
 
     if (stats) {
