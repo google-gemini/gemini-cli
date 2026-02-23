@@ -34,20 +34,6 @@ export function safeJsonStringify(
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function removeEmptyObjects(data: any): object {
-  const cleanedObject: { [key: string]: unknown } = {};
-  for (const k in data) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const v = data[k];
-    if (v !== null && v !== undefined && typeof v === 'boolean') {
-      cleanedObject[k] = v;
-    }
-  }
-
-  return cleanedObject;
-}
-
 /**
  * Redacts API keys and credentials from proxy URLs.
  * Removes user:password@ from URLs like http://api-key@proxy.example.com:8080
@@ -106,7 +92,7 @@ export function safeJsonStringifyBooleanValuesOnly(obj: any): string {
     }
   }
 
-  return JSON.stringify(removeEmptyObjects(obj), (key, value) => {
+  return JSON.stringify(obj, (key, value) => {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     if ((value as Config) !== null && !configSeen) {
       configSeen = true;
