@@ -909,5 +909,25 @@ describe('WebFetchTool', () => {
       expect(result.llmContent).toContain('Error');
       expect(result.llmContent).toContain('exceeds size limit');
     });
+
+    it('should return error if url is missing (experimental)', async () => {
+      const tool = new WebFetchTool(mockConfig, bus);
+      // Manually bypass build() validation to test executeExperimental safety check
+      const invocation = tool['createInvocation']({}, bus);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).toContain('Error: No URL provided.');
+      expect(result.error?.type).toBe(ToolErrorType.INVALID_TOOL_PARAMS);
+    });
+
+    it('should return error if url is invalid (experimental)', async () => {
+      const tool = new WebFetchTool(mockConfig, bus);
+      // Manually bypass build() validation to test executeExperimental safety check
+      const invocation = tool['createInvocation']({ url: 'not-a-url' }, bus);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).toContain('Error: Invalid URL "not-a-url"');
+      expect(result.error?.type).toBe(ToolErrorType.INVALID_TOOL_PARAMS);
+    });
   });
 });

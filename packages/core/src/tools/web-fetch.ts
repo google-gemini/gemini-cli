@@ -347,18 +347,26 @@ ${textContent}
   }
 
   private async executeExperimental(_signal: AbortSignal): Promise<ToolResult> {
-    let url: string;
-    if (this.params.url) {
-      url = new URL(this.params.url).href;
-    } else if (this.params.prompt) {
-      const { validUrls } = parsePrompt(this.params.prompt);
-      url = validUrls[0];
-    } else {
+    if (!this.params.url) {
       return {
         llmContent: 'Error: No URL provided.',
         returnDisplay: 'Error: No URL provided.',
         error: {
           message: 'No URL provided.',
+          type: ToolErrorType.INVALID_TOOL_PARAMS,
+        },
+      };
+    }
+
+    let url: string;
+    try {
+      url = new URL(this.params.url).href;
+    } catch {
+      return {
+        llmContent: `Error: Invalid URL "${this.params.url}"`,
+        returnDisplay: `Error: Invalid URL "${this.params.url}"`,
+        error: {
+          message: `Invalid URL "${this.params.url}"`,
           type: ToolErrorType.INVALID_TOOL_PARAMS,
         },
       };
