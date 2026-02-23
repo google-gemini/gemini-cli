@@ -18,11 +18,7 @@ import type {
 } from './types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { A2AClientManager } from './a2a-client-manager.js';
-import {
-  extractIdsFromResponse,
-  getDelta,
-  extractAnyText,
-} from './a2aUtils.js';
+import { extractIdsFromResponse, extractAnyText } from './a2aUtils.js';
 import { GoogleAuth } from 'google-auth-library';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -172,13 +168,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
 
         if (currentText && currentText !== lastText) {
           if (updateOutput) {
-            const delta = getDelta(currentText, lastText);
-            if (delta) {
-              if (delta === currentText && lastText !== '') {
-                updateOutput('\n');
-              }
-              updateOutput(delta);
-            }
+            updateOutput(currentText);
           }
           lastText = currentText;
         }

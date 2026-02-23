@@ -175,6 +175,7 @@ describe('a2aUtils', () => {
     it('should extract text from task status message', () => {
       const task: Task = {
         id: 't1',
+        contextId: 'ctx-1',
         kind: 'task',
         status: {
           state: 'working',

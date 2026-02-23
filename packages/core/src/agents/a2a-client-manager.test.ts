@@ -190,7 +190,7 @@ describe('A2AClientManager', () => {
         role: 'agent',
       } as SendMessageResult;
 
-      sendMessageStreamMock.mockResolvedValue(
+      sendMessageStreamMock.mockReturnValue(
         (async function* () {
           yield mockResult;
         })(),
@@ -211,7 +211,7 @@ describe('A2AClientManager', () => {
     });
 
     it('should use contextId and taskId when provided', async () => {
-      sendMessageStreamMock.mockResolvedValue(
+      sendMessageStreamMock.mockReturnValue(
         (async function* () {
           yield {
             kind: 'message',
@@ -230,7 +230,6 @@ describe('A2AClientManager', () => {
         taskId: expectedTaskId,
       });
 
-       
       for await (const _ of stream) {
         // consume stream
       }
@@ -241,23 +240,23 @@ describe('A2AClientManager', () => {
     });
 
     it('should throw prefixed error on failure', async () => {
-      sendMessageStreamMock.mockRejectedValueOnce(new Error('Network error'));
+      sendMessageStreamMock.mockImplementationOnce(() => {
+        throw new Error('Network error');
+      });
 
       const stream = manager.sendMessageStream('TestAgent', 'Hello');
       await expect(async () => {
-         
         for await (const _ of stream) {
           // consume
         }
       }).rejects.toThrow(
-        'A2AClient SendMessageStream Error [TestAgent]: Network error',
+        '[A2AClientManager] sendMessageStream Error [TestAgent]: Network error',
       );
     });
 
     it('should throw an error if the agent is not found', async () => {
       const stream = manager.sendMessageStream('NonExistentAgent', 'Hello');
       await expect(async () => {
-         
         for await (const _ of stream) {
           // consume
         }
