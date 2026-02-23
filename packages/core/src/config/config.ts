@@ -578,8 +578,7 @@ export class Config {
   private readonly bugCommand: BugCommandSettings | undefined;
   private model: string;
   private readonly disableLoopDetection: boolean;
-  // null = unknown (quota not fetched); true = has access; false = definitively no access
-  private hasAccessToPreviewModel: boolean | null = null;
+  private hasAccessToPreviewModel: boolean = false;
   private readonly noBrowser: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
@@ -1114,9 +1113,8 @@ export class Config {
       this.setHasAccessToPreviewModel(true);
     }
 
-    // Only reset when we have explicit "no access" (hasAccessToPreviewModel === false).
-    // When null (quota not fetched) or true, we preserve the saved model.
-    if (isPreviewModel(this.model) && this.hasAccessToPreviewModel === false) {
+    // Update model if user no longer has access to the preview model
+    if (!this.hasAccessToPreviewModel && isPreviewModel(this.model)) {
       this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
     }
 
@@ -1453,10 +1451,10 @@ export class Config {
   }
 
   getHasAccessToPreviewModel(): boolean {
-    return this.hasAccessToPreviewModel !== false;
+    return this.hasAccessToPreviewModel;
   }
 
-  setHasAccessToPreviewModel(hasAccess: boolean | null): void {
+  setHasAccessToPreviewModel(hasAccess: boolean): void {
     this.hasAccessToPreviewModel = hasAccess;
   }
 
