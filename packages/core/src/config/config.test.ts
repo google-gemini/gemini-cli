@@ -36,7 +36,8 @@ import {
   DEFAULT_OTLP_ENDPOINT,
   uiTelemetryService,
 } from '../telemetry/index.js';
-import type { ContentGenerator ,
+import type { ContentGenerator } from '../core/contentGenerator.js';
+import {
   AuthType,
   createContentGenerator,
   createContentGeneratorConfig,
