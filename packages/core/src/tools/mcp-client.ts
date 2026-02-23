@@ -71,6 +71,7 @@ import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from '../services/environmentSanitization.js';
+import { expandEnvVars } from '../utils/envExpansion.js';
 import {
   GEMINI_CLI_IDENTIFICATION_ENV_VAR,
   GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
@@ -755,7 +756,7 @@ function createTransportRequestInit(
 
   return {
     headers: {
-      ...mcpServerConfig.headers,
+      ...expandedHeaders,
       ...headers,
     },
   };
@@ -1964,12 +1965,7 @@ export async function createTransport(
     let transport: Transport = new StdioClientTransport({
       command: mcpServerConfig.command,
       args: mcpServerConfig.args || [],
-      env: {
-        ...sanitizeEnvironment(process.env, sanitizationConfig),
-        ...(mcpServerConfig.env || {}),
-        [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
-          GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
-      } as Record<string, string>,
+      env: finalEnv,
       cwd: mcpServerConfig.cwd,
       stderr: 'pipe',
     });
