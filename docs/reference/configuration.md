@@ -137,12 +137,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
-- **`general.enablePromptCompletion`** (boolean):
-  - **Description:** Enable AI-powered prompt completion suggestions while
-    typing.
-  - **Default:** `false`
-  - **Requires restart:** Yes
-
 - **`general.retryFetchErrors`** (boolean):
   - **Description:** Retry on "exception TypeError: fetch failed sending
     request" errors.
