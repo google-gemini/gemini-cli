@@ -110,13 +110,16 @@ describe('FileTokenStorage', () => {
     it('should throw error with file path when file is corrupted', async () => {
       mockFs.readFile.mockResolvedValue('corrupted-data');
 
-      const error = await storage
-        .getCredentials('test-server')
-        .catch((e) => e as Error);
-
-      expect(error.message).toContain('Corrupted token file detected at:');
-      expect(error.message).toContain('mcp-oauth-tokens-v2.json');
-      expect(error.message).toContain('delete or rename');
+      try {
+        await storage.getCredentials('test-server');
+        expect.fail('Expected error to be thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        const err = error as Error;
+        expect(err.message).toContain('Corrupted token file detected at:');
+        expect(err.message).toContain('mcp-oauth-tokens-v2.json');
+        expect(err.message).toContain('delete or rename');
+      }
     });
   });
 
@@ -136,13 +139,16 @@ describe('FileTokenStorage', () => {
       };
 
       // Should throw error with file path
-      const error = await storage
-        .setCredentials(newCredentials)
-        .catch((e) => e as Error);
-
-      expect(error.message).toContain('Corrupted token file detected at:');
-      expect(error.message).toContain('mcp-oauth-tokens-v2.json');
-      expect(error.message).toContain('delete or rename');
+      try {
+        await storage.setCredentials(newCredentials);
+        expect.fail('Expected error to be thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        const err = error as Error;
+        expect(err.message).toContain('Corrupted token file detected at:');
+        expect(err.message).toContain('mcp-oauth-tokens-v2.json');
+        expect(err.message).toContain('delete or rename');
+      }
     });
   });
 
