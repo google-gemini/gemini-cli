@@ -128,6 +128,13 @@
           "default": false,
           "type": "boolean"
         },
+        "maxAttempts": {
+          "title": "Max Chat Model Attempts",
+          "description": "Maximum number of attempts for requests to the main chat model. Cannot exceed 10.",
+          "markdownDescription": "Maximum number of attempts for requests to the main chat model. Cannot exceed 10.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `10`",
+          "default": 10,
+          "type": "number"
+        },
         "debugKeystrokeLogging": {
           "title": "Debug Keystroke Logging",
           "description": "Enable debug logging of keystrokes to the console.",
