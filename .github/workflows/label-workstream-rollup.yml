@@ -1,91 +1,50 @@
-name: "CodeQL Smart Analysis"
+steps:
+  - name: 'Checkout'
+    uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
+    with:
+      ref: '${{ needs.parse_run_context.outputs.sha }}'
+      repository: '${{ needs.parse_run_context.outputs.repository }}'
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  schedule:
-    - cron: "0 0 * * 0"  # Weekly Sunday run
-  workflow_dispatch:
+  - name: 'Set up Node.js 20.x'
+    uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
+    with:
+      node-version: '20.x'
+      cache: 'npm'
 
-concurrency:
-  group: codeql-analysis
-  cancel-in-progress: false
+  - name: 'Configure Windows Defender exclusions'
+    run: |
+      Add-MpPreference -ExclusionPath $env:GITHUB_WORKSPACE -Force
+      Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\node_modules" -Force
+      Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\packages" -Force
+      Add-MpPreference -ExclusionPath "$env:TEMP" -Force
+    shell: 'pwsh'
 
-jobs:
-  analyze:
-    name: Smart CodeQL Analysis
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
+  - name: 'Configure npm for Windows performance'
+    run: |
+      npm config set progress false
+      npm config set audit false
+      npm config set fund false
+      npm config set loglevel error
+      npm config set maxsockets 32
+      npm config set registry https://registry.npmjs.org/
+    shell: 'pwsh'
 
-    steps:
-      # ⬇️ Get your repository code
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+  - name: 'Install dependencies'
+    run: 'npm ci'
+    shell: 'pwsh'
 
-      # 🧠 Detect repository’s primary languages using GitHub’s Linguist
-      - name: Detect Repository Languages
-        id: detect_lang
-        run: |
-          echo "Detecting repo languages..."
-          curl -s -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/languages" \
-            | jq -r 'keys | map(ascii_downcase) | join(",")' > detected_langs.txt
+  - name: 'Build project'
+    run: 'npm run build'
+    shell: 'pwsh'
 
-          detected=$(cat detected_langs.txt)
-          echo "Detected languages: $detected"
-          if [ -z "$detected" ]; then
-            echo "No languages detected — defaulting to javascript."
-            echo "language=javascript" >> $GITHUB_OUTPUT
-          else
-            # Map GitHub language keys to CodeQL-compatible identifiers
-            langs=""
-            for lang in $(echo $detected | tr "," " "); do
-              case "$lang" in
-                javascript|typescript) langs="${langs},javascript" ;;
-                python) langs="${langs},python" ;;
-                java) langs="${langs},java" ;;
-                c|cpp|c++) langs="${langs},cpp" ;;
-                c#|csharp) langs="${langs},csharp" ;;
-                go) langs="${langs},go" ;;
-              esac
-            done
-            langs=$(echo $langs | sed 's/^,//')
-            echo "language=$langs" >> $GITHUB_OUTPUT
-            echo "Languages prepared for CodeQL: $langs"
-          fi
-
-      # 🧩 Initialize CodeQL with detected languages
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: ${{ steps.detect_lang.outputs.language }}
-          queries: +security-and-quality
-
-      # 🧱 Try to build automatically if needed (Java, C++, C#, etc.)
-      - name: Autobuild Project
-        uses: github/codeql-action/autobuild@v3
-
-      # 🧠 If autobuild fails, you can manually specify build commands:
-      # - name: Manual Build
-      #   run: |
-      #     npm ci && npm run build
-      #     # or pip install -r requirements.txt
-      #     # or mvn package
-
-      # 🔍 Perform static analysis and upload results
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-        with:
-          upload: true
-          category: "/auto:detected"
-
-      # ✅ Log results for workflow summary
-      - name: Summary
-        run: |
-          echo "✅ CodeQL smart scan complete."
-          echo "Results available in Security → Code scanning alerts."
+  - name: 'Run E2E tests'
+    env:
+      GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+      KEEP_OUTPUT: 'true'
+      SANDBOX: 'sandbox:none'
+      VERBOSE: 'true'
+      NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
+      UV_THREADPOOL_SIZE: '32'
+      NODE_ENV: 'test'
+    shell: 'pwsh'
+    run: 'npm run test:integration:sandbox:none'
