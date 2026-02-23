@@ -243,7 +243,10 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   const styledHeaders = useMemo(
     () =>
       headers.map((header) =>
-        parseMarkdownToStyledChars(stripUnsafeCharacters(header), theme.text.link),
+        parseMarkdownToStyledChars(
+          stripUnsafeCharacters(header),
+          theme.text.link,
+        ),
       ),
     [headers],
   );
@@ -251,7 +254,12 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   const styledRows = useMemo(
     () =>
       rows.map((row) =>
-        row.map((cell) => parseMarkdownToStyledChars(stripUnsafeCharacters(cell), theme.text.primary)),
+        row.map((cell) =>
+          parseMarkdownToStyledChars(
+            stripUnsafeCharacters(cell),
+            theme.text.primary,
+          ),
+        ),
       ),
     [rows],
   );
