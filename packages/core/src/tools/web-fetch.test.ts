@@ -217,6 +217,12 @@ describe('convertGithubUrlToRaw', () => {
     ).toBe('https://mygithub.com/user/repo/blob/main');
   });
 
+  it('should only replace the /blob/ that separates repo from branch', () => {
+    expect(
+      convertGithubUrlToRaw('https://github.com/blob/repo/blob/main/test.ts'),
+    ).toBe('https://raw.githubusercontent.com/blob/repo/main/test.ts');
+  });
+
   it('should not convert urls if blob is not in path', () => {
     expect(
       convertGithubUrlToRaw('https://github.com/user/repo/tree/main'),
@@ -815,7 +821,7 @@ describe('WebFetchTool', () => {
           selectors: [
             expect.objectContaining({
               selector: 'a',
-              options: { ignoreHref: false },
+              options: { ignoreHref: false, baseUrl: 'https://example.com/' },
             }),
           ],
         }),

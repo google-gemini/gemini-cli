@@ -18,6 +18,7 @@ import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
+import { truncateString } from '../utils/textUtils.js';
 import { convert } from 'html-to-text';
 import {
   logWebFetchFallbackAttempt,
@@ -34,6 +35,9 @@ import { LRUCache } from 'mnemonist';
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
 const MAX_EXPERIMENTAL_FETCH_SIZE = 10 * 1024 * 1024; // 10MB
+const USER_AGENT =
+  'Mozilla/5.0 (compatible; Google-Gemini-CLI/1.0; +https://github.com/google-gemini/gemini-cli)';
+const TRUNCATION_WARNING = '\n\n... [Content truncated due to size limit] ...';
 
 // Rate limiting configuration
 const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
@@ -116,7 +120,7 @@ export function convertGithubUrlToRaw(urlStr: string): string {
     const url = new URL(urlStr);
     if (url.hostname === 'github.com' && url.pathname.includes('/blob/')) {
       url.hostname = 'raw.githubusercontent.com';
-      url.pathname = url.pathname.replace('/blob/', '/');
+      url.pathname = url.pathname.replace(/^\/([^/]+\/[^/]+)\/blob\//, '/$1/');
       return url.href;
     }
   } catch {
@@ -189,7 +193,12 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     try {
       const response = await retryWithBackoff(
         async () => {
-          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS);
+          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
+            signal,
+            headers: {
+              'User-Agent': USER_AGENT,
+            },
+          });
           if (!res.ok) {
             const error = new Error(
               `Request failed with status code ${res.status} ${res.statusText}`,
@@ -229,7 +238,11 @@ class WebFetchToolInvocation extends BaseToolInvocation<
         textContent = rawContent;
       }
 
-      textContent = textContent.substring(0, MAX_CONTENT_LENGTH);
+      textContent = truncateString(
+        textContent,
+        MAX_CONTENT_LENGTH,
+        TRUNCATION_WARNING,
+      );
 
       const geminiClient = this.config.getGeminiClient();
       const fallbackPrompt = `The user requested the following: "${this.params.prompt}".
@@ -346,7 +359,7 @@ ${textContent}
     return Buffer.concat(chunks);
   }
 
-  private async executeExperimental(_signal: AbortSignal): Promise<ToolResult> {
+  private async executeExperimental(signal: AbortSignal): Promise<ToolResult> {
     if (!this.params.url) {
       return {
         llmContent: 'Error: No URL provided.',
@@ -379,9 +392,11 @@ ${textContent}
       const response = await retryWithBackoff(
         async () => {
           const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
+            signal,
             headers: {
               Accept:
                 'text/markdown, text/plain;q=0.9, application/json;q=0.9, text/html;q=0.8, application/pdf;q=0.7, video/*;q=0.7, */*;q=0.5',
+              'User-Agent': USER_AGENT,
             },
           });
           return res;
@@ -406,7 +421,7 @@ ${textContent}
         });
         const errorContent = `Request failed with status ${status}
 Headers: ${JSON.stringify(headers, null, 2)}
-Response: ${rawResponseText}`;
+Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response truncated] ...')}`;
         return {
           llmContent: errorContent,
           returnDisplay: `Failed to fetch ${url} (Status: ${status})`,
@@ -419,21 +434,31 @@ Response: ${rawResponseText}`;
         lowContentType.includes('text/plain') ||
         lowContentType.includes('application/json')
       ) {
-        const text = bodyBuffer.toString('utf8');
+        const text = truncateString(
+          bodyBuffer.toString('utf8'),
+          MAX_CONTENT_LENGTH,
+          TRUNCATION_WARNING,
+        );
         return {
-          llmContent: text.substring(0, MAX_CONTENT_LENGTH),
+          llmContent: text,
           returnDisplay: `Fetched ${contentType} content from ${url}`,
         };
       }
 
       if (lowContentType.includes('text/html')) {
         const html = bodyBuffer.toString('utf8');
-        const textContent = convert(html, {
-          wordwrap: false,
-          selectors: [{ selector: 'a', options: { ignoreHref: false } }],
-        });
+        const textContent = truncateString(
+          convert(html, {
+            wordwrap: false,
+            selectors: [
+              { selector: 'a', options: { ignoreHref: false, baseUrl: url } },
+            ],
+          }),
+          MAX_CONTENT_LENGTH,
+          TRUNCATION_WARNING,
+        );
         return {
-          llmContent: textContent.substring(0, MAX_CONTENT_LENGTH),
+          llmContent: textContent,
           returnDisplay: `Fetched and converted HTML content from ${url}`,
         };
       }
@@ -456,9 +481,13 @@ Response: ${rawResponseText}`;
       }
 
       // Fallback for unknown types - try as text
-      const text = bodyBuffer.toString('utf8');
+      const text = truncateString(
+        bodyBuffer.toString('utf8'),
+        MAX_CONTENT_LENGTH,
+        TRUNCATION_WARNING,
+      );
       return {
-        llmContent: text.substring(0, MAX_CONTENT_LENGTH),
+        llmContent: text,
         returnDisplay: `Fetched ${contentType || 'unknown'} content from ${url}`,
       };
     } catch (e) {

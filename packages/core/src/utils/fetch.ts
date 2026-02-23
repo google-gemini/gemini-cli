@@ -46,6 +46,16 @@ export async function fetchWithTimeout(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
+  if (options?.signal) {
+    if (options.signal.aborted) {
+      controller.abort();
+    } else {
+      options.signal.addEventListener('abort', () => controller.abort(), {
+        once: true,
+      });
+    }
+  }
+
   try {
     const response = await fetch(url, {
       ...options,
