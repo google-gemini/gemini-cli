@@ -5,9 +5,7 @@
  */
 
 import { spawn, execSync } from 'node:child_process';
-import type { HookConfig } from './types.js';
 import { HookEventName, ConfigSource } from './types.js';
-import type { Config } from '../config/config.js';
 import type {
   HookConfig,
   HookInput,
@@ -18,7 +16,6 @@ import type {
   BeforeModelOutput,
   BeforeToolInput,
 } from './types.js';
-import { HookEventName, ConfigSource } from './types.js';
 import type { Config } from '../config/config.js';
 import type { LLMRequest } from './hookTranslator.js';
 import { debugLogger } from '../utils/debugLogger.js';
