@@ -1,10 +1,9 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "outDir": "dist",
     "lib": ["DOM", "DOM.Iterable", "ES2023"],
-    "jsx": "react-jsx",
-    "allowImportingTsExtensions": true,
-    "noEmit": true
+    "jsx": "react-jsx"
   },
   "include": ["src", "client/src"]
 }
