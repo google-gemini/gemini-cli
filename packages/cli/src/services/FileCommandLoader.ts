@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { promises as fs } from 'node:fs';
+import { promises as fs, existsSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import toml from '@iarna/toml';
 import { glob } from 'glob';
 import { z } from 'zod';
@@ -150,6 +151,28 @@ export class FileCommandLoader implements ICommandLoader {
 
     const storage = this.config?.storage ?? new Storage(this.projectRoot);
 
+    // 0. Built-in Packaged Commands
+    // Safely resolve the current directory for both ESM and CommonJS
+    const currentDir =
+      typeof __dirname !== 'undefined'
+        ? __dirname
+        : path.dirname(fileURLToPath(import.meta.url));
+
+    // Production path: When bundled, __dirname/currentDir is the bundle folder.
+    const builtInBundlePath = path.join(currentDir, 'commands');
+
+    // Local Dev path: Traverse up from packages/cli/src/services to the repo root.
+    const builtInDevPath = path.join(
+      currentDir,
+      '../../../../.gemini/commands',
+    );
+
+    if (existsSync(builtInBundlePath)) {
+      dirs.push({ path: builtInBundlePath });
+    } else if (existsSync(builtInDevPath)) {
+      dirs.push({ path: builtInDevPath });
+    }
+
     // 1. User commands
     dirs.push({ path: Storage.getUserCommandsDir() });
 
@@ -161,7 +184,7 @@ export class FileCommandLoader implements ICommandLoader {
       const activeExtensions = this.config
         .getExtensions()
         .filter((ext) => ext.isActive)
-        .sort((a, b) => a.name.localeCompare(b.name)); // Sort alphabetically for deterministic loading
+        .sort((a, b) => a.name.localeCompare(b.name));
 
       const extensionCommandDirs = activeExtensions.map((ext) => ({
         path: path.join(ext.path, 'commands'),

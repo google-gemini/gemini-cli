@@ -74,3 +74,14 @@ if (existsSync(builtinSkillsSrc)) {
 }
 
 console.log('Assets copied to bundle/');
+
+// 5. Copy Built-in Slash Commands (.gemini/commands)
+const commandsSrc = join(root, '.gemini/commands');
+const commandsDest = join(bundleDir, 'commands');
+if (existsSync(commandsSrc)) {
+  cpSync(commandsSrc, commandsDest, {
+    recursive: true,
+    dereference: true,
+  });
+  console.log('Copied built-in commands to bundle/commands/');
+}
