@@ -13,42 +13,51 @@ import path from 'node:path';
 export function useGitBranchName(cwd: string): string | undefined {
   const [branchName, setBranchName] = useState<string | undefined>(undefined);
 
-  const fetchBranchName = useCallback(async () => {
-    try {
-      const { stdout } = await spawnAsync(
-        'git',
-        ['rev-parse', '--abbrev-ref', 'HEAD'],
-        { cwd },
-      );
-      const branch = stdout.toString().trim();
-      if (branch && branch !== 'HEAD') {
-        setBranchName(branch);
-      } else {
-        const { stdout: hashStdout } = await spawnAsync(
+  const fetchBranchName = useCallback(
+    async (isMounted: () => boolean) => {
+      try {
+        const { stdout } = await spawnAsync(
           'git',
-          ['rev-parse', '--short', 'HEAD'],
+          ['rev-parse', '--abbrev-ref', 'HEAD'],
           { cwd },
         );
-        setBranchName(hashStdout.toString().trim());
+        if (!isMounted()) return;
+        const branch = stdout.toString().trim();
+        if (branch && branch !== 'HEAD') {
+          setBranchName(branch);
+        } else {
+          const { stdout: hashStdout } = await spawnAsync(
+            'git',
+            ['rev-parse', '--short', 'HEAD'],
+            { cwd },
+          );
+          if (!isMounted()) return;
+          setBranchName(hashStdout.toString().trim());
+        }
+      } catch (_error) {
+        if (isMounted()) {
+          setBranchName(undefined);
+        }
       }
-    } catch (_error) {
-      setBranchName(undefined);
-    }
-  }, [cwd, setBranchName]);
+    },
+    [cwd, setBranchName],
+  );
 
   useEffect(() => {
+    let cancelled = false;
+    const isMounted = () => !cancelled;
+
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    fetchBranchName(); // Initial fetch
+    fetchBranchName(isMounted); // Initial fetch
 
     const gitHeadPath = path.join(cwd, '.git', 'HEAD');
     const gitLogsHeadPath = path.join(cwd, '.git', 'logs', 'HEAD');
     const watchers: fs.FSWatcher[] = [];
-    let cancelled = false;
 
     const onFileChange = (eventType: string) => {
       if (eventType === 'change' || eventType === 'rename') {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        fetchBranchName();
+        fetchBranchName(isMounted);
       }
     };
 

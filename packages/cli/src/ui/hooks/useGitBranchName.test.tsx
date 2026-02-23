@@ -171,6 +171,11 @@ describe('useGitBranchName', () => {
     // Simulate file change event on .git/logs/HEAD
     await act(async () => {
       fs.writeFileSync(GIT_LOGS_HEAD_PATH, 'ref: refs/heads/develop');
+      // Trigger the watcher callback manually as memfs might not trigger it in all environments
+      const onFileChange = watchSpy.mock.calls.find(
+        (call) => call[0] === GIT_LOGS_HEAD_PATH,
+      )?.[1] as (eventType: string) => void;
+      if (onFileChange) onFileChange('change');
       rerender();
     });
 
@@ -208,6 +213,11 @@ describe('useGitBranchName', () => {
     // Simulate file change event on .git/HEAD (branch switch)
     await act(async () => {
       fs.writeFileSync(GIT_HEAD_PATH, 'ref: refs/heads/feature-branch');
+      // Trigger the watcher callback manually
+      const onFileChange = watchSpy.mock.calls.find(
+        (call) => call[0] === GIT_HEAD_PATH,
+      )?.[1] as (eventType: string) => void;
+      if (onFileChange) onFileChange('change');
       rerender();
     });
 
