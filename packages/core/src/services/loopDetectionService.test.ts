@@ -26,7 +26,7 @@ vi.mock('../telemetry/loggers.js', () => ({
   logLlmLoopCheck: vi.fn(),
 }));
 
-const TOOL_CALL_LOOP_THRESHOLD = 5;
+const TOOL_CALL_LOOP_THRESHOLD = 4;
 const CONTENT_LOOP_THRESHOLD = 10;
 const CONTENT_CHUNK_SIZE = 50;
 
@@ -806,15 +806,15 @@ describe('LoopDetectionService LLM Checks', () => {
   };
 
   it('should not trigger LLM check before LLM_CHECK_AFTER_TURNS', async () => {
-    await advanceTurns(29);
+    await advanceTurns(19);
     expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
   });
 
-  it('should trigger LLM check on the 30th turn', async () => {
+  it('should trigger LLM check on the 20th turn', async () => {
     mockBaseLlmClient.generateJson = vi
       .fn()
       .mockResolvedValue({ unproductive_state_confidence: 0.1 });
-    await advanceTurns(30);
+    await advanceTurns(20);
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -828,12 +828,12 @@ describe('LoopDetectionService LLM Checks', () => {
   });
 
   it('should detect a cognitive loop when confidence is high', async () => {
-    // First check at turn 30
+    // First check at turn 20
     mockBaseLlmClient.generateJson = vi.fn().mockResolvedValue({
       unproductive_state_confidence: 0.85,
       unproductive_state_analysis: 'Repetitive actions',
     });
-    await advanceTurns(30);
+    await advanceTurns(20);
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -843,13 +843,13 @@ describe('LoopDetectionService LLM Checks', () => {
 
     // The confidence of 0.85 will result in a low interval.
     // The interval will be: 5 + (15 - 5) * (1 - 0.85) = 5 + 10 * 0.15 = 6.5 -> rounded to 7
-    await advanceTurns(6); // advance to turn 36
+    await advanceTurns(6); // advance to turn 26
 
     mockBaseLlmClient.generateJson = vi.fn().mockResolvedValue({
       unproductive_state_confidence: 0.95,
       unproductive_state_analysis: 'Repetitive actions',
     });
-    const finalResult = await service.turnStarted(abortController.signal); // This is turn 37
+    const finalResult = await service.turnStarted(abortController.signal); // This is turn 27
 
     expect(finalResult).toBe(true);
     expect(loggers.logLoopDetected).toHaveBeenCalledWith(
@@ -867,7 +867,7 @@ describe('LoopDetectionService LLM Checks', () => {
       unproductive_state_confidence: 0.5,
       unproductive_state_analysis: 'Looks okay',
     });
-    await advanceTurns(30);
+    await advanceTurns(20);
     const result = await service.turnStarted(abortController.signal);
     expect(result).toBe(false);
     expect(loggers.logLoopDetected).not.toHaveBeenCalled();
@@ -878,13 +878,13 @@ describe('LoopDetectionService LLM Checks', () => {
     mockBaseLlmClient.generateJson = vi
       .fn()
       .mockResolvedValue({ unproductive_state_confidence: 0.0 });
-    await advanceTurns(30); // First check at turn 30
+    await advanceTurns(20); // First check at turn 20
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
 
-    await advanceTurns(14); // Advance to turn 44
+    await advanceTurns(14); // Advance to turn 34
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
 
-    await service.turnStarted(abortController.signal); // Turn 45
+    await service.turnStarted(abortController.signal); // Turn 35
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(2);
   });
 
@@ -892,7 +892,7 @@ describe('LoopDetectionService LLM Checks', () => {
     mockBaseLlmClient.generateJson = vi
       .fn()
       .mockRejectedValue(new Error('API error'));
-    await advanceTurns(30);
+    await advanceTurns(20);
     const result = await service.turnStarted(abortController.signal);
     expect(result).toBe(false);
     expect(loggers.logLoopDetected).not.toHaveBeenCalled();
@@ -901,7 +901,7 @@ describe('LoopDetectionService LLM Checks', () => {
   it('should not trigger LLM check when disabled for session', async () => {
     service.disableForSession();
     expect(loggers.logLoopDetectionDisabled).toHaveBeenCalledTimes(1);
-    await advanceTurns(30);
+    await advanceTurns(20);
     const result = await service.turnStarted(abortController.signal);
     expect(result).toBe(false);
     expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
@@ -924,7 +924,7 @@ describe('LoopDetectionService LLM Checks', () => {
       .fn()
       .mockResolvedValue({ unproductive_state_confidence: 0.1 });
 
-    await advanceTurns(30);
+    await advanceTurns(20);
 
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
     const calledArg = vi.mocked(mockBaseLlmClient.generateJson).mock
@@ -949,7 +949,7 @@ describe('LoopDetectionService LLM Checks', () => {
         unproductive_state_analysis: 'Main says loop',
       });
 
-    await advanceTurns(30);
+    await advanceTurns(20);
 
     // It should have called generateJson twice
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(2);
@@ -989,7 +989,7 @@ describe('LoopDetectionService LLM Checks', () => {
         unproductive_state_analysis: 'Main says no loop',
       });
 
-    await advanceTurns(30);
+    await advanceTurns(20);
 
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(2);
     expect(mockBaseLlmClient.generateJson).toHaveBeenNthCalledWith(
@@ -1032,7 +1032,7 @@ describe('LoopDetectionService LLM Checks', () => {
       unproductive_state_analysis: 'Flash says loop',
     });
 
-    await advanceTurns(30);
+    await advanceTurns(20);
 
     // It should have called generateJson only once
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
