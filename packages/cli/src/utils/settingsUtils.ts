@@ -100,7 +100,7 @@ export function getDefaultValue(key: string): SettingsValue {
 
 /**
  * Get the effective default value for a setting, checking experiment values when available.
- * For settings like compressionThreshold, this will return the experiment value if set,
+ * For settings like Context Compression Threshold, this will return the experiment value if set,
  * otherwise falls back to the schema default.
  */
 export function getEffectiveDefaultValue(
@@ -473,6 +473,10 @@ export function getDisplayValue(
   if (definition?.type === 'enum' && definition.options) {
     const option = definition.options?.find((option) => option.value === value);
     valueString = option?.label ?? `${value}`;
+  }
+
+  if (definition?.unit) {
+    valueString = `${valueString}${definition.unit}`;
   }
 
   // Check if value is different from default OR if it's in modified settings OR if there are pending changes

@@ -268,7 +268,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`ui.footer.hideContextPercentage`** (boolean):
-  - **Description:** Hides the context window remaining percentage.
+  - **Description:** Hides the context window usage percentage.
   - **Default:** `true`
 
 - **`ui.hideFooter`** (boolean):
@@ -390,9 +390,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
 
 - **`model.compressionThreshold`** (number):
-  - **Description:** The fraction of context usage at which to trigger context
-    compression (e.g. 0.2, 0.3).
-  - **Default:** `0.5`
+  - **Description:** The percentage of context usage at which to trigger context
+    compression (0-100).
+  - **Default:** `50` (50%)
   - **Requires restart:** Yes
 
 - **`model.disableLoopDetection`** (boolean):

@@ -1068,7 +1068,7 @@ export const useGeminiStream = (
       return addItem({
         type: 'info',
         text:
-          `IMPORTANT: This conversation exceeded the compress threshold. ` +
+          `IMPORTANT: This conversation exceeded the compression threshold. ` +
           `A compressed context will be sent for future messages (compressed from: ` +
           `${eventValue?.originalTokenCount ?? 'unknown'} to ` +
           `${eventValue?.newTokenCount ?? 'unknown'} tokens).`,
@@ -1094,12 +1094,12 @@ export const useGeminiStream = (
 
       const limit = tokenLimit(config.getModel());
 
-      const isLessThan75Percent =
+      const isMoreThan25PercentUsed =
         limit > 0 && remainingTokenCount < limit * 0.75;
 
-      let text = `Sending this message (${estimatedRequestTokenCount} tokens) might exceed the remaining context window limit (${remainingTokenCount} tokens).`;
+      let text = `Sending this message (${estimatedRequestTokenCount} tokens) might exceed the context window limit (${remainingTokenCount.toLocaleString()} tokens left).`;
 
-      if (isLessThan75Percent) {
+      if (isMoreThan25PercentUsed) {
         text +=
           ' Please try reducing the size of your message or use the `/compress` command to compress the chat history.';
       }

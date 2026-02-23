@@ -152,7 +152,6 @@ export const Footer: React.FC = () => {
                   <ContextUsageDisplay
                     promptTokenCount={promptTokenCount}
                     model={model}
-                    terminalWidth={terminalWidth}
                   />
                 </>
               )}
