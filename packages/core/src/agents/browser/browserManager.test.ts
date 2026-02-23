@@ -157,6 +157,10 @@ describe('BrowserManager', () => {
         ?.args as string[];
       expect(args).not.toContain('--isolated');
       expect(args).not.toContain('--autoConnect');
+      // Persistent mode should set the default --userDataDir under ~/.gemini
+      expect(args).toContain('--userDataDir');
+      const userDataDirIndex = args.indexOf('--userDataDir');
+      expect(args[userDataDirIndex + 1]).toMatch(/cli-browser-profile$/);
     });
 
     it('should pass headless flag when configured', async () => {

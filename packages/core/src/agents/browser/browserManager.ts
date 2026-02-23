@@ -22,9 +22,14 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import type { Tool as McpTool } from '@modelcontextprotocol/sdk/types.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import type { Config } from '../../config/config.js';
+import { Storage } from '../../config/storage.js';
+import * as path from 'node:path';
 
 // Pin chrome-devtools-mcp version for reproducibility.
 const CHROME_DEVTOOLS_MCP_VERSION = '0.17.1';
+
+// Default browser profile directory name within ~/.gemini/
+const BROWSER_PROFILE_DIR = 'cli-browser-profile';
 
 // Default timeout for MCP operations
 const MCP_TIMEOUT_MS = 60_000;
@@ -246,7 +251,7 @@ export class BrowserManager {
 
     // Session mode determines how the browser is managed:
     // - "isolated": Temp profile, cleaned up after session (--isolated)
-    // - "persistent": Persistent profile at ~/.cache/chrome-devtools-mcp/ (default)
+    // - "persistent": Persistent profile at ~/.gemini/cli-browser-profile/ (default)
     // - "existing": Connect to already-running Chrome (--autoConnect, requires
     //   remote debugging enabled at chrome://inspect/#remote-debugging)
     if (sessionMode === 'isolated') {
@@ -261,6 +266,13 @@ export class BrowserManager {
     }
     if (browserConfig.customConfig.profilePath) {
       mcpArgs.push('--userDataDir', browserConfig.customConfig.profilePath);
+    } else if (sessionMode === 'persistent') {
+      // Default persistent profile lives under ~/.gemini/cli-browser-profile
+      const defaultProfilePath = path.join(
+        Storage.getGlobalGeminiDir(),
+        BROWSER_PROFILE_DIR,
+      );
+      mcpArgs.push('--userDataDir', defaultProfilePath);
     }
 
     debugLogger.log(
