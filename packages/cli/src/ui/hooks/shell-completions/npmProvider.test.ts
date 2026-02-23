@@ -44,11 +44,39 @@ describe('npmProvider', () => {
 
     expect(result.exclusive).toBe(true);
     expect(result.suggestions).toHaveLength(2);
+    expect(result.suggestions[0].label).toBe('build');
     expect(result.suggestions[0].value).toBe('build');
+    expect(result.suggestions[1].label).toBe('build:dev');
     expect(result.suggestions[1].value).toBe('build:dev');
     expect(fs.readFile).toHaveBeenCalledWith(
       expect.stringContaining('package.json'),
       'utf8',
+    );
+  });
+
+  it('escapes script names with shell metacharacters', async () => {
+    const mockPackageJson = {
+      scripts: {
+        'build(prod)': 'tsc',
+        'test:watch': 'vitest',
+      },
+    };
+    vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(mockPackageJson));
+
+    const result = await npmProvider.getCompletions(
+      ['npm', 'run', 'bu'],
+      2,
+      '/tmp',
+    );
+
+    expect(result.exclusive).toBe(true);
+    expect(result.suggestions).toHaveLength(1);
+    expect(result.suggestions[0].label).toBe('build(prod)');
+
+    // Windows does not escape spaces/parens in cmds by default in our function, but Unix does.
+    const isWin = process.platform === 'win32';
+    expect(result.suggestions[0].value).toBe(
+      isWin ? 'build(prod)' : 'build\\(prod\\)',
     );
   });
 

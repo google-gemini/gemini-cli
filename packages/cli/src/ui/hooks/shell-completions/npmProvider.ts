@@ -7,6 +7,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { ShellCompletionProvider, CompletionResult } from './types.js';
+import { escapeShellPath } from '../useShellCompletion.js';
 
 const NPM_SUBCOMMANDS = [
   'build',
@@ -64,7 +65,7 @@ export const npmProvider: ShellCompletionProvider = {
             .filter((s) => s.startsWith(partial))
             .map((s) => ({
               label: s,
-              value: s,
+              value: escapeShellPath(s),
               description: 'npm script',
             })),
           exclusive: true,
