@@ -138,9 +138,8 @@ async function calculateExactReplacement(
   const normalizedReplace = new_string.replace(/\r\n/g, '\n');
 
   const exactOccurrences = normalizedCode.split(normalizedSearch).length - 1;
-  const expectedReplacements = params.expected_replacements ?? 1;
 
-  if (exactOccurrences > expectedReplacements) {
+  if (!params.allow_multiple && exactOccurrences > 1) {
     return {
       newContent: currentContent,
       occurrences: exactOccurrences,
@@ -256,28 +255,27 @@ async function calculateRegexReplacement(
   // The final pattern captures leading whitespace (indentation) and then matches the token pattern.
   // 'm' flag enables multi-line mode, so '^' matches the start of any line.
   const finalPattern = `^([ \t]*)${pattern}`;
-  const flexibleRegex = new RegExp(finalPattern, 'm');
 
-  const match = flexibleRegex.exec(currentContent);
+  // Always use a global regex to count all potential occurrences for accurate validation.
+  const globalRegex = new RegExp(finalPattern, 'gm');
+  const matches = currentContent.match(globalRegex);
 
-  if (!match) {
+  if (!matches) {
     return null;
   }
 
+  const occurrences = matches.length;
   const newLines = normalizedReplace.split('\n');
 
-  let occurrences = 0;
-  const flexibleRegexGlobal = new RegExp(
+  // Use the appropriate regex for replacement based on allow_multiple.
+  const replaceRegex = new RegExp(
     finalPattern,
     params.allow_multiple ? 'gm' : 'm',
   );
 
   const modifiedCode = currentContent.replace(
-    flexibleRegexGlobal,
-    (_match, indentation) => {
-      occurrences++;
-      return applyIndentation(newLines, indentation || '').join('\n');
-    },
+    replaceRegex,
+    (_match, indentation) => applyIndentation(newLines, indentation || '').join('\n'),
   );
 
   return {
