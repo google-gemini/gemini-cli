@@ -107,6 +107,9 @@ export function useCommandCompletion({
     completionStart,
     completionEnd,
     shellTokenIsCommand,
+    shellTokens,
+    shellCursorIndex,
+    shellCommandToken,
   } = useMemo(() => {
     const currentLine = buffer.lines[cursorRow] || '';
     const codePoints = toCodePoints(currentLine);
@@ -247,22 +250,6 @@ export function useCommandCompletion({
     setIsLoadingSuggestions,
     setIsPerfectMatch,
   });
-
-  const { shellTokens, shellCursorIndex, shellCommandToken } = useMemo(() => {
-    if (!shellModeActive) {
-      return { shellTokens: [], shellCursorIndex: -1, shellCommandToken: '' };
-    }
-    const currentLine = buffer.lines[cursorRow] || '';
-    const tokenInfo = getTokenAtCursor(currentLine, cursorCol);
-    if (!tokenInfo) {
-      return { shellTokens: [''], shellCursorIndex: 0, shellCommandToken: '' };
-    }
-    return {
-      shellTokens: tokenInfo.tokens,
-      shellCursorIndex: tokenInfo.cursorIndex,
-      shellCommandToken: tokenInfo.commandToken,
-    };
-  }, [buffer.lines, cursorRow, cursorCol, shellModeActive]);
 
   useShellCompletion({
     enabled: active && completionMode === CompletionMode.SHELL,
