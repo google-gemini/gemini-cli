@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type McpToolContext, BeforeToolHookOutput } from '../hooks/types.js';
+import {
+  type McpToolContext,
+  BeforeToolHookOutput,
+  AfterToolHookOutput,
+} from '../hooks/types.js';
 import type { Config } from '../config/config.js';
 import type {
   ToolResult,
@@ -222,6 +226,15 @@ export async function executeToolWithHooks(
           message: blockingError.reason,
         },
       };
+    }
+
+    // Check if hook requested to override tool output
+    if (afterOutput instanceof AfterToolHookOutput) {
+      const modifiedOutput = afterOutput.getModifiedToolOutput();
+      if (modifiedOutput !== undefined) {
+        toolResult.llmContent = modifiedOutput;
+        toolResult.returnDisplay = modifiedOutput;
+      }
     }
 
     // Add additional context from hooks to the tool result

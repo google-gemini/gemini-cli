@@ -141,6 +141,8 @@ export function createHookOutput(
       return new BeforeToolSelectionHookOutput(data);
     case 'BeforeTool':
       return new BeforeToolHookOutput(data);
+    case 'AfterTool':
+      return new AfterToolHookOutput(data);
     case 'AfterAgent':
       return new AfterAgentHookOutput(data);
     default:
@@ -385,6 +387,24 @@ export class AfterModelHookOutput extends DefaultHookOutput {
 }
 
 /**
+ * Specific hook output class for AfterTool events
+ */
+export class AfterToolHookOutput extends DefaultHookOutput {
+  /**
+   * Get modified tool output if provided by hook
+   */
+  getModifiedToolOutput(): string | undefined {
+    if (this.hookSpecificOutput && 'tool_output' in this.hookSpecificOutput) {
+      const output = this.hookSpecificOutput['tool_output'];
+      if (typeof output === 'string') {
+        return output;
+      }
+    }
+    return undefined;
+  }
+}
+
+/**
  * Specific hook output class for AfterAgent events
  */
 export class AfterAgentHookOutput extends DefaultHookOutput {
@@ -459,6 +479,7 @@ export interface AfterToolOutput extends HookOutput {
   hookSpecificOutput?: {
     hookEventName: 'AfterTool';
     additionalContext?: string;
+    tool_output?: string;
   };
 }
 

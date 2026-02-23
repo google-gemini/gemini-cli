@@ -16,6 +16,7 @@ import {
   BeforeModelHookOutput,
   BeforeToolSelectionHookOutput,
   AfterModelHookOutput,
+  AfterToolHookOutput,
   AfterAgentHookOutput,
   HookEventName,
 } from './types.js';
@@ -333,6 +334,8 @@ export class HookAggregator {
         return new BeforeModelHookOutput(output);
       case HookEventName.BeforeToolSelection:
         return new BeforeToolSelectionHookOutput(output);
+      case HookEventName.AfterTool:
+        return new AfterToolHookOutput(output);
       case HookEventName.AfterModel:
         return new AfterModelHookOutput(output);
       case HookEventName.AfterAgent:
