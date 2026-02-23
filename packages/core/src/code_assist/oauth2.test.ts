@@ -219,7 +219,7 @@ describe('oauth2', () => {
       await serverListeningPromise;
 
       const mockReq = {
-        url: `/oauth2callback?code=${mockCode}&state=${mockState}`,
+        url: `/oauth2redirect?code=${mockCode}&state=${mockState}`,
       } as http.IncomingMessage;
       const mockRes = {
         writeHead: vi.fn(),
@@ -234,7 +234,7 @@ describe('oauth2', () => {
       expect(open).toHaveBeenCalledWith(mockAuthUrl);
       expect(mockGetToken).toHaveBeenCalledWith({
         code: mockCode,
-        redirect_uri: `http://127.0.0.1:${capturedPort}/oauth2callback`,
+        redirect_uri: `http://127.0.0.1:${capturedPort}/oauth2redirect`,
       });
       expect(mockSetCredentials).toHaveBeenCalledWith(mockTokens);
 

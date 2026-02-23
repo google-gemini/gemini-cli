@@ -472,7 +472,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
   // (i.e., 'localhost' or '127.0.0.1'). This is a strict security policy for credentials of
   // type 'Desktop app' or 'Web application' (when using loopback flow) to mitigate
   // authorization code interception attacks.
-  const redirectUri = `http://127.0.0.1:${port}/oauth2callback`;
+  const redirectUri = `http://127.0.0.1:${port}/oauth2redirect`;
 
   // For Remote Tunnels, localhost is not reachable from the local browser.
   // We use vscode.env.asExternalUri (via IdeClient) to resolve a reachable URI.
@@ -494,7 +494,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
   const loginCompletePromise = new Promise<void>((resolve, reject) => {
     const server = http.createServer(async (req, res) => {
       try {
-        if (req.url!.indexOf('/oauth2callback') === -1) {
+        if (req.url!.indexOf('/oauth2redirect') === -1) {
           res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_FAILURE_URL });
           res.end();
           reject(

@@ -480,15 +480,45 @@ const createMcpServer = (
     'asExternalUri',
     {
       description:
-        '(IDE Tool) Resolve an external URI for a local URI. This is required for Remote Tunnels support.',
+        '(IDE Tool) Resolve an external URI for a local URI. Hardened to allow only OAuth callback redirects on loopback.',
       inputSchema: AsExternalUriRequestSchema.shape,
     },
     async ({ uri }: z.infer<typeof AsExternalUriRequestSchema>) => {
       log(`Received asExternalUri request for uri: ${uri}`);
       try {
-        const externalUri = await vscode.env.asExternalUri(
-          vscode.Uri.parse(uri),
-        );
+        const parsedUri = vscode.Uri.parse(uri);
+
+        // 1. Only allow absolute URIs with http scheme
+        if (parsedUri.scheme !== 'http') {
+          throw new Error(
+            `Invalid scheme: ${parsedUri.scheme}. Only 'http' is allowed for security reasons.`,
+          );
+        }
+
+        // 2. Only allow loopback hosts
+        const host = parsedUri.authority.split(':')[0];
+        const loopbackHosts = ['localhost', '127.0.0.1'];
+        if (!loopbackHosts.includes(host)) {
+          throw new Error(
+            `Invalid host: ${host}. Only loopback hosts (localhost, 127.0.0.1) are allowed.`,
+          );
+        }
+
+        // 3. Require a port
+        const port = parsedUri.authority.split(':')[1];
+        if (!port) {
+          throw new Error('A port must be specified in the URI.');
+        }
+
+        // 4. Restrict path to OAuth callback
+        // The path must be exactly '/oauth2redirect' as per hardening requirements.
+        if (parsedUri.path !== '/oauth2redirect') {
+          throw new Error(
+            `Unauthorized path: ${parsedUri.path}. Only '/oauth2redirect' is allowed for security reasons.`,
+          );
+        }
+
+        const externalUri = await vscode.env.asExternalUri(parsedUri);
         return {
           content: [
             {
@@ -499,7 +529,7 @@ const createMcpServer = (
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        log(`Failed to resolve external URI: ${message}`);
+        log(`asExternalUri validation failed: ${message}`);
         return {
           isError: true,
           content: [
