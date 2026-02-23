@@ -43,11 +43,13 @@ export class A2AResultReassembler {
           const id = chunk.artifact.artifactId;
           const existing = this.artifacts.get(id);
           if (chunk.append && existing) {
-            existing.parts = existing.parts.concat(chunk.artifact.parts);
+            existing.parts = existing.parts.concat(
+              structuredClone(chunk.artifact.parts),
+            );
           } else {
             this.artifacts.set(id, {
               ...chunk.artifact,
-              parts: [...chunk.artifact.parts],
+              parts: structuredClone(chunk.artifact.parts),
             });
           }
         }
@@ -61,7 +63,7 @@ export class A2AResultReassembler {
           for (const art of chunk.artifacts) {
             this.artifacts.set(art.artifactId, {
               ...art,
-              parts: [...art.parts],
+              parts: structuredClone(art.parts),
             });
           }
         }
