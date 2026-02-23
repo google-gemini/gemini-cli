@@ -26,7 +26,7 @@ import {
   type Config,
   type MessageBus,
   LlmRole,
-  type MCPServerConfig,
+  type GitService,
 } from '@google/gemini-cli-core';
 import {
   SettingScope,
@@ -63,7 +63,33 @@ vi.mock('node:path', async (importOriginal) => {
   };
 });
 
-// Mock ReadManyFilesTool
+vi.mock('../ui/commands/memoryCommand.js', () => ({
+  memoryCommand: {
+    name: 'memory',
+    action: vi.fn(),
+  },
+}));
+
+vi.mock('../ui/commands/extensionsCommand.js', () => ({
+  extensionsCommand: vi.fn().mockReturnValue({
+    name: 'extensions',
+    action: vi.fn(),
+  }),
+}));
+
+vi.mock('../ui/commands/restoreCommand.js', () => ({
+  restoreCommand: vi.fn().mockReturnValue({
+    name: 'restore',
+    action: vi.fn(),
+  }),
+}));
+
+vi.mock('../ui/commands/initCommand.js', () => ({
+  initCommand: {
+    name: 'init',
+    action: vi.fn(),
+  },
+}));
 vi.mock(
   '@google/gemini-cli-core',
   async (
@@ -197,6 +223,7 @@ describe('GeminiAgent', () => {
   });
 
   it('should create a new session', async () => {
+    vi.useFakeTimers();
     mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
       apiKey: 'test-key',
     });
@@ -209,6 +236,17 @@ describe('GeminiAgent', () => {
     expect(loadCliConfig).toHaveBeenCalled();
     expect(mockConfig.initialize).toHaveBeenCalled();
     expect(mockConfig.getGeminiClient).toHaveBeenCalled();
+
+    // Verify deferred call
+    await vi.runAllTimersAsync();
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'available_commands_update',
+        }),
+      }),
+    );
+    vi.useRealTimers();
   });
 
   it('should return modes without plan mode when plan is disabled', async () => {
@@ -450,6 +488,7 @@ describe('Session', () => {
       getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getMcpServers: vi.fn(),
+
       getFileService: vi.fn().mockReturnValue({
         shouldIgnoreFile: vi.fn().mockReturnValue(false),
       }),
@@ -460,6 +499,7 @@ describe('Session', () => {
       getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
       setApprovalMode: vi.fn(),
       isPlanEnabled: vi.fn().mockReturnValue(false),
+      getGitService: vi.fn().mockResolvedValue({} as GitService),
     } as unknown as Mocked<Config>;
     mockConnection = {
       sessionUpdate: vi.fn(),
@@ -467,7 +507,14 @@ describe('Session', () => {
       sendNotification: vi.fn(),
     } as unknown as Mocked<acp.AgentSideConnection>;
 
-    session = new Session('session-1', mockChat, mockConfig, mockConnection);
+    session = new Session('session-1', mockChat, mockConfig, mockConnection, {
+      system: { settings: {} },
+      systemDefaults: { settings: {} },
+      user: { settings: {} },
+      workspace: { settings: {} },
+      merged: { settings: {} },
+      errors: [],
+    } as unknown as LoadedSettings);
   });
 
   afterEach(() => {
@@ -482,10 +529,10 @@ describe('Session', () => {
         update: expect.objectContaining({
           sessionUpdate: 'available_commands_update',
           availableCommands: expect.arrayContaining([
-            expect.objectContaining({ name: 'status' }),
-            expect.objectContaining({ name: 'mcp' }),
-            expect.objectContaining({ name: '$commit' }),
-            expect.objectContaining({ name: '$review-pr' }),
+            expect.objectContaining({ name: 'memory' }),
+            expect.objectContaining({ name: 'extensions' }),
+            expect.objectContaining({ name: 'restore' }),
+            expect.objectContaining({ name: 'init' }),
           ]),
         }),
       }),
@@ -519,161 +566,59 @@ describe('Session', () => {
     expect(result).toEqual({ stopReason: 'end_turn' });
   });
 
-  it('should handle /status command directly with newlines', async () => {
-    mockConfig.getActiveModel.mockReturnValue('gemini-1.5-pro-test');
-
+  it('should handle /memory command', async () => {
+    const { memoryCommand } = await import('../ui/commands/memoryCommand.js');
     const result = await session.prompt({
       sessionId: 'session-1',
-      prompt: [{ type: 'text', text: '/status\nTell me more' }],
+      prompt: [{ type: 'text', text: '/memory view' }],
     });
 
-    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        update: expect.objectContaining({
-          sessionUpdate: 'agent_message_chunk',
-        }),
-      }),
-    );
     expect(result).toEqual({ stopReason: 'end_turn' });
-    expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
-  });
-  it('should handle /status command directly', async () => {
-    mockConfig.getActiveModel.mockReturnValue('gemini-1.5-pro-test');
-    const result = await session.prompt({
-      sessionId: 'session-1',
-      prompt: [{ type: 'text', text: '/status' }],
-    });
-
-    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        update: expect.objectContaining({
-          sessionUpdate: 'agent_message_chunk',
-          content: expect.objectContaining({
-            type: 'text',
-            text: expect.stringContaining('gemini-1.5-pro-test'),
-          }),
-        }),
-      }),
-    );
-    expect(result).toEqual({ stopReason: 'end_turn' });
-    // Chat should not be called
+    expect(memoryCommand.action).toHaveBeenCalled();
     expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
   });
 
-  it('should handle /mcp command directly', async () => {
-    mockConfig.getMcpServers.mockReturnValue({
-      'test-mcp': {},
-    } as Record<string, MCPServerConfig>);
-
+  it('should handle /extensions command', async () => {
+    const { extensionsCommand } = await import(
+      '../ui/commands/extensionsCommand.js'
+    );
     const result = await session.prompt({
       sessionId: 'session-1',
-      prompt: [{ type: 'text', text: '/mcp' }],
+      prompt: [{ type: 'text', text: '/extensions list' }],
     });
 
-    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        update: expect.objectContaining({
-          sessionUpdate: 'agent_message_chunk',
-          content: expect.objectContaining({
-            type: 'text',
-            text: expect.stringContaining('`test-mcp`'),
-          }),
-        }),
-      }),
-    );
     expect(result).toEqual({ stopReason: 'end_turn' });
+    // extensionsCommand is a factory function, we mocked it to return an object with action
+    const cmd = extensionsCommand();
+    expect(cmd.action).toHaveBeenCalled();
     expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
   });
 
-  it('should intercept $commit command and mutate prompt', async () => {
-    const stream = createMockStream([
-      {
-        type: StreamEventType.CHUNK,
-        value: {
-          candidates: [{ content: { parts: [{ text: 'Committing...' }] } }],
-        },
-      },
-    ]);
-    mockChat.sendMessageStream.mockResolvedValue(stream);
-
-    await session.prompt({
+  it('should handle /restore command', async () => {
+    const { restoreCommand } = await import('../ui/commands/restoreCommand.js');
+    const result = await session.prompt({
       sessionId: 'session-1',
-      // Should replace `$commit` with the instruction
-      prompt: [{ type: 'text', text: '$commit my cool changes' }],
+      prompt: [{ type: 'text', text: '/restore' }],
     });
 
-    expect(mockChat.sendMessageStream).toHaveBeenCalledWith(
-      expect.anything(),
-      // The prompt text should be modified to include the commit instruction
-      expect.arrayContaining([
-        expect.objectContaining({
-          text: 'Create a git commit based on the current changes using the tools available. my cool changes',
-        }),
-      ]),
-      expect.anything(),
-      expect.any(AbortSignal),
-      LlmRole.MAIN,
-    );
+    expect(result).toEqual({ stopReason: 'end_turn' });
+    // restoreCommand is a factory function
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cmd = (restoreCommand as any)();
+    expect(cmd.action).toHaveBeenCalled();
+    expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
   });
 
-  it('should intercept $commit command with leading spaces and case insensitivity', async () => {
-    const stream = createMockStream([
-      {
-        type: StreamEventType.CHUNK,
-        value: {
-          candidates: [{ content: { parts: [{ text: 'Committing...' }] } }],
-        },
-      },
-    ]);
-    mockChat.sendMessageStream.mockResolvedValue(stream);
-
-    await session.prompt({
+  it('should handle /init command', async () => {
+    const { initCommand } = await import('../ui/commands/initCommand.js');
+    const result = await session.prompt({
       sessionId: 'session-1',
-      // Should replace `$commit` with the instruction
-      prompt: [{ type: 'text', text: '   \n$cOmMiT my cool changes' }],
+      prompt: [{ type: 'text', text: '/init' }],
     });
 
-    expect(mockChat.sendMessageStream).toHaveBeenCalledWith(
-      expect.anything(),
-      // The prompt text should be modified to include the commit instruction
-      expect.arrayContaining([
-        expect.objectContaining({
-          text: 'Create a git commit based on the current changes using the tools available. my cool changes',
-        }),
-      ]),
-      expect.anything(),
-      expect.any(AbortSignal),
-      LlmRole.MAIN,
-    );
-  });
-
-  it('should intercept $review-pr command and mutate prompt', async () => {
-    const stream = createMockStream([
-      {
-        type: StreamEventType.CHUNK,
-        value: {
-          candidates: [{ content: { parts: [{ text: 'Reviewing...' }] } }],
-        },
-      },
-    ]);
-    mockChat.sendMessageStream.mockResolvedValue(stream);
-
-    await session.prompt({
-      sessionId: 'session-1',
-      prompt: [{ type: 'text', text: '$review-pr' }],
-    });
-
-    expect(mockChat.sendMessageStream).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.arrayContaining([
-        expect.objectContaining({
-          text: 'Review the current pull request using the tools available.',
-        }),
-      ]),
-      expect.anything(),
-      expect.any(AbortSignal),
-      LlmRole.MAIN,
-    );
+    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(initCommand.action).toHaveBeenCalled();
+    expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
   });
 
   it('should handle tool calls', async () => {
@@ -1204,5 +1149,22 @@ describe('Session', () => {
     expect(() => session.setMode('invalid-mode')).toThrow(
       'Invalid or unavailable mode: invalid-mode',
     );
+  });
+  it('should handle unquoted commands from autocomplete (with empty leading parts)', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleCommandSpy = vi.spyOn(session as any, 'handleCommand');
+    // Mock runCommand to verify it gets called
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.spyOn(session as any, 'runCommand').mockResolvedValue(undefined);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [
+        { type: 'text', text: '' },
+        { type: 'text', text: '/memory' },
+      ],
+    });
+
+    expect(handleCommandSpy).toHaveBeenCalledWith('/memory', expect.anything());
   });
 });
