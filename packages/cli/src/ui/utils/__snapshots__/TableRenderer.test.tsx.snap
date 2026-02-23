@@ -64,6 +64,42 @@ exports[`TableRenderer > 'renders correctly when there are more…' 1`] = `
 "
 `;
 
+exports[`TableRenderer > calculates width correctly for content with URLs and styles 1`] = `
+"
+┌───────────────────────────────────┬───────────────────────────────┬─────────────────────────────────┐
+│ Col 1                             │ Col 2                         │ Col 3                           │
+├───────────────────────────────────┼───────────────────────────────┼─────────────────────────────────┤
+│ Visit Google (https://google.com) │ Plain Text                    │ More Info                       │
+│ Info Here                         │ Visit Bing (https://bing.com) │ Links                           │
+│ Check This                        │ Search                        │ Visit Yahoo (https://yahoo.com) │
+└───────────────────────────────────┴───────────────────────────────┴─────────────────────────────────┘
+"
+`;
+
+exports[`TableRenderer > does not parse markdown inside code snippets 1`] = `
+"
+┌─────────────────┬──────────────────────┬──────────────────┐
+│ Col 1           │ Col 2                │ Col 3            │
+├─────────────────┼──────────────────────┼──────────────────┤
+│ **not bold**    │ _not italic_         │ ~~not strike~~   │
+│ [not link](url) │ <u>not underline</u> │ https://not.link │
+│ Normal Text     │ More Code: *test*    │ ***nested***     │
+└─────────────────┴──────────────────────┴──────────────────┘
+"
+`;
+
+exports[`TableRenderer > handles nested markdown styles recursively 1`] = `
+"
+┌─────────────────────────────┬─────────────────────────────┬─────────────────────────────┐
+│ Header 1                    │ Header 2                    │ Header 3                    │
+├─────────────────────────────┼─────────────────────────────┼─────────────────────────────┤
+│ Bold with Italic and Strike │ Normal                      │ Short                       │
+│ Short                       │ Bold with Italic and Strike │ Normal                      │
+│ Normal                      │ Short                       │ Bold with Italic and Strike │
+└─────────────────────────────┴─────────────────────────────┴─────────────────────────────┘
+"
+`;
+
 exports[`TableRenderer > handles wrapped bold headers without showing markers 1`] = `
 "
 ┌─────────────┬───────┬─────────┐
@@ -140,6 +176,22 @@ exports[`TableRenderer > renders a table with long headers and 4 columns correct
 │ Data 2.1      │ Data 2.2      │ Data 2.3         │ Data 2.4         │
 │ Data 3.1      │ Data 3.2      │ Data 3.3         │ Data 3.4         │
 └───────────────┴───────────────┴──────────────────┴──────────────────┘
+"
+`;
+
+exports[`TableRenderer > renders complex markdown in rows and calculates widths correctly 1`] = `
+"
+┌───────────────┬─────────────────────────────┐
+│ Feature       │ Markdown                    │
+├───────────────┼─────────────────────────────┤
+│ Bold          │ Bold Text                   │
+│ Italic        │ Italic Text                 │
+│ Combined      │ Bold and Italic             │
+│ Link          │ Google (https://google.com) │
+│ Code          │ const x = 1                 │
+│ Strikethrough │ Strike                      │
+│ Underline     │ Underline                   │
+└───────────────┴─────────────────────────────┘
 "
 `;
 

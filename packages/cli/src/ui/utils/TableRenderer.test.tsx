@@ -345,4 +345,158 @@ describe('TableRenderer', () => {
     });
     expect(output).toMatchSnapshot();
   });
+
+  it('renders complex markdown in rows and calculates widths correctly', () => {
+    const headers = ['Feature', 'Markdown'];
+    const rows = [
+      ['Bold', '**Bold Text**'],
+      ['Italic', '_Italic Text_'],
+      ['Combined', '***Bold and Italic***'],
+      ['Link', '[Google](https://google.com)'],
+      ['Code', '`const x = 1`'],
+      ['Strikethrough', '~~Strike~~'],
+      ['Underline', '<u>Underline</u>'],
+    ];
+    const terminalWidth = 80;
+
+    const { lastFrame } = renderWithProviders(
+      <TableRenderer
+        headers={headers}
+        rows={rows}
+        terminalWidth={terminalWidth}
+      />,
+    );
+
+    const output = lastFrame();
+    // Markers should be gone
+    expect(output).not.toContain('**Bold Text**');
+    expect(output).toContain('Bold Text');
+    expect(output).not.toContain('_Italic Text_');
+    expect(output).toContain('Italic Text');
+    expect(output).toContain('Bold and Italic');
+    expect(output).toContain('Google (https://google.com)');
+    expect(output).toContain('const x = 1');
+    expect(output).not.toContain('`const x = 1`');
+    expect(output).toContain('Strike');
+    expect(output).toContain('Underline');
+    expect(output).toMatchSnapshot();
+  });
+
+  it('calculates column widths based on rendered text, not raw markdown', () => {
+    const headers = ['Col 1', 'Col 2', 'Col 3'];
+    // "**123456**" is 10 characters raw, but 6 characters rendered.
+    const rows = [
+      ['**123456**', 'Normal', 'Short'],
+      ['Short', '**123456**', 'Normal'],
+      ['Normal', 'Short', '**123456**'],
+    ];
+    const terminalWidth = 40;
+
+    const { lastFrame } = renderWithProviders(
+      <TableRenderer
+        headers={headers}
+        rows={rows}
+        terminalWidth={terminalWidth}
+      />,
+    );
+
+    const output = lastFrame();
+    expect(output).toBeDefined();
+
+    // We expect "123456" to be on a single line if width calculation is correct
+    expect(output).toContain('123456');
+    // Find the lines containing the data and check they don't have partial text
+    const dataLines = output!.split('\n').filter((l) => /123456/.test(l));
+    // Each row should have one line for the data containing "123456"
+    expect(dataLines.length).toBe(3);
+  });
+
+  it('handles nested markdown styles recursively', () => {
+    const headers = ['Header 1', 'Header 2', 'Header 3'];
+    const rows = [
+      ['**Bold with _Italic_ and ~~Strike~~**', 'Normal', 'Short'],
+      ['Short', '**Bold with _Italic_ and ~~Strike~~**', 'Normal'],
+      ['Normal', 'Short', '**Bold with _Italic_ and ~~Strike~~**'],
+    ];
+    const terminalWidth = 100;
+
+    const { lastFrame } = renderWithProviders(
+      <TableRenderer
+        headers={headers}
+        rows={rows}
+        terminalWidth={terminalWidth}
+      />,
+    );
+
+    const output = lastFrame();
+    expect(output).toBeDefined();
+    expect(output).not.toContain('**');
+    expect(output).not.toContain('_');
+    expect(output).not.toContain('~~');
+    expect(output).toContain('Bold with Italic and Strike');
+    expect(output).toMatchSnapshot();
+  });
+
+  it('calculates width correctly for content with URLs and styles', () => {
+    const headers = ['Col 1', 'Col 2', 'Col 3'];
+    // "Visit [Google](https://google.com)"
+    // Rendered: Visit Google (https://google.com)
+    // "Visit " (6) + "Google" (6) + " (" (2) + "https://google.com" (18) + ")" (1) = 33 chars.
+    const rows = [
+      ['Visit [Google](https://google.com)', 'Plain Text', 'More Info'],
+      ['Info Here', 'Visit [Bing](https://bing.com)', 'Links'],
+      ['Check This', 'Search', 'Visit [Yahoo](https://yahoo.com)'],
+    ];
+    const terminalWidth = 120;
+
+    const { lastFrame } = renderWithProviders(
+      <TableRenderer
+        headers={headers}
+        rows={rows}
+        terminalWidth={terminalWidth}
+      />,
+    );
+
+    const output = lastFrame();
+    expect(output).toBeDefined();
+    expect(output).toContain('Visit Google (https://google.com)');
+    expect(output).toContain('Visit Bing (https://bing.com)');
+    expect(output).toContain('Visit Yahoo (https://yahoo.com)');
+    // Check that it didn't wrap for the first URL
+    const dataLine = output!
+      .split('\n')
+      .find((l) => l.includes('Visit Google'));
+    expect(dataLine).toContain('Visit Google (https://google.com)');
+    expect(output).toMatchSnapshot();
+  });
+
+  it('does not parse markdown inside code snippets', () => {
+    const headers = ['Col 1', 'Col 2', 'Col 3'];
+    const rows = [
+      ['`**not bold**`', '`_not italic_`', '`~~not strike~~`'],
+      ['`[not link](url)`', '`<u>not underline</u>`', '`https://not.link`'],
+      ['Normal Text', 'More Code: `*test*`', '`***nested***`'],
+    ];
+    const terminalWidth = 100;
+
+    const { lastFrame } = renderWithProviders(
+      <TableRenderer
+        headers={headers}
+        rows={rows}
+        terminalWidth={terminalWidth}
+      />,
+    );
+
+    const output = lastFrame();
+    expect(output).toBeDefined();
+    // Markers should be visible inside code snippets
+    expect(output).toContain('**not bold**');
+    expect(output).toContain('_not italic_');
+    expect(output).toContain('~~not strike~~');
+    expect(output).toContain('[not link](url)');
+    expect(output).toContain('<u>not underline</u>');
+    expect(output).toContain('https://not.link');
+    expect(output).toContain('***nested***');
+    expect(output).toMatchSnapshot();
+  });
 });

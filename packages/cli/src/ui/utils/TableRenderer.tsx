@@ -5,6 +5,7 @@
  */
 
 import React, { useMemo } from 'react';
+import chalk from 'chalk';
 import { styledCharsToString } from '@alcalzone/ansi-tokenize';
 import {
   Text,
@@ -17,7 +18,11 @@ import {
   widestLineFromStyledChars,
 } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { RenderInline } from './InlineMarkdownRenderer.js';
+import {
+  resolveColor,
+  INK_SUPPORTED_NAMES,
+  INK_NAME_TO_HEX_MAP,
+} from '../themes/color-utils.js';
 
 interface TableRendererProps {
   headers: string[];
@@ -28,6 +33,187 @@ interface TableRendererProps {
 const MIN_COLUMN_WIDTH = 5;
 const COLUMN_PADDING = 2;
 const TABLE_MARGIN = 2;
+
+// Constants for Markdown parsing
+const BOLD_MARKER_LENGTH = 2; // For "**"
+const ITALIC_MARKER_LENGTH = 1; // For "*" or "_"
+const STRIKETHROUGH_MARKER_LENGTH = 2; // For "~~")
+const INLINE_CODE_MARKER_LENGTH = 1; // For "`"
+const UNDERLINE_TAG_START_LENGTH = 3; // For "<u>"
+const UNDERLINE_TAG_END_LENGTH = 4; // For "</u>"
+
+/**
+ * Helper to apply color to a string using ANSI escape codes,
+ * consistent with how Ink's colorize works.
+ */
+const ansiColorize = (str: string, color: string | undefined): string => {
+  if (!color) return str;
+  const resolved = resolveColor(color);
+  if (!resolved) return str;
+
+  if (resolved.startsWith('#')) {
+    return chalk.hex(resolved)(str);
+  }
+
+  const mappedHex = INK_NAME_TO_HEX_MAP[resolved];
+  if (mappedHex) {
+    return chalk.hex(mappedHex)(str);
+  }
+
+  if (INK_SUPPORTED_NAMES.has(resolved)) {
+    switch (resolved) {
+      case 'black':
+        return chalk.black(str);
+      case 'red':
+        return chalk.red(str);
+      case 'green':
+        return chalk.green(str);
+      case 'yellow':
+        return chalk.yellow(str);
+      case 'blue':
+        return chalk.blue(str);
+      case 'magenta':
+        return chalk.magenta(str);
+      case 'cyan':
+        return chalk.cyan(str);
+      case 'white':
+        return chalk.white(str);
+      case 'gray':
+      case 'grey':
+        return chalk.gray(str);
+      default:
+        return str;
+    }
+  }
+
+  return str;
+};
+
+/**
+ * Converts markdown text into a string with ANSI escape codes.
+ * This mirrors the parsing logic in InlineMarkdownRenderer.tsx
+ */
+const parseMarkdownToANSI = (text: string, defaultColor?: string): string => {
+  const baseColor = defaultColor ?? theme.text.primary;
+  // Early return for plain text without markdown or URLs
+  if (!/[*_~`<[https?:]/.test(text)) {
+    return ansiColorize(text, baseColor);
+  }
+
+  let result = '';
+  const inlineRegex =
+    // /(\*\*\*.*?\*\*\*|___.*?___|\*\*.*?\*\*|__.*?__|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+)/g;
+    /(\*\*\*.*?\*\*\*|\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+)/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = inlineRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      result += ansiColorize(text.slice(lastIndex, match.index), baseColor);
+    }
+
+    const fullMatch = match[0];
+    let styledPart = '';
+    if (
+      fullMatch.endsWith('***') &&
+      fullMatch.startsWith('***') &&
+      fullMatch.length > (BOLD_MARKER_LENGTH + ITALIC_MARKER_LENGTH) * 2
+    ) {
+      styledPart = chalk.bold(
+        chalk.italic(parseMarkdownToANSI(fullMatch.slice(3, -3), baseColor)),
+      );
+    } else if (
+      fullMatch.endsWith('**') &&
+      fullMatch.startsWith('**') &&
+      fullMatch.length > BOLD_MARKER_LENGTH * 2
+    ) {
+      styledPart = chalk.bold(
+        parseMarkdownToANSI(fullMatch.slice(2, -2), baseColor),
+      );
+    } else if (
+      fullMatch.length > ITALIC_MARKER_LENGTH * 2 &&
+      ((fullMatch.startsWith('*') && fullMatch.endsWith('*')) ||
+        (fullMatch.startsWith('_') && fullMatch.endsWith('_'))) &&
+      !/\w/.test(text.substring(match.index - 1, match.index)) &&
+      !/\w/.test(
+        text.substring(inlineRegex.lastIndex, inlineRegex.lastIndex + 1),
+      ) &&
+      !/\S[./\\]/.test(text.substring(match.index - 2, match.index)) &&
+      !/[./\\]\S/.test(
+        text.substring(inlineRegex.lastIndex, inlineRegex.lastIndex + 2),
+      )
+    ) {
+      styledPart = chalk.italic(
+        parseMarkdownToANSI(fullMatch.slice(1, -1), baseColor),
+      );
+    } else if (
+      fullMatch.startsWith('~~') &&
+      fullMatch.endsWith('~~') &&
+      fullMatch.length > STRIKETHROUGH_MARKER_LENGTH * 2
+    ) {
+      styledPart = chalk.strikethrough(
+        parseMarkdownToANSI(fullMatch.slice(2, -2), baseColor),
+      );
+    } else if (
+      fullMatch.startsWith('`') &&
+      fullMatch.endsWith('`') &&
+      fullMatch.length > INLINE_CODE_MARKER_LENGTH
+    ) {
+      const codeMatch = fullMatch.match(/^(`+)(.+?)\1$/s);
+      if (codeMatch && codeMatch[2]) {
+        styledPart = ansiColorize(codeMatch[2], theme.text.accent);
+      }
+    } else if (
+      fullMatch.startsWith('[') &&
+      fullMatch.includes('](') &&
+      fullMatch.endsWith(')')
+    ) {
+      const linkMatch = fullMatch.match(/\[(.*?)\]\((.*?)\)/);
+      if (linkMatch) {
+        const linkText = linkMatch[1];
+        const url = linkMatch[2];
+        styledPart =
+          parseMarkdownToANSI(linkText, baseColor) +
+          ' (' +
+          ansiColorize(url, theme.text.link) +
+          ')';
+      }
+    } else if (
+      fullMatch.startsWith('<u>') &&
+      fullMatch.endsWith('</u>') &&
+      fullMatch.length >
+        UNDERLINE_TAG_START_LENGTH + UNDERLINE_TAG_END_LENGTH - 1
+    ) {
+      styledPart = chalk.underline(
+        parseMarkdownToANSI(fullMatch.slice(3, -4), baseColor),
+      );
+    } else if (fullMatch.match(/^https?:\/\//)) {
+      styledPart = ansiColorize(fullMatch, theme.text.link);
+    }
+
+    result += styledPart || ansiColorize(fullMatch, baseColor);
+    lastIndex = inlineRegex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    result += ansiColorize(text.slice(lastIndex), baseColor);
+  }
+
+  return result;
+};
+
+/**
+ * Parses markdown to StyledChar array by first converting to ANSI.
+ * This ensures character counts are accurate (markdown markers are removed
+ * and styles are applied to the character's internal style object).
+ */
+const parseMarkdownToStyledChars = (
+  text: string,
+  defaultColor?: string,
+): StyledChar[] => {
+  const ansi = parseMarkdownToANSI(text, defaultColor);
+  return toStyledCharacters(ansi);
+};
 
 const calculateWidths = (styledChars: StyledChar[]) => {
   const contentWidth = styledCharsWidth(styledChars);
@@ -53,20 +239,19 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   rows,
   terminalWidth,
 }) => {
-  // Clean headers: remove bold markers since we already render headers as bold
-  // and having them can break wrapping when the markers are split across lines.
-  const cleanedHeaders = useMemo(
-    () => headers.map((header) => header.replace(/\*\*(.*?)\*\*/g, '$1')),
+  const styledHeaders = useMemo(
+    () =>
+      headers.map((header) =>
+        parseMarkdownToStyledChars(header, theme.text.link),
+      ),
     [headers],
   );
 
-  const styledHeaders = useMemo(
-    () => cleanedHeaders.map((header) => toStyledCharacters(header)),
-    [cleanedHeaders],
-  );
-
   const styledRows = useMemo(
-    () => rows.map((row) => row.map((cell) => toStyledCharacters(cell))),
+    () =>
+      rows.map((row) =>
+        row.map((cell) => parseMarkdownToStyledChars(cell, theme.text.primary)),
+      ),
     [rows],
   );
 
@@ -126,7 +311,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
       const scale =
         (availableWidth - finalTotalShortColumnWidth) /
-        (totalMinWidth - finalTotalShortColumnWidth);
+          (totalMinWidth - finalTotalShortColumnWidth) || 0;
       finalContentWidths = constraints.map((c) => {
         if (c.maxWidth <= MIN_COLUMN_WIDTH && finalTotalShortColumnWidth > 0) {
           return c.minWidth;
@@ -191,6 +376,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
     return { wrappedHeaders, wrappedRows, adjustedWidths };
   }, [styledHeaders, styledRows, terminalWidth]);
+
   // Helper function to render a cell with proper width
   const renderCell = (
     content: ProcessedLine,
@@ -206,10 +392,10 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
       <Text>
         {isHeader ? (
           <Text bold color={theme.text.link}>
-            <RenderInline text={content.text} />
+            {content.text}
           </Text>
         ) : (
-          <RenderInline text={content.text} />
+          <Text>{content.text}</Text>
         )}
         {' '.repeat(paddingNeeded)}
       </Text>
@@ -242,18 +428,18 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     });
 
     return (
-      <Text color={theme.text.primary}>
-        <Text color={theme.border.default}>│</Text>{' '}
+      <Box flexDirection="row">
+        <Text color={theme.border.default}>│</Text>
         {renderedCells.map((cell, index) => (
           <React.Fragment key={index}>
-            {cell}
+            <Box paddingX={1}>{cell}</Box>
             {index < renderedCells.length - 1 && (
-              <Text color={theme.border.default}>{' │ '}</Text>
+              <Text color={theme.border.default}>│</Text>
             )}
           </React.Fragment>
-        ))}{' '}
+        ))}
         <Text color={theme.border.default}>│</Text>
-      </Text>
+      </Box>
     );
   };
 
@@ -263,7 +449,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     rowIndex?: number,
     isHeader = false,
   ): React.ReactNode => {
-    const key = isHeader ? 'header' : `${rowIndex}`;
+    const key = rowIndex === -1 ? 'header' : `${rowIndex}`;
     const maxHeight = Math.max(...wrappedCells.map((lines) => lines.length), 1);
 
     const visualRows: React.ReactNode[] = [];
