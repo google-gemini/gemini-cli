@@ -299,7 +299,7 @@ const SETTINGS_SCHEMA = {
       },
       maxAttempts: {
         type: 'number',
-        label: 'Max Retry Attempts',
+        label: 'Max Attempts',
         category: 'General',
         requiresRestart: false,
         default: 10,
