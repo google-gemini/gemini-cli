@@ -80,8 +80,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
         "items": {
           "properties": {
             "header": {
-              "description": "MUST be 16 characters or fewer or the call will fail. Very short label displayed as a chip/tag. Use abbreviations: "Auth" not "Authentication", "Config" not "Configuration". Examples: "Auth method", "Library", "Approach", "Database".",
-              "maxLength": 16,
+              "description": "Very short label displayed as a chip/tag. Use abbreviations: "Auth" not "Authentication", "Config" not "Configuration". Examples: "Auth method", "Library", "Approach", "Database".",
               "type": "string",
             },
             "multiSelect": {
@@ -869,8 +868,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
         "items": {
           "properties": {
             "header": {
-              "description": "MUST be 16 characters or fewer or the call will fail. Very short label displayed as a chip/tag. Use abbreviations: "Auth" not "Authentication", "Config" not "Configuration". Examples: "Auth method", "Library", "Approach", "Database".",
-              "maxLength": 16,
+              "description": "Very short label displayed as a chip/tag. Use abbreviations: "Auth" not "Authentication", "Config" not "Configuration". Examples: "Auth method", "Library", "Approach", "Database".",
               "type": "string",
             },
             "multiSelect": {
