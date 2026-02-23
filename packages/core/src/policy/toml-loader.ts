@@ -210,7 +210,11 @@ const MAX_TYPO_DISTANCE = 3;
  * tool name, or null if valid or not close to any built-in name.
  */
 function validateToolName(name: string, ruleIndex: number): string | null {
-  if (isValidToolName(name, { allowWildcards: true })) {
+  // A name that looks like an MCP tool (e.g., "re__ad") could be a typo of a
+  // built-in tool ("read_file"). We should let such names fall through to the
+  // Levenshtein distance check below. Non-MCP-like names that are valid can
+  // be safely skipped.
+  if (isValidToolName(name, { allowWildcards: true }) && !name.includes('__')) {
     return null;
   }
 
