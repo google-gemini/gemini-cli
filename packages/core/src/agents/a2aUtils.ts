@@ -11,8 +11,88 @@ import type {
   TextPart,
   DataPart,
   FilePart,
+  Artifact,
 } from '@a2a-js/sdk';
 import type { SendMessageResult } from './a2a-client-manager.js';
+
+/**
+ * Reassembles incremental A2A streaming updates into a coherent result.
+ * Handles status message replacement and artifact accumulation/appending.
+ */
+export class A2AResultReassembler {
+  private statusMessage = '';
+  private artifacts = new Map<string, Artifact>();
+
+  /**
+   * Processes a new chunk from the A2A stream.
+   */
+  update(chunk: SendMessageResult) {
+    if (!('kind' in chunk)) return;
+
+    switch (chunk.kind) {
+      case 'status-update':
+        if (chunk.status?.message) {
+          this.statusMessage = extractMessageText(chunk.status.message);
+        }
+        break;
+
+      case 'artifact-update':
+        if (chunk.artifact) {
+          const id = chunk.artifact.artifactId;
+          const existing = this.artifacts.get(id);
+          if (chunk.append && existing) {
+            existing.parts.push(...chunk.artifact.parts);
+          } else {
+            this.artifacts.set(id, { ...chunk.artifact });
+          }
+        }
+        break;
+
+      case 'task':
+        if (chunk.status?.message) {
+          this.statusMessage = extractMessageText(chunk.status.message);
+        }
+        if (chunk.artifacts) {
+          for (const art of chunk.artifacts) {
+            this.artifacts.set(art.artifactId, { ...art });
+          }
+        }
+        break;
+
+      case 'message':
+        // A direct message is treated as a final status update for display purposes
+        this.statusMessage = extractMessageText(chunk);
+        break;
+
+      default:
+        // Ignore other chunk types
+        break;
+    }
+  }
+
+  /**
+   * Returns a human-readable string representation of the current reassembled state.
+   */
+  toString(): string {
+    const parts: string[] = [];
+
+    if (this.statusMessage) {
+      parts.push(this.statusMessage);
+    }
+
+    for (const artifact of this.artifacts.values()) {
+      const content = extractPartsText(artifact.parts);
+      if (content) {
+        const header = artifact.name
+          ? `Artifact (${artifact.name}):`
+          : 'Artifact:';
+        parts.push(`${header}\n${content}`);
+      }
+    }
+
+    return parts.join('\n\n');
+  }
+}
 
 /**
  * Extracts a human-readable text representation from a Message object.

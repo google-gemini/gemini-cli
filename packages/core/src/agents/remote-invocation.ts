@@ -18,7 +18,7 @@ import type {
 } from './types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { A2AClientManager } from './a2a-client-manager.js';
-import { extractIdsFromResponse, extractAnyText } from './a2aUtils.js';
+import { extractIdsFromResponse, A2AResultReassembler } from './a2aUtils.js';
 import { GoogleAuth } from 'google-auth-library';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -156,21 +156,19 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         },
       );
 
-      let lastText = '';
+      const reassembler = new A2AResultReassembler();
       let finalResponse: SendMessageResult | undefined;
+      const terminalTaskIds = new Set<string>();
 
       for await (const chunk of stream) {
         if (_signal.aborted) {
           throw new Error('Operation aborted');
         }
         finalResponse = chunk;
-        const currentText = extractAnyText(chunk);
+        reassembler.update(chunk);
 
-        if (currentText && currentText !== lastText) {
-          if (updateOutput) {
-            updateOutput(currentText);
-          }
-          lastText = currentText;
+        if (updateOutput) {
+          updateOutput(reassembler.toString());
         }
 
         const {
@@ -183,12 +181,13 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
           this.contextId = newContextId;
         }
 
-        if (newTaskId) {
-          this.taskId = newTaskId;
-        }
-
         if (clearTaskId) {
           this.taskId = undefined;
+          if (newTaskId) {
+            terminalTaskIds.add(newTaskId);
+          }
+        } else if (newTaskId && !terminalTaskIds.has(newTaskId)) {
+          this.taskId = newTaskId;
         }
       }
 
@@ -201,13 +200,15 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         taskId: this.taskId,
       });
 
+      const finalOutput = reassembler.toString();
+
       debugLogger.debug(
         `[RemoteAgent] Final response from ${this.definition.name}:\n${JSON.stringify(finalResponse, null, 2)}`,
       );
 
       return {
-        llmContent: [{ text: lastText }],
-        returnDisplay: lastText,
+        llmContent: [{ text: finalOutput }],
+        returnDisplay: finalOutput,
       };
     } catch (error: unknown) {
       const errorMessage = `Error calling remote agent: ${error instanceof Error ? error.message : String(error)}`;

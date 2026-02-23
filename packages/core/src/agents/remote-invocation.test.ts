@@ -290,7 +290,7 @@ describe('RemoteAgentInvocation', () => {
       );
     });
 
-    it('should handle streaming updates and calculate deltas', async () => {
+    it('should handle streaming updates and reassemble output', async () => {
       mockClientManager.getClient.mockReturnValue({});
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
@@ -318,7 +318,7 @@ describe('RemoteAgentInvocation', () => {
       await invocation.execute(new AbortController().signal, updateOutput);
 
       expect(updateOutput).toHaveBeenCalledWith('Hello');
-      expect(updateOutput).toHaveBeenCalledWith(' World');
+      expect(updateOutput).toHaveBeenCalledWith('Hello World');
     });
 
     it('should abort when signal is aborted during streaming', async () => {
@@ -447,9 +447,63 @@ describe('RemoteAgentInvocation', () => {
       );
 
       expect(updateOutput).toHaveBeenCalledWith('Thinking...');
-      expect(updateOutput).toHaveBeenCalledWith('\n');
       expect(updateOutput).toHaveBeenCalledWith('Final Answer');
       expect(result.returnDisplay).toBe('Final Answer');
+    });
+
+    it('should handle artifact reassembly with append: true', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+      mockClientManager.sendMessageStream.mockImplementation(
+        async function* () {
+          yield {
+            kind: 'status-update',
+            taskId: 'task-1',
+            status: {
+              state: 'working',
+              message: {
+                kind: 'message',
+                role: 'agent',
+                parts: [{ kind: 'text', text: 'Generating...' }],
+              },
+            },
+          };
+          yield {
+            kind: 'artifact-update',
+            taskId: 'task-1',
+            append: false,
+            artifact: {
+              artifactId: 'art-1',
+              name: 'Result',
+              parts: [{ kind: 'text', text: 'Part 1' }],
+            },
+          };
+          yield {
+            kind: 'artifact-update',
+            taskId: 'task-1',
+            append: true,
+            artifact: {
+              artifactId: 'art-1',
+              parts: [{ kind: 'text', text: ' Part 2' }],
+            },
+          };
+        },
+      );
+
+      const updateOutput = vi.fn();
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+      await invocation.execute(new AbortController().signal, updateOutput);
+
+      expect(updateOutput).toHaveBeenCalledWith('Generating...');
+      expect(updateOutput).toHaveBeenCalledWith(
+        'Generating...\n\nArtifact (Result):\nPart 1',
+      );
+      expect(updateOutput).toHaveBeenCalledWith(
+        'Generating...\n\nArtifact (Result):\nPart 1\n Part 2',
+      );
     });
   });
 

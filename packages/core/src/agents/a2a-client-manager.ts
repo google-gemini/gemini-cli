@@ -147,9 +147,6 @@ export class A2AClientManager {
         contextId: options?.contextId,
         taskId: options?.taskId,
       },
-      configuration: {
-        blocking: false,
-      },
     };
 
     try {
