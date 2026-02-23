@@ -275,7 +275,8 @@ async function calculateRegexReplacement(
 
   const modifiedCode = currentContent.replace(
     replaceRegex,
-    (_match, indentation) => applyIndentation(newLines, indentation || '').join('\n'),
+    (_match, indentation) =>
+      applyIndentation(newLines, indentation || '').join('\n'),
   );
 
   return {
