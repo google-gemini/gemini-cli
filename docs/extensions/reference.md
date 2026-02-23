@@ -132,7 +132,10 @@ The manifest file defines the extension's behavior and configuration.
   servers. Extension servers follow the same format as standard
   [CLI configuration](../reference/configuration.md).
 - `contextFileName`: The name of the context file (defaults to `GEMINI.md`). Can
-  also be an array of strings to load multiple context files.
+  also be an array of strings to load multiple context files. This file is
+  loaded into the **Extension** layer of the CLI's
+  [context hierarchy](../cli/gemini-md.md); it is read-only for users (they see
+  it in `/memory show` but cannot edit it via the CLI).
 - `excludeTools`: An array of tools to block from the model. You can restrict
   specific arguments, such as `run_shell_command(rm -rf)`.
 - `themes`: An optional list of themes provided by the extension. See
