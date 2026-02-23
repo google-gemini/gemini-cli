@@ -1,4 +1,4 @@
-name: "CodeQL Analysis"
+name: "CodeQL Smart Analysis"
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ main ]
   schedule:
-    - cron: "0 0 * * 0" # Runs weekly on Sunday
+    - cron: "0 0 * * 0"  # Weekly Sunday run
   workflow_dispatch:
 
 concurrency:
@@ -15,39 +15,77 @@ concurrency:
 
 jobs:
   analyze:
-    name: Analyze with CodeQL
+    name: Smart CodeQL Analysis
     runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
       security-events: write
 
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [ "javascript", "python", "java", "cpp", "csharp", "go" ]
-
     steps:
+      # ⬇️ Get your repository code
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # 🧠 Detect repository’s primary languages using GitHub’s Linguist
+      - name: Detect Repository Languages
+        id: detect_lang
+        run: |
+          echo "Detecting repo languages..."
+          curl -s -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/languages" \
+            | jq -r 'keys | map(ascii_downcase) | join(",")' > detected_langs.txt
+
+          detected=$(cat detected_langs.txt)
+          echo "Detected languages: $detected"
+          if [ -z "$detected" ]; then
+            echo "No languages detected — defaulting to javascript."
+            echo "language=javascript" >> $GITHUB_OUTPUT
+          else
+            # Map GitHub language keys to CodeQL-compatible identifiers
+            langs=""
+            for lang in $(echo $detected | tr "," " "); do
+              case "$lang" in
+                javascript|typescript) langs="${langs},javascript" ;;
+                python) langs="${langs},python" ;;
+                java) langs="${langs},java" ;;
+                c|cpp|c++) langs="${langs},cpp" ;;
+                c#|csharp) langs="${langs},csharp" ;;
+                go) langs="${langs},go" ;;
+              esac
+            done
+            langs=$(echo $langs | sed 's/^,//')
+            echo "language=$langs" >> $GITHUB_OUTPUT
+            echo "Languages prepared for CodeQL: $langs"
+          fi
+
+      # 🧩 Initialize CodeQL with detected languages
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: ${{ matrix.language }}
+          languages: ${{ steps.detect_lang.outputs.language }}
+          queries: +security-and-quality
 
-      # 🧩 Automatically build codebases that need compilation (e.g., Java, C++, C#)
+      # 🧱 Try to build automatically if needed (Java, C++, C#, etc.)
       - name: Autobuild Project
         uses: github/codeql-action/autobuild@v3
 
-      # 🧱 For custom build steps, uncomment and customize below:
+      # 🧠 If autobuild fails, you can manually specify build commands:
       # - name: Manual Build
       #   run: |
-      #     npm install && npm run build
-      #     # or: mvn package
-      #     # or: make build
+      #     npm ci && npm run build
+      #     # or pip install -r requirements.txt
+      #     # or mvn package
 
+      # 🔍 Perform static analysis and upload results
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
-          category: "/language:${{ matrix.language }}"
+          upload: true
+          category: "/auto:detected"
+
+      # ✅ Log results for workflow summary
+      - name: Summary
+        run: |
+          echo "✅ CodeQL smart scan complete."
+          echo "Results available in Security → Code scanning alerts."
