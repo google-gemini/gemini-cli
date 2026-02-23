@@ -11,7 +11,6 @@
  * @param space - Optional space parameter for formatting (defaults to no formatting)
  * @returns JSON string with circular references replaced by [Circular]
  */
-import type { Config } from '../config/config.js';
 
 export function safeJsonStringify(
   obj: unknown,
@@ -75,38 +74,32 @@ export function redactProxyUrl(
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function safeJsonStringifyBooleanValuesOnly(obj: any): string {
   let configSeen = false;
-  // check if this is a config object - if so we need to redact the proxy url
-  // before we serialize it, otherwise api keys could leak into telemetry
-  if (obj && typeof obj === 'object' && 'getProxy' in obj && !configSeen) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const config = obj as Config;
-    const proxy = config.getProxy();
-    if (proxy) {
-      // create a copy of the config but with the proxy url redacted
-      // need to keep the prototype chain intact so it still works like a config
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
-      const sanitized: any = Object.create(Object.getPrototypeOf(obj));
-      // copy over all the properties from the original
-      Object.assign(sanitized, obj);
-      // swap out the proxy with the redacted version
-      sanitized.proxy = redactProxyUrl(proxy);
-      // also override getProxy() to return the safe version
-      sanitized.getProxy = () => redactProxyUrl(proxy);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      obj = sanitized;
-    }
-  }
 
   return JSON.stringify(obj, (key, value) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    if ((value as Config) !== null && !configSeen) {
+    // handle config object - only include it once
+    if (
+      !configSeen &&
+      value !== null &&
+      typeof value === 'object' &&
+      'getProxy' in value
+    ) {
       configSeen = true;
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return value;
     }
+
+    // explicitly omit the proxy property to prevent any potential credential leakage
+    // even though it's a string and wouldn't be serialized anyway, this is defensive
+    if (key === 'proxy') {
+      return undefined;
+    }
+
+    // only include boolean values, omit everything else
     if (typeof value === 'boolean') {
       return value;
     }
-    return '';
+    // return undefined to omit non-boolean properties entirely
+    // this prevents confusing empty string values in the output and reduces log size
+    return undefined;
   });
 }
