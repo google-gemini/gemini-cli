@@ -64,7 +64,7 @@ vi.mock('../ui/auth/useAuth.js', () => ({
     apiKeyDefaultValue: 'test-api-key',
     reloadApiKey: vi.fn().mockResolvedValue('test-api-key'),
   }),
-  validateAuthMethodWithSettings: () => null,
+  validateAuthMethodWithSettings: async () => null,
 }));
 
 // A minimal mock ExtensionManager to satisfy AppContainer's forceful cast
