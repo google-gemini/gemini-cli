@@ -270,7 +270,6 @@ describe('toolMapping', () => {
         tool: mockTool,
         invocation: mockInvocation,
         progressMessage: 'Downloading...',
-        progressPercent: 50,
         progress: 5,
         progressTotal: 10,
       };
@@ -281,7 +280,6 @@ describe('toolMapping', () => {
       expect(displayTool.progress).toBe(5);
       expect(displayTool.progressTotal).toBe(10);
       expect(displayTool.progressMessage).toBe('Downloading...');
-      expect(displayTool.progressPercent).toBe(50);
     });
 
     it('leaves progress fields undefined for non-Executing calls', () => {

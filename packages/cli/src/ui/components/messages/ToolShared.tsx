@@ -272,7 +272,7 @@ export const McpProgressIndicator: React.FC<McpProgressIndicatorProps> = ({
   const progressBar = '\u2588'.repeat(filled) + '\u2591'.repeat(empty);
 
   return (
-    <Box flexDirection="column" marginTop={1}>
+    <Box flexDirection="column">
       <Box>
         <Text color={theme.text.accent}>
           {progressBar} {percentage !== null ? `${percentage}%` : `${progress}`}
