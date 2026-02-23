@@ -13,6 +13,8 @@ import { GEMINI_DIR } from '../utils/paths.js';
 import { ApprovalMode } from '../policy/types.js';
 import * as snippets from './snippets.js';
 import * as legacySnippets from './snippets.legacy.js';
+import * as minimalSnippets from './snippets.minimal.js';
+import * as capabilitySnippets from './snippets.capability.js';
 import {
   resolvePathFromEnv,
   applySubstitutions,
@@ -29,7 +31,12 @@ import {
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
 } from '../tools/tool-names.js';
-import { resolveModel, supportsModernFeatures } from '../config/models.js';
+import {
+  resolveModel,
+  supportsModernFeatures,
+  PREVIEW_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
+} from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
 
@@ -40,6 +47,7 @@ export class PromptProvider {
   /**
    * Generates the core system prompt.
    */
+  /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
   getCoreSystemPrompt(
     config: Config,
     userMemory?: string | HierarchicalMemory,
@@ -54,6 +62,10 @@ export class PromptProvider {
     const isPlanMode = approvalMode === ApprovalMode.PLAN;
     const isYoloMode = approvalMode === ApprovalMode.YOLO;
     const skills = config.getSkillManager().getSkills();
+    const activatedSkills = config
+      .getSkillManager()
+      .getSkills()
+      .filter((s) => config.getSkillManager().isSkillActive(s.name));
     const toolNames = config.getToolRegistry().getAllToolNames();
     const enabledToolNames = new Set(toolNames);
     const approvedPlanPath = config.getApprovedPlanPath();
@@ -63,7 +75,27 @@ export class PromptProvider {
       config.getGemini31LaunchedSync?.() ?? false,
     );
     const isModernModel = supportsModernFeatures(desiredModel);
-    const activeSnippets = isModernModel ? snippets : legacySnippets;
+    const snippetsVariant = process.env['GEMINI_SNIPPETS_VARIANT'];
+    /* eslint-disable @typescript-eslint/no-unsafe-assignment */
+    let activeSnippets: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (snippetsVariant === 'minimal') {
+      activeSnippets = minimalSnippets;
+    } else if (snippetsVariant === 'legacy') {
+      activeSnippets = legacySnippets;
+    } else if (snippetsVariant === 'modern') {
+      activeSnippets = snippets;
+    } else if (snippetsVariant === 'capability') {
+      activeSnippets = capabilitySnippets;
+    } else {
+      activeSnippets = isModernModel ? snippets : legacySnippets;
+
+      // Automatically use capability snippets for Gemini 3 Flash Preview
+      if (desiredModel === PREVIEW_GEMINI_FLASH_MODEL) {
+        activeSnippets = capabilitySnippets;
+      } else if (desiredModel === DEFAULT_GEMINI_FLASH_MODEL) {
+        activeSnippets = minimalSnippets;
+      }
+    }
     const contextFilenames = getAllGeminiMdFilenames();
 
     // --- Context Gathering ---
@@ -151,6 +183,15 @@ export class PromptProvider {
             })),
           skills.length > 0,
         ),
+        activatedSkills: this.withSection(
+          'agentSkills',
+          () =>
+            activatedSkills.map((s) => ({
+              name: s.name,
+              body: s.body,
+            })),
+          activatedSkills.length > 0,
+        ),
         hookContext: isSectionEnabled('hookContext') || undefined,
         primaryWorkflows: this.withSection(
           'primaryWorkflows',
@@ -206,19 +247,24 @@ export class PromptProvider {
             })),
       } as snippets.SystemPromptOptions;
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const getCoreSystemPrompt = activeSnippets.getCoreSystemPrompt as (
         options: snippets.SystemPromptOptions,
       ) => string;
+       
       basePrompt = getCoreSystemPrompt(options);
     }
 
     // --- Finalization (Shell) ---
-    const finalPrompt = activeSnippets.renderFinalShell(
-      basePrompt,
-      userMemory,
-      contextFilenames,
-    );
+    const finalPrompt =
+      /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+      (
+        activeSnippets.renderFinalShell as (
+          basePrompt: string,
+          userMemory?: string | HierarchicalMemory,
+          contextFilenames?: string[],
+        ) => string
+      )(basePrompt, userMemory, contextFilenames);
+    /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
 
     // Sanitize erratic newlines from composition
     const sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');
@@ -230,7 +276,9 @@ export class PromptProvider {
       path.resolve(path.join(GEMINI_DIR, 'system.md')),
     );
 
+    /* eslint-enable @typescript-eslint/no-unsafe-assignment */
     return sanitizedPrompt;
+     
   }
 
   getCompressionPrompt(config: Config): string {
@@ -240,6 +288,7 @@ export class PromptProvider {
     );
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
+     
     return activeSnippets.getCompressionPrompt();
   }
 

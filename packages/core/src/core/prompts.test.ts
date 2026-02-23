@@ -109,6 +109,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       }),
       getSkillManager: vi.fn().mockReturnValue({
         getSkills: vi.fn().mockReturnValue([]),
+        isSkillActive: vi.fn().mockReturnValue(false),
       }),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
@@ -205,6 +206,17 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toMatchSnapshot();
   });
 
+  it('should use capability system prompt when GEMINI_SNIPPETS_VARIANT is "capability"', () => {
+    vi.stubEnv('GEMINI_SNIPPETS_VARIANT', 'capability');
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+      PREVIEW_GEMINI_FLASH_MODEL,
+    );
+    const prompt = getCoreSystemPrompt(mockConfig);
+    expect(prompt).toContain('You are Gemini CLI, an expert agent.');
+    expect(prompt).not.toContain('## Development Lifecycle');
+    expect(prompt).toMatchSnapshot();
+  });
+
   it('should use legacy system prompt for non-preview model', () => {
     vi.mocked(mockConfig.getActiveModel).mockReturnValue(
       DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -236,8 +248,8 @@ describe('Core System Prompt (prompts.ts)', () => {
       PREVIEW_GEMINI_FLASH_MODEL,
     );
     const prompt = getCoreSystemPrompt(mockConfig);
-    expect(prompt).toContain('You are Gemini CLI, an interactive CLI agent'); // Check for core content
-    expect(prompt).toContain('No Chitchat:');
+    expect(prompt).toContain('You are Gemini CLI, an expert agent'); // Check for core content
+    expect(prompt).not.toContain('No Chitchat:');
     expect(prompt).toMatchSnapshot();
   });
 
@@ -258,11 +270,13 @@ describe('Core System Prompt (prompts.ts)', () => {
     ['whitespace only', '   \n  \t '],
   ])('should return the base prompt when userMemory is %s', (_, userMemory) => {
     vi.stubEnv('SANDBOX', undefined);
-    vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+      PREVIEW_GEMINI_FLASH_MODEL,
+    );
     const prompt = getCoreSystemPrompt(mockConfig, userMemory);
     expect(prompt).not.toContain('---\n\n'); // Separator should not be present
-    expect(prompt).toContain('You are Gemini CLI, an interactive CLI agent'); // Check for core content
-    expect(prompt).toContain('No Chitchat:');
+    expect(prompt).toContain('You are Gemini CLI, an expert agent'); // Check for core content
+    expect(prompt).not.toContain('No Chitchat:');
     expect(prompt).toMatchSnapshot(); // Use snapshot for base prompt structure
   });
 

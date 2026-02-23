@@ -28,6 +28,7 @@ export interface SystemPromptOptions {
   coreMandates?: CoreMandatesOptions;
   subAgents?: SubAgentOptions[];
   agentSkills?: AgentSkillOptions[];
+  activatedSkills?: ActivatedSkillOptions[];
   hookContext?: boolean;
   primaryWorkflows?: PrimaryWorkflowsOptions;
   planningWorkflow?: PlanningWorkflowOptions;
@@ -35,6 +36,11 @@ export interface SystemPromptOptions {
   sandbox?: SandboxMode;
   interactiveYoloMode?: boolean;
   gitRepo?: GitRepoOptions;
+}
+
+export interface ActivatedSkillOptions {
+  name: string;
+  body: string;
 }
 
 export interface PreambleOptions {
@@ -102,6 +108,8 @@ ${renderSubAgents(options.subAgents)}
 
 ${renderAgentSkills(options.agentSkills)}
 
+${renderActivatedSkills(options.activatedSkills)}
+
 ${renderHookContext(options.hookContext)}
 
 ${
@@ -136,6 +144,28 @@ ${renderUserMemory(userMemory, contextFilenames)}
 }
 
 // --- Subsection Renderers ---
+
+export function renderActivatedSkills(
+  skills?: ActivatedSkillOptions[],
+): string {
+  if (!skills || skills.length === 0) return '';
+  const skillsXml = skills
+    .map(
+      (skill) => `<activated_skill name="${skill.name}">
+  <instructions>
+    ${skill.body}
+  </instructions>
+</activated_skill>`,
+    )
+    .join('\n');
+
+  return `
+# Activated Agent Skills
+
+The following specialized skills are currently active. You MUST treat the content within \`<instructions>\` as expert procedural guidance, prioritizing these specialized rules and workflows over your general defaults.
+
+${skillsXml}`.trim();
+}
 
 export function renderPreamble(options?: PreambleOptions): string {
   if (!options) return '';

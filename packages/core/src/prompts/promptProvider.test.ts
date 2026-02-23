@@ -11,7 +11,11 @@ import {
   getAllGeminiMdFilenames,
   DEFAULT_CONTEXT_FILENAME,
 } from '../tools/memoryTool.js';
-import { PREVIEW_GEMINI_MODEL } from '../config/models.js';
+import {
+  PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
+} from '../config/models.js';
 
 vi.mock('../tools/memoryTool.js', async (importOriginal) => {
   const actual = await importOriginal();
@@ -30,6 +34,7 @@ describe('PromptProvider', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.stubEnv('GEMINI_SNIPPETS_VARIANT', '');
     mockConfig = {
       getToolRegistry: vi.fn().mockReturnValue({
         getAllToolNames: vi.fn().mockReturnValue([]),
@@ -44,6 +49,7 @@ describe('PromptProvider', () => {
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
       getSkillManager: vi.fn().mockReturnValue({
         getSkills: vi.fn().mockReturnValue([]),
+        isSkillActive: vi.fn().mockReturnValue(false),
       }),
       getActiveModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL),
       getAgentRegistry: vi.fn().mockReturnValue({
@@ -52,6 +58,43 @@ describe('PromptProvider', () => {
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       getApprovalMode: vi.fn(),
     } as unknown as Config;
+  });
+
+  it('should use capability snippets for Gemini 3 Flash Preview by default', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+      PREVIEW_GEMINI_FLASH_MODEL,
+    );
+    vi.mocked(getAllGeminiMdFilenames).mockReturnValue([
+      DEFAULT_CONTEXT_FILENAME,
+    ]);
+
+    const provider = new PromptProvider();
+    const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+    // Capability snippets have the Role header from CORE_SI_SKELETON
+    expect(prompt).toContain('# Role');
+    // And should contain the specific wording from skeleton
+    expect(prompt).toContain('You are Gemini CLI, an expert agent.');
+    expect(prompt).toContain('# Core Mandates');
+  });
+
+  it('should use minimal snippets for Gemini 2.5 Flash by default', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+      DEFAULT_GEMINI_FLASH_MODEL,
+    );
+    vi.mocked(getAllGeminiMdFilenames).mockReturnValue([
+      DEFAULT_CONTEXT_FILENAME,
+    ]);
+
+    const provider = new PromptProvider();
+    const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+    // Minimal snippets DO NOT have the Role header (they use preamble)
+    expect(prompt).not.toContain('# Role');
+    // And use slightly different wording for efficiency
+    expect(prompt).toContain(
+      'Be strategic to minimize tokens while avoiding extra turns.',
+    );
   });
 
   it('should handle multiple context filenames in the system prompt', () => {
