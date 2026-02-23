@@ -267,7 +267,7 @@ describe('MCPOAuthProvider', () => {
     });
 
     it('should use JWT exp claim for expiresAt when access token is a JWT', async () => {
-      const futureExp = Math.floor(Date.now() / 1000) + 172800; // 48h from now
+      const futureExp = Math.floor(Date.now() / 1000) + 172800; // Unix timestamp 48h from now
       const jwtPayload = Buffer.from(
         JSON.stringify({ exp: futureExp }),
       ).toString('base64');
