@@ -5,10 +5,14 @@
  */
 
 import { AuthType } from '@google/gemini-cli-core';
-import { loadEnvironment, loadSettings } from './settings.js';
+import { loadEnvironment, type MergedSettings } from './settings.js';
 
-export function validateAuthMethod(authMethod: string): string | null {
-  loadEnvironment(loadSettings().merged, process.cwd());
+export function validateAuthMethod(
+  authMethod: string,
+  settings: MergedSettings,
+  workspaceDir: string = process.cwd(),
+): string | null {
+  loadEnvironment(settings, workspaceDir);
   if (
     authMethod === AuthType.LOGIN_WITH_GOOGLE ||
     authMethod === AuthType.COMPUTE_ADC
