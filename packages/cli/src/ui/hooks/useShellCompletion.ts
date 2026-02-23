@@ -27,7 +27,7 @@ const FS_COMPLETION_DEBOUNCE_MS = 50;
 // On Unix, backslash-quote shell metacharacters (spaces, parens, etc.).
 // On Windows, cmd.exe doesn't use backslash-quoting and `\` is the path
 // separator, so we leave the path as-is.
-const UNIX_SHELL_SPECIAL_CHARS = /[ '"()&|;<>!#$`{}[\]*?]/g;
+const UNIX_SHELL_SPECIAL_CHARS = /[ \t\n\r'"()&|;<>!#$`{}[\]*?\\]/g;
 
 /**
  * Escapes special shell characters in a path segment.

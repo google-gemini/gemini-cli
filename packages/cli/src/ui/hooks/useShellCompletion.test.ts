@@ -156,6 +156,13 @@ describe('useShellCompletion utilities', () => {
       expect(escapeShellPath('normal-file.txt')).toBe('normal-file.txt');
     });
 
+    it('should escape tabs, newlines, carriage returns, and backslashes', () => {
+      expect(escapeShellPath('a\tb')).toBe('a\\\tb');
+      expect(escapeShellPath('a\nb')).toBe('a\\\nb');
+      expect(escapeShellPath('a\rb')).toBe('a\\\rb');
+      expect(escapeShellPath('a\\b')).toBe('a\\\\b');
+    });
+
     it('should handle empty string', () => {
       expect(escapeShellPath('')).toBe('');
     });
