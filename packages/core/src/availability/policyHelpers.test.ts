@@ -222,7 +222,10 @@ describe('policyHelpers', () => {
         selectedModel: 'gemini-pro',
       });
 
-      const result = applyModelSelection(config, { model: 'gemini-pro' });
+      const result = applyModelSelection(config, {
+        model: 'gemini-pro',
+        isChatModel: true,
+      });
       expect(result.model).toBe('gemini-pro');
       expect(result.maxAttempts).toBeUndefined();
       expect(config.setActiveModel).toHaveBeenCalledWith('gemini-pro');
@@ -243,7 +246,10 @@ describe('policyHelpers', () => {
         selectedModel: 'gemini-flash',
       });
 
-      const result = applyModelSelection(config, { model: 'gemini-pro' });
+      const result = applyModelSelection(config, {
+        model: 'gemini-pro',
+        isChatModel: true,
+      });
 
       expect(result.model).toBe('gemini-flash');
       expect(result.config).toEqual({
@@ -253,14 +259,33 @@ describe('policyHelpers', () => {
 
       expect(mockModelConfigService.getResolvedConfig).toHaveBeenCalledWith({
         model: 'gemini-pro',
+        isChatModel: true,
       });
       expect(mockModelConfigService.getResolvedConfig).toHaveBeenCalledWith({
         model: 'gemini-flash',
+        isChatModel: true,
       });
       expect(config.setActiveModel).toHaveBeenCalledWith('gemini-flash');
     });
 
-    it('consumes sticky attempt if indicated', () => {
+    it('does not call setActiveModel if isChatModel is false', () => {
+      const config = createExtendedMockConfig();
+      mockModelConfigService.getResolvedConfig.mockReturnValue({
+        model: 'gemini-pro',
+        generateContentConfig: {},
+      });
+      mockAvailabilityService.selectFirstAvailable.mockReturnValue({
+        selectedModel: 'gemini-pro',
+      });
+
+      applyModelSelection(config, {
+        model: 'gemini-pro',
+        isChatModel: false,
+      });
+      expect(config.setActiveModel).not.toHaveBeenCalled();
+    });
+
+    it('consumes sticky attempt if indicated and isChatModel is true', () => {
       const config = createExtendedMockConfig();
       mockModelConfigService.getResolvedConfig.mockReturnValue({
         model: 'gemini-pro',
@@ -271,10 +296,36 @@ describe('policyHelpers', () => {
         attempts: 1,
       });
 
-      const result = applyModelSelection(config, { model: 'gemini-pro' });
+      const result = applyModelSelection(config, {
+        model: 'gemini-pro',
+        isChatModel: true,
+      });
       expect(mockAvailabilityService.consumeStickyAttempt).toHaveBeenCalledWith(
         'gemini-pro',
       );
+      expect(config.setActiveModel).toHaveBeenCalledWith('gemini-pro');
+      expect(result.maxAttempts).toBe(1);
+    });
+
+    it('consumes sticky attempt if indicated but does not call setActiveModel if isChatModel is false', () => {
+      const config = createExtendedMockConfig();
+      mockModelConfigService.getResolvedConfig.mockReturnValue({
+        model: 'gemini-pro',
+        generateContentConfig: {},
+      });
+      mockAvailabilityService.selectFirstAvailable.mockReturnValue({
+        selectedModel: 'gemini-pro',
+        attempts: 1,
+      });
+
+      const result = applyModelSelection(config, {
+        model: 'gemini-pro',
+        isChatModel: false,
+      });
+      expect(mockAvailabilityService.consumeStickyAttempt).toHaveBeenCalledWith(
+        'gemini-pro',
+      );
+      expect(config.setActiveModel).not.toHaveBeenCalled();
       expect(result.maxAttempts).toBe(1);
     });
 
@@ -291,7 +342,7 @@ describe('policyHelpers', () => {
 
       const result = applyModelSelection(
         config,
-        { model: 'gemini-pro' },
+        { model: 'gemini-pro', isChatModel: true },
         {
           consumeAttempt: false,
         },
@@ -299,6 +350,7 @@ describe('policyHelpers', () => {
       expect(
         mockAvailabilityService.consumeStickyAttempt,
       ).not.toHaveBeenCalled();
+      expect(config.setActiveModel).toHaveBeenCalledWith('gemini-pro');
       expect(result.maxAttempts).toBe(1);
     });
   });
