@@ -37,6 +37,7 @@ import {
   partListUnionToString,
   LlmRole,
   ApprovalMode,
+  convertSessionToClientHistory,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -53,10 +54,7 @@ import { randomUUID } from 'node:crypto';
 import type { CliArgs } from '../config/config.js';
 import { loadCliConfig } from '../config/config.js';
 import { runExitCleanup } from '../utils/cleanup.js';
-import {
-  SessionSelector,
-  convertSessionToHistoryFormats,
-} from '../utils/sessionUtils.js';
+import { SessionSelector } from '../utils/sessionUtils.js';
 
 export async function runZedIntegration(
   config: Config,
@@ -258,9 +256,7 @@ export class GeminiAgent {
       config.setFileSystemService(acpFileSystemService);
     }
 
-    const { clientHistory } = convertSessionToHistoryFormats(
-      sessionData.messages,
-    );
+    const clientHistory = convertSessionToClientHistory(sessionData.messages);
 
     const geminiClient = config.getGeminiClient();
     await geminiClient.initialize();
@@ -520,7 +516,10 @@ export class Session {
       const functionCalls: FunctionCall[] = [];
 
       try {
-        const model = resolveModel(this.config.getModel());
+        const model = resolveModel(
+          this.config.getModel(),
+          (await this.config.getGemini31Launched?.()) ?? false,
+        );
         const responseStream = await chat.sendMessageStream(
           { model },
           nextMessage?.parts ?? [],
@@ -699,6 +698,7 @@ export class Session {
           },
         };
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const output = await this.connection.requestPermission(params);
         const outcome =
           output.outcome.outcome === CoreToolCallStatus.Cancelled

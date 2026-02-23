@@ -12,6 +12,7 @@ import type {
 } from './tools.js';
 import { Kind, BaseDeclarativeTool, BaseToolInvocation } from './tools.js';
 import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
 import { DiscoveredMCPTool } from './mcp-tool.js';
@@ -25,6 +26,9 @@ import {
   DISCOVERED_TOOL_PREFIX,
   TOOL_LEGACY_ALIASES,
   getToolAliases,
+  PLAN_MODE_TOOLS,
+  WRITE_FILE_TOOL_NAME,
+  EDIT_TOOL_NAME,
 } from './tool-names.js';
 
 type ToolParams = Record<string, unknown>;
@@ -386,6 +390,7 @@ export class ToolRegistry {
 
       // execute discovery command and extract function declarations (w/ or w/o "tool" wrappers)
       const functions: FunctionDeclaration[] = [];
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const discoveredItems = JSON.parse(stdout.trim());
 
       if (!discoveredItems || !Array.isArray(discoveredItems)) {
@@ -484,6 +489,31 @@ export class ToolRegistry {
     excludeTools ??=
       this.expandExcludeToolsWithAliases(this.config.getExcludeTools()) ??
       new Set([]);
+
+    // Filter tools in Plan Mode to only allow approved read-only tools.
+    const isPlanMode =
+      typeof this.config.getApprovalMode === 'function' &&
+      this.config.getApprovalMode() === ApprovalMode.PLAN;
+    if (isPlanMode) {
+      const allowedToolNames = new Set<string>(PLAN_MODE_TOOLS);
+      // We allow write_file and replace for writing plans specifically.
+      allowedToolNames.add(WRITE_FILE_TOOL_NAME);
+      allowedToolNames.add(EDIT_TOOL_NAME);
+
+      // Discovered MCP tools are allowed if they are read-only.
+      if (
+        tool instanceof DiscoveredMCPTool &&
+        tool.isReadOnly &&
+        !allowedToolNames.has(tool.name)
+      ) {
+        allowedToolNames.add(tool.name);
+      }
+
+      if (!allowedToolNames.has(tool.name)) {
+        return false;
+      }
+    }
+
     const normalizedClassName = tool.constructor.name.replace(/^_+/, '');
     const possibleNames = [tool.name, normalizedClassName];
     if (tool instanceof DiscoveredMCPTool) {
@@ -507,9 +537,22 @@ export class ToolRegistry {
    * @returns An array of FunctionDeclarations.
    */
   getFunctionDeclarations(modelId?: string): FunctionDeclaration[] {
+    const isPlanMode = this.config.getApprovalMode() === ApprovalMode.PLAN;
+    const plansDir = this.config.storage.getPlansDir();
+
     const declarations: FunctionDeclaration[] = [];
     this.getActiveTools().forEach((tool) => {
-      declarations.push(tool.getSchema(modelId));
+      let schema = tool.getSchema(modelId);
+      if (
+        isPlanMode &&
+        (tool.name === WRITE_FILE_TOOL_NAME || tool.name === EDIT_TOOL_NAME)
+      ) {
+        schema = {
+          ...schema,
+          description: `ONLY FOR PLANS: ${schema.description}. You are currently in Plan Mode and may ONLY use this tool to write or update plans (.md files) in the plans directory: ${plansDir}/. You cannot use this tool to modify source code directly.`,
+        };
+      }
+      declarations.push(schema);
     });
     return declarations;
   }

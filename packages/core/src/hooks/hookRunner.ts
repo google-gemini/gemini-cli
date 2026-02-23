@@ -9,10 +9,6 @@ import type {
   HookConfig,
   CommandHookConfig,
   RuntimeHookConfig,
-} from './types.js';
-import { HookEventName, ConfigSource, HookType } from './types.js';
-import type { Config } from '../config/config.js';
-import type {
   HookInput,
   HookOutput,
   HookExecutionResult,
@@ -21,6 +17,8 @@ import type {
   BeforeModelOutput,
   BeforeToolInput,
 } from './types.js';
+import { HookEventName, ConfigSource, HookType } from './types.js';
+import type { Config } from '../config/config.js';
 import type { LLMRequest } from './hookTranslator.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { sanitizeEnvironment } from '../services/environmentSanitization.js';
@@ -424,8 +422,10 @@ export class HookRunner {
         const textToParse = stdout.trim() || stderr.trim();
         if (textToParse) {
           try {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             let parsed = JSON.parse(textToParse);
             if (typeof parsed === 'string') {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               parsed = JSON.parse(parsed);
             }
             if (parsed && typeof parsed === 'object') {

@@ -31,6 +31,31 @@ export function isJetBrainsTerminal(): boolean {
 }
 
 /**
+ * Detects if the current terminal is the default Apple Terminal.app.
+ */
+export function isAppleTerminal(): boolean {
+  return process.env['TERM_PROGRAM'] === 'Apple_Terminal';
+}
+
+/**
+ * Detects if the current terminal supports 256 colors (8-bit).
+ */
+export function supports256Colors(): boolean {
+  // Check if stdout supports at least 8-bit color depth
+  if (process.stdout.getColorDepth && process.stdout.getColorDepth() >= 8) {
+    return true;
+  }
+
+  // Check TERM environment variable
+  const term = process.env['TERM'] || '';
+  if (term.includes('256color')) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Detects if the current terminal supports true color (24-bit).
  */
 export function supportsTrueColor(): boolean {
@@ -50,28 +75,64 @@ export function supportsTrueColor(): boolean {
   return false;
 }
 
+export enum WarningPriority {
+  Low = 'low',
+  High = 'high',
+}
+
+export interface StartupWarning {
+  id: string;
+  message: string;
+  priority: WarningPriority;
+}
+
 /**
  * Returns a list of compatibility warnings based on the current environment.
  */
-export function getCompatibilityWarnings(): string[] {
-  const warnings: string[] = [];
+export function getCompatibilityWarnings(options?: {
+  isAlternateBuffer?: boolean;
+}): StartupWarning[] {
+  const warnings: StartupWarning[] = [];
 
   if (isWindows10()) {
-    warnings.push(
-      'Warning: Windows 10 detected. Some UI features like smooth scrolling may be degraded. Windows 11 is recommended for the best experience.',
-    );
+    warnings.push({
+      id: 'windows-10',
+      message:
+        'Warning: Windows 10 detected. Some UI features like smooth scrolling may be degraded. Windows 11 is recommended for the best experience.',
+      priority: WarningPriority.High,
+    });
   }
 
-  if (isJetBrainsTerminal()) {
-    warnings.push(
-      'Warning: JetBrains terminal detected. You may experience rendering or scrolling issues. Using an external terminal (e.g., Windows Terminal, iTerm2) is recommended.',
-    );
+  if (isJetBrainsTerminal() && options?.isAlternateBuffer) {
+    const platformTerminals: Partial<Record<NodeJS.Platform, string>> = {
+      win32: 'Windows Terminal',
+      darwin: 'iTerm2 or Ghostty',
+      linux: 'Ghostty',
+    };
+    const suggestion = platformTerminals[os.platform()];
+    const suggestedTerminals = suggestion ? ` (e.g., ${suggestion})` : '';
+
+    warnings.push({
+      id: 'jetbrains-terminal',
+      message: `Warning: JetBrains mouse scrolling is unreliable. Disabling alternate buffer mode in settings or using an external terminal${suggestedTerminals} is recommended.`,
+      priority: WarningPriority.High,
+    });
   }
 
-  if (!supportsTrueColor()) {
-    warnings.push(
-      'Warning: True color (24-bit) support not detected. Using a terminal with true color enabled will result in a better visual experience.',
-    );
+  if (!supports256Colors()) {
+    warnings.push({
+      id: '256-color',
+      message:
+        'Warning: 256-color support not detected. Using a terminal with at least 256-color support is recommended for a better visual experience.',
+      priority: WarningPriority.High,
+    });
+  } else if (!supportsTrueColor() && !isAppleTerminal()) {
+    warnings.push({
+      id: 'true-color',
+      message:
+        'Warning: True color (24-bit) support not detected. Using a terminal with true color enabled will result in a better visual experience.',
+      priority: WarningPriority.Low,
+    });
   }
 
   return warnings;
