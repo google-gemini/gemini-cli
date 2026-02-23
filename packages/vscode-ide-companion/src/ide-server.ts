@@ -486,39 +486,42 @@ const createMcpServer = (
     async ({ uri }: z.infer<typeof AsExternalUriRequestSchema>) => {
       log(`Received asExternalUri request for uri: ${uri}`);
       try {
-        const parsedUri = vscode.Uri.parse(uri);
+        // 1. Validate using WHATWG URL constructor for reliable host/port/path parsing
+        const parsedUrl = new URL(uri);
 
-        // 1. Only allow absolute URIs with http scheme
-        if (parsedUri.scheme !== 'http') {
+        // Required for security: Only allow absolute URIs with http scheme
+        if (parsedUrl.protocol !== 'http:') {
           throw new Error(
-            `Invalid scheme: ${parsedUri.scheme}. Only 'http' is allowed for security reasons.`,
+            `Invalid scheme: ${parsedUrl.protocol.slice(0, -1)}. Only 'http' is allowed for security reasons.`,
           );
         }
 
-        // 2. Only allow loopback hosts
-        const host = parsedUri.authority.split(':')[0];
-        const loopbackHosts = ['localhost', '127.0.0.1'];
-        if (!loopbackHosts.includes(host)) {
+        // Required for security: Only allow loopback hosts
+        // Use normalized hostname to handle both IPv4 and IPv6 (stripping [] from IPv6)
+        const hostname = parsedUrl.hostname.replace(/^\[(.*)\]$/, '$1');
+        const loopbackHosts = ['localhost', '127.0.0.1', '::1'];
+        if (!loopbackHosts.includes(hostname)) {
           throw new Error(
-            `Invalid host: ${host}. Only loopback hosts (localhost, 127.0.0.1) are allowed.`,
+            `Invalid host: ${hostname}. Only loopback hosts (localhost, 127.0.0.1, ::1) are allowed.`,
           );
         }
 
-        // 3. Require a port
-        const port = parsedUri.authority.split(':')[1];
-        if (!port) {
+        // Required for security: Require an explicit port
+        if (!parsedUrl.port) {
           throw new Error('A port must be specified in the URI.');
         }
 
-        // 4. Restrict path to OAuth callback
-        // The path must be exactly '/oauth2redirect' as per hardening requirements.
-        if (parsedUri.path !== '/oauth2redirect') {
+        // Required for security: Restrict path strictly to OAuth callback
+        if (parsedUrl.pathname !== '/oauth2redirect') {
           throw new Error(
-            `Unauthorized path: ${parsedUri.path}. Only '/oauth2redirect' is allowed for security reasons.`,
+            `Unauthorized path: ${parsedUrl.pathname}. Only '/oauth2redirect' is allowed for security reasons.`,
           );
         }
 
+        // 2. Use vscode.Uri for the actual resolution
+        const parsedUri = vscode.Uri.parse(uri);
         const externalUri = await vscode.env.asExternalUri(parsedUri);
+
         return {
           content: [
             {
