@@ -102,6 +102,52 @@ priority = 100
       expect(result.errors).toHaveLength(0);
     });
 
+    it('should parse toolAnnotations from TOML', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "annotated-tool"
+toolAnnotations = { readOnlyHint = true, custom = "value" }
+decision = "allow"
+priority = 70
+`);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('annotated-tool');
+      expect(result.rules[0].toolAnnotations).toEqual({
+        readOnlyHint: true,
+        custom: 'value',
+      });
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should transform mcpName = "*" to wildcard toolName', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+mcpName = "*"
+decision = "ask_user"
+priority = 10
+`);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('*__*');
+      expect(result.rules[0].decision).toBe(PolicyDecision.ASK_USER);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should transform mcpName = "*" and specific toolName to wildcard prefix', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+mcpName = "*"
+toolName = "search"
+decision = "allow"
+priority = 10
+`);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('*__search');
+      expect(result.errors).toHaveLength(0);
+    });
+
     it('should transform commandRegex to argsPattern', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
