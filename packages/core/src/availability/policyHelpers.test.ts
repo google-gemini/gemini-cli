@@ -15,12 +15,17 @@ import type { Config } from '../config/config.js';
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL,
 } from '../config/models.js';
+import { AuthType } from '../core/contentGenerator.js';
 
 const createMockConfig = (overrides: Partial<Config> = {}): Config =>
   ({
     getUserTier: () => undefined,
     getModel: () => 'gemini-2.5-pro',
+    getGemini31LaunchedSync: () => false,
+    getContentGeneratorConfig: () => ({ authType: undefined }),
     ...overrides,
   }) as unknown as Config;
 
@@ -115,6 +120,43 @@ describe('policyHelpers', () => {
       expect(chain[0]?.model).toBe('gemini-2.5-flash');
       expect(chain[1]?.model).toBe('gemini-2.5-pro');
     });
+<<<<<<< HEAD
+=======
+
+    it('proactively returns Gemini 2.5 chain if Gemini 3 requested but user lacks access', () => {
+      const config = createMockConfig({
+        getModel: () => 'auto-gemini-3',
+        getHasAccessToPreviewModel: () => false,
+      });
+      const chain = resolvePolicyChain(config);
+
+      // Should downgrade to [Pro 2.5, Flash 2.5]
+      expect(chain).toHaveLength(2);
+      expect(chain[0]?.model).toBe('gemini-2.5-pro');
+      expect(chain[1]?.model).toBe('gemini-2.5-flash');
+    });
+
+    it('returns Gemini 3.1 Pro chain when launched and auto-gemini-3 requested', () => {
+      const config = createMockConfig({
+        getModel: () => 'auto-gemini-3',
+        getGemini31LaunchedSync: () => true,
+      });
+      const chain = resolvePolicyChain(config);
+      expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_MODEL);
+      expect(chain[1]?.model).toBe('gemini-3-flash-preview');
+    });
+
+    it('returns Gemini 3.1 Pro Custom Tools chain when launched, auth is Gemini, and auto-gemini-3 requested', () => {
+      const config = createMockConfig({
+        getModel: () => 'auto-gemini-3',
+        getGemini31LaunchedSync: () => true,
+        getContentGeneratorConfig: () => ({ authType: AuthType.USE_GEMINI }),
+      });
+      const chain = resolvePolicyChain(config);
+      expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
+      expect(chain[1]?.model).toBe('gemini-3-flash-preview');
+    });
+>>>>>>> aa9163da6 (feat(core): add policy chain support for Gemini 3.1 (#19991))
   });
 
   describe('buildFallbackPolicyContext', () => {

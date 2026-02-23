@@ -6,6 +6,7 @@
 
 import type { GenerateContentConfig } from '@google/genai';
 import type { Config } from '../config/config.js';
+import { AuthType } from '../core/contentGenerator.js';
 import type {
   FailureKind,
   FallbackAction,
@@ -43,15 +44,22 @@ export function resolvePolicyChain(
   const configuredModel = config.getModel();
 
   let chain;
+  const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
+  const useCustomToolModel =
+    useGemini31 &&
+    config.getContentGeneratorConfig?.()?.authType === AuthType.USE_GEMINI;
+
   const resolvedModel = resolveModel(
     modelFromConfig,
-    config.getGemini31LaunchedSync?.() ?? false,
+    useGemini31,
+    useCustomToolModel,
   );
   const isAutoPreferred = preferredModel ? isAutoModel(preferredModel) : false;
   const isAutoConfigured = isAutoModel(configuredModel);
 
   if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
     chain = getFlashLitePolicyChain();
+<<<<<<< HEAD
   } else if (isAutoPreferred || isAutoConfigured) {
     const previewEnabled =
       preferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
@@ -60,6 +68,34 @@ export function resolvePolicyChain(
       previewEnabled,
       userTier: config.getUserTier(),
     });
+=======
+  } else if (
+    isGemini3Model(resolvedModel) ||
+    isAutoPreferred ||
+    isAutoConfigured
+  ) {
+    if (hasAccessToPreview) {
+      const previewEnabled =
+        isGemini3Model(resolvedModel) ||
+        preferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
+        configuredModel === PREVIEW_GEMINI_MODEL_AUTO;
+      chain = getModelPolicyChain({
+        previewEnabled,
+        userTier: config.getUserTier(),
+        useGemini31,
+        useCustomToolModel,
+      });
+    } else {
+      // User requested Gemini 3 but has no access. Proactively downgrade
+      // to the stable Gemini 2.5 chain.
+      return getModelPolicyChain({
+        previewEnabled: false,
+        userTier: config.getUserTier(),
+        useGemini31,
+        useCustomToolModel,
+      });
+    }
+>>>>>>> aa9163da6 (feat(core): add policy chain support for Gemini 3.1 (#19991))
   } else {
     chain = createSingleModelChain(modelFromConfig);
   }
