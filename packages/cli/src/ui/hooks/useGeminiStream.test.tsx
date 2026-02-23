@@ -2416,8 +2416,8 @@ describe('useGeminiStream', () => {
         expect(mockAddItem).toHaveBeenCalledWith(
           expect.objectContaining({
             type: MessageType.INFO,
-            text: 'Context compressed',
-            secondaryText: 'at 50% threshold. Change this in /settings.',
+            text: 'Context compressed from 10% to 5%',
+            secondaryText: '. Change threshold in /settings.',
             color: theme.status.warning,
           }),
           expect.any(Number),
