@@ -1692,6 +1692,33 @@ ${INSTALL_WARNING_MESSAGE}`,
       ).rejects.toThrow('Invalid extension name: "bad_name"');
     });
 
+    it('should install an extension when manifest name differs from source directory name', async () => {
+      const sourceRoot = path.join(tempHomeDir, 'source-mismatch-parent');
+      const sourceExtDir = path.join(sourceRoot, 'folder-name-ext');
+      fs.mkdirSync(sourceExtDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(sourceExtDir, EXTENSIONS_CONFIG_FILENAME),
+        JSON.stringify({
+          name: 'manifest-name-ext',
+          version: '1.0.0',
+        }),
+      );
+
+      await extensionManager.loadExtensions();
+      const installed = await extensionManager.installOrUpdateExtension({
+        source: sourceExtDir,
+        type: 'local',
+      });
+
+      expect(installed.name).toBe('manifest-name-ext');
+      expect(
+        fs.existsSync(path.join(userExtensionsDir, 'manifest-name-ext')),
+      ).toBe(true);
+      expect(
+        fs.existsSync(path.join(userExtensionsDir, 'folder-name-ext')),
+      ).toBe(false);
+    });
+
     describe('installing from github', () => {
       const gitUrl = 'https://github.com/google/gemini-test-extension.git';
       const extensionName = 'gemini-test-extension';

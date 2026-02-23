@@ -124,8 +124,8 @@ The manifest file defines the extension's behavior and configuration.
 }
 ```
 
-- `name`: A unique identifier for the extension. Use lowercase letters, numbers,
-  and dashes. This name must match the extension's directory name.
+- `name`: A unique identifier for the extension. Use letters, numbers, and
+  dashes. It does not need to match the extension directory name.
 - `version`: The current version of the extension.
 - `description`: A short summary shown in the extension gallery.
 - <a id="mcp-servers"></a>`mcpServers`: A map of Model Context Protocol (MCP)
