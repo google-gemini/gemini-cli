@@ -695,7 +695,7 @@ export const renderWithProviders = (
           <UIStateContext.Provider value={finalUiState}>
             <VimModeProvider settings={finalSettings}>
               <ShellFocusContext.Provider value={shellFocus}>
-                <SessionStatsProvider>
+                <SessionStatsProvider initialSessionId="test-session-id">
                   <StreamingContext.Provider
                     value={finalUiState.streamingState}
                   >
