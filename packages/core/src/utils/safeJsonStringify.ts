@@ -56,8 +56,13 @@ export function redactProxyUrl(
     return url.toString();
   } catch {
     // if url parsing fails for some reason, fall back to regex
-    // handles weird edge cases or malformed urls
-    return proxyUrl.replace(/^([^:]+:\/\/)([^@]+@)?(.+)$/, '$1$3');
+    // handles weird edge cases or malformed urls, including urls without protocols
+    // make protocol optional to handle cases like "user:pass@host.com"
+    return proxyUrl.replace(
+      /^([^:]+:\/\/)?([^@]+@)?(.+)$/,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+      (_, protocol, __, rest) => (protocol || '') + rest,
+    );
   }
 }
 

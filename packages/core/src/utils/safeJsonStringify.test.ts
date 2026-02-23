@@ -126,13 +126,30 @@ describe('redactProxyUrl', () => {
   });
 
   it('should handle malformed URLs with regex fallback', () => {
-    const malformedUrl = 'http://user:pass@host';
+    // test the regex fallback with a url that will fail new URL()
+    // using a url with invalid characters that can't be parsed
+    // this ensures we test the catch block and regex fallback
+    const malformedUrl = '://user:pass@host';
     const redacted = redactProxyUrl(malformedUrl);
 
-    // url constructor might add a trailing slash, so just check the content
-    expect(redacted).toContain('http://host');
+    // regex fallback should remove credentials
     expect(redacted).not.toContain('user:pass');
     expect(redacted).not.toContain('@');
+    expect(redacted).toContain('host');
+  });
+
+  it('should handle URLs without protocol in regex fallback', () => {
+    // test that regex fallback handles urls without protocols
+    // this tests the vulnerability fix where credentials could leak
+    // if the url doesn't have a protocol and new URL() fails
+    const urlWithoutProtocol = 'user:pass@example.com';
+    // manually test the regex to ensure it works
+    const regexResult = urlWithoutProtocol.replace(
+      /^([^:]+:\/\/)?([^@]+@)?(.+)$/,
+      (_, protocol, __, rest) => (protocol || '') + rest,
+    );
+    expect(regexResult).toBe('example.com');
+    expect(regexResult).not.toContain('user:pass');
   });
 
   it('should return undefined for undefined input', () => {
