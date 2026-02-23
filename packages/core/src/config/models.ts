@@ -134,6 +134,7 @@ export function isPreviewModel(model: string): boolean {
   return (
     model === PREVIEW_GEMINI_MODEL ||
     model === PREVIEW_GEMINI_3_1_MODEL ||
+    model === PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL ||
     model === PREVIEW_GEMINI_FLASH_MODEL ||
     model === PREVIEW_GEMINI_MODEL_AUTO
   );
