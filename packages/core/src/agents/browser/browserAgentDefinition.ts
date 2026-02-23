@@ -118,10 +118,7 @@ export const BrowserAgentDefinition = (
     kind: 'local',
     experimental: true,
     displayName: 'Browser Agent',
-    description: `Specialized agent for web browser automation using the Accessibility Tree.
-    Use this agent for: navigating websites, filling forms, clicking buttons,
-    extracting information from web pages. It can see and interact with the page
-    structure semantically through the accessibility tree.`,
+    description: `Specialized autonomous agent for end-to-end web browser automation and objective-driven problem solving. Delegate complete, high-level tasks to this agent — it independently plans, executes multi-step interactions, interprets dynamic page feedback (e.g., game states, form validation errors, search results), and iterates until the goal is achieved. It perceives page structure through the Accessibility Tree, handles overlays and popups, and supports complex web apps.`,
 
     inputConfig: {
       inputSchema: {
