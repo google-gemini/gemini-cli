@@ -42,7 +42,10 @@ USER node
 # install gemini-cli and clean up
 COPY packages/cli/dist/google-gemini-cli-*.tgz /tmp/gemini-cli.tgz
 COPY packages/core/dist/google-gemini-cli-core-*.tgz /tmp/gemini-core.tgz
-RUN npm install -g /tmp/gemini-cli.tgz /tmp/gemini-core.tgz \
+RUN npm install -g /tmp/gemini-core.tgz \
+  && npm install -g /tmp/gemini-cli.tgz \
+  && node -e "const fs=require('node:fs'); JSON.parse(fs.readFileSync('/usr/local/share/npm-global/lib/node_modules/@google/gemini-cli/package.json','utf8')); JSON.parse(fs.readFileSync('/usr/local/share/npm-global/lib/node_modules/@google/gemini-cli-core/package.json','utf8'));" \
+  && gemini --version > /dev/null \
   && npm cache clean --force \
   && rm -f /tmp/gemini-{cli,core}.tgz
 
