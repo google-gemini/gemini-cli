@@ -299,12 +299,12 @@ const SETTINGS_SCHEMA = {
       },
       maxAttempts: {
         type: 'number',
-        label: 'Max Attempts',
+        label: 'Max Chat Model Attempts',
         category: 'General',
         requiresRestart: false,
         default: 10,
         description:
-          'Maximum number of attempts for failed API requests. Cannot exceed 10.',
+          'Maximum number of attempts for requests to the main chat model. Cannot exceed 10.',
         showInDialog: true,
       },
       debugKeystrokeLogging: {

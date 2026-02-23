@@ -143,8 +143,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`general.maxAttempts`** (number):
-  - **Description:** Maximum number of attempts for failed API requests. Cannot
-    exceed 10.
+  - **Description:** Maximum number of attempts for requests to the main chat
+    model. Cannot exceed 10.
   - **Default:** `10`
 
 - **`general.debugKeystrokeLogging`** (boolean):

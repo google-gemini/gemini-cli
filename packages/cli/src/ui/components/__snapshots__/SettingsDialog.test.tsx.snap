@@ -25,8 +25,8 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
-│    Max Attempts                                                                              10  │
-│    Maximum number of attempts for failed API requests. Cannot exceed 10.                         │
+│    Max Chat Model Attempts                                                                   10  │
+│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
@@ -72,8 +72,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
-│    Max Attempts                                                                              10  │
-│    Maximum number of attempts for failed API requests. Cannot exceed 10.                         │
+│    Max Chat Model Attempts                                                                   10  │
+│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
@@ -119,8 +119,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
-│    Max Attempts                                                                              10  │
-│    Maximum number of attempts for failed API requests. Cannot exceed 10.                         │
+│    Max Chat Model Attempts                                                                   10  │
+│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                               false*  │
 │    Enable debug logging of keystrokes to the console.                                            │
@@ -166,8 +166,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
-│    Max Attempts                                                                              10  │
-│    Maximum number of attempts for failed API requests. Cannot exceed 10.                         │
+│    Max Chat Model Attempts                                                                   10  │
+│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
@@ -213,8 +213,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
-│    Max Attempts                                                                              10  │
-│    Maximum number of attempts for failed API requests. Cannot exceed 10.                         │
+│    Max Chat Model Attempts                                                                   10  │
+│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
@@ -260,8 +260,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
-│    Max Attempts                                                                              10  │
-│    Maximum number of attempts for failed API requests. Cannot exceed 10.                         │
+│    Max Chat Model Attempts                                                                   10  │
+│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
@@ -307,8 +307,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
-│    Max Attempts                                                                              10  │
-│    Maximum number of attempts for failed API requests. Cannot exceed 10.                         │
+│    Max Chat Model Attempts                                                                   10  │
+│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
@@ -354,8 +354,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
-│    Max Attempts                                                                              10  │
-│    Maximum number of attempts for failed API requests. Cannot exceed 10.                         │
+│    Max Chat Model Attempts                                                                   10  │
+│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
@@ -401,8 +401,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
-│    Max Attempts                                                                              10  │
-│    Maximum number of attempts for failed API requests. Cannot exceed 10.                         │
+│    Max Chat Model Attempts                                                                   10  │
+│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                true*  │
 │    Enable debug logging of keystrokes to the console.                                            │

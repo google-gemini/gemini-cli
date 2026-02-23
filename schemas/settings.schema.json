@@ -129,9 +129,9 @@
           "type": "boolean"
         },
         "maxAttempts": {
-          "title": "Max Attempts",
-          "description": "Maximum number of attempts for failed API requests. Cannot exceed 10.",
-          "markdownDescription": "Maximum number of attempts for failed API requests. Cannot exceed 10.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `10`",
+          "title": "Max Chat Model Attempts",
+          "description": "Maximum number of attempts for requests to the main chat model. Cannot exceed 10.",
+          "markdownDescription": "Maximum number of attempts for requests to the main chat model. Cannot exceed 10.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `10`",
           "default": 10,
           "type": "number"
         },
