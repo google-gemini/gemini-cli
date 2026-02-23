@@ -142,6 +142,11 @@ their corresponding top-level category object in your `settings.json` file.
     request" errors.
   - **Default:** `false`
 
+- **`general.maxAttempts`** (number):
+  - **Description:** Maximum number of attempts for failed API requests. Cannot
+    exceed 10.
+  - **Default:** `10`
+
 - **`general.debugKeystrokeLogging`** (boolean):
   - **Description:** Enable debug logging of keystrokes to the console.
   - **Default:** `false`
