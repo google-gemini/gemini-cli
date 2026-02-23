@@ -224,6 +224,9 @@ export class GeminiAgent {
     const session = new Session(sessionId, chat, config, this.connection);
     this.sessions.set(sessionId, session);
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    session.sendAvailableCommands();
+
     return {
       sessionId,
       modes: {
@@ -280,6 +283,9 @@ export class GeminiAgent {
     // Stream history back to client
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     session.streamHistory(sessionData.messages);
+
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    session.sendAvailableCommands();
 
     return {
       modes: {
@@ -429,6 +435,30 @@ export class Session {
     return {};
   }
 
+  async sendAvailableCommands(): Promise<void> {
+    await this.sendUpdate({
+      sessionUpdate: 'available_commands_update',
+      availableCommands: [
+        {
+          name: 'status',
+          description: 'Display session configuration and token usage',
+        },
+        {
+          name: 'mcp',
+          description: 'List configured MCP tools',
+        },
+        {
+          name: '$commit',
+          description: 'Create a git commit',
+        },
+        {
+          name: '$review-pr',
+          description: 'Review a pull request',
+        },
+      ],
+    });
+  }
+
   async streamHistory(messages: ConversationRecord['messages']): Promise<void> {
     for (const msg of messages) {
       const contentString = partListUnionToString(msg.content);
@@ -508,6 +538,23 @@ export class Session {
     const chat = this.chat;
 
     const parts = await this.#resolvePrompt(params.prompt, pendingSend.signal);
+
+    // Command interception
+    if (
+      parts.length > 0 &&
+      typeof parts[0] === 'object' &&
+      parts[0] !== null &&
+      'text' in parts[0] &&
+      parts[0].text
+    ) {
+      const firstText = parts[0].text.trim();
+      if (firstText.startsWith('/') || firstText.startsWith('$')) {
+        const handled = await this.handleCommand(firstText, parts);
+        if (handled) {
+          return { stopReason: 'end_turn' };
+        }
+      }
+    }
 
     let nextMessage: Content | null = { role: 'user', parts };
 
@@ -603,6 +650,72 @@ export class Session {
     }
 
     return { stopReason: 'end_turn' };
+  }
+
+  private async handleCommand(
+    commandText: string,
+    parts: Part[],
+  ): Promise<boolean> {
+    const rawCommand = commandText.split(' ')[0] || '';
+    const commandToMatch = rawCommand.toLowerCase();
+
+    if (commandToMatch === '/status') {
+      const activeModel = this.config.getActiveModel();
+      const resolvedModel = resolveModel(activeModel);
+      const content = `**Session Status**\n\n- Active Model: \`${resolvedModel}\``;
+
+      await this.sendUpdate({
+        sessionUpdate: 'agent_message_chunk',
+        content: { type: 'text', text: content },
+      });
+      return true;
+    }
+
+    if (commandToMatch === '/mcp') {
+      const mcpServers = this.config.getMcpServers() || {};
+      let content = '**Configured MCP Servers**\n';
+
+      const serverNames = Object.keys(mcpServers);
+      if (serverNames.length === 0) {
+        content += '\nNo MCP servers configured.';
+      } else {
+        content += '\n' + serverNames.map((name) => `- \`${name}\``).join('\n');
+      }
+
+      await this.sendUpdate({
+        sessionUpdate: 'agent_message_chunk',
+        content: { type: 'text', text: content },
+      });
+      return true;
+    }
+
+    if (commandToMatch === '$commit') {
+      const textPart = parts[0];
+      if (textPart && 'text' in textPart && typeof textPart.text === 'string') {
+        textPart.text = textPart.text
+          .replace(
+            /^\$commit/,
+            'Create a git commit based on the current changes using the tools available.',
+          )
+          .trim();
+      }
+      return false; // Proceed with LLM execution
+    }
+
+    if (commandToMatch === '$review-pr') {
+      const textPart = parts[0];
+      if (textPart && 'text' in textPart && typeof textPart.text === 'string') {
+        textPart.text = textPart.text
+          .replace(
+            /^\$review-pr/,
+            'Review the current pull request using the tools available.',
+          )
+          .trim();
+      }
+      return false; // Proceed with LLM execution
+    }
+
+    return false;
   }
 
   private async sendUpdate(
