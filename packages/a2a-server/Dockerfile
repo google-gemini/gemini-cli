@@ -1,0 +1,40 @@
+# Pre-built production image for a2a-server
+# Used with Cloud Build: npm install + build runs in step 1, then Docker copies artifacts
+FROM docker.io/library/node:20-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  python3 curl git jq ripgrep ca-certificates gpg apt-transport-https \
+  && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+     | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
+  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+     > /etc/apt/sources.list.d/github-cli.list \
+  && curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+     | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
+  && echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
+     > /etc/apt/sources.list.d/google-cloud-sdk.list \
+  && apt-get update && apt-get install -y --no-install-recommends gh google-cloud-cli \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy everything including pre-installed node_modules and pre-built dist
+COPY package.json package-lock.json ./
+COPY node_modules/ node_modules/
+COPY packages/core/ packages/core/
+COPY packages/a2a-server/ packages/a2a-server/
+
+# Create workspace directory for agent operations
+RUN mkdir -p /workspace && chown -R node:node /workspace
+
+USER node
+
+ENV CODER_AGENT_WORKSPACE_PATH=/workspace
+ENV CODER_AGENT_PORT=8080
+ENV NODE_ENV=production
+# Prevent git from prompting for credentials interactively — fails fast instead of hanging
+ENV GIT_TERMINAL_PROMPT=0
+ENV CODER_AGENT_HOST=0.0.0.0
+
+EXPOSE 8080
+
+CMD ["node", "packages/a2a-server/dist/src/http/server.js"]

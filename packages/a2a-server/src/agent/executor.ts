@@ -36,6 +36,10 @@ import { loadExtensions } from '../config/extension.js';
 import { Task } from './task.js';
 import { requestStorage } from '../http/requestStorage.js';
 import { pushTaskStateFailed } from '../utils/executor_utils.js';
+import {
+  A2UI_CLIENT_CAPABILITIES_KEY,
+  A2UI_EXTENSION_URI,
+} from '../a2ui/a2ui-extension.js';
 
 /**
  * Provides a wrapper for Task. Passes data from Task to SDKTask.
@@ -73,6 +77,24 @@ class TaskWrapper {
       artifacts: [],
     };
     sdkTask.metadata!['_contextId'] = this.task.contextId;
+
+    // Persist conversation history for session resumability.
+    // GCSTaskStore saves this as a separate object and restores it on load.
+    try {
+      const conversationHistory = this.task.geminiClient.getHistory();
+      if (conversationHistory.length > 0) {
+        sdkTask.metadata!['_conversationHistory'] = conversationHistory;
+        logger.info(
+          `Task ${this.task.id}: Persisting ${conversationHistory.length} conversation history entries.`,
+        );
+      }
+    } catch {
+      // GeminiClient may not be initialized yet
+      logger.warn(
+        `Task ${this.task.id}: Could not get conversation history for persistence.`,
+      );
+    }
+
     return sdkTask;
   }
 }
@@ -127,7 +149,22 @@ export class CoderAgentExecutor implements AgentExecutor {
       agentSettings.autoExecute,
     );
     runtimeTask.taskState = persistedState._taskState;
-    await runtimeTask.geminiClient.initialize();
+
+    // Restore conversation history if available from the TaskStore.
+    // This enables session resumability — the LLM gets full context of
+    // prior interactions rather than starting with a blank slate.
+    const conversationHistory = metadata['_conversationHistory'];
+    if (Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+      logger.info(
+        `Task ${sdkTask.id}: Resuming with ${conversationHistory.length} conversation history entries.`,
+      );
+      // History was serialized from GeminiClient.getHistory() which returns
+      // Content[]. After JSON round-trip it's structurally identical.
+      await runtimeTask.geminiClient.initialize();
+      runtimeTask.geminiClient.setHistory(conversationHistory);
+    } else {
+      await runtimeTask.geminiClient.initialize();
+    }
 
     const wrapper = new TaskWrapper(runtimeTask, agentSettings);
     this.tasks.set(sdkTask.id, wrapper);
@@ -435,6 +472,22 @@ export class CoderAgentExecutor implements AgentExecutor {
 
     const currentTask = wrapper.task;
 
+    // Detect A2UI extension activation from the request
+    // Check if user message metadata contains A2UI client capabilities
+    // or if the extensions header includes the A2UI URI
+    const messageMetadata = userMessage.metadata;
+    const hasA2UICapabilities =
+      messageMetadata?.[A2UI_CLIENT_CAPABILITIES_KEY] != null;
+    // Also check if extension URI is referenced in message extensions
+    const messageExtensions = messageMetadata?.['extensions'];
+    const hasA2UIExtension =
+      Array.isArray(messageExtensions) &&
+      messageExtensions.includes(A2UI_EXTENSION_URI);
+    if (hasA2UICapabilities || hasA2UIExtension) {
+      currentTask.a2uiEnabled = true;
+      logger.info(`[CoderAgentExecutor] A2UI enabled for task ${taskId}`);
+    }
+
     if (['canceled', 'failed', 'completed'].includes(currentTask.taskState)) {
       logger.warn(
         `[CoderAgentExecutor] Attempted to execute task ${taskId} which is already in state ${currentTask.taskState}. Ignoring.`,
@@ -552,6 +605,9 @@ export class CoderAgentExecutor implements AgentExecutor {
       logger.info(
         `[CoderAgentExecutor] Task ${taskId}: Agent turn finished, setting to input-required.`,
       );
+      // Finalize A2UI surfaces before marking complete
+      currentTask.finalizeA2UISurfaces();
+
       const stateChange: StateChange = {
         kind: CoderAgentEvent.StateChangeEvent,
       };

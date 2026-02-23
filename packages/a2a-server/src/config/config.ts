@@ -29,6 +29,7 @@ import {
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
+import { ensureDefaultGeminiMd } from '../chat-bridge/default-gemini-md.js';
 import type { Settings } from './settings.js';
 import { type AgentSettings, CoderAgentEvent } from '../types.js';
 
@@ -59,7 +60,7 @@ export async function loadConfig(
 
   const configParams: ConfigParameters = {
     sessionId: taskId,
-    model: PREVIEW_GEMINI_MODEL,
+    model: process.env['GEMINI_MODEL'] || PREVIEW_GEMINI_MODEL,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: undefined, // Sandbox might not be relevant for a server-side agent
     targetDir: workspaceDir, // Or a specific directory the agent operates on
@@ -106,6 +107,10 @@ export async function loadConfig(
     enableInteractiveShell: true,
     ptyInfo: 'auto',
   };
+
+  // Ensure a base GEMINI.md exists in the workspace so the agent gets
+  // default behavior instructions. Does not overwrite user-created files.
+  await ensureDefaultGeminiMd(workspaceDir);
 
   const fileService = new FileDiscoveryService(workspaceDir, {
     respectGitIgnore: configParams?.fileFiltering?.respectGitIgnore,

@@ -9,7 +9,7 @@ import { gzipSync, gunzipSync } from 'node:zlib';
 import * as tar from 'tar';
 import * as fse from 'fs-extra';
 import { promises as fsPromises, createReadStream } from 'node:fs';
-import { tmpdir } from '@google/gemini-cli-core';
+import { tmpdir, homedir } from '@google/gemini-cli-core';
 import { join } from 'node:path';
 import type { Task as SDKTask } from '@a2a-js/sdk';
 import type { TaskStore } from '@a2a-js/sdk/server';
@@ -18,7 +18,7 @@ import { setTargetDir } from '../config/config.js';
 import { getPersistedState, type PersistedTaskMetadata } from '../types.js';
 import { v4 as uuidv4 } from 'uuid';
 
-type ObjectType = 'metadata' | 'workspace';
+type ObjectType = 'metadata' | 'workspace' | 'conversation' | 'gemini-home';
 
 const getTmpArchiveFilename = (taskId: string): string =>
   `task-${taskId}-workspace-${uuidv4()}.tar.gz`;
@@ -224,6 +224,76 @@ export class GCSTaskStore implements TaskStore {
           `Workspace directory ${workDir} not found, skipping workspace save for task ${taskId}.`,
         );
       }
+      // Save conversation history if present in metadata
+      const rawHistory = dataToStore?.['_conversationHistory'];
+      const conversationHistory = Array.isArray(rawHistory)
+        ? rawHistory
+        : undefined;
+      if (conversationHistory && conversationHistory.length > 0) {
+        const conversationObjectPath = this.getObjectPath(
+          taskId,
+          'conversation',
+        );
+        const historyJson = JSON.stringify(conversationHistory);
+        const compressedHistory = gzipSync(Buffer.from(historyJson));
+        const conversationFile = this.storage
+          .bucket(this.bucketName)
+          .file(conversationObjectPath);
+        await conversationFile.save(compressedHistory, {
+          contentType: 'application/gzip',
+        });
+        logger.info(
+          `Task ${taskId} conversation history saved to GCS: gs://${this.bucketName}/${conversationObjectPath} (${conversationHistory.length} entries)`,
+        );
+      }
+
+      // Save ~/.gemini directory if it exists
+      const geminiHomeDir = join(homedir(), '.gemini');
+      if (await fse.pathExists(geminiHomeDir)) {
+        const geminiHomeEntries = await fsPromises.readdir(geminiHomeDir);
+        if (geminiHomeEntries.length > 0) {
+          const geminiHomePath = this.getObjectPath(taskId, 'gemini-home');
+          const tmpGeminiHome = join(
+            tmpdir(),
+            `task-${taskId}-gemini-home-${uuidv4()}.tar.gz`,
+          );
+          try {
+            await tar.c(
+              {
+                gzip: true,
+                file: tmpGeminiHome,
+                cwd: geminiHomeDir,
+                portable: true,
+              },
+              geminiHomeEntries,
+            );
+            const ghFile = this.storage
+              .bucket(this.bucketName)
+              .file(geminiHomePath);
+            const ghSource = createReadStream(tmpGeminiHome);
+            const ghDest = ghFile.createWriteStream({
+              contentType: 'application/gzip',
+              resumable: true,
+            });
+            await new Promise<void>((resolve, reject) => {
+              ghSource.on('error', (err) => {
+                if (!ghDest.destroyed) ghDest.destroy(err);
+                reject(err);
+              });
+              ghDest.on('error', reject);
+              ghDest.on('finish', () => resolve());
+              ghSource.pipe(ghDest);
+            });
+            logger.info(
+              `Task ${taskId} ~/.gemini saved to GCS: gs://${this.bucketName}/${geminiHomePath}`,
+            );
+          } finally {
+            if (await fse.pathExists(tmpGeminiHome)) {
+              await fse.remove(tmpGeminiHome);
+            }
+          }
+        }
+      }
     } catch (error) {
       logger.error(`Failed to save task ${taskId} to GCS:`, error);
       throw error;
@@ -280,6 +350,55 @@ export class GCSTaskStore implements TaskStore {
         logger.info(`Task ${taskId} workspace archive not found in GCS.`);
       }
 
+      // Restore ~/.gemini directory if available
+      const geminiHomePath = this.getObjectPath(taskId, 'gemini-home');
+      const geminiHomeFile = this.storage
+        .bucket(this.bucketName)
+        .file(geminiHomePath);
+      const [geminiHomeExists] = await geminiHomeFile.exists();
+      if (geminiHomeExists) {
+        const geminiHomeDir = join(homedir(), '.gemini');
+        await fse.ensureDir(geminiHomeDir);
+        const tmpGeminiHome = join(
+          tmpdir(),
+          `task-${taskId}-gemini-home-${uuidv4()}.tar.gz`,
+        );
+        try {
+          await geminiHomeFile.download({ destination: tmpGeminiHome });
+          await tar.x({ file: tmpGeminiHome, cwd: geminiHomeDir });
+          logger.info(
+            `Task ${taskId} ~/.gemini restored from GCS to ${geminiHomeDir}`,
+          );
+        } finally {
+          if (await fse.pathExists(tmpGeminiHome)) {
+            await fse.remove(tmpGeminiHome);
+          }
+        }
+      }
+
+      // Restore conversation history if available
+      const conversationObjectPath = this.getObjectPath(taskId, 'conversation');
+      const conversationFile = this.storage
+        .bucket(this.bucketName)
+        .file(conversationObjectPath);
+      const [conversationExists] = await conversationFile.exists();
+      if (conversationExists) {
+        try {
+          const [compressedHistory] = await conversationFile.download();
+          const historyJson = gunzipSync(compressedHistory).toString();
+          const conversationHistory: unknown[] = JSON.parse(historyJson);
+          loadedMetadata['_conversationHistory'] = conversationHistory;
+          logger.info(
+            `Task ${taskId} conversation history restored from GCS (${conversationHistory.length} entries)`,
+          );
+        } catch (historyError) {
+          logger.warn(
+            `Task ${taskId} conversation history could not be restored:`,
+            historyError,
+          );
+        }
+      }
+
       return {
         id: taskId,
         contextId: loadedMetadata._contextId || uuidv4(),
@@ -300,6 +419,8 @@ export class GCSTaskStore implements TaskStore {
 }
 
 export class NoOpTaskStore implements TaskStore {
+  private cache = new Map<string, SDKTask>();
+
   constructor(private realStore: TaskStore) {}
 
   async save(task: SDKTask): Promise<void> {
@@ -308,9 +429,20 @@ export class NoOpTaskStore implements TaskStore {
   }
 
   async load(taskId: string): Promise<SDKTask | undefined> {
+    const cached = this.cache.get(taskId);
+    if (cached) {
+      logger.info(
+        `[NoOpTaskStore] load called for task ${taskId}, returning cached.`,
+      );
+      return cached;
+    }
     logger.info(
       `[NoOpTaskStore] load called for task ${taskId}, delegating to real store.`,
     );
-    return this.realStore.load(taskId);
+    const result = await this.realStore.load(taskId);
+    if (result) {
+      this.cache.set(taskId, result);
+    }
+    return result;
   }
 }

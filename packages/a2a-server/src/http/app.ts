@@ -28,6 +28,7 @@ import { commandRegistry } from '../commands/command-registry.js';
 import { debugLogger, SimpleExtensionLoader } from '@google/gemini-cli-core';
 import type { Command, CommandArgument } from '../commands/types.js';
 import { GitService } from '@google/gemini-cli-core';
+import { getA2UIAgentExtension } from '../a2ui/a2ui-extension.js';
 
 type CommandResponse = {
   name: string;
@@ -46,11 +47,12 @@ const coderAgentCard: AgentCard = {
     url: 'https://google.com',
   },
   protocolVersion: '0.3.0',
-  version: '0.0.2', // Incremented version
+  version: '0.1.0', // A2UI-enabled version
   capabilities: {
     streaming: true,
-    pushNotifications: false,
+    pushNotifications: true,
     stateTransitionHistory: true,
+    extensions: [getA2UIAgentExtension()],
   },
   securitySchemes: undefined,
   security: undefined,
@@ -75,7 +77,11 @@ const coderAgentCard: AgentCard = {
 };
 
 export function updateCoderAgentCardUrl(port: number) {
-  coderAgentCard.url = `http://localhost:${port}/`;
+  // On Cloud Run, use the public service URL so remote clients can reach us
+  const publicUrl = process.env['CODER_AGENT_PUBLIC_URL'];
+  coderAgentCard.url = publicUrl
+    ? publicUrl.replace(/\/$/, '') + '/'
+    : `http://localhost:${port}/`;
 }
 
 async function handleExecuteCommand(
@@ -200,6 +206,31 @@ export async function createApp() {
       requestStorage.run({ req }, next);
     });
 
+    // SSE keepalive — sends periodic comment lines to prevent Cloud Run's
+    // load balancer from closing idle SSE connections during long tool
+    // executions (npm install, tsc builds, etc.). SSE comments (`: ...`)
+    // are ignored by conformant parsers per the spec.
+    expressApp.use((req, res, next) => {
+      const origFlush = res.flushHeaders;
+      res.flushHeaders = function (this: express.Response) {
+        origFlush.call(this);
+        const ct = this.getHeader('content-type');
+        if (ct && String(ct).includes('text/event-stream')) {
+          const timer = setInterval(() => {
+            if (!res.writableEnded) {
+              res.write(': keepalive\n\n');
+            } else {
+              clearInterval(timer);
+            }
+          }, 15_000);
+          res.on('close', () => clearInterval(timer));
+        }
+      };
+      next();
+    });
+
+    // Google Chat bridge runs as a separate service (src/chat-bridge/server.ts).
+    // It connects to this A2A server over HTTP.
     const appBuilder = new A2AExpressApp(requestHandler);
     expressApp = appBuilder.setupRoutes(expressApp, '');
     expressApp.use(express.json());
@@ -330,7 +361,8 @@ export async function main() {
     const expressApp = await createApp();
     const port = Number(process.env['CODER_AGENT_PORT'] || 0);
 
-    const server = expressApp.listen(port, 'localhost', () => {
+    const host = process.env['CODER_AGENT_HOST'] || 'localhost';
+    const server = expressApp.listen(port, host, () => {
       const address = server.address();
       let actualPort;
       if (process.env['CODER_AGENT_PORT']) {

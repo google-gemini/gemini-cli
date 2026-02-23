@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gemini-a2a-server
+  labels:
+    app: gemini-a2a-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gemini-a2a-server
+  template:
+    metadata:
+      labels:
+        app: gemini-a2a-server
+    spec:
+      containers:
+        - name: a2a-server
+          image: us-central1-docker.pkg.dev/adamfweidman-test/gemini-a2a/a2a-server:latest
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          env:
+            - name: CODER_AGENT_PORT
+              value: "8080"
+            - name: CODER_AGENT_HOST
+              value: "0.0.0.0"
+            - name: CODER_AGENT_WORKSPACE_PATH
+              value: "/workspace"
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gemini-secrets
+                  key: api-key
+            - name: GEMINI_YOLO_MODE
+              value: "true"
+            - name: CHAT_BRIDGE_A2A_URL
+              value: "http://localhost:8080"
+            - name: NODE_ENV
+              value: "production"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+          readinessProbe:
+            httpGet:
+              path: /.well-known/agent-card.json
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /.well-known/agent-card.json
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gemini-a2a-server
+  labels:
+    app: gemini-a2a-server
+spec:
+  type: ClusterIP
+  selector:
+    app: gemini-a2a-server
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
