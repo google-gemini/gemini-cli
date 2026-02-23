@@ -20,7 +20,7 @@ import {
   getDialogRestartRequiredSettings,
   getEffectiveDefaultValue,
   getEffectiveValue,
-  isInScope,
+  isInSettingsScope,
   getEditValue,
   parseEditedValue,
 } from '../../utils/settingsUtils.js';
@@ -78,7 +78,7 @@ function getActiveRestartRequiredSettings(
     const scopeMap = new Map<string, string>();
     for (const [scopeName, scopeSettings] of scopes) {
       // Raw per-scope value (undefined if not in file)
-      const value = isInScope(key, scopeSettings)
+      const value = isInSettingsScope(key, scopeSettings)
         ? getEffectiveValue(key, scopeSettings)
         : undefined;
       scopeMap.set(scopeName, JSON.stringify(value));
@@ -176,7 +176,7 @@ export function SettingsDialog({
     // Iterate through the nested map snapshot in activeRestartRequiredSettings, diff with current settings
     for (const [key, initialScopeMap] of activeRestartRequiredSettings) {
       for (const [scopeName, scopeSettings] of scopes) {
-        const currentValue = isInScope(key, scopeSettings)
+        const currentValue = isInSettingsScope(key, scopeSettings)
           ? getEffectiveValue(key, scopeSettings)
           : undefined;
         const initialJson = initialScopeMap.get(scopeName);
@@ -243,7 +243,7 @@ export function SettingsDialog({
       );
 
       // Grey out values that defer to defaults
-      const isGreyedOut = !isInScope(key, scopeSettings);
+      const isGreyedOut = !isInSettingsScope(key, scopeSettings);
 
       // Some settings can be edited by an inline editor
       const rawValue = getEffectiveValue(key, scopeSettings);
