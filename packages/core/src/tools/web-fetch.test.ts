@@ -242,7 +242,7 @@ describe('WebFetchTool', () => {
       getProxy: vi.fn(),
       getGeminiClient: mockGetGeminiClient,
       getRetryFetchErrors: vi.fn().mockReturnValue(false),
-      getUseExperimentalWebFetch: vi.fn().mockReturnValue(false),
+      getDirectWebFetch: vi.fn().mockReturnValue(false),
       modelConfigService: {
         getResolvedConfig: vi.fn().mockImplementation(({ model }) => ({
           model,
@@ -286,9 +286,7 @@ describe('WebFetchTool', () => {
 
     describe('experimental mode', () => {
       beforeEach(() => {
-        vi.spyOn(mockConfig, 'getUseExperimentalWebFetch').mockReturnValue(
-          true,
-        );
+        vi.spyOn(mockConfig, 'getDirectWebFetch').mockReturnValue(true);
       });
 
       it('should throw if url is missing', () => {
@@ -321,7 +319,7 @@ describe('WebFetchTool', () => {
     });
 
     it('should return experimental schema when enabled', () => {
-      vi.spyOn(mockConfig, 'getUseExperimentalWebFetch').mockReturnValue(true);
+      vi.spyOn(mockConfig, 'getDirectWebFetch').mockReturnValue(true);
       const tool = new WebFetchTool(mockConfig, bus);
       const schema = tool.getSchema();
       expect(schema.parametersJsonSchema).toHaveProperty('properties.url');
@@ -519,7 +517,7 @@ describe('WebFetchTool', () => {
     });
 
     it('should handle URL param in confirmation details', async () => {
-      vi.spyOn(mockConfig, 'getUseExperimentalWebFetch').mockReturnValue(true);
+      vi.spyOn(mockConfig, 'getDirectWebFetch').mockReturnValue(true);
       const tool = new WebFetchTool(mockConfig, bus);
       const params = { url: 'https://example.com' };
       const invocation = tool.build(params);
@@ -767,7 +765,7 @@ describe('WebFetchTool', () => {
 
   describe('execute (experimental)', () => {
     beforeEach(() => {
-      vi.spyOn(mockConfig, 'getUseExperimentalWebFetch').mockReturnValue(true);
+      vi.spyOn(mockConfig, 'getDirectWebFetch').mockReturnValue(true);
       vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(false);
     });
 

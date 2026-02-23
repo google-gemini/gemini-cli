@@ -135,7 +135,7 @@ they appear in the UI.
 | Use OSC 52 Copy            | `experimental.useOSC52Copy`              | Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
 | Plan                       | `experimental.plan`                      | Enable planning features (Plan Mode and tools).                                                                                                           | `false` |
 | Model Steering             | `experimental.modelSteering`             | Enable model steering (user hints) to guide the model during tool execution.                                                                              | `false` |
-| Use Experimental Web Fetch | `experimental.useExperimentalWebFetch`   | Enable experimental web fetch behavior that bypasses LLM summarization.                                                                                   | `false` |
+| Direct Web Fetch           | `experimental.directWebFetch`            | Enable web fetch behavior that bypasses LLM summarization.                                                                                                | `false` |
 
 ### Skills
 

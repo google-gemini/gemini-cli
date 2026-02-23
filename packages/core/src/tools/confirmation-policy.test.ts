@@ -71,7 +71,7 @@ describe('Tool Confirmation Policy Updates', () => {
         isPathWithinWorkspace: () => true,
         getDirectories: () => [rootDir],
       }),
-      getUseExperimentalWebFetch: () => false,
+      getDirectWebFetch: () => false,
       storage: {
         getProjectTempDir: () => path.join(os.tmpdir(), 'gemini-cli-temp'),
       },

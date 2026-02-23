@@ -2016,7 +2016,7 @@ describe('loadCliConfig useRipgrep', () => {
   });
 });
 
-describe('loadCliConfig useExperimentalWebFetch', () => {
+describe('loadCliConfig directWebFetch', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
@@ -2029,24 +2029,24 @@ describe('loadCliConfig useExperimentalWebFetch', () => {
     vi.restoreAllMocks();
   });
 
-  it('should be false by default when useExperimentalWebFetch is not set in settings', async () => {
+  it('should be false by default when directWebFetch is not set in settings', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings();
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getUseExperimentalWebFetch()).toBe(false);
+    expect(config.getDirectWebFetch()).toBe(false);
   });
 
-  it('should be true when useExperimentalWebFetch is set to true in settings', async () => {
+  it('should be true when directWebFetch is set to true in settings', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
       experimental: {
-        useExperimentalWebFetch: true,
+        directWebFetch: true,
       },
     });
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getUseExperimentalWebFetch()).toBe(true);
+    expect(config.getDirectWebFetch()).toBe(true);
   });
 });
 

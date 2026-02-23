@@ -475,7 +475,7 @@ Response: ${rawResponseText}`;
   }
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
-    if (this.config.getUseExperimentalWebFetch()) {
+    if (this.config.getDirectWebFetch()) {
       return this.executeExperimental(signal);
     }
     const userPrompt = this.params.prompt!;
@@ -666,7 +666,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: WebFetchToolParams,
   ): string | null {
-    if (this.config.getUseExperimentalWebFetch()) {
+    if (this.config.getDirectWebFetch()) {
       if (!params.url) {
         return "The 'url' parameter is required.";
       }
@@ -712,7 +712,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
 
   override getSchema(modelId?: string) {
     const schema = resolveToolDeclaration(WEB_FETCH_DEFINITION, modelId);
-    if (this.config.getUseExperimentalWebFetch()) {
+    if (this.config.getDirectWebFetch()) {
       return {
         ...schema,
         description:

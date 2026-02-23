@@ -969,7 +969,7 @@ their corresponding top-level category object in your `settings.json` file.
     during tool execution.
   - **Default:** `false`
 
-- **`experimental.useExperimentalWebFetch`** (boolean):
+- **`experimental.directWebFetch`** (boolean):
   - **Description:** Enable experimental web fetch behavior that bypasses LLM
     summarization.
   - **Default:** `false`
