@@ -106,7 +106,7 @@ export type PolicyFileErrorType =
 export interface PolicyFileError {
   filePath: string;
   fileName: string;
-  tier: 'default' | 'extension' | 'user' | 'workspace' | 'admin';
+  tier: 'default' | 'user' | 'workspace' | 'admin';
   ruleIndex?: number;
   errorType: PolicyFileErrorType;
   message: string;
@@ -171,14 +171,11 @@ export async function readPolicyFiles(
 /**
  * Converts a tier number to a human-readable tier name.
  */
-function getTierName(
-  tier: number,
-): 'default' | 'extension' | 'user' | 'workspace' | 'admin' {
+function getTierName(tier: number): 'default' | 'user' | 'workspace' | 'admin' {
   if (tier === 1) return 'default';
-  if (tier === 2) return 'extension';
-  if (tier === 3) return 'workspace';
-  if (tier === 4) return 'user';
-  if (tier === 5) return 'admin';
+  if (tier === 2) return 'workspace';
+  if (tier === 3) return 'user';
+  if (tier === 4) return 'admin';
   return 'default';
 }
 

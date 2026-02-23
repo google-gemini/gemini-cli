@@ -222,9 +222,9 @@ To add policies, specify the file path in your `gemini-extension.json`:
 }
 ```
 
-Rules contributed by extensions run in the **Extension Tier** (Tier 2). This
-tier has higher priority than the default rules but lower priority than
-workspace-specific or user-defined policies.
+Rules contributed by extensions run in the **User Tier** (Tier 3), alongside
+user-defined policies. This tier has higher priority than the default or
+workspace-specific rules but lower priority than admin policies.
 
 > **Warning:** For security, Gemini CLI ignores any `allow` decisions or `yolo`
 > mode configurations in extension policies. This ensures that an extension

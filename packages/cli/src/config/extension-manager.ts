@@ -810,11 +810,6 @@ Would you like to attempt to install via "git clone" instead?`,
               return true;
             });
           }
-          if (checkers) {
-            for (const checker of checkers) {
-              checker.source = `Extension (${config.name}): ${checker.source}`;
-            }
-          }
 
           if (result.errors.length > 0) {
             for (const error of result.errors) {

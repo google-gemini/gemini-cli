@@ -234,11 +234,11 @@ modes = ["autoEdit"]
       expect(result3.rules).toHaveLength(1);
       expect(result3.rules[0].toolName).toBe('tier3-tool');
       expect(result3.rules[0].modes).toEqual(['autoEdit']);
-      expect(result3.rules[0].source).toBe('Workspace: tier3.toml');
+      expect(result3.rules[0].source).toBe('User: tier3.toml');
 
-      const getPolicyTier4 = (_dir: string) => 4; // Tier 4 (User)
+      const getPolicyTier4 = (_dir: string) => 4; // Tier 4 (Admin)
       const result4 = await loadPoliciesFromToml([tempDir], getPolicyTier4);
-      expect(result4.rules[0].source).toBe('User: tier3.toml');
+      expect(result4.rules[0].source).toBe('Admin: tier3.toml');
       expect(result4.errors).toHaveLength(0);
     });
 

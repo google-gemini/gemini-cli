@@ -39,15 +39,15 @@ export const DEFAULT_CORE_POLICIES_DIR = path.join(__dirname, 'policies');
 
 // Policy tier constants for priority calculation
 export const DEFAULT_POLICY_TIER = 1;
-export const EXTENSION_POLICY_TIER = 2;
-export const WORKSPACE_POLICY_TIER = 3;
-export const USER_POLICY_TIER = 4;
-export const ADMIN_POLICY_TIER = 5;
+export const WORKSPACE_POLICY_TIER = 2;
+export const USER_POLICY_TIER = 3;
+export const EXTENSION_POLICY_TIER = 3;
+export const ADMIN_POLICY_TIER = 4;
 
 // Specific priority offsets and derived priorities for dynamic/settings rules.
 // These are added to the tier base (e.g., USER_POLICY_TIER).
 
-// Workspace tier (3) + high priority (950/1000) = ALWAYS_ALLOW_PRIORITY
+// Workspace tier (2) + high priority (950/1000) = ALWAYS_ALLOW_PRIORITY
 // This ensures user "always allow" selections are high priority
 // within the workspace tier but still lose to user/admin policies.
 export const ALWAYS_ALLOW_PRIORITY = WORKSPACE_POLICY_TIER + 0.95;
