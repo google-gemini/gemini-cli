@@ -252,22 +252,30 @@ export async function resolvePathCompletions(
 ): Promise<Suggestion[]> {
   if (partial == null) return [];
 
-  const [expandedPartial, didExpandTilde] = expandTilde(partial);
+  // Input Sanitization
+  let strippedPartial = partial;
+  if (strippedPartial.startsWith('"') || strippedPartial.startsWith("'")) {
+    strippedPartial = strippedPartial.slice(1);
+  }
+  if (strippedPartial.endsWith('"') || strippedPartial.endsWith("'")) {
+    strippedPartial = strippedPartial.slice(0, -1);
+  }
 
-  // Determine the directory to list and the prefix to match
-  const resolvedPath = path.isAbsolute(expandedPartial)
-    ? expandedPartial
-    : path.resolve(cwd, expandedPartial);
+  // Normalize separators \ to /
+  const normalizedPartial = strippedPartial.replace(/\\/g, '/');
 
-  // If the partial ends with a separator, list that directory directly.
-  // Otherwise, list the parent and filter by the basename prefix.
+  const [expandedPartial, didExpandTilde] = expandTilde(normalizedPartial);
+
+  // Directory Detection
   const endsWithSep =
-    partial.endsWith('/') || partial.endsWith(path.sep) || partial === '';
-  const dirToRead = endsWithSep ? resolvedPath : path.dirname(resolvedPath);
-  const prefix = endsWithSep ? '' : path.basename(resolvedPath);
+    normalizedPartial.endsWith('/') || normalizedPartial === '';
+  const dirToRead = endsWithSep
+    ? path.resolve(cwd, expandedPartial)
+    : path.resolve(cwd, path.dirname(expandedPartial));
+
+  const prefix = endsWithSep ? '' : path.basename(expandedPartial);
   const prefixLower = prefix.toLowerCase();
 
-  // Determine whether to show dotfiles
   const showDotfiles = prefix.startsWith('.');
 
   let entries: Array<import('node:fs').Dirent>;
@@ -294,30 +302,30 @@ export async function resolvePathCompletions(
     if (!name.toLowerCase().startsWith(prefixLower)) continue;
 
     const isDir = entry.isDirectory();
-    const displayName = isDir ? name + path.sep : name;
+    const displayName = isDir ? name + '/' : name;
 
     // Build the completion value relative to what the user typed
     let completionValue: string;
     if (endsWithSep) {
-      completionValue = partial + displayName;
+      completionValue = normalizedPartial + displayName;
     } else {
-      // Replace the basename portion
-      const parentPart = partial.slice(
+      const parentPart = normalizedPartial.slice(
         0,
-        partial.length - path.basename(partial).length,
+        normalizedPartial.length - path.basename(normalizedPartial).length,
       );
       completionValue = parentPart + displayName;
     }
 
     // Restore tilde if we expanded it
     if (didExpandTilde) {
-      const homeDir = os.homedir();
+      const homeDir = os.homedir().replace(/\\/g, '/');
       if (completionValue.startsWith(homeDir)) {
         completionValue = '~' + completionValue.slice(homeDir.length);
       }
     }
 
-    // Escape special characters in the completion value
+    // Output formatting: Escape special characters in the completion value
+    // Since normalizedPartial stripped quotes, we escape the value directly.
     const escapedValue = escapeShellPath(completionValue);
 
     suggestions.push({

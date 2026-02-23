@@ -245,6 +245,65 @@ describe('useShellCompletion utilities', () => {
       expect(labels).toContain('.hidden');
     });
 
+    it('should show dotfiles in the current directory when query is exactly "."', async () => {
+      const structure: FileSystemStructure = {
+        '.hidden': '',
+        '.bashrc': '',
+        visible: '',
+      };
+      tmpDir = await createTmpDir(structure);
+
+      const results = await resolvePathCompletions('.', tmpDir);
+      const labels = results.map((s) => s.label);
+      expect(labels).toContain('.hidden');
+      expect(labels).toContain('.bashrc');
+      expect(labels).not.toContain('visible');
+    });
+
+    it('should handle dotfile completions within a subdirectory', async () => {
+      const structure: FileSystemStructure = {
+        subdir: {
+          '.secret': '',
+          'public.txt': '',
+        },
+      };
+      tmpDir = await createTmpDir(structure);
+
+      const results = await resolvePathCompletions('subdir/.', tmpDir);
+      const labels = results.map((s) => s.label);
+      expect(labels).toContain('.secret');
+      expect(labels).not.toContain('public.txt');
+    });
+
+    it('should strip leading quotes to resolve inner directory contents', async () => {
+      const structure: FileSystemStructure = {
+        src: {
+          'index.ts': '',
+        },
+      };
+      tmpDir = await createTmpDir(structure);
+
+      const results = await resolvePathCompletions('"src/', tmpDir);
+      expect(results).toHaveLength(1);
+      expect(results[0].label).toBe('index.ts');
+
+      const resultsSingleQuote = await resolvePathCompletions("'src/", tmpDir);
+      expect(resultsSingleQuote).toHaveLength(1);
+      expect(resultsSingleQuote[0].label).toBe('index.ts');
+    });
+
+    it('should properly escape resolutions with spaces inside stripped quote queries', async () => {
+      const structure: FileSystemStructure = {
+        'Folder With Spaces': {},
+      };
+      tmpDir = await createTmpDir(structure);
+
+      const results = await resolvePathCompletions('"Fo', tmpDir);
+      expect(results).toHaveLength(1);
+      expect(results[0].label).toBe('Folder With Spaces/');
+      expect(results[0].value).toBe(escapeShellPath('Folder With Spaces/'));
+    });
+
     it('should return empty array for non-existent directory', async () => {
       const results = await resolvePathCompletions(
         '/nonexistent/path/foo',
