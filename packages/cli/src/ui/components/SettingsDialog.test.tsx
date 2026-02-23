@@ -1620,7 +1620,6 @@ describe('SettingsDialog', () => {
             vimMode: true,
             enableAutoUpdate: false,
             debugKeystrokeLogging: true,
-            enablePromptCompletion: true,
           },
           ui: {
             hideWindowTitle: true,
@@ -1766,7 +1765,6 @@ describe('SettingsDialog', () => {
             vimMode: false,
             enableAutoUpdate: true,
             debugKeystrokeLogging: false,
-            enablePromptCompletion: false,
           },
           ui: {
             hideWindowTitle: false,

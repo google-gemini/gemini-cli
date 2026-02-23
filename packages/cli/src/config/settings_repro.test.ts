@@ -131,7 +131,6 @@ describe('Settings Repro', () => {
       },
       general: {
         debugKeystrokeLogging: false,
-        enablePromptCompletion: false,
         preferredEditor: 'vim',
         vimMode: false,
       },
