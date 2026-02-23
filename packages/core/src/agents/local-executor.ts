@@ -549,7 +549,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       if (
         terminateReason !== AgentTerminateMode.ERROR &&
         terminateReason !== AgentTerminateMode.ABORTED &&
-        terminateReason !== AgentTerminateMode.GOAL
+        terminateReason !== AgentTerminateMode.GOAL &&
+        terminateReason !== AgentTerminateMode.LOOP
       ) {
         const recoveryResult = await this.executeFinalWarningTurn(
           chat,
