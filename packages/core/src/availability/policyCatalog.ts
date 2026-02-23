@@ -62,7 +62,8 @@ export function getFlashLitePolicyChain(
   config?: Config,
 ): ModelPolicyChain | undefined {
   if (config?.getEnableModelConfigurability?.()) {
-    const requestedChain = config.getModelChains?.()['flash-lite'];
+    const chains = config.getModelChains?.();
+    const requestedChain = chains?.['flash-lite'];
     if (requestedChain) {
       return cloneChain(requestedChain);
     }

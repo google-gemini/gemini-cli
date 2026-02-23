@@ -10,6 +10,7 @@ import {
   SETTINGS_SCHEMA_DEFINITIONS,
   type SettingCollectionDefinition,
   type SettingDefinition,
+  type SettingsJsonSchemaDefinition,
   type Settings,
   type SettingsSchema,
 } from './settingsSchema.js';
@@ -416,10 +417,29 @@ describe('SettingsSchema', () => {
     const schema = getSettingsSchema();
     const referenced = new Set<string>();
 
+    const visitRef = (ref: string) => {
+      if (referenced.has(ref)) return;
+      referenced.add(ref);
+      const def = SETTINGS_SCHEMA_DEFINITIONS[ref];
+      expect(def).toBeDefined();
+      if (def['properties']) {
+        Object.values(def['properties'] as SettingsSchema).forEach(
+          visitDefinition,
+        );
+      }
+      if (def['items']) {
+        visitCollection(def['items'] as SettingCollectionDefinition);
+      }
+      if (def['additionalProperties']) {
+        visitCollection(
+          def['additionalProperties'] as SettingCollectionDefinition,
+        );
+      }
+    };
+
     const visitDefinition = (definition: SettingDefinition) => {
       if (definition.ref) {
-        referenced.add(definition.ref);
-        expect(SETTINGS_SCHEMA_DEFINITIONS).toHaveProperty(definition.ref);
+        visitRef(definition.ref);
       }
       if (definition.properties) {
         Object.values(definition.properties).forEach(visitDefinition);
@@ -434,8 +454,7 @@ describe('SettingsSchema', () => {
 
     const visitCollection = (collection: SettingCollectionDefinition) => {
       if (collection.ref) {
-        referenced.add(collection.ref);
-        expect(SETTINGS_SCHEMA_DEFINITIONS).toHaveProperty(collection.ref);
+        visitRef(collection.ref);
         return;
       }
       if (collection.properties) {
