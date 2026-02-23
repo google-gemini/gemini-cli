@@ -27,19 +27,73 @@ import {
 import { getToolAliases } from '../tools/tool-names.js';
 
 function isWildcardPattern(name: string): boolean {
-  return name.endsWith('__*');
+  return name === '*' || name.includes('*');
 }
 
-function getWildcardPrefix(pattern: string): string {
-  return pattern.slice(0, -3);
+/**
+ * Checks if a tool call matches a wildcard pattern.
+ * Supports global (*) and composite (server__*, *__tool, *__*) patterns.
+ */
+function matchesWildcard(
+  pattern: string,
+  toolName: string,
+  serverName: string | undefined,
+): boolean {
+  if (pattern === '*') {
+    return true;
+  }
+
+  if (pattern.includes('__')) {
+    return matchesCompositePattern(pattern, toolName, serverName);
+  }
+
+  return toolName === pattern;
 }
 
-function matchesWildcard(pattern: string, toolName: string): boolean {
-  if (!isWildcardPattern(pattern)) {
+/**
+ * Matches composite patterns like "server__*", "*__tool", or "*__*".
+ */
+function matchesCompositePattern(
+  pattern: string,
+  toolName: string,
+  serverName: string | undefined,
+): boolean {
+  const parts = pattern.split('__');
+  if (parts.length !== 2) return false;
+  const [patternServer, patternTool] = parts;
+
+  // 1. Identify the tool's components
+  const { actualServer, actualTool } = getToolMetadata(toolName, serverName);
+
+  // 2. Composite patterns require a server context
+  if (actualServer === undefined) {
     return false;
   }
-  const prefix = getWildcardPrefix(pattern);
-  return toolName.startsWith(prefix + '__');
+
+  // 3. Robustness: if serverName is provided, toolName MUST be qualified by it.
+  // This prevents "malicious-server" from spoofing "trusted-server" by naming itself "trusted-server__malicious".
+  if (serverName !== undefined && !toolName.startsWith(serverName + '__')) {
+    return false;
+  }
+
+  // 4. Match components
+  const serverMatch = patternServer === '*' || patternServer === actualServer;
+  const toolMatch = patternTool === '*' || patternTool === actualTool;
+
+  return serverMatch && toolMatch;
+}
+
+/**
+ * Extracts the server and unqualified tool name from a tool call context.
+ */
+function getToolMetadata(toolName: string, serverName: string | undefined) {
+  const sepIndex = toolName.indexOf('__');
+  const isQualified = sepIndex !== -1;
+  return {
+    actualServer:
+      serverName ?? (isQualified ? toolName.substring(0, sepIndex) : undefined),
+    actualTool: isQualified ? toolName.substring(sepIndex + 2) : toolName,
+  };
 }
 
 function ruleMatches(
@@ -58,18 +112,11 @@ function ruleMatches(
 
   // Check tool name if specified
   if (rule.toolName) {
-    // Support wildcard patterns: "serverName__*" matches "serverName__anyTool"
     if (isWildcardPattern(rule.toolName)) {
-      const prefix = getWildcardPrefix(rule.toolName);
-      if (serverName !== undefined) {
-        // Robust check: if serverName is provided, it MUST match the prefix exactly.
-        // This prevents "malicious-server" from spoofing "trusted-server" by naming itself "trusted-server__malicious".
-        if (serverName !== prefix) {
-          return false;
-        }
-      }
-      // Always verify the prefix, even if serverName matched
-      if (!toolCall.name || !matchesWildcard(rule.toolName, toolCall.name)) {
+      if (
+        !toolCall.name ||
+        !matchesWildcard(rule.toolName, toolCall.name, serverName)
+      ) {
         return false;
       }
     } else if (toolCall.name !== rule.toolName) {
@@ -597,7 +644,7 @@ export class PolicyEngine {
       for (const processed of processedTools) {
         if (
           isWildcardPattern(processed) &&
-          matchesWildcard(processed, toolName)
+          matchesWildcard(processed, toolName, undefined)
         ) {
           // It's covered by a higher-priority wildcard rule.
           // If that wildcard rule resulted in exclusion, this tool should also be excluded.
