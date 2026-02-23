@@ -1065,7 +1065,7 @@ describe('InputPrompt', () => {
     unmount();
   });
 
-  it('should NOT submit on Enter when an @-path is a perfect match', async () => {
+  it('should submit on Enter when an @-path is a perfect match', async () => {
     mockedUseCommandCompletion.mockReturnValue({
       ...mockCommandCompletion,
       showSuggestions: true,
@@ -1085,10 +1085,35 @@ describe('InputPrompt', () => {
     });
 
     await waitFor(() => {
-      // Should handle autocomplete but NOT submit
-      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
-      expect(props.onSubmit).not.toHaveBeenCalled();
+      // Should submit directly
+      expect(props.onSubmit).toHaveBeenCalledWith('@file.txt');
     });
+    unmount();
+  });
+
+  it('should NOT submit on Shift+Enter even if an @-path is a perfect match', async () => {
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [{ label: 'file.txt', value: 'file.txt' }],
+      activeSuggestionIndex: 0,
+      isPerfectMatch: true,
+      completionMode: CompletionMode.AT,
+    });
+    props.buffer.text = '@file.txt';
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      // Simulate Shift+Enter using CSI u sequence
+      stdin.write('\x1b[13;2u');
+    });
+
+    // Should NOT submit, should call newline instead
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    expect(props.buffer.newline).toHaveBeenCalled();
     unmount();
   });
 
@@ -2276,6 +2301,36 @@ describe('InputPrompt', () => {
       });
       await act(async () => {
         await vi.runAllTimersAsync();
+      });
+
+      // Verify that onSubmit was NOT called due to recent paste protection
+      expect(props.onSubmit).not.toHaveBeenCalled();
+      // It should call newline() instead
+      expect(props.buffer.newline).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should prevent perfect match auto-submission immediately after an unsafe paste', async () => {
+      // isTerminalPasteTrusted will be false due to beforeEach setup.
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        isPerfectMatch: true,
+        completionMode: CompletionMode.AT,
+      });
+      props.buffer.text = '@file.txt';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+
+      // Simulate an unsafe paste of a perfect match
+      await act(async () => {
+        stdin.write(`\x1b[200~@file.txt\x1b[201~`);
+      });
+
+      // Simulate an Enter key press immediately after paste
+      await act(async () => {
+        stdin.write('\r');
       });
 
       // Verify that onSubmit was NOT called due to recent paste protection

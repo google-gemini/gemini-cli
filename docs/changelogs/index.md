@@ -295,7 +295,8 @@ on GitHub.
 - **Experimental permission improvements:** We are now experimenting with a new
   policy engine in Gemini CLI. This allows users and administrators to create
   fine-grained policy for tool calls. Currently behind a flag. See
-  [policy engine documentation](../core/policy-engine.md) for more information.
+  [policy engine documentation](../reference/policy-engine.md) for more
+  information.
   - Blog:
     [https://allen.hutchison.org/2025/11/26/the-guardrails-of-autonomy/](https://allen.hutchison.org/2025/11/26/the-guardrails-of-autonomy/)
 - **Gemini 3 support for paid:** Gemini 3 support has been rolled out to all API

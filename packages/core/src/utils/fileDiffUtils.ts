@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { FileDiff } from '../tools/tools.js';
+import type { DiffStat, FileDiff } from '../tools/tools.js';
 import type { ToolCallRecord } from '../services/chatRecordingService.js';
 
 /**
@@ -23,17 +23,14 @@ export function getFileDiffFromResultDisplay(
     typeof resultDisplay.diffStat === 'object' &&
     resultDisplay.diffStat !== null
   ) {
-    const diffStat = resultDisplay.diffStat as FileDiff['diffStat'];
-    if (diffStat) {
+    if (resultDisplay.diffStat) {
       return resultDisplay;
     }
   }
   return undefined;
 }
 
-export function computeModelAddedAndRemovedLines(
-  stats: FileDiff['diffStat'] | undefined,
-): {
+export function computeModelAddedAndRemovedLines(stats: DiffStat | undefined): {
   addedLines: number;
   removedLines: number;
 } {

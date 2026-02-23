@@ -21,7 +21,11 @@ import {
   type MCPServerConfig,
 } from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
-import { type Settings, createTestMergedSettings } from './settings.js';
+import {
+  type Settings,
+  type MergedSettings,
+  createTestMergedSettings,
+} from './settings.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
@@ -2631,6 +2635,21 @@ describe('loadCliConfig approval mode', () => {
 
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
+  });
+
+  it('should pass planSettings.directory from settings to config', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      general: {
+        plan: {
+          directory: '.custom-plans',
+        },
+      },
+    } as unknown as MergedSettings);
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    const plansDir = config.storage.getPlansDir();
+    expect(plansDir).toContain('.custom-plans');
   });
 
   // --- Untrusted Folder Scenarios ---

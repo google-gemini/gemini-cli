@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render as inkRenderDirect, type Instance as InkInstance } from 'ink';
+import {
+  render as inkRenderDirect,
+  type Instance as InkInstance,
+  type RenderOptions,
+} from 'ink';
 import { EventEmitter } from 'node:events';
 import { Box } from 'ink';
 import type React from 'react';
@@ -67,6 +71,25 @@ type TerminalState = {
   cols: number;
   rows: number;
 };
+
+type RenderMetrics = Parameters<NonNullable<RenderOptions['onRender']>>[0];
+
+interface InkRenderMetrics extends RenderMetrics {
+  output: string;
+  staticOutput?: string;
+}
+
+function isInkRenderMetrics(
+  metrics: RenderMetrics,
+): metrics is InkRenderMetrics {
+  const m = metrics as Record<string, unknown>;
+  return (
+    typeof m === 'object' &&
+    m !== null &&
+    'output' in m &&
+    typeof m['output'] === 'string'
+  );
+}
 
 class XtermStdout extends EventEmitter {
   private state: TerminalState;
@@ -357,8 +380,10 @@ export const render = (
       debug: false,
       exitOnCtrlC: false,
       patchConsole: false,
-      onRender: (metrics: { output: string; staticOutput?: string }) => {
-        stdout.onRender(metrics.staticOutput ?? '', metrics.output);
+      onRender: (metrics: RenderMetrics) => {
+        if (isInkRenderMetrics(metrics)) {
+          stdout.onRender(metrics.staticOutput ?? '', metrics.output);
+        }
       },
     });
   });
@@ -506,6 +531,7 @@ const mockUIActions: UIActions = {
   vimHandleInput: vi.fn(),
   handleIdePromptComplete: vi.fn(),
   handleFolderTrustSelect: vi.fn(),
+  setIsPolicyUpdateDialogOpen: vi.fn(),
   setConstrainHeight: vi.fn(),
   onEscapePromptChange: vi.fn(),
   refreshStatic: vi.fn(),
