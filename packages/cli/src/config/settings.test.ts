@@ -75,6 +75,7 @@ import {
   SettingScope,
   LoadedSettings,
   sanitizeEnvVar,
+  createTestMergedSettings,
 } from './settings.js';
 import {
   FatalConfigError,
@@ -1804,22 +1805,35 @@ describe('Settings Loading and Merging', () => {
       expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
     });
 
-    it('does not load env files from untrusted spaces', () => {
+    it('does not load env files from untrusted spaces when sandboxed', () => {
       setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
       const settings = {
         security: { folderTrust: { enabled: true } },
+        tools: { sandbox: true },
       } as Settings;
       loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
 
       expect(process.env['TESTTEST']).not.toEqual('1234');
     });
 
-    it('does not load env files when trust is undefined', () => {
+    it('does load env files from untrusted spaces when NOT sandboxed', () => {
+      setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
+      const settings = {
+        security: { folderTrust: { enabled: true } },
+        tools: { sandbox: false },
+      } as Settings;
+      loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
+
+      expect(process.env['TESTTEST']).toEqual('1234');
+    });
+
+    it('does not load env files when trust is undefined and sandboxed', () => {
       delete process.env['TESTTEST'];
       // isWorkspaceTrusted returns {isTrusted: undefined} for matched rules with no trust value, or no matching rules.
       setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: undefined });
       const settings = {
         security: { folderTrust: { enabled: true } },
+        tools: { sandbox: true },
       } as Settings;
 
       const mockTrustFn = vi.fn().mockReturnValue({ isTrusted: undefined });
@@ -1831,9 +1845,10 @@ describe('Settings Loading and Merging', () => {
 
     it('loads whitelisted env files from untrusted spaces if sandboxing is enabled', () => {
       setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
-      const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      settings.merged.tools.sandbox = true;
-      loadEnvironment(settings.merged, MOCK_WORKSPACE_DIR);
+      const settings = createTestMergedSettings({
+        tools: { sandbox: true },
+      });
+      loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
 
       // GEMINI_API_KEY is in the whitelist, so it should be loaded.
       expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
@@ -1846,10 +1861,10 @@ describe('Settings Loading and Merging', () => {
       process.argv.push('-s');
       try {
         setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
-        const settings = loadSettings(MOCK_WORKSPACE_DIR);
-        // Ensure sandbox is NOT in settings to test argv sniffing
-        settings.merged.tools.sandbox = undefined;
-        loadEnvironment(settings.merged, MOCK_WORKSPACE_DIR);
+        const settings = createTestMergedSettings({
+          tools: { sandbox: false },
+        });
+        loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
 
         expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
         expect(process.env['TESTTEST']).not.toEqual('1234');
