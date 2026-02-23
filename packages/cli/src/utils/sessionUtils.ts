@@ -276,6 +276,12 @@ export const getAllSessionFiles = async (
             return { fileName: file, sessionInfo: null };
           }
 
+          // Skip subagent sessions - these are implementation details of a tool call
+          // and shouldn't be surfaced for resumption in the main agent history.
+          if (content.kind === 'subagent') {
+            return { fileName: file, sessionInfo: null };
+          }
+
           const firstUserMessage = extractFirstUserMessage(content.messages);
           const isCurrentSession = currentSessionId
             ? file.includes(currentSessionId.slice(0, 8))

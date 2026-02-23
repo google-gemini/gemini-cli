@@ -141,7 +141,7 @@ describe('WebFetchTool', () => {
       setApprovalMode: vi.fn(),
       getProxy: vi.fn(),
       getGeminiClient: mockGetGeminiClient,
-      getRetryFetchErrors: vi.fn().mockReturnValue(false),
+      getRetryFetchErrors: vi.fn().mockReturnValue(true),
       modelConfigService: {
         getResolvedConfig: vi.fn().mockImplementation(({ model }) => ({
           model,
@@ -208,6 +208,8 @@ describe('WebFetchTool', () => {
       vi.spyOn(fetchUtils, 'fetchWithTimeout').mockRejectedValue(
         new Error('fetch failed'),
       );
+      // Disable retries so test doesn't timeout waiting for backoff
+      vi.mocked(mockConfig.getRetryFetchErrors).mockReturnValue(false);
       const tool = new WebFetchTool(mockConfig, bus);
       const params = { prompt: 'fetch https://private.ip' };
       const invocation = tool.build(params);

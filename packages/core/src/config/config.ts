@@ -68,7 +68,12 @@ import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
-import { logRipgrepFallback, logFlashFallback } from '../telemetry/loggers.js';
+import {
+  logRipgrepFallback,
+  logFlashFallback,
+  logApprovalModeSwitch,
+  logApprovalModeDuration,
+} from '../telemetry/loggers.js';
 import {
   RipgrepFallbackEvent,
   FlashFallbackEvent,
@@ -103,9 +108,11 @@ import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
-import type { UserTierId } from '../code_assist/types.js';
-import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
-import type { AdminControlsSettings } from '../code_assist/types.js';
+import type {
+  UserTierId,
+  RetrieveUserQuotaResponse,
+  AdminControlsSettings,
+} from '../code_assist/types.js';
 import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
@@ -119,10 +126,6 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
-import {
-  logApprovalModeSwitch,
-  logApprovalModeDuration,
-} from '../telemetry/loggers.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath } from '../utils/paths.js';
 import { UserHintService } from './userHintService.js';
@@ -696,7 +699,7 @@ export class Config {
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
-  private lastModeSwitchTime: number = Date.now();
+  private lastModeSwitchTime: number = performance.now();
   readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
 
@@ -849,8 +852,9 @@ export class Config {
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;
+    const defaultShellTimeout = this.interactive ? 300 : 600; // 5 min interactive, 10 min non-interactive
     this.shellToolInactivityTimeout =
-      (params.shellToolInactivityTimeout ?? 300) * 1000; // 5 minutes
+      (params.shellToolInactivityTimeout ?? defaultShellTimeout) * 1000;
     this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir, this.sessionId);
@@ -874,7 +878,7 @@ export class Config {
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
-    this.retryFetchErrors = params.retryFetchErrors ?? false;
+    this.retryFetchErrors = params.retryFetchErrors ?? true;
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.rawOutput = params.rawOutput ?? false;
     this.acceptRawOutputRisk = params.acceptRawOutputRisk ?? false;
@@ -1497,7 +1501,8 @@ export class Config {
       }
 
       const hasAccess =
-        quota.buckets?.some((b) => b.modelId === PREVIEW_GEMINI_MODEL) ?? false;
+        quota.buckets?.some((b) => b.modelId && isPreviewModel(b.modelId)) ??
+        false;
       this.setHasAccessToPreviewModel(hasAccess);
       return quota;
     } catch (e) {
@@ -1795,12 +1800,11 @@ export class Config {
 
     const currentMode = this.getApprovalMode();
     if (currentMode !== mode) {
-      this.logCurrentModeDuration(this.getApprovalMode());
+      this.logCurrentModeDuration(currentMode);
       logApprovalModeSwitch(
         this,
         new ApprovalModeSwitchEvent(currentMode, mode),
       );
-      this.lastModeSwitchTime = Date.now();
     }
 
     this.policyEngine.setApprovalMode(mode);
@@ -1863,12 +1867,15 @@ export class Config {
    * Logs the duration of the current approval mode.
    */
   logCurrentModeDuration(mode: ApprovalMode): void {
-    const now = Date.now();
+    const now = performance.now();
     const duration = now - this.lastModeSwitchTime;
-    logApprovalModeDuration(
-      this,
-      new ApprovalModeDurationEvent(mode, duration),
-    );
+    if (duration > 0) {
+      logApprovalModeDuration(
+        this,
+        new ApprovalModeDurationEvent(mode, duration),
+      );
+    }
+    this.lastModeSwitchTime = now;
   }
 
   isYoloModeDisabled(): boolean {

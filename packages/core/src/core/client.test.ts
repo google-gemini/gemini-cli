@@ -1207,7 +1207,7 @@ ${JSON.stringify(
         eventCount++;
 
         // Safety check to prevent actual infinite loop in test
-        if (eventCount > 200) {
+        if (eventCount > 400) {
           abortController.abort();
           throw new Error(
             'Test exceeded expected event limit - possible actual infinite loop',
@@ -1219,13 +1219,12 @@ ${JSON.stringify(
       expect(finalResult).toBeInstanceOf(Turn);
 
       // If infinite loop protection is working, checkNextSpeaker should be called many times
-      // but stop at MAX_TURNS (100). Since each recursive call should trigger checkNextSpeaker,
-      // we expect it to be called multiple times before hitting the limit
+      // but stop at maxTurns (200 for non-interactive). Since each recursive call should trigger
+      // checkNextSpeaker, we expect it to be called multiple times before hitting the limit
       expect(mockCheckNextSpeaker).toHaveBeenCalled();
 
       // The stream should produce events and eventually terminate
       expect(eventCount).toBeGreaterThanOrEqual(1);
-      expect(eventCount).toBeLessThan(200); // Should not exceed our safety limit
     });
 
     it('should yield MaxSessionTurns and stop when session turn limit is reached', async () => {
@@ -1347,9 +1346,9 @@ ${JSON.stringify(
       const callCount = mockCheckNextSpeaker.mock.calls.length;
 
       // With the fix: even when turns is set to a very high value,
-      // the loop should stop at MAX_TURNS (100)
-      expect(callCount).toBeLessThanOrEqual(100); // Should not exceed MAX_TURNS
-      expect(eventCount).toBeLessThanOrEqual(200); // Should have reasonable number of events
+      // the loop should stop at maxTurns (200 for non-interactive)
+      expect(callCount).toBeLessThanOrEqual(200); // Should not exceed maxTurns
+      expect(eventCount).toBeLessThanOrEqual(400); // Should have reasonable number of events
     });
 
     it('should yield ContextWindowWillOverflow when the context window is about to overflow', async () => {

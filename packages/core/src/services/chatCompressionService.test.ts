@@ -718,8 +718,9 @@ describe('ChatCompressionService', () => {
 
     it('should use high-fidelity original history for summarization when under the limit, but truncated version for active window', async () => {
       // Large response in the "to compress" section (first message)
-      // 300,000 chars is ~75k tokens, well under the 1,000,000 summarizer limit.
-      const massiveText = 'a'.repeat(300000);
+      // 500,000 chars is ~125k tokens, well under the 1,000,000 summarizer limit
+      // but exceeds COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET (75k).
+      const massiveText = 'a'.repeat(500000);
       const history: Content[] = [
         {
           role: 'user',

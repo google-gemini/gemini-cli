@@ -17,8 +17,7 @@ import {
   getInitialChatHistory,
 } from '../utils/environmentContext.js';
 import type { ServerGeminiStreamEvent, ChatCompressionInfo } from './turn.js';
-import { CompressionStatus } from './turn.js';
-import { Turn, GeminiEventType } from './turn.js';
+import { CompressionStatus, Turn, GeminiEventType } from './turn.js';
 import type { Config } from '../config/config.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
@@ -66,7 +65,8 @@ import { partToString } from '../utils/partUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import type { LlmRole } from '../telemetry/types.js';
 
-const MAX_TURNS = 100;
+const MAX_TURNS_INTERACTIVE = 100;
+const MAX_TURNS_NON_INTERACTIVE = 200;
 
 type BeforeAgentHookReturn =
   | {
@@ -87,6 +87,7 @@ export class GeminiClient {
   private readonly loopDetector: LoopDetectionService;
   private readonly compressionService: ChatCompressionService;
   private readonly toolOutputMaskingService: ToolOutputMaskingService;
+  private readonly maxTurns: number;
   private lastPromptId: string;
   private currentSequenceModel: string | null = null;
   private lastSentIdeContext: IdeContext | undefined;
@@ -103,6 +104,9 @@ export class GeminiClient {
     this.compressionService = new ChatCompressionService();
     this.toolOutputMaskingService = new ToolOutputMaskingService();
     this.lastPromptId = this.config.getSessionId();
+    this.maxTurns = config.isInteractive()
+      ? MAX_TURNS_INTERACTIVE
+      : MAX_TURNS_NON_INTERACTIVE;
 
     coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
   }
@@ -791,7 +795,7 @@ export class GeminiClient {
     request: PartListUnion,
     signal: AbortSignal,
     prompt_id: string,
-    turns: number = MAX_TURNS,
+    turns?: number,
     isInvalidStreamRetry: boolean = false,
     displayContent?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
@@ -839,7 +843,7 @@ export class GeminiClient {
       }
     }
 
-    const boundedTurns = Math.min(turns, MAX_TURNS);
+    const boundedTurns = Math.min(turns ?? this.maxTurns, this.maxTurns);
     let turn = new Turn(this.getChat(), prompt_id);
 
     try {
