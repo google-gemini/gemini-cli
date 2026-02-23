@@ -18,7 +18,7 @@ import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 import type { RetryAvailabilityContext } from '../availability/modelPolicy.js';
 
 export type { RetryAvailabilityContext };
-export const DEFAULT_MAX_ATTEMPTS = 3;
+export const DEFAULT_MAX_ATTEMPTS = 10;
 
 export interface RetryOptions {
   maxAttempts: number;
@@ -302,13 +302,18 @@ export async function retryWithBackoff<T>(
           classifiedError instanceof RetryableQuotaError &&
           classifiedError.retryDelayMs !== undefined
         ) {
+          currentDelay = Math.max(currentDelay, classifiedError.retryDelayMs);
+          // Positive jitter up to +20% while respecting server minimum delay
+          const jitter = currentDelay * 0.2 * Math.random();
+          const delayWithJitter = currentDelay + jitter;
           debugLogger.warn(
-            `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${classifiedError.retryDelayMs}ms...`,
+            `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${Math.round(delayWithJitter)}ms...`,
           );
           if (onRetry) {
-            onRetry(attempt, error, classifiedError.retryDelayMs);
+            onRetry(attempt, error, delayWithJitter);
           }
-          await delay(classifiedError.retryDelayMs, signal);
+          await delay(delayWithJitter, signal);
+          currentDelay = Math.min(maxDelayMs, currentDelay * 2);
           continue;
         } else {
           const errorStatus = getErrorStatus(error);
