@@ -64,6 +64,16 @@ and more.
 
 To explore the power of Gemini CLI, see [Gemini CLI examples](./examples.md).
 
+## Check usage and quota
+
+You can check your current token usage and quota information using the
+`/stats model` command. This command provides a snapshot of your current
+session's token usage, as well as your overall quota and usage for the supported
+models.
+
+For more information on the `/stats` command and its subcommands, see the
+[Command Reference](../../reference/commands.md#stats).
+
 ## Next steps
 
 - Follow the [File management](../cli/tutorials/file-management.md) guide to
