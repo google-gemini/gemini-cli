@@ -498,7 +498,7 @@ export async function loadAgentsFromDirectory(
 
   const files = dirEntries.filter(
     (entry) =>
-      entry.isFile() &&
+      (entry.isFile() || entry.isSymbolicLink()) &&
       !entry.name.startsWith('_') &&
       entry.name.endsWith('.md'),
   );

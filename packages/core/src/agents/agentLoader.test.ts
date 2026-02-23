@@ -354,6 +354,28 @@ Hidden`,
       expect(result.errors).toHaveLength(0);
     });
 
+    it('should load agents from symbolic links to .md files', async () => {
+      await writeAgentMarkdown(
+        `---
+name: original-agent
+description: Original agent
+---
+Original prompt`,
+        'original.md',
+      );
+
+      await fs.symlink(
+        path.join(tempDir, 'original.md'),
+        path.join(tempDir, 'symlinked.md'),
+      );
+
+      const result = await loadAgentsFromDirectory(tempDir);
+      expect(result.errors).toHaveLength(0);
+      expect(result.agents).toHaveLength(2);
+      const names = result.agents.map((a) => a.name);
+      expect(names).toContain('original-agent');
+    });
+
     it('should capture errors for malformed individual files', async () => {
       // Create a malformed Markdown file
       await writeAgentMarkdown('invalid markdown', 'malformed.md');
