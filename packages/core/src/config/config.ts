@@ -471,6 +471,7 @@ export interface ConfigParameters {
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
+  directWebFetch?: boolean;
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
   output?: OutputSettings;
   disableModelRouterForAuth?: AuthType[];
@@ -635,6 +636,7 @@ export class Config {
   readonly interactive: boolean;
   private readonly ptyInfo: string;
   private readonly trustedFolder: boolean | undefined;
+  private readonly directWebFetch: boolean;
   private readonly useRipgrep: boolean;
   private readonly enableInteractiveShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
@@ -829,6 +831,7 @@ export class Config {
     this.interactive = params.interactive ?? false;
     this.ptyInfo = params.ptyInfo ?? 'child_process';
     this.trustedFolder = params.trustedFolder;
+    this.directWebFetch = params.directWebFetch ?? false;
     this.useRipgrep = params.useRipgrep ?? true;
     this.useBackgroundColor = params.useBackgroundColor ?? true;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
@@ -2090,6 +2093,10 @@ export class Config {
 
   getApprovedPlanPath(): string | undefined {
     return this.approvedPlanPath;
+  }
+
+  getDirectWebFetch(): boolean {
+    return this.directWebFetch;
   }
 
   setApprovedPlanPath(path: string | undefined): void {
