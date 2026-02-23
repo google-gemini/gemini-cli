@@ -104,7 +104,7 @@ export interface CommandContext {
     /**
      * Sets the text content of the last visible output.
      */
-    setLastOutput: (output: LastOutput) => void;
+    setLastOutput: (output: LastOutput | undefined) => void;
   };
   // Session-specific data
   session: {

@@ -5,7 +5,7 @@
  */
 
 import { vi } from 'vitest';
-import type { CommandContext } from '../ui/commands/types.js';
+import type { CommandContext, LastOutput } from '../ui/commands/types.js';
 import type { LoadedSettings } from '../config/settings.js';
 import { mergeSettings } from '../config/settings.js';
 import type { GitService } from '@google/gemini-cli-core';
@@ -70,7 +70,7 @@ export const createMockCommandContext = (
       extensionsUpdateState: new Map(),
       setExtensionsUpdateState: vi.fn(),
       getLastOutput: vi.fn().mockReturnValue(undefined),
-      setLastOutput: vi.fn(),
+      setLastOutput: vi.fn<(output: LastOutput | undefined) => void>(),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any,
     session: {

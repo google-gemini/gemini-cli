@@ -196,7 +196,7 @@ export const useGeminiStream = (
   terminalHeight: number,
   isShellFocused?: boolean,
   consumeUserHint?: () => string | null,
-  setLastOutput?: (output: LastOutput) => void,
+  setLastOutput?: (output: LastOutput | undefined) => void,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const [retryStatus, setRetryStatus] = useState<RetryAttemptPayload | null>(
@@ -206,6 +206,7 @@ export const useGeminiStream = (
   const turnCancelledRef = useRef(false);
   const activeQueryIdRef = useRef<string | null>(null);
   const [isResponding, setIsResponding] = useState<boolean>(false);
+  const fullAiResponseBufferRef = useRef<string>('');
   const [thought, thoughtRef, setThought] =
     useStateAndRef<ThoughtSummary | null>(null);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
@@ -1135,7 +1136,6 @@ export const useGeminiStream = (
       signal: AbortSignal,
     ): Promise<StreamProcessingStatus> => {
       let geminiMessageBuffer = '';
-      let fullAiResponseBuffer = '';
       const toolCallRequests: ToolCallRequestInfo[] = [];
       for await (const event of stream) {
         if (
@@ -1152,10 +1152,8 @@ export const useGeminiStream = (
             break;
           case ServerGeminiEventType.Content:
             setLastGeminiActivityTime(Date.now());
-            fullAiResponseBuffer += event.value;
-            setLastOutput?.({
-              content: fullAiResponseBuffer,
-            });
+            fullAiResponseBufferRef.current += event.value;
+
             geminiMessageBuffer = handleContentEvent(
               event.value,
               geminiMessageBuffer,
@@ -1228,6 +1226,12 @@ export const useGeminiStream = (
           }
         }
       }
+      if (fullAiResponseBufferRef.current.length > 0) {
+        setLastOutput?.({
+          content: fullAiResponseBufferRef.current.trim(),
+        });
+      }
+
       if (toolCallRequests.length > 0) {
         if (pendingHistoryItemRef.current) {
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);
@@ -1257,6 +1261,7 @@ export const useGeminiStream = (
       setPendingHistoryItem,
       setThought,
       setLastOutput,
+      fullAiResponseBufferRef,
     ],
   );
   const submitQuery = useCallback(
@@ -1322,6 +1327,8 @@ export const useGeminiStream = (
               }
               startNewPrompt();
               setThought(null); // Reset thought when starting a new prompt
+              fullAiResponseBufferRef.current = '';
+              setLastOutput?.(undefined);
             }
 
             setIsResponding(true);
@@ -1438,6 +1445,8 @@ export const useGeminiStream = (
       startNewPrompt,
       getPromptCount,
       setThought,
+      setLastOutput,
+      fullAiResponseBufferRef,
     ],
   );
 
