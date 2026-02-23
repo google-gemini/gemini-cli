@@ -94,16 +94,19 @@ export function TabHeader({
           {showStatusIcons && (
             <Text color={theme.text.secondary}>{getStatusIcon(tab, i)} </Text>
           )}
-          <Text
-            color={
-              i === currentIndex ? theme.status.success : theme.text.secondary
-            }
-            bold={i === currentIndex}
-            underline={i === currentIndex}
-            aria-current={i === currentIndex ? 'step' : undefined}
-          >
-            {tab.header}
-          </Text>
+          <Box maxWidth={i !== currentIndex ? 16 : 100}>
+            <Text
+              color={
+                i === currentIndex ? theme.status.success : theme.text.secondary
+              }
+              bold={i === currentIndex}
+              underline={i === currentIndex}
+              aria-current={i === currentIndex ? 'step' : undefined}
+              wrap="truncate"
+            >
+              {tab.header}
+            </Text>
+          </Box>
         </React.Fragment>
       ))}
       {showArrows && <Text color={theme.text.secondary}>{' →'}</Text>}
