@@ -7,8 +7,26 @@
 import { AuthType } from '@google/gemini-cli-core';
 import { loadEnvironment, loadSettings } from './settings.js';
 
+const GEMINI_API_KEY_ERROR =
+  'When using Gemini API, you must specify the GEMINI_API_KEY environment variable.\n' +
+  'Update your environment and try again (no reload needed if using .env)!';
+
+const UNTRUSTED_ENV_HINT =
+  'Note: A .env file was found but not loaded because the current folder is untrusted.\n' +
+  'Use the /permissions trust command to trust this folder and load workspace environment variables.';
+
+function withUntrustedEnvHint(
+  baseMessage: string,
+  envLoadResult: ReturnType<typeof loadEnvironment>,
+): string {
+  if (envLoadResult.skippedDueToTrust && envLoadResult.envFilePath) {
+    return `${baseMessage}\n${UNTRUSTED_ENV_HINT}`;
+  }
+  return baseMessage;
+}
+
 export function validateAuthMethod(authMethod: string): string | null {
-  loadEnvironment(loadSettings().merged, process.cwd());
+  const envLoadResult = loadEnvironment(loadSettings().merged, process.cwd());
   if (
     authMethod === AuthType.LOGIN_WITH_GOOGLE ||
     authMethod === AuthType.COMPUTE_ADC
@@ -18,10 +36,7 @@ export function validateAuthMethod(authMethod: string): string | null {
 
   if (authMethod === AuthType.USE_GEMINI) {
     if (!process.env['GEMINI_API_KEY']) {
-      return (
-        'When using Gemini API, you must specify the GEMINI_API_KEY environment variable.\n' +
-        'Update your environment and try again (no reload needed if using .env)!'
-      );
+      return withUntrustedEnvHint(GEMINI_API_KEY_ERROR, envLoadResult);
     }
     return null;
   }

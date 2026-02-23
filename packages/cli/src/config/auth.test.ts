@@ -7,11 +7,12 @@
 import { AuthType } from '@google/gemini-cli-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { validateAuthMethod } from './auth.js';
+import { loadEnvironment } from './settings.js';
 
 vi.mock('./settings.js', () => ({
   loadEnvironment: vi.fn(),
   loadSettings: vi.fn().mockReturnValue({
-    merged: vi.fn().mockReturnValue({}),
+    merged: {},
   }),
 }));
 
@@ -21,6 +22,12 @@ describe('validateAuthMethod', () => {
     vi.stubEnv('GOOGLE_CLOUD_PROJECT', undefined);
     vi.stubEnv('GOOGLE_CLOUD_LOCATION', undefined);
     vi.stubEnv('GOOGLE_API_KEY', undefined);
+    vi.mocked(loadEnvironment).mockReturnValue({
+      envFilePath: null,
+      trustResult: { isTrusted: true, source: 'file' },
+      isSandboxed: false,
+      skippedDueToTrust: false,
+    });
   });
 
   afterEach(() => {
@@ -95,5 +102,35 @@ describe('validateAuthMethod', () => {
       vi.stubEnv(key, value as string);
     }
     expect(validateAuthMethod(authType)).toBe(expected);
+  });
+
+  it('adds trust guidance when a .env file is skipped in an untrusted workspace', () => {
+    vi.mocked(loadEnvironment).mockReturnValue({
+      envFilePath: '/tmp/project/.env',
+      trustResult: { isTrusted: false, source: 'file' },
+      isSandboxed: false,
+      skippedDueToTrust: true,
+    });
+
+    expect(validateAuthMethod(AuthType.USE_GEMINI)).toBe(
+      'When using Gemini API, you must specify the GEMINI_API_KEY environment variable.\n' +
+        'Update your environment and try again (no reload needed if using .env)!\n' +
+        'Note: A .env file was found but not loaded because the current folder is untrusted.\n' +
+        'Use the /permissions trust command to trust this folder and load workspace environment variables.',
+    );
+  });
+
+  it('does not add trust guidance when no .env file was found', () => {
+    vi.mocked(loadEnvironment).mockReturnValue({
+      envFilePath: null,
+      trustResult: { isTrusted: false, source: 'file' },
+      isSandboxed: false,
+      skippedDueToTrust: true,
+    });
+
+    expect(validateAuthMethod(AuthType.USE_GEMINI)).toBe(
+      'When using Gemini API, you must specify the GEMINI_API_KEY environment variable.\n' +
+        'Update your environment and try again (no reload needed if using .env)!',
+    );
   });
 });

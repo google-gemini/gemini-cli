@@ -22,7 +22,7 @@ import {
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
-import { isWorkspaceTrusted } from './trustedFolders.js';
+import { isWorkspaceTrusted, type TrustResult } from './trustedFolders.js';
 import {
   type Settings,
   type MergedSettings,
@@ -553,7 +553,12 @@ export function loadEnvironment(
   settings: Settings,
   workspaceDir: string,
   isWorkspaceTrustedFn = isWorkspaceTrusted,
-): void {
+): {
+  envFilePath: string | null;
+  trustResult: TrustResult;
+  isSandboxed: boolean;
+  skippedDueToTrust: boolean;
+} {
   const envFilePath = findEnvFile(workspaceDir);
   const trustResult = isWorkspaceTrustedFn(settings, workspaceDir);
 
@@ -574,7 +579,12 @@ export function loadEnvironment(
     relevantArgs.includes('--sandbox');
 
   if (trustResult.isTrusted !== true && !isSandboxed) {
-    return;
+    return {
+      envFilePath,
+      trustResult,
+      isSandboxed,
+      skippedDueToTrust: true,
+    };
   }
 
   // Cloud Shell environment variable handling
@@ -620,6 +630,13 @@ export function loadEnvironment(
       // Errors are ignored to match the behavior of `dotenv.config({ quiet: true })`.
     }
   }
+
+  return {
+    envFilePath,
+    trustResult,
+    isSandboxed,
+    skippedDueToTrust: false,
+  };
 }
 
 /**
