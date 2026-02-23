@@ -8,13 +8,16 @@ import { Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { getContextUsagePercentage } from '../utils/contextUsage.js';
 import { useSettings } from '../contexts/SettingsContext.js';
+import { MIN_TERMINAL_WIDTH_FOR_FULL_LABEL } from '../constants.js';
 
 export const ContextUsageDisplay = ({
   promptTokenCount,
   model,
+  terminalWidth,
 }: {
   promptTokenCount: number;
-  model: string;
+  model: string | undefined;
+  terminalWidth: number;
 }) => {
   const settings = useSettings();
   const percentage = getContextUsagePercentage(promptTokenCount, model);
@@ -29,7 +32,8 @@ export const ContextUsageDisplay = ({
     textColor = theme.status.warning;
   }
 
-  const label = '% context used';
+  const label =
+    terminalWidth < MIN_TERMINAL_WIDTH_FOR_FULL_LABEL ? '%' : '% context used';
 
   return (
     <Text color={textColor}>

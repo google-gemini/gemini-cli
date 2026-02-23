@@ -249,7 +249,7 @@ describe('<Footer />', () => {
     unmount();
   });
 
-  it('displays the model name and context used label even on narrow terminals', async () => {
+  it('displays the model name and abbreviated context used label on narrow terminals', async () => {
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <Footer />,
       {
@@ -266,7 +266,8 @@ describe('<Footer />', () => {
     );
     await waitUntilReady();
     expect(lastFrame()).toContain(defaultProps.model);
-    expect(lastFrame()).toMatch(/\d+% context used/);
+    expect(lastFrame()).toMatch(/\d+%/);
+    expect(lastFrame()).not.toContain('context used');
     unmount();
   });
 

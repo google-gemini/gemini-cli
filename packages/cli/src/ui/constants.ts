@@ -48,3 +48,6 @@ export const ACTIVE_SHELL_MAX_LINES = 15;
 
 // Max lines to preserve in history for completed shell commands
 export const COMPLETED_SHELL_MAX_LINES = 15;
+
+/** Minimum terminal width required to show the full context used label */
+export const MIN_TERMINAL_WIDTH_FOR_FULL_LABEL = 100;
