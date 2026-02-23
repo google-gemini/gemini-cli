@@ -866,6 +866,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
     try {
       const hooksContent = await fs.promises.readFile(hooksFilePath, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const rawHooks = JSON.parse(hooksContent);
 
       if (

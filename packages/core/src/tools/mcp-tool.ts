@@ -10,13 +10,13 @@ import type {
   ToolInvocation,
   ToolMcpConfirmationDetails,
   ToolResult,
+  PolicyUpdateOptions,
 } from './tools.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
   ToolConfirmationOutcome,
-  type PolicyUpdateOptions,
 } from './tools.js';
 import type { CallableTool, FunctionCall, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
@@ -130,7 +130,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
           DiscoveredMCPToolInvocation.allowlist.add(toolAllowListKey);
         } else if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
           DiscoveredMCPToolInvocation.allowlist.add(toolAllowListKey);
-          await this.publishPolicyUpdate(outcome);
+          // Persistent policy updates are now handled centrally by the scheduler
         }
       },
     };
@@ -247,7 +247,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     override readonly parameterSchema: unknown,
     messageBus: MessageBus,
     readonly trust?: boolean,
-    readonly isReadOnly?: boolean,
+    isReadOnly?: boolean,
     nameOverride?: string,
     private readonly cliConfig?: Config,
     override readonly extensionName?: string,
@@ -265,6 +265,16 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       extensionName,
       extensionId,
     );
+    this._isReadOnly = isReadOnly;
+  }
+
+  private readonly _isReadOnly?: boolean;
+
+  override get isReadOnly(): boolean {
+    if (this._isReadOnly !== undefined) {
+      return this._isReadOnly;
+    }
+    return super.isReadOnly;
   }
 
   getFullyQualifiedPrefix(): string {

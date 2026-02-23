@@ -17,10 +17,12 @@ import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type {
+  DeclarativeTool,
   ToolCallConfirmationDetails,
   ToolInvocation,
   ToolResult,
 } from '../tools/tools.js';
+import type { ToolRegistry } from 'src/tools/tool-registry.js';
 
 vi.mock('./subagent-tool-wrapper.js');
 
@@ -272,5 +274,87 @@ describe('SubAgentInvocation', () => {
 
       expect(hintedParams).toEqual(params);
     });
+  });
+});
+
+describe('SubagentTool Read-Only logic', () => {
+  let mockConfig: Config;
+  let mockMessageBus: MessageBus;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockConfig = makeFakeConfig();
+    mockMessageBus = createMockMessageBus();
+  });
+
+  it('should be false for remote agents', () => {
+    const tool = new SubagentTool(
+      testRemoteDefinition,
+      mockConfig,
+      mockMessageBus,
+    );
+    expect(tool.isReadOnly).toBe(false);
+  });
+
+  it('should be true for local agent with only read-only tools', () => {
+    const readOnlyTool = {
+      name: 'read',
+      isReadOnly: true,
+    } as unknown as DeclarativeTool<object, ToolResult>;
+    const registry = {
+      getTool: (name: string) => (name === 'read' ? readOnlyTool : undefined),
+    };
+    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(
+      registry as unknown as ToolRegistry,
+    );
+
+    const defWithTools: LocalAgentDefinition = {
+      ...testDefinition,
+      toolConfig: { tools: ['read'] },
+    };
+    const tool = new SubagentTool(defWithTools, mockConfig, mockMessageBus);
+    expect(tool.isReadOnly).toBe(true);
+  });
+
+  it('should be false for local agent with at least one non-read-only tool', () => {
+    const readOnlyTool = {
+      name: 'read',
+      isReadOnly: true,
+    } as unknown as DeclarativeTool<object, ToolResult>;
+    const mutatorTool = {
+      name: 'write',
+      isReadOnly: false,
+    } as unknown as DeclarativeTool<object, ToolResult>;
+    const registry = {
+      getTool: (name: string) => {
+        if (name === 'read') return readOnlyTool;
+        if (name === 'write') return mutatorTool;
+        return undefined;
+      },
+    };
+    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(
+      registry as unknown as ToolRegistry,
+    );
+
+    const defWithTools: LocalAgentDefinition = {
+      ...testDefinition,
+      toolConfig: { tools: ['read', 'write'] },
+    };
+    const tool = new SubagentTool(defWithTools, mockConfig, mockMessageBus);
+    expect(tool.isReadOnly).toBe(false);
+  });
+
+  it('should be true for local agent with no tools', () => {
+    const registry = { getTool: () => undefined };
+    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(
+      registry as unknown as ToolRegistry,
+    );
+
+    const defNoTools: LocalAgentDefinition = {
+      ...testDefinition,
+      toolConfig: { tools: [] },
+    };
+    const tool = new SubagentTool(defNoTools, mockConfig, mockMessageBus);
+    expect(tool.isReadOnly).toBe(true);
   });
 });

@@ -15,6 +15,7 @@ interface PersistentStateData {
   tipsShown?: number;
   hasSeenScreenReaderNudge?: boolean;
   focusUiEnabled?: boolean;
+  startupWarningCounts?: Record<string, number>;
   // Add other persistent state keys here as needed
 }
 
@@ -37,6 +38,7 @@ export class PersistentState {
       const filePath = this.getPath();
       if (fs.existsSync(filePath)) {
         const content = fs.readFileSync(filePath, 'utf-8');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         this.cache = JSON.parse(content);
       } else {
         this.cache = {};

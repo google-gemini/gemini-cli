@@ -266,15 +266,26 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      enablePromptCompletion: {
-        type: 'boolean',
-        label: 'Enable Prompt Completion',
+      plan: {
+        type: 'object',
+        label: 'Plan',
         category: 'General',
         requiresRestart: true,
-        default: false,
-        description:
-          'Enable AI-powered prompt completion suggestions while typing.',
-        showInDialog: true,
+        default: {},
+        description: 'Planning features configuration.',
+        showInDialog: false,
+        properties: {
+          directory: {
+            type: 'string',
+            label: 'Plan Directory',
+            category: 'General',
+            requiresRestart: true,
+            default: undefined as string | undefined,
+            description:
+              'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.',
+            showInDialog: true,
+          },
+        },
       },
       retryFetchErrors: {
         type: 'boolean',
@@ -1313,6 +1324,7 @@ const SETTINGS_SCHEMA = {
       },
     },
   },
+
   useWriteTodos: {
     type: 'boolean',
     label: 'Use WriteTodos',
