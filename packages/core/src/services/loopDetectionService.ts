@@ -28,6 +28,10 @@ import {
 import { debugLogger } from '../utils/debugLogger.js';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
+const MIN_CYCLE_LENGTH = 2;
+const MAX_CYCLE_LENGTH = 5;
+const CYCLE_REPEAT_THRESHOLD = 3;
+const TOOL_CALL_HISTORY_WINDOW = 20;
 const CONTENT_LOOP_THRESHOLD = 10;
 const CONTENT_CHUNK_SIZE = 50;
 const MAX_HISTORY_LENGTH = 5000;
@@ -105,6 +109,7 @@ export class LoopDetectionService {
   // Tool call tracking
   private lastToolCallKey: string | null = null;
   private toolCallRepetitionCount: number = 0;
+  private recentToolCallKeys: string[] = [];
 
   // Content streaming tracking
   private streamContentHistory = '';
@@ -201,6 +206,8 @@ export class LoopDetectionService {
 
   private checkToolCallLoop(toolCall: { name: string; args: object }): boolean {
     const key = this.getToolCallKey(toolCall);
+
+    // Consecutive identical call check.
     if (this.lastToolCallKey === key) {
       this.toolCallRepetitionCount++;
     } else {
@@ -216,6 +223,54 @@ export class LoopDetectionService {
         ),
       );
       return true;
+    }
+
+    // Cyclic / alternating pattern check (e.g. A→B→A→B or A→B→C→A→B→C).
+    this.recentToolCallKeys.push(key);
+    if (this.recentToolCallKeys.length > TOOL_CALL_HISTORY_WINDOW) {
+      this.recentToolCallKeys.shift();
+    }
+    if (this.checkCyclicToolCallPattern()) {
+      logLoopDetected(
+        this.config,
+        new LoopDetectedEvent(LoopType.CYCLIC_TOOL_CALLS, this.promptId),
+      );
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Detects cyclic / rotating tool call patterns.
+   *
+   * Checks whether the tail of `recentToolCallKeys` consists of
+   * `CYCLE_REPEAT_THRESHOLD` consecutive repetitions of the same sub-sequence
+   * of length `cycleLen` (for all cycle lengths from `MIN_CYCLE_LENGTH` to
+   * `MAX_CYCLE_LENGTH`).  Only exact key matches (same tool name AND same
+   * serialised args) are considered, so legitimate incremental work that
+   * targets different inputs is not flagged.
+   */
+  private checkCyclicToolCallPattern(): boolean {
+    const history = this.recentToolCallKeys;
+    for (
+      let cycleLen = MIN_CYCLE_LENGTH;
+      cycleLen <= MAX_CYCLE_LENGTH;
+      cycleLen++
+    ) {
+      const required = cycleLen * CYCLE_REPEAT_THRESHOLD;
+      if (history.length < required) continue;
+
+      const tail = history.slice(-required);
+      const pattern = tail.slice(0, cycleLen);
+      let isCyclic = true;
+      for (let i = cycleLen; i < tail.length; i++) {
+        if (tail[i] !== pattern[i % cycleLen]) {
+          isCyclic = false;
+          break;
+        }
+      }
+      if (isCyclic) return true;
     }
     return false;
   }
@@ -613,6 +668,7 @@ export class LoopDetectionService {
   private resetToolCallCount(): void {
     this.lastToolCallKey = null;
     this.toolCallRepetitionCount = 0;
+    this.recentToolCallKeys = [];
   }
 
   private resetContentTracking(resetHistory = true): void {
