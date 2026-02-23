@@ -163,8 +163,8 @@ Each server configuration supports the following properties:
 - **`args`** (string[]): Command-line arguments for Stdio transport
 - **`headers`** (object): Custom HTTP headers when using `url` or `httpUrl`
 - **`env`** (object): Environment variables for the server process. Values can
-  reference environment variables using `$VAR_NAME` or `${VAR_NAME}` syntax
-  (all platforms), or `%VAR_NAME%` (Windows only).
+  reference environment variables using `$VAR_NAME` or `${VAR_NAME}` syntax (all
+  platforms), or `%VAR_NAME%` (Windows only).
 - **`cwd`** (string): Working directory for Stdio transport
 - **`timeout`** (number): Request timeout in milliseconds (default: 600,000ms =
   10 minutes)
@@ -194,7 +194,8 @@ directly in your `settings.json` file.
 
 The expansion utility supports:
 
-- **POSIX/Bash syntax:** `$VARIABLE_NAME` or `${VARIABLE_NAME}` (supported on all platforms)
+- **POSIX/Bash syntax:** `$VARIABLE_NAME` or `${VARIABLE_NAME}` (supported on
+  all platforms)
 - **Windows syntax:** `%VARIABLE_NAME%` (supported only when running on Windows)
 
 If a variable is not defined in the current environment, it resolves to an empty
