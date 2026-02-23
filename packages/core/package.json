@@ -49,7 +49,7 @@
     "@opentelemetry/semantic-conventions": "^1.39.0",
     "@types/html-to-text": "^9.0.4",
     "@xterm/headless": "5.5.0",
-    "ajv": "^8.17.1",
+    "ajv": "^8.18.0",
     "ajv-formats": "^3.0.0",
     "chardet": "^2.1.0",
     "diff": "^8.0.3",
