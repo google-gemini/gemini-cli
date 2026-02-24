@@ -5,7 +5,12 @@
  */
 
 import { AuthType } from '@google/gemini-cli-core';
-import { loadEnvironment, loadSettings } from './settings.js';
+import {
+  loadEnvironment,
+  loadSettings,
+  type EnvironmentLoadResult,
+  type MergedSettings,
+} from './settings.js';
 
 const GEMINI_API_KEY_ERROR =
   'When using Gemini API, you must specify the GEMINI_API_KEY environment variable.\n' +
@@ -17,7 +22,7 @@ const UNTRUSTED_ENV_HINT =
 
 function withUntrustedEnvHint(
   baseMessage: string,
-  envLoadResult: ReturnType<typeof loadEnvironment>,
+  envLoadResult: EnvironmentLoadResult,
 ): string {
   if (envLoadResult.skippedDueToTrust && envLoadResult.envFilePath) {
     return `${baseMessage}\n${UNTRUSTED_ENV_HINT}`;
@@ -25,8 +30,22 @@ function withUntrustedEnvHint(
   return baseMessage;
 }
 
-export function validateAuthMethod(authMethod: string): string | null {
-  const envLoadResult = loadEnvironment(loadSettings().merged, process.cwd());
+interface ValidateAuthMethodOptions {
+  envLoadResult?: EnvironmentLoadResult;
+  settings?: MergedSettings;
+  workspaceDir?: string;
+}
+
+export function validateAuthMethod(
+  authMethod: string,
+  options: ValidateAuthMethodOptions = {},
+): string | null {
+  const workspaceDir = options.workspaceDir ?? process.cwd();
+  const envLoadResult =
+    options.envLoadResult ??
+    (options.settings
+      ? loadEnvironment(options.settings, workspaceDir)
+      : loadEnvironment(loadSettings(workspaceDir).merged, workspaceDir));
   if (
     authMethod === AuthType.LOGIN_WITH_GOOGLE ||
     authMethod === AuthType.COMPUTE_ADC

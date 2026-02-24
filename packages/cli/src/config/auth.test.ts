@@ -7,7 +7,7 @@
 import { AuthType } from '@google/gemini-cli-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { validateAuthMethod } from './auth.js';
-import { loadEnvironment } from './settings.js';
+import { loadEnvironment, loadSettings } from './settings.js';
 
 vi.mock('./settings.js', () => ({
   loadEnvironment: vi.fn(),
@@ -132,5 +132,21 @@ describe('validateAuthMethod', () => {
       'When using Gemini API, you must specify the GEMINI_API_KEY environment variable.\n' +
         'Update your environment and try again (no reload needed if using .env)!',
     );
+  });
+
+  it('does not reload settings when envLoadResult is injected', () => {
+    const loadSettingsSpy = vi.mocked(loadSettings);
+    loadSettingsSpy.mockClear();
+
+    validateAuthMethod(AuthType.USE_GEMINI, {
+      envLoadResult: {
+        envFilePath: '/tmp/project/.env',
+        trustResult: { isTrusted: false, source: 'file' },
+        isSandboxed: false,
+        skippedDueToTrust: true,
+      },
+    });
+
+    expect(loadSettingsSpy).not.toHaveBeenCalled();
   });
 });

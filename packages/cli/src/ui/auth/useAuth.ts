@@ -31,7 +31,10 @@ export function validateAuthMethodWithSettings(
   if (authType === AuthType.USE_GEMINI) {
     return null;
   }
-  return validateAuthMethod(authType);
+  return validateAuthMethod(authType, {
+    envLoadResult: settings.initialEnvLoadResult,
+    settings: settings.merged,
+  });
 }
 
 export const useAuthCommand = (

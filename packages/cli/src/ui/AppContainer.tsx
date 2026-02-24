@@ -846,12 +846,18 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
       const error = validateAuthMethod(
         settings.merged.security.auth.selectedType,
+        {
+          envLoadResult: settings.initialEnvLoadResult,
+          settings: settings.merged,
+        },
       );
       if (error) {
         onAuthError(error);
       }
     }
   }, [
+    settings.initialEnvLoadResult,
+    settings.merged,
     settings.merged.security.auth.selectedType,
     settings.merged.security.auth.enforcedType,
     settings.merged.security.auth.useExternal,
