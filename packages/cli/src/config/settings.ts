@@ -303,6 +303,7 @@ export interface LoadedSettingsSnapshot {
   isTrusted: boolean;
   errors: SettingsError[];
   merged: MergedSettings;
+  initialEnvLoadResult?: EnvironmentLoadResult;
 }
 
 export interface EnvironmentLoadResult {
@@ -416,6 +417,9 @@ export class LoadedSettings {
       isTrusted: this.isTrusted,
       errors: [...this.errors],
       merged: structuredClone(this._merged),
+      initialEnvLoadResult: this.initialEnvLoadResult
+        ? structuredClone(this.initialEnvLoadResult)
+        : undefined,
     };
   }
 

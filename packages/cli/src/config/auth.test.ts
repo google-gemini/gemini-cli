@@ -149,4 +149,25 @@ describe('validateAuthMethod', () => {
 
     expect(loadSettingsSpy).not.toHaveBeenCalled();
   });
+
+  it('uses injected settings without reloading settings', () => {
+    const loadSettingsSpy = vi.mocked(loadSettings);
+    const loadEnvironmentSpy = vi.mocked(loadEnvironment);
+    loadSettingsSpy.mockClear();
+    loadEnvironmentSpy.mockClear();
+    loadEnvironmentSpy.mockReturnValue({
+      envFilePath: null,
+      trustResult: { isTrusted: true, source: 'file' },
+      isSandboxed: false,
+      skippedDueToTrust: false,
+    });
+
+    validateAuthMethod(AuthType.USE_GEMINI, {
+      settings: {} as never,
+    });
+
+    expect(loadSettingsSpy).not.toHaveBeenCalled();
+    expect(loadEnvironmentSpy).toHaveBeenCalledOnce();
+    expect(loadEnvironmentSpy.mock.calls[0]?.[0]).toEqual({});
+  });
 });
