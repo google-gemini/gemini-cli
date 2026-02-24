@@ -145,6 +145,49 @@ export function isLargePaste(text: string): boolean {
   );
 }
 
+function getTextWithNextGhostWord(
+  currentText: string,
+  ghostText: string,
+): string | null {
+  if (!ghostText || !ghostText.startsWith(currentText)) {
+    return null;
+  }
+
+  const suffix = ghostText.slice(currentText.length);
+  if (!suffix) {
+    return null;
+  }
+
+  let i = 0;
+  const isHorizontalWhitespace = (char: string) => char === ' ' || char === '\t';
+
+  // Keep existing spacing before the next word.
+  while (i < suffix.length && isHorizontalWhitespace(suffix[i]!)) {
+    i++;
+  }
+
+  // Treat line breaks as their own step and keep indentation.
+  if (i < suffix.length && suffix[i] === '\n') {
+    i++;
+    while (i < suffix.length && isHorizontalWhitespace(suffix[i]!)) {
+      i++;
+    }
+    return i > 0 ? `${currentText}${suffix.slice(0, i)}` : null;
+  }
+
+  // Consume one word.
+  while (i < suffix.length && !/\s/.test(suffix[i]!)) {
+    i++;
+  }
+
+  // Keep trailing spaces so repeated accepts feel natural.
+  while (i < suffix.length && isHorizontalWhitespace(suffix[i]!)) {
+    i++;
+  }
+
+  return i > 0 ? `${currentText}${suffix.slice(0, i)}` : null;
+}
+
 const DOUBLE_TAB_CLEAN_UI_TOGGLE_WINDOW_MS = 350;
 
 /**
@@ -987,6 +1030,23 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       ) {
         completion.promptCompletion.accept();
         return true;
+      }
+
+      if (
+        keyMatchers[Command.MOVE_WORD_RIGHT](key) &&
+        !completion.showSuggestions &&
+        completion.promptCompletion.text
+      ) {
+        const nextText = getTextWithNextGhostWord(
+          buffer.text,
+          completion.promptCompletion.text,
+        );
+        if (nextText) {
+          buffer.setText(nextText);
+          completion.promptCompletion.markSelected(nextText);
+          setExpandedSuggestionIndex(-1);
+          return true;
+        }
       }
 
       if (!shellModeActive) {

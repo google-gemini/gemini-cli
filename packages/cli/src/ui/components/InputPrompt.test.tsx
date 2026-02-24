@@ -3185,6 +3185,89 @@ describe('InputPrompt', () => {
       unmount();
     });
 
+    it('accepts ghost text word-by-word on Ctrl+Right', async () => {
+      const mockMarkSelected = vi.fn();
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: false,
+        suggestions: [],
+        promptCompletion: {
+          text: 'build a weather app',
+          accept: vi.fn(),
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: true,
+          markSelected: mockMarkSelected,
+        },
+      });
+
+      props.buffer.setText('build ');
+      mockBuffer.setText.mockClear();
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x1b[1;5C'); // Ctrl+Right
+        stdin.write('\x1b[1;5C'); // Ctrl+Right
+      });
+
+      await waitFor(() => {
+        expect(mockBuffer.setText).toHaveBeenNthCalledWith(1, 'build a ');
+        expect(mockBuffer.setText).toHaveBeenNthCalledWith(
+          2,
+          'build a weather ',
+        );
+        expect(mockMarkSelected).toHaveBeenNthCalledWith(1, 'build a ');
+        expect(mockMarkSelected).toHaveBeenNthCalledWith(
+          2,
+          'build a weather ',
+        );
+      });
+      unmount();
+    });
+
+    it('does not accept ghost text word-by-word when suggestions are visible', async () => {
+      const mockMarkSelected = vi.fn();
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: true,
+        suggestions: [{ label: 'test', value: 'test' }],
+        promptCompletion: {
+          text: 'build a weather app',
+          accept: vi.fn(),
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: true,
+          markSelected: mockMarkSelected,
+        },
+      });
+
+      props.buffer.setText('build ');
+      mockBuffer.setText.mockClear();
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x1b[1;5C'); // Ctrl+Right
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(mockBuffer.setText).not.toHaveBeenCalled();
+      expect(mockMarkSelected).not.toHaveBeenCalled();
+      unmount();
+    });
+
     it('should not reveal clean UI details on Shift+Tab when hidden', async () => {
       mockedUseCommandCompletion.mockReturnValue({
         ...mockCommandCompletion,
