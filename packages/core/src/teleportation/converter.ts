@@ -89,10 +89,22 @@ export function convertAgyToCliRecord(agyJson: unknown): ConversationRecord {
       case 'CORTEX_STEP_TYPE_LIST_DIRECTORY':
       case 21: // CORTEX_STEP_TYPE_RUN_COMMAND
       case 'CORTEX_STEP_TYPE_RUN_COMMAND':
+      case 23: // CORTEX_STEP_TYPE_WRITE_TO_FILE
+      case 'CORTEX_STEP_TYPE_WRITE_TO_FILE':
+      case 25: // CORTEX_STEP_TYPE_FIND
+      case 'CORTEX_STEP_TYPE_FIND':
+      case 31: // CORTEX_STEP_TYPE_READ_URL_CONTENT
+      case 'CORTEX_STEP_TYPE_READ_URL_CONTENT':
+      case 33: // CORTEX_STEP_TYPE_SEARCH_WEB
+      case 'CORTEX_STEP_TYPE_SEARCH_WEB':
+      case 38: // CORTEX_STEP_TYPE_MCP_TOOL
+      case 'CORTEX_STEP_TYPE_MCP_TOOL':
       case 85: // CORTEX_STEP_TYPE_BROWSER_SUBAGENT
       case 'CORTEX_STEP_TYPE_BROWSER_SUBAGENT':
       case 86: // CORTEX_STEP_TYPE_FILE_CHANGE
-      case 'CORTEX_STEP_TYPE_FILE_CHANGE': {
+      case 'CORTEX_STEP_TYPE_FILE_CHANGE':
+      case 140: // CORTEX_STEP_TYPE_GENERIC
+      case 'CORTEX_STEP_TYPE_GENERIC': {
         if (!currentGeminiMessage) {
           // If no planner response preceded this, create a dummy one
           const adjunctMessage: MessageRecord = {
@@ -161,6 +173,39 @@ function mapAgyStepToToolCall(step: Record<string, any>): ToolCallRecord {
   } else if (step['fileChange']) {
     name = 'replace_file_content'; // Or multi_replace_file_content
     args = { TargetFile: step['fileChange']['absolutePathUri'] };
+  } else if (step['writeToFile']) {
+    name = 'write_file';
+    args = { TargetFile: step['writeToFile']['targetFileUri'] };
+  } else if (step['find']) {
+    name = 'glob';
+    args = {
+      Pattern: step['find']['pattern'],
+      SearchDirectory: step['find']['searchDirectory'],
+    };
+    result = [{ text: step['find']['truncatedOutput'] || '' }];
+  } else if (step['readUrlContent']) {
+    name = 'web_fetch';
+    args = { Url: step['readUrlContent']['url'] };
+    // We intentionally don't try fully mapping the complex KnowledgeBaseItem struct into a string here
+    result = [{ text: 'successfully read url content' }];
+  } else if (step['searchWeb']) {
+    name = 'google_web_search'; // Usually mapped from 'searchWeb'
+    args = { query: step['searchWeb']['query'] };
+    if (step['searchWeb']['domain']) {
+      args['domain'] = step['searchWeb']['domain'];
+    }
+    result = [{ text: 'successfully searched web' }];
+  } else if (step['mcpTool']) {
+    const mcpStep = step['mcpTool'];
+    name = mcpStep['toolCall']?.['name'] || 'unknown_mcp_tool';
+    try {
+      if (mcpStep['toolCall']?.['arguments']) {
+        args = JSON.parse(mcpStep['toolCall']['arguments']);
+      }
+    } catch {
+      args = {};
+    }
+    result = [{ text: mcpStep['resultString'] || '' }];
   } else if (step['browserSubagent']) {
     name = 'browser_subagent';
     args = { Task: step['browserSubagent']['task'] };
