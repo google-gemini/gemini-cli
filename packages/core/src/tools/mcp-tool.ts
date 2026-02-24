@@ -82,6 +82,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     private readonly cliConfig?: Config,
     private readonly toolDescription?: string,
     private readonly toolParameterSchema?: unknown,
+    toolAnnotationsData?: Record<string, unknown>,
   ) {
     // Use composite format for policy checks: serverName__toolName
     // This enables server wildcards (e.g., "google-workspace__*")
@@ -93,6 +94,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       `${serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${serverToolName}`,
       displayName,
       serverName,
+      toolAnnotationsData,
     );
   }
 
@@ -257,6 +259,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     private readonly cliConfig?: Config,
     override readonly extensionName?: string,
     override readonly extensionId?: string,
+    private readonly _toolAnnotations?: Record<string, unknown>,
   ) {
     super(
       nameOverride ?? generateValidName(serverToolName),
@@ -282,6 +285,10 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     return super.isReadOnly;
   }
 
+  override get toolAnnotations(): Record<string, unknown> | undefined {
+    return this._toolAnnotations;
+  }
+
   getFullyQualifiedPrefix(): string {
     return `${this.serverName}${MCP_QUALIFIED_NAME_SEPARATOR}`;
   }
@@ -304,6 +311,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.cliConfig,
       this.extensionName,
       this.extensionId,
+      this._toolAnnotations,
     );
   }
 
@@ -324,6 +332,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.cliConfig,
       this.description,
       this.parameterSchema,
+      this._toolAnnotations,
     );
   }
 }

@@ -627,8 +627,15 @@ export class PolicyEngine {
    * 1. Global rules (no argsPattern)
    * 2. Priority order (higher priority wins)
    * 3. Non-interactive mode (ASK_USER becomes DENY)
+   * 4. Annotation-based rules (when toolMetadata is provided)
+   *
+   * @param toolMetadata Optional map of tool names to their annotations.
+   *   When provided, annotation-based rules can match tools by their metadata.
+   *   When not provided, rules with toolAnnotations are skipped (conservative fallback).
    */
-  getExcludedTools(): Set<string> {
+  getExcludedTools(
+    toolMetadata?: Map<string, Record<string, unknown>>,
+  ): Set<string> {
     const excludedTools = new Set<string>();
     const processedTools = new Set<string>();
     let globalVerdict: PolicyDecision | undefined;
@@ -646,6 +653,53 @@ export class PolicyEngine {
         if (!rule.modes.includes(this.approvalMode)) {
           continue;
         }
+      }
+
+      // Handle annotation-based rules
+      if (rule.toolAnnotations) {
+        if (!toolMetadata) {
+          // Without metadata, we can't evaluate annotation rules — skip (conservative fallback)
+          continue;
+        }
+        // Iterate over all known tools and check if their annotations match this rule
+        for (const [toolName, annotations] of toolMetadata) {
+          if (processedTools.has(toolName)) {
+            continue;
+          }
+          // Check if annotations match the rule's toolAnnotations (partial match)
+          let annotationsMatch = true;
+          for (const [key, value] of Object.entries(rule.toolAnnotations)) {
+            if (annotations[key] !== value) {
+              annotationsMatch = false;
+              break;
+            }
+          }
+          if (!annotationsMatch) {
+            continue;
+          }
+          // Check if the tool name matches the rule's toolName pattern (if any)
+          if (rule.toolName) {
+            if (isWildcardPattern(rule.toolName)) {
+              if (!matchesWildcard(rule.toolName, toolName, undefined)) {
+                continue;
+              }
+            } else if (toolName !== rule.toolName) {
+              continue;
+            }
+          }
+          // Determine decision considering global verdict
+          let decision: PolicyDecision;
+          if (globalVerdict !== undefined) {
+            decision = globalVerdict;
+          } else {
+            decision = rule.decision;
+          }
+          if (decision === PolicyDecision.DENY) {
+            excludedTools.add(toolName);
+          }
+          processedTools.add(toolName);
+        }
+        continue;
       }
 
       // Handle Global Rules

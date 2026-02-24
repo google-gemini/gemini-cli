@@ -37,6 +37,13 @@ deny_message = "You are in Plan Mode with access to read-only tools. Execution o
 # Explicitly Allow Read-Only Tools in Plan mode.
 
 [[rule]]
+mcpName = "*"
+toolAnnotations = { readOnlyHint = true }
+decision = "ask_user"
+priority = 70
+modes = ["plan"]
+
+[[rule]]
 toolName = ["glob", "grep_search", "list_directory", "read_file", "google_web_search", "activate_skill"]
 decision = "allow"
 priority = 70
