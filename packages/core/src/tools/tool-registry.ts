@@ -441,13 +441,25 @@ export class ToolRegistry {
     }
   }
 
+  private buildToolMetadata(): Map<string, Record<string, unknown>> {
+    const toolMetadata = new Map<string, Record<string, unknown>>();
+    for (const [name, tool] of this.allKnownTools) {
+      if (tool.toolAnnotations) {
+        toolMetadata.set(name, tool.toolAnnotations);
+      }
+    }
+    return toolMetadata;
+  }
+
   /**
    * @returns All the tools that are not excluded.
    */
   private getActiveTools(): AnyDeclarativeTool[] {
+    const toolMetadata = this.buildToolMetadata();
     const excludedTools =
-      this.expandExcludeToolsWithAliases(this.config.getExcludeTools()) ??
-      new Set([]);
+      this.expandExcludeToolsWithAliases(
+        this.config.getExcludeTools(toolMetadata),
+      ) ?? new Set([]);
     const activeTools: AnyDeclarativeTool[] = [];
     for (const tool of this.allKnownTools.values()) {
       if (this.isActiveTool(tool, excludedTools)) {
@@ -487,8 +499,9 @@ export class ToolRegistry {
     excludeTools?: Set<string>,
   ): boolean {
     excludeTools ??=
-      this.expandExcludeToolsWithAliases(this.config.getExcludeTools()) ??
-      new Set([]);
+      this.expandExcludeToolsWithAliases(
+        this.config.getExcludeTools(this.buildToolMetadata()),
+      ) ?? new Set([]);
 
     // Filter tools in Plan Mode to only allow approved read-only tools.
     const isPlanMode =
