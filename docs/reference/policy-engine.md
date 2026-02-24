@@ -64,9 +64,11 @@ primary conditions are the tool's name and its arguments.
 
 The `toolName` in the rule must match the name of the tool being called.
 
-- **Wildcards**: For Model-hosting-protocol (MCP) servers, you can use a
-  wildcard. A `toolName` of `my-server__*` will match any tool from the
-  `my-server` MCP.
+- **Wildcards**: You can use wildcards to match multiple tools.
+  - `*`: Matches **any tool** (built-in or MCP).
+  - `server__*`: Matches any tool from a specific MCP server.
+  - `*__toolName`: Matches a specific tool name across **all** MCP servers.
+  - `*__*`: Matches **any tool from any MCP server**.
 
 #### Arguments pattern
 
@@ -144,9 +146,9 @@ A rule matches a tool call if all of its conditions are met:
 
 1.  **Tool name**: The `toolName` in the rule must match the name of the tool
     being called.
-    - **Wildcards**: For Model-hosting-protocol (MCP) servers, you can use a
-      wildcard. A `toolName` of `my-server__*` will match any tool from the
-      `my-server` MCP.
+    - **Wildcards**: You can use wildcards like `*`, `server__*`, or
+      `*__toolName` to match multiple tools. See [Tool Name](#tool-name) for
+      details.
 2.  **Arguments pattern**: If `argsPattern` is specified, the tool's arguments
     are converted to a stable JSON string, which is then tested against the
     provided regular expression. If the arguments don't match the pattern, the
@@ -202,6 +204,10 @@ toolName = "run_shell_command"
 # (Optional) The name of an MCP server. Can be combined with toolName
 # to form a composite name like "mcpName__toolName".
 mcpName = "my-custom-server"
+
+# (Optional) Metadata hints provided by the tool. A rule matches if all
+# key-value pairs provided here are present in the tool's annotations.
+toolAnnotations = { readOnlyHint = true }
 
 # (Optional) A regex to match against the tool's arguments.
 argsPattern = '"command":"(git|npm)'
@@ -272,13 +278,12 @@ priority = 100
 
 ### Special syntax for MCP tools
 
-You can create rules that target tools from Model-hosting-protocol (MCP) servers
-using the `mcpName` field or a wildcard pattern.
+You can create rules that target tools from Model Context Protocol (MCP) servers
+using the `mcpName` field or composite wildcard patterns.
 
-**1. Using `mcpName`**
+**1. Targeting a specific tool on a server**
 
-To target a specific tool from a specific server, combine `mcpName` and
-`toolName`.
+Combine `mcpName` and `toolName` to target a single operation.
 
 ```toml
 # Allows the `search` tool on the `my-jira-server` MCP
@@ -289,10 +294,10 @@ decision = "allow"
 priority = 200
 ```
 
-**2. Using a wildcard**
+**2. Targeting all tools on a specific server**
 
-To create a rule that applies to _all_ tools on a specific MCP server, specify
-only the `mcpName`.
+Specify only the `mcpName` to apply a rule to every tool provided by that
+server.
 
 ```toml
 # Denies all tools from the `untrusted-server` MCP
@@ -301,6 +306,33 @@ mcpName = "untrusted-server"
 decision = "deny"
 priority = 500
 deny_message = "This server is not trusted by the admin."
+```
+
+**3. Targeting all MCP servers**
+
+Use `mcpName = "*"` to create a rule that applies to **all** tools from **any**
+registered MCP server. This is useful for setting category-wide defaults.
+
+```toml
+# Ask user for any tool call from any MCP server
+[[rule]]
+mcpName = "*"
+decision = "ask_user"
+priority = 10
+```
+
+**4. Targeting a tool name across all servers**
+
+Use `mcpName = "*"` with a specific `toolName` to target that operation
+regardless of which server provides it.
+
+```toml
+# Allow the `search` tool across all connected MCP servers
+[[rule]]
+mcpName = "*"
+toolName = "search"
+decision = "allow"
+priority = 50
 ```
 
 ## Default policies

@@ -9,7 +9,11 @@ import { policiesCommand } from './policiesCommand.js';
 import { CommandKind } from './types.js';
 import { MessageType } from '../types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import { type Config, PolicyDecision } from '@google/gemini-cli-core';
+import {
+  type Config,
+  PolicyDecision,
+  ApprovalMode,
+} from '@google/gemini-cli-core';
 
 describe('policiesCommand', () => {
   let mockContext: ReturnType<typeof createMockCommandContext>;
@@ -106,6 +110,7 @@ describe('policiesCommand', () => {
       expect(content).toContain(
         '### Yolo Mode Policies (combined with normal mode policies)',
       );
+      expect(content).toContain('### Plan Mode Policies');
       expect(content).toContain(
         '**DENY** tool: `dangerousTool` [Priority: 10]',
       );
@@ -113,6 +118,46 @@ describe('policiesCommand', () => {
         '**ALLOW** all tools (args match: `safe`) [Source: test.toml]',
       );
       expect(content).toContain('**ASK_USER** all tools');
+    });
+
+    it('should show plan-only rules in plan mode section', async () => {
+      const mockRules = [
+        {
+          decision: PolicyDecision.ALLOW,
+          toolName: 'glob',
+          priority: 70,
+          modes: [ApprovalMode.PLAN],
+        },
+        {
+          decision: PolicyDecision.DENY,
+          priority: 60,
+          modes: [ApprovalMode.PLAN],
+        },
+        {
+          decision: PolicyDecision.ALLOW,
+          toolName: 'shell',
+          priority: 50,
+        },
+      ];
+      const mockPolicyEngine = {
+        getRules: vi.fn().mockReturnValue(mockRules),
+      };
+      mockContext.services.config = {
+        getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+      } as unknown as Config;
+
+      const listCommand = policiesCommand.subCommands![0];
+      await listCommand.action!(mockContext, '');
+
+      const call = vi.mocked(mockContext.ui.addItem).mock.calls[0];
+      const content = (call[0] as { text: string }).text;
+
+      // Plan-only rules appear under Plan Mode section
+      expect(content).toContain('### Plan Mode Policies');
+      // glob ALLOW is plan-only, should appear in plan section
+      expect(content).toContain('**ALLOW** tool: `glob` [Priority: 70]');
+      // shell ALLOW has no modes (applies to all), appears in normal section
+      expect(content).toContain('**ALLOW** tool: `shell` [Priority: 50]');
     });
   });
 });
