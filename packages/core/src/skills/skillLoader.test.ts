@@ -271,4 +271,56 @@ description: Test sanitization
     expect(skills).toHaveLength(1);
     expect(skills[0].name).toBe('gke-prs-troubleshooter');
   });
+
+  it('should parse skill with matcher and pre-compile the regex', async () => {
+    const skillDir = path.join(testRootDir, 'matcher-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `---
+name: matcher-skill
+description: A skill with a matcher
+matcher: (hello|hi) world
+---
+`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].matcher).toBe('(hello|hi) world');
+    expect(skills[0].compiledMatcher).toBeInstanceOf(RegExp);
+    expect(skills[0].compiledMatcher?.test('Hello World')).toBe(true);
+    expect(skills[0].compiledMatcher?.test('hi world')).toBe(true);
+    expect(skills[0].compiledMatcher?.test('bye world')).toBe(false);
+  });
+
+  it('should log an error for invalid regex matcher', async () => {
+    const skillDir = path.join(testRootDir, 'invalid-matcher');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `---
+name: invalid-matcher
+description: A skill with an invalid matcher
+matcher: [unclosed bracket
+---
+`,
+    );
+
+    const errorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].matcher).toBe('[unclosed bracket');
+    expect(skills[0].compiledMatcher).toBeUndefined();
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Invalid regex pattern'),
+      expect.anything(),
+    );
+  });
 });
