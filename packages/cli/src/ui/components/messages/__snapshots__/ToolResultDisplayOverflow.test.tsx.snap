@@ -4,11 +4,13 @@ exports[`ToolResultDisplay Overflow > should display "press ctrl-o" hint when co
 "╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool a test tool                                                 │
 │                                                                          │
-│ ... first 46 lines hidden ...                                            │
+│ line 45                                                                  │
+│ line 46                                                                  │
 │ line 47                                                                  │
 │ line 48                                                                  │
 │ line 49                                                                  │
-│ line 50                                                                  │
+│ line 50                                                                █ │
 ╰──────────────────────────────────────────────────────────────────────────╯
- Press ctrl-o to show more lines"
+ Press Ctrl+O to show more lines
+"
 `;

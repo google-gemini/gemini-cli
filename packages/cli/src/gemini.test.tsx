@@ -38,6 +38,8 @@ import { appEvents, AppEvent } from './utils/events.js';
 import {
   type Config,
   type ResumedSessionData,
+  type StartupWarning,
+  WarningPriority,
   debugLogger,
   coreEvents,
   AuthType,
@@ -54,6 +56,20 @@ vi.stubGlobal('performance', performance);
 const runNonInteractiveSpy = vi.hoisted(() => vi.fn());
 vi.mock('./nonInteractiveCli.js', () => ({
   runNonInteractive: runNonInteractiveSpy,
+}));
+
+const terminalNotificationMocks = vi.hoisted(() => ({
+  notifyViaTerminal: vi.fn().mockResolvedValue(true),
+  buildRunEventNotificationContent: vi.fn(() => ({
+    title: 'Session complete',
+    body: 'done',
+    subtitle: 'Run finished',
+  })),
+}));
+vi.mock('./utils/terminalNotifications.js', () => ({
+  notifyViaTerminal: terminalNotificationMocks.notifyViaTerminal,
+  buildRunEventNotificationContent:
+    terminalNotificationMocks.buildRunEventNotificationContent,
 }));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -238,18 +254,15 @@ vi.mock('./validateNonInterActiveAuth.js', () => ({
 }));
 
 describe('gemini.tsx main function', () => {
-  let originalEnvGeminiSandbox: string | undefined;
-  let originalEnvSandbox: string | undefined;
   let originalIsTTY: boolean | undefined;
   let initialUnhandledRejectionListeners: NodeJS.UnhandledRejectionListener[] =
     [];
 
   beforeEach(() => {
     // Store and clear sandbox-related env variables to ensure a consistent test environment
-    originalEnvGeminiSandbox = process.env['GEMINI_SANDBOX'];
-    originalEnvSandbox = process.env['SANDBOX'];
-    delete process.env['GEMINI_SANDBOX'];
-    delete process.env['SANDBOX'];
+    vi.stubEnv('GEMINI_SANDBOX', '');
+    vi.stubEnv('SANDBOX', '');
+    vi.stubEnv('SHPOOL_SESSION_NAME', '');
 
     initialUnhandledRejectionListeners =
       process.listeners('unhandledRejection');
@@ -260,18 +273,6 @@ describe('gemini.tsx main function', () => {
   });
 
   afterEach(() => {
-    // Restore original env variables
-    if (originalEnvGeminiSandbox !== undefined) {
-      process.env['GEMINI_SANDBOX'] = originalEnvGeminiSandbox;
-    } else {
-      delete process.env['GEMINI_SANDBOX'];
-    }
-    if (originalEnvSandbox !== undefined) {
-      process.env['SANDBOX'] = originalEnvSandbox;
-    } else {
-      delete process.env['SANDBOX'];
-    }
-
     const currentListeners = process.listeners('unhandledRejection');
     currentListeners.forEach((listener) => {
       if (!initialUnhandledRejectionListeners.includes(listener)) {
@@ -282,6 +283,7 @@ describe('gemini.tsx main function', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (process.stdin as any).isTTY = originalIsTTY;
 
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -478,6 +480,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       query: undefined,
       yolo: undefined,
       approvalMode: undefined,
+      policy: undefined,
       allowedMcpServerNames: undefined,
       allowedTools: undefined,
       experimentalAcp: undefined,
@@ -850,6 +853,10 @@ describe('gemini.tsx main function kitty protocol', () => {
     expect(runNonInteractive).toHaveBeenCalled();
     const callArgs = vi.mocked(runNonInteractive).mock.calls[0][0];
     expect(callArgs.input).toBe('stdin-data\n\ntest-question');
+    expect(
+      terminalNotificationMocks.buildRunEventNotificationContent,
+    ).not.toHaveBeenCalled();
+    expect(terminalNotificationMocks.notifyViaTerminal).not.toHaveBeenCalled();
     expect(processExitSpy).toHaveBeenCalledWith(0);
     processExitSpy.mockRestore();
   });
@@ -1188,7 +1195,9 @@ describe('startInteractiveUI', () => {
       },
     },
   } as LoadedSettings;
-  const mockStartupWarnings = ['warning1'];
+  const mockStartupWarnings: StartupWarning[] = [
+    { id: 'w1', message: 'warning1', priority: WarningPriority.High },
+  ];
   const mockWorkspaceRoot = '/root';
   const mockInitializationResult = {
     authError: null,
@@ -1209,14 +1218,19 @@ describe('startInteractiveUI', () => {
     registerTelemetryConfig: vi.fn(),
   }));
 
+  beforeEach(() => {
+    vi.stubEnv('SHPOOL_SESSION_NAME', '');
+  });
+
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
   async function startTestInteractiveUI(
     config: Config,
     settings: LoadedSettings,
-    startupWarnings: string[],
+    startupWarnings: StartupWarning[],
     workspaceRoot: string,
     resumedSessionData: ResumedSessionData | undefined,
     initializationResult: InitializationResult,
@@ -1308,7 +1322,7 @@ describe('startInteractiveUI', () => {
 
     // Verify all startup tasks were called
     expect(getVersion).toHaveBeenCalledTimes(1);
-    expect(registerCleanup).toHaveBeenCalledTimes(3);
+    expect(registerCleanup).toHaveBeenCalledTimes(4);
 
     // Verify cleanup handler is registered with unmount function
     const cleanupFn = vi.mocked(registerCleanup).mock.calls[0][0];

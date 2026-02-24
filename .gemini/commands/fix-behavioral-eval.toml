@@ -25,7 +25,7 @@ You are an expert at fixing behavioral evaluations.
        the same scenario. We don't want to lose test fidelity by making the prompts too
        direct (i.e.: easy).
      - Your primary mechanism for improving the agent's behavior is to make changes to
-       tool instructions, prompt.ts, and/or modules that contribute to the prompt.
+       tool instructions, system prompt (snippets.ts), and/or modules that contribute to the prompt.
      - If prompt and description changes are unsuccessful, use logs and debugging to
        confirm that everything is working as expected.
     - If unable to fix the test, you can make recommendations for architecture changes

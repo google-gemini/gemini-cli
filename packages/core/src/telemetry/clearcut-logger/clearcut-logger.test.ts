@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import 'vitest';
 import {
   vi,
   describe,
@@ -36,6 +35,7 @@ import {
   WebFetchFallbackAttemptEvent,
   HookCallEvent,
 } from '../types.js';
+import { HookType } from '../../hooks/types.js';
 import { AgentTerminateMode } from '../../agents/types.js';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import { UserAccountManager } from '../../utils/userAccountManager.js';
@@ -43,6 +43,7 @@ import { InstallationManager } from '../../utils/installationManager.js';
 
 import si from 'systeminformation';
 import type { Systeminformation } from 'systeminformation';
+import * as os from 'node:os';
 
 interface CustomMatchers<R = unknown> {
   toHaveMetadataValue: ([key, value]: [EventMetadataKey, string]) => R;
@@ -120,6 +121,7 @@ vi.mock('node:os', async (importOriginal) => {
   return {
     ...actual,
     cpus: vi.fn(() => [{ model: 'Intel(R) Core(TM) i9-9980HK CPU @ 2.40GHz' }]),
+    availableParallelism: vi.fn(() => 8),
     totalmem: vi.fn(() => 32 * 1024 * 1024 * 1024),
   };
 });
@@ -336,6 +338,10 @@ describe('ClearcutLogger', () => {
             gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_SETTINGS,
             value: logger?.getConfigJson(),
           },
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_ACTIVE_APPROVAL_MODE,
+            value: 'default',
+          },
         ]),
       );
     });
@@ -432,6 +438,26 @@ describe('ClearcutLogger', () => {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_GPU_INFO,
         value: 'FAILED',
       });
+    });
+
+    it('handles empty os.cpus() gracefully', async () => {
+      const { logger, loggerConfig } = setup({});
+      vi.mocked(os.cpus).mockReturnValueOnce([]);
+
+      await logger?.logStartSessionEvent(new StartSessionEvent(loggerConfig));
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const metadata = event?.event_metadata[0];
+
+      const cpuInfoEntry = metadata?.find(
+        (m) => m.gemini_cli_key === EventMetadataKey.GEMINI_CLI_CPU_INFO,
+      );
+      expect(cpuInfoEntry).toBeUndefined();
+
+      const cpuCoresEntry = metadata?.find(
+        (m) => m.gemini_cli_key === EventMetadataKey.GEMINI_CLI_CPU_CORES,
+      );
+      expect(cpuCoresEntry?.value).toBe('8');
     });
 
     type SurfaceDetectionTestCase = {
@@ -1239,6 +1265,90 @@ describe('ClearcutLogger', () => {
         EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
       );
     });
+
+    it('logs AskUser tool metadata', () => {
+      const { logger } = setup();
+      const completedToolCall = {
+        request: {
+          name: 'ask_user',
+          args: { questions: [] },
+          prompt_id: 'prompt-123',
+        },
+        response: {
+          resultDisplay: 'User answered: ...',
+          data: {
+            ask_user: {
+              question_types: ['choice', 'text'],
+              dismissed: false,
+              empty_submission: false,
+              answer_count: 2,
+            },
+          },
+        },
+        status: 'success',
+      } as unknown as SuccessfulToolCall;
+
+      logger?.logToolCallEvent(new ToolCallEvent(completedToolCall));
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.TOOL_CALL);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ASK_USER_QUESTION_TYPES,
+        JSON.stringify(['choice', 'text']),
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ASK_USER_DISMISSED,
+        'false',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ASK_USER_EMPTY_SUBMISSION,
+        'false',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ASK_USER_ANSWER_COUNT,
+        '2',
+      ]);
+    });
+
+    it('does not log AskUser tool metadata for other tools', () => {
+      const { logger } = setup();
+      const completedToolCall = {
+        request: {
+          name: 'some_other_tool',
+          args: {},
+          prompt_id: 'prompt-123',
+        },
+        response: {
+          resultDisplay: 'Result',
+          data: {
+            ask_user_question_types: ['choice', 'text'],
+            ask_user_dismissed: false,
+            ask_user_empty_submission: false,
+            ask_user_answer_count: 2,
+          },
+        },
+        status: 'success',
+      } as unknown as SuccessfulToolCall;
+
+      logger?.logToolCallEvent(new ToolCallEvent(completedToolCall));
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.TOOL_CALL);
+      expect(events[0]).not.toHaveMetadataKey(
+        EventMetadataKey.GEMINI_CLI_ASK_USER_QUESTION_TYPES,
+      );
+      expect(events[0]).not.toHaveMetadataKey(
+        EventMetadataKey.GEMINI_CLI_ASK_USER_DISMISSED,
+      );
+      expect(events[0]).not.toHaveMetadataKey(
+        EventMetadataKey.GEMINI_CLI_ASK_USER_EMPTY_SUBMISSION,
+      );
+      expect(events[0]).not.toHaveMetadataKey(
+        EventMetadataKey.GEMINI_CLI_ASK_USER_ANSWER_COUNT,
+      );
+    });
   });
 
   describe('flushIfNeeded', () => {
@@ -1292,7 +1402,7 @@ describe('ClearcutLogger', () => {
 
       const event = new HookCallEvent(
         'before-tool',
-        'command',
+        HookType.Command,
         hookName,
         {}, // input
         150, // duration

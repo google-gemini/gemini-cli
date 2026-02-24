@@ -83,6 +83,19 @@ describe('SettingsSchema', () => {
       ).toBe('boolean');
     });
 
+    it('should have loadingPhrases enum property', () => {
+      const definition = getSettingsSchema().ui?.properties?.loadingPhrases;
+      expect(definition).toBeDefined();
+      expect(definition?.type).toBe('enum');
+      expect(definition?.default).toBe('tips');
+      expect(definition?.options?.map((o) => o.value)).toEqual([
+        'tips',
+        'witty',
+        'all',
+        'off',
+      ]);
+    });
+
     it('should have checkpointing nested properties', () => {
       expect(
         getSettingsSchema().general?.properties?.checkpointing.properties
@@ -92,6 +105,16 @@ describe('SettingsSchema', () => {
         getSettingsSchema().general?.properties?.checkpointing.properties
           ?.enabled.type,
       ).toBe('boolean');
+    });
+
+    it('should have plan nested properties', () => {
+      expect(
+        getSettingsSchema().general?.properties?.plan?.properties?.directory,
+      ).toBeDefined();
+      expect(
+        getSettingsSchema().general?.properties?.plan?.properties?.directory
+          .type,
+      ).toBe('string');
     });
 
     it('should have fileFiltering nested properties', () => {
@@ -186,6 +209,9 @@ describe('SettingsSchema', () => {
       expect(getSettingsSchema().ui.properties.hideTips.showInDialog).toBe(
         true,
       );
+      expect(
+        getSettingsSchema().ui.properties.showShortcutsHint.showInDialog,
+      ).toBe(true);
       expect(getSettingsSchema().ui.properties.hideBanner.showInDialog).toBe(
         true,
       );
@@ -224,7 +250,7 @@ describe('SettingsSchema', () => {
       expect(
         getSettingsSchema().advanced.properties.autoConfigureMemory
           .showInDialog,
-      ).toBe(false);
+      ).toBe(true);
     });
 
     it('should infer Settings type correctly', () => {
@@ -326,6 +352,39 @@ describe('SettingsSchema', () => {
         getSettingsSchema().general.properties.debugKeystrokeLogging
           .description,
       ).toBe('Enable debug logging of keystrokes to the console.');
+    });
+
+    it('should have showShortcutsHint setting in schema', () => {
+      expect(getSettingsSchema().ui.properties.showShortcutsHint).toBeDefined();
+      expect(getSettingsSchema().ui.properties.showShortcutsHint.type).toBe(
+        'boolean',
+      );
+      expect(getSettingsSchema().ui.properties.showShortcutsHint.category).toBe(
+        'UI',
+      );
+      expect(getSettingsSchema().ui.properties.showShortcutsHint.default).toBe(
+        true,
+      );
+      expect(
+        getSettingsSchema().ui.properties.showShortcutsHint.requiresRestart,
+      ).toBe(false);
+      expect(
+        getSettingsSchema().ui.properties.showShortcutsHint.showInDialog,
+      ).toBe(true);
+      expect(
+        getSettingsSchema().ui.properties.showShortcutsHint.description,
+      ).toBe('Show the "? for shortcuts" hint above the input.');
+    });
+
+    it('should have enableNotifications setting in schema', () => {
+      const setting =
+        getSettingsSchema().general.properties.enableNotifications;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('General');
+      expect(setting.default).toBe(false);
+      expect(setting.requiresRestart).toBe(false);
+      expect(setting.showInDialog).toBe(true);
     });
 
     it('should have enableAgents setting in schema', () => {

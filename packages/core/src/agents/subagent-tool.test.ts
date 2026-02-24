@@ -17,10 +17,12 @@ import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type {
+  DeclarativeTool,
   ToolCallConfirmationDetails,
   ToolInvocation,
   ToolResult,
 } from '../tools/tools.js';
+import type { ToolRegistry } from 'src/tools/tool-registry.js';
 
 vi.mock('./subagent-tool-wrapper.js');
 
@@ -147,5 +149,212 @@ describe('SubAgentInvocation', () => {
       abortSignal,
       updateOutput,
     );
+  });
+
+  describe('withUserHints', () => {
+    it('should NOT modify query for local agents', async () => {
+      mockConfig = makeFakeConfig({ modelSteering: true });
+      mockConfig.userHintService.addUserHint('Test Hint');
+
+      const tool = new SubagentTool(testDefinition, mockConfig, mockMessageBus);
+      const params = { query: 'original query' };
+      // @ts-expect-error - accessing private method for testing
+      const invocation = tool.createInvocation(params, mockMessageBus);
+
+      // @ts-expect-error - accessing private method for testing
+      const hintedParams = invocation.withUserHints(params);
+
+      expect(hintedParams.query).toBe('original query');
+    });
+
+    it('should NOT modify query for remote agents if model steering is disabled', async () => {
+      mockConfig = makeFakeConfig({ modelSteering: false });
+      mockConfig.userHintService.addUserHint('Test Hint');
+
+      const tool = new SubagentTool(
+        testRemoteDefinition,
+        mockConfig,
+        mockMessageBus,
+      );
+      const params = { query: 'original query' };
+      // @ts-expect-error - accessing private method for testing
+      const invocation = tool.createInvocation(params, mockMessageBus);
+
+      // @ts-expect-error - accessing private method for testing
+      const hintedParams = invocation.withUserHints(params);
+
+      expect(hintedParams.query).toBe('original query');
+    });
+
+    it('should NOT modify query for remote agents if there are no hints', async () => {
+      mockConfig = makeFakeConfig({ modelSteering: true });
+
+      const tool = new SubagentTool(
+        testRemoteDefinition,
+        mockConfig,
+        mockMessageBus,
+      );
+      const params = { query: 'original query' };
+      // @ts-expect-error - accessing private method for testing
+      const invocation = tool.createInvocation(params, mockMessageBus);
+
+      // @ts-expect-error - accessing private method for testing
+      const hintedParams = invocation.withUserHints(params);
+
+      expect(hintedParams.query).toBe('original query');
+    });
+
+    it('should prepend hints to query for remote agents when hints exist and steering is enabled', async () => {
+      mockConfig = makeFakeConfig({ modelSteering: true });
+
+      const tool = new SubagentTool(
+        testRemoteDefinition,
+        mockConfig,
+        mockMessageBus,
+      );
+      const params = { query: 'original query' };
+      // @ts-expect-error - accessing private method for testing
+      const invocation = tool.createInvocation(params, mockMessageBus);
+
+      mockConfig.userHintService.addUserHint('Hint 1');
+      mockConfig.userHintService.addUserHint('Hint 2');
+
+      // @ts-expect-error - accessing private method for testing
+      const hintedParams = invocation.withUserHints(params);
+
+      expect(hintedParams.query).toContain('Hint 1');
+      expect(hintedParams.query).toContain('Hint 2');
+      expect(hintedParams.query).toMatch(/original query$/);
+    });
+
+    it('should NOT include legacy hints added before the invocation was created', async () => {
+      mockConfig = makeFakeConfig({ modelSteering: true });
+      mockConfig.userHintService.addUserHint('Legacy Hint');
+
+      const tool = new SubagentTool(
+        testRemoteDefinition,
+        mockConfig,
+        mockMessageBus,
+      );
+      const params = { query: 'original query' };
+
+      // Creation of invocation captures the current hint state
+      // @ts-expect-error - accessing private method for testing
+      const invocation = tool.createInvocation(params, mockMessageBus);
+
+      // Verify no hints are present yet
+      // @ts-expect-error - accessing private method for testing
+      let hintedParams = invocation.withUserHints(params);
+      expect(hintedParams.query).toBe('original query');
+
+      // Add a new hint after creation
+      mockConfig.userHintService.addUserHint('New Hint');
+      // @ts-expect-error - accessing private method for testing
+      hintedParams = invocation.withUserHints(params);
+
+      expect(hintedParams.query).toContain('New Hint');
+      expect(hintedParams.query).not.toContain('Legacy Hint');
+    });
+
+    it('should NOT modify query if query is missing or not a string', async () => {
+      mockConfig = makeFakeConfig({ modelSteering: true });
+      mockConfig.userHintService.addUserHint('Hint');
+
+      const tool = new SubagentTool(
+        testRemoteDefinition,
+        mockConfig,
+        mockMessageBus,
+      );
+      const params = { other: 'param' };
+      // @ts-expect-error - accessing private method for testing
+      const invocation = tool.createInvocation(params, mockMessageBus);
+
+      // @ts-expect-error - accessing private method for testing
+      const hintedParams = invocation.withUserHints(params);
+
+      expect(hintedParams).toEqual(params);
+    });
+  });
+});
+
+describe('SubagentTool Read-Only logic', () => {
+  let mockConfig: Config;
+  let mockMessageBus: MessageBus;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockConfig = makeFakeConfig();
+    mockMessageBus = createMockMessageBus();
+  });
+
+  it('should be false for remote agents', () => {
+    const tool = new SubagentTool(
+      testRemoteDefinition,
+      mockConfig,
+      mockMessageBus,
+    );
+    expect(tool.isReadOnly).toBe(false);
+  });
+
+  it('should be true for local agent with only read-only tools', () => {
+    const readOnlyTool = {
+      name: 'read',
+      isReadOnly: true,
+    } as unknown as DeclarativeTool<object, ToolResult>;
+    const registry = {
+      getTool: (name: string) => (name === 'read' ? readOnlyTool : undefined),
+    };
+    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(
+      registry as unknown as ToolRegistry,
+    );
+
+    const defWithTools: LocalAgentDefinition = {
+      ...testDefinition,
+      toolConfig: { tools: ['read'] },
+    };
+    const tool = new SubagentTool(defWithTools, mockConfig, mockMessageBus);
+    expect(tool.isReadOnly).toBe(true);
+  });
+
+  it('should be false for local agent with at least one non-read-only tool', () => {
+    const readOnlyTool = {
+      name: 'read',
+      isReadOnly: true,
+    } as unknown as DeclarativeTool<object, ToolResult>;
+    const mutatorTool = {
+      name: 'write',
+      isReadOnly: false,
+    } as unknown as DeclarativeTool<object, ToolResult>;
+    const registry = {
+      getTool: (name: string) => {
+        if (name === 'read') return readOnlyTool;
+        if (name === 'write') return mutatorTool;
+        return undefined;
+      },
+    };
+    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(
+      registry as unknown as ToolRegistry,
+    );
+
+    const defWithTools: LocalAgentDefinition = {
+      ...testDefinition,
+      toolConfig: { tools: ['read', 'write'] },
+    };
+    const tool = new SubagentTool(defWithTools, mockConfig, mockMessageBus);
+    expect(tool.isReadOnly).toBe(false);
+  });
+
+  it('should be true for local agent with no tools', () => {
+    const registry = { getTool: () => undefined };
+    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(
+      registry as unknown as ToolRegistry,
+    );
+
+    const defNoTools: LocalAgentDefinition = {
+      ...testDefinition,
+      toolConfig: { tools: [] },
+    };
+    const tool = new SubagentTool(defNoTools, mockConfig, mockMessageBus);
+    expect(tool.isReadOnly).toBe(true);
   });
 });

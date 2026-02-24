@@ -21,7 +21,7 @@ export interface ToolCallContext {
 /**
  * AsyncLocalStorage instance for tool call context.
  */
-export const toolCallContext = new AsyncLocalStorage<ToolCallContext>();
+const toolCallContext = new AsyncLocalStorage<ToolCallContext>();
 
 /**
  * Runs a function within a tool call context.

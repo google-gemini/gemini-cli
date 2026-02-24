@@ -4,287 +4,205 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ToolDefinition } from './types.js';
-import * as os from 'node:os';
+/**
+ * Orchestrator for tool definitions.
+ * Resolves the correct toolset based on model family and provides legacy exports.
+ */
 
-// Centralized tool names to avoid circular dependencies
-export const GLOB_TOOL_NAME = 'glob';
-export const GREP_TOOL_NAME = 'grep_search';
-export const LS_TOOL_NAME = 'list_directory';
-export const READ_FILE_TOOL_NAME = 'read_file';
-export const SHELL_TOOL_NAME = 'run_shell_command';
-export const WRITE_FILE_TOOL_NAME = 'write_file';
+import type { ToolDefinition, CoreToolSet } from './types.js';
+import { getToolFamily } from './modelFamilyService.js';
+import { DEFAULT_LEGACY_SET } from './model-family-sets/default-legacy.js';
+import { GEMINI_3_SET } from './model-family-sets/gemini-3.js';
+import {
+  getShellDeclaration,
+  getExitPlanModeDeclaration,
+  getActivateSkillDeclaration,
+} from './dynamic-declaration-helpers.js';
+
+// Re-export names for compatibility
+export {
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
+  LS_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  EDIT_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
+  WRITE_TODOS_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
+  READ_MANY_FILES_TOOL_NAME,
+  MEMORY_TOOL_NAME,
+  GET_INTERNAL_DOCS_TOOL_NAME,
+  ACTIVATE_SKILL_TOOL_NAME,
+  ASK_USER_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+} from './base-declarations.js';
+
+// Re-export sets for compatibility
+export { DEFAULT_LEGACY_SET } from './model-family-sets/default-legacy.js';
+export { GEMINI_3_SET } from './model-family-sets/gemini-3.js';
+
+/**
+ * Resolves the appropriate tool set for a given model ID.
+ */
+export function getToolSet(modelId?: string): CoreToolSet {
+  const family = getToolFamily(modelId);
+
+  switch (family) {
+    case 'gemini-3':
+      return GEMINI_3_SET;
+    case 'default-legacy':
+    default:
+      return DEFAULT_LEGACY_SET;
+  }
+}
 
 // ============================================================================
-// READ_FILE TOOL
+// TOOL DEFINITIONS (LEGACY EXPORTS)
 // ============================================================================
 
 export const READ_FILE_DEFINITION: ToolDefinition = {
-  base: {
-    name: READ_FILE_TOOL_NAME,
-    description: `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
-    parametersJsonSchema: {
-      type: 'object',
-      properties: {
-        file_path: {
-          description: 'The path to the file to read.',
-          type: 'string',
-        },
-        offset: {
-          description:
-            "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
-          type: 'number',
-        },
-        limit: {
-          description:
-            "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
-          type: 'number',
-        },
-      },
-      required: ['file_path'],
-    },
+  get base() {
+    return DEFAULT_LEGACY_SET.read_file;
   },
+  overrides: (modelId) => getToolSet(modelId).read_file,
 };
-
-// ============================================================================
-// WRITE_FILE TOOL
-// ============================================================================
 
 export const WRITE_FILE_DEFINITION: ToolDefinition = {
-  base: {
-    name: WRITE_FILE_TOOL_NAME,
-    description: `Writes content to a specified file in the local filesystem.
-
-      The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
-    parametersJsonSchema: {
-      type: 'object',
-      properties: {
-        file_path: {
-          description: 'The path to the file to write to.',
-          type: 'string',
-        },
-        content: {
-          description: 'The content to write to the file.',
-          type: 'string',
-        },
-      },
-      required: ['file_path', 'content'],
-    },
+  get base() {
+    return DEFAULT_LEGACY_SET.write_file;
   },
+  overrides: (modelId) => getToolSet(modelId).write_file,
 };
-
-// ============================================================================
-// GREP TOOL
-// ============================================================================
 
 export const GREP_DEFINITION: ToolDefinition = {
-  base: {
-    name: GREP_TOOL_NAME,
-    description:
-      'Searches for a regular expression pattern within file contents. Max 100 matches.',
-    parametersJsonSchema: {
-      type: 'object',
-      properties: {
-        pattern: {
-          description: `The regular expression (regex) pattern to search for within file contents (e.g., 'function\\s+myFunction', 'import\\s+\\{.*\\}\\s+from\\s+.*').`,
-          type: 'string',
-        },
-        dir_path: {
-          description:
-            'Optional: The absolute path to the directory to search within. If omitted, searches the current working directory.',
-          type: 'string',
-        },
-        include: {
-          description: `Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).`,
-          type: 'string',
-        },
-      },
-      required: ['pattern'],
-    },
+  get base() {
+    return DEFAULT_LEGACY_SET.grep_search;
   },
+  overrides: (modelId) => getToolSet(modelId).grep_search,
 };
 
-// ============================================================================
-// GLOB TOOL
-// ============================================================================
+export const RIP_GREP_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.grep_search_ripgrep;
+  },
+  overrides: (modelId) => getToolSet(modelId).grep_search_ripgrep,
+};
+
+export const WEB_SEARCH_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.google_web_search;
+  },
+  overrides: (modelId) => getToolSet(modelId).google_web_search,
+};
+
+export const EDIT_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.replace;
+  },
+  overrides: (modelId) => getToolSet(modelId).replace,
+};
 
 export const GLOB_DEFINITION: ToolDefinition = {
-  base: {
-    name: GLOB_TOOL_NAME,
-    description:
-      'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.',
-    parametersJsonSchema: {
-      type: 'object',
-      properties: {
-        pattern: {
-          description:
-            "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
-          type: 'string',
-        },
-        dir_path: {
-          description:
-            'Optional: The absolute path to the directory to search within. If omitted, searches the root directory.',
-          type: 'string',
-        },
-        case_sensitive: {
-          description:
-            'Optional: Whether the search should be case-sensitive. Defaults to false.',
-          type: 'boolean',
-        },
-        respect_git_ignore: {
-          description:
-            'Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.',
-          type: 'boolean',
-        },
-        respect_gemini_ignore: {
-          description:
-            'Optional: Whether to respect .geminiignore patterns when finding files. Defaults to true.',
-          type: 'boolean',
-        },
-      },
-      required: ['pattern'],
-    },
+  get base() {
+    return DEFAULT_LEGACY_SET.glob;
   },
+  overrides: (modelId) => getToolSet(modelId).glob,
 };
-
-// ============================================================================
-// LS TOOL
-// ============================================================================
 
 export const LS_DEFINITION: ToolDefinition = {
-  base: {
-    name: LS_TOOL_NAME,
-    description:
-      'Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns.',
-    parametersJsonSchema: {
-      type: 'object',
-      properties: {
-        dir_path: {
-          description: 'The path to the directory to list',
-          type: 'string',
-        },
-        ignore: {
-          description: 'List of glob patterns to ignore',
-          items: {
-            type: 'string',
-          },
-          type: 'array',
-        },
-        file_filtering_options: {
-          description:
-            'Optional: Whether to respect ignore patterns from .gitignore or .geminiignore',
-          type: 'object',
-          properties: {
-            respect_git_ignore: {
-              description:
-                'Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.',
-              type: 'boolean',
-            },
-            respect_gemini_ignore: {
-              description:
-                'Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.',
-              type: 'boolean',
-            },
-          },
-        },
-      },
-      required: ['dir_path'],
-    },
+  get base() {
+    return DEFAULT_LEGACY_SET.list_directory;
   },
+  overrides: (modelId) => getToolSet(modelId).list_directory,
+};
+
+export const WEB_FETCH_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.web_fetch;
+  },
+  overrides: (modelId) => getToolSet(modelId).web_fetch,
+};
+
+export const READ_MANY_FILES_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.read_many_files;
+  },
+  overrides: (modelId) => getToolSet(modelId).read_many_files,
+};
+
+export const MEMORY_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.save_memory;
+  },
+  overrides: (modelId) => getToolSet(modelId).save_memory,
+};
+
+export const WRITE_TODOS_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.write_todos;
+  },
+  overrides: (modelId) => getToolSet(modelId).write_todos,
+};
+
+export const GET_INTERNAL_DOCS_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.get_internal_docs;
+  },
+  overrides: (modelId) => getToolSet(modelId).get_internal_docs,
+};
+
+export const ASK_USER_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.ask_user;
+  },
+  overrides: (modelId) => getToolSet(modelId).ask_user,
+};
+
+export const ENTER_PLAN_MODE_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.enter_plan_mode;
+  },
+  overrides: (modelId) => getToolSet(modelId).enter_plan_mode,
 };
 
 // ============================================================================
-// SHELL TOOL
+// DYNAMIC TOOL DEFINITIONS (LEGACY EXPORTS)
 // ============================================================================
 
-/**
- * Generates the platform-specific description for the shell tool.
- */
-export function getShellToolDescription(
-  enableInteractiveShell: boolean,
-  enableEfficiency: boolean,
-): string {
-  const efficiencyGuidelines = enableEfficiency
-    ? `
+export {
+  getShellToolDescription,
+  getCommandDescription,
+} from './dynamic-declaration-helpers.js';
 
-      Efficiency Guidelines:
-      - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).`
-    : '';
-
-  const returnedInfo = `
-
-      The following information is returned:
-
-      Output: Combined stdout/stderr. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Exit Code: Only included if non-zero (command failed).
-      Error: Only included if a process-level error occurred (e.g., spawn failure).
-      Signal: Only included if process was terminated by a signal.
-      Background PIDs: Only included if background processes were started.
-      Process Group PGID: Only included if available.`;
-
-  if (os.platform() === 'win32') {
-    const backgroundInstructions = enableInteractiveShell
-      ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use PowerShell background constructs.'
-      : 'Command can start background processes using PowerShell constructs such as `Start-Process -NoNewWindow` or `Start-Job`.';
-    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. ${backgroundInstructions}${efficiencyGuidelines}${returnedInfo}`;
-  } else {
-    const backgroundInstructions = enableInteractiveShell
-      ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use `&` to background commands.'
-      : 'Command can start background processes using `&`.';
-    return `This tool executes a given shell command as \`bash -c <command>\`. ${backgroundInstructions} Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${efficiencyGuidelines}${returnedInfo}`;
-  }
-}
-
-/**
- * Returns the platform-specific description for the 'command' parameter.
- */
-export function getCommandDescription(): string {
-  if (os.platform() === 'win32') {
-    return 'Exact command to execute as `powershell.exe -NoProfile -Command <command>`';
-  }
-  return 'Exact bash command to execute as `bash -c <command>`';
-}
-
-/**
- * Returns the tool definition for the shell tool, customized for the platform.
- */
 export function getShellDefinition(
   enableInteractiveShell: boolean,
   enableEfficiency: boolean,
 ): ToolDefinition {
   return {
-    base: {
-      name: SHELL_TOOL_NAME,
-      description: getShellToolDescription(
+    base: getShellDeclaration(enableInteractiveShell, enableEfficiency),
+    overrides: (modelId) =>
+      getToolSet(modelId).run_shell_command(
         enableInteractiveShell,
         enableEfficiency,
       ),
-      parametersJsonSchema: {
-        type: 'object',
-        properties: {
-          command: {
-            type: 'string',
-            description: getCommandDescription(),
-          },
-          description: {
-            type: 'string',
-            description:
-              'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.',
-          },
-          dir_path: {
-            type: 'string',
-            description:
-              '(OPTIONAL) The path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
-          },
-          is_background: {
-            type: 'boolean',
-            description:
-              'Set to true if this command should be run in the background (e.g. for long-running servers or watchers). The command will be started, allowed to run for a brief moment to check for immediate errors, and then moved to the background.',
-          },
-        },
-        required: ['command'],
-      },
-    },
+  };
+}
+
+export function getExitPlanModeDefinition(plansDir: string): ToolDefinition {
+  return {
+    base: getExitPlanModeDeclaration(plansDir),
+    overrides: (modelId) => getToolSet(modelId).exit_plan_mode(plansDir),
+  };
+}
+
+export function getActivateSkillDefinition(
+  skillNames: string[],
+): ToolDefinition {
+  return {
+    base: getActivateSkillDeclaration(skillNames),
+    overrides: (modelId) => getToolSet(modelId).activate_skill(skillNames),
   };
 }

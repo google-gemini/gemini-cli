@@ -35,6 +35,7 @@ import { ChatList } from './views/ChatList.js';
 import { HooksList } from './views/HooksList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
 import { ThinkingMessage } from './messages/ThinkingMessage.js';
+import { HintMessage } from './messages/HintMessage.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 
@@ -43,11 +44,9 @@ interface HistoryItemDisplayProps {
   availableTerminalHeight?: number;
   terminalWidth: number;
   isPending: boolean;
-  isFocused?: boolean;
   commands?: readonly SlashCommand[];
-  activeShellPtyId?: number | null;
-  embeddedShellFocused?: boolean;
   availableTerminalHeightGemini?: number;
+  isExpandable?: boolean;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -56,10 +55,8 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   terminalWidth,
   isPending,
   commands,
-  isFocused = true,
-  activeShellPtyId,
-  embeddedShellFocused,
   availableTerminalHeightGemini,
+  isExpandable,
 }) => {
   const settings = useSettings();
   const inlineThinkingMode = getInlineThinkingMode(settings);
@@ -70,6 +67,9 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       {/* Render standard message types */}
       {itemForDisplay.type === 'thinking' && inlineThinkingMode !== 'off' && (
         <ThinkingMessage thought={itemForDisplay.thought} />
+      )}
+      {itemForDisplay.type === 'hint' && (
+        <HintMessage text={itemForDisplay.text} />
       )}
       {itemForDisplay.type === 'user' && (
         <UserMessage text={itemForDisplay.text} width={terminalWidth} />
@@ -102,6 +102,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           text={itemForDisplay.text}
           icon={itemForDisplay.icon}
           color={itemForDisplay.color}
+          marginBottom={itemForDisplay.marginBottom}
         />
       )}
       {itemForDisplay.type === 'warning' && (
@@ -175,15 +176,13 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'tool_group' && (
         <ToolGroupMessage
+          item={itemForDisplay}
           toolCalls={itemForDisplay.tools}
-          groupId={itemForDisplay.id}
           availableTerminalHeight={availableTerminalHeight}
           terminalWidth={terminalWidth}
-          isFocused={isFocused}
-          activeShellPtyId={activeShellPtyId}
-          embeddedShellFocused={embeddedShellFocused}
           borderTop={itemForDisplay.borderTop}
           borderBottom={itemForDisplay.borderBottom}
+          isExpandable={isExpandable}
         />
       )}
       {itemForDisplay.type === 'compression' && (

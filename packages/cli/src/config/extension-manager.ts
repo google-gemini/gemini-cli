@@ -32,6 +32,7 @@ import {
   ExtensionUninstallEvent,
   ExtensionUpdateEvent,
   getErrorMessage,
+  getRealPath,
   logExtensionDisable,
   logExtensionEnable,
   logExtensionInstallEvent,
@@ -50,6 +51,8 @@ import {
   coreEvents,
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
+  CoreToolCallStatus,
+  HookType,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
@@ -201,13 +204,11 @@ export class ExtensionManager extends ExtensionLoader {
       const extensionsDir = ExtensionStorage.getUserExtensionsDir();
       await fs.promises.mkdir(extensionsDir, { recursive: true });
 
-      if (
-        !path.isAbsolute(installMetadata.source) &&
-        (installMetadata.type === 'local' || installMetadata.type === 'link')
-      ) {
-        installMetadata.source = path.resolve(
-          this.workspaceDir,
-          installMetadata.source,
+      if (installMetadata.type === 'local' || installMetadata.type === 'link') {
+        installMetadata.source = getRealPath(
+          path.isAbsolute(installMetadata.source)
+            ? installMetadata.source
+            : path.resolve(this.workspaceDir, installMetadata.source),
         );
       }
 
@@ -383,7 +384,7 @@ Would you like to attempt to install via "git clone" instead?`,
               newExtensionConfig.version,
               previousExtensionConfig.version,
               installMetadata.type,
-              'success',
+              CoreToolCallStatus.Success,
             ),
           );
         } else {
@@ -395,7 +396,7 @@ Would you like to attempt to install via "git clone" instead?`,
               getExtensionId(newExtensionConfig, installMetadata),
               newExtensionConfig.version,
               installMetadata.type,
-              'success',
+              CoreToolCallStatus.Success,
             ),
           );
           await this.enableExtension(
@@ -433,7 +434,7 @@ Would you like to attempt to install via "git clone" instead?`,
             newExtensionConfig?.version ?? '',
             previousExtensionConfig.version,
             installMetadata.type,
-            'error',
+            CoreToolCallStatus.Error,
           ),
         );
       } else {
@@ -445,7 +446,7 @@ Would you like to attempt to install via "git clone" instead?`,
             extensionId ?? '',
             newExtensionConfig?.version ?? '',
             installMetadata.type,
-            'error',
+            CoreToolCallStatus.Error,
           ),
         );
       }
@@ -491,7 +492,7 @@ Would you like to attempt to install via "git clone" instead?`,
         extension.name,
         hashValue(extension.name),
         extension.id,
-        'success',
+        CoreToolCallStatus.Success,
       ),
     );
   }
@@ -735,8 +736,10 @@ Would you like to attempt to install via "git clone" instead?`,
             if (eventHooks) {
               for (const definition of eventHooks) {
                 for (const hook of definition.hooks) {
-                  // Merge existing env with new env vars, giving extension settings precedence.
-                  hook.env = { ...hook.env, ...hookEnv };
+                  if (hook.type === HookType.Command) {
+                    // Merge existing env with new env vars, giving extension settings precedence.
+                    hook.env = { ...hook.env, ...hookEnv };
+                  }
                 }
               }
             }
@@ -865,6 +868,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
     try {
       const hooksContent = await fs.promises.readFile(hooksFilePath, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const rawHooks = JSON.parse(hooksContent);
 
       if (

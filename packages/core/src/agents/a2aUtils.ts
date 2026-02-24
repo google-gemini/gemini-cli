@@ -152,7 +152,7 @@ function extractPartsText(
 /**
  * Extracts text from a single Part.
  */
-export function extractPartText(part: Part): string {
+function extractPartText(part: Part): string {
   if (isTextPart(part)) {
     return part.text;
   }

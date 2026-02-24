@@ -47,6 +47,13 @@ const writeKey = (stdin: { write: (data: string) => void }, key: string) => {
   act(() => {
     stdin.write(key);
   });
+  // Advance timers to simulate time passing between keystrokes.
+  // This avoids bufferFastReturn converting Enter to Shift+Enter.
+  if (vi.isFakeTimers()) {
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
+  }
 };
 
 describe('ExitPlanModeDialog', () => {
@@ -147,7 +154,7 @@ Implement a comprehensive authentication system with multiple providers.
           getIdeMode: () => false,
           isTrustedFolder: () => true,
           storage: {
-            getProjectTempPlansDir: () => mockPlansDir,
+            getPlansDir: () => mockPlansDir,
           },
           getFileSystemService: (): FileSystemService => ({
             readTextFile: vi.fn(),
@@ -234,7 +241,6 @@ Implement a comprehensive authentication system with multiple providers.
         // Navigate to feedback option
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
-        writeKey(stdin, '\r'); // Select to focus input
 
         // Type feedback
         for (const char of 'Add tests') {
@@ -423,7 +429,7 @@ Implement a comprehensive authentication system with multiple providers.
               getIdeMode: () => false,
               isTrustedFolder: () => true,
               storage: {
-                getProjectTempPlansDir: () => mockPlansDir,
+                getPlansDir: () => mockPlansDir,
               },
               getFileSystemService: (): FileSystemService => ({
                 readTextFile: vi.fn(),
@@ -512,7 +518,6 @@ Implement a comprehensive authentication system with multiple providers.
         // Navigate to feedback option and start typing
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
-        writeKey(stdin, '\r'); // Select to focus input
 
         // Type some feedback
         for (const char of 'test') {

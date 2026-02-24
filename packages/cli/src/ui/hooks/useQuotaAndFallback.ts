@@ -14,9 +14,9 @@ import {
   TerminalQuotaError,
   ModelNotFoundError,
   type UserTierId,
-  PREVIEW_GEMINI_MODEL,
-  DEFAULT_GEMINI_MODEL,
   VALID_GEMINI_MODELS,
+  isProModel,
+  getDisplayString,
 } from '@google/gemini-cli-core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -67,11 +67,9 @@ export function useQuotaAndFallback({
       let message: string;
       let isTerminalQuotaError = false;
       let isModelNotFoundError = false;
-      const usageLimitReachedModel =
-        failedModel === DEFAULT_GEMINI_MODEL ||
-        failedModel === PREVIEW_GEMINI_MODEL
-          ? 'all Pro models'
-          : failedModel;
+      const usageLimitReachedModel = isProModel(failedModel)
+        ? 'all Pro models'
+        : failedModel;
       if (error instanceof TerminalQuotaError) {
         isTerminalQuotaError = true;
         // Common part of the message for both tiers
@@ -83,16 +81,21 @@ export function useQuotaAndFallback({
           `/auth to switch to API key.`,
         ].filter(Boolean);
         message = messageLines.join('\n');
-      } else if (
-        error instanceof ModelNotFoundError &&
-        VALID_GEMINI_MODELS.has(failedModel)
-      ) {
+      } else if (error instanceof ModelNotFoundError) {
         isModelNotFoundError = true;
-        const messageLines = [
-          `It seems like you don't have access to ${failedModel}.`,
-          `Your admin might have disabled the access. Contact them to enable the Preview Release Channel.`,
-        ];
-        message = messageLines.join('\n');
+        if (VALID_GEMINI_MODELS.has(failedModel)) {
+          const messageLines = [
+            `It seems like you don't have access to ${getDisplayString(failedModel)}.`,
+            `Your admin might have disabled the access. Contact them to enable the Preview Release Channel.`,
+          ];
+          message = messageLines.join('\n');
+        } else {
+          const messageLines = [
+            `Model "${failedModel}" was not found or is invalid.`,
+            `/model to switch models.`,
+          ];
+          message = messageLines.join('\n');
+        }
       } else {
         const messageLines = [
           `We are currently experiencing high demand.`,

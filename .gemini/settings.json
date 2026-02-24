@@ -1,9 +1,7 @@
 {
   "experimental": {
-    "toolOutputMasking": {
-      "enabled": true
-    },
-    "plan": true
+    "plan": true,
+    "extensionReloading": true
   },
   "general": {
     "devtools": true

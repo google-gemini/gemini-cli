@@ -210,6 +210,25 @@ describe('LoopDetectionService', () => {
       expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
     });
 
+    it('should not detect a loop for a list with a long shared prefix', () => {
+      service.reset('');
+      let isLoop = false;
+      const longPrefix =
+        'projects/my-google-cloud-project-12345/locations/us-central1/services/';
+
+      let listContent = '';
+      for (let i = 0; i < 15; i++) {
+        listContent += `- ${longPrefix}${i}\n`;
+      }
+
+      // Simulate receiving the list in a single large chunk or a few chunks
+      // This is the specific case where the issue occurs, as list boundaries might not reset tracking properly
+      isLoop = service.addAndCheck(createContentEvent(listContent));
+
+      expect(isLoop).toBe(false);
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+
     it('should not detect a loop if repetitions are very far apart', () => {
       service.reset('');
       const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);

@@ -11,6 +11,7 @@ import {
   type ToolResult,
   BaseToolInvocation,
   type ToolCallConfirmationDetails,
+  isTool,
 } from '../tools/tools.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { Config } from '../config/config.js';
@@ -18,6 +19,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { AgentDefinition, AgentInputs } from './types.js';
 import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
+import { formatUserHintsForModel } from '../utils/fastAckHelper.js';
 
 export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
   constructor(
@@ -47,6 +49,53 @@ export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
     );
   }
 
+  private _memoizedIsReadOnly: boolean | undefined;
+
+  override get isReadOnly(): boolean {
+    if (this._memoizedIsReadOnly !== undefined) {
+      return this._memoizedIsReadOnly;
+    }
+    // No try-catch here. If getToolRegistry() throws, we let it throw.
+    // This is an invariant: you can't check read-only status if the system isn't initialized.
+    this._memoizedIsReadOnly = SubagentTool.checkIsReadOnly(
+      this.definition,
+      this.config,
+    );
+    return this._memoizedIsReadOnly;
+  }
+
+  private static checkIsReadOnly(
+    definition: AgentDefinition,
+    config: Config,
+  ): boolean {
+    if (definition.kind === 'remote') {
+      return false;
+    }
+    const tools = definition.toolConfig?.tools ?? [];
+    const registry = config.getToolRegistry();
+
+    if (!registry) {
+      return false;
+    }
+
+    for (const tool of tools) {
+      if (typeof tool === 'string') {
+        const resolvedTool = registry.getTool(tool);
+        if (!resolvedTool || !resolvedTool.isReadOnly) {
+          return false;
+        }
+      } else if (isTool(tool)) {
+        if (!tool.isReadOnly) {
+          return false;
+        }
+      } else {
+        // FunctionDeclaration - we don't know, so assume NOT read-only
+        return false;
+      }
+    }
+    return true;
+  }
+
   protected createInvocation(
     params: AgentInputs,
     messageBus: MessageBus,
@@ -65,6 +114,8 @@ export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
 }
 
 class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
+  private readonly startIndex: number;
+
   constructor(
     params: AgentInputs,
     private readonly definition: AgentDefinition,
@@ -79,6 +130,7 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
       _toolName ?? definition.name,
       _toolDisplayName ?? definition.displayName ?? definition.name,
     );
+    this.startIndex = config.userHintService.getLatestHintIndex();
   }
 
   getDescription(): string {
@@ -88,7 +140,10 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
   override async shouldConfirmExecute(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    const invocation = this.buildSubInvocation(this.definition, this.params);
+    const invocation = this.buildSubInvocation(
+      this.definition,
+      this.withUserHints(this.params),
+    );
     return invocation.shouldConfirmExecute(abortSignal);
   }
 
@@ -107,9 +162,36 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
       );
     }
 
-    const invocation = this.buildSubInvocation(this.definition, this.params);
+    const invocation = this.buildSubInvocation(
+      this.definition,
+      this.withUserHints(this.params),
+    );
 
     return invocation.execute(signal, updateOutput);
+  }
+
+  private withUserHints(agentArgs: AgentInputs): AgentInputs {
+    if (this.definition.kind !== 'remote') {
+      return agentArgs;
+    }
+
+    const userHints = this.config.userHintService.getUserHintsAfter(
+      this.startIndex,
+    );
+    const formattedHints = formatUserHintsForModel(userHints);
+    if (!formattedHints) {
+      return agentArgs;
+    }
+
+    const query = agentArgs['query'];
+    if (typeof query !== 'string' || query.trim().length === 0) {
+      return agentArgs;
+    }
+
+    return {
+      ...agentArgs,
+      query: `${formattedHints}\n\n${query}`,
+    };
   }
 
   private buildSubInvocation(
