@@ -19,6 +19,9 @@ import {
   USER_AGREEMENT_RATE_MEDIUM,
   CACHE_EFFICIENCY_HIGH,
   CACHE_EFFICIENCY_MEDIUM,
+  getUsedStatusColor,
+  QUOTA_USED_WARNING_THRESHOLD,
+  QUOTA_USED_CRITICAL_THRESHOLD,
 } from '../utils/displayUtils.js';
 import { computeSessionStats } from '../utils/computeStats.js';
 import {
@@ -379,14 +382,30 @@ const ModelUsageTable: React.FC<{
                 {row.bucket.remainingFraction != null &&
                   renderProgressBar(1 - row.bucket.remainingFraction)}
                 <Box marginLeft={1}>
-                  <Text color={theme.text.secondary} wrap="truncate-end">
-                    {row.bucket.remainingFraction != null
-                      ? `${((1 - row.bucket.remainingFraction) * 100).toFixed(0)}% used`
-                      : 'Quota active'}
-                    {row.bucket.resetTime &&
-                    formatResetTime(row.bucket.resetTime)
-                      ? ` (Limit resets in ${formatResetTime(row.bucket.resetTime)})`
-                      : ''}
+                  <Text wrap="truncate-end">
+                    <Text
+                      color={
+                        row.bucket.remainingFraction != null
+                          ? getUsedStatusColor(
+                              (1 - row.bucket.remainingFraction) * 100,
+                              {
+                                warning: QUOTA_USED_WARNING_THRESHOLD,
+                                critical: QUOTA_USED_CRITICAL_THRESHOLD,
+                              },
+                            )
+                          : theme.text.secondary
+                      }
+                    >
+                      {row.bucket.remainingFraction != null
+                        ? `${((1 - row.bucket.remainingFraction) * 100).toFixed(0)}% used`
+                        : 'Quota active'}
+                    </Text>
+                    <Text color={theme.text.secondary}>
+                      {row.bucket.resetTime &&
+                      formatResetTime(row.bucket.resetTime)
+                        ? ` (Limit resets in ${formatResetTime(row.bucket.resetTime)})`
+                        : ''}
+                    </Text>
                   </Text>
                 </Box>
               </Box>
