@@ -1274,6 +1274,11 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Specifies the default Gemini model to use.
   - Overrides the hardcoded default
   - Example: `export GEMINI_MODEL="gemini-3-flash-preview"`
+- **`GEMINI_CLI_IDE_PID`**:
+  - Manually specifies the PID of the IDE process to use for integration. This
+    is useful when running Gemini CLI in a standalone terminal while still
+    wanting to associate it with a specific IDE instance.
+  - Overrides the automatic IDE detection logic.
 - **`GEMINI_CLI_HOME`**:
   - Specifies the root directory for Gemini CLI's user-level configuration and
     storage.
