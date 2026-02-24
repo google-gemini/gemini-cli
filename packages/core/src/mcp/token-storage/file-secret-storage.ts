@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { promises as fs, statSync } from 'node:fs';
+import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
@@ -193,16 +193,6 @@ export class FileSecretStorage implements SecretStorage {
 
     const userSecret = process.env['GEMINI_MASTER_KEY'] || '';
 
-    let fsBinding = '';
-    if (version === 'v2') {
-      try {
-        const stats = statSync(this.secretFilePath);
-        fsBinding = `${stats.ino}-${stats.birthtimeMs}`;
-      } catch {
-        // File doesn't exist yet
-      }
-    }
-
     let systemSecret = '';
     if (version === 'v2') {
       systemSecret = (await this.getPersistentSystemSecret()) || '';
@@ -217,7 +207,7 @@ export class FileSecretStorage implements SecretStorage {
 
     const password =
       version === 'v2'
-        ? `${FileSecretStorage.PEPPER}-v2-${this.serviceName}-${machineIdentifier}-${fsBinding}-${systemSecret}-${installationId}-${userSecret}`
+        ? `${FileSecretStorage.PEPPER}-v3-${this.serviceName}-${machineIdentifier}-${systemSecret}-${installationId}-${userSecret}`
         : `gemini-cli-secret-v1-${this.serviceName}-${userSecret}`;
 
     let salt: Buffer;

@@ -21,10 +21,10 @@ vi.mock('node:fs', () => {
       mkdir: vi.fn(),
       rename: vi.fn(),
     },
-    statsSync: vi.fn((_p: string) => ({
-        ino: 12345,
-        birthtimeMs: 67890,
-      })),
+    statSync: vi.fn(() => ({
+      ino: 12345,
+      birthtimeMs: 67890,
+    })),
   };
 });
 
