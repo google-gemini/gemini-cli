@@ -39,7 +39,12 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
-import { ApprovalMode, coreEvents, debugLogger } from '@google/gemini-cli-core';
+import {
+  ApprovalMode,
+  coreEvents,
+  debugLogger,
+  getDisplayString,
+} from '@google/gemini-cli-core';
 import {
   parseInputForHighlighting,
   parseSegmentsFromTokens,
@@ -1118,6 +1123,24 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
+      if (keyMatchers[Command.CYCLE_MODEL_FORWARD](key)) {
+        const nextModel = config.cycleModel();
+        appEvents.emit(AppEvent.TransientMessage, {
+          message: `Model set to ${getDisplayString(nextModel)}`,
+          type: TransientMessageType.Info,
+        });
+        return true;
+      }
+
+      if (keyMatchers[Command.CYCLE_MODEL_BACKWARD](key)) {
+        const nextModel = config.cycleModel(true);
+        appEvents.emit(AppEvent.TransientMessage, {
+          message: `Model set to ${getDisplayString(nextModel)}`,
+          type: TransientMessageType.Info,
+        });
+        return true;
+      }
+
       if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
         return false;
       }
@@ -1191,6 +1214,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       registerPlainTabPress,
       resetPlainTabPress,
       toggleCleanUiDetailsVisible,
+      config,
     ],
   );
 

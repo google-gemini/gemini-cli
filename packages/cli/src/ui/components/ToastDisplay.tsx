@@ -70,6 +70,15 @@ export const ToastDisplay: React.FC = () => {
     );
   }
 
+  if (
+    uiState.transientMessage?.type === TransientMessageType.Info &&
+    uiState.transientMessage.text
+  ) {
+    return (
+      <Text color={theme.text.accent}>{uiState.transientMessage.text}</Text>
+    );
+  }
+
   if (uiState.queueErrorMessage) {
     return <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>;
   }

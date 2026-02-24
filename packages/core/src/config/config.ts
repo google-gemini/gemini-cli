@@ -53,6 +53,7 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   isAutoModel,
@@ -539,6 +540,7 @@ export interface ConfigParameters {
   planSettings?: PlanSettings;
   modelSteering?: boolean;
   onModelChange?: (model: string) => void;
+  onFavoriteModelsChange?: (favorites: string[]) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
   agents?: AgentSettings;
@@ -548,6 +550,7 @@ export interface ConfigParameters {
     agents?: AgentSettings;
   }>;
   enableConseca?: boolean;
+  favoriteModels?: string[];
 }
 
 export class Config {
@@ -622,6 +625,8 @@ export class Config {
   private readonly noBrowser: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
+  private favoriteModels: string[];
+  private readonly params: ConfigParameters;
 
   private _activeModel: string;
   private readonly maxSessionTurns: number;
@@ -744,6 +749,7 @@ export class Config {
   private approvedPlanPath: string | undefined;
 
   constructor(params: ConfigParameters) {
+    this.params = params;
     this.sessionId = params.sessionId;
     this.clientVersion = params.clientVersion ?? 'unknown';
     this.approvedPlanPath = undefined;
@@ -817,6 +823,7 @@ export class Config {
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
+    this.favoriteModels = params.favoriteModels ?? [];
     this.disableLoopDetection = params.disableLoopDetection ?? false;
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
@@ -1324,6 +1331,60 @@ export class Config {
 
   getActiveModel(): string {
     return this._activeModel ?? this.model;
+  }
+
+  getCycleableModels(): string[] {
+    if (this.favoriteModels.length > 0) {
+      return this.favoriteModels;
+    }
+
+    const models = [
+      DEFAULT_GEMINI_MODEL_AUTO,
+      DEFAULT_GEMINI_MODEL,
+      DEFAULT_GEMINI_FLASH_MODEL,
+      DEFAULT_GEMINI_FLASH_LITE_MODEL,
+    ];
+
+    if (this.getHasAccessToPreviewModel()) {
+      models.push(
+        PREVIEW_GEMINI_MODEL_AUTO,
+        PREVIEW_GEMINI_MODEL,
+        PREVIEW_GEMINI_FLASH_MODEL,
+      );
+    }
+
+    return models;
+  }
+
+  cycleModel(reverse: boolean = false): string {
+    const models = this.getCycleableModels();
+    const currentModel = this.getModel();
+    const currentIndex = models.indexOf(currentModel);
+    const nextIndex = reverse
+      ? (currentIndex - 1 + models.length) % models.length
+      : (currentIndex + 1) % models.length;
+    const nextModel = models[nextIndex];
+    this.setModel(nextModel, false);
+    return nextModel;
+  }
+
+  getFavoriteModels(): string[] {
+    return this.favoriteModels;
+  }
+
+  toggleFavoriteModel(model: string): void {
+    const index = this.favoriteModels.indexOf(model);
+    if (index === -1) {
+      this.favoriteModels.push(model);
+    } else {
+      this.favoriteModels.splice(index, 1);
+    }
+    coreEvents.emit(CoreEvent.SettingsChanged);
+    // Explicitly use this.params to satisfy TS and trigger callback
+    const changeCallback = this.params.onFavoriteModelsChange;
+    if (changeCallback) {
+      changeCallback(this.favoriteModels);
+    }
   }
 
   setActiveModel(model: string): void {

@@ -63,6 +63,7 @@ import {
   debugLogger,
   coreEvents,
   CoreEvent,
+  getDisplayString,
   refreshServerHierarchicalMemory,
   flattenMemory,
   type MemoryChangedPayload,
@@ -1721,6 +1722,20 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return true;
       } else if (keyMatchers[Command.EXIT](key)) {
         handleCtrlDPress();
+        return true;
+      } else if (keyMatchers[Command.CYCLE_MODEL_FORWARD](key)) {
+        const nextModel = config.cycleModel();
+        showTransientMessage({
+          text: `Model set to ${getDisplayString(nextModel)}`,
+          type: TransientMessageType.Info,
+        });
+        return true;
+      } else if (keyMatchers[Command.CYCLE_MODEL_BACKWARD](key)) {
+        const nextModel = config.cycleModel(true);
+        showTransientMessage({
+          text: `Model set to ${getDisplayString(nextModel)}`,
+          type: TransientMessageType.Info,
+        });
         return true;
       } else if (keyMatchers[Command.SUSPEND_APP](key)) {
         handleSuspend();

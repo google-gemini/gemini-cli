@@ -7,7 +7,10 @@
 import type React from 'react';
 import { Text, Box } from 'ink';
 import { theme } from '../../semantic-colors.js';
-import { BaseSelectionList } from './BaseSelectionList.js';
+import {
+  BaseSelectionList,
+  type RenderItemContext,
+} from './BaseSelectionList.js';
 import type { SelectionListItem } from '../../hooks/useSelectionList.js';
 
 export interface DescriptiveRadioSelectItem<T> extends SelectionListItem<T> {
@@ -22,8 +25,8 @@ export interface DescriptiveRadioButtonSelectProps<T> {
   initialIndex?: number;
   /** Function called when an item is selected. Receives the `value` of the selected item. */
   onSelect: (value: T) => void;
-  /** Function called when an item is highlighted. Receives the `value` of the selected item. */
-  onHighlight?: (value: T) => void;
+  /** Function called when an item is highlighted. Receives the `value` of the selected item and its index. */
+  onHighlight?: (value: T, index: number) => void;
   /** Whether this select input is currently focused and should respond to input. */
   isFocused?: boolean;
   /** Whether to show numbers next to items. */
@@ -32,6 +35,11 @@ export interface DescriptiveRadioButtonSelectProps<T> {
   showScrollArrows?: boolean;
   /** The maximum number of items to show at once. */
   maxItemsToShow?: number;
+  /** Custom render function for items. */
+  renderItem?: (
+    item: DescriptiveRadioSelectItem<T>,
+    context: RenderItemContext,
+  ) => React.ReactNode;
 }
 
 /**
@@ -48,7 +56,20 @@ export function DescriptiveRadioButtonSelect<T>({
   showNumbers = false,
   showScrollArrows = false,
   maxItemsToShow = 10,
+  renderItem,
 }: DescriptiveRadioButtonSelectProps<T>): React.JSX.Element {
+  const defaultRenderItem = (
+    item: DescriptiveRadioSelectItem<T>,
+    { titleColor }: RenderItemContext,
+  ): React.ReactNode => (
+    <Box flexDirection="column" key={item.key}>
+      <Text color={titleColor}>{item.title}</Text>
+      {item.description && (
+        <Text color={theme.text.secondary}>{item.description}</Text>
+      )}
+    </Box>
+  );
+
   return (
     <BaseSelectionList<T, DescriptiveRadioSelectItem<T>>
       items={items}
@@ -59,14 +80,7 @@ export function DescriptiveRadioButtonSelect<T>({
       showNumbers={showNumbers}
       showScrollArrows={showScrollArrows}
       maxItemsToShow={maxItemsToShow}
-      renderItem={(item, { titleColor }) => (
-        <Box flexDirection="column" key={item.key}>
-          <Text color={titleColor}>{item.title}</Text>
-          {item.description && (
-            <Text color={theme.text.secondary}>{item.description}</Text>
-          )}
-        </Box>
-      )}
+      renderItem={renderItem || defaultRenderItem}
     />
   );
 }

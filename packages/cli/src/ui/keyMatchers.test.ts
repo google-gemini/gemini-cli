@@ -384,6 +384,11 @@ describe('keyMatchers', () => {
       negative: [createKey('tab')],
     },
     {
+      command: Command.CYCLE_MODEL_FORWARD,
+      positive: [createKey('c', { alt: true })],
+      negative: [createKey('c')],
+    },
+    {
       command: Command.TOGGLE_BACKGROUND_SHELL,
       positive: [createKey('b', { ctrl: true })],
       negative: [createKey('f10'), createKey('b')],

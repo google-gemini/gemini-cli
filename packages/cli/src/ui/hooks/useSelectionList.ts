@@ -25,7 +25,7 @@ export interface UseSelectionListOptions<T> {
   items: Array<SelectionListItem<T>>;
   initialIndex?: number;
   onSelect: (value: T) => void;
-  onHighlight?: (value: T) => void;
+  onHighlight?: (value: T, index: number) => void;
   isFocused?: boolean;
   showNumbers?: boolean;
   wrapAround?: boolean;
@@ -226,7 +226,7 @@ function selectionListReducer(
         items,
         initialIndex,
         activeIndex: targetIndex,
-        pendingHighlight: false,
+        pendingHighlight: true,
         wrapAround,
       };
     }
@@ -352,7 +352,7 @@ export function useSelectionList<T>({
     let needsClear = false;
 
     if (state.pendingHighlight && items[state.activeIndex]) {
-      onHighlight?.(items[state.activeIndex].value);
+      onHighlight?.(items[state.activeIndex].value, state.activeIndex);
       needsClear = true;
     }
 
@@ -404,6 +404,16 @@ export function useSelectionList<T>({
 
       if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
         dispatch({ type: 'MOVE_DOWN' });
+        return true;
+      }
+
+      if (keyMatchers[Command.CYCLE_MODEL_FORWARD](key)) {
+        dispatch({ type: 'MOVE_DOWN' });
+        return true;
+      }
+
+      if (keyMatchers[Command.CYCLE_MODEL_BACKWARD](key)) {
+        dispatch({ type: 'MOVE_UP' });
         return true;
       }
 

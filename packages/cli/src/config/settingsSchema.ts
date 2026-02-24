@@ -896,6 +896,17 @@ const SETTINGS_SCHEMA = {
         description: 'Skip the next speaker check.',
         showInDialog: true,
       },
+      favoriteModels: {
+        type: 'array',
+        label: 'Favorite Models',
+        category: 'Model',
+        requiresRestart: false,
+        default: [] as string[],
+        description:
+          'A list of models to cycle through when using the cycle model shortcut. If empty, all available models will be cycled.',
+        showInDialog: false,
+        items: { type: 'string' },
+      },
     },
   },
 

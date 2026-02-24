@@ -49,6 +49,7 @@ import {
   type MergedSettings,
   saveModelChange,
   loadSettings,
+  SettingScope,
 } from './settings.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
@@ -870,7 +871,14 @@ export async function loadCliConfig(
     hooks: settings.hooks || {},
     disabledHooks: settings.hooksConfig?.disabled || [],
     projectHooks: projectHooks || {},
+    favoriteModels: settings.model?.favoriteModels,
     onModelChange: (model: string) => saveModelChange(loadedSettings, model),
+    onFavoriteModelsChange: (favorites: string[]) =>
+      loadedSettings.setValue(
+        SettingScope.User,
+        'model.favoriteModels',
+        favorites,
+      ),
     onReload: async () => {
       const refreshedSettings = loadSettings(cwd);
       return {
