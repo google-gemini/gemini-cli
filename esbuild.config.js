@@ -63,7 +63,7 @@ const external = [
   '@lydell/node-pty-win32-arm64',
   '@lydell/node-pty-win32-x64',
   'keytar',
-  'gemini-cli-devtools',
+  '@google/gemini-cli-devtools',
 ];
 
 const baseConfig = {
@@ -73,6 +73,10 @@ const baseConfig = {
   external,
   loader: { '.node': 'file' },
   write: true,
+};
+
+const commonAliases = {
+  punycode: 'punycode/',
 };
 
 const cliConfig = {
@@ -88,6 +92,7 @@ const cliConfig = {
   plugins: createWasmPlugins(),
   alias: {
     'is-in-ci': path.resolve(__dirname, 'packages/cli/src/patches/is-in-ci.ts'),
+    ...commonAliases,
   },
   metafile: true,
 };
@@ -103,6 +108,7 @@ const a2aServerConfig = {
     'process.env.CLI_VERSION': JSON.stringify(pkg.version),
   },
   plugins: createWasmPlugins(),
+  alias: commonAliases,
 };
 
 Promise.allSettled([

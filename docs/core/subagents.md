@@ -1,13 +1,13 @@
-# Sub-agents (experimental)
+# Subagents (experimental)
 
-Sub-agents are specialized agents that operate within your main Gemini CLI
+Subagents are specialized agents that operate within your main Gemini CLI
 session. They are designed to handle specific, complex tasks—like deep codebase
 analysis, documentation lookup, or domain-specific reasoning—without cluttering
 the main agent's context or toolset.
 
-> **Note: Sub-agents are currently an experimental feature.**
+> **Note: Subagents are currently an experimental feature.**
 >
-> To use custom sub-agents, you must explicitly enable them in your
+> To use custom subagents, you must explicitly enable them in your
 > `settings.json`:
 >
 > ```json
@@ -16,31 +16,31 @@ the main agent's context or toolset.
 > }
 > ```
 >
-> **Warning:** Sub-agents currently operate in
-> ["YOLO mode"](../get-started/configuration.md#command-line-arguments), meaning
+> **Warning:** Subagents currently operate in
+> ["YOLO mode"](../reference/configuration.md#command-line-arguments), meaning
 > they may execute tools without individual user confirmation for each step.
 > Proceed with caution when defining agents with powerful tools like
 > `run_shell_command` or `write_file`.
 
-## What are sub-agents?
+## What are subagents?
 
-Sub-agents are "specialists" that the main Gemini agent can hire for a specific
+Subagents are "specialists" that the main Gemini agent can hire for a specific
 job.
 
-- **Focused context:** Each sub-agent has its own system prompt and persona.
-- **Specialized tools:** Sub-agents can have a restricted or specialized set of
+- **Focused context:** Each subagent has its own system prompt and persona.
+- **Specialized tools:** Subagents can have a restricted or specialized set of
   tools.
-- **Independent context window:** Interactions with a sub-agent happen in a
+- **Independent context window:** Interactions with a subagent happen in a
   separate context loop, which saves tokens in your main conversation history.
 
-Sub-agents are exposed to the main agent as a tool of the same name. When the
-main agent calls the tool, it delegates the task to the sub-agent. Once the
-sub-agent completes its task, it reports back to the main agent with its
+Subagents are exposed to the main agent as a tool of the same name. When the
+main agent calls the tool, it delegates the task to the subagent. Once the
+subagent completes its task, it reports back to the main agent with its
 findings.
 
-## Built-in sub-agents
+## Built-in subagents
 
-Gemini CLI comes with the following built-in sub-agents:
+Gemini CLI comes with the following built-in subagents:
 
 ### Codebase Investigator
 
@@ -75,15 +75,15 @@ Gemini CLI comes with the following built-in sub-agents:
 ### Generalist Agent
 
 - **Name:** `generalist_agent`
-- **Purpose:** Route tasks to the appropriate specialized sub-agent.
+- **Purpose:** Route tasks to the appropriate specialized subagent.
 - **When to use:** Implicitly used by the main agent for routing. Not directly
   invoked by the user.
 - **Configuration:** Enabled by default. No specific configuration options.
 
-## Creating custom sub-agents
+## Creating custom subagents
 
-You can create your own sub-agents to automate specific workflows or enforce
-specific personas. To use custom sub-agents, you must enable them in your
+You can create your own subagents to automate specific workflows or enforce
+specific personas. To use custom subagents, you must enable them in your
 `settings.json`:
 
 ```json
@@ -138,20 +138,20 @@ it yourself; just report it.
 
 ### Configuration schema
 
-| Field          | Type   | Required | Description                                                                                                                |
-| :------------- | :----- | :------- | :------------------------------------------------------------------------------------------------------------------------- |
-| `name`         | string | Yes      | Unique identifier (slug) used as the tool name for the agent. Only lowercase letters, numbers, hyphens, and underscores.   |
-| `description`  | string | Yes      | Short description of what the agent does. This is visible to the main agent to help it decide when to call this sub-agent. |
-| `kind`         | string | No       | `local` (default) or `remote`.                                                                                             |
-| `tools`        | array  | No       | List of tool names this agent can use. If omitted, it may have access to a default set.                                    |
-| `model`        | string | No       | Specific model to use (e.g., `gemini-2.5-pro`). Defaults to `inherit` (uses the main session model).                       |
-| `temperature`  | number | No       | Model temperature (0.0 - 2.0).                                                                                             |
-| `max_turns`    | number | No       | Maximum number of conversation turns allowed for this agent before it must return. Defaults to `15`.                       |
-| `timeout_mins` | number | No       | Maximum execution time in minutes. Defaults to `5`.                                                                        |
+| Field          | Type   | Required | Description                                                                                                               |
+| :------------- | :----- | :------- | :------------------------------------------------------------------------------------------------------------------------ |
+| `name`         | string | Yes      | Unique identifier (slug) used as the tool name for the agent. Only lowercase letters, numbers, hyphens, and underscores.  |
+| `description`  | string | Yes      | Short description of what the agent does. This is visible to the main agent to help it decide when to call this subagent. |
+| `kind`         | string | No       | `local` (default) or `remote`.                                                                                            |
+| `tools`        | array  | No       | List of tool names this agent can use. If omitted, it may have access to a default set.                                   |
+| `model`        | string | No       | Specific model to use (e.g., `gemini-2.5-pro`). Defaults to `inherit` (uses the main session model).                      |
+| `temperature`  | number | No       | Model temperature (0.0 - 2.0).                                                                                            |
+| `max_turns`    | number | No       | Maximum number of conversation turns allowed for this agent before it must return. Defaults to `15`.                      |
+| `timeout_mins` | number | No       | Maximum execution time in minutes. Defaults to `5`.                                                                       |
 
-### Optimizing your sub-agent
+### Optimizing your subagent
 
-The main agent's system prompt encourages it to use an expert sub-agent when one
+The main agent's system prompt encourages it to use an expert subagent when one
 is available. It decides whether an agent is a relevant expert based on the
 agent's description. You can improve the reliability with which an agent is used
 by updating the description to more clearly indicate:
@@ -160,7 +160,7 @@ by updating the description to more clearly indicate:
 - When it should be used.
 - Some example scenarios.
 
-For example, the following sub-agent description should be called fairly
+For example, the following subagent description should be called fairly
 consistently for Git operations.
 
 > Git expert agent which should be used for all local and remote git operations.
@@ -170,13 +170,13 @@ consistently for Git operations.
 > - Searching for regressions with bisect
 > - Interacting with source control and issues providers such as GitHub.
 
-If you need to further tune your sub-agent, you can do so by selecting the model
+If you need to further tune your subagent, you can do so by selecting the model
 to optimize for with `/model` and then asking the model why it does not think
-that your sub-agent was called with a specific prompt and the given description.
+that your subagent was called with a specific prompt and the given description.
 
 ## Remote subagents (Agent2Agent) (experimental)
 
-Gemini CLI can also delegate tasks to remote sub-agents using the Agent-to-Agent
+Gemini CLI can also delegate tasks to remote subagents using the Agent-to-Agent
 (A2A) protocol.
 
 > **Note: Remote subagents are currently an experimental feature.**
@@ -184,8 +184,8 @@ Gemini CLI can also delegate tasks to remote sub-agents using the Agent-to-Agent
 See the [Remote Subagents documentation](/docs/core/remote-agents) for detailed
 configuration and usage instructions.
 
-## Extension sub-agents
+## Extension subagents
 
-Extensions can bundle and distribute sub-agents. See the
-[Extensions documentation](../extensions/index.md#sub-agents) for details on how
+Extensions can bundle and distribute subagents. See the
+[Extensions documentation](../extensions/index.md#subagents) for details on how
 to package agents within an extension.

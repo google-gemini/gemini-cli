@@ -35,6 +35,9 @@ import {
   startupProfiler,
   Kind,
   partListUnionToString,
+  LlmRole,
+  ApprovalMode,
+  convertSessionToClientHistory,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -51,10 +54,7 @@ import { randomUUID } from 'node:crypto';
 import type { CliArgs } from '../config/config.js';
 import { loadCliConfig } from '../config/config.js';
 import { runExitCleanup } from '../utils/cleanup.js';
-import {
-  SessionSelector,
-  convertSessionToHistoryFormats,
-} from '../utils/sessionUtils.js';
+import { SessionSelector } from '../utils/sessionUtils.js';
 
 export async function runZedIntegration(
   config: Config,
@@ -112,6 +112,7 @@ export class GeminiAgent {
       },
     ];
 
+    await this.config.initialize();
     return {
       protocolVersion: acp.PROTOCOL_VERSION,
       authMethods,
@@ -223,6 +224,10 @@ export class GeminiAgent {
 
     return {
       sessionId,
+      modes: {
+        availableModes: buildAvailableModes(config.isPlanEnabled()),
+        currentModeId: config.getApprovalMode(),
+      },
     };
   }
 
@@ -251,9 +256,7 @@ export class GeminiAgent {
       config.setFileSystemService(acpFileSystemService);
     }
 
-    const { clientHistory } = convertSessionToHistoryFormats(
-      sessionData.messages,
-    );
+    const clientHistory = convertSessionToClientHistory(sessionData.messages);
 
     const geminiClient = config.getGeminiClient();
     await geminiClient.initialize();
@@ -274,7 +277,12 @@ export class GeminiAgent {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     session.streamHistory(sessionData.messages);
 
-    return {};
+    return {
+      modes: {
+        availableModes: buildAvailableModes(config.isPlanEnabled()),
+        currentModeId: config.getApprovalMode(),
+      },
+    };
   }
 
   private async initializeSessionConfig(
@@ -375,6 +383,16 @@ export class GeminiAgent {
     }
     return session.prompt(params);
   }
+
+  async setSessionMode(
+    params: acp.SetSessionModeRequest,
+  ): Promise<acp.SetSessionModeResponse> {
+    const session = this.sessions.get(params.sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${params.sessionId}`);
+    }
+    return session.setMode(params.modeId);
+  }
 }
 
 export class Session {
@@ -394,6 +412,17 @@ export class Session {
 
     this.pendingPrompt.abort();
     this.pendingPrompt = null;
+  }
+
+  setMode(modeId: acp.SessionModeId): acp.SetSessionModeResponse {
+    const availableModes = buildAvailableModes(this.config.isPlanEnabled());
+    const mode = availableModes.find((m) => m.id === modeId);
+    if (!mode) {
+      throw new Error(`Invalid or unavailable mode: ${modeId}`);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    this.config.setApprovalMode(mode.id as ApprovalMode);
+    return {};
   }
 
   async streamHistory(messages: ConversationRecord['messages']): Promise<void> {
@@ -487,12 +516,16 @@ export class Session {
       const functionCalls: FunctionCall[] = [];
 
       try {
-        const model = resolveModel(this.config.getModel());
+        const model = resolveModel(
+          this.config.getModel(),
+          (await this.config.getGemini31Launched?.()) ?? false,
+        );
         const responseStream = await chat.sendMessageStream(
           { model },
           nextMessage?.parts ?? [],
           promptId,
           pendingSend.signal,
+          LlmRole.MAIN,
         );
         nextMessage = null;
 
@@ -649,6 +682,13 @@ export class Session {
             path: confirmationDetails.fileName,
             oldText: confirmationDetails.originalContent,
             newText: confirmationDetails.newContent,
+            _meta: {
+              kind: !confirmationDetails.originalContent
+                ? 'add'
+                : confirmationDetails.newContent === ''
+                  ? 'delete'
+                  : 'modify',
+            },
           });
         }
 
@@ -665,6 +705,7 @@ export class Session {
           },
         };
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const output = await this.connection.requestPermission(params);
         const outcome =
           output.outcome.outcome === CoreToolCallStatus.Cancelled
@@ -1169,6 +1210,13 @@ function toToolCallContent(toolResult: ToolResult): acp.ToolCallContent | null {
           path: toolResult.returnDisplay.fileName,
           oldText: toolResult.returnDisplay.originalContent,
           newText: toolResult.returnDisplay.newContent,
+          _meta: {
+            kind: !toolResult.returnDisplay.originalContent
+              ? 'add'
+              : toolResult.returnDisplay.newContent === ''
+                ? 'delete'
+                : 'modify',
+          },
         };
       }
       return null;
@@ -1257,16 +1305,48 @@ function toAcpToolKind(kind: Kind): acp.ToolKind {
   switch (kind) {
     case Kind.Read:
     case Kind.Edit:
+    case Kind.Execute:
+    case Kind.Search:
     case Kind.Delete:
     case Kind.Move:
-    case Kind.Search:
-    case Kind.Execute:
     case Kind.Think:
     case Kind.Fetch:
+    case Kind.SwitchMode:
     case Kind.Other:
       return kind as acp.ToolKind;
+    case Kind.Plan:
     case Kind.Communicate:
     default:
       return 'other';
   }
+}
+
+function buildAvailableModes(isPlanEnabled: boolean): acp.SessionMode[] {
+  const modes: acp.SessionMode[] = [
+    {
+      id: ApprovalMode.DEFAULT,
+      name: 'Default',
+      description: 'Prompts for approval',
+    },
+    {
+      id: ApprovalMode.AUTO_EDIT,
+      name: 'Auto Edit',
+      description: 'Auto-approves edit tools',
+    },
+    {
+      id: ApprovalMode.YOLO,
+      name: 'YOLO',
+      description: 'Auto-approves all tools',
+    },
+  ];
+
+  if (isPlanEnabled) {
+    modes.push({
+      id: ApprovalMode.PLAN,
+      name: 'Plan',
+      description: 'Read-only mode',
+    });
+  }
+
+  return modes;
 }

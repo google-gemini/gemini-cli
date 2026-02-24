@@ -60,24 +60,23 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
       ? Math.max(uiAvailableHeight - 1, 4)
       : Math.floor(terminalHeight * 0.5);
 
-  // ToolConfirmationMessage needs to know the height available for its OWN content.
-  // We subtract the lines used by the Queue wrapper:
-  // - 2 lines for the rounded border
-  // - 2 lines for the Header (text + margin)
-  // - 2 lines for Tool Identity (text + margin)
-  const availableContentHeight =
-    constrainHeight && !isAlternateBuffer
-      ? Math.max(maxHeight - 6, 4)
-      : undefined;
-
   const isRoutine =
     tool.confirmationDetails?.type === 'ask_user' ||
     tool.confirmationDetails?.type === 'exit_plan_mode';
   const borderColor = isRoutine ? theme.status.success : theme.status.warning;
   const hideToolIdentity = isRoutine;
 
-  return (
-    <OverflowProvider>
+  // ToolConfirmationMessage needs to know the height available for its OWN content.
+  // We subtract the lines used by the Queue wrapper:
+  // - 2 lines for the rounded border
+  // - 2 lines for the Header (text + margin)
+  // - 2 lines for Tool Identity (text + margin)
+  const availableContentHeight = constrainHeight
+    ? Math.max(maxHeight - (hideToolIdentity ? 4 : 6), 4)
+    : undefined;
+
+  const content = (
+    <>
       <Box flexDirection="column" width={mainAreaWidth} flexShrink={0}>
         <StickyHeader
           width={mainAreaWidth}
@@ -152,6 +151,13 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
         />
       </Box>
       <ShowMoreLines constrainHeight={constrainHeight} />
-    </OverflowProvider>
+    </>
+  );
+
+  return isAlternateBuffer ? (
+    /* Shadow the global provider to maintain isolation in ASB mode. */
+    <OverflowProvider>{content}</OverflowProvider>
+  ) : (
+    content
   );
 };

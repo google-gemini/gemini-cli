@@ -68,10 +68,11 @@ const createTestMetrics = (
 });
 
 describe('<StatsDisplay />', () => {
-  it('renders only the Performance section in its zero state', () => {
+  it('renders only the Performance section in its zero state', async () => {
     const zeroMetrics = createTestMetrics();
 
-    const { lastFrame } = renderWithMockedStats(zeroMetrics);
+    const { lastFrame, waitUntilReady } = renderWithMockedStats(zeroMetrics);
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toContain('Performance');
@@ -79,7 +80,7 @@ describe('<StatsDisplay />', () => {
     expect(output).toMatchSnapshot();
   });
 
-  it('renders a table with two models correctly', () => {
+  it('renders a table with two models correctly', async () => {
     const metrics = createTestMetrics({
       models: {
         'gemini-2.5-pro': {
@@ -93,6 +94,7 @@ describe('<StatsDisplay />', () => {
             thoughts: 100,
             tool: 50,
           },
+          roles: {},
         },
         'gemini-2.5-flash': {
           api: { totalRequests: 5, totalErrors: 1, totalLatencyMs: 4500 },
@@ -105,11 +107,13 @@ describe('<StatsDisplay />', () => {
             thoughts: 2000,
             tool: 1000,
           },
+          roles: {},
         },
       },
     });
 
-    const { lastFrame } = renderWithMockedStats(metrics);
+    const { lastFrame, waitUntilReady } = renderWithMockedStats(metrics);
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toContain('gemini-2.5-pro');
@@ -119,7 +123,7 @@ describe('<StatsDisplay />', () => {
     expect(output).toMatchSnapshot();
   });
 
-  it('renders all sections when all data is present', () => {
+  it('renders all sections when all data is present', async () => {
     const metrics = createTestMetrics({
       models: {
         'gemini-2.5-pro': {
@@ -133,6 +137,7 @@ describe('<StatsDisplay />', () => {
             thoughts: 0,
             tool: 0,
           },
+          roles: {},
         },
       },
       tools: {
@@ -163,7 +168,8 @@ describe('<StatsDisplay />', () => {
       },
     });
 
-    const { lastFrame } = renderWithMockedStats(metrics);
+    const { lastFrame, waitUntilReady } = renderWithMockedStats(metrics);
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toContain('Performance');
@@ -174,7 +180,7 @@ describe('<StatsDisplay />', () => {
   });
 
   describe('Conditional Rendering Tests', () => {
-    it('hides User Agreement when no decisions are made', () => {
+    it('hides User Agreement when no decisions are made', async () => {
       const metrics = createTestMetrics({
         tools: {
           totalCalls: 2,
@@ -204,7 +210,8 @@ describe('<StatsDisplay />', () => {
         },
       });
 
-      const { lastFrame } = renderWithMockedStats(metrics);
+      const { lastFrame, waitUntilReady } = renderWithMockedStats(metrics);
+      await waitUntilReady();
       const output = lastFrame();
 
       expect(output).toContain('Interaction Summary');
@@ -213,7 +220,7 @@ describe('<StatsDisplay />', () => {
       expect(output).toMatchSnapshot();
     });
 
-    it('hides Efficiency section when cache is not used', () => {
+    it('hides Efficiency section when cache is not used', async () => {
       const metrics = createTestMetrics({
         models: {
           'gemini-2.5-pro': {
@@ -227,11 +234,13 @@ describe('<StatsDisplay />', () => {
               thoughts: 0,
               tool: 0,
             },
+            roles: {},
           },
         },
       });
 
-      const { lastFrame } = renderWithMockedStats(metrics);
+      const { lastFrame, waitUntilReady } = renderWithMockedStats(metrics);
+      await waitUntilReady();
       const output = lastFrame();
 
       expect(output).toMatchSnapshot();
@@ -239,7 +248,7 @@ describe('<StatsDisplay />', () => {
   });
 
   describe('Conditional Color Tests', () => {
-    it('renders success rate in green for high values', () => {
+    it('renders success rate in green for high values', async () => {
       const metrics = createTestMetrics({
         tools: {
           totalCalls: 10,
@@ -255,11 +264,12 @@ describe('<StatsDisplay />', () => {
           byName: {},
         },
       });
-      const { lastFrame } = renderWithMockedStats(metrics);
+      const { lastFrame, waitUntilReady } = renderWithMockedStats(metrics);
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
     });
 
-    it('renders success rate in yellow for medium values', () => {
+    it('renders success rate in yellow for medium values', async () => {
       const metrics = createTestMetrics({
         tools: {
           totalCalls: 10,
@@ -275,11 +285,12 @@ describe('<StatsDisplay />', () => {
           byName: {},
         },
       });
-      const { lastFrame } = renderWithMockedStats(metrics);
+      const { lastFrame, waitUntilReady } = renderWithMockedStats(metrics);
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
     });
 
-    it('renders success rate in red for low values', () => {
+    it('renders success rate in red for low values', async () => {
       const metrics = createTestMetrics({
         tools: {
           totalCalls: 10,
@@ -295,13 +306,14 @@ describe('<StatsDisplay />', () => {
           byName: {},
         },
       });
-      const { lastFrame } = renderWithMockedStats(metrics);
+      const { lastFrame, waitUntilReady } = renderWithMockedStats(metrics);
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
     });
   });
 
   describe('Code Changes Display', () => {
-    it('displays Code Changes when line counts are present', () => {
+    it('displays Code Changes when line counts are present', async () => {
       const metrics = createTestMetrics({
         tools: {
           totalCalls: 1,
@@ -322,7 +334,8 @@ describe('<StatsDisplay />', () => {
         },
       });
 
-      const { lastFrame } = renderWithMockedStats(metrics);
+      const { lastFrame, waitUntilReady } = renderWithMockedStats(metrics);
+      await waitUntilReady();
       const output = lastFrame();
 
       expect(output).toContain('Code Changes:');
@@ -331,7 +344,7 @@ describe('<StatsDisplay />', () => {
       expect(output).toMatchSnapshot();
     });
 
-    it('hides Code Changes when no lines are added or removed', () => {
+    it('hides Code Changes when no lines are added or removed', async () => {
       const metrics = createTestMetrics({
         tools: {
           totalCalls: 1,
@@ -348,7 +361,8 @@ describe('<StatsDisplay />', () => {
         },
       });
 
-      const { lastFrame } = renderWithMockedStats(metrics);
+      const { lastFrame, waitUntilReady } = renderWithMockedStats(metrics);
+      await waitUntilReady();
       const output = lastFrame();
 
       expect(output).not.toContain('Code Changes:');
@@ -359,15 +373,16 @@ describe('<StatsDisplay />', () => {
   describe('Title Rendering', () => {
     const zeroMetrics = createTestMetrics();
 
-    it('renders the default title when no title prop is provided', () => {
-      const { lastFrame } = renderWithMockedStats(zeroMetrics);
+    it('renders the default title when no title prop is provided', async () => {
+      const { lastFrame, waitUntilReady } = renderWithMockedStats(zeroMetrics);
+      await waitUntilReady();
       const output = lastFrame();
       expect(output).toContain('Session Stats');
       expect(output).not.toContain('Agent powering down');
       expect(output).toMatchSnapshot();
     });
 
-    it('renders the custom title when a title prop is provided', () => {
+    it('renders the custom title when a title prop is provided', async () => {
       useSessionStatsMock.mockReturnValue({
         stats: {
           sessionId: 'test-session-id',
@@ -381,10 +396,11 @@ describe('<StatsDisplay />', () => {
         startNewPrompt: vi.fn(),
       });
 
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = renderWithProviders(
         <StatsDisplay duration="1s" title="Agent powering down. Goodbye!" />,
         { width: 100 },
       );
+      await waitUntilReady();
       const output = lastFrame();
       expect(output).toContain('Agent powering down. Goodbye!');
       expect(output).not.toContain('Session Stats');
@@ -393,7 +409,7 @@ describe('<StatsDisplay />', () => {
   });
 
   describe('Quota Display', () => {
-    it('renders quota information when quotas are provided', () => {
+    it('renders quota information when quotas are provided', async () => {
       const now = new Date('2025-01-01T12:00:00Z');
       vi.useFakeTimers();
       vi.setSystemTime(now);
@@ -411,6 +427,7 @@ describe('<StatsDisplay />', () => {
               thoughts: 0,
               tool: 0,
             },
+            roles: {},
           },
         },
       });
@@ -441,10 +458,11 @@ describe('<StatsDisplay />', () => {
         startNewPrompt: vi.fn(),
       });
 
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = renderWithProviders(
         <StatsDisplay duration="1s" quotas={quotas} />,
         { width: 100 },
       );
+      await waitUntilReady();
       const output = lastFrame();
 
       expect(output).toContain('Usage remaining');
@@ -455,7 +473,7 @@ describe('<StatsDisplay />', () => {
       vi.useRealTimers();
     });
 
-    it('renders pooled quota information for auto mode', () => {
+    it('renders pooled quota information for auto mode', async () => {
       const now = new Date('2025-01-01T12:00:00Z');
       vi.useFakeTimers();
       vi.setSystemTime(now);
@@ -488,7 +506,7 @@ describe('<StatsDisplay />', () => {
         startNewPrompt: vi.fn(),
       });
 
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = renderWithProviders(
         <StatsDisplay
           duration="1s"
           quotas={quotas}
@@ -500,6 +518,7 @@ describe('<StatsDisplay />', () => {
         />,
         { width: 100 },
       );
+      await waitUntilReady();
       const output = lastFrame();
 
       // (10 + 700) / (100 + 1000) = 710 / 1100 = 64.5%
@@ -510,7 +529,7 @@ describe('<StatsDisplay />', () => {
       vi.useRealTimers();
     });
 
-    it('renders quota information for unused models', () => {
+    it('renders quota information for unused models', async () => {
       const now = new Date('2025-01-01T12:00:00Z');
       vi.useFakeTimers();
       vi.setSystemTime(now);
@@ -543,10 +562,11 @@ describe('<StatsDisplay />', () => {
         startNewPrompt: vi.fn(),
       });
 
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = renderWithProviders(
         <StatsDisplay duration="1s" quotas={quotas} />,
         { width: 100 },
       );
+      await waitUntilReady();
       const output = lastFrame();
 
       expect(output).toContain('gemini-2.5-flash');
@@ -560,7 +580,7 @@ describe('<StatsDisplay />', () => {
   });
 
   describe('User Identity Display', () => {
-    it('renders User row with Auth Method and Tier', () => {
+    it('renders User row with Auth Method and Tier', async () => {
       const metrics = createTestMetrics();
 
       useSessionStatsMock.mockReturnValue({
@@ -575,7 +595,7 @@ describe('<StatsDisplay />', () => {
         startNewPrompt: vi.fn(),
       });
 
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = renderWithProviders(
         <StatsDisplay
           duration="1s"
           selectedAuthType="oauth"
@@ -584,6 +604,7 @@ describe('<StatsDisplay />', () => {
         />,
         { width: 100 },
       );
+      await waitUntilReady();
       const output = lastFrame();
 
       expect(output).toContain('Auth Method:');
@@ -592,7 +613,7 @@ describe('<StatsDisplay />', () => {
       expect(output).toContain('Pro');
     });
 
-    it('renders User row with API Key and no Tier', () => {
+    it('renders User row with API Key and no Tier', async () => {
       const metrics = createTestMetrics();
 
       useSessionStatsMock.mockReturnValue({
@@ -607,10 +628,11 @@ describe('<StatsDisplay />', () => {
         startNewPrompt: vi.fn(),
       });
 
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = renderWithProviders(
         <StatsDisplay duration="1s" selectedAuthType="Google API Key" />,
         { width: 100 },
       );
+      await waitUntilReady();
       const output = lastFrame();
 
       expect(output).toContain('Auth Method:');

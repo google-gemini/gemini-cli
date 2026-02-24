@@ -41,6 +41,8 @@ import {
 } from './semantic.js';
 import { sanitizeHookName } from './sanitize.js';
 import { getFileDiffFromResultDisplay } from '../utils/fileDiffUtils.js';
+import { LlmRole } from './llmRole.js';
+export { LlmRole };
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -241,6 +243,8 @@ export class ToolCallEvent implements BaseTelemetryEvent {
   mcp_server_name?: string;
   extension_name?: string;
   extension_id?: string;
+  start_time?: number;
+  end_time?: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: { [key: string]: any };
 
@@ -254,6 +258,8 @@ export class ToolCallEvent implements BaseTelemetryEvent {
     prompt_id: string,
     tool_type: 'native' | 'mcp',
     error?: string,
+    start_time?: number,
+    end_time?: number,
   );
   constructor(
     call?: CompletedToolCall,
@@ -264,6 +270,8 @@ export class ToolCallEvent implements BaseTelemetryEvent {
     prompt_id?: string,
     tool_type?: 'native' | 'mcp',
     error?: string,
+    start_time?: number,
+    end_time?: number,
   ) {
     this['event.name'] = 'tool_call';
     this['event.timestamp'] = new Date().toISOString();
@@ -280,6 +288,8 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       this.error_type = call.response.errorType;
       this.prompt_id = call.request.prompt_id;
       this.content_length = call.response.contentLength;
+      this.start_time = call.startTime;
+      this.end_time = call.endTime;
       if (
         typeof call.tool !== 'undefined' &&
         call.tool instanceof DiscoveredMCPTool
@@ -330,6 +340,8 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       this.prompt_id = prompt_id!;
       this.tool_type = tool_type!;
       this.error = error;
+      this.start_time = start_time;
+      this.end_time = end_time;
     }
   }
 
@@ -349,6 +361,8 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       mcp_server_name: this.mcp_server_name,
       extension_name: this.extension_name,
       extension_id: this.extension_id,
+      start_time: this.start_time,
+      end_time: this.end_time,
       metadata: this.metadata,
     };
 
@@ -375,17 +389,20 @@ export class ApiRequestEvent implements BaseTelemetryEvent {
   model: string;
   prompt: GenAIPromptDetails;
   request_text?: string;
+  role?: LlmRole;
 
   constructor(
     model: string,
     prompt_details: GenAIPromptDetails,
     request_text?: string,
+    role?: LlmRole,
   ) {
     this['event.name'] = 'api_request';
     this['event.timestamp'] = new Date().toISOString();
     this.model = model;
     this.prompt = prompt_details;
     this.request_text = request_text;
+    this.role = role;
   }
 
   toLogRecord(config: Config): LogRecord {
@@ -397,6 +414,9 @@ export class ApiRequestEvent implements BaseTelemetryEvent {
       prompt_id: this.prompt.prompt_id,
       request_text: this.request_text,
     };
+    if (this.role) {
+      attributes['role'] = this.role;
+    }
     return { body: `API request to ${this.model}.`, attributes };
   }
 
@@ -445,6 +465,7 @@ export class ApiErrorEvent implements BaseTelemetryEvent {
   status_code?: number | string;
   duration_ms: number;
   auth_type?: string;
+  role?: LlmRole;
 
   constructor(
     model: string,
@@ -454,6 +475,7 @@ export class ApiErrorEvent implements BaseTelemetryEvent {
     auth_type?: string,
     error_type?: string,
     status_code?: number | string,
+    role?: LlmRole,
   ) {
     this['event.name'] = 'api_error';
     this['event.timestamp'] = new Date().toISOString();
@@ -464,6 +486,7 @@ export class ApiErrorEvent implements BaseTelemetryEvent {
     this.duration_ms = duration_ms;
     this.prompt = prompt_details;
     this.auth_type = auth_type;
+    this.role = role;
   }
 
   toLogRecord(config: Config): LogRecord {
@@ -481,6 +504,10 @@ export class ApiErrorEvent implements BaseTelemetryEvent {
       prompt_id: this.prompt.prompt_id,
       auth_type: this.auth_type,
     };
+
+    if (this.role) {
+      attributes['role'] = this.role;
+    }
 
     if (this.error_type) {
       attributes['error.type'] = this.error_type;
@@ -590,6 +617,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
   response: GenAIResponseDetails;
   usage: GenAIUsageDetails;
   finish_reasons: OTelFinishReason[];
+  role?: LlmRole;
 
   constructor(
     model: string,
@@ -599,6 +627,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
     auth_type?: string,
     usage_data?: GenerateContentResponseUsageMetadata,
     response_text?: string,
+    role?: LlmRole,
   ) {
     this['event.name'] = 'api_response';
     this['event.timestamp'] = new Date().toISOString();
@@ -619,6 +648,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       total_token_count: usage_data?.totalTokenCount ?? 0,
     };
     this.finish_reasons = toFinishReasons(this.response.candidates);
+    this.role = role;
   }
 
   toLogRecord(config: Config): LogRecord {
@@ -639,6 +669,9 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       status_code: this.status_code,
       finish_reasons: this.finish_reasons,
     };
+    if (this.role) {
+      attributes['role'] = this.role;
+    }
     if (this.response_text) {
       attributes['response_text'] = this.response_text;
     }
@@ -843,6 +876,105 @@ export class NextSpeakerCheckEvent implements BaseTelemetryEvent {
 
   toLogBody(): string {
     return `Next speaker check.`;
+  }
+}
+
+export const EVENT_CONSECA_POLICY_GENERATION =
+  'gemini_cli.conseca.policy_generation';
+export class ConsecaPolicyGenerationEvent implements BaseTelemetryEvent {
+  'event.name': 'conseca_policy_generation';
+  'event.timestamp': string;
+  user_prompt: string;
+  trusted_content: string;
+  policy: string;
+  error?: string;
+
+  constructor(
+    user_prompt: string,
+    trusted_content: string,
+    policy: string,
+    error?: string,
+  ) {
+    this['event.name'] = 'conseca_policy_generation';
+    this['event.timestamp'] = new Date().toISOString();
+    this.user_prompt = user_prompt;
+    this.trusted_content = trusted_content;
+    this.policy = policy;
+    this.error = error;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_CONSECA_POLICY_GENERATION,
+      'event.timestamp': this['event.timestamp'],
+      user_prompt: this.user_prompt,
+      trusted_content: this.trusted_content,
+      policy: this.policy,
+    };
+
+    if (this.error) {
+      attributes['error'] = this.error;
+    }
+
+    return attributes;
+  }
+
+  toLogBody(): string {
+    return `Conseca Policy Generation.`;
+  }
+}
+
+export const EVENT_CONSECA_VERDICT = 'gemini_cli.conseca.verdict';
+export class ConsecaVerdictEvent implements BaseTelemetryEvent {
+  'event.name': 'conseca_verdict';
+  'event.timestamp': string;
+  user_prompt: string;
+  policy: string;
+  tool_call: string;
+  verdict: string;
+  verdict_rationale: string;
+  error?: string;
+
+  constructor(
+    user_prompt: string,
+    policy: string,
+    tool_call: string,
+    verdict: string,
+    verdict_rationale: string,
+    error?: string,
+  ) {
+    this['event.name'] = 'conseca_verdict';
+    this['event.timestamp'] = new Date().toISOString();
+    this.user_prompt = user_prompt;
+    this.policy = policy;
+    this.tool_call = tool_call;
+    this.verdict = verdict;
+    this.verdict_rationale = verdict_rationale;
+    this.error = error;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_CONSECA_VERDICT,
+      'event.timestamp': this['event.timestamp'],
+      user_prompt: this.user_prompt,
+      policy: this.policy,
+      tool_call: this.tool_call,
+      verdict: this.verdict,
+      verdict_rationale: this.verdict_rationale,
+    };
+
+    if (this.error) {
+      attributes['error'] = this.error;
+    }
+
+    return attributes;
+  }
+
+  toLogBody(): string {
+    return `Conseca Verdict: ${this.verdict}.`;
   }
 }
 

@@ -59,25 +59,33 @@ describe('<ToolMessage />', () => {
     renderWithProviders(ui, {
       uiActions,
       uiState: { streamingState },
+      width: 80,
     });
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
   });
 
-  it('renders basic tool information', () => {
-    const { lastFrame } = renderWithContext(
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('renders basic tool information', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithContext(
       <ToolMessage {...baseProps} />,
       StreamingState.Idle,
     );
+    await waitUntilReady();
     const output = lastFrame();
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
   describe('JSON rendering', () => {
-    it('pretty prints valid JSON', () => {
+    it('pretty prints valid JSON', async () => {
       const testJSONstring = '{"a": 1, "b": [2, 3]}';
-      const { lastFrame } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
         <ToolMessage
           {...baseProps}
           resultDisplay={testJSONstring}
@@ -85,6 +93,7 @@ describe('<ToolMessage />', () => {
         />,
         StreamingState.Idle,
       );
+      await waitUntilReady();
 
       const output = lastFrame();
 
@@ -94,22 +103,25 @@ describe('<ToolMessage />', () => {
       expect(output).toContain('"a": 1');
       expect(output).toContain('"b": [');
       // Should not use markdown renderer for JSON
+      unmount();
     });
 
-    it('renders pretty JSON in ink frame', () => {
-      const { lastFrame } = renderWithContext(
+    it('renders pretty JSON in ink frame', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
         <ToolMessage {...baseProps} resultDisplay='{"a":1,"b":2}' />,
         StreamingState.Idle,
       );
+      await waitUntilReady();
 
       const frame = lastFrame();
 
       expect(frame).toMatchSnapshot();
+      unmount();
     });
 
-    it('uses JSON renderer even when renderOutputAsMarkdown=true is true', () => {
+    it('uses JSON renderer even when renderOutputAsMarkdown=true is true', async () => {
       const testJSONstring = '{"a": 1, "b": [2, 3]}';
-      const { lastFrame } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
         <ToolMessage
           {...baseProps}
           resultDisplay={testJSONstring}
@@ -117,6 +129,7 @@ describe('<ToolMessage />', () => {
         />,
         StreamingState.Idle,
       );
+      await waitUntilReady();
 
       const output = lastFrame();
 
@@ -126,10 +139,11 @@ describe('<ToolMessage />', () => {
       expect(output).toContain('"a": 1');
       expect(output).toContain('"b": [');
       // Should not use markdown renderer for JSON even when renderOutputAsMarkdown=true
+      unmount();
     });
-    it('falls back to plain text for malformed JSON', () => {
+    it('falls back to plain text for malformed JSON', async () => {
       const testJSONstring = 'a": 1, "b": [2, 3]}';
-      const { lastFrame } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
         <ToolMessage
           {...baseProps}
           resultDisplay={testJSONstring}
@@ -137,16 +151,18 @@ describe('<ToolMessage />', () => {
         />,
         StreamingState.Idle,
       );
+      await waitUntilReady();
 
       const output = lastFrame();
 
       expect(tryParseJSON(testJSONstring)).toBeFalsy();
       expect(typeof output === 'string').toBeTruthy();
+      unmount();
     });
 
-    it('rejects mixed text + JSON renders as plain text', () => {
+    it('rejects mixed text + JSON renders as plain text', async () => {
       const testJSONstring = `{"result":  "count": 42,"items": ["apple", "banana"]},"meta": {"timestamp": "2025-09-28T12:34:56Z"}}End.`;
-      const { lastFrame } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
         <ToolMessage
           {...baseProps}
           resultDisplay={testJSONstring}
@@ -154,17 +170,19 @@ describe('<ToolMessage />', () => {
         />,
         StreamingState.Idle,
       );
+      await waitUntilReady();
 
       const output = lastFrame();
 
       expect(tryParseJSON(testJSONstring)).toBeFalsy();
       expect(typeof output === 'string').toBeTruthy();
+      unmount();
     });
 
-    it('rejects ANSI-tained JSON renders as plain text', () => {
+    it('rejects ANSI-tained JSON renders as plain text', async () => {
       const testJSONstring =
         '\u001b[32mOK\u001b[0m {"status": "success", "data": {"id": 123, "values": [10, 20, 30]}}';
-      const { lastFrame } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
         <ToolMessage
           {...baseProps}
           resultDisplay={testJSONstring}
@@ -172,16 +190,18 @@ describe('<ToolMessage />', () => {
         />,
         StreamingState.Idle,
       );
+      await waitUntilReady();
 
       const output = lastFrame();
 
       expect(tryParseJSON(testJSONstring)).toBeFalsy();
       expect(typeof output === 'string').toBeTruthy();
+      unmount();
     });
 
-    it('pretty printing 10kb JSON completes in <50ms', () => {
+    it('pretty printing 10kb JSON completes in <50ms', async () => {
       const large = '{"key": "' + 'x'.repeat(10000) + '"}';
-      const { lastFrame } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
         <ToolMessage
           {...baseProps}
           resultDisplay={large}
@@ -189,83 +209,101 @@ describe('<ToolMessage />', () => {
         />,
         StreamingState.Idle,
       );
+      await waitUntilReady();
 
       const start = performance.now();
       lastFrame();
       expect(performance.now() - start).toBeLessThan(50);
+      unmount();
     });
   });
 
   describe('ToolStatusIndicator rendering', () => {
-    it('shows ✓ for Success status', () => {
-      const { lastFrame } = renderWithContext(
+    it('shows ✓ for Success status', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
         <ToolMessage {...baseProps} status={CoreToolCallStatus.Success} />,
         StreamingState.Idle,
       );
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
-    it('shows o for Pending status', () => {
-      const { lastFrame } = renderWithContext(
+    it('shows o for Pending status', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
         <ToolMessage {...baseProps} status={CoreToolCallStatus.Scheduled} />,
         StreamingState.Idle,
       );
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
-    it('shows ? for Confirming status', () => {
-      const { lastFrame } = renderWithContext(
+    it('shows ? for Confirming status', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
         <ToolMessage
           {...baseProps}
           status={CoreToolCallStatus.AwaitingApproval}
         />,
         StreamingState.Idle,
       );
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
-    it('shows - for Canceled status', () => {
-      const { lastFrame } = renderWithContext(
+    it('shows - for Canceled status', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
         <ToolMessage {...baseProps} status={CoreToolCallStatus.Cancelled} />,
         StreamingState.Idle,
       );
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
-    it('shows x for Error status', () => {
-      const { lastFrame } = renderWithContext(
+    it('shows x for Error status', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
         <ToolMessage {...baseProps} status={CoreToolCallStatus.Error} />,
         StreamingState.Idle,
       );
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
-    it('shows paused spinner for Executing status when streamingState is Idle', () => {
-      const { lastFrame } = renderWithContext(
+    it('shows paused spinner for Executing status when streamingState is Idle', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
         <ToolMessage {...baseProps} status={CoreToolCallStatus.Executing} />,
         StreamingState.Idle,
       );
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
-    it('shows paused spinner for Executing status when streamingState is WaitingForConfirmation', () => {
-      const { lastFrame } = renderWithContext(
+    it('shows paused spinner for Executing status when streamingState is WaitingForConfirmation', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
         <ToolMessage {...baseProps} status={CoreToolCallStatus.Executing} />,
         StreamingState.WaitingForConfirmation,
       );
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
-    it('shows MockRespondingSpinner for Executing status when streamingState is Responding', () => {
-      const { lastFrame } = renderWithContext(
+    it('shows MockRespondingSpinner for Executing status when streamingState is Responding', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
         <ToolMessage {...baseProps} status={CoreToolCallStatus.Executing} />,
         StreamingState.Responding, // Simulate app still responding
       );
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
   });
 
-  it('renders DiffRenderer for diff results', () => {
+  it('renders DiffRenderer for diff results', async () => {
     const diffResult = {
       fileDiff: '--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new',
       fileName: 'file.txt',
@@ -273,33 +311,47 @@ describe('<ToolMessage />', () => {
       newContent: 'new',
       filePath: 'file.txt',
     };
-    const { lastFrame } = renderWithContext(
+    const { lastFrame, waitUntilReady, unmount } = renderWithContext(
       <ToolMessage {...baseProps} resultDisplay={diffResult} />,
       StreamingState.Idle,
     );
+    await waitUntilReady();
     // Check that the output contains the MockDiff content as part of the whole message
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('renders emphasis correctly', () => {
-    const { lastFrame: highEmphasisFrame } = renderWithContext(
+  it('renders emphasis correctly', async () => {
+    const {
+      lastFrame: highEmphasisFrame,
+      waitUntilReady: waitUntilReadyHigh,
+      unmount: unmountHigh,
+    } = renderWithContext(
       <ToolMessage {...baseProps} emphasis="high" />,
       StreamingState.Idle,
     );
+    await waitUntilReadyHigh();
     // Check for trailing indicator or specific color if applicable (Colors are not easily testable here)
     expect(highEmphasisFrame()).toMatchSnapshot();
+    unmountHigh();
 
-    const { lastFrame: lowEmphasisFrame } = renderWithContext(
+    const {
+      lastFrame: lowEmphasisFrame,
+      waitUntilReady: waitUntilReadyLow,
+      unmount: unmountLow,
+    } = renderWithContext(
       <ToolMessage {...baseProps} emphasis="low" />,
       StreamingState.Idle,
     );
+    await waitUntilReadyLow();
     // For low emphasis, the name and description might be dimmed (check for dimColor if possible)
     // This is harder to assert directly in text output without color checks.
     // We can at least ensure it doesn't have the high emphasis indicator.
     expect(lowEmphasisFrame()).toMatchSnapshot();
+    unmountLow();
   });
 
-  it('renders AnsiOutputText for AnsiOutput results', () => {
+  it('renders AnsiOutputText for AnsiOutput results', async () => {
     const ansiResult: AnsiOutput = [
       [
         {
@@ -314,10 +366,43 @@ describe('<ToolMessage />', () => {
         },
       ],
     ];
-    const { lastFrame } = renderWithContext(
+    const { lastFrame, waitUntilReady, unmount } = renderWithContext(
       <ToolMessage {...baseProps} resultDisplay={ansiResult} />,
       StreamingState.Idle,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders progress information appended to description for executing tools', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+      <ToolMessage
+        {...baseProps}
+        status={CoreToolCallStatus.Executing}
+        progressMessage="Working on it..."
+        progressPercent={42}
+      />,
+      StreamingState.Responding,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toContain(
+      'A tool for testing (Working on it... - 42%)',
+    );
+    unmount();
+  });
+
+  it('renders only percentage when progressMessage is missing', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+      <ToolMessage
+        {...baseProps}
+        status={CoreToolCallStatus.Executing}
+        progressPercent={75}
+      />,
+      StreamingState.Responding,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toContain('A tool for testing (75%)');
+    unmount();
   });
 });

@@ -38,7 +38,8 @@ export const copyCommand: SlashCommand = {
 
     if (lastAiOutput) {
       try {
-        await copyToClipboard(lastAiOutput);
+        const settings = context.services.settings.merged;
+        await copyToClipboard(lastAiOutput, settings);
 
         return {
           type: 'message',

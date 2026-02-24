@@ -23,6 +23,7 @@ import * as fs from 'node:fs';
 import { promptIdContext } from './promptIdContext.js';
 import { debugLogger } from './debugLogger.js';
 import { LRUCache } from 'mnemonist';
+import { LlmRole } from '../telemetry/types.js';
 
 const CODE_CORRECTION_SYSTEM_PROMPT = `
 You are an expert code-editing assistant. Your task is to analyze a failed edit attempt and provide a corrected version of the text snippets.
@@ -184,12 +185,16 @@ export async function ensureCorrectEdit(
     unescapeStringForGeminiBug(originalParams.new_string) !==
     originalParams.new_string;
 
-  const expectedReplacements = originalParams.expected_replacements ?? 1;
+  const allowMultiple = originalParams.allow_multiple ?? false;
 
   let finalOldString = originalParams.old_string;
   let occurrences = countOccurrences(currentContent, finalOldString);
 
-  if (occurrences === expectedReplacements) {
+  const isOccurrencesMatch = allowMultiple
+    ? occurrences > 0
+    : occurrences === 1;
+
+  if (isOccurrencesMatch) {
     if (newStringPotentiallyEscaped && !disableLLMCorrection) {
       finalNewString = await correctNewStringEscaping(
         baseLlmClient,
@@ -198,30 +203,8 @@ export async function ensureCorrectEdit(
         abortSignal,
       );
     }
-  } else if (occurrences > expectedReplacements) {
-    const expectedReplacements = originalParams.expected_replacements ?? 1;
-
-    // If user expects multiple replacements, return as-is
-    if (occurrences === expectedReplacements) {
-      const result: CorrectedEditResult = {
-        params: { ...originalParams },
-        occurrences,
-      };
-      editCorrectionCache.set(cacheKey, result);
-      return result;
-    }
-
-    // If user expects 1 but found multiple, try to correct (existing behavior)
-    if (expectedReplacements === 1) {
-      const result: CorrectedEditResult = {
-        params: { ...originalParams },
-        occurrences,
-      };
-      editCorrectionCache.set(cacheKey, result);
-      return result;
-    }
-
-    // If occurrences don't match expected, return as-is (will fail validation later)
+  } else if (occurrences > 1 && !allowMultiple) {
+    // If user doesn't allow multiple but found multiple, return as-is (will fail validation later)
     const result: CorrectedEditResult = {
       params: { ...originalParams },
       occurrences,
@@ -235,7 +218,11 @@ export async function ensureCorrectEdit(
     );
     occurrences = countOccurrences(currentContent, unescapedOldStringAttempt);
 
-    if (occurrences === expectedReplacements) {
+    const isUnescapedOccurrencesMatch = allowMultiple
+      ? occurrences > 0
+      : occurrences === 1;
+
+    if (isUnescapedOccurrencesMatch) {
       finalOldString = unescapedOldStringAttempt;
       if (newStringPotentiallyEscaped && !disableLLMCorrection) {
         finalNewString = await correctNewString(
@@ -295,7 +282,11 @@ export async function ensureCorrectEdit(
         llmCorrectedOldString,
       );
 
-      if (llmOldOccurrences === expectedReplacements) {
+      const isLlmOccurrencesMatch = allowMultiple
+        ? llmOldOccurrences > 0
+        : llmOldOccurrences === 1;
+
+      if (isLlmOccurrencesMatch) {
         finalOldString = llmCorrectedOldString;
         occurrences = llmOldOccurrences;
 
@@ -321,7 +312,7 @@ export async function ensureCorrectEdit(
         return result;
       }
     } else {
-      // Unescaping old_string resulted in > 1 occurrence
+      // Unescaping old_string resulted in > 1 occurrence but not allowMultiple
       const result: CorrectedEditResult = {
         params: { ...originalParams },
         occurrences, // This will be > 1
@@ -335,7 +326,7 @@ export async function ensureCorrectEdit(
     finalOldString,
     finalNewString,
     currentContent,
-    expectedReplacements,
+    allowMultiple,
   );
   finalOldString = targetString;
   finalNewString = pair;
@@ -439,6 +430,7 @@ Return ONLY the corrected target snippet in the specified JSON format with the k
       abortSignal,
       systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
       promptId: getPromptId(),
+      role: LlmRole.UTILITY_EDIT_CORRECTOR,
     });
 
     if (
@@ -528,6 +520,7 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
       abortSignal,
       systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
       promptId: getPromptId(),
+      role: LlmRole.UTILITY_EDIT_CORRECTOR,
     });
 
     if (
@@ -598,6 +591,7 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
       abortSignal,
       systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
       promptId: getPromptId(),
+      role: LlmRole.UTILITY_EDIT_CORRECTOR,
     });
 
     if (
@@ -665,6 +659,7 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
       abortSignal,
       systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
       promptId: getPromptId(),
+      role: LlmRole.UTILITY_EDIT_CORRECTOR,
     });
 
     if (
@@ -700,7 +695,7 @@ function trimPairIfPossible(
   target: string,
   trimIfTargetTrims: string,
   currentContent: string,
-  expectedReplacements: number,
+  allowMultiple: boolean,
 ) {
   const trimmedTargetString = trimPreservingTrailingNewline(target);
   if (target.length !== trimmedTargetString.length) {
@@ -709,7 +704,11 @@ function trimPairIfPossible(
       trimmedTargetString,
     );
 
-    if (trimmedTargetOccurrences === expectedReplacements) {
+    const isMatch = allowMultiple
+      ? trimmedTargetOccurrences > 0
+      : trimmedTargetOccurrences === 1;
+
+    if (isMatch) {
       const trimmedReactiveString =
         trimPreservingTrailingNewline(trimIfTargetTrims);
       return {

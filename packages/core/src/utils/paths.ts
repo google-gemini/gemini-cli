@@ -319,13 +319,15 @@ export function getProjectHash(projectRoot: string): string {
 }
 
 /**
- * Normalizes a path for reliable comparison.
+ * Normalizes a path for reliable comparison across platforms.
  * - Resolves to an absolute path.
+ * - Converts all path separators to forward slashes.
  * - On Windows, converts to lowercase for case-insensitivity.
  */
 export function normalizePath(p: string): string {
   const resolved = path.resolve(p);
-  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+  const normalized = resolved.replace(/\\/g, '/');
+  return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
 }
 
 /**
