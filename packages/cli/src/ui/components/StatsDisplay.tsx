@@ -290,7 +290,8 @@ const ModelUsageTable: React.FC<{
           <Box
             width={usageLimitWidth}
             flexDirection="column"
-            alignItems="flex-end"
+            alignItems="flex-start"
+            paddingLeft={4}
           >
             <Text bold color={theme.text.primary}>
               Model usage
@@ -375,7 +376,8 @@ const ModelUsageTable: React.FC<{
           <Box
             width={usageLimitWidth}
             flexDirection="column"
-            alignItems="flex-end"
+            alignItems="flex-start"
+            paddingLeft={4}
           >
             {row.bucket && (
               <Box flexDirection="row">
