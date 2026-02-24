@@ -654,6 +654,7 @@ export class Config {
   private compressionTruncationCounter = 0;
   private initialized = false;
   private initPromise: Promise<void> | undefined;
+  private mcpInitializationPromise: Promise<void> | null = null;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
@@ -1049,6 +1050,8 @@ export class Config {
         }
       }
     });
+
+    this.mcpInitializationPromise = mcpInitialization;
 
     if (!this.interactive || this.experimentalZedIntegration) {
       await mcpInitialization;
@@ -2078,6 +2081,12 @@ export class Config {
 
   getExperimentalZedIntegration(): boolean {
     return this.experimentalZedIntegration;
+  }
+
+  async waitForMcpInit(): Promise<void> {
+    if (this.mcpInitializationPromise) {
+      await this.mcpInitializationPromise;
+    }
   }
 
   getListExtensions(): boolean {

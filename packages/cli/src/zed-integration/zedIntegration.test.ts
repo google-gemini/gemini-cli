@@ -129,6 +129,7 @@ describe('GeminiAgent', () => {
     mockConfig = {
       refreshAuth: vi.fn(),
       initialize: vi.fn(),
+      waitForMcpInit: vi.fn(),
       getFileSystemService: vi.fn(),
       setFileSystemService: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
@@ -458,6 +459,7 @@ describe('Session', () => {
       getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
       setApprovalMode: vi.fn(),
       isPlanEnabled: vi.fn().mockReturnValue(false),
+      waitForMcpInit: vi.fn(),
     } as unknown as Mocked<Config>;
     mockConnection = {
       sessionUpdate: vi.fn(),
@@ -470,6 +472,28 @@ describe('Session', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('should await MCP initialization before processing a prompt', async () => {
+    const stream = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [{ content: { parts: [{ text: 'Hi' }] } }] },
+      },
+    ]);
+    mockChat.sendMessageStream.mockResolvedValue(stream);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'test' }],
+    });
+
+    expect(mockConfig.waitForMcpInit).toHaveBeenCalledOnce();
+    const waitOrder = (mockConfig.waitForMcpInit as Mock).mock
+      .invocationCallOrder[0];
+    const sendOrder = (mockChat.sendMessageStream as Mock).mock
+      .invocationCallOrder[0];
+    expect(waitOrder).toBeLessThan(sendOrder);
   });
 
   it('should handle prompt with text response', async () => {
