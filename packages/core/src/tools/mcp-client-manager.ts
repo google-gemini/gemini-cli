@@ -218,30 +218,27 @@ export class McpClientManager {
       (async () => {
         try {
           if (existing) {
+            this.clients.delete(name);
             await existing.disconnect();
           }
 
-          const client =
-            existing ??
-            new McpClient(
-              name,
-              config,
-              this.toolRegistry,
-              this.cliConfig.getPromptRegistry(),
-              this.cliConfig.getResourceRegistry(),
-              this.cliConfig.getWorkspaceContext(),
-              this.cliConfig,
-              this.cliConfig.getDebugMode(),
-              this.clientVersion,
-              async () => {
-                debugLogger.log('Tools changed, updating Gemini context...');
-                await this.scheduleMcpContextRefresh();
-              },
-            );
-          if (!existing) {
-            this.clients.set(name, client);
-            this.eventEmitter?.emit('mcp-client-update', this.clients);
-          }
+          const client = new McpClient(
+            name,
+            config,
+            this.toolRegistry,
+            this.cliConfig.getPromptRegistry(),
+            this.cliConfig.getResourceRegistry(),
+            this.cliConfig.getWorkspaceContext(),
+            this.cliConfig,
+            this.cliConfig.getDebugMode(),
+            this.clientVersion,
+            async () => {
+              debugLogger.log('Tools changed, updating Gemini context...');
+              await this.scheduleMcpContextRefresh();
+            },
+          );
+          this.clients.set(name, client);
+          this.eventEmitter?.emit('mcp-client-update', this.clients);
           try {
             await client.connect();
             await client.discover(this.cliConfig);
