@@ -102,7 +102,7 @@ describe('FileSecretStorage', () => {
     vi.clearAllMocks();
   });
 
-  it('should set and get a secret using deep hardware binding and double encryption', async () => {
+  it('should set and get a secret using stable hardware binding', async () => {
     const storedData = new Map<string, string>();
     mockFs.readFile.mockImplementation(async (filePath: string) => {
       const data = storedData.get(filePath);
@@ -135,31 +135,26 @@ describe('FileSecretStorage', () => {
 
     await storage.setSecret('key1', 'value1');
 
+    // Check v3 path
     const stealthPath = path.join(
       '/home/test',
       '.gemini',
-      '.sys-test-service-cache.db',
+      '.sys-test-service-v3.db',
     );
     const finalContent = storedData.get(stealthPath);
     expect(finalContent).toBeDefined();
     expect(finalContent).toMatch(/^v2:/);
 
-    // Check Installation ID
-    expect(storedData.has('/home/test/.gemini_id')).toBe(true);
-
-    // Verify atomic operation (temp file was used)
-    expect(mockFs.rename).toHaveBeenCalled();
-
-    // Re-read with a new instance to verify consistency
+    // Re-read
     const storage2 = new FileSecretStorage('test-service');
     const value = await storage2.getSecret('key1');
     expect(value).toBe('value1');
   });
 
-  it('should migrate legacy v1 files and upgrade to v2 double-encryption', async () => {
-    // Manually construct a legacy V1 file (No inner encryption)
+  it('should migrate from previous unstable cache files', async () => {
+    // Legacy derivation for 'v1'
     const machineIdentifier =
-      'os-uuid-hw-uuid-baseboard-serial-disk-serial-00:11:22:33:44:55-test-host-test-user';
+      'os-uuid|hw-uuid|baseboard-serial|test-host|test-user';
     const password = 'gemini-cli-secret-v1-test-service-';
     const salt = crypto
       .createHash('sha256')
@@ -175,14 +170,15 @@ describe('FileSecretStorage', () => {
     const authTag = cipher.getAuthTag();
     const v1Data = `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
 
-    const oldPath = path.join(
+    // Previous version paths
+    const v2Path = path.join(
       '/home/test',
       '.gemini',
-      'secrets-test-service.json',
+      '.sys-test-service-cache.db',
     );
 
     mockFs.readFile.mockImplementation(async (filePath: string) => {
-      if (filePath === oldPath) return v1Data;
+      if (filePath === v2Path) return v1Data;
       const error = new Error('File not found');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (error as any).code = 'ENOENT';

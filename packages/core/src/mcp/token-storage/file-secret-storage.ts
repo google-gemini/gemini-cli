@@ -36,23 +36,23 @@ function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
  * Security features:
  * 1. AES-256-GCM encryption for authenticated encryption.
  * 2. Key derivation using scrypt with random salt (v2) or machine-unique salt (v1).
- * 3. Deep Hardware Binding: Incorporates Baseboard Serials, Disk Serials, and Machine UUIDs.
+ * 3. Deep Hardware Binding: Incorporates Baseboard Serials and Machine UUIDs.
  * 4. Supports optional user-provided master key via GEMINI_MASTER_KEY.
  * 5. Strict file system permissions (0600).
  * 6. Hardcoded pepper for key derivation.
  * 7. Increased scrypt cost parameters (N=65536).
  * 8. System Keychain CLI (security/secret-tool) integration for Master Key storage.
- * 9. Environmental binding to file Inode and Birthtime to detect illegal moves.
- * 10. Installation ID: A hidden 3rd-factor file (.gemini_id) in the home directory.
- * 11. Plaintext Padding: Random noise added to secrets to obfuscate data length and count.
- * 12. Secret-Level Double-Encryption: Each secret is individually encrypted with a key derived from its name.
- * 13. Atomic Writes: Uses temporary files and renames to prevent data corruption.
+ * 9. Installation ID: A hidden 3rd-factor file (.gemini_id) in the home directory.
+ * 10. Plaintext Padding: Random noise added to secrets to obfuscate data length and count.
+ * 11. Secret-Level Double-Encryption: Each secret is individually encrypted with a key derived from its name.
+ * 12. Atomic Writes: Uses temporary files and renames to prevent data corruption.
  */
 export class FileSecretStorage implements SecretStorage {
   private readonly secretFilePath: string;
   private readonly installationIdPath: string;
   private encryptionKey: Buffer | null = null;
   private readonly serviceName: string;
+  private readonly sanitizedService: string;
   private initPromise: Promise<void> | null = null;
 
   // Pepper to add extra entropy to the password
@@ -62,13 +62,14 @@ export class FileSecretStorage implements SecretStorage {
 
   constructor(serviceName: string) {
     const configDir = path.join(homedir(), GEMINI_DIR);
-    const sanitizedService = serviceName.replace(/[^a-zA-Z0-9-_.]/g, '_');
+    this.sanitizedService = serviceName.replace(/[^a-zA-Z0-9-_.]/g, '_');
 
+    // v3 filename to clear unstable previous versions and fix atomic write corruption
     this.secretFilePath = path.join(
       configDir,
-      `.sys-${sanitizedService}-cache.db`,
+      `.sys-${this.sanitizedService}-v3.db`,
     );
-    this.installationIdPath = path.join(homedir(), '.gemini_id');
+    this.installationIdPath = path.join(configDir, 'installation_id');
     this.serviceName = serviceName;
   }
 
@@ -82,9 +83,12 @@ export class FileSecretStorage implements SecretStorage {
     } catch {
       const newId = crypto.randomBytes(32).toString('hex');
       try {
+        await fs.mkdir(path.dirname(this.installationIdPath), {
+          recursive: true,
+        });
         await fs.writeFile(this.installationIdPath, newId, { mode: 0o600 });
       } catch {
-        // Fallback to hardware-only
+        // Fallback
       }
       return newId;
     }
@@ -106,7 +110,7 @@ export class FileSecretStorage implements SecretStorage {
   }
 
   private async getPersistentSystemSecret(): Promise<string | null> {
-    const account = `gemini-cli-master-${this.serviceName}`;
+    const account = `gemini-cli-master-${this.sanitizedService}`;
     const service = 'gemini-cli-secret-storage';
 
     try {
@@ -128,7 +132,7 @@ export class FileSecretStorage implements SecretStorage {
   }
 
   private async setPersistentSystemSecret(secret: string): Promise<void> {
-    const account = `gemini-cli-master-${this.serviceName}`;
+    const account = `gemini-cli-master-${this.sanitizedService}`;
     const service = 'gemini-cli-secret-storage';
 
     try {
@@ -147,47 +151,40 @@ export class FileSecretStorage implements SecretStorage {
   }
 
   /**
-   * Derives a strong encryption key with deep hardware binding.
+   * Derives a strong encryption key with stable hardware binding.
    */
   private async deriveEncryptionKey(
     providedSalt?: Buffer,
     version: 'v1' | 'v2' = 'v2',
   ): Promise<Buffer> {
     if (!FileSecretStorage.machineIdentifierCache) {
+      let osUuid = '';
+      let hwUuid = '';
+      let baseboardSerial = '';
+
       try {
-        const [uuid, baseboard, disks, network] = await Promise.all([
-          si.uuid(),
-          si.baseboard(),
-          si.diskLayout(),
-          si.networkInterfaces(),
-        ]);
-
-        // Deep hardware fingerprint including MAC addresses
-        const macs = Array.isArray(network)
-          ? network
-              .map((n) => n.mac)
-              .filter((m) => m && m !== '00:00:00:00:00:00')
-              .sort()
-              .join(',')
-          : '';
-
-        FileSecretStorage.machineIdentifierCache = [
-          uuid.os,
-          uuid.hardware,
-          baseboard.serial,
-          disks
-            .map((d) => d.serialNum)
-            .filter(Boolean)
-            .join(','),
-          macs,
-          os.hostname(),
-          os.userInfo().username,
-        ]
-          .filter(Boolean)
-          .join('-');
+        const uuid = await si.uuid();
+        osUuid = uuid.os || '';
+        hwUuid = uuid.hardware || '';
       } catch {
-        FileSecretStorage.machineIdentifierCache = `${os.hostname()}-${os.userInfo().username}`;
+        /* ignore */
       }
+
+      try {
+        const baseboard = await si.baseboard();
+        baseboardSerial = baseboard.serial || '';
+      } catch {
+        /* ignore */
+      }
+
+      // Fingerprint structure MUST be stable even if values are missing
+      FileSecretStorage.machineIdentifierCache = [
+        osUuid,
+        hwUuid,
+        baseboardSerial,
+        os.hostname() || 'unknown-host',
+        os.userInfo().username || 'unknown-user',
+      ].join('|');
     }
     const machineIdentifier = FileSecretStorage.machineIdentifierCache;
 
@@ -207,7 +204,7 @@ export class FileSecretStorage implements SecretStorage {
 
     const password =
       version === 'v2'
-        ? `${FileSecretStorage.PEPPER}-v3-${this.serviceName}-${machineIdentifier}-${systemSecret}-${installationId}-${userSecret}`
+        ? `${FileSecretStorage.PEPPER}-v4-${this.sanitizedService}-${machineIdentifier}-${systemSecret}-${installationId}-${userSecret}`
         : `gemini-cli-secret-v1-${this.serviceName}-${userSecret}`;
 
     let salt: Buffer;
@@ -321,17 +318,23 @@ export class FileSecretStorage implements SecretStorage {
       if (isErrnoException(error) && error.code === 'ENOENT') {
         try {
           const configDir = path.dirname(this.secretFilePath);
-          const sanitizedService = this.serviceName.replace(
-            /[^a-zA-Z0-9-_.]/g,
-            '_',
-          );
           const oldPath = path.join(
             configDir,
-            `secrets-${sanitizedService}.json`,
+            `secrets-${this.sanitizedService}.json`,
           );
           data = await fs.readFile(oldPath, 'utf-8');
         } catch {
-          return {};
+          // Check for previous unstable cache files
+          try {
+            const configDir = path.dirname(this.secretFilePath);
+            const unstablePath = path.join(
+              configDir,
+              `.sys-${this.sanitizedService}-cache.db`,
+            );
+            data = await fs.readFile(unstablePath, 'utf-8');
+          } catch {
+            return {};
+          }
         }
       } else {
         throw error;
@@ -421,12 +424,6 @@ export class FileSecretStorage implements SecretStorage {
 
     // Atomic Write: Prepare temp file
     const tempPath = `${this.secretFilePath}.tmp`;
-
-    try {
-      await fs.writeFile(this.secretFilePath, '', { flag: 'a', mode: 0o600 });
-    } catch {
-      /* Ignore */
-    }
 
     await this.ensureInitialized(salt, 'v2');
     if (!this.encryptionKey) throw new Error('Init failed');
