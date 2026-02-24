@@ -72,19 +72,34 @@ export class EncryptedFileSecretStorage implements SecretStorage {
     try {
       const data = await fs.readFile(this.tokenFilePath, 'utf-8');
       const decrypted = this.decrypt(data);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return JSON.parse(decrypted) as Record<string, Record<string, string>>;
+      const parsed: unknown = JSON.parse(decrypted);
+      const result: Record<string, Record<string, string>> = {};
+      if (typeof parsed === 'object' && parsed !== null) {
+        for (const [service, secrets] of Object.entries(parsed)) {
+          if (typeof secrets === 'object' && secrets !== null) {
+            result[service] = {};
+            for (const [key, value] of Object.entries(secrets)) {
+              if (typeof value === 'string') {
+                result[service][key] = value;
+              }
+            }
+          }
+        }
+      }
+      return result;
     } catch (error: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const err = error as NodeJS.ErrnoException & { message?: string };
-      if (err.code === 'ENOENT') {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      ) {
         return {};
       }
+      const errMessage = error instanceof Error ? error.message : String(error);
       if (
-        err.message?.includes('Invalid encrypted data format') ||
-        err.message?.includes(
-          'Unsupported state or unable to authenticate data',
-        )
+        errMessage.includes('Invalid encrypted data format') ||
+        errMessage.includes('Unsupported state or unable to authenticate data')
       ) {
         throw new Error(
           `Corrupted secret file detected at: ${this.tokenFilePath}
@@ -122,7 +137,6 @@ export class EncryptedFileSecretStorage implements SecretStorage {
     const allSecrets = await this.loadSecrets();
     if (allSecrets[this.serviceName]?.[key]) {
       delete allSecrets[this.serviceName][key];
-      // Clean up empty service object
       if (Object.keys(allSecrets[this.serviceName]).length === 0) {
         delete allSecrets[this.serviceName];
       }
@@ -131,9 +145,12 @@ export class EncryptedFileSecretStorage implements SecretStorage {
         try {
           await fs.unlink(this.tokenFilePath);
         } catch (error: unknown) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const err = error as NodeJS.ErrnoException;
-          if (err.code !== 'ENOENT') {
+          if (
+            error &&
+            typeof error === 'object' &&
+            'code' in error &&
+            error.code !== 'ENOENT'
+          ) {
             throw error;
           }
         }
