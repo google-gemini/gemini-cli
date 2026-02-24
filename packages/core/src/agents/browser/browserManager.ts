@@ -23,7 +23,10 @@ import type { Tool as McpTool } from '@modelcontextprotocol/sdk/types.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import type { Config } from '../../config/config.js';
 import { Storage } from '../../config/storage.js';
-import type { BrowserSessionLogger } from './browserSessionLogger.js';
+import {
+  type BrowserSessionLogger,
+  redactSensitiveFields,
+} from './browserSessionLogger.js';
 import * as path from 'node:path';
 
 // Pin chrome-devtools-mcp version for reproducibility.
@@ -117,7 +120,10 @@ export class BrowserManager {
       throw signal.reason ?? new Error('Operation cancelled');
     }
 
-    this.sessionLogger?.logEvent('mcp_tool_call', { toolName, args });
+    this.sessionLogger?.logEvent('mcp_tool_call', {
+      toolName,
+      args: redactSensitiveFields(args),
+    });
 
     const client = await this.getRawMcpClient();
     const callPromise = client.callTool(

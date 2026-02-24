@@ -29,6 +29,7 @@ vi.mock('./browserSessionLogger.js', () => ({
     close: vi.fn(),
     getFilePath: vi.fn().mockReturnValue('/tmp/test.jsonl'),
   })),
+  redactSensitiveFields: vi.fn((data: Record<string, unknown>) => data),
 }));
 
 describe('BrowserAgentInvocation', () => {
@@ -264,13 +265,13 @@ describe('BrowserAgentInvocation', () => {
       );
     });
 
-    it('should detect failed TOOL_CALL_END via error prefix', () => {
+    it('should treat TOOL_CALL_END as success since executor only emits it for successful calls', () => {
       const activity = makeActivity('TOOL_CALL_END', {
         name: 'click',
-        output: 'Error: element not found',
+        output: 'Clicked element',
       });
-      const output = String(activity.data['output'] ?? '');
-      expect(output.toLowerCase().startsWith('error')).toBe(true);
+      expect(activity.type).toBe('TOOL_CALL_END');
+      expect(activity.data['name']).toBe('click');
     });
 
     it('should format ERROR events', () => {

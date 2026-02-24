@@ -29,7 +29,10 @@ import {
   createBrowserAgentDefinition,
   cleanupBrowserAgent,
 } from './browserAgentFactory.js';
-import { BrowserSessionLogger } from './browserSessionLogger.js';
+import {
+  BrowserSessionLogger,
+  redactSensitiveFields,
+} from './browserSessionLogger.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -111,11 +114,7 @@ function formatActivityMessage(
     case 'TOOL_CALL_END': {
       const name = String(activity.data['name'] ?? '');
       if (name === TASK_COMPLETE_TOOL_NAME) return undefined;
-      const output = String(activity.data['output'] ?? '');
-      const failed =
-        output.toLowerCase().startsWith('error') ||
-        output.toLowerCase().includes('failed');
-      return failed ? `🌐❌ ${name} failed\n` : `🌐✅ ${name} completed\n`;
+      return `🌐✅ ${name} completed\n`;
     }
     case 'ERROR': {
       const error = String(activity.data['error'] ?? 'Unknown error');
@@ -218,7 +217,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
 
       const onActivity = (activity: SubagentActivityEvent): void => {
         sessionLogger.logEvent(`activity_${activity.type.toLowerCase()}`, {
-          ...activity.data,
+          ...redactSensitiveFields(activity.data),
           agentName: activity.agentName,
         });
 

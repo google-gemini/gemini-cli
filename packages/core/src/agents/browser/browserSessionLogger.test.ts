@@ -8,7 +8,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { BrowserSessionLogger } from './browserSessionLogger.js';
+import {
+  BrowserSessionLogger,
+  redactSensitiveFields,
+} from './browserSessionLogger.js';
 
 vi.mock('../../utils/debugLogger.js', () => ({
   debugLogger: {
@@ -103,5 +106,69 @@ describe('BrowserSessionLogger', () => {
 
     // Restore permissions for cleanup
     fs.chmodSync(logger.getFilePath(), 0o644);
+  });
+
+  it('should create log files with restrictive permissions', () => {
+    const logger = new BrowserSessionLogger(tmpDir, 'sess-perms');
+    logger.logEvent('test', { key: 'value' });
+
+    const stats = fs.statSync(logger.getFilePath());
+    // 0o600 = owner read+write only (octal 33188 on most systems)
+    const mode = stats.mode & 0o777;
+    expect(mode).toBe(0o600);
+  });
+});
+
+describe('redactSensitiveFields', () => {
+  it('should redact known sensitive keys', () => {
+    const data = {
+      value: 'my-password',
+      text: 'secret-text',
+      password: 'hunter2',
+      token: 'abc123',
+    };
+    const result = redactSensitiveFields(data);
+    expect(result['value']).toBe('[REDACTED]');
+    expect(result['text']).toBe('[REDACTED]');
+    expect(result['password']).toBe('[REDACTED]');
+    expect(result['token']).toBe('[REDACTED]');
+  });
+
+  it('should preserve non-sensitive keys', () => {
+    const data = { uid: '87_4', name: 'click', url: 'https://example.com' };
+    const result = redactSensitiveFields(data);
+    expect(result).toEqual(data);
+  });
+
+  it('should redact sensitive keys inside nested args', () => {
+    const data = {
+      name: 'fill',
+      args: { uid: '5_1', value: 'super-secret' },
+    };
+    const result = redactSensitiveFields(data);
+    expect(result['name']).toBe('fill');
+    const args = result['args'] as Record<string, unknown>;
+    expect(args['uid']).toBe('5_1');
+    expect(args['value']).toBe('[REDACTED]');
+  });
+
+  it('should be case-insensitive for key matching', () => {
+    const data = { Password: 'secret', TOKEN: 'abc' };
+    const result = redactSensitiveFields(data);
+    expect(result['Password']).toBe('[REDACTED]');
+    expect(result['TOKEN']).toBe('[REDACTED]');
+  });
+
+  it('should not redact non-string values for sensitive keys', () => {
+    const data = { value: 42, text: true };
+    const result = redactSensitiveFields(data);
+    expect(result['value']).toBe(42);
+    expect(result['text']).toBe(true);
+  });
+
+  it('should not mutate the original object', () => {
+    const data = { value: 'secret', uid: '1_2' };
+    redactSensitiveFields(data);
+    expect(data['value']).toBe('secret');
   });
 });

@@ -25,12 +25,44 @@ export interface BrowserLogEntry {
   data: Record<string, unknown>;
 }
 
+const SENSITIVE_KEY_PATTERN =
+  /^(value|text|password|secret|token|key|credential|auth)$/i;
+
+const REDACTED = '[REDACTED]';
+
+/**
+ * Returns a shallow copy of `data` with values redacted for keys that match
+ * common sensitive-field names. Nested `args` objects are redacted recursively.
+ */
+export function redactSensitiveFields(
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (SENSITIVE_KEY_PATTERN.test(key) && typeof value === 'string') {
+      result[key] = REDACTED;
+    } else if (
+      key === 'args' &&
+      typeof value === 'object' &&
+      value !== null &&
+      !Array.isArray(value)
+    ) {
+      result[key] = redactSensitiveFields(
+        Object.fromEntries(Object.entries(value)),
+      );
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 export class BrowserSessionLogger {
   private readonly filePath: string;
   private closed = false;
 
   constructor(logsDir: string, sessionId: string) {
-    fs.mkdirSync(logsDir, { recursive: true });
+    fs.mkdirSync(logsDir, { recursive: true, mode: 0o700 });
     this.filePath = path.join(logsDir, `browser-session-${sessionId}.jsonl`);
   }
 
@@ -48,7 +80,9 @@ export class BrowserSessionLogger {
     };
 
     try {
-      fs.appendFileSync(this.filePath, JSON.stringify(entry) + '\n');
+      fs.appendFileSync(this.filePath, JSON.stringify(entry) + '\n', {
+        mode: 0o600,
+      });
     } catch (err) {
       debugLogger.warn(
         `Browser session log write failed: ${err instanceof Error ? err.message : String(err)}`,
