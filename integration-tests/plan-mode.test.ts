@@ -6,7 +6,6 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig, checkModelOutputContent } from './test-helper.js';
-import path from 'node:path';
 
 describe('Plan Mode', () => {
   let rig: TestRig;
@@ -43,11 +42,9 @@ describe('Plan Mode', () => {
         'Please list the files in the current directory, and then attempt to create a new file named "denied.txt" using a shell command.',
     });
 
-    // list_directory should be called and succeed.
     const lsCallFound = await rig.waitForToolCall('list_directory');
     expect(lsCallFound, 'Expected list_directory to be called').toBe(true);
 
-    // run_shell_command should be called but fail.
     const shellCallFound = await rig.waitForToolCall('run_shell_command');
     expect(shellCallFound, 'Expected run_shell_command to fail').toBe(false);
 
@@ -91,13 +88,13 @@ describe('Plan Mode', () => {
       (l) => l.toolRequest.name === 'write_file',
     );
 
-    // We expect at least two write_file calls: one for the plan and one for the blocked file.
-    const expectedPlanPath = path.join('plans', 'plan.md');
-    const planWrite = writeLogs.find((l) =>
-      l.toolRequest.args.includes(expectedPlanPath),
+    const planWrite = writeLogs.find(
+      (l) =>
+        l.toolRequest.args.includes('plans') &&
+        l.toolRequest.args.includes('plan.md'),
     );
 
-    expect(planWrite?.toolRequest.success).toBeDefined();
+    expect(planWrite?.toolRequest.success).toBe(true);
   });
 
   it('should be able to enter plan mode from default mode', async () => {
