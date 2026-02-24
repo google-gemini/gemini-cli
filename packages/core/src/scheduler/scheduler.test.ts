@@ -75,6 +75,7 @@ import type {
   CancelledToolCall,
   CompletedToolCall,
   ToolCallResponseInfo,
+  ExecutingToolCall,
   Status,
   ToolCall,
 } from './types.js';
@@ -86,7 +87,11 @@ import {
   getToolCallContext,
   type ToolCallContext,
 } from '../utils/toolCallContext.js';
-import { coreEvents, CoreEvent } from '../utils/events.js';
+import {
+  coreEvents,
+  CoreEvent,
+  type McpProgressPayload,
+} from '../utils/events.js';
 
 describe('Scheduler (Orchestrator)', () => {
   let scheduler: Scheduler;
@@ -1189,5 +1194,224 @@ describe('Scheduler (Orchestrator)', () => {
         expect.any(Function),
       );
     });
+  });
+});
+
+describe('Scheduler MCP Progress', () => {
+  let scheduler: Scheduler;
+  let mockStateManager: Mocked<SchedulerStateManager>;
+  let mockActiveCallsMap: Map<string, ToolCall>;
+  let mockConfig: Mocked<Config>;
+  let mockMessageBus: Mocked<MessageBus>;
+  let getPreferredEditor: Mock<() => EditorType | undefined>;
+
+  const makePayload = (
+    callId: string,
+    progress: number,
+    overrides: Partial<McpProgressPayload> = {},
+  ): McpProgressPayload => ({
+    serverName: 'test-server',
+    callId,
+    progressToken: 'tok-1',
+    progress,
+    ...overrides,
+  });
+
+  const makeExecutingCall = (callId: string): ExecutingToolCall =>
+    ({
+      status: CoreToolCallStatus.Executing,
+      request: {
+        callId,
+        name: 'mcp-tool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p-1',
+        schedulerId: ROOT_SCHEDULER_ID,
+        parentCallId: undefined,
+      },
+      tool: {
+        name: 'mcp-tool',
+        build: vi.fn(),
+      } as unknown as AnyDeclarativeTool,
+      invocation: {} as unknown as AnyToolInvocation,
+    }) as ExecutingToolCall;
+
+  beforeEach(() => {
+    vi.mocked(randomUUID).mockReturnValue(
+      '123e4567-e89b-12d3-a456-426614174000',
+    );
+
+    mockActiveCallsMap = new Map<string, ToolCall>();
+
+    mockStateManager = {
+      enqueue: vi.fn(),
+      dequeue: vi.fn(),
+      peekQueue: vi.fn(),
+      getToolCall: vi.fn((id: string) => mockActiveCallsMap.get(id)),
+      updateStatus: vi.fn(),
+      finalizeCall: vi.fn(),
+      updateArgs: vi.fn(),
+      setOutcome: vi.fn(),
+      cancelAllQueued: vi.fn(),
+      clearBatch: vi.fn(),
+    } as unknown as Mocked<SchedulerStateManager>;
+
+    Object.defineProperty(mockStateManager, 'isActive', {
+      get: vi.fn(() => mockActiveCallsMap.size > 0),
+      configurable: true,
+    });
+    Object.defineProperty(mockStateManager, 'allActiveCalls', {
+      get: vi.fn(() => Array.from(mockActiveCallsMap.values())),
+      configurable: true,
+    });
+    Object.defineProperty(mockStateManager, 'queueLength', {
+      get: vi.fn(() => 0),
+      configurable: true,
+    });
+    Object.defineProperty(mockStateManager, 'firstActiveCall', {
+      get: vi.fn(() => mockActiveCallsMap.values().next().value),
+      configurable: true,
+    });
+    Object.defineProperty(mockStateManager, 'completedBatch', {
+      get: vi.fn().mockReturnValue([]),
+      configurable: true,
+    });
+
+    const mockPolicyEngine = {
+      check: vi.fn().mockResolvedValue({ decision: PolicyDecision.ALLOW }),
+    } as unknown as Mocked<PolicyEngine>;
+
+    const mockToolRegistry = {
+      getTool: vi.fn(),
+      getAllToolNames: vi.fn().mockReturnValue([]),
+    } as unknown as Mocked<ToolRegistry>;
+
+    mockConfig = {
+      getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      isInteractive: vi.fn().mockReturnValue(true),
+      getEnableHooks: vi.fn().mockReturnValue(true),
+      setApprovalMode: vi.fn(),
+      getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+    } as unknown as Mocked<Config>;
+
+    mockMessageBus = {
+      publish: vi.fn(),
+      subscribe: vi.fn(),
+    } as unknown as Mocked<MessageBus>;
+
+    getPreferredEditor = vi.fn().mockReturnValue('vim');
+
+    vi.mocked(SchedulerStateManager).mockImplementation(
+      (_messageBus, _schedulerId, _onTerminalCall) =>
+        mockStateManager as unknown as SchedulerStateManager,
+    );
+
+    scheduler = new Scheduler({
+      config: mockConfig,
+      messageBus: mockMessageBus,
+      getPreferredEditor,
+      schedulerId: 'progress-test',
+    });
+  });
+
+  afterEach(() => {
+    scheduler.dispose();
+    vi.clearAllMocks();
+  });
+
+  it('should update state on progress event', () => {
+    const call = makeExecutingCall('call-A');
+    mockActiveCallsMap.set('call-A', call);
+
+    coreEvents.emit(CoreEvent.McpProgress, makePayload('call-A', 10));
+
+    expect(mockStateManager.updateStatus).toHaveBeenCalledTimes(1);
+    expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+      'call-A',
+      CoreToolCallStatus.Executing,
+      expect.objectContaining({ progress: 10 }),
+    );
+  });
+
+  it('should not respond to progress events after dispose()', () => {
+    const call = makeExecutingCall('call-A');
+    mockActiveCallsMap.set('call-A', call);
+
+    scheduler.dispose();
+
+    coreEvents.emit(CoreEvent.McpProgress, makePayload('call-A', 10));
+
+    expect(mockStateManager.updateStatus).not.toHaveBeenCalled();
+  });
+
+  it('should handle concurrent calls independently', () => {
+    const callA = makeExecutingCall('call-A');
+    const callB = makeExecutingCall('call-B');
+    mockActiveCallsMap.set('call-A', callA);
+    mockActiveCallsMap.set('call-B', callB);
+
+    coreEvents.emit(CoreEvent.McpProgress, makePayload('call-A', 10));
+    coreEvents.emit(CoreEvent.McpProgress, makePayload('call-B', 20));
+
+    expect(mockStateManager.updateStatus).toHaveBeenCalledTimes(2);
+    expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+      'call-A',
+      CoreToolCallStatus.Executing,
+      expect.objectContaining({ progress: 10 }),
+    );
+    expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+      'call-B',
+      CoreToolCallStatus.Executing,
+      expect.objectContaining({ progress: 20 }),
+    );
+  });
+
+  it('should ignore progress for a callId not in active calls', () => {
+    coreEvents.emit(CoreEvent.McpProgress, makePayload('unknown-call', 10));
+
+    expect(mockStateManager.updateStatus).not.toHaveBeenCalled();
+  });
+
+  it('should ignore progress for a call in a terminal state', () => {
+    const successCall = {
+      status: CoreToolCallStatus.Success,
+      request: {
+        callId: 'call-done',
+        name: 'mcp-tool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p-1',
+        schedulerId: ROOT_SCHEDULER_ID,
+        parentCallId: undefined,
+      },
+      tool: { name: 'mcp-tool' },
+      response: { callId: 'call-done', responseParts: [] },
+    } as unknown as ToolCall;
+    mockActiveCallsMap.set('call-done', successCall);
+
+    coreEvents.emit(CoreEvent.McpProgress, makePayload('call-done', 50));
+
+    expect(mockStateManager.updateStatus).not.toHaveBeenCalled();
+  });
+
+  it('should compute validTotal and percentage for determinate progress', () => {
+    const call = makeExecutingCall('call-A');
+    mockActiveCallsMap.set('call-A', call);
+
+    coreEvents.emit(
+      CoreEvent.McpProgress,
+      makePayload('call-A', 50, { total: 100 }),
+    );
+
+    expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+      'call-A',
+      CoreToolCallStatus.Executing,
+      expect.objectContaining({
+        progress: 50,
+        progressTotal: 100,
+        progressPercent: 50,
+      }),
+    );
   });
 });
