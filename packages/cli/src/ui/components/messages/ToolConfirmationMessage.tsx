@@ -543,6 +543,9 @@ export const ToolConfirmationMessage: React.FC<
                   : ToolConfirmationOutcome.ProceedAlwaysAndSaveCustom,
                 { commandPrefix: prefix },
               );
+            } else {
+              // If the prefix is empty, treat it as a cancellation.
+              setCustomPrefixMode(null);
             }
           }}
           onCancel={() => {
