@@ -2511,6 +2511,56 @@ describe('Config Quota & Preview Model Access', () => {
     });
   });
 
+  describe('getGemini31LaunchedSync', () => {
+    it('should return true if authType is USE_GEMINI', async () => {
+      vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+        authType: AuthType.USE_GEMINI,
+      } as ContentGeneratorConfig);
+      await config.refreshAuth(AuthType.USE_GEMINI);
+      expect(config.getGemini31LaunchedSync()).toBe(true);
+    });
+
+    it('should return true if userTier is STANDARD', () => {
+      vi.mocked(getCodeAssistServer).mockReturnValue({
+        userTier: UserTierId.STANDARD,
+      } as Partial<CodeAssistServer> as CodeAssistServer);
+      expect(config.getGemini31LaunchedSync()).toBe(true);
+    });
+
+    it('should return true if experiment flag is true', () => {
+      vi.mocked(getCodeAssistServer).mockReturnValue({
+        userTier: UserTierId.FREE,
+      } as Partial<CodeAssistServer> as CodeAssistServer);
+      Object.defineProperty(config, 'experiments', {
+        value: {
+          flags: {
+            [ExperimentFlags.GEMINI_3_1_PRO_LAUNCHED]: { boolValue: true },
+          },
+        },
+        writable: true,
+      });
+      expect(config.getGemini31LaunchedSync()).toBe(true);
+    });
+
+    it('should return false if authType is Google, userTier is FREE, and flag is false', () => {
+      vi.spyOn(config, 'getContentGeneratorConfig').mockReturnValue({
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      } as ContentGeneratorConfig);
+      vi.mocked(getCodeAssistServer).mockReturnValue({
+        userTier: UserTierId.FREE,
+      } as Partial<CodeAssistServer> as CodeAssistServer);
+      Object.defineProperty(config, 'experiments', {
+        value: {
+          flags: {
+            [ExperimentFlags.GEMINI_3_1_PRO_LAUNCHED]: { boolValue: false },
+          },
+        },
+        writable: true,
+      });
+      expect(config.getGemini31LaunchedSync()).toBe(false);
+    });
+  });
+
   describe('isPlanEnabled', () => {
     it('should return false by default', () => {
       const config = new Config(baseParams);
