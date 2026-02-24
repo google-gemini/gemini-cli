@@ -1047,9 +1047,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           completion.promptCompletion.text,
         );
         if (nextText) {
-          const safeNextText = stripUnsafeCharacters(nextText);
-          buffer.setText(safeNextText);
-          completion.promptCompletion.markSelected(safeNextText);
+          buffer.setText(nextText);
+          completion.promptCompletion.markSelected(nextText);
           setExpandedSuggestionIndex(-1);
           return true;
         }
