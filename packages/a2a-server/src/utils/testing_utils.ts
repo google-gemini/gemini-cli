@@ -71,6 +71,7 @@ export function createMockConfig(
       getMcpServers: vi.fn().mockReturnValue({}),
     }),
     getGitService: vi.fn(),
+    validatePathAccess: vi.fn().mockReturnValue(undefined),
     ...overrides,
   } as unknown as Config;
   mockConfig.getMessageBus = vi.fn().mockReturnValue(createMockMessageBus());
