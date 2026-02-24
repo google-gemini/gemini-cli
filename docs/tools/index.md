@@ -52,6 +52,9 @@ These tools help the model manage its plan and interact with you.
   complex plans.
 - **[Agent Skills](../cli/skills.md) (`activate_skill`):** Loads specialized
   procedural expertise when needed.
+- **[Browser agent](../core/subagents.md#browser-agent-experimental)
+  (`browser_agent`):** Automates web browser tasks through the accessibility
+  tree.
 - **Internal docs (`get_internal_docs`):** Accesses Gemini CLI's own
   documentation to help answer your questions.
 
