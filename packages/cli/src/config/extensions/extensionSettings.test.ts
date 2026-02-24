@@ -590,6 +590,29 @@ describe('extensionSettings', () => {
         SENSITIVE_VAR: 'workspace-secret',
       });
     });
+
+    it('should ignore .env if it is a directory', async () => {
+      const workspaceEnvPath = path.join(
+        tempWorkspaceDir,
+        EXTENSION_SETTINGS_FILENAME,
+      );
+      fs.mkdirSync(workspaceEnvPath);
+      const workspaceKeychain = new KeychainTokenStorage(
+        `Gemini CLI Extensions test-ext 12345 ${tempWorkspaceDir}`,
+      );
+      await workspaceKeychain.setSecret('SENSITIVE_VAR', 'workspace-secret');
+
+      const contents = await getScopedEnvContents(
+        config,
+        extensionId,
+        ExtensionSettingScope.WORKSPACE,
+        tempWorkspaceDir,
+      );
+
+      expect(contents).toEqual({
+        SENSITIVE_VAR: 'workspace-secret',
+      });
+    });
   });
 
   describe('getEnvContents (merged)', () => {
@@ -694,6 +717,26 @@ describe('extensionSettings', () => {
       const expectedEnvPath = path.join(tempWorkspaceDir, '.env');
       const actualContent = await fsPromises.readFile(expectedEnvPath, 'utf-8');
       expect(actualContent).toContain('VAR1=new-workspace-value');
+    });
+
+    it('should throw an error when trying to write to a workspace with a .env directory', async () => {
+      const workspaceEnvPath = path.join(tempWorkspaceDir, '.env');
+      fs.mkdirSync(workspaceEnvPath);
+
+      mockRequestSetting.mockResolvedValue('new-workspace-value');
+
+      await expect(
+        updateSetting(
+          config,
+          '12345',
+          'VAR1',
+          mockRequestSetting,
+          ExtensionSettingScope.WORKSPACE,
+          tempWorkspaceDir,
+        ),
+      ).rejects.toThrow(
+        /Cannot write extension settings to .* because it is a directory./,
+      );
     });
 
     it('should update a sensitive setting in USER scope', async () => {
