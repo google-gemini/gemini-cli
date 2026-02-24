@@ -154,34 +154,40 @@ function getTextWithNextGhostWord(
     return null;
   }
 
+  const suffixCp = toCodePoints(suffix);
+  if (suffixCp.length === 0) {
+    return null;
+  }
+
   let i = 0;
-  const isHorizontalWhitespace = (char: string) => char !== '\n' && /\s/.test(char);
+  const isHorizontalWhitespace = (char: string) =>
+    char !== '\n' && /\s/.test(char);
 
   // Keep existing spacing before the next word.
-  while (i < suffix.length && isHorizontalWhitespace(suffix[i]!)) {
+  while (i < suffixCp.length && isHorizontalWhitespace(suffixCp[i]!)) {
     i++;
   }
 
   // Treat line breaks as their own step and keep indentation.
-  if (i < suffix.length && suffix[i] === '\n') {
+  if (i < suffixCp.length && suffixCp[i] === '\n') {
     i++;
-    while (i < suffix.length && isHorizontalWhitespace(suffix[i]!)) {
+    while (i < suffixCp.length && isHorizontalWhitespace(suffixCp[i]!)) {
       i++;
     }
-    return i > 0 ? `${currentText}${suffix.slice(0, i)}` : null;
+    return i > 0 ? `${currentText}${suffixCp.slice(0, i).join('')}` : null;
   }
 
   // Consume one word.
-  while (i < suffix.length && !/\s/.test(suffix[i]!)) {
+  while (i < suffixCp.length && !/\s/.test(suffixCp[i]!)) {
     i++;
   }
 
   // Keep trailing spaces so repeated accepts feel natural.
-  while (i < suffix.length && isHorizontalWhitespace(suffix[i]!)) {
+  while (i < suffixCp.length && isHorizontalWhitespace(suffixCp[i]!)) {
     i++;
   }
 
-  return i > 0 ? `${currentText}${suffix.slice(0, i)}` : null;
+  return i > 0 ? `${currentText}${suffixCp.slice(0, i).join('')}` : null;
 }
 
 const DOUBLE_TAB_CLEAN_UI_TOGGLE_WINDOW_MS = 350;
