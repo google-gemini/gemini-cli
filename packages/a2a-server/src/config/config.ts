@@ -7,6 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
+import { execSync } from 'node:child_process';
 
 import type { TelemetryTarget } from '@google/gemini-cli-core';
 import {
@@ -30,6 +31,7 @@ import {
 
 import { logger } from '../utils/logger.js';
 import { ensureDefaultGeminiMd } from '../chat-bridge/default-gemini-md.js';
+import { ensureDefaultAgents } from '../chat-bridge/default-agents.js';
 import type { Settings } from './settings.js';
 import { type AgentSettings, CoderAgentEvent } from '../types.js';
 
@@ -55,6 +57,20 @@ export async function loadConfig(
         '[Config] Checkpointing is enabled but git is not installed. Disabling checkpointing.',
       );
       checkpointing = false;
+    }
+  }
+
+  // Configure git to use GITHUB_TOKEN for HTTPS push/pull if available.
+  if (process.env['GITHUB_TOKEN']) {
+    try {
+      execSync(
+        `git config --global credential.helper '!f() { echo "password=$GITHUB_TOKEN"; }; f'`,
+      );
+      logger.info(
+        '[Config] Configured git credential helper with GITHUB_TOKEN',
+      );
+    } catch (e) {
+      logger.warn(`[Config] Failed to configure git credential helper: ${e}`);
     }
   }
 
@@ -106,11 +122,13 @@ export async function loadConfig(
     interactive: true,
     enableInteractiveShell: true,
     ptyInfo: 'auto',
+    enableAgents: !!process.env['GKE_AGENT_URL'],
   };
 
   // Ensure a base GEMINI.md exists in the workspace so the agent gets
   // default behavior instructions. Does not overwrite user-created files.
   await ensureDefaultGeminiMd(workspaceDir);
+  await ensureDefaultAgents(process.env['GKE_AGENT_URL']);
 
   const fileService = new FileDiscoveryService(workspaceDir, {
     respectGitIgnore: configParams?.fileFiltering?.respectGitIgnore,

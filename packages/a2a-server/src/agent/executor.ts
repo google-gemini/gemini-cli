@@ -488,7 +488,15 @@ export class CoderAgentExecutor implements AgentExecutor {
       logger.info(`[CoderAgentExecutor] A2UI enabled for task ${taskId}`);
     }
 
-    if (['canceled', 'failed', 'completed'].includes(currentTask.taskState)) {
+    if (currentTask.taskState === 'canceled') {
+      // Allow resuming canceled tasks — user wants to redirect after /esc.
+      // The workspace and conversation history are preserved, so the LLM
+      // picks up with full context of prior interactions.
+      logger.info(
+        `[CoderAgentExecutor] Resuming canceled task ${taskId}. Resetting state to submitted.`,
+      );
+      currentTask.taskState = 'submitted';
+    } else if (['failed', 'completed'].includes(currentTask.taskState)) {
       logger.warn(
         `[CoderAgentExecutor] Attempted to execute task ${taskId} which is already in state ${currentTask.taskState}. Ignoring.`,
       );
@@ -623,7 +631,10 @@ export class CoderAgentExecutor implements AgentExecutor {
         logger.warn(`[CoderAgentExecutor] Task ${taskId} execution aborted.`);
         currentTask.cancelPendingTools('Execution aborted');
         if (
-          currentTask.taskState !== 'canceled' &&
+          // cancelTask() can set state to 'canceled' concurrently, so we
+          // need to re-check at runtime despite TypeScript's narrowing.
+           
+          (currentTask.taskState as string) !== 'canceled' &&
           currentTask.taskState !== 'failed'
         ) {
           currentTask.setTaskStateAndPublishUpdate(

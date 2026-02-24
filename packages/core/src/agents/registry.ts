@@ -355,20 +355,27 @@ export class AgentRegistry {
     // Log remote A2A agent registration for visibility.
     try {
       const clientManager = A2AClientManager.getInstance();
-      // Use ADCHandler to ensure we can load agents hosted on secure platforms (e.g. Vertex AI)
-      const authHandler = new ADCHandler();
-      const agentCard = await clientManager.loadAgent(
-        definition.name,
-        definition.agentCardUrl,
-        authHandler,
-      );
+      // Check if the A2A client is already loaded (singleton persists across
+      // Config instances in long-lived processes like servers).
+      let agentCard = clientManager.getAgentCard(definition.name);
+      if (!agentCard) {
+        // Use ADCHandler to ensure we can load agents hosted on secure platforms (e.g. Vertex AI)
+        const authHandler = new ADCHandler();
+        agentCard = await clientManager.loadAgent(
+          definition.name,
+          definition.agentCardUrl,
+          authHandler,
+        );
+      }
       if (agentCard.skills && agentCard.skills.length > 0) {
-        definition.description = agentCard.skills
+        const skillsDescription = agentCard.skills
           .map(
             (skill: { name: string; description: string }) =>
               `${skill.name}: ${skill.description}`,
           )
           .join('\n');
+        definition.description =
+          definition.description + '\n' + skillsDescription;
       }
       if (this.config.getDebugMode()) {
         debugLogger.log(

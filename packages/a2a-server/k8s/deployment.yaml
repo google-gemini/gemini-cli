@@ -34,8 +34,6 @@ spec:
                   key: api-key
             - name: GEMINI_YOLO_MODE
               value: "true"
-            - name: CHAT_BRIDGE_A2A_URL
-              value: "http://localhost:8080"
             - name: NODE_ENV
               value: "production"
           resources:
@@ -64,8 +62,10 @@ metadata:
   name: gemini-a2a-server
   labels:
     app: gemini-a2a-server
+  annotations:
+    networking.gke.io/load-balancer-type: "Internal"
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   selector:
     app: gemini-a2a-server
   ports:

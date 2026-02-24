@@ -40,6 +40,15 @@ export class ChatBridgeHandler {
   private initialized = false;
   /** Full webhook URL for card button actions (HTTP Add-ons need a URL, not a function name). */
   private webhookUrl: string | undefined;
+  /**
+   * Tracks active background work per thread. A self-request to /internal/keepalive
+   * awaits the promise, giving Cloud Run an active incoming request so it won't
+   * kill the instance while work is in progress.
+   */
+  private workCompletionMap = new Map<
+    string,
+    { promise: Promise<void>; resolve: () => void }
+  >();
 
   constructor(
     private config: ChatBridgeConfig,
@@ -200,7 +209,11 @@ export class ChatBridgeHandler {
         logger.info(
           `[ChatBridge] Task cancelled via /esc for thread ${threadName}`,
         );
-        return this.pushAndReturn(spaceName, threadName, 'Task cancelled.');
+        return this.pushAndReturn(
+          spaceName,
+          threadName,
+          'Task stopped. Send a new message to continue with updated directions.',
+        );
       } else {
         return this.pushAndReturn(
           spaceName,
@@ -319,6 +332,25 @@ export class ChatBridgeHandler {
     const spaceName = event.space.name;
 
     session.asyncProcessing = true;
+    session.cancelled = false;
+
+    // Fire keepalive self-request (same as processMessageAsync)
+    let resolveApprovalWork: () => void;
+    const approvalWorkPromise = new Promise<void>((r) => {
+      resolveApprovalWork = r;
+    });
+    this.workCompletionMap.set(threadName, {
+      promise: approvalWorkPromise,
+      resolve: resolveApprovalWork!,
+    });
+    const approvalPort = process.env['PORT'] || '8080';
+    fetch(`http://localhost:${approvalPort}/internal/keepalive`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ threadName }),
+    }).catch((err) => {
+      logger.warn(`[ChatBridge] Keepalive self-request failed: ${err}`);
+    });
 
     try {
       // Stream the tool confirmation to collect text as it arrives
@@ -340,6 +372,7 @@ export class ChatBridgeHandler {
       let lastContextId: string | undefined;
       let lastState: string | undefined;
       let sentResponse = false;
+      let textSnapshotAtLastTool: string | undefined;
 
       for await (const streamEvent of stream) {
         if (session.cancelled) break;
@@ -351,6 +384,11 @@ export class ChatBridgeHandler {
         if (extracted.text) {
           tracker.addText(extracted.text);
           lastText = extracted.text;
+        }
+
+        // Track tool activity for text snapshot
+        if (extracted.toolApprovals.length > 0 && lastText) {
+          textSnapshotAtLastTool = lastText;
         }
 
         // Check for new tool approvals
@@ -370,7 +408,12 @@ export class ChatBridgeHandler {
               lastContextId = autoResult.lastContextId;
             if (autoResult.lastTaskId) lastTaskId = autoResult.lastTaskId;
             if (autoResult.lastState) lastState = autoResult.lastState;
-            if (autoResult.text) lastText = autoResult.text;
+            if (autoResult.text) {
+              lastText = autoResult.text;
+              if (autoResult.textSnapshotAtLastTool) {
+                textSnapshotAtLastTool = autoResult.textSnapshotAtLastTool;
+              }
+            }
           } else {
             // Non-YOLO: push approval card
             session.pendingToolApproval = {
@@ -430,12 +473,24 @@ export class ChatBridgeHandler {
             cardsV2: [activityCard],
           });
         }
-        // The text here is already post-approval, so send it directly
+        // Strip intermediate "I will..." narration — send only the final answer
+        let finalText = lastText;
+        if (
+          textSnapshotAtLastTool &&
+          lastText.startsWith(textSnapshotAtLastTool)
+        ) {
+          const postToolText = lastText
+            .substring(textSnapshotAtLastTool.length)
+            .trim();
+          if (postToolText) {
+            finalText = postToolText;
+          }
+        }
         await this.chatApiClient.sendMessage(spaceName, threadName, {
-          text: lastText,
+          text: finalText,
         });
         logger.info(
-          `[ChatBridge] Pushed post-approval response (${lastText.length} chars, ${tracker.count} activity entries): "${lastText.substring(0, 200)}"`,
+          `[ChatBridge] Pushed post-approval response (${finalText.length} chars, ${tracker.count} activity entries): "${finalText.substring(0, 200)}"`,
         );
       }
     } catch (error) {
@@ -451,6 +506,11 @@ export class ChatBridgeHandler {
     } finally {
       session.asyncProcessing = false;
       session.cancelled = false;
+      const approvalEntry = this.workCompletionMap.get(threadName);
+      if (approvalEntry) {
+        approvalEntry.resolve();
+        this.workCompletionMap.delete(threadName);
+      }
     }
   }
 
@@ -468,6 +528,30 @@ export class ChatBridgeHandler {
     const spaceName = event.space.name;
 
     session.asyncProcessing = true;
+    // Clear any stale cancellation flag from a previous /esc.
+    // The old processMessageAsync may still be winding down (blocked on its
+    // SSE stream), so its finally block hasn't cleared cancelled yet.
+    session.cancelled = false;
+
+    // Fire a self-request to keep this Cloud Run instance alive.
+    // Cloud Run only tracks active incoming HTTP requests — without this,
+    // it may kill the instance during scale-down or deployment rollouts.
+    let resolveWork: () => void;
+    const workPromise = new Promise<void>((r) => {
+      resolveWork = r;
+    });
+    this.workCompletionMap.set(threadName, {
+      promise: workPromise,
+      resolve: resolveWork!,
+    });
+    const port = process.env['PORT'] || '8080';
+    fetch(`http://localhost:${port}/internal/keepalive`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ threadName }),
+    }).catch((err) => {
+      logger.warn(`[ChatBridge] Keepalive self-request failed: ${err}`);
+    });
 
     try {
       // Retry streaming if the A2A server returns 500 (no available instance).
@@ -560,6 +644,11 @@ export class ChatBridgeHandler {
                 existing.label,
                 tool.status,
               );
+              // Capture text at tool status changes (e.g., completion) so the
+              // post-tool text stripping at the end works correctly. Without this,
+              // "I will..." narration between tool detection and completion leaks
+              // into the final response.
+              lastTextSnapshotAtTool = lastText;
             }
           } else {
             // New tool — capture any narration text before this tool as an activity entry.
@@ -677,7 +766,7 @@ export class ChatBridgeHandler {
       // Handle pending approvals (only relevant when server sent input-required)
       // Use the text snapshot from when the last tool appeared — everything after
       // that is the actual final response the user cares about.
-      const textBeforeTools = lastTextSnapshotAtTool || lastText;
+      let textBeforeTools = lastTextSnapshotAtTool || lastText;
 
       if (latestPendingApprovals.length > 0 && lastState === 'input-required') {
         if (session.yoloMode) {
@@ -692,7 +781,16 @@ export class ChatBridgeHandler {
             lastContextId = autoApproved.lastContextId;
           if (autoApproved.lastTaskId) lastTaskId = autoApproved.lastTaskId;
           if (autoApproved.lastState) lastState = autoApproved.lastState;
-          if (autoApproved.text) lastText = autoApproved.text;
+          if (autoApproved.text) {
+            lastText = autoApproved.text;
+            // Update textBeforeTools with the snapshot from the last tool
+            // activity inside autoApproveTools. Without this, textBeforeTools
+            // is stale (captured before auto-approval ran) and all "I will..."
+            // narration from auto-approval rounds leaks into the final output.
+            if (autoApproved.textSnapshotAtLastTool) {
+              textBeforeTools = autoApproved.textSnapshotAtLastTool;
+            }
+          }
         } else {
           // Non-YOLO: push approval card and wait for user input
           const firstApproval = latestPendingApprovals[0];
@@ -813,6 +911,23 @@ export class ChatBridgeHandler {
     } finally {
       session.asyncProcessing = false;
       session.cancelled = false;
+      // Release the keepalive self-request so Cloud Run can reclaim the instance.
+      const entry = this.workCompletionMap.get(threadName);
+      if (entry) {
+        entry.resolve();
+        this.workCompletionMap.delete(threadName);
+      }
+    }
+  }
+
+  /**
+   * Waits for background work on a thread to complete. Called by the
+   * /internal/keepalive endpoint to keep the Cloud Run instance alive.
+   */
+  async waitForWork(threadName: string): Promise<void> {
+    const entry = this.workCompletionMap.get(threadName);
+    if (entry) {
+      await entry.promise;
     }
   }
 
@@ -885,12 +1000,16 @@ export class ChatBridgeHandler {
     lastTaskId?: string;
     lastState?: string;
     text?: string;
+    textSnapshotAtLastTool?: string;
   }> {
     let approvalsToProcess = initialApprovals;
     let lastContextId = contextId;
     let lastTaskId: string | undefined;
     let lastState: string | undefined;
     let lastText: string | undefined;
+    // Track text at the last tool activity — used by the caller to strip
+    // intermediate "I will..." narration from the final output.
+    let textSnapshotAtLastTool: string | undefined;
     const approvedNames: string[] = [];
     const MAX_ROUNDS = 20;
 
@@ -931,6 +1050,13 @@ export class ChatBridgeHandler {
           lastText = extracted.text;
         }
 
+        // Track tool activity for text snapshot — any event with tool surfaces
+        // means tools are still running; capture the text at this point so the
+        // caller can strip all intermediate narration.
+        if (extracted.toolApprovals.length > 0 && lastText) {
+          textSnapshotAtLastTool = lastText;
+        }
+
         logger.info(
           `[ChatBridge] YOLO event #${eventCount}: kind=${event.kind}, ` +
             `state=${extracted.state ?? 'n/a'}, text=${extracted.text.length} chars`,
@@ -958,7 +1084,13 @@ export class ChatBridgeHandler {
       `[ChatBridge] YOLO auto-approved ${approvedNames.length} tools: ${approvedNames.join(', ')}`,
     );
 
-    return { lastContextId, lastTaskId, lastState, text: lastText };
+    return {
+      lastContextId,
+      lastTaskId,
+      lastState,
+      text: lastText,
+      textSnapshotAtLastTool,
+    };
   }
 
   /**
@@ -1040,8 +1172,7 @@ export class ChatBridgeHandler {
         `I can:\n` +
         `- Generate code from natural language\n` +
         `- Edit files and run commands\n` +
-        `- Answer questions about code\n\n` +
-        `I'll ask for your approval before executing tools.`,
+        `- Answer questions about code`,
     };
   }
 

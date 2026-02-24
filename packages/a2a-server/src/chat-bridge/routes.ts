@@ -352,6 +352,28 @@ export function createChatBridgeRoutes(config: ChatBridgeConfig): Router {
     },
   );
 
+  // Internal keepalive endpoint — called by the bridge itself to keep the
+  // Cloud Run instance alive while background work (processMessageAsync) runs.
+  // The request stays open until the work completes, giving Cloud Run an active
+  // incoming request to track. No auth needed since it's localhost-only.
+  router.post('/internal/keepalive', async (req: Request, res: Response) => {
+    const threadName =
+      typeof req.body?.threadName === 'string' ? req.body.threadName : '';
+    if (!threadName) {
+      res.status(400).json({ error: 'Missing threadName' });
+      return;
+    }
+    logger.info(`[ChatBridge] Keepalive started for thread ${threadName}`);
+    try {
+      await handler.waitForWork(threadName);
+      logger.info(`[ChatBridge] Keepalive released for thread ${threadName}`);
+      res.json({ ok: true });
+    } catch (err) {
+      logger.warn(`[ChatBridge] Keepalive error: ${err}`);
+      res.status(500).json({ error: 'Keepalive failed' });
+    }
+  });
+
   // Health check endpoint for the chat bridge (no auth required)
   router.get('/chat/health', (_req: Request, res: Response) => {
     res.json({

@@ -38,9 +38,9 @@ import { logger } from '../utils/logger.js';
  * when the agent runs long tools (npm install, tsc builds, etc.).
  */
 const sseDispatcher = new Agent({
-  bodyTimeout: 10 * 60 * 1000, // 10 minutes
-  headersTimeout: 10 * 60 * 1000,
-  keepAliveTimeout: 10 * 60 * 1000,
+  bodyTimeout: 60 * 60 * 1000, // 1 hour — matches Cloud Run request timeout
+  headersTimeout: 60 * 60 * 1000,
+  keepAliveTimeout: 60 * 60 * 1000,
 });
 
 // Inline A2UI constants so the chat bridge has no dependency on ../a2ui/

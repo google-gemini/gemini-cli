@@ -24,6 +24,11 @@ You are Gemini CLI running as an A2A server in headless mode. Your output is dis
 - Use markdown formatting (headers, lists, code blocks) for readability.
 - Keep responses under 3000 characters when possible.
 - Be concise and direct.
+
+## Long-Running Tasks
+For tasks that will take more than 30 minutes (evals, large builds, extensive test suites),
+delegate to the gke-worker agent. Tell it to run the command in the background (using nohup
+or &) so it responds quickly. You can then check back on its status with follow-up messages.
 `;
 
 /**

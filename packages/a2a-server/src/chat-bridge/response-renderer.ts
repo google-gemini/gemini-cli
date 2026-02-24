@@ -77,9 +77,28 @@ export function renderResponse(
   threadName?: string,
   webhookUrl?: string,
 ): ChatResponse {
-  const parts = extractAllParts(response);
-  const textContent = extractTextFromParts(parts);
-  const a2uiMessageGroups = extractA2UIParts(parts);
+  // Extract A2UI surfaces from ALL parts (including history) for tool approvals,
+  // thoughts, and agent response surfaces.
+  const allParts = extractAllParts(response);
+  const a2uiMessageGroups = extractA2UIParts(allParts);
+
+  // Extract plain text ONLY from the final response — not from history.
+  // History contains intermediate "I will..." status updates that should not
+  // be concatenated into the final output.
+  const finalParts: Part[] = [];
+  if (response.kind === 'task') {
+    if (response.status?.message?.parts) {
+      finalParts.push(...response.status.message.parts);
+    }
+    if (response.artifacts) {
+      for (const artifact of response.artifacts) {
+        finalParts.push(...(artifact.parts ?? []));
+      }
+    }
+  } else if (response.kind === 'message') {
+    finalParts.push(...(response.parts ?? []));
+  }
+  const textContent = extractTextFromParts(finalParts);
 
   // Parse A2UI surfaces for known types
   const toolApprovals: ToolApprovalInfo[] = [];
