@@ -146,12 +146,13 @@ function getTextWithNextGhostWord(
   currentText: string,
   ghostText: string,
 ): string | null {
+  const strippedGhostText = stripUnsafeCharacters(ghostText);
   const trimmedCurrentText = currentText.trimEnd();
-  if (!ghostText || !ghostText.startsWith(trimmedCurrentText)) {
+  if (!strippedGhostText || !strippedGhostText.startsWith(trimmedCurrentText)) {
     return null;
   }
 
-  const suffix = ghostText.slice(trimmedCurrentText.length);
+  const suffix = strippedGhostText.slice(trimmedCurrentText.length);
   if (!suffix) {
     return null;
   }
