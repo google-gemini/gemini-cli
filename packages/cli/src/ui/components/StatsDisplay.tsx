@@ -376,18 +376,20 @@ const ModelUsageTable: React.FC<{
             flexDirection="column"
             alignItems="flex-end"
           >
-            {row.bucket &&
-              row.bucket.remainingFraction != null &&
-              row.bucket.resetTime && (
-                <>
-                  {renderProgressBar(1 - row.bucket.remainingFraction)}
-                  <Text color={theme.text.secondary} wrap="truncate-end">
-                    {((1 - row.bucket.remainingFraction) * 100).toFixed(0)}%
-                    used (Limit resets in{' '}
-                    {formatResetTime(row.bucket.resetTime)})
-                  </Text>
-                </>
-              )}
+            {row.bucket && (
+              <>
+                {row.bucket.remainingFraction != null &&
+                  renderProgressBar(1 - row.bucket.remainingFraction)}
+                <Text color={theme.text.secondary} wrap="truncate-end">
+                  {row.bucket.remainingFraction != null
+                    ? `${((1 - row.bucket.remainingFraction) * 100).toFixed(0)}% used`
+                    : 'Quota active'}
+                  {row.bucket.resetTime && formatResetTime(row.bucket.resetTime)
+                    ? ` (Limit resets in ${formatResetTime(row.bucket.resetTime)})`
+                    : ''}
+                </Text>
+              </>
+            )}
           </Box>
         </Box>
       ))}

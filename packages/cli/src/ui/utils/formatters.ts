@@ -98,8 +98,14 @@ export function stripReferenceContent(text: string): string {
   return text.replace(pattern, '').trim();
 }
 
-export const formatResetTime = (resetTime: string, terse = false): string => {
+export const formatResetTime = (
+  resetTime: string | undefined,
+  terse = false,
+): string => {
+  if (!resetTime) return '';
   const resetDate = new Date(resetTime);
+  if (isNaN(resetDate.getTime())) return '';
+
   const diff = resetDate.getTime() - Date.now();
   if (diff <= 0) return '';
 

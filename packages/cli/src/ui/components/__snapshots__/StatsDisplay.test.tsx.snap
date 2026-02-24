@@ -171,7 +171,9 @@ exports[`<StatsDisplay /> > Quota Display > renders pooled quota information for
 │  Model                       Reqs                             Model usage                        │
 │  ────────────────────────────────────────────────────────────────────────                        │
 │  gemini-2.5-pro                 -                                                                │
+│                                                                  90% used                        │
 │  gemini-2.5-flash               -                                                                │
+│                                                                  30% used                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
