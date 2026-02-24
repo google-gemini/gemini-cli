@@ -1235,7 +1235,7 @@ describe('useSlashCommandProcessor', () => {
       });
     });
 
-    it('should not update if content is empty or whitespace-only', async () => {
+    it('should clear output if content is empty or whitespace-only', async () => {
       const result = await setupProcessorHook();
       act(() => {
         result.current.commandContext.ui.setLastOutput({
@@ -1248,8 +1248,15 @@ describe('useSlashCommandProcessor', () => {
           content: '   ',
         });
       });
+      expect(result.current.commandContext.ui.getLastOutput()).toBeUndefined();
+
+      act(() => {
+        result.current.commandContext.ui.setLastOutput({
+          content: 'new valid content',
+        });
+      });
       expect(result.current.commandContext.ui.getLastOutput()).toEqual({
-        content: 'initial',
+        content: 'new valid content',
       });
 
       act(() => {
@@ -1257,9 +1264,7 @@ describe('useSlashCommandProcessor', () => {
           content: '',
         });
       });
-      expect(result.current.commandContext.ui.getLastOutput()).toEqual({
-        content: 'initial',
-      });
+      expect(result.current.commandContext.ui.getLastOutput()).toBeUndefined();
     });
   });
 });
