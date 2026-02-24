@@ -11,3 +11,6 @@ export * from './keychain-token-storage.js';
 export * from './hybrid-token-storage.js';
 export * from './file-secret-storage.js';
 export * from './hybrid-secret-storage.js';
+
+export const DEFAULT_SERVICE_NAME = 'gemini-cli-mcp';
+export const FORCE_ENCRYPTED_FILE_ENV_VAR = 'GEMINI_FORCE_ENCRYPTED_FILE';

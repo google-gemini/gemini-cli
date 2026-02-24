@@ -12,6 +12,19 @@ import type { SecretStorage } from './types.js';
 import { GEMINI_DIR, homedir } from '../../utils/paths.js';
 
 /**
+ * Type guard for NodeJS.ErrnoException
+ */
+function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
+  return (
+    error instanceof Error &&
+    ('code' in error ||
+      'errno' in error ||
+      'path' in error ||
+      'syscall' in error)
+  );
+}
+
+/**
  * Encrypted file-based storage for secrets, used as a fallback
  * when a system keychain (like keytar) is unavailable.
  */
@@ -23,7 +36,10 @@ export class FileSecretStorage implements SecretStorage {
     const configDir = path.join(homedir(), GEMINI_DIR);
     // Sanitize service name for filename
     const sanitizedService = serviceName.replace(/[^a-zA-Z0-9-_.]/g, '_');
-    this.secretFilePath = path.join(configDir, `secrets-${sanitizedService}.json`);
+    this.secretFilePath = path.join(
+      configDir,
+      `secrets-${sanitizedService}.json`,
+    );
     this.encryptionKey = this.deriveEncryptionKey();
   }
 
@@ -76,18 +92,30 @@ export class FileSecretStorage implements SecretStorage {
     try {
       const data = await fs.readFile(this.secretFilePath, 'utf-8');
       const decrypted = this.decrypt(data);
-      return JSON.parse(decrypted) as Record<string, string>;
+      const parsed = JSON.parse(decrypted) as unknown;
+
+      if (parsed === null || typeof parsed !== 'object') {
+        throw new Error('Secret file content is not a valid object');
+      }
+
+      const result: Record<string, string> = {};
+      for (const [key, value] of Object.entries(parsed)) {
+        if (typeof value === 'string') {
+          result[key] = value;
+        }
+      }
+
+      return result;
     } catch (error: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const err = error as NodeJS.ErrnoException & { message?: string };
-      if (err.code === 'ENOENT') {
+      if (isErrnoException(error) && error.code === 'ENOENT') {
         return {};
       }
+
+      const message = error instanceof Error ? error.message : '';
+
       if (
-        err.message?.includes('Invalid encrypted data format') ||
-        err.message?.includes(
-          'Unsupported state or unable to authenticate data',
-        )
+        message.includes('Invalid encrypted data format') ||
+        message.includes('Unsupported state or unable to authenticate data')
       ) {
         throw new Error('Secret file corrupted');
       }
@@ -133,11 +161,10 @@ export class FileSecretStorage implements SecretStorage {
     try {
       await fs.unlink(this.secretFilePath);
     } catch (error: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const err = error as NodeJS.ErrnoException;
-      if (err.code !== 'ENOENT') {
-        throw error;
+      if (isErrnoException(error) && error.code === 'ENOENT') {
+        return;
       }
+      throw error;
     }
   }
 }
