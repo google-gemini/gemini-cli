@@ -1926,13 +1926,14 @@ describe('CoreToolScheduler Sequential Execution', () => {
     isModifiableSpy.mockRestore();
   });
 
-  it('should pass serverName to policy engine for DiscoveredMCPTool', async () => {
+  it('should pass serverName and toolAnnotations to policy engine for DiscoveredMCPTool', async () => {
     const mockMcpTool = {
       tool: async () => ({ functionDeclarations: [] }),
       callTool: async () => [],
     };
     const serverName = 'test-server';
     const toolName = 'test-tool';
+    const annotations = { readOnlyHint: true };
     const mcpTool = new DiscoveredMCPTool(
       mockMcpTool as unknown as CallableTool,
       serverName,
@@ -1940,6 +1941,13 @@ describe('CoreToolScheduler Sequential Execution', () => {
       'description',
       { type: 'object', properties: {} },
       createMockMessageBus() as unknown as MessageBus,
+      undefined, // trust
+      true, // isReadOnly
+      undefined, // nameOverride
+      undefined, // cliConfig
+      undefined, // extensionName
+      undefined, // extensionId
+      annotations, // toolAnnotations
     );
 
     const mockToolRegistry = {
@@ -1989,6 +1997,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
     expect(mockPolicyEngineCheck).toHaveBeenCalledWith(
       expect.objectContaining({ name: toolName }),
       serverName,
+      annotations,
     );
   });
 
