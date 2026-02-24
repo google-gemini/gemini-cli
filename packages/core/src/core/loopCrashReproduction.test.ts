@@ -9,17 +9,16 @@ import { GeminiClient } from './client.js';
 import { GeminiEventType } from './turn.js';
 import { createGeminiConfigMock } from '../test-utils/configMock.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
-import type { PartListUnion } from '@google/genai';
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 
 describe('GeminiClient', () => {
   let client: GeminiClient;
   let config: any;
   let mockChat: any;
-
-  /* eslint-disable @typescript-eslint/no-explicit-any */
-  /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-  /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-  /* eslint-disable @typescript-eslint/no-unsafe-call */
 
   beforeEach(() => {
     config = createGeminiConfigMock();
@@ -73,7 +72,7 @@ describe('GeminiClient', () => {
         }
       }
 
-      (mockChat as any).sendMessageStream.mockImplementation((_c: any, _r: any, _p: any, signal: AbortSignal) => mockStream(signal));
+      mockChat.sendMessageStream.mockImplementation((_c: any, _r: any, _p: any, signal: AbortSignal) => mockStream(signal));
 
       const events: any[] = [];
       for await (const event of client.sendMessageStream([{ text: 'Trigger loop' }], controller.signal, 'loop-id')) {
@@ -93,7 +92,7 @@ describe('GeminiClient', () => {
         events.push(event);
       }
 
-      expect((mockChat as any).sendMessageStream).not.toHaveBeenCalled();
+      expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
       expect(events.length).toBe(0);
     });
 
@@ -118,19 +117,17 @@ describe('GeminiClient', () => {
         yield { type: 'chunk', value: { candidates: [{ content: { parts: [{ text: 'Chunk 2' }] } }] } };
       }
 
-      (mockChat as any).sendMessageStream.mockImplementation((_c: any, _r: any, _p: any, signal: AbortSignal) => mockStream(signal));
+      mockChat.sendMessageStream.mockImplementation((_c: any, _r: any, _p: any, signal: AbortSignal) => mockStream(signal));
 
+      // We just need to prove that we can consume the stream and abort without an unhandled exception crashing the test runner.
       const events: any[] = [];
-      try {
-        const stream = client.sendMessageStream([{ text: 'Hello' }] as PartListUnion, controller.signal, 'manual-cancel-id');
-        for await (const event of stream) {
-          events.push(event);
-          controller.abort(); 
-        }
-      } catch (e) {
-        throw e;
+      const stream = client.sendMessageStream([{ text: 'Hello' }], controller.signal, 'manual-cancel-id');
+      for await (const event of stream) {
+        events.push(event);
+        controller.abort(); // Trigger the 'explosion'! 💣
       }
 
+      // The fact that we reached here means the process didn't crash.
       expect(events.length).toBeGreaterThan(0);
     });
   });

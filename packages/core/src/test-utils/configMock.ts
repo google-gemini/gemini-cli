@@ -30,7 +30,15 @@ export function createGeminiConfigMock(overrides: Partial<Config> = {}): Config 
     getSkipNextSpeakerCheck: () => true,
     getUsageStatisticsEnabled: () => false,
     getDebugMode: () => false,
-    getBaseLlmClient: () => ({}),
+    getBaseLlmClient: () => ({
+      contentGenerator: {} as any,
+      config: {} as any,
+      generateJson: vi.fn(),
+      generateEmbedding: vi.fn(),
+      countTokens: vi.fn(),
+      generateContent: vi.fn(),
+      streamGenerateContent: vi.fn(),
+    } as any),
     getModelAvailabilityService: () => ({
       snapshot: () => ({ available: true }),
       selectFirstAvailable: (models: string[]) => models[0],
@@ -44,29 +52,28 @@ export function createGeminiConfigMock(overrides: Partial<Config> = {}): Config 
       getAllTools: () => [],
       getFunctionDeclarations: () => [],
     } as any),
-    getContentGeneratorConfig: () => ({}),
-    getHookSystem: () => null,
+    getContentGeneratorConfig: () => ({} as any),
+    getHookSystem: () => undefined,
     resetTurn: vi.fn(),
-    getMessageBus: () => null,
+    getMessageBus: () => ({} as any),
     getRetryFetchErrors: () => false,
     getActiveModel: () => 'gemini-2.0-flash',
     getIdeMode: () => false,
     getToolOutputMaskingEnabled: () => false,
     getGeminiClient: vi.fn(),
-    getHistory: () => [],
     setActiveModel: vi.fn(),
     getGemini31LaunchedSync: () => false,
     getUserMemory: () => '',
-    getValidationHandler: () => null,
+    getValidationHandler: () => undefined,
   };
 
   return new Proxy(baseConfig as Config, {
     get: (target, prop) => {
       if (prop in overrides) {
-        return (overrides as Record<string, unknown>)[prop as string];
+        return (overrides as Record<string, any>)[prop as string];
       }
       if (prop in target) {
-        return (target as Record<string, unknown>)[prop as string];
+        return (target as Record<string, any>)[prop as string];
       }
       return vi.fn();
     },
