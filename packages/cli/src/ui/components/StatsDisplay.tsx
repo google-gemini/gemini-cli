@@ -200,19 +200,21 @@ const ModelUsageTable: React.FC<{
       : uncachedWidth + cachedWidth + outputTokensWidth);
 
   const isAuto = currentModel && isAutoModel(currentModel);
-  const modelUsageTitle = isAuto
-    ? `${getDisplayString(currentModel)} Usage`
-    : `Model Usage`;
+  const modelUsageTitle = isAuto ? (
+    <Text color={theme.text.primary} wrap="truncate-end">
+      <Text bold>Model Usage:</Text> {getDisplayString(currentModel)}
+    </Text>
+  ) : (
+    <Text bold color={theme.text.primary} wrap="truncate-end">
+      Model Usage
+    </Text>
+  );
 
   return (
     <Box flexDirection="column" marginBottom={1}>
       {/* Header */}
       <Box alignItems="flex-end">
-        <Box width={nameWidth}>
-          <Text bold color={theme.text.primary} wrap="truncate-end">
-            {modelUsageTitle}
-          </Text>
-        </Box>
+        <Box width={totalWidth}>{modelUsageTitle}</Box>
       </Box>
 
       {isAuto &&

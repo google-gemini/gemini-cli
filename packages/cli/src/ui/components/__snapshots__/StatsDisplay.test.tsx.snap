@@ -162,7 +162,7 @@ exports[`<StatsDisplay /> > Quota Display > renders pooled quota information for
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
-│  auto Usage                                                                                      │
+│  Model Usage: auto                                                                               │
 │  35% used                                                                                        │
 │  Usage limit: 1,100                                                                              │
 │  Usage limits span all sessions and reset daily.                                                 │
