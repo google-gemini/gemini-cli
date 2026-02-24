@@ -289,7 +289,7 @@ gemini
 
 ### Core Features
 
-- [**Commands Reference**](./docs/cli/commands.md) - All slash commands
+- [**Commands Reference**](./docs/reference/commands.md) - All slash commands
   (`/help`, `/chat`, etc).
 - [**Custom Commands**](./docs/cli/custom-commands.md) - Create your own
   reusable commands.
