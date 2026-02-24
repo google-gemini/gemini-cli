@@ -1041,7 +1041,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (
         keyMatchers[Command.MOVE_WORD_RIGHT](key) &&
         !completion.showSuggestions &&
-        completion.promptCompletion.text
+        completion.promptCompletion.text &&
+        buffer.getOffset() === buffer.text.length
       ) {
         const nextText = getTextWithNextGhostWord(
           buffer.text,

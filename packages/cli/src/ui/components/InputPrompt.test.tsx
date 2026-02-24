@@ -236,7 +236,7 @@ describe('InputPrompt', () => {
       visualToLogicalMap: [[0, 0]],
       visualToTransformedMap: [0],
       transformationsByLine: [],
-      getOffset: vi.fn().mockReturnValue(0),
+      getOffset: vi.fn(() => mockBuffer.text.length),
       pastedContent: {},
     } as unknown as TextBuffer;
 
@@ -3265,6 +3265,44 @@ describe('InputPrompt', () => {
         expect(mockBuffer.setText).toHaveBeenCalledWith('build a ');
         expect(mockMarkSelected).toHaveBeenCalledWith('build a ');
       });
+      unmount();
+    });
+
+    it('does not accept ghost text word-by-word when cursor is not at end of input', async () => {
+      const mockMarkSelected = vi.fn();
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: false,
+        suggestions: [],
+        promptCompletion: {
+          text: 'build a weather app',
+          accept: vi.fn(),
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: true,
+          markSelected: mockMarkSelected,
+        },
+      });
+
+      props.buffer.setText('build ');
+      mockBuffer.getOffset = vi.fn().mockReturnValue(2);
+      mockBuffer.setText.mockClear();
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x1b[1;5C'); // Ctrl+Right
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(mockBuffer.setText).not.toHaveBeenCalled();
+      expect(mockMarkSelected).not.toHaveBeenCalled();
       unmount();
     });
 
