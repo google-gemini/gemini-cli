@@ -45,9 +45,7 @@ ASCII diagram rules:
 - Always include ▼ arrows to show direction of flow.
 - Keep boxes aligned and use consistent spacing.
 
-Always provide BOTH the Mermaid syntax (for future use) and the ASCII rendering (for immediate terminal display).
-
-The user wants to visualize: `;
+Always provide BOTH the Mermaid syntax (for future use) and the ASCII rendering (for immediate terminal display).`;
 
 export const visualizeCommand: SlashCommand = {
   name: 'visualize',
@@ -72,7 +70,10 @@ export const visualizeCommand: SlashCommand = {
 
     return {
       type: 'submit_prompt',
-      content: [{ text: VISUALIZE_PROMPT + userRequest }],
+      content: [
+        { text: VISUALIZE_PROMPT },
+        { text: `User request: ${userRequest}` },
+      ],
     };
   },
 };
