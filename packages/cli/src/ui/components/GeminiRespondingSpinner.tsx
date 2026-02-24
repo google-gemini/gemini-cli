@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { useState, useEffect, useMemo } from 'react';
-import { Text, useIsScreenReaderEnabled } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { CliSpinner } from './CliSpinner.js';
 import type { SpinnerName } from 'cli-spinners';
 import { useStreamingContext } from '../contexts/StreamingContext.js';
@@ -18,8 +18,13 @@ import {
 import { theme } from '../semantic-colors.js';
 import { Colors } from '../colors.js';
 import tinygradient from 'tinygradient';
+import { useTerminalEnvironment } from '../hooks/useTerminalEnvironment.js';
+import { debugState } from '../debug.js';
 
 const COLOR_CYCLE_DURATION_MS = 4000;
+const TMUX_COLOR_UPDATE_INTERVAL_MS = 500;
+const DOTS_PATTERN = ['.', '..', '...', '..'];
+const DOTS_ANIMATION_DURATION_MS = 3000;
 
 interface GeminiRespondingSpinnerProps {
   /**
@@ -65,7 +70,9 @@ export const GeminiSpinner: React.FC<GeminiSpinnerProps> = ({
   altText,
 }) => {
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
+  const { isTmux } = useTerminalEnvironment();
   const [time, setTime] = useState(0);
+  const [dotsFrame, setDotsFrame] = useState(0);
 
   const googleGradient = useMemo(() => {
     const brandColors = [
@@ -84,19 +91,48 @@ export const GeminiSpinner: React.FC<GeminiSpinnerProps> = ({
       return;
     }
 
+    const updateInterval = isTmux ? TMUX_COLOR_UPDATE_INTERVAL_MS : 30;
+
     const interval = setInterval(() => {
-      setTime((prevTime) => prevTime + 30);
-    }, 30); // ~33fps for smooth color transitions
+      setTime((prevTime) => prevTime + updateInterval);
+    }, updateInterval);
 
     return () => clearInterval(interval);
-  }, [isScreenReaderEnabled]);
+  }, [isScreenReaderEnabled, isTmux]);
+
+  useEffect(() => {
+    if (!isTmux || isScreenReaderEnabled) {
+      return;
+    }
+
+    debugState.debugNumAnimatedComponents++;
+
+    const dotsInterval = setInterval(() => {
+      setDotsFrame((prev) => (prev + 1) % DOTS_PATTERN.length);
+    }, DOTS_ANIMATION_DURATION_MS / DOTS_PATTERN.length);
+
+    return () => {
+      clearInterval(dotsInterval);
+      debugState.debugNumAnimatedComponents--;
+    };
+  }, [isTmux, isScreenReaderEnabled]);
 
   const progress = (time % COLOR_CYCLE_DURATION_MS) / COLOR_CYCLE_DURATION_MS;
   const currentColor = googleGradient.rgbAt(progress).toHexString();
 
-  return isScreenReaderEnabled ? (
-    <Text>{altText}</Text>
-  ) : (
+  if (isScreenReaderEnabled) {
+    return <Text>{altText}</Text>;
+  }
+
+  if (isTmux) {
+    return (
+      <Box width={3} minWidth={3}>
+        <Text color={currentColor}>{DOTS_PATTERN[dotsFrame]}</Text>
+      </Box>
+    );
+  }
+
+  return (
     <Text color={currentColor}>
       <CliSpinner type={spinnerType} />
     </Text>
