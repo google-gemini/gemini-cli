@@ -1286,6 +1286,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 const char = wordCP[i];
                 const charWidth = stringWidth(char);
                 if (partWidth + charWidth > inputWidth) {
+                  // Ensure we always consume at least one character to prevent infinite loops,
+                  // even if the character itself is wider than inputWidth (e.g. inputWidth is 0 or 1).
+                  if (partWidth === 0) {
+                    part += char;
+                    splitIndex = i + 1;
+                  }
                   break;
                 }
                 part += char;
