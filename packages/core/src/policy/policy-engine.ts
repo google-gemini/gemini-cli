@@ -113,7 +113,10 @@ function ruleMatches(
 
   // Check tool name if specified
   if (rule.toolName) {
-    if (isWildcardPattern(rule.toolName)) {
+    // Support wildcard patterns: "serverName__*" matches "serverName__anyTool"
+    if (rule.toolName === '*') {
+      // Match all tools
+    } else if (isWildcardPattern(rule.toolName)) {
       if (
         !toolCall.name ||
         !matchesWildcard(rule.toolName, toolCall.name, serverName)

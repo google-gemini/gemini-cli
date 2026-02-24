@@ -1493,6 +1493,16 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      enableConseca: {
+        type: 'boolean',
+        label: 'Enable Context-Aware Security',
+        category: 'Security',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.',
+        showInDialog: true,
+      },
     },
   },
 
