@@ -91,21 +91,7 @@
               }
             ]
           },
-          {
-            "label": "Agent Skills",
-            "collapsed": true,
-            "items": [
-              { "label": "Overview", "slug": "docs/cli/skills" },
-              {
-                "label": "Create Agent skills",
-                "slug": "docs/cli/tutorials/skills-getting-started"
-              }
-            ]
-          },
-          {
-            "label": "Authentication",
-            "slug": "docs/get-started/authentication"
-          },
+          { "label": "Agent Skills", "slug": "docs/cli/skills" },
           { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
           { "label": "Headless mode", "slug": "docs/cli/headless" },
           { "label": "Hooks", "slug": "docs/hooks" },
@@ -113,15 +99,15 @@
           { "label": "MCP servers", "slug": "docs/tools/mcp-server" },
           { "label": "Model routing", "slug": "docs/cli/model-routing" },
           { "label": "Model selection", "slug": "docs/cli/model" },
-          { "label": "Plan mode", "badge": "🧪", "slug": "docs/cli/plan-mode" },
+          { "label": "Plan mode", "badge": "🔬", "slug": "docs/cli/plan-mode" },
           {
             "label": "Subagents",
-            "badge": "🧪",
+            "badge": "🔬",
             "slug": "docs/core/subagents"
           },
           {
             "label": "Remote subagents",
-            "badge": "🧪",
+            "badge": "🔬",
             "slug": "docs/core/remote-agents"
           },
           { "label": "Rewind", "slug": "docs/cli/rewind" },
