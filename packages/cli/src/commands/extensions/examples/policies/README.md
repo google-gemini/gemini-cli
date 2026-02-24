@@ -5,7 +5,7 @@ to the Gemini CLI Policy Engine.
 
 ## Description
 
-The extension uses a `policies.toml` file to define:
+The extension uses a `policies/` directory containing `.toml` files to define:
 
 - A rule that requires user confirmation for `rm -rf` commands.
 - A rule that denies searching for sensitive files (like `.env`) using `grep`.
@@ -13,8 +13,8 @@ The extension uses a `policies.toml` file to define:
 
 ## Structure
 
-- `gemini-extension.json`: The manifest file that points to the policy file.
-- `policies.toml`: Contains the policy rules and safety checkers.
+- `gemini-extension.json`: The manifest file.
+- `policies/`: Contains the `.toml` policy files.
 
 ## How to use
 

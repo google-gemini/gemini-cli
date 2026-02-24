@@ -33,10 +33,6 @@ export interface ExtensionConfig {
    * These themes will be registered when the extension is activated.
    */
   themes?: CustomTheme[];
-  /**
-   * Path to a policy TOML file relative to the extension root.
-   */
-  policies?: string;
 }
 
 export interface ExtensionUpdateInfo {

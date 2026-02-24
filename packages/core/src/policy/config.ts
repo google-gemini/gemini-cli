@@ -41,7 +41,7 @@ export const DEFAULT_CORE_POLICIES_DIR = path.join(__dirname, 'policies');
 export const DEFAULT_POLICY_TIER = 1;
 export const WORKSPACE_POLICY_TIER = 2;
 export const USER_POLICY_TIER = 3;
-export const EXTENSION_POLICY_TIER = 3;
+export const EXTENSION_POLICY_TIER = WORKSPACE_POLICY_TIER;
 export const ADMIN_POLICY_TIER = 4;
 
 // Specific priority offsets and derived priorities for dynamic/settings rules.

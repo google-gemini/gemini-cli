@@ -136,8 +136,6 @@ The manifest file defines the extension's behavior and configuration.
   also be an array of strings to load multiple context files.
 - `excludeTools`: An array of tools to block from the model. You can restrict
   specific arguments, such as `run_shell_command(rm -rf)`.
-- `policies`: An optional path to a policy TOML file relative to the extension
-  root. See [Policy Engine](#policy-engine) for more information.
 - `themes`: An optional list of themes provided by the extension. See
   [Themes](../cli/themes.md) for more information.
 
@@ -209,22 +207,16 @@ agent definition files (`.md`) to an `agents/` directory in your extension root.
 ### <a id="policy-engine"></a>Policy Engine
 
 Extensions can contribute policy rules and safety checkers to the Gemini CLI
-[Policy Engine](../reference/policy-engine.md). These rules are defined in a
-TOML file and take effect when the extension is activated.
+[Policy Engine](../admin/policy-engine.md). These rules are defined in `.toml`
+files and take effect when the extension is activated.
 
-To add policies, specify the file path in your `gemini-extension.json`:
+To add policies, create a `policies/` directory in your extension's root and
+place your `.toml` policy files inside it. Gemini CLI automatically loads all
+`.toml` files from this directory.
 
-```json
-{
-  "name": "my-secure-extension",
-  "version": "1.0.0",
-  "policies": "policies.toml"
-}
-```
-
-Rules contributed by extensions run in the **User Tier** (Tier 3), alongside
-user-defined policies. This tier has higher priority than the default or
-workspace-specific rules but lower priority than admin policies.
+Rules contributed by extensions run in the **Workspace Tier** (Tier 2),
+alongside workspace-defined policies. This tier has higher priority than the
+default rules but lower priority than user or admin policies.
 
 > **Warning:** For security, Gemini CLI ignores any `allow` decisions or `yolo`
 > mode configurations in extension policies. This ensures that an extension

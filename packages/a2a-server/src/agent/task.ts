@@ -728,7 +728,7 @@ export class Task {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const errorEvent = event as ServerGeminiErrorEvent; // Type assertion
         const errorMessage =
-          errorEvent.value?.error.message ?? 'Unknown error from LLM stream';
+          errorEvent.value?.error?.message ?? 'Unknown error from LLM stream';
         logger.error(
           '[Task] Received error event from LLM stream:',
           errorMessage,
