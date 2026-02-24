@@ -312,10 +312,12 @@ export class FileSecretStorage implements SecretStorage {
 
   private async loadSecrets(): Promise<Record<string, string>> {
     let data: string;
+    let isMigration = false;
     try {
       data = await fs.readFile(this.secretFilePath, 'utf-8');
     } catch (error: unknown) {
       if (isErrnoException(error) && error.code === 'ENOENT') {
+        isMigration = true;
         try {
           const configDir = path.dirname(this.secretFilePath);
           const oldPath = path.join(
@@ -360,7 +362,24 @@ export class FileSecretStorage implements SecretStorage {
         if (!this.encryptionKey) throw new Error('Init failed');
         decrypted = this.decryptBlob(data, this.encryptionKey);
       }
+    } catch (error: unknown) {
+      if (isMigration) {
+        // If migration fails, start fresh instead of blocking
+        return {};
+      }
+      const message = error instanceof Error ? error.message : '';
+      if (
+        message.includes('Invalid') ||
+        message.includes('Unsupported state') ||
+        message.includes('authTag') ||
+        message.includes('mac check failed')
+      ) {
+        throw new Error('Secret file corrupted or master key incorrect');
+      }
+      throw error;
+    }
 
+    try {
       let json = decrypted;
       const isV2 = data.startsWith('v2:');
 
@@ -402,6 +421,7 @@ export class FileSecretStorage implements SecretStorage {
 
       return result;
     } catch (error: unknown) {
+      if (isMigration) return {};
       const message = error instanceof Error ? error.message : '';
       if (
         message.includes('Invalid') ||
