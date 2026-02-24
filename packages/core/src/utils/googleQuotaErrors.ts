@@ -203,19 +203,18 @@ export function classifyGoogleError(error: unknown): unknown {
     }
   }
 
-  // Handle 503 Service Unavailable (capacity errors)
+  // Check for 503 Service Unavailable errors
   if (status === 503) {
     const errorMessage =
       googleApiError?.message ||
       (error instanceof Error ? error.message : String(error));
     return new RetryableQuotaError(
-      `${errorMessage}`,
+      errorMessage,
       googleApiError ?? {
         code: 503,
         message: errorMessage,
         details: [],
       },
-      10, // Retry after 10 seconds for capacity issues
     );
   }
 

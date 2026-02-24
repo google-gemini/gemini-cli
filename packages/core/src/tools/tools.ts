@@ -173,8 +173,8 @@ export abstract class BaseToolInvocation<
       type: 'info',
       title: `Confirm: ${this._toolDisplayName || this._toolName}`,
       prompt: this.getDescription(),
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        await this.publishPolicyUpdate(outcome);
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // Policy updates are now handled centrally by the scheduler
       },
     };
     return confirmationDetails;
@@ -334,6 +334,11 @@ export interface ToolBuilder<
   canUpdateOutput: boolean;
 
   /**
+   * Whether the tool is read-only (has no side effects).
+   */
+  isReadOnly: boolean;
+
+  /**
    * Validates raw parameters and builds a ready-to-execute invocation.
    * @param params The raw, untrusted parameters from the model.
    * @returns A valid `ToolInvocation` if successful. Throws an error if validation fails.
@@ -362,6 +367,10 @@ export abstract class DeclarativeTool<
     readonly extensionName?: string,
     readonly extensionId?: string,
   ) {}
+
+  get isReadOnly(): boolean {
+    return READ_ONLY_KINDS.includes(this.kind);
+  }
 
   getSchema(_modelId?: string): FunctionDeclaration {
     return {
@@ -570,6 +579,15 @@ export interface ToolResult {
    * Optional data payload for passing structured information back to the caller.
    */
   data?: Record<string, unknown>;
+
+  /**
+   * Optional request to execute another tool immediately after this one.
+   * The result of this tail call will replace the original tool's response.
+   */
+  tailToolCallRequest?: {
+    name: string;
+    args: Record<string, unknown>;
+  };
 }
 
 /**
@@ -748,6 +766,9 @@ export interface ToolMcpConfirmationDetails {
   serverName: string;
   toolName: string;
   toolDisplayName: string;
+  toolArgs?: Record<string, unknown>;
+  toolDescription?: string;
+  toolParameterSchema?: unknown;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
 }
 
@@ -808,6 +829,7 @@ export enum Kind {
   Fetch = 'fetch',
   Communicate = 'communicate',
   Plan = 'plan',
+  SwitchMode = 'switch_mode',
   Other = 'other',
 }
 
@@ -817,6 +839,13 @@ export const MUTATOR_KINDS: Kind[] = [
   Kind.Delete,
   Kind.Move,
   Kind.Execute,
+] as const;
+
+// Function kinds that are safe to run in parallel
+export const READ_ONLY_KINDS: Kind[] = [
+  Kind.Read,
+  Kind.Search,
+  Kind.Fetch,
 ] as const;
 
 export interface ToolLocation {

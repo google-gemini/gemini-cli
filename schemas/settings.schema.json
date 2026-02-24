@@ -105,12 +105,21 @@
           },
           "additionalProperties": false
         },
-        "enablePromptCompletion": {
-          "title": "Enable Prompt Completion",
-          "description": "Enable AI-powered prompt completion suggestions while typing.",
-          "markdownDescription": "Enable AI-powered prompt completion suggestions while typing.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
+        "plan": {
+          "title": "Plan",
+          "description": "Planning features configuration.",
+          "markdownDescription": "Planning features configuration.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "directory": {
+              "title": "Plan Directory",
+              "description": "The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.",
+              "markdownDescription": "The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.\n\n- Category: `General`\n- Requires restart: `yes`",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
         },
         "retryFetchErrors": {
           "title": "Retry Fetch Errors",
@@ -118,6 +127,13 @@
           "markdownDescription": "Retry on \"exception TypeError: fetch failed sending request\" errors.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
+        },
+        "maxAttempts": {
+          "title": "Max Chat Model Attempts",
+          "description": "Maximum number of attempts for requests to the main chat model. Cannot exceed 10.",
+          "markdownDescription": "Maximum number of attempts for requests to the main chat model. Cannot exceed 10.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `10`",
+          "default": 10,
+          "type": "number"
         },
         "debugKeystrokeLogging": {
           "title": "Debug Keystroke Logging",
@@ -405,6 +421,14 @@
           "default": true,
           "type": "boolean"
         },
+        "loadingPhrases": {
+          "title": "Loading Phrases",
+          "description": "What to show while the model is working: tips, witty comments, both, or nothing.",
+          "markdownDescription": "What to show while the model is working: tips, witty comments, both, or nothing.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `tips`",
+          "default": "tips",
+          "type": "string",
+          "enum": ["tips", "witty", "all", "off"]
+        },
         "customWittyPhrases": {
           "title": "Custom Witty Phrases",
           "description": "Custom witty phrases to display during loading. When provided, the CLI cycles through these instead of the defaults.",
@@ -424,8 +448,8 @@
           "properties": {
             "enableLoadingPhrases": {
               "title": "Enable Loading Phrases",
-              "description": "Enable loading phrases during operations.",
-              "markdownDescription": "Enable loading phrases during operations.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+              "description": "@deprecated Use ui.loadingPhrases instead. Enable loading phrases during operations.",
+              "markdownDescription": "@deprecated Use ui.loadingPhrases instead. Enable loading phrases during operations.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
@@ -1455,6 +1479,13 @@
             }
           },
           "additionalProperties": false
+        },
+        "enableConseca": {
+          "title": "Enable Context-Aware Security",
+          "description": "Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.",
+          "markdownDescription": "Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -1610,6 +1641,13 @@
           "title": "Model Steering",
           "description": "Enable model steering (user hints) to guide the model during tool execution.",
           "markdownDescription": "Enable model steering (user hints) to guide the model during tool execution.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "directWebFetch": {
+          "title": "Direct Web Fetch",
+          "description": "Enable web fetch behavior that bypasses LLM summarization.",
+          "markdownDescription": "Enable web fetch behavior that bypasses LLM summarization.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         }

@@ -260,6 +260,7 @@ export class DevTools extends EventEmitter {
 
       ws.on('message', (data: Buffer) => {
         try {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const message = JSON.parse(data.toString());
 
           // Handle registration first

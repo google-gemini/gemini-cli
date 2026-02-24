@@ -131,16 +131,21 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`general.enablePromptCompletion`** (boolean):
-  - **Description:** Enable AI-powered prompt completion suggestions while
-    typing.
-  - **Default:** `false`
+- **`general.plan.directory`** (string):
+  - **Description:** The directory where planning artifacts are stored. If not
+    specified, defaults to the system temporary directory.
+  - **Default:** `undefined`
   - **Requires restart:** Yes
 
 - **`general.retryFetchErrors`** (boolean):
   - **Description:** Retry on "exception TypeError: fetch failed sending
     request" errors.
   - **Default:** `false`
+
+- **`general.maxAttempts`** (number):
+  - **Description:** Maximum number of attempts for requests to the main chat
+    model. Cannot exceed 10.
+  - **Default:** `10`
 
 - **`general.debugKeystrokeLogging`** (boolean):
   - **Description:** Enable debug logging of keystrokes to the console.
@@ -305,13 +310,20 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Show the spinner during operations.
   - **Default:** `true`
 
+- **`ui.loadingPhrases`** (enum):
+  - **Description:** What to show while the model is working: tips, witty
+    comments, both, or nothing.
+  - **Default:** `"tips"`
+  - **Values:** `"tips"`, `"witty"`, `"all"`, `"off"`
+
 - **`ui.customWittyPhrases`** (array):
   - **Description:** Custom witty phrases to display during loading. When
     provided, the CLI cycles through these instead of the defaults.
   - **Default:** `[]`
 
 - **`ui.accessibility.enableLoadingPhrases`** (boolean):
-  - **Description:** Enable loading phrases during operations.
+  - **Description:** @deprecated Use ui.loadingPhrases instead. Enable loading
+    phrases during operations.
   - **Default:** `true`
   - **Requires restart:** Yes
 
@@ -861,6 +873,14 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`security.enableConseca`** (boolean):
+  - **Description:** Enable the context-aware security checker. This feature
+    uses an LLM to dynamically generate and enforce security policies for tool
+    use based on your prompt, providing an additional layer of protection
+    against unintended actions.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 #### `advanced`
 
 - **`advanced.autoConfigureMemory`** (boolean):
@@ -961,6 +981,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable model steering (user hints) to guide the model
     during tool execution.
   - **Default:** `false`
+
+- **`experimental.directWebFetch`** (boolean):
+  - **Description:** Enable web fetch behavior that bypasses LLM summarization.
+  - **Default:** `false`
+  - **Requires restart:** Yes
 
 #### `skills`
 
@@ -1221,8 +1246,8 @@ within your user's home folder.
 Environment variables are a common way to configure applications, especially for
 sensitive information like API keys or for settings that might change between
 environments. For authentication setup, see the
-[Authentication documentation](./authentication.md) which covers all available
-authentication methods.
+[Authentication documentation](../get-started/authentication.md) which covers
+all available authentication methods.
 
 The CLI automatically loads environment variables from an `.env` file. The
 loading order is:
@@ -1241,7 +1266,8 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 
 - **`GEMINI_API_KEY`**:
   - Your API key for the Gemini API.
-  - One of several available [authentication methods](./authentication.md).
+  - One of several available
+    [authentication methods](../get-started/authentication.md).
   - Set this in your shell profile (e.g., `~/.bashrc`, `~/.zshrc`) or an `.env`
     file.
 - **`GEMINI_MODEL`**:
@@ -1587,15 +1613,15 @@ conventions and context.
   about the active instructional context.
 - **Importing content:** You can modularize your context files by importing
   other Markdown files using the `@path/to/file.md` syntax. For more details,
-  see the [Memory Import Processor documentation](../core/memport.md).
+  see the [Memory Import Processor documentation](./memport.md).
 - **Commands for memory management:**
   - Use `/memory refresh` to force a re-scan and reload of all context files
     from all configured locations. This updates the AI's instructional context.
   - Use `/memory show` to display the combined instructional context currently
     loaded, allowing you to verify the hierarchy and content being used by the
     AI.
-  - See the [Commands documentation](../cli/commands.md#memory) for full details
-    on the `/memory` command and its sub-commands (`show` and `refresh`).
+  - See the [Commands documentation](./commands.md#memory) for full details on
+    the `/memory` command and its sub-commands (`show` and `refresh`).
 
 By understanding and utilizing these configuration layers and the hierarchical
 nature of context files, you can effectively manage the AI's memory and tailor
