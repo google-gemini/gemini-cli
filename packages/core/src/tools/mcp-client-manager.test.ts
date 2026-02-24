@@ -264,6 +264,40 @@ describe('McpClientManager', () => {
         'No MCP server registered with the name "non-existent"',
       );
     });
+
+    it('should create a new McpClient with updated config on restart', async () => {
+      const originalConfig = { command: 'node', args: ['--port', '8000'] };
+      const updatedConfig = { command: 'node', args: ['--port', '9000'] };
+
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': originalConfig,
+      });
+
+      // Track McpClient constructor calls
+      const constructorCalls: unknown[][] = [];
+      vi.mocked(McpClient).mockImplementation((...args: unknown[]) => {
+        constructorCalls.push(args);
+        return mockedMcpClient;
+      });
+      mockedMcpClient.getServerConfig.mockReturnValue(originalConfig);
+
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      await manager.startConfiguredMcpServers();
+
+      // First call should use the original config
+      expect(constructorCalls).toHaveLength(1);
+      expect(constructorCalls[0][1]).toBe(originalConfig);
+
+      // Simulate config file change and hot-reload
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': updatedConfig,
+      });
+      await manager.startConfiguredMcpServers();
+
+      // A NEW McpClient should have been constructed with the updated config
+      expect(constructorCalls).toHaveLength(2);
+      expect(constructorCalls[1][1]).toBe(updatedConfig);
+    });
   });
 
   describe('getMcpInstructions', () => {
