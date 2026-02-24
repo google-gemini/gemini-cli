@@ -63,14 +63,41 @@ key should be uppercase. There should be no additional spaces.
 - **"Escape"** should be written as `Esc` for brevity.
 - If there are space constraints, it is acceptable to use Unicode symbols for
   modifiers, for example `⇧+K` for `Shift+K`, or `⏎` for `Enter`. 
-  
+
 #### Examples
 
-* `Ctrl+C`
-* `Esc`
-* `Shift+Tab`
+- `Ctrl+C`
+- `Esc`
+- `Shift+Tab`
 
-### Step 4: Enforce general style guidelines
+### Step 4: Ensure that settings and options are presented in a consistent format
+
+#### Noun-First Labeling (Scannability):
+
+Labels must start with the subject of the setting, not the action. This allows
+users to scan for the feature they want to change.
+
+- **Rule:** `[Noun]` `[Attribute/Action]`
+- **Example:** `Show line numbers` becomes simply `Line numbers`
+
+#### Positive Boolean Logic (Cognitive Ease):
+
+Eliminate "double negatives." Booleans should represent the presence of a
+feature, not its absence.
+
+   - **Rule:** Replace `Disable {feature}` or `Hide {Feature}` with `{Feature} enabled` or simply `{Feature}`.
+   - **Example:** Change "Disable auto update" to "Auto update".
+   - **Implementation:** Invert the boolean value in your config loader so true always equals `On`
+
+#### Verb Stripping (Brevity):
+  
+Remove redundant leading verbs like "Enable," "Use," "Display," or "Show" unless
+they are part of a specific technical term.
+
+- **Rule**: If the label works without the verb, remove it
+- **Example**: Change `Enable prompt completion` to `Prompt completion`
+
+### Step 5: Enforce general style guidelines
 
 1. Don't use a period after a single sentence. When a sentence appears by itself
    on its own line, do not end it with a period. Use a period if the sentence is
@@ -87,15 +114,17 @@ key should be uppercase. There should be no additional spaces.
 7. Avoid pleasantries like “sorry”. Instead, be clear about the issue and
    promote a positive solution.
 
-### Step 5: Use consistent terminology
+### Step 6: Use consistent terminology
 
 Finally, review the text for consistent use of terminology. A full list of
 preferred terminology can be found in the [terminology reference](./references/terminology.md).
 
-### Step 6: Output format
-When suggesting changes, always present your review using the following list format
-format. Do not provide suggestions outside of this list:
+### Step 7: Output format
+When suggesting changes, always present your review using the following list
+format. Do not provide suggestions outside of this list.
 
-1. `{original string}`
-   - **Suggested:** {suggested string}
-   - **Reason:** {reason}
+```
+1. {rationale}
+  - ❌ "{incorrect phrase}"
+  - ✅ `"{corrected phrase}"`
+```
