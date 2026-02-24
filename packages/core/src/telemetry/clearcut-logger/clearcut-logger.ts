@@ -846,10 +846,11 @@ export class ClearcutLogger {
           EventMetadataKey.GEMINI_CLI_API_RESPONSE_TOOL_TOKEN_COUNT,
         value: JSON.stringify(event.usage.tool_token_count),
       },
-      // Context breakdown fields are emitted on every API response. Since
-      // conversation history grows with each turn, these values are cumulative.
-      // Downstream consumers should use the last event per session (MAX) rather
-      // than summing across events to avoid double-counting.
+      // Context breakdown fields are only populated on turn-ending responses
+      // (when the user gets back control), not during intermediate tool-use
+      // loops. Values still grow across turns as conversation history
+      // accumulates, so downstream consumers should use the last event per
+      // session (MAX) rather than summing across events.
       {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_SYSTEM_INSTRUCTIONS,

@@ -242,10 +242,20 @@ export class LoggingContentGenerator implements ContentGenerator {
       responseText,
       role,
     );
-    event.usage.context_breakdown = estimateContextBreakdown(
-      requestContents,
-      generationConfig,
+
+    // Only compute context breakdown for turn-ending responses (when the user
+    // gets back control to type). If the response contains function calls, the
+    // model is in a tool-use loop and will make more API calls — skip to avoid
+    // emitting redundant cumulative snapshots for every intermediate step.
+    const hasToolCalls = responseCandidates?.some((c) =>
+      c.content?.parts?.some((p) => p.functionCall),
     );
+    if (!hasToolCalls) {
+      event.usage.context_breakdown = estimateContextBreakdown(
+        requestContents,
+        generationConfig,
+      );
+    }
 
     logApiResponse(this.config, event);
   }
