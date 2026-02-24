@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { expand } from 'dotenv-expand';
+import { expand, type DotenvExpandOutput } from 'dotenv-expand';
 
 /**
  * Expands environment variables in a string using the provided environment record.
@@ -45,12 +45,10 @@ export function expandEnvVars(
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const result = expand({
+  const result: DotenvExpandOutput = expand({
     parsed: { [dummyKey]: processedStr },
     processEnv,
-  }) as unknown as { parsed?: Record<string, unknown> };
+  });
 
-  const expanded: unknown = result.parsed?.[dummyKey];
-  return typeof expanded === 'string' ? expanded : '';
+  return result.parsed?.[dummyKey] ?? '';
 }
