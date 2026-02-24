@@ -25,7 +25,7 @@ import {
 } from '../config/models.js';
 import { ApprovalMode } from '../policy/types.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import type { AnyDeclarativeTool } from '../tools/tool-registry.js';
+import type { AnyDeclarativeTool } from '../tools/tools.js';
 import type { CallableTool } from '@google/genai';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
