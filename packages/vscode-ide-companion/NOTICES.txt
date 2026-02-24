@@ -2241,7 +2241,7 @@ THE SOFTWARE.
 
 
 ============================================================
-hono@4.12.1
+hono@4.12.2
 (git+https://github.com/honojs/hono.git)
 
 MIT License
