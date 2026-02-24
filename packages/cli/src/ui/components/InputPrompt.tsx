@@ -177,22 +177,24 @@ function getTextWithNextGhostWord(
     while (i < suffixCp.length && isHorizontalWhitespace(suffixCp[i]!)) {
       i++;
     }
-    const acceptedPart = suffixCp.slice(0, i).join('');
-    return i > 0 ? `${trimmedCurrentText}${acceptedPart}` : null;
+  } else {
+    // Consume one word.
+    while (i < suffixCp.length && !/\s/.test(suffixCp[i]!)) {
+      i++;
+    }
+
+    // Keep trailing spaces so repeated accepts feel natural.
+    while (i < suffixCp.length && isHorizontalWhitespace(suffixCp[i]!)) {
+      i++;
+    }
   }
 
-  // Consume one word.
-  while (i < suffixCp.length && !/\s/.test(suffixCp[i]!)) {
-    i++;
-  }
-
-  // Keep trailing spaces so repeated accepts feel natural.
-  while (i < suffixCp.length && isHorizontalWhitespace(suffixCp[i]!)) {
-    i++;
+  if (i === 0) {
+    return null;
   }
 
   const acceptedPart = suffixCp.slice(0, i).join('');
-  return i > 0 ? `${trimmedCurrentText}${acceptedPart}` : null;
+  return `${trimmedCurrentText}${acceptedPart}`;
 }
 
 const DOUBLE_TAB_CLEAN_UI_TOGGLE_WINDOW_MS = 350;
