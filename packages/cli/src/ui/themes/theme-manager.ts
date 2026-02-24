@@ -354,37 +354,22 @@ class ThemeManager {
       this.terminalBackground &&
       this.isThemeCompatible(activeTheme, this.terminalBackground)
     ) {
+      const colors = this.getColors();
       this.cachedSemanticColors = {
         ...semanticColors,
         background: {
           ...semanticColors.background,
           primary: this.terminalBackground,
-          message: interpolateColor(
-            this.terminalBackground,
-            activeTheme.colors.Gray,
-            DEFAULT_BACKGROUND_OPACITY,
-          ),
-          input: interpolateColor(
-            this.terminalBackground,
-            activeTheme.colors.Gray,
-            DEFAULT_INPUT_BACKGROUND_OPACITY,
-          ),
+          message: colors.MessageBackground!,
+          input: colors.InputBackground!,
         },
         border: {
           ...semanticColors.border,
-          default: interpolateColor(
-            this.terminalBackground,
-            activeTheme.colors.Gray,
-            DEFAULT_BORDER_OPACITY,
-          ),
+          default: colors.DarkGray,
         },
         ui: {
           ...semanticColors.ui,
-          dark: interpolateColor(
-            this.terminalBackground,
-            activeTheme.colors.Gray,
-            DEFAULT_BORDER_OPACITY,
-          ),
+          dark: colors.DarkGray,
         },
       };
     } else {
