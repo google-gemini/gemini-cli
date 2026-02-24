@@ -39,6 +39,7 @@ import {
   coreEvents,
   CoreEvent,
   MCPDiscoveryState,
+  getPlanModeExitMessage,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -2078,6 +2079,34 @@ describe('useGeminiStream', () => {
       expect(mockMessageBus.publish).not.toHaveBeenCalledWith(
         expect.objectContaining({ correlationId: 'corr-call2' }),
       );
+    });
+
+    it('should inject a notification message when manually exiting Plan Mode', async () => {
+      // Setup mockConfig to return PLAN mode initially
+      (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.PLAN);
+
+      // Render the hook, which will initialize the previousApprovalModeRef with PLAN
+      const { result, client } = renderTestHook([]);
+
+      // Update mockConfig to return DEFAULT mode (new mode)
+      (mockConfig.getApprovalMode as Mock).mockReturnValue(
+        ApprovalMode.DEFAULT,
+      );
+
+      await act(async () => {
+        // Trigger manual exit from Plan Mode
+        await result.current.handleApprovalModeChange(ApprovalMode.DEFAULT);
+      });
+
+      // Verify that addHistory was called with the notification message
+      expect(client.addHistory).toHaveBeenCalledWith({
+        role: 'user',
+        parts: [
+          {
+            text: getPlanModeExitMessage(ApprovalMode.DEFAULT, true),
+          },
+        ],
+      });
     });
   });
 
