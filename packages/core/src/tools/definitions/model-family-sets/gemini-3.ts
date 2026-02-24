@@ -73,7 +73,7 @@ export const GEMINI_3_SET: CoreToolSet = {
         },
         content: {
           description:
-            "The complete content to write. Provide the full file; do not use placeholders like '// ... rest of code'. IMPORTANT: If writing code that contains string literals with escape sequences (e.g., \\n, \\t), you MUST double-escape the backslashes in this JSON field (e.g., use \\\\n or \\\\t) so that the literal backslash and the character are written to the file.",
+            "The complete content to write. Provide the full file; do not use placeholders like '// ... rest of code'.",
           type: 'string',
         },
       },
@@ -291,8 +291,7 @@ export const GEMINI_3_SET: CoreToolSet = {
   replace: {
     name: EDIT_TOOL_NAME,
     description: `Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool requires providing significant context around the change to ensure precise targeting.
-The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
-IMPORTANT: If writing code that contains string literals with escape sequences (e.g., \\n, \\t), you MUST double-escape the backslashes in the \`new_string\` JSON field (e.g., use \\\\n or \\\\t) so that the literal backslash and the character are written to the file.`,
+The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -311,7 +310,7 @@ IMPORTANT: If writing code that contains string literals with escape sequences (
         },
         new_string: {
           description:
-            "The exact literal text to replace `old_string` with, unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide exact literal code.",
+            "The exact literal text to replace `old_string` with. Provide the EXACT text. Ensure the resulting code is correct and idiomatic. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide exact literal code.",
           type: 'string',
         },
         allow_multiple: {

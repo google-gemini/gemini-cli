@@ -507,13 +507,11 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
       
       The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
       
-      IMPORTANT: If writing code that contains string literals with escape sequences (e.g., \\n, \\t), you MUST double-escape the backslashes in the \`new_string\` JSON field (e.g., use \\\\n or \\\\t) so that the literal backslash and the character are written to the file.
-      
       Expectation for required parameters:
       1. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
       2. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic and that \`old_string\` and \`new_string\` are different.
       3. \`instruction\` is the detailed instruction of what needs to be changed. It is important to Make it specific and detailed so developers or large language models can understand what needs to be changed and perform the changes on their own if necessary. 
-      4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
+      4. NEVER escape \`old_string\`, that would break the exact literal text requirement.
       **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the instance(s) to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations and \`allow_multiple\` is not true, the tool will fail.
       5. Prefer to break down complex and long changes into multiple smaller atomic calls to this tool. Always check the content of the file after changes or not finding a string to match.
       **Multiple replacements:** Set \`allow_multiple\` to true if you want to replace ALL occurrences that match \`old_string\` exactly.",
@@ -665,7 +663,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
   "parametersJsonSchema": {
     "properties": {
       "content": {
-        "description": "The content to write to the file. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide complete literal content. IMPORTANT: If writing code that contains string literals with escape sequences (e.g., \\n, \\t), you MUST double-escape the backslashes in this JSON field (e.g., use \\\\n or \\\\t) so that the literal backslash and the character are written to the file.",
+        "description": "The content to write to the file. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide complete literal content.",
         "type": "string",
       },
       "file_path": {
@@ -1293,8 +1291,7 @@ Use this tool when the user's query implies needing the content of several files
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: replace 1`] = `
 {
   "description": "Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool requires providing significant context around the change to ensure precise targeting.
-The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
-IMPORTANT: If writing code that contains string literals with escape sequences (e.g., \\n, \\t), you MUST double-escape the backslashes in the \`new_string\` JSON field (e.g., use \\\\n or \\\\t) so that the literal backslash and the character are written to the file.",
+The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.",
   "name": "replace",
   "parametersJsonSchema": {
     "properties": {
@@ -1311,7 +1308,7 @@ IMPORTANT: If writing code that contains string literals with escape sequences (
         "type": "string",
       },
       "new_string": {
-        "description": "The exact literal text to replace \`old_string\` with, unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide exact literal code.",
+        "description": "The exact literal text to replace \`old_string\` with. Provide the EXACT text. Ensure the resulting code is correct and idiomatic. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide exact literal code.",
         "type": "string",
       },
       "old_string": {
@@ -1420,7 +1417,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
   "parametersJsonSchema": {
     "properties": {
       "content": {
-        "description": "The complete content to write. Provide the full file; do not use placeholders like '// ... rest of code'. IMPORTANT: If writing code that contains string literals with escape sequences (e.g., \\n, \\t), you MUST double-escape the backslashes in this JSON field (e.g., use \\\\n or \\\\t) so that the literal backslash and the character are written to the file.",
+        "description": "The complete content to write. Provide the full file; do not use placeholders like '// ... rest of code'.",
         "type": "string",
       },
       "file_path": {

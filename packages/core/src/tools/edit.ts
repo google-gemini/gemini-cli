@@ -37,7 +37,11 @@ import {
 } from './modifiable-tool.js';
 import { IdeClient } from '../ide/ide-client.js';
 import { FixLLMEditWithInstruction } from '../utils/llm-edit-fixer.js';
-import { safeLiteralReplace, detectLineEnding } from '../utils/textUtils.js';
+import {
+  safeLiteralReplace,
+  detectLineEnding,
+  sanitizeBackslashes,
+} from '../utils/textUtils.js';
 import { EditStrategyEvent, EditCorrectionEvent } from '../telemetry/types.js';
 import {
   logEditStrategy,
@@ -798,6 +802,11 @@ class EditToolInvocation
         },
       };
     }
+
+    this.params.new_string = sanitizeBackslashes(
+      this.params.new_string,
+      this.params.file_path,
+    );
 
     let editData: CalculatedEdit;
     try {
