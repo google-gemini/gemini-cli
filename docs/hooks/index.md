@@ -22,12 +22,12 @@ With hooks, you can:
 
 ### Getting started
 
-- **[Writing hooks guide](/docs/hooks/writing-hooks)**: A tutorial on creating
-  your first hook with comprehensive examples.
-- **[Best practices](/docs/hooks/best-practices)**: Guidelines on security,
+- **[Writing hooks guide](./writing-hooks.md)**: A tutorial on creating your
+  first hook with comprehensive examples.
+- **[Best practices](./best-practices.md)**: Guidelines on security,
   performance, and debugging.
-- **[Hooks reference](/docs/hooks/reference)**: The definitive technical
-  specification of I/O schemas and exit codes.
+- **[Hooks reference](./reference.md)**: The definitive technical specification
+  of I/O schemas and exit codes.
 
 ## Core concepts
 
@@ -152,8 +152,8 @@ Gemini CLI **fingerprints** project hooks. If a hook's name or command changes
 (e.g., via `git pull`), it is treated as a **new, untrusted hook** and you will
 be warned before it executes.
 
-See [Security Considerations](/docs/hooks/best-practices#using-hooks-securely)
-for a detailed threat model.
+See [Security Considerations](./best-practices.md#using-hooks-securely) for a
+detailed threat model.
 
 ## Managing hooks
 
