@@ -20,11 +20,18 @@ vi.mock('./loggers.js', () => ({
 }));
 
 // Mock os module
-vi.mock('node:os', () => ({
-  platform: vi.fn(() => 'darwin'),
-  arch: vi.fn(() => 'x64'),
-  release: vi.fn(() => '22.6.0'),
-}));
+vi.mock('node:os', () => {
+  const mockOs = {
+    platform: vi.fn(() => 'darwin'),
+    arch: vi.fn(() => 'x64'),
+    release: vi.fn(() => '22.6.0'),
+    homedir: vi.fn(() => '/mocked/home'),
+  };
+  return {
+    ...mockOs,
+    default: mockOs,
+  };
+});
 
 // Mock fs module
 vi.mock('node:fs', () => ({

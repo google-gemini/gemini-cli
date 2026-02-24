@@ -7,12 +7,19 @@
 /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import {
-  type ConversationRecord,
-  type MessageRecord,
-  type ToolCallRecord,
-} from '../services/chatRecordingService.js';
+import type { ConversationRecord, ToolCallRecord, MessageRecord } from '../types.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
+import {
+  EDIT_TOOL_NAME,
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
+  LS_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+} from '../tools/definitions/coreTools.js';
 
 /**
  * Converts an Antigravity Trajectory JSON to a Gemini CLI ConversationRecord.
@@ -153,43 +160,43 @@ function mapAgyStepToToolCall(step: Record<string, any>): ToolCallRecord {
   let result: any = null;
 
   if (step['viewFile']) {
-    name = 'view_file';
+    name = READ_FILE_TOOL_NAME;
     args = { AbsolutePath: step['viewFile']['absolutePathUri'] };
     result = [{ text: step['viewFile']['content'] || '' }];
   } else if (step['listDirectory']) {
-    name = 'list_dir';
+    name = LS_TOOL_NAME;
     args = { DirectoryPath: step['listDirectory']['directoryPathUri'] };
   } else if (step['grepSearch']) {
-    name = 'grep_search';
+    name = GREP_TOOL_NAME;
     args = {
       Query: step['grepSearch']['query'],
       SearchPath: step['grepSearch']['searchPathUri'],
     };
     result = [{ text: step['grepSearch']['rawOutput'] || '' }];
   } else if (step['runCommand']) {
-    name = 'run_command';
+    name = SHELL_TOOL_NAME;
     args = { CommandLine: step['runCommand']['commandLine'] };
     result = [{ text: step['runCommand']['combinedOutput']?.['full'] || '' }];
   } else if (step['fileChange']) {
-    name = 'replace_file_content'; // Or multi_replace_file_content
+    name = EDIT_TOOL_NAME; // Or multi_replace_file_content
     args = { TargetFile: step['fileChange']['absolutePathUri'] };
   } else if (step['writeToFile']) {
-    name = 'write_file';
+    name = WRITE_FILE_TOOL_NAME;
     args = { TargetFile: step['writeToFile']['targetFileUri'] };
   } else if (step['find']) {
-    name = 'glob';
+    name = GLOB_TOOL_NAME;
     args = {
       Pattern: step['find']['pattern'],
       SearchDirectory: step['find']['searchDirectory'],
     };
     result = [{ text: step['find']['truncatedOutput'] || '' }];
   } else if (step['readUrlContent']) {
-    name = 'web_fetch';
+    name = WEB_FETCH_TOOL_NAME;
     args = { Url: step['readUrlContent']['url'] };
     // We intentionally don't try fully mapping the complex KnowledgeBaseItem struct into a string here
     result = [{ text: 'successfully read url content' }];
   } else if (step['searchWeb']) {
-    name = 'google_web_search'; // Usually mapped from 'searchWeb'
+    name = WEB_SEARCH_TOOL_NAME; // Usually mapped from 'searchWeb'
     args = { query: step['searchWeb']['query'] };
     if (step['searchWeb']['domain']) {
       args['domain'] = step['searchWeb']['domain'];
