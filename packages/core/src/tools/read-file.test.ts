@@ -130,29 +130,36 @@ describe('ReadFileTool', () => {
       );
     });
 
-    it('should throw error if offset is negative', () => {
+    it('should throw error if start_line is less than 1', () => {
       const params: ReadFileToolParams = {
         file_path: path.join(tempRootDir, 'test.txt'),
-        offset: -1,
+        start_line: 0,
       };
-      expect(() => tool.build(params)).toThrow(
-        'Offset must be a non-negative number',
-      );
+      expect(() => tool.build(params)).toThrow('start_line must be at least 1');
     });
 
-    it('should throw error if limit is zero or negative', () => {
+    it('should throw error if end_line is less than 1', () => {
       const params: ReadFileToolParams = {
         file_path: path.join(tempRootDir, 'test.txt'),
-        limit: 0,
+        end_line: 0,
+      };
+      expect(() => tool.build(params)).toThrow('end_line must be at least 1');
+    });
+
+    it('should throw error if start_line is greater than end_line', () => {
+      const params: ReadFileToolParams = {
+        file_path: path.join(tempRootDir, 'test.txt'),
+        start_line: 10,
+        end_line: 5,
       };
       expect(() => tool.build(params)).toThrow(
-        'Limit must be a positive number',
+        'start_line cannot be greater than end_line',
       );
     });
   });
 
   describe('getDescription', () => {
-    it('should return relative path without limit/offset', () => {
+    it('should return relative path without ranges', () => {
       const subDir = path.join(tempRootDir, 'sub', 'dir');
       const params: ReadFileToolParams = {
         file_path: path.join(subDir, 'file.txt'),
@@ -393,7 +400,7 @@ describe('ReadFileTool', () => {
       expect(result.returnDisplay).toBe('');
     });
 
-    it('should support offset and limit for text files', async () => {
+    it('should support start_line and end_line for text files', async () => {
       const filePath = path.join(tempRootDir, 'paginated.txt');
       const lines = Array.from({ length: 20 }, (_, i) => `Line ${i + 1}`);
       const fileContent = lines.join('\n');
@@ -401,8 +408,8 @@ describe('ReadFileTool', () => {
 
       const params: ReadFileToolParams = {
         file_path: filePath,
-        offset: 5, // Start from line 6
-        limit: 3,
+        start_line: 6,
+        end_line: 8,
       };
       const invocation = tool.build(params);
 
@@ -569,6 +576,10 @@ describe('ReadFileTool', () => {
       const schema = tool.getSchema();
       expect(schema.name).toBe(ReadFileTool.Name);
       expect(schema.description).toMatchSnapshot();
+      expect(
+        (schema.parametersJsonSchema as { properties: Record<string, unknown> })
+          .properties,
+      ).not.toHaveProperty('offset');
     });
 
     it('should return the schema from the resolver when modelId is provided', () => {

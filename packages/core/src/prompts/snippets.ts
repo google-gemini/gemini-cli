@@ -192,7 +192,7 @@ Use the following guidelines to optimize your search and read patterns.
 - **Searching:** utilize search tools like ${GREP_TOOL_NAME} and ${GLOB_TOOL_NAME} with a conservative result count (\`total_max_matches\`) and a narrow scope (\`include\` and \`exclude\` parameters).
 - **Searching and editing:** utilize search tools like ${GREP_TOOL_NAME} with a conservative result count and a narrow scope. Use \`context\`, \`before\`, and/or \`after\` to request enough context to avoid the need to read the file before editing matches.
 - **Understanding:** minimize turns needed to understand a file. It's most efficient to read small files in their entirety.
-- **Large files:** utilize search tools like ${GREP_TOOL_NAME} and/or ${READ_FILE_TOOL_NAME} called in parallel with an offset and a limit to reduce the impact on context. Minmize extra turns, unless unavoidable due to the file being too large.
+- **Large files:** utilize search tools like ${GREP_TOOL_NAME} and/or ${READ_FILE_TOOL_NAME} called in parallel with 'start_line' and 'end_line' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
 
@@ -452,23 +452,22 @@ export function renderPlanningWorkflow(
 You are operating in **Plan Mode**. Your goal is to produce a detailed implementation plan in \`${options.plansDir}/\` and get user approval before editing source code.
 
 ## Available Tools
-The following read-only tools are available in Plan Mode:
+The following tools are available in Plan Mode:
 <available_tools>
 ${options.planModeToolsList}
-  <tool>${formatToolName(WRITE_FILE_TOOL_NAME)} - Save plans to the plans directory</tool>
-  <tool>${formatToolName(EDIT_TOOL_NAME)} - Update plans in the plans directory</tool>
 </available_tools>
 
 ## Rules
 1. **Read-Only:** You cannot modify source code. You may ONLY use read-only tools to explore, and you can only write to \`${options.plansDir}/\`. If the user asks you to modify source code directly, you MUST explain that you are in Plan Mode and must first create a detailed plan in the plans directory and get approval before any source code changes can be made.
-2. **Efficiency:** Autonomously combine discovery and drafting phases to minimize conversational turns. If the request is ambiguous, use ${formatToolName(ASK_USER_TOOL_NAME)} to clarify. Otherwise, explore the codebase and write the draft in one fluid motion.
-3. **Inquiries and Directives:** Distinguish between Inquiries and Directives to minimize unnecessary planning.
+2. **Write Constraint:** ${formatToolName(WRITE_FILE_TOOL_NAME)} and ${formatToolName(EDIT_TOOL_NAME)} may ONLY be used to write .md plan files to \`${options.plansDir}/\`. They cannot modify source code.
+3. **Efficiency:** Autonomously combine discovery and drafting phases to minimize conversational turns. If the request is ambiguous, use ${formatToolName(ASK_USER_TOOL_NAME)} to clarify. Otherwise, explore the codebase and write the draft in one fluid motion.
+4. **Inquiries and Directives:** Distinguish between Inquiries and Directives to minimize unnecessary planning.
    - **Inquiries:** If the request is an **Inquiry** (e.g., "How does X work?"), use read-only tools to explore and answer directly in your chat response. DO NOT create a plan or call ${formatToolName(
      EXIT_PLAN_MODE_TOOL_NAME,
    )}.
    - **Directives:** If the request is a **Directive** (e.g., "Fix bug Y"), follow the workflow below to create and approve a plan.
-4. **Plan Storage:** Save plans as Markdown (.md) using descriptive filenames (e.g., \`feature-x.md\`).
-5. **Direct Modification:** If asked to modify code outside the plans directory, or if the user requests implementation of an existing plan, explain that you are in Plan Mode and use the ${formatToolName(
+5. **Plan Storage:** Save plans as Markdown (.md) using descriptive filenames (e.g., \`feature-x.md\`).
+6. **Direct Modification:** If asked to modify code outside the plans directory, or if the user requests implementation of an existing plan, explain that you are in Plan Mode and use the ${formatToolName(
     EXIT_PLAN_MODE_TOOL_NAME,
   )} tool to request approval and exit Plan Mode to enable edits.
 
@@ -560,7 +559,7 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
 
 function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
   if (options.approvedPlan) {
-    return `2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements.`;
+    return `2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements. Once all implementation and verification steps are finished, provide a **final summary** of the work completed against the plan and offer clear **next steps** to the user (e.g., 'Open a pull request').`;
   }
 
   if (options.enableWriteTodosTool) {

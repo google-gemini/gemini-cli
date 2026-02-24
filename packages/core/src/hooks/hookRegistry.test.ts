@@ -8,14 +8,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import { HookRegistry } from './hookRegistry.js';
 import type { Storage } from '../config/storage.js';
-import {
+import type {
+ HookDefinition ,
   ConfigSource,
   HookEventName,
   HookType,
   HOOKS_CONFIG_FIELDS,
-} from './types.js';
+  type CommandHookConfig } from './types.js';
 import type { Config } from '../config/config.js';
-import type { HookDefinition } from './types.js';
 
 // Mock fs
 vi.mock('fs', () => ({
@@ -153,7 +153,9 @@ describe('HookRegistry', () => {
       expect(hooks).toHaveLength(1);
       expect(hooks[0].eventName).toBe(HookEventName.BeforeTool);
       expect(hooks[0].config.type).toBe(HookType.Command);
-      expect(hooks[0].config.command).toBe('./hooks/check_style.sh');
+      expect((hooks[0].config as CommandHookConfig).command).toBe(
+        './hooks/check_style.sh',
+      );
       expect(hooks[0].matcher).toBe('EditTool');
       expect(hooks[0].source).toBe(ConfigSource.Project);
     });
@@ -186,7 +188,9 @@ describe('HookRegistry', () => {
       expect(hooks).toHaveLength(1);
       expect(hooks[0].eventName).toBe(HookEventName.AfterTool);
       expect(hooks[0].config.type).toBe(HookType.Command);
-      expect(hooks[0].config.command).toBe('./hooks/after-tool.sh');
+      expect((hooks[0].config as CommandHookConfig).command).toBe(
+        './hooks/after-tool.sh',
+      );
     });
 
     it('should handle invalid configuration gracefully', async () => {
@@ -632,7 +636,9 @@ describe('HookRegistry', () => {
       // Should only load the valid hook
       const hooks = hookRegistry.getAllHooks();
       expect(hooks).toHaveLength(1);
-      expect(hooks[0].config.command).toBe('./valid-hook.sh');
+      expect((hooks[0].config as CommandHookConfig).command).toBe(
+        './valid-hook.sh',
+      );
 
       // Verify the warnings for invalid configurations
       // 1st warning: non-object hookConfig ('invalid-string')

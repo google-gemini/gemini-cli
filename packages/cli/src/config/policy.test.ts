@@ -142,4 +142,48 @@ describe('resolveWorkspacePolicyState', () => {
       expect.stringContaining('Automatically accepting and loading'),
     );
   });
+
+  it('should not return workspace policies if cwd is the home directory', async () => {
+    const policiesDir = path.join(tempDir, '.gemini', 'policies');
+    fs.mkdirSync(policiesDir, { recursive: true });
+    fs.writeFileSync(path.join(policiesDir, 'policy.toml'), 'rules = []');
+
+    // Run from HOME directory (tempDir is mocked as HOME in beforeEach)
+    const result = await resolveWorkspacePolicyState({
+      cwd: tempDir,
+      trustedFolder: true,
+      interactive: true,
+    });
+
+    expect(result.workspacePoliciesDir).toBeUndefined();
+    expect(result.policyUpdateConfirmationRequest).toBeUndefined();
+  });
+
+  it('should not return workspace policies if cwd is a symlink to the home directory', async () => {
+    const policiesDir = path.join(tempDir, '.gemini', 'policies');
+    fs.mkdirSync(policiesDir, { recursive: true });
+    fs.writeFileSync(path.join(policiesDir, 'policy.toml'), 'rules = []');
+
+    // Create a symlink to the home directory
+    const symlinkDir = path.join(
+      os.tmpdir(),
+      `gemini-cli-symlink-${Date.now()}`,
+    );
+    fs.symlinkSync(tempDir, symlinkDir, 'dir');
+
+    try {
+      // Run from symlink to HOME directory
+      const result = await resolveWorkspacePolicyState({
+        cwd: symlinkDir,
+        trustedFolder: true,
+        interactive: true,
+      });
+
+      expect(result.workspacePoliciesDir).toBeUndefined();
+      expect(result.policyUpdateConfirmationRequest).toBeUndefined();
+    } finally {
+      // Clean up symlink
+      fs.unlinkSync(symlinkDir);
+    }
+  });
 });
