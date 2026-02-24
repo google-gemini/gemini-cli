@@ -25,6 +25,7 @@ import {
   cpLen,
   toCodePoints,
   cpIndexToOffset,
+  stripUnsafeCharacters,
 } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
@@ -145,11 +146,12 @@ function getTextWithNextGhostWord(
   currentText: string,
   ghostText: string,
 ): string | null {
-  if (!ghostText || !ghostText.startsWith(currentText)) {
+  const trimmedCurrentText = currentText.trimEnd();
+  if (!ghostText || !ghostText.startsWith(trimmedCurrentText)) {
     return null;
   }
 
-  const suffix = ghostText.slice(currentText.length);
+  const suffix = ghostText.slice(trimmedCurrentText.length);
   if (!suffix) {
     return null;
   }
@@ -174,7 +176,8 @@ function getTextWithNextGhostWord(
     while (i < suffixCp.length && isHorizontalWhitespace(suffixCp[i]!)) {
       i++;
     }
-    return i > 0 ? `${currentText}${suffixCp.slice(0, i).join('')}` : null;
+    const acceptedPart = suffixCp.slice(0, i).join('');
+    return i > 0 ? `${trimmedCurrentText}${acceptedPart}` : null;
   }
 
   // Consume one word.
@@ -187,7 +190,8 @@ function getTextWithNextGhostWord(
     i++;
   }
 
-  return i > 0 ? `${currentText}${suffixCp.slice(0, i).join('')}` : null;
+  const acceptedPart = suffixCp.slice(0, i).join('');
+  return i > 0 ? `${trimmedCurrentText}${acceptedPart}` : null;
 }
 
 const DOUBLE_TAB_CLEAN_UI_TOGGLE_WINDOW_MS = 350;
@@ -1043,8 +1047,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           completion.promptCompletion.text,
         );
         if (nextText) {
-          buffer.setText(nextText);
-          completion.promptCompletion.markSelected(nextText);
+          const safeNextText = stripUnsafeCharacters(nextText);
+          buffer.setText(safeNextText);
+          completion.promptCompletion.markSelected(safeNextText);
           setExpandedSuggestionIndex(-1);
           return true;
         }

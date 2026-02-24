@@ -3231,6 +3231,43 @@ describe('InputPrompt', () => {
       unmount();
     });
 
+    it('accepts ghost text word-by-word when current text has trailing spaces', async () => {
+      const mockMarkSelected = vi.fn();
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: false,
+        suggestions: [],
+        promptCompletion: {
+          text: 'build a weather app',
+          accept: vi.fn(),
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: true,
+          markSelected: mockMarkSelected,
+        },
+      });
+
+      props.buffer.setText('build   ');
+      mockBuffer.setText.mockClear();
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x1b[1;5C'); // Ctrl+Right
+      });
+
+      await waitFor(() => {
+        expect(mockBuffer.setText).toHaveBeenCalledWith('build a ');
+        expect(mockMarkSelected).toHaveBeenCalledWith('build a ');
+      });
+      unmount();
+    });
+
     it('does not accept ghost text word-by-word when suggestions are visible', async () => {
       const mockMarkSelected = vi.fn();
       mockedUseCommandCompletion.mockReturnValue({
@@ -3265,6 +3302,43 @@ describe('InputPrompt', () => {
 
       expect(mockBuffer.setText).not.toHaveBeenCalled();
       expect(mockMarkSelected).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('sanitizes ghost text before word-by-word acceptance', async () => {
+      const mockMarkSelected = vi.fn();
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: false,
+        suggestions: [],
+        promptCompletion: {
+          text: 'echo \x1b[31mhello\x1b[0m world',
+          accept: vi.fn(),
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: true,
+          markSelected: mockMarkSelected,
+        },
+      });
+
+      props.buffer.setText('echo ');
+      mockBuffer.setText.mockClear();
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x1b[1;5C'); // Ctrl+Right
+      });
+
+      await waitFor(() => {
+        expect(mockBuffer.setText).toHaveBeenCalledWith('echo hello ');
+        expect(mockMarkSelected).toHaveBeenCalledWith('echo hello ');
+      });
       unmount();
     });
 
