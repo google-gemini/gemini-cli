@@ -196,7 +196,6 @@ export interface AgentRunConfig {
 /**
  * Override configuration for a specific agent.
  * Generic fields (modelConfig, runConfig, enabled) are standard across all agents.
- * Agent-specific settings go in customConfig - each agent defines its own type.
  */
 export interface AgentOverride {
   modelConfig?: ModelConfig;
@@ -262,7 +261,10 @@ export interface CustomTheme {
 
 /**
  * Browser agent custom configuration.
- * Used in agents.overrides.browser_agent.customConfig
+ * Used in agents.browser
+ *
+ * IMPORTANT: Keep in sync with the browser settings schema in
+ * packages/cli/src/config/settingsSchema.ts (agents.browser.properties).
  */
 export interface BrowserAgentCustomConfig {
   /**

@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -73,11 +73,7 @@ class AnalyzeScreenshotInvocation extends BaseToolInvocation<
 
   getDescription(): string {
     const instruction = String(this.params['instruction'] ?? '');
-    const preview =
-      instruction.length > 50
-        ? instruction.substring(0, 50) + '...'
-        : instruction;
-    return `Visual analysis: "${preview}"`;
+    return `Visual analysis: "${instruction}"`;
   }
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
@@ -166,9 +162,7 @@ class AnalyzeScreenshotInvocation extends BaseToolInvocation<
         };
       }
 
-      debugLogger.log(
-        `Visual analysis complete: ${responseText.slice(0, 100)}`,
-      );
+      debugLogger.log(`Visual analysis complete: ${responseText}`);
 
       return {
         llmContent: `Visual Analysis Result:\n${responseText}`,

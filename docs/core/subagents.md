@@ -96,7 +96,7 @@ Gemini CLI comes with the following built-in subagents:
 
 The browser agent requires:
 
-- **Chrome** version 144 or later installed on your system.
+- **Chrome** version 144 or later (any recent stable release will work).
 - **Node.js** with `npx` available (used to launch the
   [`chrome-devtools-mcp`](https://www.npmjs.com/package/chrome-devtools-mcp)
   server).
@@ -192,6 +192,9 @@ When enabled, the agent gains access to the `analyze_screenshot` tool, which
 captures a screenshot and sends it to the vision model for analysis. The model
 returns coordinates and element descriptions that the browser agent uses with
 the `click_at` tool for precise, coordinate-based interactions.
+
+> **Note:** The visual agent requires API key or Vertex AI authentication. It is
+> not available when using Google Login.
 
 ## Creating custom subagents
 

@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,7 +9,20 @@ import { createMcpDeclarativeTools } from './mcpToolWrapper.js';
 import type { BrowserManager } from './browserManager.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import { MessageBusType } from '../../confirmation-bus/types.js';
-import { ToolConfirmationOutcome } from '../../tools/tools.js';
+import {
+  ToolConfirmationOutcome,
+  type ToolCallConfirmationDetails,
+  type PolicyUpdateOptions,
+} from '../../tools/tools.js';
+
+interface TestableConfirmation {
+  getConfirmationDetails(
+    signal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false>;
+  getPolicyUpdateOptions(
+    outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined;
+}
 
 describe('mcpToolWrapper Confirmation', () => {
   let mockBrowserManager: BrowserManager;
@@ -25,7 +38,6 @@ describe('mcpToolWrapper Confirmation', () => {
       callTool: vi.fn(),
     } as unknown as BrowserManager;
 
-    // We accept any cast here because we are mocking the interface
     mockMessageBus = {
       publish: vi.fn().mockResolvedValue(undefined),
       subscribe: vi.fn(),
@@ -38,11 +50,9 @@ describe('mcpToolWrapper Confirmation', () => {
       mockBrowserManager,
       mockMessageBus,
     );
-    const invocation = tools[0].build({});
+    const invocation = tools[0].build({}) as unknown as TestableConfirmation;
 
-    // Use "any" to access protected method
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const details = await (invocation as any).getConfirmationDetails(
+    const details = await invocation.getConfirmationDetails(
       new AbortController().signal,
     );
 
@@ -57,15 +67,15 @@ describe('mcpToolWrapper Confirmation', () => {
     // Verify onConfirm publishes policy update
     const outcome = ToolConfirmationOutcome.ProceedAlways;
 
-    await details.onConfirm(outcome);
+    if (details && typeof details === 'object' && 'onConfirm' in details) {
+      await details.onConfirm(outcome);
+    }
 
     expect(mockMessageBus.publish).toHaveBeenCalledWith(
       expect.objectContaining({
         type: MessageBusType.UPDATE_POLICY,
         mcpName: 'browser-agent',
-        persist: false, // ProceedAlwaysServer doesn't persist by default unless specified otherwise in logic?
-        // Wait, BaseToolInvocation.publishPolicyUpdate handles logic.
-        // If outcome is ProceedAlwaysServer, BaseToolInvocation doesn't do anything by default!
+        persist: false,
       }),
     );
   });
@@ -75,10 +85,9 @@ describe('mcpToolWrapper Confirmation', () => {
       mockBrowserManager,
       mockMessageBus,
     );
-    const invocation = tools[0].build({});
+    const invocation = tools[0].build({}) as unknown as TestableConfirmation;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const options = (invocation as any).getPolicyUpdateOptions(
+    const options = invocation.getPolicyUpdateOptions(
       ToolConfirmationOutcome.ProceedAlways,
     );
 

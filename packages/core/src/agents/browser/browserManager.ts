@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -324,6 +324,8 @@ export class BrowserManager {
         }),
       ]);
     } catch (error) {
+      await this.close();
+
       // Provide error-specific, session-mode-aware remediation
       throw this.createConnectionError(
         error instanceof Error ? error.message : String(error),

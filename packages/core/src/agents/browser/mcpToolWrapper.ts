@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,8 +17,8 @@
 
 import type { FunctionDeclaration } from '@google/genai';
 import type { Tool as McpTool } from '@modelcontextprotocol/sdk/types.js';
-import type { ToolConfirmationOutcome } from '../../tools/tools.js';
 import {
+  type ToolConfirmationOutcome,
   DeclarativeTool,
   BaseToolInvocation,
   Kind,
@@ -86,18 +86,7 @@ class McpToolInvocation extends BaseToolInvocation<
         signal,
       );
 
-      const result: McpToolCallResult = await (signal.aborted
-        ? Promise.reject(signal.reason ?? new Error('Operation cancelled'))
-        : Promise.race([
-            callToolPromise,
-            new Promise<never>((_resolve, reject) => {
-              signal.addEventListener(
-                'abort',
-                () => reject(signal.reason ?? new Error('Operation cancelled')),
-                { once: true },
-              );
-            }),
-          ]));
+      const result: McpToolCallResult = await callToolPromise;
 
       // Extract text content from MCP response
       let textContent = '';
@@ -210,9 +199,11 @@ class TypeTextInvocation extends BaseToolInvocation<
 
       // Optionally press a submit key (Enter, Tab, etc.) after typing
       if (this.submitKey && !signal.aborted) {
-        const keyResult = await this.browserManager.callTool('press_key', {
-          key: this.submitKey,
-        });
+        const keyResult = await this.browserManager.callTool(
+          'press_key',
+          { key: this.submitKey },
+          signal,
+        );
         if (keyResult.isError) {
           const errText = this.extractErrorText(keyResult);
           debugLogger.warn(
@@ -254,7 +245,11 @@ class TypeTextInvocation extends BaseToolInvocation<
 
       // Map special characters to key names
       const key = char === ' ' ? 'Space' : char;
-      const result = await this.browserManager.callTool('press_key', { key });
+      const result = await this.browserManager.callTool(
+        'press_key',
+        { key },
+        signal,
+      );
 
       if (result.isError) {
         debugLogger.warn(

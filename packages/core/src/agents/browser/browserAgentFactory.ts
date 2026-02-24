@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -98,7 +98,7 @@ export async function createBrowserAgentDefinition(
     if (missingVisualTools.length > 0) {
       return (
         `Visual tools missing (${missingVisualTools.join(', ')}). ` +
-        `Ensure chrome-devtools-mcp is started with --experimental-vision.`
+        `The installed chrome-devtools-mcp version may be too old.`
       );
     }
     const authType = config.getContentGeneratorConfig()?.authType;

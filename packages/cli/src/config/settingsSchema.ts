@@ -981,7 +981,7 @@ const SETTINGS_SCHEMA = {
             default: 'persistent',
             description:
               "Session mode: 'persistent', 'isolated', or 'existing'.",
-            showInDialog: true,
+            showInDialog: false,
             options: [
               { value: 'persistent', label: 'Persistent' },
               { value: 'isolated', label: 'Isolated' },
@@ -995,7 +995,7 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: false,
             description: 'Run browser in headless mode.',
-            showInDialog: true,
+            showInDialog: false,
           },
           profilePath: {
             type: 'string',
@@ -1005,7 +1005,7 @@ const SETTINGS_SCHEMA = {
             default: undefined as string | undefined,
             description:
               'Path to browser profile directory for session persistence.',
-            showInDialog: true,
+            showInDialog: false,
           },
           visualModel: {
             type: 'string',
@@ -1014,7 +1014,7 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: undefined as string | undefined,
             description: 'Model override for the visual agent.',
-            showInDialog: true,
+            showInDialog: false,
           },
         },
       },

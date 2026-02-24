@@ -87,15 +87,6 @@ they appear in the UI.
 | Disable Loop Detection  | `model.disableLoopDetection` | Disable automatic detection and prevention of infinite loops.                          | `false` |
 | Skip Next Speaker Check | `model.skipNextSpeakerCheck` | Skip the next speaker check.                                                           | `true`  |
 
-### Agents
-
-| UI Label             | Setting                      | Description                                                | Default        |
-| -------------------- | ---------------------------- | ---------------------------------------------------------- | -------------- |
-| Browser Session Mode | `agents.browser.sessionMode` | Session mode: 'persistent', 'isolated', or 'existing'.     | `"persistent"` |
-| Browser Headless     | `agents.browser.headless`    | Run browser in headless mode.                              | `false`        |
-| Browser Profile Path | `agents.browser.profilePath` | Path to browser profile directory for session persistence. | `undefined`    |
-| Browser Visual Model | `agents.browser.visualModel` | Model override for the visual agent.                       | `undefined`    |
-
 ### Context
 
 | UI Label                             | Setting                                           | Description                                                                                                                                                                                                                                 | Default |
