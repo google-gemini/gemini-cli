@@ -19,6 +19,7 @@ import type { A2AAuthConfig } from './auth-provider/types.js';
 import { isValidToolName } from '../tools/tool-names.js';
 import { FRONTMATTER_REGEX } from '../skills/skillLoader.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { isSubpath } from '../utils/paths.js';
 
 /**
  * DTO for Markdown parsing - represents the structure from frontmatter.
@@ -506,7 +507,18 @@ export async function loadAgentsFromDirectory(
   for (const entry of files) {
     const filePath = path.join(dir, entry.name);
     try {
-      const content = await fs.readFile(filePath, 'utf-8');
+      // Resolve symlinks to their real path to prevent path traversal
+      const resolvedPath = await fs.realpath(filePath);
+      if (!isSubpath(dir, resolvedPath)) {
+        result.errors.push(
+          new AgentLoadError(
+            filePath,
+            `Symbolic link points outside the agents directory`,
+          ),
+        );
+        continue;
+      }
+      const content = await fs.readFile(resolvedPath, 'utf-8');
       const hash = crypto.createHash('sha256').update(content).digest('hex');
       const agentDefs = await parseAgentMarkdown(filePath, content);
       for (const def of agentDefs) {
