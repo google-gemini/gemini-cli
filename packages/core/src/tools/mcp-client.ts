@@ -70,6 +70,7 @@ import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from '../services/environmentSanitization.js';
+import { expandEnvVars } from '../utils/envExpansion.js';
 import {
   GEMINI_CLI_IDENTIFICATION_ENV_VAR,
   GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
@@ -783,32 +784,38 @@ function createTransportRequestInit(
   mcpServerConfig: MCPServerConfig,
   headers: Record<string, string>,
 ): RequestInit {
-  // Merge configured headers and runtime headers (e.g. Authorization)
-  const mergedHeaders: Record<string, string> = {
-    ...(mcpServerConfig.headers ?? {}),
-    ...headers,
-  };
+// Expand configured headers (support env vars)
+const expandedHeaders: Record<string, string> = {};
+if (mcpServerConfig.headers) {
+  for (const [key, value] of Object.entries(mcpServerConfig.headers)) {
+    expandedHeaders[key] = expandEnvVars(value, process.env);
+  }
+}
 
-  // If user already provided an Accept header (any casing), respect it.
-  const hasAccept = Object.keys(mergedHeaders).some(
-    (k) => k.toLowerCase() === 'accept',
-  );
+// Merge configured headers and runtime headers (e.g. Authorization)
+const mergedHeaders: Record<string, string> = {
+  ...expandedHeaders,
+  ...headers,
+};
 
-  if (!hasAccept) {
-    // Determine appropriate Accept header based on configured transport.
-    // For Streamable HTTP (httpUrl, explicit type 'http', or url without type)
-    // the MCP spec requires the client to accept both JSON and SSE.
-    let acceptValue = 'application/json, text/event-stream';
+// Use Headers API to check for Accept header (case-insensitive)
+const headersObj = new Headers(mergedHeaders);
+const hasAccept = headersObj.has('accept');
 
-    if (mcpServerConfig.type === 'sse') {
-      acceptValue = 'text/event-stream';
-    }
+if (!hasAccept) {
+  // Determine appropriate Accept header based on configured transport
+  let acceptValue = 'application/json, text/event-stream';
 
-    mergedHeaders['Accept'] = acceptValue;
+  if (mcpServerConfig.type === 'sse') {
+    acceptValue = 'text/event-stream';
   }
 
-  return {
-    headers: mergedHeaders,
+  headersObj.set('Accept', acceptValue);
+}
+
+return {
+  headers: Object.fromEntries(headersObj.entries()),
+};
   };
 }
 
@@ -1991,15 +1998,33 @@ export async function createTransport(
   }
 
   if (mcpServerConfig.command) {
+    // 1. Sanitize the base process environment to prevent unintended leaks of system-wide secrets.
+    const sanitizedEnv = sanitizeEnvironment(process.env, {
+      ...sanitizationConfig,
+      enableEnvironmentVariableRedaction: true,
+    });
+
+    const finalEnv: Record<string, string> = {
+      [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
+        GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
+    };
+    for (const [key, value] of Object.entries(sanitizedEnv)) {
+      if (value !== undefined) {
+        finalEnv[key] = value;
+      }
+    }
+
+    // Expand and merge explicit environment variables from the MCP configuration.
+    if (mcpServerConfig.env) {
+      for (const [key, value] of Object.entries(mcpServerConfig.env)) {
+        finalEnv[key] = expandEnvVars(value, process.env);
+      }
+    }
+
     let transport: Transport = new StdioClientTransport({
       command: mcpServerConfig.command,
       args: mcpServerConfig.args || [],
-      env: {
-        ...sanitizeEnvironment(process.env, sanitizationConfig),
-        ...(mcpServerConfig.env || {}),
-        [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
-          GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
-      } as Record<string, string>,
+      env: finalEnv,
       cwd: mcpServerConfig.cwd,
       stderr: 'pipe',
     });
