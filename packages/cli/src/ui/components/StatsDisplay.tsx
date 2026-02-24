@@ -173,16 +173,22 @@ const ModelUsageTable: React.FC<{
   const outputTokensWidth = 15;
   const usageLimitWidth = showQuotaColumn ? 85 : 0;
 
-  const renderProgressBar = (usedFraction: number) => {
+  const renderProgressBar = (usedFraction: number, color?: string) => {
     const totalSteps = 20;
-    const filledSteps = Math.min(
-      totalSteps,
-      Math.max(1, Math.round(usedFraction * totalSteps)),
-    );
+    let filledSteps = Math.round(usedFraction * totalSteps);
+
+    // If something is used but < 5%, show 1 tick.
+    // If < 100% but rounding to 20, show 19 ticks.
+    if (usedFraction > 0 && usedFraction < 1) {
+      filledSteps = Math.min(Math.max(filledSteps, 1), totalSteps - 1);
+    }
+
     const emptySteps = totalSteps - filledSteps;
     return (
       <Box flexDirection="row">
-        <Text color={theme.text.primary}>{'▬'.repeat(filledSteps)}</Text>
+        <Text color={color ?? theme.text.primary}>
+          {'▬'.repeat(filledSteps)}
+        </Text>
         <Text color={theme.text.secondary}>{'▬'.repeat(emptySteps)}</Text>
       </Box>
     );
@@ -382,32 +388,51 @@ const ModelUsageTable: React.FC<{
             {row.bucket && (
               <Box flexDirection="row">
                 {row.bucket.remainingFraction != null &&
-                  renderProgressBar(1 - row.bucket.remainingFraction)}
+                  renderProgressBar(
+                    1 - row.bucket.remainingFraction,
+                    getUsedStatusColor(
+                      (1 - row.bucket.remainingFraction) * 100,
+                      {
+                        warning: QUOTA_USED_WARNING_THRESHOLD,
+                        critical: QUOTA_USED_CRITICAL_THRESHOLD,
+                      },
+                    ),
+                  )}
                 <Box marginLeft={1}>
                   <Text wrap="truncate-end">
-                    <Text
-                      color={
-                        row.bucket.remainingFraction != null
-                          ? getUsedStatusColor(
-                              (1 - row.bucket.remainingFraction) * 100,
-                              {
-                                warning: QUOTA_USED_WARNING_THRESHOLD,
-                                critical: QUOTA_USED_CRITICAL_THRESHOLD,
-                              },
-                            )
-                          : theme.text.secondary
-                      }
-                    >
-                      {row.bucket.remainingFraction != null
-                        ? `${((1 - row.bucket.remainingFraction) * 100).toFixed(0)}% used`
-                        : 'Quota active'}
-                    </Text>
-                    <Text color={theme.text.secondary}>
-                      {row.bucket.resetTime &&
-                      formatResetTime(row.bucket.resetTime)
-                        ? ` (Limit resets in ${formatResetTime(row.bucket.resetTime)})`
-                        : ''}
-                    </Text>
+                    {row.bucket.remainingFraction === 0 ? (
+                      <Text color={theme.status.error}>
+                        Limit reached
+                        {row.bucket.resetTime &&
+                          `, resets in ${formatResetTime(row.bucket.resetTime, true)}`}
+                      </Text>
+                    ) : (
+                      <>
+                        <Text
+                          color={
+                            row.bucket.remainingFraction != null
+                              ? getUsedStatusColor(
+                                  (1 - row.bucket.remainingFraction) * 100,
+                                  {
+                                    warning: QUOTA_USED_WARNING_THRESHOLD,
+                                    critical: QUOTA_USED_CRITICAL_THRESHOLD,
+                                  },
+                                )
+                              : theme.text.secondary
+                          }
+                        >
+                          {row.bucket.remainingFraction != null
+                            ? `${((1 - row.bucket.remainingFraction) * 100).toFixed(0)}% used`
+                            : 'Quota active'}
+                        </Text>
+                        <Text color={theme.text.secondary}>
+                          {row.bucket.resetTime &&
+                          formatResetTime(row.bucket.resetTime)
+                            ? ` (Limit resets in ${formatResetTime(row.bucket.resetTime)})`
+                            : ''}
+                        </Text>
+                      </>
+                    )}
                   </Text>
                 </Box>
               </Box>
