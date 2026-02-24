@@ -58,13 +58,13 @@ function extractPartText(part: Part): string {
 export function extractTaskText(task: Task): string {
   const parts: string[] = [];
 
-  // 1. Status Message (Current "what is happening" update)
+  // Status Message (Current "what is happening" update)
   const statusMessageText = extractMessageText(task.status?.message);
   if (statusMessageText) {
     parts.push(statusMessageText);
   }
 
-  // 2. Artifacts
+  // Artifacts
   if (task.artifacts) {
     for (const artifact of task.artifacts) {
       const artifactContent = extractPartsText(artifact.parts);
@@ -78,13 +78,13 @@ export function extractTaskText(task: Task): string {
     }
   }
 
-  // 3. History Fallback
+  // History Fallback
   // If we still have no content (no status message and no artifacts),
   // we look for the most recent agent message in the history.
   if (!parts.length && task.history && task.history.length > 0) {
     const lastAgentMsg = [...task.history]
       .reverse()
-      .find((m) => m.role === 'agent');
+      .find((m) => m.role?.toLowerCase().includes('agent'));
     if (lastAgentMsg) {
       const historyText = extractMessageText(lastAgentMsg);
       if (historyText) {
