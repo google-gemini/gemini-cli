@@ -33,7 +33,7 @@ describe('GeminiClient', () => {
     };
 
     mockChat = new Proxy(baseChat, {
-      get: (target, prop) => (prop in target ? (target as any)[prop] : vi.fn())
+      get: (target, prop) => (prop in target ? (target as any)[prop] : vi.fn()),
     });
 
     client = new GeminiClient(config);
@@ -51,7 +51,8 @@ describe('GeminiClient', () => {
     it('should stop the turn when a content loop is detected', async () => {
       const controller = new AbortController();
       // Increase repetition to ensure it exceeds the threshold (10 chunks of 50 chars)
-      const repetitiveText = 'I am stuck in a loop. I am stuck in a loop. '.repeat(100);
+      const repetitiveText =
+        'I am stuck in a loop. I am stuck in a loop. '.repeat(100);
       const repetitiveChunks: string[] = [];
       for (let i = 0; i < repetitiveText.length; i += 10) {
         repetitiveChunks.push(repetitiveText.slice(i, i + 10));
@@ -59,9 +60,13 @@ describe('GeminiClient', () => {
 
       async function* mockStream(signal: AbortSignal) {
         // Mimic the SDK's vulnerable behavior: synchronous throw on abort signal propagation.
-        signal.addEventListener('abort', () => {
-          throw createAbortError();
-        }, { once: true });
+        signal.addEventListener(
+          'abort',
+          () => {
+            throw createAbortError();
+          },
+          { once: true },
+        );
 
         for (const chunk of repetitiveChunks) {
           if (signal.aborted) throw createAbortError();
@@ -72,21 +77,33 @@ describe('GeminiClient', () => {
         }
       }
 
-      mockChat.sendMessageStream.mockImplementation((_c: any, _r: any, _p: any, signal: AbortSignal) => mockStream(signal));
+      mockChat.sendMessageStream.mockImplementation(
+        (_c: any, _r: any, _p: any, signal: AbortSignal) => mockStream(signal),
+      );
 
       const events: any[] = [];
-      for await (const event of client.sendMessageStream([{ text: 'Trigger loop' }], controller.signal, 'loop-id')) {
+      for await (const event of client.sendMessageStream(
+        [{ text: 'Trigger loop' }],
+        controller.signal,
+        'loop-id',
+      )) {
         events.push(event);
       }
 
-      expect(events.some(e => e.type === GeminiEventType.LoopDetected)).toBe(true);
+      expect(events.some((e) => e.type === GeminiEventType.LoopDetected)).toBe(
+        true,
+      );
     });
 
     it('should not call sendMessageStream if the signal is already aborted', async () => {
       const controller = new AbortController();
       controller.abort();
 
-      const stream = client.sendMessageStream([{ text: 'Hello' }], controller.signal, 'pre-abort-id');
+      const stream = client.sendMessageStream(
+        [{ text: 'Hello' }],
+        controller.signal,
+        'pre-abort-id',
+      );
       const events = [];
       for await (const event of stream) {
         events.push(event);
@@ -100,28 +117,45 @@ describe('GeminiClient', () => {
       const controller = new AbortController();
 
       async function* mockStream(signal: AbortSignal) {
-        signal.addEventListener('abort', () => {
-          // This mimicking of SDK behavior is what used to cause the crash!
-          throw createAbortError();
-        }, { once: true });
+        signal.addEventListener(
+          'abort',
+          () => {
+            // This mimicking of SDK behavior is what used to cause the crash!
+            throw createAbortError();
+          },
+          { once: true },
+        );
 
         yield {
           type: 'chunk',
-          value: { candidates: [{ content: { parts: [{ text: 'Chunk 1' }] } }] },
+          value: {
+            candidates: [{ content: { parts: [{ text: 'Chunk 1' }] } }],
+          },
         };
-        
+
         // Simulating some async work
-        await new Promise(r => setTimeout(r, 10));
+        await new Promise((r) => setTimeout(r, 10));
 
         if (signal.aborted) throw createAbortError();
-        yield { type: 'chunk', value: { candidates: [{ content: { parts: [{ text: 'Chunk 2' }] } }] } };
+        yield {
+          type: 'chunk',
+          value: {
+            candidates: [{ content: { parts: [{ text: 'Chunk 2' }] } }],
+          },
+        };
       }
 
-      mockChat.sendMessageStream.mockImplementation((_c: any, _r: any, _p: any, signal: AbortSignal) => mockStream(signal));
+      mockChat.sendMessageStream.mockImplementation(
+        (_c: any, _r: any, _p: any, signal: AbortSignal) => mockStream(signal),
+      );
 
       // We just need to prove that we can consume the stream and abort without an unhandled exception crashing the test runner.
       const events: any[] = [];
-      const stream = client.sendMessageStream([{ text: 'Hello' }], controller.signal, 'manual-cancel-id');
+      const stream = client.sendMessageStream(
+        [{ text: 'Hello' }],
+        controller.signal,
+        'manual-cancel-id',
+      );
       for await (const event of stream) {
         events.push(event);
         controller.abort(); // Trigger the 'explosion'! 💣
