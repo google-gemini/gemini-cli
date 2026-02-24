@@ -27,6 +27,7 @@ import { PolicyDecision } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
+  type ToolConfirmationPayload,
 } from '../tools/tools.js';
 import { getToolSuggestion } from '../utils/tool-utils.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
@@ -474,6 +475,7 @@ export class Scheduler {
     // User Confirmation Loop
     let outcome = ToolConfirmationOutcome.ProceedOnce;
     let lastDetails: SerializableConfirmationDetails | undefined;
+    let lastPayload: ToolConfirmationPayload | undefined;
 
     if (decision === PolicyDecision.ASK_USER) {
       const result = await resolveConfirmation(toolCall, signal, {
@@ -487,15 +489,22 @@ export class Scheduler {
       });
       outcome = result.outcome;
       lastDetails = result.lastDetails;
+      lastPayload = result.payload;
     } else {
       this.state.setOutcome(callId, ToolConfirmationOutcome.ProceedOnce);
     }
 
     // Handle Policy Updates
-    await updatePolicy(toolCall.tool, outcome, lastDetails, {
-      config: this.config,
-      messageBus: this.messageBus,
-    });
+    await updatePolicy(
+      toolCall.tool,
+      outcome,
+      lastDetails,
+      {
+        config: this.config,
+        messageBus: this.messageBus,
+      },
+      lastPayload,
+    );
 
     // Handle cancellation (cascades to entire batch)
     if (outcome === ToolConfirmationOutcome.Cancel) {

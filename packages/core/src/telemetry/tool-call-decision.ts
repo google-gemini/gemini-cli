@@ -20,6 +20,8 @@ export function getDecisionFromOutcome(
     case ToolConfirmationOutcome.ProceedOnce:
       return ToolCallDecision.ACCEPT;
     case ToolConfirmationOutcome.ProceedAlways:
+    case ToolConfirmationOutcome.ProceedAlwaysCustom:
+    case ToolConfirmationOutcome.ProceedAlwaysAndSaveCustom:
     case ToolConfirmationOutcome.ProceedAlwaysServer:
     case ToolConfirmationOutcome.ProceedAlwaysTool:
       return ToolCallDecision.AUTO_ACCEPT;

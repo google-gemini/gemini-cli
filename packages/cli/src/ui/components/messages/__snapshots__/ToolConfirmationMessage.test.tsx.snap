@@ -8,7 +8,8 @@ Allow execution of 3 commands?
 
 ● 1. Allow once
   2. Allow for this session
-  3. No, suggest changes (esc)
+  3. Allow custom prefix for this session
+  4. No, suggest changes (esc)
 "
 `;
 
@@ -79,7 +80,8 @@ Allow execution of: 'echo'?
 
 ● 1. Allow once
   2. Allow for this session
-  3. No, suggest changes (esc)
+  3. Allow custom prefix for this session
+  4. No, suggest changes (esc)
 "
 `;
 

@@ -96,7 +96,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
   ): PolicyUpdateOptions | undefined {
     if (
       outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave ||
-      outcome === ToolConfirmationOutcome.ProceedAlways
+      outcome === ToolConfirmationOutcome.ProceedAlways ||
+      outcome === ToolConfirmationOutcome.ProceedAlwaysCustom ||
+      outcome === ToolConfirmationOutcome.ProceedAlwaysAndSaveCustom
     ) {
       const command = stripShellWrapper(this.params.command);
       const rootCommands = [...new Set(getCommandRoots(command))];

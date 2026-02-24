@@ -45,6 +45,7 @@ export interface ConfirmationResult {
 export interface ResolutionResult {
   outcome: ToolConfirmationOutcome;
   lastDetails?: SerializableConfirmationDetails;
+  payload?: ToolConfirmationPayload;
 }
 
 /**
@@ -123,6 +124,8 @@ export async function resolveConfirmation(
   let outcome = ToolConfirmationOutcome.ModifyWithEditor;
   let lastDetails: SerializableConfirmationDetails | undefined;
 
+  let lastPayload: ToolConfirmationPayload | undefined;
+
   // Loop exists to allow the user to modify the parameters and see the new
   // diff.
   while (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
@@ -163,6 +166,7 @@ export async function resolveConfirmation(
     );
     onWaitingForConfirmation?.(false);
     outcome = response.outcome;
+    lastPayload = response.payload;
 
     if ('onConfirm' in details && typeof details.onConfirm === 'function') {
       await details.onConfirm(outcome, response.payload);
@@ -185,7 +189,7 @@ export async function resolveConfirmation(
     }
   }
 
-  return { outcome, lastDetails };
+  return { outcome, lastDetails, payload: lastPayload };
 }
 
 /**

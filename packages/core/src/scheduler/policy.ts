@@ -21,6 +21,7 @@ import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
   type PolicyUpdateOptions,
+  type ToolConfirmationPayload,
 } from '../tools/tools.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { EDIT_TOOL_NAMES } from '../tools/tool-names.js';
@@ -89,6 +90,7 @@ export async function updatePolicy(
   outcome: ToolConfirmationOutcome,
   confirmationDetails: SerializableConfirmationDetails | undefined,
   deps: { config: Config; messageBus: MessageBus },
+  payload?: ToolConfirmationPayload,
 ): Promise<void> {
   // Mode Transitions (AUTO_EDIT)
   if (isAutoEditTransition(tool, outcome)) {
@@ -113,6 +115,7 @@ export async function updatePolicy(
     outcome,
     confirmationDetails,
     deps.messageBus,
+    payload,
   );
 }
 
@@ -142,21 +145,36 @@ async function handleStandardPolicyUpdate(
   outcome: ToolConfirmationOutcome,
   confirmationDetails: SerializableConfirmationDetails | undefined,
   messageBus: MessageBus,
+  payload?: ToolConfirmationPayload,
 ): Promise<void> {
+  // Map custom outcomes to their base equivalents for the policy engine
+  const isCustom =
+    outcome === ToolConfirmationOutcome.ProceedAlwaysCustom ||
+    outcome === ToolConfirmationOutcome.ProceedAlwaysAndSaveCustom;
+  const effectiveOutcome = isCustom
+    ? outcome === ToolConfirmationOutcome.ProceedAlwaysCustom
+      ? ToolConfirmationOutcome.ProceedAlways
+      : ToolConfirmationOutcome.ProceedAlwaysAndSave
+    : outcome;
+
   if (
-    outcome === ToolConfirmationOutcome.ProceedAlways ||
-    outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
+    effectiveOutcome === ToolConfirmationOutcome.ProceedAlways ||
+    effectiveOutcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
   ) {
     const options: PolicyUpdateOptions = {};
 
-    if (confirmationDetails?.type === 'exec') {
+    // If user provided a custom commandPrefix via the payload, use it
+    if (isCustom && payload && 'commandPrefix' in payload) {
+      options.commandPrefix = payload.commandPrefix;
+    } else if (confirmationDetails?.type === 'exec') {
       options.commandPrefix = confirmationDetails.rootCommands;
     }
 
     await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
       toolName: tool.name,
-      persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
+      persist:
+        effectiveOutcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
       ...options,
     });
   }

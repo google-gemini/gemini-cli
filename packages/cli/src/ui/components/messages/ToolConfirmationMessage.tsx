@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { Box, Text } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
@@ -14,6 +14,7 @@ import {
   type Config,
   type ToolConfirmationPayload,
   ToolConfirmationOutcome,
+  QuestionType,
   hasRedirection,
   debugLogger,
 } from '@google/gemini-cli-core';
@@ -95,9 +96,26 @@ export const ToolConfirmationMessage: React.FC<
   );
 
   const handleSelect = useCallback(
-    (item: ToolConfirmationOutcome) => handleConfirm(item),
+    (item: ToolConfirmationOutcome) => {
+      if (
+        item === ToolConfirmationOutcome.ProceedAlwaysCustom ||
+        item === ToolConfirmationOutcome.ProceedAlwaysAndSaveCustom
+      ) {
+        setCustomPrefixMode(
+          item === ToolConfirmationOutcome.ProceedAlwaysCustom
+            ? 'session'
+            : 'always',
+        );
+        return;
+      }
+      handleConfirm(item);
+    },
     [handleConfirm],
   );
+
+  const [customPrefixMode, setCustomPrefixMode] = useState<
+    'session' | 'always' | null
+  >(null);
 
   const getOptions = useCallback(() => {
     const options: Array<RadioSelectItem<ToolConfirmationOutcome>> = [];
@@ -151,11 +169,21 @@ export const ToolConfirmationMessage: React.FC<
           value: ToolConfirmationOutcome.ProceedAlways,
           key: `Allow for this session`,
         });
+        options.push({
+          label: `Allow custom prefix for this session`,
+          value: ToolConfirmationOutcome.ProceedAlwaysCustom,
+          key: `Allow custom prefix for this session`,
+        });
         if (allowPermanentApproval) {
           options.push({
             label: `Allow for all future sessions`,
             value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
             key: `Allow for all future sessions`,
+          });
+          options.push({
+            label: `Allow custom prefix for all future sessions`,
+            value: ToolConfirmationOutcome.ProceedAlwaysAndSaveCustom,
+            key: `Allow custom prefix for all future sessions`,
           });
         }
       }
@@ -483,6 +511,48 @@ export const ToolConfirmationMessage: React.FC<
         </Box>
       );
     }
+  }
+
+  if (customPrefixMode && confirmationDetails.type === 'exec') {
+    const defaultPrefix =
+      confirmationDetails.rootCommands?.join(', ') ||
+      confirmationDetails.rootCommand ||
+      '';
+    return (
+      <Box flexDirection="column" paddingTop={0} paddingBottom={1}>
+        <Box marginBottom={1}>
+          <Text color={theme.text.primary}>
+            Enter the command prefix to allow (e.g. &quot;jj describe&quot;):
+          </Text>
+        </Box>
+        <AskUserDialog
+          questions={[
+            {
+              type: QuestionType.TEXT,
+              header: 'Command prefix',
+              question: `Enter the exact command prefix to ${customPrefixMode === 'session' ? 'allow for this session' : 'allow for all future sessions'}:`,
+              placeholder: defaultPrefix,
+            },
+          ]}
+          onSubmit={(answers) => {
+            const prefix = (answers['0'] || defaultPrefix).trim();
+            if (prefix) {
+              handleConfirm(
+                customPrefixMode === 'session'
+                  ? ToolConfirmationOutcome.ProceedAlwaysCustom
+                  : ToolConfirmationOutcome.ProceedAlwaysAndSaveCustom,
+                { commandPrefix: prefix },
+              );
+            }
+          }}
+          onCancel={() => {
+            setCustomPrefixMode(null);
+          }}
+          width={terminalWidth}
+          availableHeight={availableTerminalHeight}
+        />
+      </Box>
+    );
   }
 
   return (

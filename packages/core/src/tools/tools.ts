@@ -143,14 +143,18 @@ export abstract class BaseToolInvocation<
   ): Promise<void> {
     if (
       outcome === ToolConfirmationOutcome.ProceedAlways ||
-      outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
+      outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave ||
+      outcome === ToolConfirmationOutcome.ProceedAlwaysCustom ||
+      outcome === ToolConfirmationOutcome.ProceedAlwaysAndSaveCustom
     ) {
       if (this._toolName) {
         const options = this.getPolicyUpdateOptions(outcome);
         void this.messageBus.publish({
           type: MessageBusType.UPDATE_POLICY,
           toolName: this._toolName,
-          persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
+          persist:
+            outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave ||
+            outcome === ToolConfirmationOutcome.ProceedAlwaysAndSaveCustom,
           ...options,
         });
       }
@@ -727,10 +731,16 @@ export interface ToolExitPlanModeConfirmationPayload {
   feedback?: string;
 }
 
+export interface ToolShellConfirmationPayload {
+  /** Custom command prefix to allow (e.g. "jj describe" instead of just "jj") */
+  commandPrefix: string;
+}
+
 export type ToolConfirmationPayload =
   | ToolEditConfirmationPayload
   | ToolAskUserConfirmationPayload
-  | ToolExitPlanModeConfirmationPayload;
+  | ToolExitPlanModeConfirmationPayload
+  | ToolShellConfirmationPayload;
 
 export interface ToolExecuteConfirmationDetails {
   type: 'exec';
@@ -791,6 +801,8 @@ export enum ToolConfirmationOutcome {
   ProceedOnce = 'proceed_once',
   ProceedAlways = 'proceed_always',
   ProceedAlwaysAndSave = 'proceed_always_and_save',
+  ProceedAlwaysCustom = 'proceed_always_custom',
+  ProceedAlwaysAndSaveCustom = 'proceed_always_and_save_custom',
   ProceedAlwaysServer = 'proceed_always_server',
   ProceedAlwaysTool = 'proceed_always_tool',
   ModifyWithEditor = 'modify_with_editor',
