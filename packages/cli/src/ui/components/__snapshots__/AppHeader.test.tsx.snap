@@ -11,7 +11,8 @@ exports[`<AppHeader /> > should not render the banner when no flags are set 1`] 
 Tips for getting started:
 1. /help for more information
 2. Ask coding questions, edit code or run commands
-3. Be specific for the best results"
+3. Be specific for the best results
+"
 `;
 
 exports[`<AppHeader /> > should not render the default banner if shown count is 5 or more 1`] = `
@@ -25,7 +26,8 @@ exports[`<AppHeader /> > should not render the default banner if shown count is 
 Tips for getting started:
 1. /help for more information
 2. Ask coding questions, edit code or run commands
-3. Be specific for the best results"
+3. Be specific for the best results
+"
 `;
 
 exports[`<AppHeader /> > should render the banner with default text 1`] = `
@@ -35,14 +37,15 @@ exports[`<AppHeader /> > should render the banner with default text 1`] = `
    ▗▟▀
   ▝▀
 
-╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ This is the default banner                                                                                           │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ This is the default banner                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 Tips for getting started:
 1. /help for more information
 2. Ask coding questions, edit code or run commands
-3. Be specific for the best results"
+3. Be specific for the best results
+"
 `;
 
 exports[`<AppHeader /> > should render the banner with warning text 1`] = `
@@ -52,12 +55,13 @@ exports[`<AppHeader /> > should render the banner with warning text 1`] = `
    ▗▟▀
   ▝▀
 
-╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ There are capacity issues                                                                                            │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ There are capacity issues                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 Tips for getting started:
 1. /help for more information
 2. Ask coding questions, edit code or run commands
-3. Be specific for the best results"
+3. Be specific for the best results
+"
 `;

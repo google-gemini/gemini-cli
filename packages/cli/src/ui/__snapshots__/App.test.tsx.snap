@@ -4,8 +4,8 @@ exports[`App > Snapshots > renders default layout correctly 1`] = `
 "
   ▝▜▄     Gemini CLI v1.2.3
     ▝▜▄
-   ▗▟▀    Authenticated with undefined /auth
-  ▝▀      Gemini Code Assist for individuals /upgrade
+   ▗▟▀
+  ▝▀
 
 
 Tips for getting started:
@@ -49,23 +49,24 @@ Footer
 
   ▝▜▄     Gemini CLI v1.2.3
     ▝▜▄
-   ▗▟▀    Authenticated with undefined /auth
-  ▝▀      Gemini Code Assist for individuals /upgrade
+   ▗▟▀
+  ▝▀
 
 
 Tips for getting started:
 1. /help for more information
 2. Ask coding questions, edit code or run commands
 3. Be specific for the best results
-Composer"
+Composer
+"
 `;
 
 exports[`App > Snapshots > renders with dialogs visible 1`] = `
 "
   ▝▜▄     Gemini CLI v1.2.3
     ▝▜▄
-   ▗▟▀    Authenticated with undefined /auth
-  ▝▀      Gemini Code Assist for individuals /upgrade
+   ▗▟▀
+  ▝▀
 
 
 
@@ -107,8 +108,8 @@ exports[`App > should render ToolConfirmationQueue along with Composer when tool
 "
   ▝▜▄     Gemini CLI v1.2.3
     ▝▜▄
-   ▗▟▀    Authenticated with undefined /auth
-  ▝▀      Gemini Code Assist for individuals /upgrade
+   ▗▟▀
+  ▝▀
 
 
 Tips for getting started:
@@ -116,19 +117,19 @@ Tips for getting started:
 2. Ask coding questions, edit code or run commands
 3. Be specific for the best results
 HistoryItemDisplay
-╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Action Required                                                                                                      │
-│                                                                                                                      │
-│ ?  ls list directory                                                                                                 │
-│                                                                                                                      │
-│ ls                                                                                                                   │
-│ Allow execution of: 'ls'?                                                                                            │
-│                                                                                                                      │
-│ ● 1. Allow once                                                                                                      │
-│   2. Allow for this session                                                                                          │
-│   3. No, suggest changes (esc)                                                                                       │
-│                                                                                                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Action Required                                                                                  │
+│                                                                                                  │
+│ ?  ls list directory                                                                             │
+│                                                                                                  │
+│ ls                                                                                               │
+│ Allow execution of: 'ls'?                                                                        │
+│                                                                                                  │
+│ ● 1. Allow once                                                                                  │
+│   2. Allow for this session                                                                      │
+│   3. No, suggest changes (esc)                                                                   │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 
 

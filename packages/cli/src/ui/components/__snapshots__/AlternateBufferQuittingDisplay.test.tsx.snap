@@ -4,8 +4,8 @@ exports[`AlternateBufferQuittingDisplay > renders with a tool awaiting confirmat
 "
   ▝▜▄     Gemini CLI v0.10.0
     ▝▜▄
-   ▗▟▀    Authenticated with undefined /auth
-  ▝▀      Gemini Code Assist for individuals /upgrade
+   ▗▟▀
+  ▝▀
 
 
 Tips for getting started:
@@ -23,8 +23,8 @@ exports[`AlternateBufferQuittingDisplay > renders with active and pending tool m
 "
   ▝▜▄     Gemini CLI v0.10.0
     ▝▜▄
-   ▗▟▀    Authenticated with undefined /auth
-  ▝▀      Gemini Code Assist for individuals /upgrade
+   ▗▟▀
+  ▝▀
 
 
 Tips for getting started:
@@ -38,29 +38,31 @@ Tips for getting started:
 ╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool2 Description for tool 2                                          │
 │                                                                          │
-╰──────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`AlternateBufferQuittingDisplay > renders with empty history and no pending items > empty 1`] = `
 "
   ▝▜▄     Gemini CLI v0.10.0
     ▝▜▄
-   ▗▟▀    Authenticated with undefined /auth
-  ▝▀      Gemini Code Assist for individuals /upgrade
+   ▗▟▀
+  ▝▀
 
 
 Tips for getting started:
 1. /help for more information
 2. Ask coding questions, edit code or run commands
-3. Be specific for the best results"
+3. Be specific for the best results
+"
 `;
 
 exports[`AlternateBufferQuittingDisplay > renders with history but no pending items > with_history_no_pending 1`] = `
 "
   ▝▜▄     Gemini CLI v0.10.0
     ▝▜▄
-   ▗▟▀    Authenticated with undefined /auth
-  ▝▀      Gemini Code Assist for individuals /upgrade
+   ▗▟▀
+  ▝▀
 
 
 Tips for getting started:
@@ -74,29 +76,31 @@ Tips for getting started:
 ╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool2 Description for tool 2                                          │
 │                                                                          │
-╰──────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`AlternateBufferQuittingDisplay > renders with pending items but no history > with_pending_no_history 1`] = `
 "
   ▝▜▄     Gemini CLI v0.10.0
     ▝▜▄
-   ▗▟▀    Authenticated with undefined /auth
-  ▝▀      Gemini Code Assist for individuals /upgrade
+   ▗▟▀
+  ▝▀
 
 
 Tips for getting started:
 1. /help for more information
 2. Ask coding questions, edit code or run commands
-3. Be specific for the best results"
+3. Be specific for the best results
+"
 `;
 
 exports[`AlternateBufferQuittingDisplay > renders with user and gemini messages > with_user_gemini_messages 1`] = `
 "
   ▝▜▄     Gemini CLI v0.10.0
     ▝▜▄
-   ▗▟▀    Authenticated with undefined /auth
-  ▝▀      Gemini Code Assist for individuals /upgrade
+   ▗▟▀
+  ▝▀
 
 
 Tips for getting started:
