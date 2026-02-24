@@ -41,7 +41,6 @@ import {
   CoreEvent,
   MCPDiscoveryState,
   getPlanModeExitMessage,
-  GeminiCliOperation,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
