@@ -11,6 +11,9 @@ import {
   type AgentConfig,
   AgentTerminateMode,
   type AgentEvent,
+  type AgentFinishEvent,
+  type ToolSuiteStartEvent,
+  type ToolCallFinishEvent,
 } from './types.js';
 import { Scheduler } from '../scheduler/scheduler.js';
 import { GeminiEventType, CompressionStatus } from '../core/turn.js';
@@ -50,6 +53,7 @@ describe('AgentSession', () => {
   let session: AgentSession;
   const agentConfig: AgentConfig = {
     name: 'TestAgent',
+    systemInstruction: 'You are a test agent.',
     capabilities: { compression: true },
   };
 
@@ -111,10 +115,7 @@ describe('AgentSession', () => {
       events.push(event);
     }
 
-    const finishEvent = events[events.length - 1] as Extract<
-      AgentEvent,
-      { type: 'agent_finish' }
-    >;
+    const finishEvent = events[events.length - 1] as AgentFinishEvent;
     expect(events[0].type).toBe('agent_start');
     expect(finishEvent.type).toBe('agent_finish');
     expect(finishEvent.value.reason).toBe(AgentTerminateMode.GOAL);
@@ -195,10 +196,7 @@ describe('AgentSession', () => {
     const callFinish = events.find((e) => e.type === 'tool_call_finish');
     expect(callStart).toBeDefined();
     expect(callFinish).toBeDefined();
-    expect(
-      (callFinish as Extract<AgentEvent, { type: 'tool_call_finish' }>).value
-        .callId,
-    ).toBe('call1');
+    expect((callFinish as ToolCallFinishEvent).value.callId).toBe('call1');
   });
 
   it('should handle multiple consecutive ReAct turns', async () => {
@@ -270,7 +268,7 @@ describe('AgentSession', () => {
 
     const suiteStart = events.find(
       (e) => e.type === 'tool_suite_start',
-    ) as Extract<AgentEvent, { type: 'tool_suite_start' }>;
+    ) as ToolSuiteStartEvent;
     expect(suiteStart.value.count).toBe(2);
     expect(mockScheduler.schedule).toHaveBeenCalledTimes(1);
     expect(mockScheduler.schedule).toHaveBeenCalledWith(
@@ -305,7 +303,7 @@ describe('AgentSession', () => {
       throw new Error('Model connection lost');
     });
 
-    const events = [];
+    const events: AgentEvent[] = [];
     try {
       for await (const event of session.prompt('Error test')) {
         events.push(event);
@@ -316,8 +314,10 @@ describe('AgentSession', () => {
 
     const finishEvent = events.find(
       (e) => e.type === 'agent_finish',
-    ) as Extract<AgentEvent, { type: 'agent_finish' }>;
+    ) as AgentFinishEvent;
     expect(finishEvent).toBeDefined();
+    expect(finishEvent.value.reason).toBe(AgentTerminateMode.ERROR);
+    expect(finishEvent.value.message).toBe('Model connection lost');
   });
 
   it('should ignore MessageBus updates from other schedulers', async () => {
@@ -371,10 +371,9 @@ describe('AgentSession', () => {
     for await (const event of session.prompt('Loop')) {
       events.push(event);
     }
-
     const finishEvent = events.find(
       (e) => e.type === 'agent_finish',
-    ) as Extract<AgentEvent, { type: 'agent_finish' }>;
+    ) as AgentFinishEvent;
     expect(finishEvent.value.reason).toBe(AgentTerminateMode.LOOP);
     expect(finishEvent.value.message).toContain('Loop detected');
   });
@@ -426,10 +425,7 @@ describe('AgentSession', () => {
       events.push(event);
     }
 
-    const finishEvent = events[events.length - 1] as Extract<
-      AgentEvent,
-      { type: 'agent_finish' }
-    >;
+    const finishEvent = events[events.length - 1] as AgentFinishEvent;
     expect(finishEvent.type).toBe('agent_finish');
     expect(finishEvent.value.reason).toBe(AgentTerminateMode.ABORTED);
   });
@@ -520,10 +516,7 @@ describe('AgentSession', () => {
 
     expect(mockScheduler.schedule).toHaveBeenCalledTimes(2);
 
-    const finishEvent = events[events.length - 1] as Extract<
-      AgentEvent,
-      { type: 'agent_finish' }
-    >;
+    const finishEvent = events[events.length - 1] as AgentFinishEvent;
     expect(finishEvent.type).toBe('agent_finish');
     expect(finishEvent.value.totalTurns).toBe(2);
     expect(finishEvent.value.reason).toBe(AgentTerminateMode.MAX_TURNS);

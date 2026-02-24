@@ -546,12 +546,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       // === UNIFIED RECOVERY BLOCK ===
       // Only attempt recovery if it's a known recoverable reason.
       // We don't recover from GOAL (already done) or ABORTED (user cancelled).
-      if (
-        terminateReason !== AgentTerminateMode.ERROR &&
-        terminateReason !== AgentTerminateMode.ABORTED &&
-        terminateReason !== AgentTerminateMode.GOAL &&
-        terminateReason !== AgentTerminateMode.LOOP
-      ) {
+      if (this.isRecoverableReason(terminateReason)) {
         const recoveryResult = await this.executeFinalWarningTurn(
           chat,
           turnCounter, // Use current turnCounter for the recovery attempt
@@ -1255,6 +1250,23 @@ Important Rules:
     }
 
     return null;
+  }
+
+  /**
+   * Returns true if the agent should attempt a recovery turn for the given reason.
+   */
+  private isRecoverableReason(
+    reason: AgentTerminateMode,
+  ): reason is
+    | AgentTerminateMode.TIMEOUT
+    | AgentTerminateMode.MAX_TURNS
+    | AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL {
+    return (
+      reason !== AgentTerminateMode.ERROR &&
+      reason !== AgentTerminateMode.ABORTED &&
+      reason !== AgentTerminateMode.GOAL &&
+      reason !== AgentTerminateMode.LOOP
+    );
   }
 
   /** Emits an activity event to the configured callback. */

@@ -16,29 +16,74 @@ import {
   type ToolCallRequestInfo,
 } from '../scheduler/types.js';
 
+/** Emitted when an agent session begins execution. */
+export interface AgentStartEvent {
+  type: 'agent_start';
+  value: { sessionId: string };
+}
+
+/** Emitted when an agent session completes, providing termination details. */
+export interface AgentFinishEvent {
+  type: 'agent_finish';
+  value: {
+    sessionId: string;
+    totalTurns: number;
+    reason: AgentTerminateMode;
+    message?: string;
+    error?: unknown;
+  };
+}
+
+/** Emitted when a group of tool calls is about to be executed. */
+export interface ToolSuiteStartEvent {
+  type: 'tool_suite_start';
+  value: { count: number };
+}
+
+/** Emitted when a group of tool calls has finished executing. */
+export interface ToolSuiteFinishEvent {
+  type: 'tool_suite_finish';
+  value: { responses: ToolCallResponseInfo[] };
+}
+
+/** Emitted when an individual tool call begins execution. */
+export interface ToolCallStartEvent {
+  type: 'tool_call_start';
+  value: ToolCallRequestInfo;
+}
+
+/** Emitted when an individual tool call has finished execution. */
+export interface ToolCallFinishEvent {
+  type: 'tool_call_finish';
+  value: ToolCallResponseInfo;
+}
+
+/** Emitted when the model generates internal reasoning or "thought" content. */
+export interface ThoughtEvent {
+  type: 'thought';
+  value: string;
+}
+
+/** Emitted when an infinite loop is detected in the model's tool calling patterns. */
+export interface LoopDetectedEvent {
+  type: 'loop_detected';
+  value: { sessionId: string };
+}
+
 /**
  * Unified event type for the Agent loop.
  * This extends the base Gemini stream events with higher-level agent lifecycle events.
  */
 export type AgentEvent =
   | ServerGeminiStreamEvent
-  | { type: 'agent_start'; value: { sessionId: string } }
-  | {
-      type: 'agent_finish';
-      value: {
-        sessionId: string;
-        totalTurns: number;
-        reason: AgentTerminateMode;
-        message?: string;
-        error?: unknown;
-      };
-    }
-  | { type: 'tool_suite_start'; value: { count: number } }
-  | { type: 'tool_suite_finish'; value: { responses: ToolCallResponseInfo[] } }
-  | { type: 'tool_call_start'; value: ToolCallRequestInfo }
-  | { type: 'tool_call_finish'; value: ToolCallResponseInfo }
-  | { type: 'thought'; value: string }
-  | { type: 'loop_detected'; value: { sessionId: string } };
+  | AgentStartEvent
+  | AgentFinishEvent
+  | ToolSuiteStartEvent
+  | ToolSuiteFinishEvent
+  | ToolCallStartEvent
+  | ToolCallFinishEvent
+  | ThoughtEvent
+  | LoopDetectedEvent;
 
 /**
  * Configuration for an Agent.
@@ -47,7 +92,7 @@ export interface AgentConfig {
   /** The name of the agent. */
   name: string;
   /** The system instruction (personality/rules) for the agent. */
-  systemInstruction?: string;
+  systemInstruction: string;
   /** Optional override for the model to use. */
   model?: string;
   /**

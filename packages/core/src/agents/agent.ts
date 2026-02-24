@@ -30,12 +30,12 @@ export class Agent {
   /**
    * Helper to quickly run a single prompt and get the results.
    */
-  async *prompt(
+  prompt(
     input: string | Part[],
     sessionId?: string,
     signal?: AbortSignal,
   ): AsyncIterable<AgentEvent> {
     const session = this.createSession(sessionId);
-    yield* session.prompt(input, signal);
+    return session.prompt(input, signal);
   }
 }
