@@ -119,7 +119,7 @@
               "type": "string"
             },
             "modelRouting": {
-              "title": "Model Routing",
+              "title": "Plan Model Routing",
               "description": "Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro for the planning phase and Flash for the implementation phase.",
               "markdownDescription": "Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro for the planning phase and Flash for the implementation phase.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,

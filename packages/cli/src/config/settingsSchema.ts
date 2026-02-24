@@ -287,7 +287,7 @@ const SETTINGS_SCHEMA = {
           },
           modelRouting: {
             type: 'boolean',
-            label: 'Model Routing',
+            label: 'Plan Model Routing',
             category: 'General',
             requiresRestart: false,
             default: true,
