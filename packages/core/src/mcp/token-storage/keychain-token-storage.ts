@@ -281,8 +281,11 @@ export class KeychainTokenStorage
         );
 
         return success;
-      } catch (_error) {
+      } catch (error) {
         this.keychainAvailable = false;
+
+        // Log the error for debugging purposes, especially on Linux
+        console.error('Keychain availability check failed:', error);
 
         // Do not log the raw error message to avoid potential PII leaks
         // (e.g. from OS-level error messages containing file paths)
