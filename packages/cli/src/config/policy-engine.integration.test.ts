@@ -132,6 +132,35 @@ describe('Policy Engine Integration Tests', () => {
       ).toBe(PolicyDecision.ASK_USER);
     });
 
+    it('should handle global MCP wildcard (*) in settings', async () => {
+      const settings: Settings = {
+        mcp: {
+          allowed: ['*'],
+        },
+      };
+
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.DEFAULT,
+      );
+      const engine = new PolicyEngine(config);
+
+      // ANY tool with a server name should be allowed
+      expect(
+        (await engine.check({ name: 'mcp-server__tool' }, 'mcp-server'))
+          .decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'another-server__tool' }, 'another-server'))
+          .decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // Built-in tools should NOT be allowed by the MCP wildcard
+      expect(
+        (await engine.check({ name: 'run_shell_command' }, undefined)).decision,
+      ).toBe(PolicyDecision.ASK_USER);
+    });
+
     it('should correctly prioritize specific tool excludes over MCP server wildcards', async () => {
       const settings: Settings = {
         mcp: {
@@ -321,6 +350,38 @@ describe('Policy Engine Integration Tests', () => {
       expect(
         (await engine.check({ name: 'unknown_tool' }, undefined)).decision,
       ).toBe(PolicyDecision.DENY);
+    });
+
+    it('should correctly match tool annotations', async () => {
+      const settings: Settings = {};
+
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.DEFAULT,
+      );
+
+      // Add a manual rule with annotations to the config
+      config.rules = config.rules || [];
+      config.rules.push({
+        toolAnnotations: { readOnlyHint: true },
+        decision: PolicyDecision.ALLOW,
+        priority: 10,
+      });
+
+      const engine = new PolicyEngine(config);
+
+      // A tool with readOnlyHint=true should be ALLOWED
+      const roCall = { name: 'some_tool', args: {} };
+      const roMeta = { readOnlyHint: true };
+      expect((await engine.check(roCall, undefined, roMeta)).decision).toBe(
+        PolicyDecision.ALLOW,
+      );
+
+      // A tool without the hint (or with false) should follow default decision (ASK_USER)
+      const rwMeta = { readOnlyHint: false };
+      expect((await engine.check(roCall, undefined, rwMeta)).decision).toBe(
+        PolicyDecision.ASK_USER,
+      );
     });
 
     describe.each(['write_file', 'replace'])(
