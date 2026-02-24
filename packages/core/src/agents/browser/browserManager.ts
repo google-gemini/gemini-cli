@@ -23,6 +23,7 @@ import type { Tool as McpTool } from '@modelcontextprotocol/sdk/types.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import type { Config } from '../../config/config.js';
 import { Storage } from '../../config/storage.js';
+import type { BrowserSessionLogger } from './browserSessionLogger.js';
 import * as path from 'node:path';
 
 // Pin chrome-devtools-mcp version for reproducibility.
@@ -70,7 +71,10 @@ export class BrowserManager {
   private mcpTransport: StdioClientTransport | undefined;
   private discoveredTools: McpTool[] = [];
 
-  constructor(private config: Config) {}
+  constructor(
+    private config: Config,
+    private readonly sessionLogger?: BrowserSessionLogger,
+  ) {}
 
   /**
    * Gets the raw MCP SDK Client for direct tool calls.
@@ -113,6 +117,8 @@ export class BrowserManager {
       throw signal.reason ?? new Error('Operation cancelled');
     }
 
+    this.sessionLogger?.logEvent('mcp_tool_call', { toolName, args });
+
     const client = await this.getRawMcpClient();
     const callPromise = client.callTool(
       { name: toolName, arguments: args },
@@ -122,7 +128,12 @@ export class BrowserManager {
 
     // If no signal, just await directly
     if (!signal) {
-      return this.toResult(await callPromise);
+      const mapped = this.toResult(await callPromise);
+      this.sessionLogger?.logEvent('mcp_tool_result', {
+        toolName,
+        isError: mapped.isError ?? false,
+      });
+      return mapped;
     }
 
     // Race the call against the abort signal
@@ -136,7 +147,12 @@ export class BrowserManager {
           signal.addEventListener('abort', onAbort, { once: true });
         }),
       ]);
-      return this.toResult(result);
+      const mapped = this.toResult(result);
+      this.sessionLogger?.logEvent('mcp_tool_result', {
+        toolName,
+        isError: mapped.isError ?? false,
+      });
+      return mapped;
     } finally {
       if (onAbort) {
         signal.removeEventListener('abort', onAbort);
@@ -278,6 +294,10 @@ export class BrowserManager {
     debugLogger.log(
       `Launching chrome-devtools-mcp (${sessionMode} mode) with args: ${mcpArgs.join(' ')}`,
     );
+    this.sessionLogger?.logEvent('mcp_launch', {
+      sessionMode,
+      args: mcpArgs,
+    });
 
     // Create stdio transport to npx chrome-devtools-mcp.
     // stderr is piped (not inherited) to prevent MCP server banners and
@@ -428,9 +448,14 @@ export class BrowserManager {
     const response = await this.rawMcpClient.listTools();
     this.discoveredTools = response.tools;
 
+    const toolNames = this.discoveredTools.map((t) => t.name);
     debugLogger.log(
       `Discovered ${this.discoveredTools.length} tools from chrome-devtools-mcp: ` +
-        this.discoveredTools.map((t) => t.name).join(', '),
+        toolNames.join(', '),
     );
+    this.sessionLogger?.logEvent('tools_discovered', {
+      count: this.discoveredTools.length,
+      tools: toolNames,
+    });
   }
 }
