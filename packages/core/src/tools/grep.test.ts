@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -519,7 +519,7 @@ describe('GrepTool', () => {
     it('should filter out matches based on exclude_pattern', async () => {
       await fs.writeFile(
         path.join(tempRootDir, 'copyright.txt'),
-        'Copyright 2025 Google LLC\nCopyright 2026 Google LLC',
+        'Copyright 2026 Google LLC\nCopyright 2026 Google LLC',
       );
 
       const params: GrepToolParams = {
@@ -533,7 +533,7 @@ describe('GrepTool', () => {
       expect(result.llmContent).toContain('Found 1 match');
       expect(result.llmContent).toContain('copyright.txt');
       // Should be a match
-      expect(result.llmContent).toContain('L1: Copyright 2025 Google LLC');
+      expect(result.llmContent).toContain('L1: Copyright 2026 Google LLC');
       // Should NOT be a match (but might be in context as L2-)
       expect(result.llmContent).not.toContain('L2: Copyright 2026 Google LLC');
     });

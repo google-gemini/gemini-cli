@@ -82,7 +82,7 @@ This file contains the source code for your MCP server. It uses the
 ```javascript
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
