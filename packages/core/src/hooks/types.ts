@@ -63,6 +63,7 @@ export enum HookType {
  */
 export type HookAction = (
   input: HookInput,
+  options?: { signal: AbortSignal },
 ) => Promise<HookOutput | void | null>;
 
 /**
@@ -70,10 +71,13 @@ export type HookAction = (
  */
 export interface RuntimeHookConfig {
   type: HookType.Runtime;
+  /** Unique name for the runtime hook */
   name: string;
+  /** Function to execute when the hook is triggered */
   action: HookAction;
   command?: never;
   source?: ConfigSource;
+  /** Maximum time allowed for hook execution in milliseconds */
   timeout?: number;
 }
 

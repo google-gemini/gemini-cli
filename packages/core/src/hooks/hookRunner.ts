@@ -255,6 +255,7 @@ export class HookRunner {
   ): Promise<HookExecutionResult> {
     const timeout = hookConfig.timeout ?? DEFAULT_HOOK_TIMEOUT;
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    const controller = new AbortController();
 
     try {
       // Create a promise that rejects after timeout
@@ -267,7 +268,7 @@ export class HookRunner {
 
       // Execute action with timeout race
       const result = await Promise.race([
-        hookConfig.action(input),
+        hookConfig.action(input, { signal: controller.signal }),
         timeoutPromise,
       ]);
 
@@ -282,6 +283,8 @@ export class HookRunner {
         duration: Date.now() - startTime,
       };
     } catch (error) {
+      // Abort the ongoing hook action if it timed out or errored
+      controller.abort();
       return {
         hookConfig,
         eventName,
