@@ -132,6 +132,11 @@ import { UserHintService } from './userHintService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
 import { loadPoliciesFromToml } from '../policy/toml-loader.js';
 
+import { CheckerRunner } from '../safety/checker-runner.js';
+import { ContextBuilder } from '../safety/context-builder.js';
+import { CheckerRegistry } from '../safety/registry.js';
+import { ConsecaSafetyChecker } from '../safety/conseca/conseca.js';
+
 export interface AccessibilitySettings {
   /** @deprecated Use ui.loadingPhrases instead. */
   enableLoadingPhrases?: boolean;
@@ -291,6 +296,7 @@ export interface ExtensionInstallMetadata {
   allowPreRelease?: boolean;
 }
 
+import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import type { FileFilteringOptions } from './constants.js';
 import {
   DEFAULT_FILE_FILTERING_OPTIONS,
@@ -476,6 +482,7 @@ export interface ConfigParameters {
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
+  maxAttempts?: number;
   enableShellOutputEfficiency?: boolean;
   shellToolInactivityTimeout?: number;
   fakeResponses?: string;
@@ -511,6 +518,7 @@ export interface ConfigParameters {
     adminSkillsEnabled?: boolean;
     agents?: AgentSettings;
   }>;
+  enableConseca?: boolean;
 }
 
 export class Config {
@@ -538,6 +546,7 @@ export class Config {
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
+  readonly enableConseca: boolean;
 
   private readonly coreTools: string[] | undefined;
   /** @deprecated Use Policy Engine instead */
@@ -657,6 +666,7 @@ export class Config {
   private readonly outputSettings: OutputSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
+  private readonly maxAttempts: number;
   private readonly enableShellOutputEfficiency: boolean;
   private readonly shellToolInactivityTimeout: number;
   readonly fakeResponses?: string;
@@ -865,13 +875,35 @@ export class Config {
     this.recordResponses = params.recordResponses;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
-    this.policyEngine = new PolicyEngine({
-      ...params.policyEngineConfig,
-      approvalMode:
-        params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+    this.enableConseca = params.enableConseca ?? false;
+
+    // Initialize Safety Infrastructure
+    const contextBuilder = new ContextBuilder(this);
+    const checkersPath = this.targetDir;
+    // The checkersPath  is used to resolve external checkers. Since we do not have any external checkers currently, it is set to the targetDir.
+    const checkerRegistry = new CheckerRegistry(checkersPath);
+    const checkerRunner = new CheckerRunner(contextBuilder, checkerRegistry, {
+      checkersPath,
+      timeout: 30000, // 30 seconds to allow for LLM-based checkers
     });
     this.policyUpdateConfirmationRequest =
       params.policyUpdateConfirmationRequest;
+
+    this.policyEngine = new PolicyEngine(
+      {
+        ...params.policyEngineConfig,
+        approvalMode:
+          params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+      },
+      checkerRunner,
+    );
+
+    // Register Conseca if enabled
+    if (this.enableConseca) {
+      debugLogger.log('[SAFETY] Registering Conseca Safety Checker');
+      ConsecaSafetyChecker.getInstance().setConfig(this);
+    }
+
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
     this.acknowledgedAgentsService = new AcknowledgedAgentsService();
     this.skillManager = new SkillManager();
@@ -879,6 +911,10 @@ export class Config {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
+    this.maxAttempts = Math.min(
+      params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+      DEFAULT_MAX_ATTEMPTS,
+    );
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.rawOutput = params.rawOutput ?? false;
     this.acceptRawOutputRisk = params.acceptRawOutputRisk ?? false;
@@ -2413,6 +2449,10 @@ export class Config {
 
   getRetryFetchErrors(): boolean {
     return this.retryFetchErrors;
+  }
+
+  getMaxAttempts(): number {
+    return this.maxAttempts;
   }
 
   getEnableShellOutputEfficiency(): boolean {

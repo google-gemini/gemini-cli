@@ -297,6 +297,16 @@ const SETTINGS_SCHEMA = {
           'Retry on "exception TypeError: fetch failed sending request" errors.',
         showInDialog: false,
       },
+      maxAttempts: {
+        type: 'number',
+        label: 'Max Chat Model Attempts',
+        category: 'General',
+        requiresRestart: false,
+        default: 10,
+        description:
+          'Maximum number of attempts for requests to the main chat model. Cannot exceed 10.',
+        showInDialog: true,
+      },
       debugKeystrokeLogging: {
         type: 'boolean',
         label: 'Debug Keystroke Logging',
@@ -1482,6 +1492,16 @@ const SETTINGS_SCHEMA = {
             showInDialog: false,
           },
         },
+      },
+      enableConseca: {
+        type: 'boolean',
+        label: 'Enable Context-Aware Security',
+        category: 'Security',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.',
+        showInDialog: true,
       },
     },
   },
