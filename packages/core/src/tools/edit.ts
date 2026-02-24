@@ -138,9 +138,8 @@ async function calculateExactReplacement(
   const normalizedReplace = new_string.replace(/\r\n/g, '\n');
 
   const exactOccurrences = normalizedCode.split(normalizedSearch).length - 1;
-  const expectedReplacements = params.expected_replacements ?? 1;
 
-  if (exactOccurrences > expectedReplacements) {
+  if (!params.allow_multiple && exactOccurrences > 1) {
     return {
       newContent: currentContent,
       occurrences: exactOccurrences,
@@ -256,28 +255,33 @@ async function calculateRegexReplacement(
   // The final pattern captures leading whitespace (indentation) and then matches the token pattern.
   // 'm' flag enables multi-line mode, so '^' matches the start of any line.
   const finalPattern = `^([ \t]*)${pattern}`;
-  const flexibleRegex = new RegExp(finalPattern, 'm');
 
-  const match = flexibleRegex.exec(currentContent);
+  // Always use a global regex to count all potential occurrences for accurate validation.
+  const globalRegex = new RegExp(finalPattern, 'gm');
+  const matches = currentContent.match(globalRegex);
 
-  if (!match) {
+  if (!matches) {
     return null;
   }
 
-  const indentation = match[1] || '';
+  const occurrences = matches.length;
   const newLines = normalizedReplace.split('\n');
-  const newBlockWithIndent = applyIndentation(newLines, indentation).join('\n');
 
-  // Use replace with the regex to substitute the matched content.
-  // Since the regex doesn't have the 'g' flag, it will only replace the first occurrence.
+  // Use the appropriate regex for replacement based on allow_multiple.
+  const replaceRegex = new RegExp(
+    finalPattern,
+    params.allow_multiple ? 'gm' : 'm',
+  );
+
   const modifiedCode = currentContent.replace(
-    flexibleRegex,
-    newBlockWithIndent,
+    replaceRegex,
+    (_match, indentation) =>
+      applyIndentation(newLines, indentation || '').join('\n'),
   );
 
   return {
     newContent: restoreTrailingNewline(currentContent, modifiedCode),
-    occurrences: 1, // This method is designed to find and replace only the first occurrence.
+    occurrences,
     finalOldString: normalizedSearch,
     finalNewString: normalizedReplace,
   };
@@ -341,7 +345,6 @@ export async function calculateReplacement(
 export function getErrorReplaceResult(
   params: EditToolParams,
   occurrences: number,
-  expectedReplacements: number,
   finalOldString: string,
   finalNewString: string,
 ) {
@@ -353,13 +356,10 @@ export function getErrorReplaceResult(
       raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${READ_FILE_TOOL_NAME} tool to verify.`,
       type: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
     };
-  } else if (occurrences !== expectedReplacements) {
-    const occurrenceTerm =
-      expectedReplacements === 1 ? 'occurrence' : 'occurrences';
-
+  } else if (!params.allow_multiple && occurrences !== 1) {
     error = {
-      display: `Failed to edit, expected ${expectedReplacements} ${occurrenceTerm} but found ${occurrences}.`,
-      raw: `Failed to edit, Expected ${expectedReplacements} ${occurrenceTerm} but found ${occurrences} for old_string in file: ${params.file_path}`,
+      display: `Failed to edit, expected 1 occurrence but found ${occurrences}.`,
+      raw: `Failed to edit, Expected 1 occurrence but found ${occurrences} for old_string in file: ${params.file_path}. If you intended to replace multiple occurrences, set 'allow_multiple' to true.`,
       type: ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
     };
   } else if (finalOldString === finalNewString) {
@@ -392,10 +392,10 @@ export interface EditToolParams {
   new_string: string;
 
   /**
-   * Number of replacements expected. Defaults to 1 if not specified.
-   * Use when you want to replace multiple occurrences.
+   * If true, the tool will replace all occurrences of `old_string` with `new_string`.
+   * If false (default), the tool will only succeed if exactly one occurrence is found.
    */
-  expected_replacements?: number;
+  allow_multiple?: boolean;
 
   /**
    * The instruction for what needs to be done.
@@ -517,7 +517,6 @@ class EditToolInvocation
     const secondError = getErrorReplaceResult(
       params,
       secondAttemptResult.occurrences,
-      params.expected_replacements ?? 1,
       secondAttemptResult.finalOldString,
       secondAttemptResult.finalNewString,
     );
@@ -562,7 +561,6 @@ class EditToolInvocation
     params: EditToolParams,
     abortSignal: AbortSignal,
   ): Promise<CalculatedEdit> {
-    const expectedReplacements = params.expected_replacements ?? 1;
     let currentContent: string | null = null;
     let fileExists = false;
     let originalLineEnding: '\r\n' | '\n' = '\n'; // Default for new files
@@ -649,7 +647,6 @@ class EditToolInvocation
     const initialError = getErrorReplaceResult(
       params,
       replacementResult.occurrences,
-      expectedReplacements,
       replacementResult.finalOldString,
       replacementResult.finalNewString,
     );
