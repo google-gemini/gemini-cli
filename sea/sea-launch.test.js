@@ -28,6 +28,9 @@ vi.mock('node:fs', async () => {
     readFileSync: vi.fn().mockReturnValue('content'),
     lstatSync: vi.fn(),
     statSync: vi.fn(),
+    openSync: vi.fn(),
+    readSync: vi.fn(),
+    closeSync: vi.fn(),
   };
   return {
     default: fsMock,
@@ -44,6 +47,9 @@ vi.mock('fs', async () => {
     readFileSync: vi.fn().mockReturnValue('content'),
     lstatSync: vi.fn(),
     statSync: vi.fn(),
+    openSync: vi.fn(),
+    readSync: vi.fn(),
+    closeSync: vi.fn(),
   };
   return {
     default: fsMock,
@@ -142,22 +148,42 @@ describe('sea-launch', () => {
       };
 
       const mockFs = {
-        readFileSync: vi.fn((p) => {
-          if (p.endsWith('gemini.mjs')) return 'content1';
-          if (p.endsWith('file.txt')) return 'content2';
+        openSync: vi.fn((p) => {
+          if (p.endsWith('gemini.mjs')) return 10;
+          if (p.endsWith('file.txt')) return 20;
           throw new Error('Not found');
         }),
+        readSync: vi.fn((fd, buffer) => {
+          let content = '';
+          if (fd === 10) content = 'content1';
+          if (fd === 20) content = 'content2';
+
+          // Simulate simple read: write content to buffer and return length once, then return 0
+          if (!buffer._readDone) {
+            const buf = Buffer.from(content);
+            buf.copy(buffer);
+            buffer._readDone = true;
+            return buf.length;
+          } else {
+            buffer._readDone = false; // Reset for next file
+            return 0;
+          }
+        }),
+        closeSync: vi.fn(),
       };
 
       const mockCrypto = {
         createHash: vi.fn(() => ({
-          update: vi.fn((content) => ({
-            digest: vi.fn(() => {
-              if (content === 'content1') return 'hash1';
-              if (content === 'content2') return 'hash2';
-              return 'wrong';
-            }),
-          })),
+          update: vi.fn(function (content) {
+            this._content =
+              (this._content || '') + Buffer.from(content).toString();
+            return this;
+          }),
+          digest: vi.fn(function () {
+            if (this._content === 'content1') return 'hash1';
+            if (this._content === 'content2') return 'hash2';
+            return 'wrong';
+          }),
         })),
       };
 
@@ -169,14 +195,29 @@ describe('sea-launch', () => {
       const manifest = { mainHash: 'hash1' };
 
       const mockFs = {
-        readFileSync: vi.fn(() => 'content_wrong'),
+        openSync: vi.fn(() => 10),
+        readSync: vi.fn((fd, buffer) => {
+          if (!buffer._readDone) {
+            const buf = Buffer.from('content_wrong');
+            buf.copy(buffer);
+            buffer._readDone = true;
+            return buf.length;
+          }
+          return 0;
+        }),
+        closeSync: vi.fn(),
       };
 
       const mockCrypto = {
         createHash: vi.fn(() => ({
-          update: vi.fn(() => ({
-            digest: vi.fn(() => 'hash_wrong'),
-          })),
+          update: vi.fn(function (content) {
+            this._content =
+              (this._content || '') + Buffer.from(content).toString();
+            return this;
+          }),
+          digest: vi.fn(function () {
+            return 'hash_wrong';
+          }),
         })),
       };
 
@@ -187,7 +228,7 @@ describe('sea-launch', () => {
       const dir = '/tmp/test';
       const manifest = { mainHash: 'hash1' };
       const mockFs = {
-        readFileSync: vi.fn(() => {
+        openSync: vi.fn(() => {
           throw new Error('FS Error');
         }),
       };
@@ -212,6 +253,15 @@ describe('sea-launch', () => {
           existsSync: vi.fn(() => true),
           rmSync: vi.fn(),
           readFileSync: vi.fn(),
+          openSync: vi.fn(() => 1),
+          readSync: vi.fn((fd, buffer) => {
+            if (!buffer._readDone) {
+              buffer._readDone = true;
+              return 1;
+            }
+            return 0;
+          }),
+          closeSync: vi.fn(),
           lstatSync: vi.fn(() => ({
             isDirectory: () => true,
             uid: 1000,
@@ -225,9 +275,13 @@ describe('sea-launch', () => {
         path: path,
         processEnv: {},
         crypto: {
-          createHash: vi.fn(() => ({
-            update: vi.fn(() => ({ digest: vi.fn(() => 'h1') })),
-          })),
+          createHash: vi.fn(() => {
+            const hash = {
+              update: vi.fn().mockReturnThis(),
+              digest: vi.fn(() => 'h1'),
+            };
+            return hash;
+          }),
         },
         processUid: 1000,
       };
@@ -248,6 +302,15 @@ describe('sea-launch', () => {
           writeFileSync: vi.fn(),
           renameSync: vi.fn(),
           readFileSync: vi.fn().mockReturnValue('content'),
+          openSync: vi.fn(() => 1),
+          readSync: vi.fn((fd, buffer) => {
+            if (!buffer._readDone) {
+              buffer._readDone = true;
+              return 1;
+            }
+            return 0;
+          }),
+          closeSync: vi.fn(),
           lstatSync: vi.fn(() => ({
             isDirectory: () => true,
             uid: 999, // Wrong UID
@@ -261,9 +324,13 @@ describe('sea-launch', () => {
         path: path,
         processEnv: {},
         crypto: {
-          createHash: vi.fn(() => ({
-            update: vi.fn(() => ({ digest: vi.fn(() => 'h1') })),
-          })),
+          createHash: vi.fn(() => {
+            const hash = {
+              update: vi.fn().mockReturnThis(),
+              digest: vi.fn(() => 'h1'),
+            };
+            return hash;
+          }),
         },
         processUid: 1000,
         processPid: 123,
@@ -292,6 +359,15 @@ describe('sea-launch', () => {
           writeFileSync: vi.fn(),
           renameSync: vi.fn(),
           readFileSync: vi.fn().mockReturnValue('content'),
+          openSync: vi.fn(() => 1),
+          readSync: vi.fn((fd, buffer) => {
+            if (!buffer._readDone) {
+              buffer._readDone = true;
+              return 1;
+            }
+            return 0;
+          }),
+          closeSync: vi.fn(),
           lstatSync: vi.fn(() => ({
             isDirectory: () => true,
             uid: 1000,
@@ -305,9 +381,13 @@ describe('sea-launch', () => {
         path: path,
         processEnv: {},
         crypto: {
-          createHash: vi.fn(() => ({
-            update: vi.fn(() => ({ digest: vi.fn(() => 'h1') })),
-          })),
+          createHash: vi.fn(() => {
+            const hash = {
+              update: vi.fn().mockReturnThis(),
+              digest: vi.fn(() => 'h1'),
+            };
+            return hash;
+          }),
         },
         processUid: 1000,
         processPid: 123,
@@ -332,6 +412,15 @@ describe('sea-launch', () => {
           writeFileSync: vi.fn(),
           renameSync: vi.fn(),
           readFileSync: vi.fn().mockReturnValue('wrong_content'),
+          openSync: vi.fn(() => 1),
+          readSync: vi.fn((fd, buffer) => {
+            if (!buffer._readDone) {
+              buffer._readDone = true;
+              return 1;
+            }
+            return 0;
+          }),
+          closeSync: vi.fn(),
           lstatSync: vi.fn(() => ({
             isDirectory: () => true,
             uid: 1000,
@@ -345,9 +434,13 @@ describe('sea-launch', () => {
         path: path,
         processEnv: {},
         crypto: {
-          createHash: vi.fn(() => ({
-            update: vi.fn(() => ({ digest: vi.fn(() => 'hash_calculated') })),
-          })),
+          createHash: vi.fn(() => {
+            const hash = {
+              update: vi.fn().mockReturnThis(),
+              digest: vi.fn(() => 'hash_calculated'),
+            };
+            return hash;
+          }),
         },
         processUid: 1000,
         processPid: 123,
@@ -378,6 +471,15 @@ describe('sea-launch', () => {
             throw new Error('Rename failed');
           }),
           readFileSync: vi.fn().mockReturnValue('content'),
+          openSync: vi.fn(() => 1),
+          readSync: vi.fn((fd, buffer) => {
+            if (!buffer._readDone) {
+              buffer._readDone = true;
+              return 1;
+            }
+            return 0;
+          }),
+          closeSync: vi.fn(),
           lstatSync: vi.fn(() => ({
             isDirectory: () => true,
             uid: 1000,
@@ -391,9 +493,13 @@ describe('sea-launch', () => {
         path: path,
         processEnv: {},
         crypto: {
-          createHash: vi.fn(() => ({
-            update: vi.fn(() => ({ digest: vi.fn(() => 'h1') })),
-          })),
+          createHash: vi.fn(() => {
+            const hash = {
+              update: vi.fn().mockReturnThis(),
+              digest: vi.fn(() => 'h1'),
+            };
+            return hash;
+          }),
         },
         processUid: 1000,
         processPid: 123,
@@ -431,6 +537,15 @@ describe('sea-launch', () => {
             throw new Error('Rename failed');
           }),
           readFileSync: vi.fn().mockReturnValue('content'),
+          openSync: vi.fn(() => 1),
+          readSync: vi.fn((fd, buffer) => {
+            if (!buffer._readDone) {
+              buffer._readDone = true;
+              return 1;
+            }
+            return 0;
+          }),
+          closeSync: vi.fn(),
           lstatSync: vi.fn(() => ({
             isDirectory: () => true,
             uid: 999, // Wrong UID
@@ -444,9 +559,13 @@ describe('sea-launch', () => {
         path: path,
         processEnv: {},
         crypto: {
-          createHash: vi.fn(() => ({
-            update: vi.fn(() => ({ digest: vi.fn(() => 'h1') })),
-          })),
+          createHash: vi.fn(() => {
+            const hash = {
+              update: vi.fn().mockReturnThis(),
+              digest: vi.fn(() => 'h1'),
+            };
+            return hash;
+          }),
         },
         processUid: 1000,
         processPid: 123,
@@ -471,6 +590,210 @@ describe('sea-launch', () => {
 
       exitSpy.mockRestore();
       consoleSpy.mockRestore();
+    });
+
+    it('uses LOCALAPPDATA on Windows if available', () => {
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', {
+        value: 'win32',
+        configurable: true,
+      });
+
+      const deps = {
+        fs: {
+          existsSync: vi.fn().mockReturnValue(false),
+          mkdirSync: vi.fn(),
+          rmSync: vi.fn(),
+          writeFileSync: vi.fn(),
+          renameSync: vi.fn(),
+          readFileSync: vi.fn().mockReturnValue('content'),
+          openSync: vi.fn(() => 1),
+          readSync: vi.fn((fd, buffer) => {
+            if (!buffer._readDone) {
+              buffer._readDone = true;
+              return 1;
+            }
+            return 0;
+          }),
+          closeSync: vi.fn(),
+          lstatSync: vi.fn(() => ({
+            isDirectory: () => true,
+            uid: 0,
+            mode: S_IFDIR | MODE_700,
+          })),
+        },
+        os: {
+          userInfo: () => ({ username: 'user' }),
+          tmpdir: () => 'C:\\Temp',
+        },
+        path: {
+          join: (...args) => args.join('\\'),
+          dirname: (p) => p.split('\\').slice(0, -1).join('\\'),
+          resolve: (p) => p,
+        },
+        processEnv: {
+          LOCALAPPDATA: 'C:\\Users\\User\\AppData\\Local',
+        },
+        crypto: {
+          createHash: vi.fn(() => {
+            const hash = {
+              update: vi.fn().mockReturnThis(),
+              digest: vi.fn(() => 'h1'),
+            };
+            return hash;
+          }),
+        },
+        processUid: 'unknown',
+      };
+
+      prepareRuntime(mockManifest, mockGetAsset, deps);
+
+      expect(deps.fs.mkdirSync).toHaveBeenCalledWith(
+        'C:\\Users\\User\\AppData\\Local\\Google\\GeminiCLI',
+        expect.objectContaining({ recursive: true }),
+      );
+
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform,
+        configurable: true,
+      });
+    });
+
+    it('falls back to tmpdir on Windows if LOCALAPPDATA is missing', () => {
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', {
+        value: 'win32',
+        configurable: true,
+      });
+
+      const deps = {
+        fs: {
+          existsSync: vi.fn().mockReturnValue(false),
+          mkdirSync: vi.fn(),
+          rmSync: vi.fn(),
+          writeFileSync: vi.fn(),
+          renameSync: vi.fn(),
+          readFileSync: vi.fn().mockReturnValue('content'),
+          openSync: vi.fn(() => 1),
+          readSync: vi.fn((fd, buffer) => {
+            if (!buffer._readDone) {
+              buffer._readDone = true;
+              return 1;
+            }
+            return 0;
+          }),
+          closeSync: vi.fn(),
+          lstatSync: vi.fn(() => ({
+            isDirectory: () => true,
+            uid: 0,
+            mode: S_IFDIR | MODE_700,
+          })),
+        },
+        os: {
+          userInfo: () => ({ username: 'user' }),
+          tmpdir: () => 'C:\\Temp',
+        },
+        path: {
+          join: (...args) => args.join('\\'),
+          dirname: (p) => p.split('\\').slice(0, -1).join('\\'),
+          resolve: (p) => p,
+        },
+        processEnv: {}, // Missing LOCALAPPDATA
+        crypto: {
+          createHash: vi.fn(() => {
+            const hash = {
+              update: vi.fn().mockReturnThis(),
+              digest: vi.fn(() => 'h1'),
+            };
+            return hash;
+          }),
+        },
+        processUid: 'unknown',
+      };
+
+      const runtime = prepareRuntime(mockManifest, mockGetAsset, deps);
+
+      // Should use tmpdir
+      expect(runtime).toContain('C:\\Temp');
+      expect(runtime).not.toContain('Google\\GeminiCLI');
+
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform,
+        configurable: true,
+      });
+    });
+
+    it('falls back to tmpdir on Windows if mkdir fails', () => {
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', {
+        value: 'win32',
+        configurable: true,
+      });
+
+      const deps = {
+        fs: {
+          existsSync: vi.fn().mockReturnValue(false),
+          mkdirSync: vi.fn((p) => {
+            if (typeof p === 'string' && p.includes('Google\\GeminiCLI')) {
+              throw new Error('Permission denied');
+            }
+          }),
+          rmSync: vi.fn(),
+          writeFileSync: vi.fn(),
+          renameSync: vi.fn(),
+          readFileSync: vi.fn().mockReturnValue('content'),
+          openSync: vi.fn(() => 1),
+          readSync: vi.fn((fd, buffer) => {
+            if (!buffer._readDone) {
+              buffer._readDone = true;
+              return 1;
+            }
+            return 0;
+          }),
+          closeSync: vi.fn(),
+          lstatSync: vi.fn(() => ({
+            isDirectory: () => true,
+            uid: 0,
+            mode: S_IFDIR | MODE_700,
+          })),
+        },
+        os: {
+          userInfo: () => ({ username: 'user' }),
+          tmpdir: () => 'C:\\Temp',
+        },
+        path: {
+          join: (...args) => args.join('\\'),
+          dirname: (p) => p.split('\\').slice(0, -1).join('\\'),
+          resolve: (p) => p,
+        },
+        processEnv: {
+          LOCALAPPDATA: 'C:\\Users\\User\\AppData\\Local',
+        },
+        crypto: {
+          createHash: vi.fn(() => {
+            const hash = {
+              update: vi.fn().mockReturnThis(),
+              digest: vi.fn(() => 'h1'),
+            };
+            return hash;
+          }),
+        },
+        processUid: 'unknown',
+      };
+
+      const runtime = prepareRuntime(mockManifest, mockGetAsset, deps);
+
+      // Should use tmpdir
+      expect(runtime).toContain('C:\\Temp');
+      expect(deps.fs.mkdirSync).toHaveBeenCalledWith(
+        expect.stringContaining('Google\\GeminiCLI'),
+        expect.anything(),
+      );
+
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform,
+        configurable: true,
+      });
     });
   });
 });

@@ -52,14 +52,29 @@ function getSafeName(name) {
  */
 function verifyIntegrity(dir, manifest, fsMod = fs, cryptoMod = crypto) {
   try {
-    const sha256 = (content) =>
-      cryptoMod.createHash('sha256').update(content).digest('hex');
-    const mainContent = fsMod.readFileSync(path.join(dir, 'gemini.mjs'));
-    if (sha256(mainContent) !== manifest.mainHash) return false;
+    const calculateHash = (filePath) => {
+      const hash = cryptoMod.createHash('sha256');
+      const fd = fsMod.openSync(filePath, 'r');
+      const buffer = new Uint8Array(65536); // 64KB
+      try {
+        let bytesRead = 0;
+        while (
+          (bytesRead = fsMod.readSync(fd, buffer, 0, buffer.length, null)) !== 0
+        ) {
+          hash.update(buffer.subarray(0, bytesRead));
+        }
+      } finally {
+        fsMod.closeSync(fd);
+      }
+      return hash.digest('hex');
+    };
+
+    if (calculateHash(path.join(dir, 'gemini.mjs')) !== manifest.mainHash)
+      return false;
     if (manifest.files) {
       for (const file of manifest.files) {
-        const content = fsMod.readFileSync(path.join(dir, file.path));
-        if (sha256(content) !== file.hash) return false;
+        if (calculateHash(path.join(dir, file.path)) !== file.hash)
+          return false;
       }
     }
     return true;
@@ -91,7 +106,20 @@ function prepareRuntime(manifest, getAssetFn, deps = {}) {
     userInfo.username || processEnv.USER || processUid || 'unknown';
   const safeUsername = getSafeName(username);
 
-  const tempBase = osMod.tmpdir();
+  let tempBase = osMod.tmpdir();
+
+  if (process.platform === 'win32' && processEnv.LOCALAPPDATA) {
+    const appDir = pathMod.join(processEnv.LOCALAPPDATA, 'Google', 'GeminiCLI');
+    try {
+      if (!fsMod.existsSync(appDir)) {
+        fsMod.mkdirSync(appDir, { recursive: true, mode: 0o700 });
+      }
+      tempBase = appDir;
+    } catch (_) {
+      // Fallback to tmpdir
+    }
+  }
+
   const finalRuntimeDir = pathMod.join(
     tempBase,
     `gemini-runtime-${safeVersion}-${safeUsername}`,
