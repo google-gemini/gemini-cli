@@ -213,7 +213,7 @@ if (includeNativeModules) {
       signFile(file);
     }
   } catch (e) {
-    console.warn('Warning: Failed to sign native modules:', e.message);
+    console.warn('Warning: Failed to sign native modules:', e.code);
   }
 } else {
   console.log('Skipping native modules bundling (BUNDLE_NATIVE_MODULES=false)');
@@ -409,7 +409,7 @@ console.log('Signing final executable...');
 try {
   signFile(targetBinaryPath);
 } catch (e) {
-  console.warn('Warning: Final signing failed:', e.message);
+  console.warn('Warning: Final signing failed:', e.code);
   console.warn('Continuing without signing...');
 }
 
