@@ -15,7 +15,7 @@ import type {
   SettingsType,
   SettingsValue,
 } from '../config/settingsSchema.js';
-import { getSettingsSchema } from '../config/settingsSchema.js';
+import { SETTING_CATEGORY_ORDER , getSettingsSchema } from '../config/settingsSchema.js';
 import type { Config } from '@google/gemini-cli-core';
 import { ExperimentFlags } from '@google/gemini-cli-core';
 
@@ -239,6 +239,7 @@ export function shouldShowInDialog(key: string): boolean {
 
 /**
  * Get all settings that should be shown in the dialog, grouped by category
+ * Returns categories in the canonical order defined in SETTING_CATEGORY_ORDER.
  */
 export function getDialogSettingsByCategory(): Record<
   string,
@@ -249,6 +250,7 @@ export function getDialogSettingsByCategory(): Record<
     Array<SettingDefinition & { key: string }>
   > = {};
 
+  // Group settings by category
   Object.values(getFlattenedSchema())
     .filter((definition) => definition.showInDialog !== false)
     .forEach((definition) => {
@@ -259,7 +261,29 @@ export function getDialogSettingsByCategory(): Record<
       categories[category].push(definition);
     });
 
-  return categories;
+  // Reorder categories based on SETTING_CATEGORY_ORDER
+  const orderedCategories: Record<
+    string,
+    Array<SettingDefinition & { key: string }>
+  > = {};
+
+  // Add known categories in order
+  SETTING_CATEGORY_ORDER.forEach((cat) => {
+    if (categories[cat]) {
+      orderedCategories[cat] = categories[cat];
+    }
+  });
+
+  // Add any remaining categories alphabetically
+  Object.keys(categories)
+    .sort()
+    .forEach((cat) => {
+      if (!orderedCategories[cat]) {
+        orderedCategories[cat] = categories[cat];
+      }
+    });
+
+  return orderedCategories;
 }
 
 /**

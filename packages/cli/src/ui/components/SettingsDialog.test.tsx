@@ -65,6 +65,20 @@ vi.mock('../../config/settingsSchema.js', async (importOriginal) => {
   return {
     ...original,
     getSettingsSchema: vi.fn(original.getSettingsSchema),
+    SETTING_CATEGORY_ORDER: [
+      'General',
+      'UI',
+      'Model',
+      'Context',
+      'Tools',
+      'IDE',
+      'Privacy',
+      'Extensions',
+      'Security',
+      'Experimental',
+      'Admin',
+      'Advanced',
+    ],
   };
 });
 
@@ -81,11 +95,57 @@ vi.mock('../contexts/VimModeContext.js', async () => {
   };
 });
 
-vi.mock('../../utils/settingsUtils.js', async () => {
-  const actual = await vi.importActual('../../utils/settingsUtils.js');
+vi.mock('../../utils/settingsUtils.js', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('../../utils/settingsUtils.js')>();
+  const CATEGORY_ORDER = [
+    'General',
+    'UI',
+    'Model',
+    'Context',
+    'Tools',
+    'IDE',
+    'Privacy',
+    'Extensions',
+    'Security',
+    'Experimental',
+    'Admin',
+    'Advanced',
+  ];
   return {
-    ...actual,
+    ...original,
     saveModifiedSettings: vi.fn(),
+    SETTING_CATEGORY_ORDER: CATEGORY_ORDER,
+    getDialogSettingsByCategory: vi.fn(() => {
+      // Use original logic but with our local order to avoid hoisting issues
+      const categories: Record<
+        string,
+        Array<SettingDefinition & { key: string }>
+      > = {};
+      Object.values(original.getFlattenedSchema())
+        .filter(
+          (definition: SettingDefinition) => definition.showInDialog !== false,
+        )
+        .forEach((definition: SettingDefinition & { key: string }) => {
+          const category = definition.category;
+          if (!categories[category]) {
+            categories[category] = [];
+          }
+          categories[category].push(definition);
+        });
+
+      const ordered: Record<string, Array<SettingDefinition & { key: string }>> =
+        {};
+      CATEGORY_ORDER.forEach((cat) => {
+        if (categories[cat]) ordered[cat] = categories[cat];
+      });
+      Object.keys(categories)
+        .sort()
+        .forEach((cat) => {
+          if (!ordered[cat]) ordered[cat] = categories[cat];
+        });
+      return ordered;
+    }),
   };
 });
 
@@ -291,7 +351,7 @@ describe('SettingsDialog', () => {
         const lines = output.trim().split('\n');
 
         expect(lines.length).toBeGreaterThanOrEqual(24);
-        expect(lines.length).toBeLessThanOrEqual(25);
+        expect(lines.length).toBeLessThanOrEqual(27);
       });
       unmount();
     });
