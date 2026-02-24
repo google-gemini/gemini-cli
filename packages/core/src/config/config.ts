@@ -1597,7 +1597,9 @@ export class Config {
    *
    * May change over time.
    */
-  getExcludeTools(): Set<string> | undefined {
+  getExcludeTools(
+    toolMetadata?: Map<string, Record<string, unknown>>,
+  ): Set<string> | undefined {
     // Right now this is present for backward compatibility with settings.json exclude
     const excludeToolsSet = new Set([...(this.excludeTools ?? [])]);
     for (const extension of this.getExtensionLoader().getExtensions()) {
@@ -1609,7 +1611,7 @@ export class Config {
       }
     }
 
-    const policyExclusions = this.policyEngine.getExcludedTools();
+    const policyExclusions = this.policyEngine.getExcludedTools(toolMetadata);
     for (const tool of policyExclusions) {
       excludeToolsSet.add(tool);
     }

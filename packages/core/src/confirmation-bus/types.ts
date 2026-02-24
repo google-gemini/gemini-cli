@@ -35,6 +35,10 @@ export interface ToolConfirmationRequest {
   correlationId: string;
   serverName?: string;
   /**
+   * Optional tool annotations (e.g., readOnlyHint, destructiveHint) from MCP.
+   */
+  toolAnnotations?: Record<string, unknown>;
+  /**
    * Optional rich details for the confirmation UI (diffs, counts, etc.)
    */
   details?: SerializableConfirmationDetails;

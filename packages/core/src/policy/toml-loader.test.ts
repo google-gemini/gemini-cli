@@ -609,6 +609,118 @@ priority = 100
   });
 
   describe('Built-in Plan Mode Policy', () => {
+    it('should allow MCP tools with readOnlyHint annotation in Plan Mode (ASK_USER, not DENY)', async () => {
+      const planTomlPath = path.resolve(__dirname, 'policies', 'plan.toml');
+      const fileContent = await fs.readFile(planTomlPath, 'utf-8');
+      const tempPolicyDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'plan-annotation-test-'),
+      );
+      try {
+        await fs.writeFile(path.join(tempPolicyDir, 'plan.toml'), fileContent);
+        const getPolicyTier = () => 1; // Default tier
+
+        // 1. Load the actual Plan Mode policies
+        const result = await loadPoliciesFromToml(
+          [tempPolicyDir],
+          getPolicyTier,
+        );
+        expect(result.errors).toHaveLength(0);
+
+        // Verify annotation rule was loaded correctly
+        const annotationRule = result.rules.find(
+          (r) => r.toolAnnotations !== undefined,
+        );
+        expect(
+          annotationRule,
+          'Should have loaded a rule with toolAnnotations',
+        ).toBeDefined();
+        expect(annotationRule!.toolName).toBe('*__*');
+        expect(annotationRule!.toolAnnotations).toEqual({
+          readOnlyHint: true,
+        });
+        expect(annotationRule!.decision).toBe(PolicyDecision.ASK_USER);
+        // Priority 70 in tier 1 => 1.070
+        expect(annotationRule!.priority).toBe(1.07);
+
+        // Verify deny rule was loaded correctly
+        const denyRule = result.rules.find(
+          (r) =>
+            r.decision === PolicyDecision.DENY &&
+            r.toolName === undefined &&
+            r.denyMessage?.includes('Plan Mode'),
+        );
+        expect(
+          denyRule,
+          'Should have loaded the catch-all deny rule',
+        ).toBeDefined();
+        // Priority 60 in tier 1 => 1.060
+        expect(denyRule!.priority).toBe(1.06);
+
+        // 2. Initialize Policy Engine in Plan Mode
+        const engine = new PolicyEngine({
+          rules: result.rules,
+          approvalMode: ApprovalMode.PLAN,
+        });
+
+        // 3. MCP tool with readOnlyHint=true and serverName should get ASK_USER
+        const askResult = await engine.check(
+          { name: 'github__list_issues' },
+          'github',
+          { readOnlyHint: true },
+        );
+        expect(
+          askResult.decision,
+          'MCP tool with readOnlyHint=true should be ASK_USER, not DENY',
+        ).toBe(PolicyDecision.ASK_USER);
+
+        // 4. MCP tool WITHOUT annotations should be DENIED
+        const denyResult = await engine.check(
+          { name: 'github__create_issue' },
+          'github',
+          undefined,
+        );
+        expect(
+          denyResult.decision,
+          'MCP tool without annotations should be DENIED in Plan Mode',
+        ).toBe(PolicyDecision.DENY);
+
+        // 5. MCP tool with readOnlyHint=false should also be DENIED
+        const denyResult2 = await engine.check(
+          { name: 'github__delete_issue' },
+          'github',
+          { readOnlyHint: false },
+        );
+        expect(
+          denyResult2.decision,
+          'MCP tool with readOnlyHint=false should be DENIED in Plan Mode',
+        ).toBe(PolicyDecision.DENY);
+
+        // 6. Test with qualified tool name format (server__tool) but no separate serverName
+        const qualifiedResult = await engine.check(
+          { name: 'github__list_repos' },
+          undefined,
+          { readOnlyHint: true },
+        );
+        expect(
+          qualifiedResult.decision,
+          'Qualified MCP tool name with readOnlyHint=true should be ASK_USER even without separate serverName',
+        ).toBe(PolicyDecision.ASK_USER);
+
+        // 7. Non-MCP tool (no server context) should be DENIED despite having annotations
+        const builtinResult = await engine.check(
+          { name: 'some_random_tool' },
+          undefined,
+          { readOnlyHint: true },
+        );
+        expect(
+          builtinResult.decision,
+          'Non-MCP tool should be DENIED even with readOnlyHint (no server context for *__* match)',
+        ).toBe(PolicyDecision.DENY);
+      } finally {
+        await fs.rm(tempPolicyDir, { recursive: true, force: true });
+      }
+    });
+
     it('should override default subagent rules when in Plan Mode', async () => {
       const planTomlPath = path.resolve(__dirname, 'policies', 'plan.toml');
       const fileContent = await fs.readFile(planTomlPath, 'utf-8');
