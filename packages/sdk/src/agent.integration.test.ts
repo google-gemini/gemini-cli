@@ -156,6 +156,9 @@ describe('GeminiCliAgent Integration', () => {
         throw new Error('Dynamic instruction failure');
       },
       model: 'gemini-2.0-flash',
+      fakeResponses: RECORD_MODE
+        ? undefined
+        : getGoldenPath('agent-dynamic-instructions'),
     });
 
     const session = agent.session();
@@ -166,5 +169,5 @@ describe('GeminiCliAgent Integration', () => {
         // Just consume the stream
       }
     }).rejects.toThrow('Dynamic instruction failure');
-  });
+  }, 30000);
 });

@@ -6,11 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ToolExecutor } from './tool-executor.js';
-import {
-  type Config,
-  type ToolResult,
-  type AnyToolInvocation,
-} from '../index.js';
+import type { Config, AnyToolInvocation } from '../index.js';
+import type { ToolResult } from '../tools/tools.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 import type { ScheduledToolCall } from './types.js';
@@ -326,7 +323,17 @@ describe('ToolExecutor', () => {
     // 2. Mock executeToolWithHooks to trigger the PID callback
     const testPid = 12345;
     vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockImplementation(
-      async (_inv, _name, _sig, _tool, _liveCb, _shellCfg, setPidCallback) => {
+      async (
+        _inv,
+        _name,
+        _sig,
+        _tool,
+        _liveCb,
+        _shellCfg,
+        setPidCallback,
+        _config,
+        _originalRequestName,
+      ) => {
         // Simulate the shell tool reporting a PID
         if (setPidCallback) {
           setPidCallback(testPid);

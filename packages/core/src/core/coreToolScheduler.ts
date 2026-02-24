@@ -625,10 +625,11 @@ export class CoreToolScheduler {
           toolCall.tool instanceof DiscoveredMCPTool
             ? toolCall.tool.serverName
             : undefined;
+        const toolAnnotations = toolCall.tool.toolAnnotations;
 
         const { decision, rule } = await this.config
           .getPolicyEngine()
-          .check(toolCallForPolicy, serverName);
+          .check(toolCallForPolicy, serverName, toolAnnotations);
 
         if (decision === PolicyDecision.DENY) {
           const { errorMessage, errorType } = getPolicyDenialError(

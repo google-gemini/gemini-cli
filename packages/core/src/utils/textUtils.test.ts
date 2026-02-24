@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { safeLiteralReplace, truncateString } from './textUtils.js';
+import {
+  safeLiteralReplace,
+  truncateString,
+  safeTemplateReplace,
+} from './textUtils.js';
 
 describe('safeLiteralReplace', () => {
   it('returns original string when oldString empty or not found', () => {
@@ -97,5 +101,62 @@ describe('truncateString', () => {
 
   it('should handle empty string', () => {
     expect(truncateString('', 5)).toBe('');
+  });
+});
+
+describe('safeTemplateReplace', () => {
+  it('replaces all occurrences of known keys', () => {
+    const tmpl = 'Hello {{name}}, welcome to {{place}}. {{name}} is happy.';
+    const replacements = { name: 'Alice', place: 'Wonderland' };
+    expect(safeTemplateReplace(tmpl, replacements)).toBe(
+      'Hello Alice, welcome to Wonderland. Alice is happy.',
+    );
+  });
+
+  it('ignores keys not present in replacements', () => {
+    const tmpl = 'Hello {{name}}, welcome to {{unknown}}.';
+    const replacements = { name: 'Bob' };
+    expect(safeTemplateReplace(tmpl, replacements)).toBe(
+      'Hello Bob, welcome to {{unknown}}.',
+    );
+  });
+
+  it('ignores extra keys in replacements', () => {
+    const tmpl = 'Hello {{name}}';
+    const replacements = { name: 'Charlie', age: '30' };
+    expect(safeTemplateReplace(tmpl, replacements)).toBe('Hello Charlie');
+  });
+
+  it('handles empty template', () => {
+    expect(safeTemplateReplace('', { key: 'val' })).toBe('');
+  });
+
+  it('handles template with no placeholders', () => {
+    expect(safeTemplateReplace('No keys here', { key: 'val' })).toBe(
+      'No keys here',
+    );
+  });
+
+  it('prevents double interpolation (security check)', () => {
+    const tmpl = 'User said: {{userInput}}';
+    const replacements = {
+      userInput: '{{secret}}',
+      secret: 'super_secret_value',
+    };
+    expect(safeTemplateReplace(tmpl, replacements)).toBe(
+      'User said: {{secret}}',
+    );
+  });
+
+  it('handles values with $ signs correctly (no regex group substitution)', () => {
+    const tmpl = 'Price: {{price}}';
+    const replacements = { price: '$100' };
+    expect(safeTemplateReplace(tmpl, replacements)).toBe('Price: $100');
+  });
+
+  it('treats special replacement patterns (e.g. "$&") as literal strings', () => {
+    const tmpl = 'Value: {{val}}';
+    const replacements = { val: '$&' };
+    expect(safeTemplateReplace(tmpl, replacements)).toBe('Value: $&');
   });
 });
