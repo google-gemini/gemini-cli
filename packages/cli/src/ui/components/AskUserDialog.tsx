@@ -12,7 +12,6 @@ import {
   useEffect,
   useReducer,
   useContext,
-  useState,
 } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
@@ -33,8 +32,7 @@ import { RenderInline } from '../utils/InlineMarkdownRenderer.js';
 import { MaxSizedBox } from './shared/MaxSizedBox.js';
 import { UIStateContext } from '../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
-import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
-import { SuggestionsDisplay } from './SuggestionsDisplay.js';
+import { useDialogHistorySearch } from '../hooks/useDialogHistorySearch.js';
 
 /** Padding for dialog content to prevent text from touching edges. */
 const DIALOG_PADDING = 4;
@@ -186,10 +184,6 @@ interface AskUserDialogProps {
    * Height constraint for scrollable content.
    */
   availableHeight?: number;
-  /**
-   * Chat history (user messages) for Ctrl+R search in text inputs.
-   */
-  chatHistoryForSearch?: readonly string[];
 }
 
 interface ReviewViewProps {
@@ -300,18 +294,14 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
 
   const { text: textValue } = buffer;
 
-  // Ctrl+R history search state
-  const [commandSearchActive, setCommandSearchActive] = useState(false);
-  const [textBeforeSearch, setTextBeforeSearch] = useState('');
-  const reversedHistory = useMemo(
-    () => [...chatHistoryForSearch].reverse(),
-    [chatHistoryForSearch],
-  );
-  const commandSearchCompletion = useReverseSearchCompletion(
-    buffer,
-    reversedHistory,
-    commandSearchActive,
-  );
+  const suggestionsWidth = Math.max(20, availableWidth - DIALOG_PADDING);
+  const { handleSearchKeys, suggestionsNode, promptPrefix } =
+    useDialogHistorySearch(
+      buffer,
+      chatHistoryForSearch,
+      true,
+      suggestionsWidth,
+    );
 
   // Sync state change with parent - only when it actually changes
   const lastTextValueRef = useRef(textValue);
@@ -322,61 +312,9 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
     }
   }, [textValue, onSelectionChange]);
 
-  const cancelSearch = useCallback(() => {
-    setCommandSearchActive(false);
-    commandSearchCompletion.resetCompletionState();
-    buffer.setText(textBeforeSearch);
-  }, [buffer, commandSearchCompletion, textBeforeSearch]);
-
-  const acceptSearch = useCallback(() => {
-    const { suggestions, activeSuggestionIndex, showSuggestions } =
-      commandSearchCompletion;
-    if (
-      showSuggestions &&
-      suggestions.length > 0 &&
-      activeSuggestionIndex >= 0
-    ) {
-      buffer.setText(suggestions[activeSuggestionIndex].value);
-    }
-    setCommandSearchActive(false);
-    commandSearchCompletion.resetCompletionState();
-  }, [buffer, commandSearchCompletion]);
-
   const handleExtraKeys = useCallback(
     (key: Key) => {
-      // When search is active, intercept navigation and cancel/accept keys
-      if (commandSearchActive) {
-        if (keyMatchers[Command.ESCAPE](key)) {
-          cancelSearch();
-          return true;
-        }
-        if (keyMatchers[Command.ACCEPT_SUGGESTION_REVERSE_SEARCH](key)) {
-          acceptSearch();
-          return true;
-        }
-        if (keyMatchers[Command.SUBMIT_REVERSE_SEARCH](key)) {
-          acceptSearch();
-          return true;
-        }
-        if (keyMatchers[Command.NAVIGATION_UP](key)) {
-          commandSearchCompletion.navigateUp();
-          return true;
-        }
-        if (keyMatchers[Command.NAVIGATION_DOWN](key)) {
-          commandSearchCompletion.navigateDown();
-          return true;
-        }
-      }
-
-      // Ctrl+R to enter search mode
-      if (
-        keyMatchers[Command.REVERSE_SEARCH](key) &&
-        chatHistoryForSearch.length > 0
-      ) {
-        setCommandSearchActive(true);
-        setTextBeforeSearch(buffer.text);
-        return true;
-      }
+      if (handleSearchKeys(key)) return true;
 
       // Ctrl+C to clear text
       if (keyMatchers[Command.QUIT](key)) {
@@ -388,15 +326,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
       }
       return false;
     },
-    [
-      buffer,
-      textValue,
-      commandSearchActive,
-      cancelSearch,
-      acceptSearch,
-      commandSearchCompletion,
-      chatHistoryForSearch.length,
-    ],
+    [buffer, textValue, handleSearchKeys],
   );
 
   useKeypress(handleExtraKeys, { isActive: true, priority: true });
@@ -427,8 +357,6 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
       ? Math.max(1, availableHeight - overhead)
       : undefined;
 
-  const suggestionsWidth = Math.max(20, availableWidth - DIALOG_PADDING);
-
   return (
     <Box flexDirection="column">
       {progressHeader}
@@ -447,11 +375,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
       </Box>
 
       <Box flexDirection="row" marginBottom={1}>
-        <Text
-          color={commandSearchActive ? theme.text.accent : theme.status.success}
-        >
-          {commandSearchActive ? '(r:) ' : '> '}
-        </Text>
+        <Text color={promptPrefix.color}>{promptPrefix.text}</Text>
         <TextInput
           buffer={buffer}
           placeholder={placeholder}
@@ -459,19 +383,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
         />
       </Box>
 
-      {commandSearchActive && commandSearchCompletion.showSuggestions && (
-        <Box marginBottom={1}>
-          <SuggestionsDisplay
-            suggestions={commandSearchCompletion.suggestions}
-            activeIndex={commandSearchCompletion.activeSuggestionIndex}
-            isLoading={commandSearchCompletion.isLoadingSuggestions}
-            width={suggestionsWidth}
-            scrollOffset={commandSearchCompletion.visibleStartIndex}
-            userInput={buffer.text}
-            mode="reverse"
-          />
-        </Box>
-      )}
+      {suggestionsNode}
 
       {keyboardHints}
     </Box>
@@ -673,38 +585,13 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
   const customOptionText = customBuffer.text;
 
-  // Ctrl+R history search state for custom option
-  const [commandSearchActive, setCommandSearchActive] = useState(false);
-  const [textBeforeSearch, setTextBeforeSearch] = useState('');
-  const reversedHistory = useMemo(
-    () => [...chatHistoryForSearch].reverse(),
-    [chatHistoryForSearch],
-  );
-  const commandSearchCompletion = useReverseSearchCompletion(
+  const suggestionsWidth = Math.max(20, availableWidth - DIALOG_PADDING);
+  const { handleSearchKeys, suggestionsNode } = useDialogHistorySearch(
     customBuffer,
-    reversedHistory,
-    commandSearchActive,
+    chatHistoryForSearch,
+    isCustomOptionFocused,
+    suggestionsWidth,
   );
-
-  const cancelSearch = useCallback(() => {
-    setCommandSearchActive(false);
-    commandSearchCompletion.resetCompletionState();
-    customBuffer.setText(textBeforeSearch);
-  }, [customBuffer, commandSearchCompletion, textBeforeSearch]);
-
-  const acceptSearch = useCallback(() => {
-    const { suggestions, activeSuggestionIndex, showSuggestions } =
-      commandSearchCompletion;
-    if (
-      showSuggestions &&
-      suggestions.length > 0 &&
-      activeSuggestionIndex >= 0
-    ) {
-      customBuffer.setText(suggestions[activeSuggestionIndex].value);
-    }
-    setCommandSearchActive(false);
-    commandSearchCompletion.resetCompletionState();
-  }, [customBuffer, commandSearchCompletion]);
 
   // Helper to build answer string from selections
   const buildAnswerString = useCallback(
@@ -751,39 +638,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   const handleExtraKeys = useCallback(
     (key: Key) => {
       if (isCustomOptionFocused) {
-        // When search is active, intercept navigation and cancel/accept keys
-        if (commandSearchActive) {
-          if (keyMatchers[Command.ESCAPE](key)) {
-            cancelSearch();
-            return true;
-          }
-          if (keyMatchers[Command.ACCEPT_SUGGESTION_REVERSE_SEARCH](key)) {
-            acceptSearch();
-            return true;
-          }
-          if (keyMatchers[Command.SUBMIT_REVERSE_SEARCH](key)) {
-            acceptSearch();
-            return true;
-          }
-          if (keyMatchers[Command.NAVIGATION_UP](key)) {
-            commandSearchCompletion.navigateUp();
-            return true;
-          }
-          if (keyMatchers[Command.NAVIGATION_DOWN](key)) {
-            commandSearchCompletion.navigateDown();
-            return true;
-          }
-        }
-
-        // Ctrl+R to enter search mode
-        if (
-          keyMatchers[Command.REVERSE_SEARCH](key) &&
-          chatHistoryForSearch.length > 0
-        ) {
-          setCommandSearchActive(true);
-          setTextBeforeSearch(customBuffer.text);
-          return true;
-        }
+        if (handleSearchKeys(key)) return true;
 
         // Ctrl+C to clear text
         if (keyMatchers[Command.QUIT](key)) {
@@ -826,8 +681,6 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       if (isPrintable && !isCustomOptionFocused) {
         dispatch({ type: 'SET_CUSTOM_FOCUSED', payload: { focused: true } });
         onEditingCustomOption?.(true);
-        // For IME or multi-char sequences, we want to capture the whole thing.
-        // If it's a single char, we start the buffer with it.
         customBuffer.setText(key.sequence);
         return true;
       }
@@ -838,11 +691,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       customBuffer,
       onEditingCustomOption,
       customOptionText,
-      commandSearchActive,
-      cancelSearch,
-      acceptSearch,
-      commandSearchCompletion,
-      chatHistoryForSearch.length,
+      handleSearchKeys,
     ],
   );
 
@@ -971,8 +820,6 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       ? Math.max(1, Math.floor((listHeight - questionHeight) / 2))
       : selectionItems.length;
 
-  const suggestionsWidth = Math.max(20, availableWidth - DIALOG_PADDING);
-
   return (
     <Box flexDirection="column">
       {progressHeader}
@@ -1096,21 +943,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         }}
       />
 
-      {isCustomOptionFocused &&
-        commandSearchActive &&
-        commandSearchCompletion.showSuggestions && (
-          <Box marginBottom={1}>
-            <SuggestionsDisplay
-              suggestions={commandSearchCompletion.suggestions}
-              activeIndex={commandSearchCompletion.activeSuggestionIndex}
-              isLoading={commandSearchCompletion.isLoadingSuggestions}
-              width={suggestionsWidth}
-              scrollOffset={commandSearchCompletion.visibleStartIndex}
-              userInput={customBuffer.text}
-              mode="reverse"
-            />
-          </Box>
-        )}
+      {isCustomOptionFocused && suggestionsNode}
 
       {keyboardHints}
     </Box>
@@ -1124,7 +957,6 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   onActiveTextInputChange,
   width,
   availableHeight: availableHeightProp,
-  chatHistoryForSearch = [],
 }) => {
   const uiState = useContext(UIStateContext);
   const availableHeight =
@@ -1132,6 +964,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
     (uiState?.constrainHeight !== false
       ? uiState?.availableTerminalHeight
       : undefined);
+  const chatHistoryForSearch: readonly string[] = uiState?.userMessages ?? [];
 
   const [state, dispatch] = useReducer(askUserDialogReducerLogic, initialState);
   const { answers, isEditingCustomOption, submitted } = state;

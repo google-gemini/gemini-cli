@@ -47,7 +47,6 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
     terminalHeight,
     constrainHeight,
     availableTerminalHeight: uiAvailableHeight,
-    userMessages,
   } = useUIState();
   const { tool, index, total } = confirmingTool;
 
@@ -138,7 +137,6 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
             terminalWidth={mainAreaWidth - 4} // Adjust for parent border/padding
             availableTerminalHeight={availableContentHeight}
             isFocused={true}
-            userMessages={userMessages}
           />
         </Box>
         <Box
