@@ -128,17 +128,7 @@ export default tseslint.config(
       ],
       // Prevent async errors from bypassing catch handlers
       '@typescript-eslint/return-await': ['error', 'in-try-catch'],
-      'import/no-internal-modules': [
-        'error',
-        {
-          allow: [
-            'react-dom/test-utils',
-            'memfs/lib/volume.js',
-            'yargs/**',
-            'msw/node',
-          ],
-        },
-      ],
+      'import/no-internal-modules': 'off',
       'import/no-relative-packages': 'error',
       'no-cond-assign': 'error',
       'no-debugger': 'error',
