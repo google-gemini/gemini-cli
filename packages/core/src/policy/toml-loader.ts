@@ -148,7 +148,11 @@ export async function readPolicyFiles(
       baseDir = policyPath;
       const dirEntries = await fs.readdir(policyPath, { withFileTypes: true });
       filesToLoad = dirEntries
-        .filter((entry) => entry.isFile() && entry.name.endsWith('.toml'))
+        .filter(
+          (entry) =>
+            (entry.isFile() || entry.isSymbolicLink()) &&
+            entry.name.endsWith('.toml'),
+        )
         .map((entry) => entry.name);
     } else if (stats.isFile() && policyPath.endsWith('.toml')) {
       baseDir = path.dirname(policyPath);
@@ -164,8 +168,13 @@ export async function readPolicyFiles(
   const results: PolicyFile[] = [];
   for (const file of filesToLoad) {
     const filePath = path.join(baseDir, file);
-    const content = await fs.readFile(filePath, 'utf-8');
-    results.push({ path: filePath, content });
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      results.push({ path: filePath, content });
+    } catch (e) {
+      // Ignore individual file read errors (e.g., broken symlinks or directories)
+      // so we don't skip the entire directory.
+    }
   }
   return results;
 }
