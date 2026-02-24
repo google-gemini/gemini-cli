@@ -38,6 +38,8 @@ import { requestConsentInteractive } from '../../config/extensions/consent.js';
 import type { ConfirmationRequest } from '../types.js';
 import type { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 
+type AddItemFn = UseHistoryManagerReturn['addItem'];
+
 export const VSCODE_SHIFT_ENTER_SEQUENCE = '\\\r\n';
 
 const execAsync = promisify(exec);
@@ -485,7 +487,7 @@ export function formatTerminalSetupResultMessage(
 
 interface UseTerminalSetupPromptParams {
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
-  historyManager: UseHistoryManagerReturn;
+  addItem: AddItemFn;
 }
 
 /**
@@ -493,7 +495,7 @@ interface UseTerminalSetupPromptParams {
  */
 export function useTerminalSetupPrompt({
   addConfirmUpdateExtensionRequest,
-  historyManager,
+  addItem,
 }: UseTerminalSetupPromptParams): void {
   useEffect(() => {
     const hasBeenPrompted = persistentState.get('terminalSetupPromptShown');
@@ -519,7 +521,7 @@ export function useTerminalSetupPrompt({
 
       const result = await terminalSetup();
       if (cancelled) return;
-      historyManager.addItem(
+      addItem(
         {
           type: result.success ? 'info' : 'error',
           text: formatTerminalSetupResultMessage(result),
@@ -531,5 +533,5 @@ export function useTerminalSetupPrompt({
     return () => {
       cancelled = true;
     };
-  }, [addConfirmUpdateExtensionRequest, historyManager]);
+  }, [addConfirmUpdateExtensionRequest, addItem]);
 }

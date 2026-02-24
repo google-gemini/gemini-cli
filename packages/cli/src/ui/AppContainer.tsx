@@ -610,7 +610,7 @@ export const AppContainer = (props: AppContainerProps) => {
   // One-time prompt to suggest running /terminal-setup when it would help.
   useTerminalSetupPrompt({
     addConfirmUpdateExtensionRequest,
-    historyManager,
+    addItem: historyManager.addItem,
   });
 
   const refreshStatic = useCallback(() => {
