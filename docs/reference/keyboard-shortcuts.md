@@ -118,6 +118,7 @@ available combinations.
 | Show warning when trying to move focus away from shell input.                                                                                      | `Tab (no Shift)` |
 | Move focus from Gemini to the active shell.                                                                                                        | `Tab (no Shift)` |
 | Move focus from the shell back to Gemini.                                                                                                          | `Shift + Tab`    |
+| Open the current plan in an external editor.                                                                                                       | `Ctrl + X`       |
 | Clear the terminal screen and redraw the UI.                                                                                                       | `Ctrl + L`       |
 | Restart the application.                                                                                                                           | `R`              |
 | Suspend the CLI and move it to the background.                                                                                                     | `Ctrl + Z`       |

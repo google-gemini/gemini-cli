@@ -16,6 +16,7 @@ import {
   validatePlanContent,
   processSingleFileContent,
   type FileSystemService,
+  openFileInEditor,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 
@@ -27,6 +28,13 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     validatePlanPath: vi.fn(async () => null),
     validatePlanContent: vi.fn(async () => null),
     processSingleFileContent: vi.fn(),
+    openFileInEditor: vi.fn(async () => ({ modified: true })),
+    IdeClient: {
+      getInstance: vi.fn(async () => ({
+        isDiffingEnabled: vi.fn(() => false),
+        openDiff: vi.fn(),
+      })),
+    },
   };
 });
 
@@ -204,7 +212,7 @@ Implement a comprehensive authentication system with multiple providers.
         writeKey(stdin, '\r');
 
         await waitFor(() => {
-          expect(onApprove).toHaveBeenCalledWith(ApprovalMode.AUTO_EDIT);
+          expect(onApprove).toHaveBeenCalledWith(ApprovalMode.AUTO_EDIT, false);
         });
       });
 
@@ -223,7 +231,7 @@ Implement a comprehensive authentication system with multiple providers.
         writeKey(stdin, '\r');
 
         await waitFor(() => {
-          expect(onApprove).toHaveBeenCalledWith(ApprovalMode.DEFAULT);
+          expect(onApprove).toHaveBeenCalledWith(ApprovalMode.DEFAULT, false);
         });
       });
 
@@ -254,7 +262,7 @@ Implement a comprehensive authentication system with multiple providers.
         writeKey(stdin, '\r');
 
         await waitFor(() => {
-          expect(onFeedback).toHaveBeenCalledWith('Add tests');
+          expect(onFeedback).toHaveBeenCalledWith('Add tests', false);
         });
       });
 
@@ -350,7 +358,7 @@ Implement a comprehensive authentication system with multiple providers.
         writeKey(stdin, '2');
 
         await waitFor(() => {
-          expect(onApprove).toHaveBeenCalledWith(ApprovalMode.DEFAULT);
+          expect(onApprove).toHaveBeenCalledWith(ApprovalMode.DEFAULT, false);
         });
       });
 
@@ -531,9 +539,49 @@ Implement a comprehensive authentication system with multiple providers.
         writeKey(stdin, '\r');
 
         await waitFor(() => {
-          expect(onApprove).toHaveBeenCalledWith(ApprovalMode.DEFAULT);
+          expect(onApprove).toHaveBeenCalledWith(ApprovalMode.DEFAULT, false);
         });
         expect(onFeedback).not.toHaveBeenCalled();
+      });
+
+      it('opens editor when Ctrl+X is pressed and reloads plan', async () => {
+        const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
+
+        await act(async () => {
+          vi.runAllTimers();
+        });
+
+        await waitFor(() => {
+          expect(lastFrame()).toContain('Add user authentication');
+        });
+
+        const updatedPlanContent = 'Updated plan content';
+        vi.mocked(processSingleFileContent).mockResolvedValue({
+          llmContent: updatedPlanContent,
+          returnDisplay: 'Read file',
+        });
+
+        writeKey(stdin, '\x18'); // Ctrl+X
+
+        await waitFor(() => {
+          expect(openFileInEditor).toHaveBeenCalled();
+        });
+
+        // Advance timers for reload
+        await act(async () => {
+          vi.runAllTimers();
+        });
+
+        await waitFor(() => {
+          expect(lastFrame()).toContain(updatedPlanContent);
+        });
+
+        // Submit to verify planModified is true
+        writeKey(stdin, '\r');
+
+        await waitFor(() => {
+          expect(onApprove).toHaveBeenCalledWith(ApprovalMode.AUTO_EDIT, true);
+        });
       });
     },
   );

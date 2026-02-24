@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Box, Text } from 'ink';
 import {
   ApprovalMode,
@@ -14,15 +14,24 @@ import {
   QuestionType,
   type Config,
   processSingleFileContent,
+  coreEvents,
+  openFileInEditor,
+  IdeClient,
+  debugLogger,
+  isValidEditorType,
 } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { AskUserDialog } from './AskUserDialog.js';
+import { useSettings } from '../contexts/SettingsContext.js';
+import { useKeypress } from '../hooks/useKeypress.js';
+import { KeypressPriority } from '../contexts/KeypressContext.js';
+import { Command, keyMatchers } from '../keyMatchers.js';
 
 export interface ExitPlanModeDialogProps {
   planPath: string;
-  onApprove: (approvalMode: ApprovalMode) => void;
-  onFeedback: (feedback: string) => void;
+  onApprove: (approvalMode: ApprovalMode, planModified: boolean) => void;
+  onFeedback: (feedback: string, planModified: boolean) => void;
   onCancel: () => void;
   width: number;
   availableHeight?: number;
@@ -38,6 +47,7 @@ interface PlanContentState {
   status: PlanStatus;
   content?: string;
   error?: string;
+  reload: () => void;
 }
 
 enum ApprovalOption {
@@ -53,9 +63,14 @@ const StatusMessage: React.FC<{
 }> = ({ children }) => <Box paddingX={1}>{children}</Box>;
 
 function usePlanContent(planPath: string, config: Config): PlanContentState {
-  const [state, setState] = useState<PlanContentState>({
+  const [nonce, setNonce] = useState(0);
+  const [state, setState] = useState<Omit<PlanContentState, 'reload'>>({
     status: PlanStatus.Loading,
   });
+
+  const reload = useCallback(() => {
+    setNonce((n) => n + 1);
+  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -120,9 +135,9 @@ function usePlanContent(planPath: string, config: Config): PlanContentState {
     return () => {
       ignore = true;
     };
-  }, [planPath, config]);
+  }, [planPath, config, nonce]);
 
-  return state;
+  return useMemo(() => ({ ...state, reload }), [state, reload]);
 }
 
 export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
@@ -134,9 +149,11 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
   availableHeight,
 }) => {
   const config = useConfig();
+  const settings = useSettings();
   const planState = usePlanContent(planPath, config);
   const [showLoading, setShowLoading] = useState(false);
-
+  const [isModified, setIsModified] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   useEffect(() => {
     if (planState.status !== PlanStatus.Loading) {
       setShowLoading(false);
@@ -149,6 +166,80 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
 
     return () => clearTimeout(timer);
   }, [planState.status]);
+
+  const performOpenInEditor = useCallback(async () => {
+    if (isEditing) return;
+    setIsEditing(true);
+    try {
+      const ideClient = await IdeClient.getInstance();
+      const preferredEditorRaw = settings.merged.general.preferredEditor;
+      const preferredEditor =
+        typeof preferredEditorRaw === 'string' &&
+        isValidEditorType(preferredEditorRaw)
+          ? preferredEditorRaw
+          : undefined;
+
+      const result = await openFileInEditor(planPath, {
+        preferredEditor,
+        ideClient,
+        readTextFile: (path: string) =>
+          config.getFileSystemService().readTextFile(path),
+        writeTextFile: (path, content) =>
+          config.getFileSystemService().writeTextFile(path, content),
+      });
+
+      if (result.modified) {
+        setIsModified(true);
+        planState.reload();
+      }
+    } catch (err) {
+      coreEvents.emitFeedback(
+        'error',
+        '[ExitPlanModeDialog] external editor error',
+        err,
+      );
+    } finally {
+      setIsEditing(false);
+    }
+  }, [
+    isEditing,
+    settings.merged.general.preferredEditor,
+    planPath,
+    config,
+    planState,
+  ]);
+
+  const handleOpenInEditor = useCallback(() => {
+    void performOpenInEditor();
+  }, [performOpenInEditor]);
+
+  const syncIde = useCallback(
+    async (outcome: 'accepted' | 'rejected') => {
+      try {
+        const ideClient = await IdeClient.getInstance();
+        if (ideClient.isDiffingEnabled()) {
+          await ideClient.resolveDiffFromCli(planPath, outcome);
+        }
+      } catch (err) {
+        debugLogger.error('ExitPlanModeDialog: IDE sync failed:', err);
+      }
+    },
+    [planPath],
+  );
+
+  useKeypress(
+    (key) => {
+      if (keyMatchers[Command.OPEN_PLAN_IN_EDITOR](key)) {
+        handleOpenInEditor();
+        return true;
+      }
+      return false;
+    },
+    {
+      isActive: planState.status === PlanStatus.Loaded && !isEditing,
+      priority: KeypressPriority.Critical,
+    },
+  );
 
   if (planState.status === PlanStatus.Loading) {
     if (!showLoading) {
@@ -209,17 +300,24 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
         ]}
         onSubmit={(answers) => {
           const answer = answers['0'];
+          // Sync IDE state first
+          void syncIde('accepted');
+
           if (answer === ApprovalOption.Auto) {
-            onApprove(ApprovalMode.AUTO_EDIT);
+            onApprove(ApprovalMode.AUTO_EDIT, isModified);
           } else if (answer === ApprovalOption.Manual) {
-            onApprove(ApprovalMode.DEFAULT);
+            onApprove(ApprovalMode.DEFAULT, isModified);
           } else if (answer) {
-            onFeedback(answer);
+            onFeedback(answer, isModified);
           }
         }}
-        onCancel={onCancel}
+        onCancel={() => {
+          void syncIde('rejected');
+          onCancel();
+        }}
         width={width}
         availableHeight={availableHeight}
+        extraFooterActions={['Ctrl+X to open in editor']}
       />
     </Box>
   );

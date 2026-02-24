@@ -4,11 +4,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec, execSync, spawn, spawnSync } from 'node:child_process';
+import { exec, spawn, spawnSync, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { once } from 'node:events';
 import { debugLogger } from './debugLogger.js';
 import { coreEvents, CoreEvent, type EditorSelectedPayload } from './events.js';
+import type { DiffUpdateResult } from '../ide/ide-client.js';
+
+const execAsync = promisify(exec);
+
+/**
+ * Interface for an object that can open a diff in an IDE.
+ * Decouples editor utility from IdeClient implementation to avoid circular dependencies.
+ */
+export interface OpenFileIdeClient {
+  isDiffingEnabled(): boolean;
+  openDiff(filePath: string, content: string): Promise<DiffUpdateResult>;
+}
+
+export interface OpenFileInEditorOptions {
+  preferredEditor?: EditorType;
+  ideClient?: OpenFileIdeClient;
+  readTextFile?: (path: string) => Promise<string>;
+  writeTextFile?: (path: string, content: string) => Promise<void>;
+}
 
 const GUI_EDITORS = [
   'vscode',
@@ -61,7 +80,7 @@ export function getEditorDisplayName(editor: EditorType): string {
   return EDITOR_DISPLAY_NAMES[editor] || editor;
 }
 
-function isValidEditorType(editor: string): editor is EditorType {
+export function isValidEditorType(editor: string): editor is EditorType {
   return EDITORS_SET.has(editor);
 }
 
@@ -77,8 +96,6 @@ interface DiffCommand {
   command: string;
   args: string[];
 }
-
-const execAsync = promisify(exec);
 
 function getCommandExistsCmd(cmd: string): string {
   return process.platform === 'win32'
@@ -141,11 +158,10 @@ export function hasValidEditorCommand(editor: EditorType): boolean {
 export async function hasValidEditorCommandAsync(
   editor: EditorType,
 ): Promise<boolean> {
-  return Promise.any(
-    getEditorCommands(editor).map((cmd) =>
-      commandExistsAsync(cmd).then((exists) => exists || Promise.reject()),
-    ),
-  ).catch(() => false);
+  const results = await Promise.allSettled(
+    getEditorCommands(editor).map((cmd) => commandExistsAsync(cmd)),
+  );
+  return results.some((r) => r.status === 'fulfilled' && r.value);
 }
 
 export function getEditorCommand(editor: EditorType): string {
@@ -334,5 +350,132 @@ export async function openDiff(
     childProcess.on('error', (error) => {
       reject(error);
     });
+  });
+}
+
+/**
+ * Opens a file in an editor.
+ * If an IDE client is provided and connected, it uses openDiff for an integrated experience.
+ * Otherwise, it falls back to external editors (GUI or Terminal).
+ */
+export async function openFileInEditor(
+  filePath: string,
+  options: OpenFileInEditorOptions = {},
+): Promise<{ modified: boolean }> {
+  const { ideClient, preferredEditor, readTextFile, writeTextFile } = options;
+
+  // 1. Try IDE Flow
+  if (ideClient?.isDiffingEnabled() && readTextFile && writeTextFile) {
+    debugLogger.debug(`openFileInEditor: Using IDE flow for ${filePath}`);
+    try {
+      const currentContent = await readTextFile(filePath);
+      const result = await ideClient.openDiff(filePath, currentContent);
+      if (result.status === 'accepted' && result.content !== undefined) {
+        if (result.content !== currentContent) {
+          await writeTextFile(filePath, result.content);
+          return { modified: true };
+        }
+      }
+      return { modified: false };
+    } catch (err) {
+      debugLogger.error(
+        'openFileInEditor: IDE flow failed, falling back:',
+        err,
+      );
+      // Fall through to external editor
+    }
+  }
+
+  // 2. Resolve external editor command
+  let command: string | undefined = undefined;
+  const args = [filePath];
+
+  if (preferredEditor) {
+    command = getEditorCommand(preferredEditor);
+    if (isGuiEditor(preferredEditor)) {
+      args.unshift('--wait');
+    }
+  }
+
+  if (!command) {
+    command =
+      process.env['VISUAL'] ??
+      process.env['EDITOR'] ??
+      (process.platform === 'win32' ? 'notepad' : 'vim');
+  }
+
+  // DEFINITIVE FIX for Vim E138: Always add -i NONE when we detect vim/nvim
+  const commandBase = command.toLowerCase();
+  if (commandBase.includes('vim') || commandBase.includes('nvim')) {
+    args.unshift('-i', 'NONE');
+  }
+
+  const useGuiSpawn = preferredEditor && isGuiEditor(preferredEditor);
+  debugLogger.debug(
+    `openFileInEditor: Using external editor: ${command} ${args.join(' ')} (GUI spawn: ${useGuiSpawn})`,
+  );
+
+  const initialContent = readTextFile
+    ? await readTextFile(filePath).catch(() => undefined)
+    : undefined;
+
+  return new Promise<{ modified: boolean }>((resolve, reject) => {
+    const wasRaw = process.stdin.isRaw;
+    if (!useGuiSpawn && wasRaw) {
+      process.stdin.setRawMode(false);
+    }
+
+    const onExit = async (status: number | null, error?: Error) => {
+      if (!useGuiSpawn && wasRaw) {
+        process.stdin.setRawMode(true);
+      }
+      coreEvents.emit(CoreEvent.ExternalEditorClosed);
+
+      if (error) {
+        reject(error);
+      } else if (status !== null && status !== 0) {
+        reject(new Error(`Editor exited with status ${status}`));
+      } else {
+        if (readTextFile) {
+          try {
+            const finalContent = await readTextFile(filePath);
+            resolve({ modified: initialContent !== finalContent });
+          } catch (err) {
+            debugLogger.error(
+              `openFileInEditor: Failed to read file after editor exit: ${filePath}`,
+              err,
+            );
+            // Fallback to true if we can't read the file but it existed or was supposed to
+            resolve({ modified: true });
+          }
+        } else {
+          // Assume modified if external editor was used and closed successfully
+          resolve({ modified: true });
+        }
+      }
+    };
+
+    if (useGuiSpawn) {
+      const child = spawn(command, args, {
+        stdio: 'inherit',
+        shell: process.platform === 'win32',
+      });
+      child.on('close', (code) => {
+        void onExit(code);
+      });
+      child.on('error', (err) => {
+        void onExit(null, err);
+      });
+    } else {
+      try {
+        const result = spawnSync(command, args, {
+          stdio: 'inherit',
+          shell: process.platform === 'win32',
+        });
+        void onExit(result.status, result.error || undefined);
+      } catch (err: unknown) {
+        void onExit(null, err instanceof Error ? err : new Error(String(err)));
+      }
+    }
   });
 }

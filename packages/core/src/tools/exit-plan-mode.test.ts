@@ -240,6 +240,28 @@ Read and follow the plan strictly during implementation.`,
       expect(mockConfig.setApprovedPlanPath).toHaveBeenCalledWith(expectedPath);
     });
 
+    it('should include modified note when planModified is true', async () => {
+      const planRelativePath = createPlanFile('test.md', '# Content');
+      const invocation = tool.build({ plan_path: planRelativePath });
+
+      const confirmDetails = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmDetails).not.toBe(false);
+      if (confirmDetails === false) return;
+
+      await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce, {
+        approved: true,
+        approvalMode: ApprovalMode.DEFAULT,
+        planModified: true,
+      });
+
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.llmContent).toContain(
+        'Note: The user modified the plan file in an external editor.',
+      );
+    });
+
     it('should return feedback message when plan is rejected with feedback', async () => {
       const planRelativePath = createPlanFile('test.md', '# Content');
       const invocation = tool.build({ plan_path: planRelativePath });

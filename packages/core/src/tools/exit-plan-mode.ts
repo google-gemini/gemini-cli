@@ -228,9 +228,12 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
       logPlanExecution(this.config, new PlanExecutionEvent(newMode));
 
       const description = getApprovalModeDescription(newMode);
+      const modifiedNote = payload.planModified
+        ? '\n\nNote: The user modified the plan file in an external editor.'
+        : '';
 
       return {
-        llmContent: `Plan approved. Switching to ${description}.
+        llmContent: `Plan approved.${modifiedNote} Switching to ${description}.
 
 The approved implementation plan is stored at: ${resolvedPlanPath}
 Read and follow the plan strictly during implementation.`,
@@ -238,9 +241,12 @@ Read and follow the plan strictly during implementation.`,
       };
     } else {
       const feedback = payload?.feedback?.trim();
+      const modifiedNote = payload?.planModified
+        ? ' (Note: The user also modified the plan file in an external editor)'
+        : '';
       if (feedback) {
         return {
-          llmContent: `Plan rejected. User feedback: ${feedback}
+          llmContent: `Plan rejected. User feedback: ${feedback}${modifiedNote}
 
 The plan is stored at: ${resolvedPlanPath}
 Revise the plan based on the feedback.`,
@@ -248,7 +254,7 @@ Revise the plan based on the feedback.`,
         };
       } else {
         return {
-          llmContent: `Plan rejected. No feedback provided.
+          llmContent: `Plan rejected. No feedback provided.${modifiedNote}
 
 The plan is stored at: ${resolvedPlanPath}
 Ask the user for specific feedback on how to improve the plan.`,

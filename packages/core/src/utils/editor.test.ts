@@ -22,6 +22,7 @@ import {
   isEditorAvailable,
   isEditorAvailableAsync,
   resolveEditorAsync,
+  openFileInEditor,
   type EditorType,
 } from './editor.js';
 import { coreEvents, CoreEvent } from './events.js';
@@ -708,6 +709,88 @@ describe('editor utils', () => {
       const result = await resolvePromise;
       expect(result).toBe('vim');
       expect(emitSpy).toHaveBeenCalledWith(CoreEvent.RequestEditorSelection);
+    });
+  });
+
+  describe('openFileInEditor', () => {
+    it('should return modified: true when no readTextFile is provided (legacy behavior)', async () => {
+      (spawnSync as Mock).mockReturnValue({ status: 0 });
+
+      const result = await openFileInEditor('test.txt');
+
+      expect(result).toEqual({ modified: true });
+    });
+
+    it('should return modified: true when content changed', async () => {
+      (spawnSync as Mock).mockReturnValue({ status: 0 });
+      const readTextFile = vi
+        .fn()
+        .mockResolvedValueOnce('initial content')
+        .mockResolvedValueOnce('changed content');
+
+      const result = await openFileInEditor('test.txt', { readTextFile });
+
+      expect(result).toEqual({ modified: true });
+      expect(readTextFile).toHaveBeenCalledTimes(2);
+    });
+
+    it('should return modified: false when content is same', async () => {
+      (spawnSync as Mock).mockReturnValue({ status: 0 });
+      const readTextFile = vi
+        .fn()
+        .mockResolvedValueOnce('initial content')
+        .mockResolvedValueOnce('initial content');
+
+      const result = await openFileInEditor('test.txt', { readTextFile });
+
+      expect(result).toEqual({ modified: false });
+      expect(readTextFile).toHaveBeenCalledTimes(2);
+    });
+
+    it("should return modified: true if file was created (didn't exist before)", async () => {
+      (spawnSync as Mock).mockReturnValue({ status: 0 });
+      const readTextFile = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('ENOENT'))
+        .mockResolvedValueOnce('new content');
+
+      const result = await openFileInEditor('test.txt', { readTextFile });
+
+      expect(result).toEqual({ modified: true });
+      expect(readTextFile).toHaveBeenCalledTimes(2);
+    });
+
+    it('should return modified: true when using GUI spawn and content changed', async () => {
+      const mockChild = {
+        on: vi.fn((event, cb) => {
+          if (event === 'close') {
+            setTimeout(() => cb(0), 0);
+          }
+        }),
+      };
+      (spawn as Mock).mockReturnValue(mockChild);
+
+      const readTextFile = vi
+        .fn()
+        .mockResolvedValueOnce('initial content')
+        .mockResolvedValueOnce('changed content');
+
+      const result = await openFileInEditor('test.txt', {
+        readTextFile,
+        preferredEditor: 'vscode',
+      });
+
+      expect(result).toEqual({ modified: true });
+      expect(readTextFile).toHaveBeenCalledTimes(2);
+    });
+
+    it('should emit ExternalEditorClosed event', async () => {
+      (spawnSync as Mock).mockReturnValue({ status: 0 });
+      const emitSpy = vi.spyOn(coreEvents, 'emit');
+
+      await openFileInEditor('test.txt');
+
+      expect(emitSpy).toHaveBeenCalledWith(CoreEvent.ExternalEditorClosed);
     });
   });
 });

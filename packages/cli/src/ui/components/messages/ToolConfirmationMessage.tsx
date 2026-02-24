@@ -340,16 +340,18 @@ export const ToolConfirmationMessage: React.FC<
       bodyContent = (
         <ExitPlanModeDialog
           planPath={confirmationDetails.planPath}
-          onApprove={(approvalMode) => {
+          onApprove={(approvalMode, planModified) => {
             handleConfirm(ToolConfirmationOutcome.ProceedOnce, {
               approved: true,
               approvalMode,
+              planModified,
             });
           }}
-          onFeedback={(feedback) => {
+          onFeedback={(feedback, planModified) => {
             handleConfirm(ToolConfirmationOutcome.ProceedOnce, {
               approved: false,
               feedback,
+              planModified,
             });
           }}
           onCancel={() => {

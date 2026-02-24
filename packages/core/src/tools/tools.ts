@@ -734,6 +734,8 @@ export interface ToolExitPlanModeConfirmationPayload {
   approvalMode?: ApprovalMode;
   /** If rejected, the user's feedback */
   feedback?: string;
+  /** Whether the user modified the plan file in an external editor */
+  planModified?: boolean;
 }
 
 export type ToolConfirmationPayload =

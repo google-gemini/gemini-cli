@@ -183,6 +183,10 @@ interface AskUserDialogProps {
    * Height constraint for scrollable content.
    */
   availableHeight?: number;
+  /**
+   * Additional shortcuts to display in the footer.
+   */
+  extraFooterActions?: string[];
 }
 
 interface ReviewViewProps {
@@ -925,6 +929,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   onActiveTextInputChange,
   width,
   availableHeight: availableHeightProp,
+  extraFooterActions,
 }) => {
   const uiState = useContext(UIStateContext);
   const availableHeight =
@@ -1143,6 +1148,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
             ? undefined
             : '↑/↓ to navigate'
       }
+      extraActions={extraFooterActions}
     />
   );
 
