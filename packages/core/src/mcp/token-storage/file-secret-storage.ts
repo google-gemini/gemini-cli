@@ -8,6 +8,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
+import si from 'systeminformation';
 import type { SecretStorage } from './types.js';
 import { GEMINI_DIR, homedir } from '../../utils/paths.js';
 
@@ -27,28 +28,97 @@ function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
 /**
  * Encrypted file-based storage for secrets, used as a fallback
  * when a system keychain (like keytar) is unavailable.
+ *
+ * Security features:
+ * 1. AES-256-GCM encryption for authenticated encryption.
+ * 2. Key derivation using scrypt with machine-unique salt.
+ * 3. Incorporates hardware identifiers (Machine ID, Disk UUID).
+ * 4. Supports optional user-provided master key via GEMINI_MASTER_KEY.
+ * 5. Strict file system permissions (0600).
  */
 export class FileSecretStorage implements SecretStorage {
   private readonly secretFilePath: string;
-  private readonly encryptionKey: Buffer;
+  private encryptionKey: Buffer | null = null;
+  private readonly serviceName: string;
+  private initPromise: Promise<void> | null = null;
 
   constructor(serviceName: string) {
     const configDir = path.join(homedir(), GEMINI_DIR);
-    // Sanitize service name for filename
     const sanitizedService = serviceName.replace(/[^a-zA-Z0-9-_.]/g, '_');
     this.secretFilePath = path.join(
       configDir,
       `secrets-${sanitizedService}.json`,
     );
-    this.encryptionKey = this.deriveEncryptionKey();
+    this.serviceName = serviceName;
   }
 
-  private deriveEncryptionKey(): Buffer {
-    const salt = `${os.hostname()}-${os.userInfo().username}-gemini-cli-secrets`;
-    return crypto.scryptSync('gemini-cli-secrets', salt, 32);
+  private async ensureInitialized(): Promise<void> {
+    if (this.encryptionKey) {
+      return;
+    }
+    if (!this.initPromise) {
+      this.initPromise = (async () => {
+        this.encryptionKey = await this.deriveEncryptionKey();
+      })();
+    }
+    return this.initPromise;
+  }
+
+  /**
+   * Derives a strong encryption key using:
+   * - Machine-specific identifiers (Machine ID, UUIDs)
+   * - User-specific identifiers (Username)
+   * - Optional user-provided master key (GEMINI_MASTER_KEY)
+   */
+  private async deriveEncryptionKey(): Promise<Buffer> {
+    let machineIdentifier = '';
+    try {
+      // Collect multiple hardware-bound identifiers
+      const uuid = await si.uuid();
+      machineIdentifier = [
+        uuid.os,
+        uuid.hardware,
+        os.hostname(),
+        os.userInfo().username,
+      ]
+        .filter(Boolean)
+        .join('-');
+    } catch {
+      // Fallback if systeminformation fails
+      machineIdentifier = `${os.hostname()}-${os.userInfo().username}`;
+    }
+
+    // Allow user to provide extra entropy via environment variable
+    const userSecret = process.env['GEMINI_MASTER_KEY'] || '';
+    const password = `gemini-cli-secret-v1-${this.serviceName}-${userSecret}`;
+    const salt = crypto
+      .createHash('sha256')
+      .update(`salt-${machineIdentifier}`)
+      .digest();
+
+    // Use strong scrypt parameters
+    // N=16384 (cost), r=8 (block size), p=1 (parallelization)
+    return new Promise((resolve, reject) => {
+      crypto.scrypt(
+        password,
+        salt,
+        32,
+        { N: 16384, r: 8, p: 1 },
+        (err, derivedKey) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(derivedKey);
+          }
+        },
+      );
+    });
   }
 
   private encrypt(text: string): string {
+    if (!this.encryptionKey) {
+      throw new Error('Storage not initialized');
+    }
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv('aes-256-gcm', this.encryptionKey, iv);
 
@@ -61,6 +131,9 @@ export class FileSecretStorage implements SecretStorage {
   }
 
   private decrypt(encryptedData: string): string {
+    if (!this.encryptionKey) {
+      throw new Error('Storage not initialized');
+    }
     const parts = encryptedData.split(':');
     if (parts.length !== 3) {
       throw new Error('Invalid encrypted data format');
@@ -89,6 +162,7 @@ export class FileSecretStorage implements SecretStorage {
   }
 
   private async loadSecrets(): Promise<Record<string, string>> {
+    await this.ensureInitialized();
     try {
       const data = await fs.readFile(this.secretFilePath, 'utf-8');
       const decrypted = this.decrypt(data);
@@ -117,13 +191,14 @@ export class FileSecretStorage implements SecretStorage {
         message.includes('Invalid encrypted data format') ||
         message.includes('Unsupported state or unable to authenticate data')
       ) {
-        throw new Error('Secret file corrupted');
+        throw new Error('Secret file corrupted or master key incorrect');
       }
       throw error;
     }
   }
 
   private async saveSecrets(secrets: Record<string, string>): Promise<void> {
+    await this.ensureInitialized();
     await this.ensureDirectoryExists();
 
     const json = JSON.stringify(secrets, null, 2);
