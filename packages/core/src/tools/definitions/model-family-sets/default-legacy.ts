@@ -60,7 +60,7 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
 
   write_file: {
     name: WRITE_FILE_TOOL_NAME,
-    description: `Writes content to a specified file in the local filesystem.
+    description: `Writes content to a specified file in the local filesystem. PREFERRED over shell-based alternatives (heredocs, cat, echo, tee, or scripts) for creating or overwriting files.
 
       The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
     parametersJsonSchema: {
