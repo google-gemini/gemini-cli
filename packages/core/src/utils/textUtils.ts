@@ -82,3 +82,24 @@ export function truncateString(
   }
   return str.slice(0, maxLength) + suffix;
 }
+
+/**
+ * Safely replaces placeholders in a template string with values from a replacements object.
+ * This performs a single-pass replacement to prevent double-interpolation attacks.
+ *
+ * @param template The template string containing {{key}} placeholders.
+ * @param replacements A record of keys to their replacement values.
+ * @returns The resulting string with placeholders replaced.
+ */
+export function safeTemplateReplace(
+  template: string,
+  replacements: Record<string, string>,
+): string {
+  // Regex to match {{key}} in the template string. The regex enforces string naming rules.
+  const placeHolderRegex = /\{\{(\w+)\}\}/g;
+  return template.replace(placeHolderRegex, (match, key) =>
+    Object.prototype.hasOwnProperty.call(replacements, key)
+      ? replacements[key]
+      : match,
+  );
+}

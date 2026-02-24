@@ -36,14 +36,14 @@ export interface ReadFileToolParams {
   file_path: string;
 
   /**
-   * The line number to start reading from (optional)
+   * The line number to start reading from (optional, 1-based)
    */
-  offset?: number;
+  start_line?: number;
 
   /**
-   * The number of lines to read (optional)
+   * The line number to end reading at (optional, 1-based, inclusive)
    */
-  limit?: number;
+  end_line?: number;
 }
 
 class ReadFileToolInvocation extends BaseToolInvocation<
@@ -74,7 +74,12 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   }
 
   override toolLocations(): ToolLocation[] {
-    return [{ path: this.resolvedPath, line: this.params.offset }];
+    return [
+      {
+        path: this.resolvedPath,
+        line: this.params.start_line,
+      },
+    ];
   }
 
   async execute(): Promise<ToolResult> {
@@ -97,8 +102,8 @@ class ReadFileToolInvocation extends BaseToolInvocation<
       this.resolvedPath,
       this.config.getTargetDir(),
       this.config.getFileSystemService(),
-      this.params.offset,
-      this.params.limit,
+      this.params.start_line,
+      this.params.end_line,
     );
 
     if (result.error) {
@@ -116,13 +121,11 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     if (result.isTruncated) {
       const [start, end] = result.linesShown!;
       const total = result.originalLineCount!;
-      const nextOffset = this.params.offset
-        ? this.params.offset + end - start + 1
-        : end;
+
       llmContent = `
 IMPORTANT: The file content has been truncated.
 Status: Showing lines ${start}-${end} of ${total} total lines.
-Action: To read more of the file, you can use the 'offset' and 'limit' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use offset: ${nextOffset}.
+Action: To read more of the file, you can use the 'start_line' and 'end_line' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use start_line: ${end + 1}.
 
 --- FILE CONTENT (truncated) ---
 ${result.llmContent}`;
@@ -207,11 +210,18 @@ export class ReadFileTool extends BaseDeclarativeTool<
       return validationError;
     }
 
-    if (params.offset !== undefined && params.offset < 0) {
-      return 'Offset must be a non-negative number';
+    if (params.start_line !== undefined && params.start_line < 1) {
+      return 'start_line must be at least 1';
     }
-    if (params.limit !== undefined && params.limit <= 0) {
-      return 'Limit must be a positive number';
+    if (params.end_line !== undefined && params.end_line < 1) {
+      return 'end_line must be at least 1';
+    }
+    if (
+      params.start_line !== undefined &&
+      params.end_line !== undefined &&
+      params.start_line > params.end_line
+    ) {
+      return 'start_line cannot be greater than end_line';
     }
 
     const fileFilteringOptions = this.config.getFileFilteringOptions();

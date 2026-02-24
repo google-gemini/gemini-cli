@@ -36,6 +36,11 @@ export interface ToolCallRequestInfo {
   callId: string;
   name: string;
   args: Record<string, unknown>;
+  /**
+   * The original name of the tool requested by the model.
+   * This is used for tail calls to ensure the final response retains the original name.
+   */
+  originalRequestName?: string;
   isClientInitiated: boolean;
   prompt_id: string;
   checkpoint?: string;
@@ -56,6 +61,12 @@ export interface ToolCallResponseInfo {
    * Optional data payload for passing structured information back to the caller.
    */
   data?: Record<string, unknown>;
+}
+
+/** Request to execute another tool immediately after a completed one. */
+export interface TailToolCallRequest {
+  name: string;
+  args: Record<string, unknown>;
 }
 
 export type ValidatingToolCall = {
@@ -86,9 +97,12 @@ export type ErroredToolCall = {
   response: ToolCallResponseInfo;
   tool?: AnyDeclarativeTool;
   durationMs?: number;
+  startTime?: number;
+  endTime?: number;
   outcome?: ToolConfirmationOutcome;
   schedulerId?: string;
   approvalMode?: ApprovalMode;
+  tailToolCallRequest?: TailToolCallRequest;
 };
 
 export type SuccessfulToolCall = {
@@ -98,9 +112,12 @@ export type SuccessfulToolCall = {
   response: ToolCallResponseInfo;
   invocation: AnyToolInvocation;
   durationMs?: number;
+  startTime?: number;
+  endTime?: number;
   outcome?: ToolConfirmationOutcome;
   schedulerId?: string;
   approvalMode?: ApprovalMode;
+  tailToolCallRequest?: TailToolCallRequest;
 };
 
 export type ExecutingToolCall = {
@@ -116,6 +133,7 @@ export type ExecutingToolCall = {
   pid?: number;
   schedulerId?: string;
   approvalMode?: ApprovalMode;
+  tailToolCallRequest?: TailToolCallRequest;
 };
 
 export type CancelledToolCall = {
@@ -125,6 +143,8 @@ export type CancelledToolCall = {
   tool: AnyDeclarativeTool;
   invocation: AnyToolInvocation;
   durationMs?: number;
+  startTime?: number;
+  endTime?: number;
   outcome?: ToolConfirmationOutcome;
   schedulerId?: string;
   approvalMode?: ApprovalMode;
