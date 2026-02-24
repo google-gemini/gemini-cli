@@ -273,9 +273,7 @@ async function initOauthClient(
   } else {
     // In Zed integration, we skip the interactive consent and directly open the browser
     if (!config.getExperimentalZedIntegration()) {
-      const userConsent = await getConsentForOauth(
-        'Code Assist login required.',
-      );
+      const userConsent = await getConsentForOauth('');
       if (!userConsent) {
         throw new FatalCancellationError('Authentication cancelled by user.');
       }
