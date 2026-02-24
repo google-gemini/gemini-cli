@@ -41,15 +41,13 @@ export const QuotaDisplay: React.FC<QuotaDisplayProps> = ({
     critical: QUOTA_USED_CRITICAL_THRESHOLD,
   });
 
-  const resetInfo =
-    !terse && resetTime ? `, ${formatResetTime(resetTime)}` : '';
-
   if (remaining === 0) {
+    const resetMsg = resetTime
+      ? `, resets in ${formatResetTime(resetTime, true)}`
+      : '';
     return (
       <Text color={color}>
-        {terse
-          ? 'Limit reached'
-          : `/stats Limit reached${resetInfo}${!terse && '. /auth to continue.'}`}
+        {terse ? 'Limit reached' : `Limit reached${resetMsg}`}
       </Text>
     );
   }
@@ -58,7 +56,9 @@ export const QuotaDisplay: React.FC<QuotaDisplayProps> = ({
     <Text color={color}>
       {terse
         ? `${usedPercentage.toFixed(0)}%`
-        : `/stats ${usedPercentage.toFixed(0)}% used${resetInfo}`}
+        : `${usedPercentage.toFixed(0)}% used${
+            resetTime ? ` (Limit resets in ${formatResetTime(resetTime)})` : ''
+          }`}
     </Text>
   );
 };

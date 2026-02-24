@@ -41,9 +41,14 @@ export const QuotaStatsInfo: React.FC<QuotaStatsInfoProps> = ({
     <Box flexDirection="column" marginTop={0} marginBottom={0}>
       <Text color={color}>
         {remaining === 0
-          ? `Limit reached`
-          : `${usedPercentage.toFixed(0)}% used`}
-        {resetTime && `, ${formatResetTime(resetTime)}`}
+          ? `Limit reached${
+              resetTime ? `, resets in ${formatResetTime(resetTime, true)}` : ''
+            }`
+          : `${usedPercentage.toFixed(0)}% used${
+              resetTime
+                ? ` (Limit resets in ${formatResetTime(resetTime)})`
+                : ''
+            }`}
       </Text>
       {showDetails && (
         <>

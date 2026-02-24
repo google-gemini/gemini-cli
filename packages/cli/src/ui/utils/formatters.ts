@@ -98,26 +98,38 @@ export function stripReferenceContent(text: string): string {
   return text.replace(pattern, '').trim();
 }
 
-export const formatResetTime = (resetTime: string): string => {
-  const diff = new Date(resetTime).getTime() - Date.now();
+export const formatResetTime = (resetTime: string, terse = false): string => {
+  const resetDate = new Date(resetTime);
+  const diff = resetDate.getTime() - Date.now();
   if (diff <= 0) return '';
 
   const totalMinutes = Math.ceil(diff / (1000 * 60));
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
 
-  const fmt = (val: number, unit: 'hour' | 'minute') =>
-    new Intl.NumberFormat('en', {
-      style: 'unit',
-      unit,
-      unitDisplay: 'narrow',
-    }).format(val);
-
-  if (hours > 0 && minutes > 0) {
-    return `resets in ${fmt(hours, 'hour')} ${fmt(minutes, 'minute')}`;
-  } else if (hours > 0) {
-    return `resets in ${fmt(hours, 'hour')}`;
+  if (terse) {
+    const hoursStr = hours > 0 ? `${hours}hr` : '';
+    const minutesStr = minutes > 0 ? `${minutes}m` : '';
+    return hoursStr && minutesStr
+      ? `${hoursStr} ${minutesStr}`
+      : hoursStr || minutesStr;
   }
 
-  return `resets in ${fmt(minutes, 'minute')}`;
+  let duration = '';
+  if (hours > 0) {
+    duration = `${hours} hour${hours > 1 ? 's' : ''}`;
+    if (minutes > 0) {
+      duration += ` ${minutes} minute${minutes > 1 ? 's' : ''}`;
+    }
+  } else {
+    duration = `${minutes} minute${minutes > 1 ? 's' : ''}`;
+  }
+
+  const timeStr = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: 'numeric',
+    timeZoneName: 'short',
+  }).format(resetDate);
+
+  return `${duration} at ${timeStr}`;
 };

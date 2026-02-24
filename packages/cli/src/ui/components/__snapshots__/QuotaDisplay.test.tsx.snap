@@ -6,7 +6,7 @@ exports[`QuotaDisplay > should NOT render reset time when terse is true 1`] = `
 `;
 
 exports[`QuotaDisplay > should render critical when used >= 95% 1`] = `
-"/stats 96% used
+"96% used
 "
 `;
 
@@ -16,11 +16,11 @@ exports[`QuotaDisplay > should render terse limit reached message 1`] = `
 `;
 
 exports[`QuotaDisplay > should render warning when used >= 80% 1`] = `
-"/stats 85% used
+"85% used
 "
 `;
 
 exports[`QuotaDisplay > should render with reset time when provided 1`] = `
-"/stats 85% used, resets in 1h
+"85% used (Limit resets in 1 hour at 9:29 PM PST)
 "
 `;
