@@ -154,7 +154,7 @@ const LINTERS = {
   yamllint: {
     check: yamllintCheck,
     installer: yamllintInstaller,
-    run: "git ls-files | grep -E '\\.(yaml|yml)' | xargs yamllint --format github",
+    run: "git ls-files '*.yml' '*.yaml' | xargs -r yamllint --format github",
   },
 };
 
