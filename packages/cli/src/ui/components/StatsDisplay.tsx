@@ -173,13 +173,17 @@ const ModelUsageTable: React.FC<{
   const outputTokensWidth = 15;
   const usageLimitWidth = showQuotaColumn ? 85 : 0;
 
-  const renderProgressBar = (usedFraction: number, color?: string) => {
+  const renderProgressBar = (
+    usedFraction: number,
+    color?: string,
+    hasUsage = false,
+  ) => {
     const totalSteps = 20;
     let filledSteps = Math.round(usedFraction * totalSteps);
 
-    // If something is used but < 5%, show 1 tick.
-    // If < 100% but rounding to 20, show 19 ticks.
-    if (usedFraction > 0 && usedFraction < 1) {
+    // If something is used (fraction > 0 OR hasUsage is true) but rounds to 0, show 1 tick.
+    // If < 100% (fraction < 1) but rounds to 20, show 19 ticks.
+    if ((usedFraction > 0 || hasUsage) && usedFraction < 1) {
       filledSteps = Math.min(Math.max(filledSteps, 1), totalSteps - 1);
     }
 
@@ -189,7 +193,7 @@ const ModelUsageTable: React.FC<{
         <Text color={color ?? theme.text.primary}>
           {'▬'.repeat(filledSteps)}
         </Text>
-        <Text color={theme.text.secondary}>{'▬'.repeat(emptySteps)}</Text>
+        <Text color={theme.border.default}>{'▬'.repeat(emptySteps)}</Text>
       </Box>
     );
   };
@@ -397,6 +401,7 @@ const ModelUsageTable: React.FC<{
                         critical: QUOTA_USED_CRITICAL_THRESHOLD,
                       },
                     ),
+                    typeof row.requests === 'number' && row.requests > 0,
                   )}
                 <Box marginLeft={1}>
                   <Text wrap="truncate-end">
