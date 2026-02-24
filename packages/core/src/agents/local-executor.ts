@@ -33,6 +33,7 @@ import {
 import {
   AgentStartEvent,
   AgentFinishEvent,
+  LlmRole,
   RecoveryAttemptEvent,
 } from '../telemetry/types.js';
 import type {
@@ -47,6 +48,7 @@ import {
   DEFAULT_MAX_TURNS,
   DEFAULT_MAX_TIME_MINUTES,
 } from './types.js';
+import { getErrorMessage } from '../utils/errors.js';
 import { templateString } from './utils.js';
 import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
@@ -59,7 +61,6 @@ import { getVersion } from '../utils/version.js';
 import { getToolCallContext } from '../utils/toolCallContext.js';
 import { scheduleAgentTools } from './agent-scheduler.js';
 import { DeadlineTimer } from '../utils/deadlineTimer.js';
-import { LlmRole } from '../telemetry/types.js';
 import { formatUserHintsForModel } from '../utils/fastAckHelper.js';
 
 /** A callback function to report on agent activity. */
@@ -826,16 +827,19 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         systemInstruction,
         [{ functionDeclarations: tools }],
         startHistory,
+        undefined,
+        undefined,
+        'subagent',
       );
-    } catch (error) {
+    } catch (e: unknown) {
       await reportError(
-        error,
+        e,
         `Error initializing Gemini chat for agent ${this.definition.name}.`,
         startHistory,
         'startChat',
       );
       // Re-throw as a more specific error after reporting.
-      throw new Error(`Failed to create chat object: ${error}`);
+      throw new Error(`Failed to create chat object: ${getErrorMessage(e)}`);
     }
   }
 
@@ -925,6 +929,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
               continue;
             }
 
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             const validatedOutput = validationResult.data;
             if (this.definition.processOutput) {
               submittedOutput = this.definition.processOutput(validatedOutput);

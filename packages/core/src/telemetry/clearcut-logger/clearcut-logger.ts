@@ -115,6 +115,8 @@ export enum EventNames {
   TOOL_OUTPUT_MASKING = 'tool_output_masking',
   KEYCHAIN_AVAILABILITY = 'keychain_availability',
   TOKEN_STORAGE_INITIALIZATION = 'token_storage_initialization',
+  CONSECA_POLICY_GENERATION = 'conseca_policy_generation',
+  CONSECA_VERDICT = 'conseca_verdict',
 }
 
 export interface LogResponse {
@@ -716,6 +718,7 @@ export class ClearcutLogger {
         event.function_name === ASK_USER_TOOL_NAME &&
         event.metadata['ask_user']
       ) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const askUser = event.metadata['ask_user'];
         const askUserMapping: { [key: string]: EventMetadataKey } = {
           question_types: EventMetadataKey.GEMINI_CLI_ASK_USER_QUESTION_TYPES,
