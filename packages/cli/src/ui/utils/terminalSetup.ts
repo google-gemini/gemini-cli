@@ -400,7 +400,7 @@ export async function shouldPromptForTerminalSetup(): Promise<boolean> {
   try {
     const content = await fs.readFile(keybindingsFile, 'utf8');
     const cleanContent = stripJsonComments(content);
-    const parsedContent = JSON.parse(cleanContent);
+    const parsedContent: unknown = JSON.parse(cleanContent) as unknown;
 
     if (!Array.isArray(parsedContent)) {
       return true;
