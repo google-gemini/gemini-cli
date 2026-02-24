@@ -131,7 +131,7 @@ export class A2AClientManager {
   async *sendMessageStream(
     agentName: string,
     message: string,
-    options?: { contextId?: string; taskId?: string },
+    options?: { contextId?: string; taskId?: string; signal?: AbortSignal },
   ): AsyncIterable<SendMessageResult> {
     const client = this.clients.get(agentName);
     if (!client) {
@@ -150,7 +150,9 @@ export class A2AClientManager {
     };
 
     try {
-      yield* client.sendMessageStream(messageParams);
+      yield* client.sendMessageStream(messageParams, {
+        signal: options?.signal,
+      });
     } catch (error: unknown) {
       const prefix = `[A2AClientManager] sendMessageStream Error [${agentName}]`;
       if (error instanceof Error) {

@@ -128,6 +128,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     // 1. Ensure the agent is loaded (cached by manager)
     // We assume the user has provided an access token via some mechanism (TODO),
     // or we rely on ADC.
+    const reassembler = new A2AResultReassembler();
     try {
       const priorState = RemoteAgentInvocation.sessionState.get(
         this.definition.name,
@@ -153,10 +154,10 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         {
           contextId: this.contextId,
           taskId: this.taskId,
+          signal: _signal,
         },
       );
 
-      const reassembler = new A2AResultReassembler();
       let finalResponse: SendMessageResult | undefined;
 
       for await (const chunk of stream) {
@@ -180,21 +181,12 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
           this.contextId = newContextId;
         }
 
-        if (clearTaskId) {
-          this.taskId = undefined;
-        } else if (newTaskId) {
-          this.taskId = newTaskId;
-        }
+        this.taskId = clearTaskId ? undefined : (newTaskId ?? this.taskId);
       }
 
       if (!finalResponse) {
         throw new Error('No response from remote agent.');
       }
-
-      RemoteAgentInvocation.sessionState.set(this.definition.name, {
-        contextId: this.contextId,
-        taskId: this.taskId,
-      });
 
       const finalOutput = reassembler.toString();
 
@@ -207,12 +199,22 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         returnDisplay: finalOutput,
       };
     } catch (error: unknown) {
+      const partialOutput = reassembler.toString();
       const errorMessage = `Error calling remote agent: ${error instanceof Error ? error.message : String(error)}`;
+      const fullDisplay = partialOutput
+        ? `${partialOutput}\n\n${errorMessage}`
+        : errorMessage;
       return {
-        llmContent: [{ text: errorMessage }],
-        returnDisplay: errorMessage,
+        llmContent: [{ text: fullDisplay }],
+        returnDisplay: fullDisplay,
         error: { message: errorMessage },
       };
+    } finally {
+      // Persist state even on partial failures or aborts to maintain conversational continuity.
+      RemoteAgentInvocation.sessionState.set(this.definition.name, {
+        contextId: this.contextId,
+        taskId: this.taskId,
+      });
     }
   }
 }

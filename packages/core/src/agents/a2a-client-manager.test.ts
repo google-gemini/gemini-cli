@@ -207,6 +207,7 @@ describe('A2AClientManager', () => {
         expect.objectContaining({
           message: expect.anything(),
         }),
+        expect.any(Object),
       );
     });
 

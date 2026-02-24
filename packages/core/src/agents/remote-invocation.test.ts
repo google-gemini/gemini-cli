@@ -102,7 +102,7 @@ describe('RemoteAgentInvocation', () => {
       expect(mockClientManager.sendMessageStream).toHaveBeenCalledWith(
         'test-agent',
         'Get Started!',
-        expect.any(Object),
+        expect.objectContaining({ signal: expect.any(Object) }),
       );
     });
 
@@ -206,7 +206,7 @@ describe('RemoteAgentInvocation', () => {
       expect(mockClientManager.sendMessageStream).toHaveBeenLastCalledWith(
         'test-agent',
         'first',
-        { contextId: undefined, taskId: undefined },
+        { contextId: undefined, taskId: undefined, signal: expect.any(Object) },
       );
 
       // Prepare for second call with simulated state persistence
@@ -236,7 +236,7 @@ describe('RemoteAgentInvocation', () => {
       expect(mockClientManager.sendMessageStream).toHaveBeenLastCalledWith(
         'test-agent',
         'second',
-        { contextId: 'ctx-1', taskId: 'task-1' }, // Used state from first call
+        { contextId: 'ctx-1', taskId: 'task-1', signal: expect.any(Object) }, // Used state from first call
       );
 
       // Third call: Task completes
@@ -286,7 +286,7 @@ describe('RemoteAgentInvocation', () => {
       expect(mockClientManager.sendMessageStream).toHaveBeenLastCalledWith(
         'test-agent',
         'fourth',
-        { contextId: 'ctx-1', taskId: undefined }, // taskId cleared!
+        { contextId: 'ctx-1', taskId: undefined, signal: expect.any(Object) }, // taskId cleared!
       );
     });
 
@@ -318,7 +318,7 @@ describe('RemoteAgentInvocation', () => {
       await invocation.execute(new AbortController().signal, updateOutput);
 
       expect(updateOutput).toHaveBeenCalledWith('Hello');
-      expect(updateOutput).toHaveBeenCalledWith('Hello World');
+      expect(updateOutput).toHaveBeenCalledWith('Hello\n\nHello World');
     });
 
     it('should abort when signal is aborted during streaming', async () => {
@@ -447,8 +447,8 @@ describe('RemoteAgentInvocation', () => {
       );
 
       expect(updateOutput).toHaveBeenCalledWith('Thinking...');
-      expect(updateOutput).toHaveBeenCalledWith('Final Answer');
-      expect(result.returnDisplay).toBe('Final Answer');
+      expect(updateOutput).toHaveBeenCalledWith('Thinking...\n\nFinal Answer');
+      expect(result.returnDisplay).toBe('Thinking...\n\nFinal Answer');
     });
 
     it('should handle artifact reassembly with append: true', async () => {
@@ -502,7 +502,7 @@ describe('RemoteAgentInvocation', () => {
         'Generating...\n\nArtifact (Result):\nPart 1',
       );
       expect(updateOutput).toHaveBeenCalledWith(
-        'Generating...\n\nArtifact (Result):\nPart 1\n Part 2',
+        'Generating...\n\nArtifact (Result):\nPart 1 Part 2',
       );
     });
   });

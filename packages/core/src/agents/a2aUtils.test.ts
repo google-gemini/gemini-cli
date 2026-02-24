@@ -7,12 +7,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   extractMessageText,
-  extractTaskText,
   extractIdsFromResponse,
-  getDelta,
   isTerminalState,
-  extractAnyText,
+  A2AResultReassembler,
 } from './a2aUtils.js';
+import type { SendMessageResult } from './a2a-client-manager.js';
 import type {
   Message,
   Task,
@@ -24,24 +23,6 @@ import type {
 } from '@a2a-js/sdk';
 
 describe('a2aUtils', () => {
-  describe('getDelta', () => {
-    it('should return the full string if previous is empty', () => {
-      expect(getDelta('hello', '')).toBe('hello');
-    });
-
-    it('should return the delta if current starts with previous', () => {
-      expect(getDelta('hello world', 'hello')).toBe(' world');
-    });
-
-    it('should return the full current string if it does not start with previous', () => {
-      expect(getDelta('world', 'hello')).toBe('world');
-    });
-
-    it('should return an empty string if current is same as previous', () => {
-      expect(getDelta('hello', 'hello')).toBe('');
-    });
-  });
-
   describe('isTerminalState', () => {
     it('should return true for completed, failed, canceled, and rejected', () => {
       expect(isTerminalState('completed')).toBe(true);
@@ -161,70 +142,6 @@ describe('a2aUtils', () => {
     });
   });
 
-  describe('extractAnyText', () => {
-    it('should extract text from message', () => {
-      const message: Message = {
-        kind: 'message',
-        role: 'agent',
-        messageId: 'm1',
-        parts: [{ kind: 'text', text: 'hello' } as TextPart],
-      };
-      expect(extractAnyText(message)).toBe('hello');
-    });
-
-    it('should extract text from task status message', () => {
-      const task: Task = {
-        id: 't1',
-        contextId: 'ctx-1',
-        kind: 'task',
-        status: {
-          state: 'working',
-          message: {
-            kind: 'message',
-            role: 'agent',
-            messageId: 'm2',
-            parts: [{ kind: 'text', text: 'working...' } as TextPart],
-          },
-        },
-      };
-      expect(extractAnyText(task)).toBe('working...');
-    });
-
-    it('should extract text from status update event', () => {
-      const update = {
-        kind: 'status-update',
-        taskId: 'task-1',
-        contextId: 'ctx-1',
-        final: false,
-        status: {
-          state: 'working',
-          message: {
-            kind: 'message',
-            role: 'agent',
-            messageId: 'm3',
-            parts: [{ kind: 'text', text: 'update' } as TextPart],
-          },
-        },
-      };
-      expect(extractAnyText(update as unknown as TaskStatusUpdateEvent)).toBe(
-        'update',
-      );
-    });
-
-    it('should extract text from artifact-update event', () => {
-      const update = {
-        kind: 'artifact-update',
-        taskId: 'task-1',
-        contextId: 'ctx-1',
-        artifact: {
-          artifactId: 'art-1',
-          parts: [{ kind: 'text', text: 'artifact content' } as TextPart],
-        },
-      } as unknown as TaskArtifactUpdateEvent;
-      expect(extractAnyText(update)).toBe('artifact content');
-    });
-  });
-
   describe('extractMessageText', () => {
     it('should extract text from simple text parts', () => {
       const message: Message = {
@@ -307,49 +224,65 @@ describe('a2aUtils', () => {
     });
   });
 
-  describe('extractTaskText', () => {
-    it('should extract basic task info (clean)', () => {
-      const task: Task = {
-        id: 'task-1',
-        contextId: 'ctx-1',
-        kind: 'task',
+  describe('A2AResultReassembler', () => {
+    it('should reassemble sequential messages and incremental artifacts', () => {
+      const reassembler = new A2AResultReassembler();
+
+      // 1. Initial status
+      reassembler.update({
+        kind: 'status-update',
+        taskId: 't1',
         status: {
           state: 'working',
           message: {
             kind: 'message',
             role: 'agent',
-            messageId: 'm1',
-            parts: [{ kind: 'text', text: 'Processing...' } as TextPart],
-          },
+            parts: [{ kind: 'text', text: 'Analyzing...' }],
+          } as Message,
         },
-      };
+      } as unknown as SendMessageResult);
 
-      const result = extractTaskText(task);
-      expect(result).not.toContain('ID: task-1');
-      expect(result).not.toContain('State: working');
-      expect(result).toBe('Processing...');
-    });
+      // 2. First artifact chunk
+      reassembler.update({
+        kind: 'artifact-update',
+        taskId: 't1',
+        append: false,
+        artifact: {
+          artifactId: 'a1',
+          name: 'Code',
+          parts: [{ kind: 'text', text: 'print(' }],
+        },
+      } as unknown as SendMessageResult);
 
-    it('should extract artifacts with headers', () => {
-      const task: Task = {
-        id: 'task-1',
-        contextId: 'ctx-1',
-        kind: 'task',
-        status: { state: 'completed' },
-        artifacts: [
-          {
-            artifactId: 'art-1',
-            name: 'Report',
-            parts: [{ kind: 'text', text: 'This is the report.' } as TextPart],
-          },
-        ],
-      };
+      // 3. Second status
+      reassembler.update({
+        kind: 'status-update',
+        taskId: 't1',
+        status: {
+          state: 'working',
+          message: {
+            kind: 'message',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Processing...' }],
+          } as Message,
+        },
+      } as unknown as SendMessageResult);
 
-      const result = extractTaskText(task);
-      expect(result).toContain('Artifact (Report):');
-      expect(result).toContain('This is the report.');
-      expect(result).not.toContain('Artifacts:');
-      expect(result).not.toContain('  - Name: Report');
+      // 4. Second artifact chunk (append)
+      reassembler.update({
+        kind: 'artifact-update',
+        taskId: 't1',
+        append: true,
+        artifact: {
+          artifactId: 'a1',
+          parts: [{ kind: 'text', text: '"Done")' }],
+        },
+      } as unknown as SendMessageResult);
+
+      const output = reassembler.toString();
+      expect(output).toBe(
+        'Analyzing...\n\nProcessing...\n\nArtifact (Code):\nprint("Done")',
+      );
     });
   });
 });

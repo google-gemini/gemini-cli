@@ -6,7 +6,6 @@
 
 import type {
   Message,
-  Task,
   Part,
   TextPart,
   DataPart,
@@ -19,11 +18,12 @@ import type { SendMessageResult } from './a2a-client-manager.js';
 
 /**
  * Reassembles incremental A2A streaming updates into a coherent result.
- * Handles status message replacement and artifact accumulation/appending.
+ * Shows sequential status/messages followed by all reassembled artifacts.
  */
 export class A2AResultReassembler {
-  private statusMessage = '';
+  private messageLog: string[] = [];
   private artifacts = new Map<string, Artifact>();
+  private artifactChunks = new Map<string, string[]>();
 
   /**
    * Processes a new chunk from the A2A stream.
@@ -33,50 +33,64 @@ export class A2AResultReassembler {
 
     switch (chunk.kind) {
       case 'status-update':
-        if (chunk.status?.message) {
-          this.statusMessage = extractMessageText(chunk.status.message);
-        }
+        this.pushMessage(chunk.status?.message);
         break;
 
       case 'artifact-update':
         if (chunk.artifact) {
           const id = chunk.artifact.artifactId;
           const existing = this.artifacts.get(id);
+
           if (chunk.append && existing) {
-            existing.parts = existing.parts.concat(
-              structuredClone(chunk.artifact.parts),
-            );
+            for (const part of chunk.artifact.parts) {
+              existing.parts.push(structuredClone(part));
+            }
           } else {
-            this.artifacts.set(id, {
-              ...chunk.artifact,
-              parts: structuredClone(chunk.artifact.parts),
-            });
+            this.artifacts.set(id, structuredClone(chunk.artifact));
+          }
+
+          const newText = extractPartsText(chunk.artifact.parts, '');
+          let chunks = this.artifactChunks.get(id);
+          if (!chunks) {
+            chunks = [];
+            this.artifactChunks.set(id, chunks);
+          }
+          if (chunk.append) {
+            chunks.push(newText);
+          } else {
+            chunks.length = 0;
+            chunks.push(newText);
           }
         }
         break;
 
       case 'task':
-        if (chunk.status?.message) {
-          this.statusMessage = extractMessageText(chunk.status.message);
-        }
+        this.pushMessage(chunk.status?.message);
         if (chunk.artifacts) {
           for (const art of chunk.artifacts) {
-            this.artifacts.set(art.artifactId, {
-              ...art,
-              parts: structuredClone(art.parts),
-            });
+            this.artifacts.set(art.artifactId, structuredClone(art));
+            this.artifactChunks.set(art.artifactId, [
+              extractPartsText(art.parts, ''),
+            ]);
           }
         }
         break;
 
-      case 'message':
-        // A direct message is treated as a final status update for display purposes
-        this.statusMessage = extractMessageText(chunk);
+      case 'message': {
+        this.pushMessage(chunk);
         break;
+      }
 
       default:
-        // Ignore other chunk types
         break;
+    }
+  }
+
+  private pushMessage(message: Message | undefined) {
+    if (!message) return;
+    const text = extractPartsText(message.parts, '\n');
+    if (text && this.messageLog[this.messageLog.length - 1] !== text) {
+      this.messageLog.push(text);
     }
   }
 
@@ -84,23 +98,26 @@ export class A2AResultReassembler {
    * Returns a human-readable string representation of the current reassembled state.
    */
   toString(): string {
-    const parts: string[] = [];
+    const joinedMessages = this.messageLog.join('\n\n');
 
-    if (this.statusMessage) {
-      parts.push(this.statusMessage);
-    }
-
-    for (const artifact of this.artifacts.values()) {
-      const content = extractPartsText(artifact.parts);
-      if (content) {
+    const artifactsOutput = Array.from(this.artifacts.keys())
+      .map((id) => {
+        const chunks = this.artifactChunks.get(id);
+        const artifact = this.artifacts.get(id);
+        if (!chunks || !artifact) return '';
+        const content = chunks.join('');
         const header = artifact.name
           ? `Artifact (${artifact.name}):`
           : 'Artifact:';
-        parts.push(`${header}\n${content}`);
-      }
-    }
+        return `${header}\n${content}`;
+      })
+      .filter(Boolean)
+      .join('\n\n');
 
-    return parts.join('\n\n');
+    if (joinedMessages && artifactsOutput) {
+      return `${joinedMessages}\n\n${artifactsOutput}`;
+    }
+    return joinedMessages || artifactsOutput;
   }
 }
 
@@ -113,7 +130,23 @@ export function extractMessageText(message: Message | undefined): string {
     return '';
   }
 
-  return extractPartsText(message.parts);
+  return extractPartsText(message.parts, '\n');
+}
+
+/**
+ * Extracts text from an array of parts, joining them with the specified separator.
+ */
+function extractPartsText(
+  parts: Part[] | undefined,
+  separator: string,
+): string {
+  if (!parts || parts.length === 0) {
+    return '';
+  }
+  return parts
+    .map((p) => extractPartText(p))
+    .filter(Boolean)
+    .join(separator);
 }
 
 /**
@@ -141,50 +174,6 @@ export function extractPartText(part: Part): string {
   }
 
   return '';
-}
-
-/**
- * Extracts a clean, human-readable text summary from a Task object.
- * Includes the status message and any artifact content with context headers.
- * Technical metadata like ID and State are omitted for better clarity and token efficiency.
- */
-export function extractTaskText(task: Task): string {
-  const parts: string[] = [];
-
-  // Status Message
-  const statusMessageText = extractMessageText(task.status?.message);
-  if (statusMessageText) {
-    parts.push(statusMessageText);
-  }
-
-  // Artifacts
-  if (task.artifacts) {
-    for (const artifact of task.artifacts) {
-      const artifactContent = extractPartsText(artifact.parts);
-
-      if (artifactContent) {
-        const header = artifact.name
-          ? `Artifact (${artifact.name}):`
-          : 'Artifact:';
-        parts.push(`${header}\n${artifactContent}`);
-      }
-    }
-  }
-
-  return parts.join('\n\n');
-}
-
-/**
- * Extracts text from an array of parts.
- */
-function extractPartsText(parts: Part[] | undefined): string {
-  if (!parts || parts.length === 0) {
-    return '';
-  }
-  return parts
-    .map((p) => extractPartText(p))
-    .filter(Boolean)
-    .join('\n');
 }
 
 // Type Guards
@@ -246,46 +235,13 @@ export function extractIdsFromResponse(result: SendMessageResult): {
     } else if (isStatusUpdateEvent(result)) {
       taskId = result.taskId;
       contextId = result.contextId;
-      // Also check for 'final' flag if present in the event
-      if (result.final || isTerminalState(result.status?.state)) {
+      // Note: We ignore the 'final' flag here per A2A protocol best practices,
+      // as a stream can close while a task is still in a 'working' state.
+      if (isTerminalState(result.status?.state)) {
         clearTaskId = true;
       }
     }
   }
 
   return { contextId, taskId, clearTaskId };
-}
-
-/**
- * Extracts a human-readable text representation from a Message, Task, or Update response.
- */
-export function extractAnyText(result: SendMessageResult): string {
-  if ('kind' in result) {
-    const kind = result.kind;
-    if (kind === 'message') {
-      return extractMessageText(result);
-    }
-    if (kind === 'task') {
-      return extractTaskText(result);
-    }
-    if (kind === 'artifact-update' && 'artifact' in result) {
-      return extractPartsText(result.artifact.parts);
-    }
-    if (isStatusUpdateEvent(result) && result.status?.message) {
-      return extractMessageText(result.status.message);
-    }
-  }
-
-  return '';
-}
-
-/**
- * Calculates the delta between the current text and the previous text.
- * Returns the delta if current starts with previous, otherwise returns current.
- */
-export function getDelta(current: string, previous: string): string {
-  if (current.startsWith(previous)) {
-    return current.slice(previous.length);
-  }
-  return current;
 }
