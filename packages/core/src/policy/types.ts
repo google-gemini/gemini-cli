@@ -78,6 +78,7 @@ export interface ExternalCheckerConfig {
 
 export enum InProcessCheckerType {
   ALLOWED_PATH = 'allowed-path',
+  CONSECA = 'conseca',
 }
 
 /**
