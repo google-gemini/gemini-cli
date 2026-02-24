@@ -29,6 +29,7 @@ import type {
 } from '../../config/trustedFolders.js';
 import type * as fs from 'node:fs/promises';
 import type { Stats } from 'node:fs';
+import * as path from 'node:path';
 
 const mockInstallOrUpdateExtension: Mock<
   typeof ExtensionManager.prototype.installOrUpdateExtension
@@ -265,7 +266,7 @@ describe('handleInstall', () => {
     );
     mockStat.mockResolvedValue({} as Stats);
     await handleInstall({
-      source: '/some/path',
+      source: path.join('/', 'some', 'path'),
     });
 
     expect(debugLogSpy).toHaveBeenCalledWith(
@@ -294,7 +295,7 @@ describe('handleInstall', () => {
     mockIsWorkspaceTrusted.mockReturnValue({ isTrusted: true, source: 'file' });
 
     await handleInstall({
-      source: '/some/path',
+      source: path.join('/', 'some', 'path'),
     });
 
     expect(mockIsWorkspaceTrusted).toHaveBeenCalled();
@@ -326,13 +327,13 @@ describe('handleInstall', () => {
     });
 
     await handleInstall({
-      source: '/untrusted/path',
+      source: path.join('/', 'untrusted', 'path'),
     });
 
     expect(mockIsWorkspaceTrusted).toHaveBeenCalled();
     expect(mockPromptForConsentNonInteractive).toHaveBeenCalled();
     expect(mockSetValue).toHaveBeenCalledWith(
-      expect.stringContaining('untrusted/path'),
+      expect.stringContaining(path.join('untrusted', 'path')),
       'TRUST_FOLDER',
     );
     expect(debugLogSpy).toHaveBeenCalledWith(
@@ -349,7 +350,7 @@ describe('handleInstall', () => {
     mockPromptForConsentNonInteractive.mockResolvedValue(false);
 
     await handleInstall({
-      source: '/evil/path',
+      source: path.join('/', 'evil', 'path'),
     });
 
     expect(mockIsWorkspaceTrusted).toHaveBeenCalled();

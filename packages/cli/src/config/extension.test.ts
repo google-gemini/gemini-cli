@@ -1075,9 +1075,7 @@ describe('extension tests', () => {
           source: sourceExtDir,
           type: 'local',
         }),
-      ).rejects.toThrow(
-        new RegExp(`Failed to load extension config from ${configPath}`),
-      );
+      ).rejects.toThrow(`Failed to load extension config from ${configPath}`);
     });
 
     it('should throw an error for missing name in gemini-extension.json', async () => {
