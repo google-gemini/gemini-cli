@@ -171,6 +171,11 @@ export const DebugProfiler = () => {
       appEvents.on(eventName, handler);
     }
 
+    // Register handlers for extension lifecycle events emitted on coreEvents
+    // but not part of the CoreEvent enum, to prevent false-positive idle warnings.
+    coreEvents.on('extensionsStarting', handler);
+    coreEvents.on('extensionsStopping', handler);
+
     return () => {
       stdin.off('data', handler);
       stdout.off('resize', handler);
@@ -182,6 +187,9 @@ export const DebugProfiler = () => {
       for (const eventName of Object.values(AppEvent)) {
         appEvents.off(eventName, handler);
       }
+
+      coreEvents.off('extensionsStarting', handler);
+      coreEvents.off('extensionsStopping', handler);
 
       profiler.profilersActive--;
     };
