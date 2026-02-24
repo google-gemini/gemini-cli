@@ -41,9 +41,11 @@ export function useAnimatedScrollbar(
     debugState.debugNumAnimatedComponents++;
     isAnimatingRef.current = true;
 
-    const fadeInDuration = 200;
-    const visibleDuration = 1000;
-    const fadeOutDuration = 300;
+    const isTest =
+      typeof process !== 'undefined' && process.env['NODE_ENV'] === 'test';
+    const fadeInDuration = isTest ? 0 : 200;
+    const visibleDuration = isTest ? 0 : 1000;
+    const fadeOutDuration = isTest ? 0 : 300;
 
     const focusedColor = theme.text.secondary;
     const unfocusedColor = theme.ui.dark;
@@ -53,9 +55,17 @@ export function useAnimatedScrollbar(
       return;
     }
 
+    if (isTest) {
+      setScrollbarColor(unfocusedColor);
+      cleanup();
+      return;
+    }
+
     // Phase 1: Fade In
     let start = Date.now();
     const animateFadeIn = () => {
+      if (!isAnimatingRef.current) return;
+
       const elapsed = Date.now() - start;
       const progress = Math.max(0, Math.min(elapsed / fadeInDuration, 1));
 
@@ -72,6 +82,8 @@ export function useAnimatedScrollbar(
           // Phase 3: Fade Out
           start = Date.now();
           const animateFadeOut = () => {
+            if (!isAnimatingRef.current) return;
+
             const elapsed = Date.now() - start;
             const progress = Math.max(
               0,

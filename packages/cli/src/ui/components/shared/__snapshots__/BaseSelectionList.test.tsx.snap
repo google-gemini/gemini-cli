@@ -3,7 +3,8 @@
 exports[`BaseSelectionList > Scroll Arrows (showScrollArrows) > should not show arrows when list fits entirely 1`] = `
 "● 1. Item A
   2. Item B
-  3. Item C"
+  3. Item C
+"
 `;
 
 exports[`BaseSelectionList > Scroll Arrows (showScrollArrows) > should show arrows and correct items when scrolled to the end 1`] = `
@@ -11,7 +12,8 @@ exports[`BaseSelectionList > Scroll Arrows (showScrollArrows) > should show arro
    8. Item 8
    9. Item 9
 ● 10. Item 10
-▼"
+▼
+"
 `;
 
 exports[`BaseSelectionList > Scroll Arrows (showScrollArrows) > should show arrows and correct items when scrolled to the middle 1`] = `
@@ -19,7 +21,8 @@ exports[`BaseSelectionList > Scroll Arrows (showScrollArrows) > should show arro
    4. Item 4
    5. Item 5
 ●  6. Item 6
-▼"
+▼
+"
 `;
 
 exports[`BaseSelectionList > Scroll Arrows (showScrollArrows) > should show arrows with correct colors when enabled (at the top) 1`] = `
@@ -27,5 +30,6 @@ exports[`BaseSelectionList > Scroll Arrows (showScrollArrows) > should show arro
 ●  1. Item 1
    2. Item 2
    3. Item 3
-▼"
+▼
+"
 `;

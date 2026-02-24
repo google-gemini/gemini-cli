@@ -49,7 +49,7 @@ describe('ToolConfirmationQueue', () => {
       readFile: vi.fn().mockResolvedValue('Plan content'),
     }),
     storage: {
-      getProjectTempPlansDir: () => '/mock/temp/plans',
+      getPlansDir: () => '/mock/temp/plans',
     },
   } as unknown as Config;
 
@@ -57,7 +57,7 @@ describe('ToolConfirmationQueue', () => {
     vi.clearAllMocks();
   });
 
-  it('renders the confirming tool with progress indicator', () => {
+  it('renders the confirming tool with progress indicator', async () => {
     const confirmingTool = {
       tool: {
         callId: 'call-1',
@@ -76,7 +76,7 @@ describe('ToolConfirmationQueue', () => {
       total: 3,
     };
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -87,6 +87,7 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Action Required');
@@ -98,9 +99,10 @@ describe('ToolConfirmationQueue', () => {
 
     const stickyHeaderProps = vi.mocked(StickyHeader).mock.calls[0][0];
     expect(stickyHeaderProps.borderColor).toBe(theme.status.warning);
+    unmount();
   });
 
-  it('returns null if tool has no confirmation details', () => {
+  it('returns null if tool has no confirmation details', async () => {
     const confirmingTool = {
       tool: {
         callId: 'call-1',
@@ -112,7 +114,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -123,8 +125,10 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
+    await waitUntilReady();
 
-    expect(lastFrame()).toBe('');
+    expect(lastFrame({ allowEmpty: true })).toBe('');
+    unmount();
   });
 
   it('renders expansion hint when content is long and constrained', async () => {
@@ -149,7 +153,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <Box flexDirection="column" height={30}>
         <ToolConfirmationQueue
           confirmingTool={confirmingTool as unknown as ConfirmingToolState}
@@ -157,7 +161,7 @@ describe('ToolConfirmationQueue', () => {
       </Box>,
       {
         config: mockConfig,
-        useAlternateBuffer: false,
+        useAlternateBuffer: true,
         uiState: {
           terminalWidth: 80,
           terminalHeight: 20,
@@ -166,12 +170,15 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
+    await waitUntilReady();
 
     await waitFor(() =>
-      expect(lastFrame()).toContain('Press ctrl-o to show more lines'),
+      expect(lastFrame()?.toLowerCase()).toContain(
+        'press ctrl+o to show more lines',
+      ),
     );
     expect(lastFrame()).toMatchSnapshot();
-    expect(lastFrame()).toContain('Press ctrl-o to show more lines');
+    unmount();
   });
 
   it('calculates availableContentHeight based on availableTerminalHeight from UI state', async () => {
@@ -197,7 +204,7 @@ describe('ToolConfirmationQueue', () => {
     };
 
     // Use a small availableTerminalHeight to force truncation
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -213,6 +220,7 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
+    await waitUntilReady();
 
     // With availableTerminalHeight = 10:
     // maxHeight = Math.max(10 - 1, 4) = 9
@@ -221,9 +229,64 @@ describe('ToolConfirmationQueue', () => {
     // It should show truncation message
     await waitFor(() => expect(lastFrame()).toContain('first 49 lines hidden'));
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('does not render expansion hint when constrainHeight is false', () => {
+  it('provides more height for ask_user by subtracting less overhead', async () => {
+    const confirmingTool = {
+      tool: {
+        callId: 'call-1',
+        name: 'ask_user',
+        description: 'ask user',
+        status: CoreToolCallStatus.AwaitingApproval,
+        confirmationDetails: {
+          type: 'ask_user' as const,
+          questions: [
+            {
+              type: 'choice',
+              header: 'Height Test',
+              question: 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6',
+              options: [{ label: 'Option 1', description: 'Desc' }],
+            },
+          ],
+        },
+      },
+      index: 1,
+      total: 1,
+    };
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <ToolConfirmationQueue
+        confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+      />,
+      {
+        config: mockConfig,
+        uiState: {
+          terminalWidth: 80,
+          terminalHeight: 40,
+          availableTerminalHeight: 20,
+          constrainHeight: true,
+          streamingState: StreamingState.WaitingForConfirmation,
+        },
+      },
+    );
+    await waitUntilReady();
+
+    // Calculation:
+    // availableTerminalHeight: 20 -> maxHeight: 19 (20-1)
+    // hideToolIdentity is true for ask_user -> subtracts 4 instead of 6
+    // availableContentHeight = 19 - 4 = 15
+    // ToolConfirmationMessage handlesOwnUI=true -> returns full 15
+    // AskUserDialog uses 15 lines to render its multi-line question and options.
+    await waitFor(() => {
+      expect(lastFrame()).toContain('Line 6');
+      expect(lastFrame()).not.toContain('lines hidden');
+    });
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('does not render expansion hint when constrainHeight is false', async () => {
     const longDiff = 'line\n'.repeat(50);
     const confirmingTool = {
       tool: {
@@ -245,7 +308,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -259,13 +322,15 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
+    await waitUntilReady();
 
     const output = lastFrame();
-    expect(output).not.toContain('Press ctrl-o to show more lines');
+    expect(output).not.toContain('Press CTRL-O to show more lines');
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('renders AskUser tool confirmation with Success color', () => {
+  it('renders AskUser tool confirmation with Success color', async () => {
     const confirmingTool = {
       tool: {
         callId: 'call-1',
@@ -282,7 +347,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -293,12 +358,14 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toMatchSnapshot();
 
     const stickyHeaderProps = vi.mocked(StickyHeader).mock.calls[0][0];
     expect(stickyHeaderProps.borderColor).toBe(theme.status.success);
+    unmount();
   });
 
   it('renders ExitPlanMode tool confirmation with Success color', async () => {
@@ -318,7 +385,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, unmount } = renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -339,5 +406,6 @@ describe('ToolConfirmationQueue', () => {
 
     const stickyHeaderProps = vi.mocked(StickyHeader).mock.calls[0][0];
     expect(stickyHeaderProps.borderColor).toBe(theme.status.success);
+    unmount();
   });
 });

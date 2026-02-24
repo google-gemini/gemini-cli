@@ -20,7 +20,7 @@ The most powerful tools for enterprise administration are the system-wide
 settings files. These files allow you to define a baseline configuration
 (`system-defaults.json`) and a set of overrides (`settings.json`) that apply to
 all users on a machine. For a complete overview of configuration options, see
-the [Configuration documentation](../get-started/configuration.md).
+the [Configuration documentation](../reference/configuration.md).
 
 Settings are merged from four files. The precedence order for single-value
 settings (like `theme`) is:
@@ -224,8 +224,8 @@ gemini
 
 You can significantly enhance security by controlling which tools the Gemini
 model can use. This is achieved through the `tools.core` setting and the
-[Policy Engine](../core/policy-engine.md). For a list of available tools, see
-the [Tools reference](../reference/tools.md).
+[Policy Engine](../reference/policy-engine.md). For a list of available tools,
+see the [Tools reference](../reference/tools.md).
 
 ### Allowlisting with `coreTools`
 
@@ -245,8 +245,8 @@ on the approved list.
 
 ### Blocklisting with `excludeTools` (Deprecated)
 
-> **Deprecated:** Use the [Policy Engine](../core/policy-engine.md) for more
-> robust control.
+> **Deprecated:** Use the [Policy Engine](../reference/policy-engine.md) for
+> more robust control.
 
 Alternatively, you can add specific tools that are considered dangerous in your
 environment to a blocklist.

@@ -144,30 +144,28 @@ export function BaseSettingsDialog({
   useEffect(() => {
     const prevItems = prevItemsRef.current;
     if (prevItems !== items) {
-      if (items.length === 0) {
+      const prevActiveItem = prevItems[activeIndex];
+      if (prevActiveItem) {
+        const newIndex = items.findIndex((i) => i.key === prevActiveItem.key);
+        if (newIndex !== -1) {
+          // Item still exists in the filtered list, keep focus on it
+          setActiveIndex(newIndex);
+          // Adjust scroll offset to ensure the item is visible
+          let newScroll = scrollOffset;
+          if (newIndex < scrollOffset) newScroll = newIndex;
+          else if (newIndex >= scrollOffset + maxItemsToShow)
+            newScroll = newIndex - maxItemsToShow + 1;
+
+          const maxScroll = Math.max(0, items.length - maxItemsToShow);
+          setScrollOffset(Math.min(newScroll, maxScroll));
+        } else {
+          // Item was filtered out, reset to the top
+          setActiveIndex(0);
+          setScrollOffset(0);
+        }
+      } else {
         setActiveIndex(0);
         setScrollOffset(0);
-      } else {
-        const prevActiveItem = prevItems[activeIndex];
-        if (prevActiveItem) {
-          const newIndex = items.findIndex((i) => i.key === prevActiveItem.key);
-          if (newIndex !== -1) {
-            // Item still exists in the filtered list, keep focus on it
-            setActiveIndex(newIndex);
-            // Adjust scroll offset to ensure the item is visible
-            let newScroll = scrollOffset;
-            if (newIndex < scrollOffset) newScroll = newIndex;
-            else if (newIndex >= scrollOffset + maxItemsToShow)
-              newScroll = newIndex - maxItemsToShow + 1;
-
-            const maxScroll = Math.max(0, items.length - maxItemsToShow);
-            setScrollOffset(Math.min(newScroll, maxScroll));
-          } else {
-            // Item was filtered out, reset to the top
-            setActiveIndex(0);
-            setScrollOffset(0);
-          }
-        }
       }
       prevItemsRef.current = items;
     }

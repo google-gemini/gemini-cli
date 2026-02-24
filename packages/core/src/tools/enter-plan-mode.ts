@@ -105,7 +105,7 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
         'This will restrict the agent to read-only tools to allow for safe planning.',
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         this.confirmationOutcome = outcome;
-        await this.publishPolicyUpdate(outcome);
+        // Policy updates are now handled centrally by the scheduler
       },
     };
   }

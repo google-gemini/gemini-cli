@@ -132,8 +132,8 @@ for your login page.
 
 ## Next steps
 
-- Explore the [User guides](../cli/index.md#user-guides) for detailed
-  walkthroughs of common tasks.
+- Follow the [File management](../cli/tutorials/file-management.md) guide to
+  start working with your codebase.
 - Follow the [Quickstart](./index.md) to start your first session.
 - See the [Cheatsheet](../cli/cli-reference.md) for a quick reference of
   available commands.

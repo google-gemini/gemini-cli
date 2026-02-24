@@ -7,15 +7,18 @@ exports[`<Checklist /> > renders expanded view correctly 1`] = `
  ✓ Task 1
  » Task 2
  ☐ Task 3
- ✗ Task 4"
+ ✗ Task 4
+"
 `;
 
 exports[`<Checklist /> > renders summary view correctly (collapsed) 1`] = `
 "────────────────────────────────────────────────────────────────────────────────────────────────────
- Test List  1/3 completed (toggle me) » Task 2"
+ Test List  1/3 completed (toggle me) » Task 2
+"
 `;
 
 exports[`<Checklist /> > renders summary view without in-progress item if none exists 1`] = `
 "────────────────────────────────────────────────────────────────────────────────────────────────────
- Test List  1/2 completed"
+ Test List  1/2 completed
+"
 `;

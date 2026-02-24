@@ -47,30 +47,59 @@ export const MainContent = () => {
     pendingHistoryItems,
     mainAreaWidth,
     staticAreaMaxItemHeight,
-    availableTerminalHeight,
     cleanUiDetailsVisible,
   } = uiState;
   const showHeaderDetails = cleanUiDetailsVisible;
 
+  const lastUserPromptIndex = useMemo(() => {
+    for (let i = uiState.history.length - 1; i >= 0; i--) {
+      const type = uiState.history[i].type;
+      if (type === 'user' || type === 'user_shell') {
+        return i;
+      }
+    }
+    return -1;
+  }, [uiState.history]);
+
   const historyItems = useMemo(
     () =>
-      uiState.history.map((h) => (
-        <MemoizedHistoryItemDisplay
-          terminalWidth={mainAreaWidth}
-          availableTerminalHeight={staticAreaMaxItemHeight}
-          availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
-          key={h.id}
-          item={h}
-          isPending={false}
-          commands={uiState.slashCommands}
-        />
-      )),
+      uiState.history.map((h, index) => {
+        const isExpandable = index > lastUserPromptIndex;
+        return (
+          <MemoizedHistoryItemDisplay
+            terminalWidth={mainAreaWidth}
+            availableTerminalHeight={
+              uiState.constrainHeight || !isExpandable
+                ? staticAreaMaxItemHeight
+                : undefined
+            }
+            availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
+            key={h.id}
+            item={h}
+            isPending={false}
+            commands={uiState.slashCommands}
+            isExpandable={isExpandable}
+          />
+        );
+      }),
     [
       uiState.history,
       mainAreaWidth,
       staticAreaMaxItemHeight,
       uiState.slashCommands,
+      uiState.constrainHeight,
+      lastUserPromptIndex,
     ],
+  );
+
+  const staticHistoryItems = useMemo(
+    () => historyItems.slice(0, lastUserPromptIndex + 1),
+    [historyItems, lastUserPromptIndex],
+  );
+
+  const lastResponseHistoryItems = useMemo(
+    () => historyItems.slice(lastUserPromptIndex + 1),
+    [historyItems, lastUserPromptIndex],
   );
 
   const pendingItems = useMemo(
@@ -80,16 +109,12 @@ export const MainContent = () => {
           <HistoryItemDisplay
             key={i}
             availableTerminalHeight={
-              (uiState.constrainHeight && !isAlternateBuffer) ||
-              isAlternateBuffer
-                ? availableTerminalHeight
-                : undefined
+              uiState.constrainHeight ? staticAreaMaxItemHeight : undefined
             }
             terminalWidth={mainAreaWidth}
             item={{ ...item, id: 0 }}
             isPending={true}
-            activeShellPtyId={uiState.activePtyId}
-            embeddedShellFocused={uiState.embeddedShellFocused}
+            isExpandable={true}
           />
         ))}
         {showConfirmationQueue && confirmingTool && (
@@ -100,11 +125,8 @@ export const MainContent = () => {
     [
       pendingHistoryItems,
       uiState.constrainHeight,
-      isAlternateBuffer,
-      availableTerminalHeight,
+      staticAreaMaxItemHeight,
       mainAreaWidth,
-      uiState.activePtyId,
-      uiState.embeddedShellFocused,
       showConfirmationQueue,
       confirmingTool,
     ],
@@ -113,10 +135,14 @@ export const MainContent = () => {
   const virtualizedData = useMemo(
     () => [
       { type: 'header' as const },
-      ...uiState.history.map((item) => ({ type: 'history' as const, item })),
+      ...uiState.history.map((item, index) => ({
+        type: 'history' as const,
+        item,
+        isExpandable: index > lastUserPromptIndex,
+      })),
       { type: 'pending' as const },
     ],
-    [uiState.history],
+    [uiState.history, lastUserPromptIndex],
   );
 
   const renderItem = useCallback(
@@ -133,12 +159,17 @@ export const MainContent = () => {
         return (
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
-            availableTerminalHeight={undefined}
+            availableTerminalHeight={
+              uiState.constrainHeight || !item.isExpandable
+                ? staticAreaMaxItemHeight
+                : undefined
+            }
             availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
             key={item.item.id}
             item={item.item}
             isPending={false}
             commands={uiState.slashCommands}
+            isExpandable={item.isExpandable}
           />
         );
       } else {
@@ -151,6 +182,8 @@ export const MainContent = () => {
       mainAreaWidth,
       uiState.slashCommands,
       pendingItems,
+      uiState.constrainHeight,
+      staticAreaMaxItemHeight,
     ],
   );
 
@@ -180,7 +213,8 @@ export const MainContent = () => {
         key={uiState.historyRemountKey}
         items={[
           <AppHeader key="app-header" version={version} />,
-          ...historyItems,
+          ...staticHistoryItems,
+          ...lastResponseHistoryItems,
         ]}
       >
         {(item) => item}

@@ -38,7 +38,7 @@ import {
 export const GEMINI_3_SET: CoreToolSet = {
   read_file: {
     name: READ_FILE_TOOL_NAME,
-    description: `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
+    description: `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'start_line' and 'end_line' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -46,14 +46,14 @@ export const GEMINI_3_SET: CoreToolSet = {
           description: 'The path to the file to read.',
           type: 'string',
         },
-        offset: {
+        start_line: {
           description:
-            "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
+            'Optional: The 1-based line number to start reading from.',
           type: 'number',
         },
-        limit: {
+        end_line: {
           description:
-            "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
+            'Optional: The 1-based line number to end reading at (inclusive).',
           type: 'number',
         },
       },
@@ -63,18 +63,17 @@ export const GEMINI_3_SET: CoreToolSet = {
 
   write_file: {
     name: WRITE_FILE_TOOL_NAME,
-    description: `Writes content to a specified file in the local filesystem.
-
-      The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
+    description: `Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use '${EDIT_TOOL_NAME}' for targeted edits to large files.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
         file_path: {
-          description: 'The path to the file to write to.',
+          description: 'Path to the file.',
           type: 'string',
         },
         content: {
-          description: 'The content to write to the file.',
+          description:
+            "The complete content to write. Provide the full file; do not use placeholders like '// ... rest of code'.",
           type: 'string',
         },
       },
@@ -132,7 +131,7 @@ export const GEMINI_3_SET: CoreToolSet = {
   grep_search_ripgrep: {
     name: GREP_TOOL_NAME,
     description:
-      'Searches for a regular expression pattern within file contents.',
+      'Searches for a regular expression pattern within file contents. This tool is FAST and optimized, powered by ripgrep. PREFERRED over standard `run_shell_command("grep ...")` due to better performance and automatic output limiting (defaults to 100 matches, but can be increased via `total_max_matches`).',
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -291,18 +290,8 @@ export const GEMINI_3_SET: CoreToolSet = {
 
   replace: {
     name: EDIT_TOOL_NAME,
-    description: `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool to examine the file's current content before attempting a text replacement.
-      
-      The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
-      
-      Expectation for required parameters:
-      1. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
-      2. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic and that \`old_string\` and \`new_string\` are different.
-      3. \`instruction\` is the detailed instruction of what needs to be changed. It is important to Make it specific and detailed so developers or large language models can understand what needs to be changed and perform the changes on their own if necessary. 
-      4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
-      **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.
-      5. Prefer to break down complex and long changes into multiple smaller atomic calls to this tool. Always check the content of the file after changes or not finding a string to match.
-      **Multiple replacements:** Set \`expected_replacements\` to the number of occurrences you want to replace. The tool will replace ALL occurrences that match \`old_string\` exactly. Ensure the number of replacements matches your expectation.`,
+    description: `Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool requires providing significant context around the change to ensure precise targeting.
+The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -311,38 +300,23 @@ export const GEMINI_3_SET: CoreToolSet = {
           type: 'string',
         },
         instruction: {
-          description: `A clear, semantic instruction for the code change, acting as a high-quality prompt for an expert LLM assistant. It must be self-contained and explain the goal of the change.
-
-A good instruction should concisely answer:
-1.  WHY is the change needed? (e.g., "To fix a bug where users can be null...")
-2.  WHERE should the change happen? (e.g., "...in the 'renderUserProfile' function...")
-3.  WHAT is the high-level change? (e.g., "...add a null check for the 'user' object...")
-4.  WHAT is the desired outcome? (e.g., "...so that it displays a loading spinner instead of crashing.")
-
-**GOOD Example:** "In the 'calculateTotal' function, correct the sales tax calculation by updating the 'taxRate' constant from 0.05 to 0.075 to reflect the new regional tax laws."
-
-**BAD Examples:**
-- "Change the text." (Too vague)
-- "Fix the bug." (Doesn't explain the bug or the fix)
-- "Replace the line with this new line." (Brittle, just repeats the other parameters)
-`,
+          description: `A clear, semantic instruction for the code change, acting as a high-quality prompt for an expert LLM assistant. It must be self-contained and explain the goal of the change.`,
           type: 'string',
         },
         old_string: {
           description:
-            'The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
+            'The exact literal text to replace, unescaped. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
           type: 'string',
         },
         new_string: {
           description:
-            'The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
+            "The exact literal text to replace `old_string` with, unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide exact literal code.",
           type: 'string',
         },
-        expected_replacements: {
-          type: 'number',
+        allow_multiple: {
+          type: 'boolean',
           description:
-            'Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.',
-          minimum: 1,
+            'If true, the tool will replace all occurrences of `old_string`. If false (default), it will only succeed if exactly one occurrence is found.',
         },
       },
       required: ['file_path', 'instruction', 'old_string', 'new_string'],
@@ -351,14 +325,14 @@ A good instruction should concisely answer:
 
   google_web_search: {
     name: WEB_SEARCH_TOOL_NAME,
-    description:
-      'Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based on a query.',
+    description: `Performs a grounded Google Search to find information across the internet. Returns a synthesized answer with citations (e.g., [1]) and source URIs. Best for finding up-to-date documentation, troubleshooting obscure errors, or broad research. Use this when you don't have a specific URL. If a search result requires deeper analysis, follow up by using '${WEB_FETCH_TOOL_NAME}' on the provided URI.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'The search query to find information on the web.',
+          description:
+            "The search query. Supports natural language questions (e.g., 'Latest breaking changes in React 19') or specific technical queries.",
         },
       },
       required: ['query'],
@@ -368,13 +342,13 @@ A good instruction should concisely answer:
   web_fetch: {
     name: WEB_FETCH_TOOL_NAME,
     description:
-      "Processes content from URL(s), including local and private network addresses (e.g., localhost), embedded in a prompt. Include up to 20 URLs and instructions (e.g., summarize, extract specific data) directly in the 'prompt' parameter.",
+      "Analyzes and extracts information from up to 20 URLs. Ideal for documentation review, technical research, or reading raw code from GitHub. You can provide specific, complex instructions for the extraction (e.g., 'Summarize the breaking changes'). Provides cited answers based on the content. GitHub 'blob' URLs are automatically converted to raw versions for better processing. Supports HTTP/HTTPS only.",
     parametersJsonSchema: {
       type: 'object',
       properties: {
         prompt: {
           description:
-            'A comprehensive prompt that includes the URL(s) (up to 20) to fetch and specific instructions on how to process their content (e.g., "Summarize https://example.com/article and extract key points from https://another.com/data"). All URLs to be fetched must be valid and complete, starting with "http://" or "https://", and be fully-formed with a valid hostname (e.g., a domain name like "example.com" or an IP address). For example, "https://example.com" is valid, but "example.com" is not.',
+            'A string containing the URL(s) and your specific analysis instructions. Be clear about what information you want to find or summarize. Supports up to 20 URLs.',
           type: 'string',
         },
       },
@@ -454,21 +428,14 @@ Use this tool when the user's query implies needing the content of several files
 
   save_memory: {
     name: MEMORY_TOOL_NAME,
-    description: `
-Saves concise global user context (preferences, facts) for use across ALL workspaces.
-
-### CRITICAL: GLOBAL CONTEXT ONLY
-NEVER save workspace-specific context, local paths, or commands (e.g. "The entry point is src/index.js", "The test command is npm test"). These are local to the current workspace and must NOT be saved globally. EXCLUSIVELY for context relevant across ALL workspaces.
-
-- Use for "Remember X" or clear personal facts.
-- Do NOT use for session context.`,
+    description: `Persists global preferences or facts across ALL future sessions. Use this for recurring instructions like coding styles or tool aliases. Unlike '${WRITE_FILE_TOOL_NAME}', which is for project-specific files, this appends to a global memory file loaded in every workspace. If you are unsure whether a fact should be remembered globally, ask the user first. CRITICAL: Do not use for session-specific context or temporary data.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
         fact: {
           type: 'string',
           description:
-            'The specific fact or piece of information to remember. Should be a clear, self-contained statement.',
+            "A concise, global fact or preference (e.g., 'I prefer using tabs'). Do not include local paths or project-specific names.",
         },
       },
       required: ['fact'],
@@ -611,9 +578,8 @@ The agent did not use the todo list because this task could be completed by a ti
               },
               header: {
                 type: 'string',
-                maxLength: 16,
                 description:
-                  'MUST be 16 characters or fewer or the call will fail. Very short label displayed as a chip/tag. Use abbreviations: "Auth" not "Authentication", "Config" not "Configuration". Examples: "Auth method", "Library", "Approach", "Database".',
+                  'Very short label displayed as a chip/tag. Use abbreviations: "Auth" not "Authentication", "Config" not "Configuration". Examples: "Auth method", "Library", "Approach", "Database".',
               },
               type: {
                 type: 'string',
