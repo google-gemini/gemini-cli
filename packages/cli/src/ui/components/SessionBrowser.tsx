@@ -12,6 +12,7 @@ import { Colors } from '../colors.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   listAgySessions,
   type Config,
@@ -482,9 +483,11 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
     const loadSessions = async () => {
       try {
         const chatsDir = path.join(config.storage.getProjectTempDir(), 'chats');
+        const workspaceUri = pathToFileURL(process.cwd()).toString();
+
         const [sessionData, agyData] = await Promise.all([
           getSessionFiles(chatsDir, config.getSessionId()),
-          listAgySessions(),
+          listAgySessions(workspaceUri),
         ]);
 
         setSessions(sessionData);

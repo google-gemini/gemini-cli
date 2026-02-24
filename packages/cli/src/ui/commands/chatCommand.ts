@@ -7,6 +7,7 @@
 import * as fsPromises from 'node:fs/promises';
 import React from 'react';
 import { Text } from 'ink';
+import { pathToFileURL } from 'node:url';
 import { theme } from '../semantic-colors.js';
 import type { Content, Part } from '@google/genai';
 import type {
@@ -69,8 +70,9 @@ const getSavedChatTags = async (
         : a.mtime.localeCompare(b.mtime),
     );
 
-    // Also look for Antigravity sessions
-    const agySessions = await listAgySessions();
+    // Also look for Antigravity sessions matching the current workspace
+    const workspaceUri = pathToFileURL(process.cwd()).toString();
+    const agySessions = await listAgySessions(workspaceUri);
     for (const agy of agySessions) {
       chatDetails.push({
         name: `agy:${agy.id}`,
