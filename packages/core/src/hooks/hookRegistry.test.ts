@@ -8,13 +8,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import { HookRegistry } from './hookRegistry.js';
 import type { Storage } from '../config/storage.js';
-import type {
- HookDefinition ,
+import {
   ConfigSource,
   HookEventName,
   HookType,
   HOOKS_CONFIG_FIELDS,
-  type CommandHookConfig } from './types.js';
+  type CommandHookConfig,
+  type HookDefinition,
+} from './types.js';
 import type { Config } from '../config/config.js';
 
 // Mock fs
