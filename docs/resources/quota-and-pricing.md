@@ -135,6 +135,18 @@ Flow video editor). These plans do not apply to the API usage which powers the
 Gemini CLI. Supporting these plans is under active consideration for future
 support.
 
+## Check usage and quota
+
+You can check your current token usage and quota information using the
+`/stats model` command. This command provides a snapshot of your current
+session's token usage, as well as your overall quota and usage for the supported
+models.
+
+For more information on the `/stats` command and its subcommands, see the
+[Command Reference](../../reference/commands.md#stats).
+
+A summary of model usage is also presented on exit at the end of a session.
+
 ## Tips to avoid high costs
 
 When using a Pay as you Go API key, be mindful of your usage to avoid unexpected
@@ -151,8 +163,3 @@ costs.
   models directly.
 - Vertex AI: This is the enterprise-grade platform for building, deploying, and
   managing Gemini models with specific security and control requirements.
-
-## Understanding your usage
-
-A summary of model usage is available through the `/stats` command and presented
-on exit at the end of a session.

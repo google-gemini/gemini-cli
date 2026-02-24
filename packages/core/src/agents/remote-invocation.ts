@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ToolConfirmationOutcome } from '../tools/tools.js';
-import {
-  BaseToolInvocation,
-  type ToolResult,
-  type ToolCallConfirmationDetails,
+import type {
+  ToolConfirmationOutcome,
+  ToolResult,
+  ToolCallConfirmationDetails,
 } from '../tools/tools.js';
+import { BaseToolInvocation } from '../tools/tools.js';
 import { DEFAULT_QUERY_STRING } from './types.js';
 import type {
   RemoteAgentInputs,
@@ -117,8 +117,8 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       type: 'info',
       title: `Call Remote Agent: ${this.definition.displayName ?? this.definition.name}`,
       prompt: `Calling remote agent: "${this.params.query}"`,
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        await this.publishPolicyUpdate(outcome);
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // Policy updates are now handled centrally by the scheduler
       },
     };
   }

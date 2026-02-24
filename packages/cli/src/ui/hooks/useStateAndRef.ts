@@ -22,6 +22,7 @@ export const useStateAndRef = <
     (newStateOrCallback) => {
       let newValue: T;
       if (typeof newStateOrCallback === 'function') {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         newValue = newStateOrCallback(ref.current);
       } else {
         newValue = newStateOrCallback;
