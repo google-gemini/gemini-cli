@@ -56,10 +56,6 @@ import {
 } from '../utils/commandUtils.js';
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
-import {
-  DEFAULT_BACKGROUND_OPACITY,
-  DEFAULT_INPUT_BACKGROUND_OPACITY,
-} from '../constants.js';
 import { getSafeLowColorBackground } from '../themes/color-utils.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
@@ -269,7 +265,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     backgroundShells,
     backgroundShellHeight,
     shortcutsHelpVisible,
-    hintMode,
   } = useUIState();
   const [suppressCompletion, setSuppressCompletion] = useState(false);
   const { handlePress: registerPlainTabPress, resetCount: resetPlainTabPress } =
@@ -1482,14 +1477,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         />
       ) : null}
       <HalfLinePaddedBox
-        backgroundBaseColor={
-          hintMode ? theme.text.accent : theme.text.secondary
-        }
-        backgroundOpacity={
-          showCursor
-            ? DEFAULT_INPUT_BACKGROUND_OPACITY
-            : DEFAULT_BACKGROUND_OPACITY
-        }
+        backgroundBaseColor={theme.background.input}
+        backgroundOpacity={1}
         useBackgroundColor={useBackgroundColor}
       >
         <Box
