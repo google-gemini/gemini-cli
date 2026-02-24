@@ -111,6 +111,11 @@ export class GeminiAgent {
         id: AuthType.USE_GEMINI,
         name: 'Gemini API key',
         description: 'Use an API key with Gemini Developer API',
+        _meta: {
+          'api-key': {
+            provider: 'google',
+          },
+        },
       },
       {
         id: AuthType.USE_VERTEX_AI,
@@ -153,10 +158,10 @@ export class GeminiAgent {
     if (selectedAuthType && selectedAuthType !== method) {
       await clearCachedCredentialFile();
     }
-    // Check for apiKey in _meta
+    // Check for api-key in _meta
     const meta = hasMeta(req) ? req._meta : undefined;
     const apiKey =
-      typeof meta?.['apiKey'] === 'string' ? meta['apiKey'] : undefined;
+      typeof meta?.['api-key'] === 'string' ? meta['api-key'] : undefined;
 
     // Refresh auth with the requested method
     // This will reuse existing credentials if they're valid,

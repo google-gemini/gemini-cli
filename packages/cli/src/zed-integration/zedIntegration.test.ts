@@ -155,6 +155,14 @@ describe('GeminiAgent', () => {
 
     expect(response.protocolVersion).toBe(acp.PROTOCOL_VERSION);
     expect(response.authMethods).toHaveLength(3);
+    const geminiAuth = response.authMethods.find(
+      (m) => m.id === AuthType.USE_GEMINI,
+    );
+    expect(geminiAuth?._meta).toEqual({
+      'api-key': {
+        provider: 'google',
+      },
+    });
     expect(response.agentCapabilities?.loadSession).toBe(true);
   });
 
@@ -165,11 +173,31 @@ describe('GeminiAgent', () => {
 
     expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
       AuthType.LOGIN_WITH_GOOGLE,
+      undefined,
     );
     expect(mockSettings.setValue).toHaveBeenCalledWith(
       SettingScope.User,
       'security.auth.selectedType',
       AuthType.LOGIN_WITH_GOOGLE,
+    );
+  });
+
+  it('should authenticate correctly with api-key in _meta', async () => {
+    await agent.authenticate({
+      methodId: AuthType.USE_GEMINI,
+      _meta: {
+        'api-key': 'test-api-key',
+      },
+    } as unknown as acp.AuthenticateRequest);
+
+    expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
+      AuthType.USE_GEMINI,
+      'test-api-key',
+    );
+    expect(mockSettings.setValue).toHaveBeenCalledWith(
+      SettingScope.User,
+      'security.auth.selectedType',
+      AuthType.USE_GEMINI,
     );
   });
 
