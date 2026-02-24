@@ -13,7 +13,7 @@ import { ExtensionStorage } from './storage.js';
 import type { ExtensionConfig } from '../extension.js';
 
 import prompts from 'prompts';
-import { debugLogger, KeychainTokenStorage } from '@google/gemini-cli-core';
+import { debugLogger, HybridSecretStorage } from '@google/gemini-cli-core';
 import { EXTENSION_SETTINGS_FILENAME } from './variables.js';
 
 export enum ExtensionSettingScope {
@@ -78,7 +78,7 @@ export async function maybePromptForSettings(
   // The user can change the scope later using the `settings set` command.
   const scope = ExtensionSettingScope.USER;
   const envFilePath = getEnvFilePath(extensionName, scope);
-  const keychain = new KeychainTokenStorage(
+  const keychain = new HybridSecretStorage(
     getKeychainStorageName(extensionName, extensionId, scope),
   );
 
@@ -167,7 +167,7 @@ export async function getScopedEnvContents(
   workspaceDir?: string,
 ): Promise<Record<string, string>> {
   const { name: extensionName } = extensionConfig;
-  const keychain = new KeychainTokenStorage(
+  const keychain = new HybridSecretStorage(
     getKeychainStorageName(extensionName, extensionId, scope, workspaceDir),
   );
   const envFilePath = getEnvFilePath(extensionName, scope, workspaceDir);
@@ -238,7 +238,7 @@ export async function updateSetting(
   }
 
   const newValue = await requestSetting(settingToUpdate);
-  const keychain = new KeychainTokenStorage(
+  const keychain = new HybridSecretStorage(
     getKeychainStorageName(extensionName, extensionId, scope, workspaceDir),
   );
 
@@ -321,7 +321,7 @@ function getSettingsChanges(
 
 async function clearSettings(
   envFilePath: string,
-  keychain: KeychainTokenStorage,
+  keychain: HybridSecretStorage,
 ) {
   if (fsSync.existsSync(envFilePath)) {
     await fs.writeFile(envFilePath, '');
