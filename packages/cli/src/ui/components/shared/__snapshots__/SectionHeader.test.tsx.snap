@@ -2,20 +2,24 @@
 
 exports[`<SectionHeader /> > 'renders correctly in a narrow contain…' 1`] = `
 "─────────────────────────
-Narrow Container"
+Narrow Container
+"
 `;
 
 exports[`<SectionHeader /> > 'renders correctly when title is trunc…' 1`] = `
 "────────────────────
-Very Long Header Ti…"
+Very Long Header Ti…
+"
 `;
 
 exports[`<SectionHeader /> > 'renders correctly with a standard tit…' 1`] = `
 "────────────────────────────────────────
-My Header"
+My Header
+"
 `;
 
 exports[`<SectionHeader /> > 'renders correctly with a subtitle' 1`] = `
 "────────────────────────────────────────
-Shortcuts See /help for more"
+Shortcuts See /help for more
+"
 `;
