@@ -428,7 +428,9 @@ describe('TableRenderer', () => {
         expect(output).not.toContain('_Italic Text_');
         expect(output).toContain('Italic Text');
         expect(output).toContain('Bold and Italic');
-        expect(output).toContain('Google (https://google.com)');
+        expect(output).toContain('Google');
+        expect(output).not.toContain('https://google.com');
+        expect(output).not.toContain('(https://google.com)');
         expect(output).toContain('const x = 1');
         expect(output).not.toContain('`const x = 1`');
         expect(output).toContain('Strike');
@@ -477,15 +479,19 @@ describe('TableRenderer', () => {
         ['Check This', 'Search', 'Visit [Yahoo](https://yahoo.com)'],
       ],
       terminalWidth: 120,
-      waitForText: 'Visit Google (https://google.com)',
+      waitForText: 'Visit Google',
       assertions: (output: string) => {
-        expect(output).toContain('Visit Google (https://google.com)');
-        expect(output).toContain('Visit Bing (https://bing.com)');
-        expect(output).toContain('Visit Yahoo (https://yahoo.com)');
+        expect(output).toContain('Visit Google');
+        expect(output).toContain('Visit Bing');
+        expect(output).toContain('Visit Yahoo');
+        expect(output).not.toContain('https://google.com');
+        expect(output).not.toContain('https://bing.com');
+        expect(output).not.toContain('https://yahoo.com');
+        expect(output).not.toContain('(https://google.com)');
         const dataLine = output
           .split('\n')
           .find((l) => l.includes('Visit Google'));
-        expect(dataLine).toContain('Visit Google (https://google.com)');
+        expect(dataLine).toContain('Visit Google');
       },
     },
     {

@@ -7,7 +7,7 @@
 import React from 'react';
 import { Text } from 'ink';
 import { stripUnsafeCharacters } from './textUtils.js';
-import { parseMarkdownToANSI } from './parsingUtils.js';
+import { parseMarkdownToANSI } from './markdownParsingUtils.js';
 
 interface RenderInlineProps {
   text: string;

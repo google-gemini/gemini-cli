@@ -14,13 +14,13 @@ exports[`TableRenderer > 'calculates column widths based on ren…' 1`] = `
 
 exports[`TableRenderer > 'calculates width correctly for conten…' 1`] = `
 "
-┌───────────────────────────────────┬───────────────────────────────┬─────────────────────────────────┐
-│ Col 1                             │ Col 2                         │ Col 3                           │
-├───────────────────────────────────┼───────────────────────────────┼─────────────────────────────────┤
-│ Visit Google (https://google.com) │ Plain Text                    │ More Info                       │
-│ Info Here                         │ Visit Bing (https://bing.com) │ Links                           │
-│ Check This                        │ Search                        │ Visit Yahoo (https://yahoo.com) │
-└───────────────────────────────────┴───────────────────────────────┴─────────────────────────────────┘
+┌──────────────┬────────────┬─────────────┐
+│ Col 1        │ Col 2      │ Col 3       │
+├──────────────┼────────────┼─────────────┤
+│ Visit Google │ Plain Text │ More Info   │
+│ Info Here    │ Visit Bing │ Links       │
+│ Check This   │ Search     │ Visit Yahoo │
+└──────────────┴────────────┴─────────────┘
 "
 `;
 
@@ -94,17 +94,17 @@ exports[`TableRenderer > 'renders a table with only emojis and …' 1`] = `
 
 exports[`TableRenderer > 'renders complex markdown in rows and …' 1`] = `
 "
-┌───────────────┬─────────────────────────────┐
-│ Feature       │ Markdown                    │
-├───────────────┼─────────────────────────────┤
-│ Bold          │ Bold Text                   │
-│ Italic        │ Italic Text                 │
-│ Combined      │ Bold and Italic             │
-│ Link          │ Google (https://google.com) │
-│ Code          │ const x = 1                 │
-│ Strikethrough │ Strike                      │
-│ Underline     │ Underline                   │
-└───────────────┴─────────────────────────────┘
+┌───────────────┬─────────────────┐
+│ Feature       │ Markdown        │
+├───────────────┼─────────────────┤
+│ Bold          │ Bold Text       │
+│ Italic        │ Italic Text     │
+│ Combined      │ Bold and Italic │
+│ Link          │ Google          │
+│ Code          │ const x = 1     │
+│ Strikethrough │ Strike          │
+│ Underline     │ Underline       │
+└───────────────┴─────────────────┘
 "
 `;
 

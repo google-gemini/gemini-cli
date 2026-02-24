@@ -4,9 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import chalk from 'chalk';
-import { parseMarkdownToANSI } from './parsingUtils.js';
+import { parseMarkdownToANSI } from './markdownParsingUtils.js';
+
+// Mock the theme to use explicit colors instead of empty strings from the default theme.
+// This ensures that ansiColorize actually applies ANSI codes that we can verify.
+vi.mock('../semantic-colors.js', () => ({
+  theme: {
+    text: {
+      primary: 'white',
+      accent: 'cyan',
+      link: 'blue',
+    },
+  },
+}));
+
 import { theme } from '../semantic-colors.js';
 import { resolveColor, INK_NAME_TO_HEX_MAP } from '../themes/color-utils.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
@@ -116,7 +129,7 @@ describe('parsingUtils', () => {
       const input = 'Check [this link](https://example.com)';
       const output = parseMarkdownToANSI(input);
       expect(output).toBe(
-        `${primary('Check ')}${primary('this link')} (${link('https://example.com')})`,
+        `${primary('Check ')}\x1b]8;;https://example.com\x07${link('this link')}\x1b]8;;\x07`,
       );
     });
 
@@ -142,7 +155,7 @@ describe('parsingUtils', () => {
       expect(output).toBe(
         `${chalk.bold(primary('Bold'))}${primary(' and ')}${chalk.italic(primary('italic'))}${primary(' and ')}${accent(
           'code',
-        )}${primary(' and ')}${primary('link')} (${link('url')})`,
+        )}${primary(' and ')}\x1b]8;;url\x07${link('link')}\x1b]8;;\x07`,
       );
     });
 
@@ -160,6 +173,44 @@ describe('parsingUtils', () => {
       expect(output).toBe(
         chalk.bold(
           `${primary('Bold with ')}${chalk.italic(primary('italic'))}${primary(' inside')}`,
+        ),
+      );
+    });
+
+    it('should handle hex colors as default', () => {
+      const hexColor = '#ff00ff';
+      const input = 'Hello **world**';
+      const output = parseMarkdownToANSI(input, hexColor);
+      const magenta = (str: string) => chalk.hex('#ff00ff')(str);
+      expect(output).toBe(
+        `${magenta('Hello ')}${chalk.bold(magenta('world'))}`,
+      );
+    });
+
+    it('should override default color with link color', () => {
+      const input = 'Check [link](url)';
+      const output = parseMarkdownToANSI(input, 'red');
+      const red = (str: string) => chalk.red(str);
+      const blue = (str: string) => chalk.blue(str);
+      expect(output).toBe(
+        `${red('Check ')}\x1b]8;;url\x07${blue('link')}\x1b]8;;\x07`,
+      );
+    });
+
+    it('should override default color with accent color for code', () => {
+      const input = 'Code: `const x = 1`';
+      const output = parseMarkdownToANSI(input, 'green');
+      const green = (str: string) => chalk.green(str);
+      const cyan = (str: string) => chalk.cyan(str);
+      expect(output).toBe(`${green('Code: ')}${cyan('const x = 1')}`);
+    });
+
+    it('should handle nested formatting with color overrides', () => {
+      const input = '**Bold with `code` inside**';
+      const output = parseMarkdownToANSI(input);
+      expect(output).toBe(
+        chalk.bold(
+          `${primary('Bold with ')}${accent('code')}${primary(' inside')}`,
         ),
       );
     });
