@@ -41,7 +41,6 @@ import {
   type ToolConfirmationRequest,
 } from '../confirmation-bus/types.js';
 import { runWithToolCallContext } from '../utils/toolCallContext.js';
-import { GeminiCliOperation } from '../telemetry/constants.js';
 import {
   coreEvents,
   CoreEvent,

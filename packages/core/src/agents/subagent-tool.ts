@@ -19,12 +19,6 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { AgentDefinition, AgentInputs } from './types.js';
 import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
-import { runInDevTraceSpan } from '../telemetry/trace.js';
-import {
-  GeminiCliOperation,
-  GEN_AI_AGENT_DESCRIPTION,
-  GEN_AI_AGENT_NAME,
-} from '../telemetry/constants.js';
 import { formatUserHintsForModel } from '../utils/fastAckHelper.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
 import {
