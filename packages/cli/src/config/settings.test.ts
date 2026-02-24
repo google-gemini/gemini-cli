@@ -2927,6 +2927,11 @@ MALICIOUS_VAR=allowed-because-trusted
         expect(sanitizeEnvVar('`rm -rf /`')).toBe('rm-rf/');
         expect(sanitizeEnvVar('normal-project-123')).toBe('normal-project-123');
         expect(sanitizeEnvVar('us-central1')).toBe('us-central1');
+
+        // Base64 padding and token characters must be preserved
+        expect(sanitizeEnvVar('AIzaSy-some_API_key+1=')).toBe(
+          'AIzaSy-some_API_key+1=',
+        );
       });
     });
 
