@@ -42,11 +42,9 @@ For example:
 You are operating in **Plan Mode** - a structured planning workflow for designing implementation strategies before execution.
 
 ## Available Tools
-The following read-only tools are available in Plan Mode:
+The following tools are available in Plan Mode:
   <tool>\`glob\`</tool>
   <tool>\`grep_search\`</tool>
-- \`write_file\` - Save plans to the plans directory (see Plan Storage below)
-- \`replace\` - Update plans in the plans directory
 
 ## Plan Storage
 - Save your plans as Markdown (.md) files ONLY within: \`/tmp/plans/\`
@@ -174,11 +172,9 @@ For example:
 You are operating in **Plan Mode** - a structured planning workflow for designing implementation strategies before execution.
 
 ## Available Tools
-The following read-only tools are available in Plan Mode:
+The following tools are available in Plan Mode:
   <tool>\`glob\`</tool>
   <tool>\`grep_search\`</tool>
-- \`write_file\` - Save plans to the plans directory (see Plan Storage below)
-- \`replace\` - Update plans in the plans directory
 
 ## Plan Storage
 - Save your plans as Markdown (.md) files ONLY within: \`/tmp/plans/\`
@@ -424,11 +420,9 @@ For example:
 You are operating in **Plan Mode** - a structured planning workflow for designing implementation strategies before execution.
 
 ## Available Tools
-The following read-only tools are available in Plan Mode:
+The following tools are available in Plan Mode:
   <tool>\`glob\`</tool>
   <tool>\`grep_search\`</tool>
-- \`write_file\` - Save plans to the plans directory (see Plan Storage below)
-- \`replace\` - Update plans in the plans directory
 
 ## Plan Storage
 - Save your plans as Markdown (.md) files ONLY within: \`/tmp/project-temp/plans/\`

@@ -22,7 +22,6 @@ import {
 import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import {
-  PLAN_MODE_TOOLS,
   WRITE_TODOS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
@@ -67,25 +66,17 @@ export class PromptProvider {
     const contextFilenames = getAllGeminiMdFilenames();
 
     // --- Context Gathering ---
-    let planModeToolsList = PLAN_MODE_TOOLS.filter((t) =>
-      enabledToolNames.has(t),
-    )
-      .map((t) => `  <tool>\`${t}\`</tool>`)
-      .join('\n');
-
-    // Add read-only MCP tools to the list
+    let planModeToolsList = '';
     if (isPlanMode) {
-      const allTools = config.getToolRegistry().getAllTools();
-      const readOnlyMcpTools = allTools.filter(
-        (t): t is DiscoveredMCPTool =>
-          t instanceof DiscoveredMCPTool && !!t.isReadOnly,
-      );
-      if (readOnlyMcpTools.length > 0) {
-        const mcpToolsList = readOnlyMcpTools
-          .map((t) => `  <tool>\`${t.name}\` (${t.serverName})</tool>`)
-          .join('\n');
-        planModeToolsList += `\n${mcpToolsList}`;
-      }
+      const activeTools = config.getToolRegistry().getActiveTools();
+      activeTools.sort((a, b) => a.name.localeCompare(b.name));
+      planModeToolsList = activeTools
+        .map((t) => {
+          const serverSuffix =
+            t instanceof DiscoveredMCPTool ? ` (${t.serverName})` : '';
+          return `  <tool>\`${t.name}\`${serverSuffix}</tool>`;
+        })
+        .join('\n');
     }
 
     let basePrompt: string;

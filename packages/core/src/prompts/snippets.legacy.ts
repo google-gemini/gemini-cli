@@ -398,10 +398,8 @@ export function renderPlanningWorkflow(
 You are operating in **Plan Mode** - a structured planning workflow for designing implementation strategies before execution.
 
 ## Available Tools
-The following read-only tools are available in Plan Mode:
+The following tools are available in Plan Mode:
 ${options.planModeToolsList}
-- \`${WRITE_FILE_TOOL_NAME}\` - Save plans to the plans directory (see Plan Storage below)
-- \`${EDIT_TOOL_NAME}\` - Update plans in the plans directory
 
 ## Plan Storage
 - Save your plans as Markdown (.md) files ONLY within: \`${options.plansDir}/\`

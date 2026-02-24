@@ -25,6 +25,7 @@ import {
 } from '../config/models.js';
 import { ApprovalMode } from '../policy/types.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import type { AnyDeclarativeTool } from '../tools/tool-registry.js';
 import type { CallableTool } from '@google/genai';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
@@ -85,6 +86,12 @@ describe('Core System Prompt (prompts.ts)', () => {
       getToolRegistry: vi.fn().mockReturnValue({
         getAllToolNames: vi.fn().mockReturnValue(['grep_search', 'glob']),
         getAllTools: vi.fn().mockReturnValue([]),
+        getActiveTools: vi
+          .fn()
+          .mockReturnValue([
+            { name: 'grep_search' } as unknown as AnyDeclarativeTool,
+            { name: 'glob' } as unknown as AnyDeclarativeTool,
+          ]),
       }),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       storage: {
@@ -452,24 +459,11 @@ describe('Core System Prompt (prompts.ts)', () => {
         true, // isReadOnly
       );
 
-      const nonReadOnlyMcpTool = new DiscoveredMCPTool(
-        {} as CallableTool,
-        'nonreadonly-server',
-        'non_read_static_value',
-        'A non-read-only tool',
-        {},
-        {} as MessageBus,
-        false,
-        false,
-      );
+      // Note: non-read-only MCP tools are implicitly filtered out by the logic
+      // because they are not potentially allowed in Plan Mode by default.
 
-      vi.mocked(mockConfig.getToolRegistry().getAllTools).mockReturnValue([
+      vi.mocked(mockConfig.getToolRegistry().getActiveTools).mockReturnValue([
         readOnlyMcpTool,
-        nonReadOnlyMcpTool,
-      ]);
-      vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([
-        readOnlyMcpTool.name,
-        nonReadOnlyMcpTool.name,
       ]);
 
       const prompt = getCoreSystemPrompt(mockConfig);
@@ -483,10 +477,10 @@ describe('Core System Prompt (prompts.ts)', () => {
     it('should only list available tools in PLAN mode', () => {
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
       // Only enable a subset of tools, including ask_user
-      vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([
-        'glob',
-        'read_file',
-        'ask_user',
+      vi.mocked(mockConfig.getToolRegistry().getActiveTools).mockReturnValue([
+        { name: 'glob' } as unknown as AnyDeclarativeTool,
+        { name: 'read_file' } as unknown as AnyDeclarativeTool,
+        { name: 'ask_user' } as unknown as AnyDeclarativeTool,
       ]);
 
       const prompt = getCoreSystemPrompt(mockConfig);
