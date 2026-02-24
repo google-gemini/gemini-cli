@@ -54,7 +54,6 @@ interface CommandParserResult {
   partial: string;
   currentLevel: readonly SlashCommand[] | undefined;
   leafCommand: SlashCommand | null;
-  exactMatchAsParent: SlashCommand | undefined;
   isArgumentCompletion: boolean;
 }
 
@@ -70,7 +69,6 @@ function useCommandParser(
         partial: '',
         currentLevel: slashCommands,
         leafCommand: null,
-        exactMatchAsParent: undefined,
         isArgumentCompletion: false,
       };
     }
@@ -112,34 +110,6 @@ function useCommandParser(
       }
     }
 
-    let exactMatchAsParent: SlashCommand | undefined;
-    if (!hasTrailingSpace && currentLevel) {
-      exactMatchAsParent = currentLevel.find(
-        (cmd) => matchesCommand(cmd, partial) && cmd.subCommands,
-      );
-
-      if (exactMatchAsParent) {
-        // Only descend if there are NO other matches for the partial at this level.
-        // This ensures that typing "/memory" still shows "/memory-leak" if it exists.
-        const otherMatches = currentLevel.filter(
-          (cmd) =>
-            cmd !== exactMatchAsParent &&
-            (cmd.name.toLowerCase().startsWith(partial.toLowerCase()) ||
-              cmd.altNames?.some((alt) =>
-                alt.toLowerCase().startsWith(partial.toLowerCase()),
-              )),
-        );
-
-        if (otherMatches.length === 0) {
-          leafCommand = exactMatchAsParent;
-          currentLevel = exactMatchAsParent.subCommands as
-            | readonly SlashCommand[]
-            | undefined;
-          partial = '';
-        }
-      }
-    }
-
     const depth = commandPathParts.length;
     const isArgumentCompletion = !!(
       leafCommand?.completion &&
@@ -153,7 +123,6 @@ function useCommandParser(
       partial,
       currentLevel,
       leafCommand,
-      exactMatchAsParent,
       isArgumentCompletion,
     };
   }, [query, slashCommands]);
@@ -356,10 +325,10 @@ function useCompletionPositions(
       return { start: -1, end: -1 };
     }
 
-    const { hasTrailingSpace, partial, exactMatchAsParent } = parserResult;
+    const { hasTrailingSpace, partial } = parserResult;
 
     // Set completion start/end positions
-    if (hasTrailingSpace || exactMatchAsParent) {
+    if (hasTrailingSpace) {
       return { start: query.length, end: query.length };
     } else if (partial) {
       if (parserResult.isArgumentCompletion) {

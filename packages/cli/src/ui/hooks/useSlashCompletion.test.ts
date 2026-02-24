@@ -492,13 +492,45 @@ describe('useSlashCompletion', () => {
       );
 
       await waitFor(() => {
-        // Should show subcommands of 'chat'
-        expect(result.current.suggestions).toHaveLength(2);
-        expect(result.current.suggestions.map((s) => s.label)).toEqual(
-          expect.arrayContaining(['list', 'save']),
-        );
-        // completionStart should be at the end of '/chat' to append subcommands
-        expect(result.current.completionStart).toBe(5);
+        // Should show 'chat' as the suggestion, NOT its subcommands
+        expect(result.current.suggestions).toHaveLength(1);
+        expect(result.current.suggestions[0].label).toBe('chat');
+        // completionStart should be at 1 (to replace 'chat')
+        expect(result.current.completionStart).toBe(1);
+      });
+      unmount();
+    });
+
+    it('should NOT suggest subcommands when a parent command is fully typed without a trailing space (fix for over-eager completion)', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'stats',
+          description: 'Check session stats',
+          action: vi.fn(), // Has action
+          subCommands: [
+            createTestCommand({
+              name: 'session',
+              description: 'Show session-specific usage statistics',
+            }),
+          ],
+        }),
+      ];
+
+      const { result, unmount } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/stats',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await waitFor(() => {
+        // Should show 'stats' as the suggestion, NOT 'session'
+        expect(result.current.suggestions).toHaveLength(1);
+        expect(result.current.suggestions[0].label).toBe('stats');
+        // isPerfectMatch should be true because it has an action
+        expect(result.current.isPerfectMatch).toBe(true);
       });
       unmount();
     });

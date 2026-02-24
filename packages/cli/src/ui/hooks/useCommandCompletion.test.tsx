@@ -20,7 +20,7 @@ import {
   useCommandCompletion,
   CompletionMode,
 } from './useCommandCompletion.js';
-import type { CommandContext } from '../commands/types.js';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
@@ -56,7 +56,11 @@ const setupMocks = ({
   shellSuggestions = [],
   isLoading = false,
   isPerfectMatch = false,
-  slashCompletionRange = { completionStart: 0, completionEnd: 0 },
+  slashCompletionRange = {
+    completionStart: 0,
+    completionEnd: 0,
+    getCommandFromSuggestion: () => undefined,
+  },
   shellCompletionRange = { completionStart: 0, completionEnd: 0, query: '' },
 }: {
   atSuggestions?: Suggestion[];
@@ -64,7 +68,13 @@ const setupMocks = ({
   shellSuggestions?: Suggestion[];
   isLoading?: boolean;
   isPerfectMatch?: boolean;
-  slashCompletionRange?: { completionStart: number; completionEnd: number };
+  slashCompletionRange?: {
+    completionStart: number;
+    completionEnd: number;
+    getCommandFromSuggestion: (
+      suggestion: Suggestion,
+    ) => SlashCommand | undefined;
+  };
   shellCompletionRange?: {
     completionStart: number;
     completionEnd: number;
@@ -427,10 +437,15 @@ describe('useCommandCompletion', () => {
   });
 
   describe('handleAutocomplete', () => {
-    it('should complete a partial command', async () => {
+    it('should complete a partial command and NOT add a space if it has an action', async () => {
       setupMocks({
         slashSuggestions: [{ label: 'memory', value: 'memory' }],
-        slashCompletionRange: { completionStart: 1, completionEnd: 4 },
+        slashCompletionRange: {
+          completionStart: 1,
+          completionEnd: 4,
+          getCommandFromSuggestion: () =>
+            ({ action: vi.fn() }) as unknown as SlashCommand,
+        },
       });
 
       const { result } = renderCommandCompletionHook('/mem');
@@ -443,12 +458,40 @@ describe('useCommandCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(result.current.textBuffer.text).toBe('/memory ');
+      expect(result.current.textBuffer.text).toBe('/memory');
+    });
+
+    it('should complete a partial command and ADD a space if it has NO action (e.g. just a parent)', async () => {
+      setupMocks({
+        slashSuggestions: [{ label: 'chat', value: 'chat' }],
+        slashCompletionRange: {
+          completionStart: 1,
+          completionEnd: 5,
+          getCommandFromSuggestion: () => ({}) as unknown as SlashCommand, // No action
+        },
+      });
+
+      const { result } = renderCommandCompletionHook('/chat');
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBe(1);
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(result.current.textBuffer.text).toBe('/chat ');
     });
 
     it('should complete a file path', async () => {
       setupMocks({
         atSuggestions: [{ label: 'src/file1.txt', value: 'src/file1.txt' }],
+        slashCompletionRange: {
+          completionStart: 0,
+          completionEnd: 0,
+          getCommandFromSuggestion: () => undefined,
+        },
       });
 
       const { result } = renderCommandCompletionHook('@src/fi');
@@ -470,6 +513,11 @@ describe('useCommandCompletion', () => {
 
       setupMocks({
         atSuggestions: [{ label: 'src/file1.txt', value: 'src/file1.txt' }],
+        slashCompletionRange: {
+          completionStart: 0,
+          completionEnd: 0,
+          getCommandFromSuggestion: () => undefined,
+        },
       });
 
       const { result } = renderCommandCompletionHook(text, cursorOffset);
@@ -490,6 +538,11 @@ describe('useCommandCompletion', () => {
     it('should complete a directory path ending with / without a trailing space', async () => {
       setupMocks({
         atSuggestions: [{ label: 'src/components/', value: 'src/components/' }],
+        slashCompletionRange: {
+          completionStart: 0,
+          completionEnd: 0,
+          getCommandFromSuggestion: () => undefined,
+        },
       });
 
       const { result } = renderCommandCompletionHook('@src/comp');
@@ -510,6 +563,11 @@ describe('useCommandCompletion', () => {
         atSuggestions: [
           { label: 'src\\components\\', value: 'src\\components\\' },
         ],
+        slashCompletionRange: {
+          completionStart: 0,
+          completionEnd: 0,
+          getCommandFromSuggestion: () => undefined,
+        },
       });
 
       const { result } = renderCommandCompletionHook('@src\\comp');
@@ -713,6 +771,11 @@ describe('useCommandCompletion', () => {
     it('should complete file path and add trailing space', async () => {
       setupMocks({
         atSuggestions: [{ label: 'src/file.txt', value: 'src/file.txt' }],
+        slashCompletionRange: {
+          completionStart: 0,
+          completionEnd: 0,
+          getCommandFromSuggestion: () => undefined,
+        },
       });
 
       const { result } = renderCommandCompletionHook('/cmd @src/fi');
