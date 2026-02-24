@@ -305,7 +305,7 @@ const SETTINGS_SCHEMA = {
         default: 10,
         description:
           'Maximum number of attempts for requests to the main chat model. Cannot exceed 10.',
-        showInDialog: true,
+        showInDialog: false,
       },
       debugKeystrokeLogging: {
         type: 'boolean',
