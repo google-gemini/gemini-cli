@@ -1445,14 +1445,24 @@ export const useGeminiStream = (
         streamingState === StreamingState.Idle
       ) {
         if (geminiClient) {
-          void geminiClient.addHistory({
-            role: 'user',
-            parts: [
-              {
-                text: getPlanModeExitMessage(newApprovalMode, true),
-              },
-            ],
-          });
+          try {
+            await geminiClient.addHistory({
+              role: 'user',
+              parts: [
+                {
+                  text: getPlanModeExitMessage(newApprovalMode, true),
+                },
+              ],
+            });
+          } catch (error) {
+            onDebugMessage(
+              `Failed to notify model of Plan Mode exit: ${getErrorMessage(error)}`,
+            );
+            addItem({
+              type: MessageType.ERROR,
+              text: 'Failed to update the model about exiting Plan Mode. The model might be out of sync. Please consider restarting the session if you see unexpected behavior.',
+            });
+          }
         }
       }
       previousApprovalModeRef.current = newApprovalMode;
@@ -1495,7 +1505,7 @@ export const useGeminiStream = (
         }
       }
     },
-    [config, toolCalls, geminiClient, streamingState],
+    [config, toolCalls, geminiClient, streamingState, addItem, onDebugMessage],
   );
 
   const handleCompletedTools = useCallback(
