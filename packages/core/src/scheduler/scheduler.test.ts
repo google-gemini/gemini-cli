@@ -1197,7 +1197,7 @@ describe('Scheduler (Orchestrator)', () => {
   });
 });
 
-describe('Scheduler MCP Progress Throttle', () => {
+describe('Scheduler MCP Progress', () => {
   let scheduler: Scheduler;
   let mockStateManager: Mocked<SchedulerStateManager>;
   let mockActiveCallsMap: Map<string, ToolCall>;
@@ -1237,8 +1237,6 @@ describe('Scheduler MCP Progress Throttle', () => {
     }) as ExecutingToolCall;
 
   beforeEach(() => {
-    vi.useFakeTimers();
-
     vi.mocked(randomUUID).mockReturnValue(
       '123e4567-e89b-12d3-a456-426614174000',
     );
@@ -1313,17 +1311,16 @@ describe('Scheduler MCP Progress Throttle', () => {
       config: mockConfig,
       messageBus: mockMessageBus,
       getPreferredEditor,
-      schedulerId: 'throttle-test',
+      schedulerId: 'progress-test',
     });
   });
 
   afterEach(() => {
     scheduler.dispose();
-    vi.useRealTimers();
     vi.clearAllMocks();
   });
 
-  it('should fire the leading-edge update immediately on first progress event', () => {
+  it('should update state on progress event', () => {
     const call = makeExecutingCall('call-A');
     mockActiveCallsMap.set('call-A', call);
 
@@ -1334,58 +1331,6 @@ describe('Scheduler MCP Progress Throttle', () => {
       'call-A',
       CoreToolCallStatus.Executing,
       expect.objectContaining({ progress: 10 }),
-    );
-  });
-
-  it('should batch rapid updates and apply trailing edge after 100ms', async () => {
-    const call = makeExecutingCall('call-A');
-    mockActiveCallsMap.set('call-A', call);
-
-    coreEvents.emit(CoreEvent.McpProgress, makePayload('call-A', 10));
-    coreEvents.emit(CoreEvent.McpProgress, makePayload('call-A', 20));
-    coreEvents.emit(CoreEvent.McpProgress, makePayload('call-A', 30));
-
-    // Only the leading-edge call should have fired
-    expect(mockStateManager.updateStatus).toHaveBeenCalledTimes(1);
-    expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
-      'call-A',
-      CoreToolCallStatus.Executing,
-      expect.objectContaining({ progress: 10 }),
-    );
-
-    await vi.advanceTimersByTimeAsync(100);
-
-    // Trailing edge fires with the latest payload (progress: 30)
-    expect(mockStateManager.updateStatus).toHaveBeenCalledTimes(2);
-    expect(mockStateManager.updateStatus).toHaveBeenLastCalledWith(
-      'call-A',
-      CoreToolCallStatus.Executing,
-      expect.objectContaining({ progress: 30 }),
-    );
-  });
-
-  it('should flush pending progress on dispose()', () => {
-    const call = makeExecutingCall('call-A');
-    mockActiveCallsMap.set('call-A', call);
-
-    // Leading edge
-    coreEvents.emit(CoreEvent.McpProgress, makePayload('call-A', 10));
-    // Store as pending (within throttle window)
-    coreEvents.emit(
-      CoreEvent.McpProgress,
-      makePayload('call-A', 50, { message: 'halfway' }),
-    );
-
-    expect(mockStateManager.updateStatus).toHaveBeenCalledTimes(1);
-
-    scheduler.dispose();
-
-    // Pending payload should have been flushed
-    expect(mockStateManager.updateStatus).toHaveBeenCalledTimes(2);
-    expect(mockStateManager.updateStatus).toHaveBeenLastCalledWith(
-      'call-A',
-      CoreToolCallStatus.Executing,
-      expect.objectContaining({ progress: 50, progressMessage: 'halfway' }),
     );
   });
 
@@ -1400,7 +1345,7 @@ describe('Scheduler MCP Progress Throttle', () => {
     expect(mockStateManager.updateStatus).not.toHaveBeenCalled();
   });
 
-  it('should throttle concurrent calls independently', () => {
+  it('should handle concurrent calls independently', () => {
     const callA = makeExecutingCall('call-A');
     const callB = makeExecutingCall('call-B');
     mockActiveCallsMap.set('call-A', callA);
@@ -1409,7 +1354,6 @@ describe('Scheduler MCP Progress Throttle', () => {
     coreEvents.emit(CoreEvent.McpProgress, makePayload('call-A', 10));
     coreEvents.emit(CoreEvent.McpProgress, makePayload('call-B', 20));
 
-    // Both should get their own leading-edge call
     expect(mockStateManager.updateStatus).toHaveBeenCalledTimes(2);
     expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
       'call-A',
@@ -1424,7 +1368,6 @@ describe('Scheduler MCP Progress Throttle', () => {
   });
 
   it('should ignore progress for a callId not in active calls', () => {
-    // Do not add any call to mockActiveCallsMap
     coreEvents.emit(CoreEvent.McpProgress, makePayload('unknown-call', 10));
 
     expect(mockStateManager.updateStatus).not.toHaveBeenCalled();
@@ -1452,27 +1395,23 @@ describe('Scheduler MCP Progress Throttle', () => {
     expect(mockStateManager.updateStatus).not.toHaveBeenCalled();
   });
 
-  it('should not apply stale trailing payload after call status changes to Cancelled', async () => {
+  it('should compute validTotal and percentage for determinate progress', () => {
     const call = makeExecutingCall('call-A');
     mockActiveCallsMap.set('call-A', call);
 
-    // Leading edge fires
-    coreEvents.emit(CoreEvent.McpProgress, makePayload('call-A', 10));
-    // Store pending
-    coreEvents.emit(CoreEvent.McpProgress, makePayload('call-A', 50));
+    coreEvents.emit(
+      CoreEvent.McpProgress,
+      makePayload('call-A', 50, { total: 100 }),
+    );
 
-    expect(mockStateManager.updateStatus).toHaveBeenCalledTimes(1);
-
-    // Simulate the call transitioning to Cancelled before the trailing edge fires
-    const cancelledCall = {
-      ...call,
-      status: CoreToolCallStatus.Cancelled,
-    } as unknown as ToolCall;
-    mockActiveCallsMap.set('call-A', cancelledCall);
-
-    await vi.advanceTimersByTimeAsync(100);
-
-    // The trailing edge should NOT have applied (applyProgress guards on Executing status)
-    expect(mockStateManager.updateStatus).toHaveBeenCalledTimes(1);
+    expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+      'call-A',
+      CoreToolCallStatus.Executing,
+      expect.objectContaining({
+        progress: 50,
+        progressTotal: 100,
+        progressPercent: 50,
+      }),
+    );
   });
 });
