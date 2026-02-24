@@ -32,27 +32,30 @@ export class KeychainTokenStorage
 {
   private keychainAvailable: boolean | null = null;
   private keytarModule: Keytar | null = null;
-  private keytarLoadAttempted = false;
+  private keytarPromise: Promise<Keytar | null> | null = null;
+  private availabilityPromise: Promise<boolean> | null = null;
 
   async getKeytar(): Promise<Keytar | null> {
-    // If we've already tried loading (successfully or not), return the result
-    if (this.keytarLoadAttempted) {
-      return this.keytarModule;
+    if (this.keytarPromise) {
+      return this.keytarPromise;
     }
 
-    this.keytarLoadAttempted = true;
+    this.keytarPromise = (async () => {
+      try {
+        // Try to import keytar without any timeout - let the OS handle it
+        const moduleName = 'keytar';
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const module = await import(moduleName);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        this.keytarModule = module.default || module;
+        return this.keytarModule;
+      } catch (_) {
+        //Keytar is optional so we shouldn't raise an error of log anything.
+        return null;
+      }
+    })();
 
-    try {
-      // Try to import keytar without any timeout - let the OS handle it
-      const moduleName = 'keytar';
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const module = await import(moduleName);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      this.keytarModule = module.default || module;
-    } catch (_) {
-      //Keytar is optional so we shouldn't raise an error of log anything.
-    }
-    return this.keytarModule;
+    return this.keytarPromise;
   }
 
   async getCredentials(serverName: string): Promise<OAuthCredentials | null> {
@@ -240,49 +243,60 @@ export class KeychainTokenStorage
     }
   }
 
-  // Checks whether or not a set-get-delete cycle with the keychain works.
-  // Returns false if any operation fails.
   async checkKeychainAvailability(): Promise<boolean> {
     if (this.keychainAvailable !== null) {
       return this.keychainAvailable;
     }
 
-    try {
-      const keytar = await this.getKeytar();
-      if (!keytar) {
-        this.keychainAvailable = false;
-        return false;
-      }
-
-      const testAccount = `${KEYCHAIN_TEST_PREFIX}${crypto.randomBytes(8).toString('hex')}`;
-      const testPassword = 'test';
-
-      await keytar.setPassword(this.serviceName, testAccount, testPassword);
-      const retrieved = await keytar.getPassword(this.serviceName, testAccount);
-      const deleted = await keytar.deletePassword(
-        this.serviceName,
-        testAccount,
-      );
-
-      const success = deleted && retrieved === testPassword;
-      this.keychainAvailable = success;
-
-      coreEvents.emitTelemetryKeychainAvailability(
-        new KeychainAvailabilityEvent(success),
-      );
-
-      return success;
-    } catch (_error) {
-      this.keychainAvailable = false;
-
-      // Do not log the raw error message to avoid potential PII leaks
-      // (e.g. from OS-level error messages containing file paths)
-      coreEvents.emitTelemetryKeychainAvailability(
-        new KeychainAvailabilityEvent(false),
-      );
-
-      return false;
+    if (this.availabilityPromise) {
+      return this.availabilityPromise;
     }
+
+    this.availabilityPromise = (async () => {
+      try {
+        const keytar = await this.getKeytar();
+        if (!keytar) {
+          this.keychainAvailable = false;
+          return false;
+        }
+
+        const testAccount = `${KEYCHAIN_TEST_PREFIX}${crypto.randomBytes(8).toString('hex')}`;
+        const testPassword = 'test';
+
+        await keytar.setPassword(this.serviceName, testAccount, testPassword);
+        const retrieved = await keytar.getPassword(
+          this.serviceName,
+          testAccount,
+        );
+        const deleted = await keytar.deletePassword(
+          this.serviceName,
+          testAccount,
+        );
+
+        const success = deleted && retrieved === testPassword;
+        this.keychainAvailable = success;
+
+        coreEvents.emitTelemetryKeychainAvailability(
+          new KeychainAvailabilityEvent(success),
+        );
+
+        return success;
+      } catch (_error) {
+        this.keychainAvailable = false;
+
+        // Do not log the raw error message to avoid potential PII leaks
+        // (e.g. from OS-level error messages containing file paths)
+        coreEvents.emitTelemetryKeychainAvailability(
+          new KeychainAvailabilityEvent(false),
+        );
+
+        return false;
+      } finally {
+        this.availabilityPromise = null;
+      }
+    })();
+
+    return this.availabilityPromise;
   }
 
   async isAvailable(): Promise<boolean> {
