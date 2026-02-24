@@ -33,7 +33,6 @@ import {
   PromptListChangedNotificationSchema,
   ProgressNotificationSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { ApprovalMode, PolicyDecision } from '../policy/types.js';
 import { parse } from 'shell-quote';
 import type { Config, MCPServerConfig } from '../config/config.js';
 import { AuthProviderType } from '../config/config.js';
@@ -70,6 +69,7 @@ import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from '../services/environmentSanitization.js';
+import { expandEnvVars } from '../utils/envExpansion.js';
 import {
   GEMINI_CLI_IDENTIFICATION_ENV_VAR,
   GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
@@ -783,9 +783,16 @@ function createTransportRequestInit(
   mcpServerConfig: MCPServerConfig,
   headers: Record<string, string>,
 ): RequestInit {
+  const expandedHeaders: Record<string, string> = {};
+  if (mcpServerConfig.headers) {
+    for (const [key, value] of Object.entries(mcpServerConfig.headers)) {
+      expandedHeaders[key] = expandEnvVars(value, process.env);
+    }
+  }
+
   return {
     headers: {
-      ...mcpServerConfig.headers,
+      ...expandedHeaders,
       ...headers,
     },
   };
@@ -1070,8 +1077,9 @@ export async function discoverTools(
           options?.progressReporter,
         );
 
-        // Extract readOnlyHint from annotations
-        const isReadOnly = toolDef.annotations?.readOnlyHint === true;
+        // Extract annotations from the tool definition
+        const annotations = toolDef.annotations;
+        const isReadOnly = annotations?.readOnlyHint === true;
 
         const tool = new DiscoveredMCPTool(
           mcpCallableTool,
@@ -1086,18 +1094,8 @@ export async function discoverTools(
           cliConfig,
           mcpServerConfig.extension?.name,
           mcpServerConfig.extension?.id,
+          annotations as Record<string, unknown> | undefined,
         );
-
-        // If the tool is read-only, allow it in Plan mode
-        if (isReadOnly) {
-          cliConfig.getPolicyEngine().addRule({
-            toolName: tool.getFullyQualifiedName(),
-            decision: PolicyDecision.ASK_USER,
-            priority: 50, // Match priority of built-in plan tools
-            modes: [ApprovalMode.PLAN],
-            source: `MCP Annotation (readOnlyHint) - ${mcpServerName}`,
-          });
-        }
 
         discoveredTools.push(tool);
       } catch (error) {
@@ -1970,15 +1968,33 @@ export async function createTransport(
   }
 
   if (mcpServerConfig.command) {
+    // 1. Sanitize the base process environment to prevent unintended leaks of system-wide secrets.
+    const sanitizedEnv = sanitizeEnvironment(process.env, {
+      ...sanitizationConfig,
+      enableEnvironmentVariableRedaction: true,
+    });
+
+    const finalEnv: Record<string, string> = {
+      [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
+        GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
+    };
+    for (const [key, value] of Object.entries(sanitizedEnv)) {
+      if (value !== undefined) {
+        finalEnv[key] = value;
+      }
+    }
+
+    // Expand and merge explicit environment variables from the MCP configuration.
+    if (mcpServerConfig.env) {
+      for (const [key, value] of Object.entries(mcpServerConfig.env)) {
+        finalEnv[key] = expandEnvVars(value, process.env);
+      }
+    }
+
     let transport: Transport = new StdioClientTransport({
       command: mcpServerConfig.command,
       args: mcpServerConfig.args || [],
-      env: {
-        ...sanitizeEnvironment(process.env, sanitizationConfig),
-        ...(mcpServerConfig.env || {}),
-        [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
-          GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
-      } as Record<string, string>,
+      env: finalEnv,
       cwd: mcpServerConfig.cwd,
       stderr: 'pipe',
     });
