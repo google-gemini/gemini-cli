@@ -153,7 +153,7 @@ export interface SummarizeToolOutputSettings {
 
 export interface PlanSettings {
   directory?: string;
-  enableModelRouting?: boolean;
+  modelRouting?: boolean;
 }
 
 export interface TelemetrySettings {
@@ -825,8 +825,7 @@ export class Config {
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
-    this.planModeRoutingEnabled =
-      params.planSettings?.enableModelRouting ?? true;
+    this.planModeRoutingEnabled = params.planSettings?.modelRouting ?? true;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];

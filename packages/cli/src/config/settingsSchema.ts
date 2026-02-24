@@ -285,9 +285,9 @@ const SETTINGS_SCHEMA = {
               'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.',
             showInDialog: true,
           },
-          enableModelRouting: {
+          modelRouting: {
             type: 'boolean',
-            label: 'Enable Model Routing',
+            label: 'Model Routing',
             category: 'General',
             requiresRestart: false,
             default: true,

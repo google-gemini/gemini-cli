@@ -2543,7 +2543,7 @@ describe('Config Quota & Preview Model Access', () => {
     it('should return true when explicitly enabled in planSettings', async () => {
       const config = new Config({
         ...baseParams,
-        planSettings: { enableModelRouting: true },
+        planSettings: { modelRouting: true },
       });
       expect(await config.getPlanModeRoutingEnabled()).toBe(true);
     });
@@ -2551,7 +2551,7 @@ describe('Config Quota & Preview Model Access', () => {
     it('should return false when explicitly disabled in planSettings', async () => {
       const config = new Config({
         ...baseParams,
-        planSettings: { enableModelRouting: false },
+        planSettings: { modelRouting: false },
       });
       expect(await config.getPlanModeRoutingEnabled()).toBe(false);
     });

@@ -263,7 +263,7 @@ performance. You can disable this automatic switching in your settings:
 {
   "general": {
     "plan": {
-      "enableModelRouting": false
+      "modelRouting": false
     }
   }
 }
