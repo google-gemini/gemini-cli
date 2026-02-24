@@ -9,7 +9,7 @@ import { trace, SpanStatusCode, diag, type Tracer } from '@opentelemetry/api';
 import { runInDevTraceSpan } from './trace.js';
 import {
   GeminiCliOperation,
-  GEMINI_CLI_SESSION_ID,
+  GEN_AI_CONVERSATION_ID,
   GEN_AI_AGENT_DESCRIPTION,
   GEN_AI_AGENT_NAME,
   GEN_AI_INPUT_MESSAGES,
@@ -107,7 +107,7 @@ describe('runInDevTraceSpan', () => {
         expect(metadata.attributes[GEN_AI_AGENT_DESCRIPTION]).toBe(
           SERVICE_DESCRIPTION,
         );
-        expect(metadata.attributes[GEMINI_CLI_SESSION_ID]).toBe(
+        expect(metadata.attributes[GEN_AI_CONVERSATION_ID]).toBe(
           'test-session-id',
         );
       },

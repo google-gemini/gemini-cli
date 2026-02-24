@@ -21,13 +21,11 @@ export const GEN_AI_PROMPT_NAME = 'gen_ai.prompt.name';
 export const GEN_AI_TOOL_NAME = 'gen_ai.tool.name';
 export const GEN_AI_TOOL_CALL_ID = 'gen_ai.tool.call_id';
 export const GEN_AI_TOOL_DESCRIPTION = 'gen_ai.tool.description';
-
-// Gemini CLI specific attributes
-export const GEMINI_CLI_GENERATE_CONTENT_CONFIG =
-  'gemini_cli.generate_content.config';
-export const GEMINI_CLI_GENERATE_CONTENT_USAGE =
-  'gemini_cli.generate_content.usage';
-export const GEMINI_CLI_SESSION_ID = 'gemini_cli.session_id';
+export const GEN_AI_USAGE_INPUT_TOKENS = 'gen_ai.usage.input_tokens';
+export const GEN_AI_USAGE_OUTPUT_TOKENS = 'gen_ai.usage.output_tokens';
+export const GEN_AI_SYSTEM_INSTRUCTIONS = 'gen_ai.system_instructions';
+export const GEN_AI_TOOL_DEFINITIONS = 'gen_ai.tool.definitions';
+export const GEN_AI_CONVERSATION_ID = 'gen_ai.conversation.id';
 
 // Gemini CLI specific operations
 export enum GeminiCliOperation {
