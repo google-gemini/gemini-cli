@@ -111,8 +111,8 @@ Deep technical documentation and API specifications.
   processes memory from various sources.
 - **[Policy engine](./reference/policy-engine.md):** Fine-grained execution
   control.
-- **[Tools API](./reference/tools-api.md):** The API for defining and using
-  tools.
+- **[Tools reference](./reference/tools.md):** Information on how tools are
+  defined, registered, and used.
 
 ## Resources
 
