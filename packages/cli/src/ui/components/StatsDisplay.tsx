@@ -168,7 +168,17 @@ const ModelUsageTable: React.FC<{
   const uncachedWidth = 15;
   const cachedWidth = 14;
   const outputTokensWidth = 15;
-  const usageLimitWidth = showQuotaColumn ? 28 : 0;
+  const usageLimitWidth = showQuotaColumn ? 40 : 0;
+
+  const renderProgressBar = (usedFraction: number) => {
+    const totalSteps = 10;
+    const filledSteps = Math.min(
+      totalSteps,
+      Math.max(0, Math.round(usedFraction * totalSteps)),
+    );
+    const emptySteps = totalSteps - filledSteps;
+    return '█'.repeat(filledSteps) + '░'.repeat(emptySteps);
+  };
 
   const cacheEfficiencyColor = getStatusColor(cacheEfficiency, {
     green: CACHE_EFFICIENCY_HIGH,
@@ -360,10 +370,16 @@ const ModelUsageTable: React.FC<{
             {row.bucket &&
               row.bucket.remainingFraction != null &&
               row.bucket.resetTime && (
-                <Text color={theme.text.secondary} wrap="truncate-end">
-                  {((1 - row.bucket.remainingFraction) * 100).toFixed(0)}% used{' '}
-                  (Limit resets in {formatResetTime(row.bucket.resetTime)})
-                </Text>
+                <>
+                  <Text color={theme.text.secondary}>
+                    {renderProgressBar(1 - row.bucket.remainingFraction)}
+                  </Text>
+                  <Text color={theme.text.secondary} wrap="truncate-end">
+                    {((1 - row.bucket.remainingFraction) * 100).toFixed(0)}%
+                    used (Limit resets in{' '}
+                    {formatResetTime(row.bucket.resetTime)})
+                  </Text>
+                </>
               )}
           </Box>
         </Box>
