@@ -140,6 +140,29 @@ describe('MessageBus', () => {
       expect(requestHandler).toHaveBeenCalledWith(request);
     });
 
+    it('should forward toolAnnotations to policyEngine.check', async () => {
+      const checkSpy = vi.spyOn(policyEngine, 'check').mockResolvedValue({
+        decision: PolicyDecision.ALLOW,
+      });
+
+      const annotations = { readOnlyHint: true };
+      const request: ToolConfirmationRequest = {
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        toolCall: { name: 'test-tool', args: {} },
+        correlationId: '123',
+        serverName: 'test-server',
+        toolAnnotations: annotations,
+      };
+
+      await messageBus.publish(request);
+
+      expect(checkSpy).toHaveBeenCalledWith(
+        { name: 'test-tool', args: {} },
+        'test-server',
+        annotations,
+      );
+    });
+
     it('should emit other message types directly', async () => {
       const successHandler = vi.fn();
       messageBus.subscribe(
