@@ -169,9 +169,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         // registered; their schemas are passed directly to the model later.
       }
     } else {
-      // If no tools are explicitly configured, default to all available tools.
-      for (const toolName of parentToolRegistry.getAllToolNames()) {
-        registerToolByName(toolName);
+      for (const tool of parentToolRegistry.getAllTools()) {
+        if (allAgentNames.has(tool.name)) {
+          debugLogger.warn(
+            `[LocalAgentExecutor] Skipping subagent tool '${tool.name}' for agent '${definition.name}' to prevent recursion.`,
+          );
+          continue;
+        }
+        agentToolRegistry.registerTool(tool);
       }
     }
 
@@ -1138,6 +1143,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       toolsList.push(
         ...this.toolRegistry.getFunctionDeclarationsFiltered(toolNamesToLoad),
       );
+    } else {
+      toolsList.push(...this.toolRegistry.getFunctionDeclarations());
     }
 
     // Always inject complete_task.
