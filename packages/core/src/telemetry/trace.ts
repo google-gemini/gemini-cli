@@ -12,34 +12,18 @@ import {
   type SpanOptions,
 } from '@opentelemetry/api';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-<<<<<<< HEAD
-<<<<<<< HEAD
 import {
   type GeminiCliOperation,
-=======
-import {
-  type GeminiCliOperation,
-  GEMINI_CLI_SESSION_ID,
->>>>>>> 3eb31a334 (added test cases to all the changes.)
   GEN_AI_AGENT_DESCRIPTION,
   GEN_AI_AGENT_NAME,
   GEN_AI_CONVERSATION_ID,
-=======
-import type { GeminiCliOperation } from './constants.js';
-import {
-  GEN_AI_AGENT_DESCRIPTION,
-  GEN_AI_AGENT_NAME,
->>>>>>> 66d989572 (Added more attributes in OTel trace.)
   GEN_AI_INPUT_MESSAGES,
   GEN_AI_OPERATION_NAME,
   GEN_AI_OUTPUT_MESSAGES,
   SERVICE_DESCRIPTION,
   SERVICE_NAME,
 } from './constants.js';
-<<<<<<< HEAD
 import { sessionId } from '../utils/session.js';
-=======
->>>>>>> 66d989572 (Added more attributes in OTel trace.)
 
 const TRACER_NAME = 'gemini-cli';
 const TRACER_VERSION = 'v1';
