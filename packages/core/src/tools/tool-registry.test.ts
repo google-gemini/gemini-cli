@@ -379,6 +379,46 @@ describe('ToolRegistry', () => {
     });
   });
 
+  describe('getActiveTools', () => {
+    it('should include tools in Plan Mode when allowed by policy', () => {
+      // Setup Plan Mode
+      vi.spyOn(config, 'getApprovalMode').mockReturnValue(ApprovalMode.PLAN);
+
+      const mockTool = new MockTool({ name: 'mock-tool' });
+      toolRegistry.registerTool(mockTool);
+
+      // Mock PolicyEngine to explicitly allow this tool
+      const policyEngine = config.getPolicyEngine();
+      vi.spyOn(policyEngine, 'isToolPotentiallyAllowed').mockImplementation(
+        (toolName) => toolName === 'mock-tool',
+      );
+
+      const activeTools = toolRegistry.getActiveTools();
+      const activeToolNames = activeTools.map((t) => t.name);
+
+      expect(activeToolNames).toContain('mock-tool');
+    });
+
+    it('should exclude tools in Plan Mode when denied by policy', () => {
+      // Setup Plan Mode
+      vi.spyOn(config, 'getApprovalMode').mockReturnValue(ApprovalMode.PLAN);
+
+      const mockTool = new MockTool({ name: 'mock-tool' });
+      toolRegistry.registerTool(mockTool);
+
+      // Mock PolicyEngine to explicitly deny this tool
+      const policyEngine = config.getPolicyEngine();
+      vi.spyOn(policyEngine, 'isToolPotentiallyAllowed').mockImplementation(
+        (toolName) => toolName !== 'mock-tool',
+      );
+
+      const activeTools = toolRegistry.getActiveTools();
+      const activeToolNames = activeTools.map((t) => t.name);
+
+      expect(activeToolNames).not.toContain('mock-tool');
+    });
+  });
+
   describe('getAllToolNames', () => {
     it('should return all registered tool names', () => {
       // Register tools with displayNames in non-alphabetical order

@@ -26,7 +26,6 @@ import {
   DISCOVERED_TOOL_PREFIX,
   TOOL_LEGACY_ALIASES,
   getToolAliases,
-  PLAN_MODE_TOOLS,
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
 } from './tool-names.js';
@@ -442,9 +441,12 @@ export class ToolRegistry {
   }
 
   /**
+   * Retrieves the list of currently active tools.
+   * This is filtered by the current policies and approval modes (e.g. Plan Mode).
+   * It is public so that PromptProvider can dynamically construct accurate tool lists.
    * @returns All the tools that are not excluded.
    */
-  private getActiveTools(): AnyDeclarativeTool[] {
+  getActiveTools(): AnyDeclarativeTool[] {
     const excludedTools =
       this.expandExcludeToolsWithAliases(this.config.getExcludeTools()) ??
       new Set([]);
@@ -490,28 +492,28 @@ export class ToolRegistry {
       this.expandExcludeToolsWithAliases(this.config.getExcludeTools()) ??
       new Set([]);
 
-    // Filter tools in Plan Mode to only allow approved read-only tools.
+    let serverName: string | undefined;
+    const isMcpTool = tool instanceof DiscoveredMCPTool;
+    if (isMcpTool) {
+      serverName = tool.getFullyQualifiedPrefix().slice(0, -2);
+    }
+
     const isPlanMode =
       typeof this.config.getApprovalMode === 'function' &&
       this.config.getApprovalMode() === ApprovalMode.PLAN;
-    if (isPlanMode) {
-      const allowedToolNames = new Set<string>(PLAN_MODE_TOOLS);
-      // We allow write_file and replace for writing plans specifically.
-      allowedToolNames.add(WRITE_FILE_TOOL_NAME);
-      allowedToolNames.add(EDIT_TOOL_NAME);
 
-      // Discovered MCP tools are allowed if they are read-only.
-      if (
-        tool instanceof DiscoveredMCPTool &&
-        tool.isReadOnly &&
-        !allowedToolNames.has(tool.name)
-      ) {
-        allowedToolNames.add(tool.name);
-      }
+    const isReadOnlyMcp = isMcpTool && tool.isReadOnly;
 
-      if (!allowedToolNames.has(tool.name)) {
-        return false;
-      }
+    // Read-only MCP tools bypass the Plan Mode global deny policy,
+    // but still respect specific tool or wildcard rules.
+    const ignoreGlobalRules = isPlanMode && isReadOnlyMcp;
+
+    if (
+      !this.config
+        .getPolicyEngine()
+        .isToolPotentiallyAllowed(tool.name, serverName, ignoreGlobalRules)
+    ) {
+      return false;
     }
 
     const normalizedClassName = tool.constructor.name.replace(/^_+/, '');
