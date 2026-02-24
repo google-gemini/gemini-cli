@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Content, GenerateContentResponse } from '@google/genai';
-import { ApiError, ThinkingLevel } from '@google/genai';
+import { ApiError } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import {
   GeminiChat,
@@ -158,13 +158,9 @@ describe('GeminiChat', () => {
       modelConfigService: {
         getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => {
           const model = modelConfigKey.model ?? mockConfig.getModel();
-          const thinkingConfig = model.startsWith('gemini-3')
-            ? {
-                thinkingLevel: ThinkingLevel.HIGH,
-              }
-            : {
-                thinkingBudget: DEFAULT_THINKING_MODE,
-              };
+          const thinkingConfig = {
+            thinkingBudget: DEFAULT_THINKING_MODE,
+          };
           return {
             model,
             generateContentConfig: {
@@ -951,7 +947,7 @@ describe('GeminiChat', () => {
       );
     });
 
-    it('should use thinkingLevel and remove thinkingBudget for gemini-3 models', async () => {
+    it('should use thinkingBudget for gemini-3 models', async () => {
       const response = (async function* () {
         yield {
           candidates: [
@@ -982,8 +978,7 @@ describe('GeminiChat', () => {
           model: 'gemini-3-test-only-model-string-for-testing',
           config: expect.objectContaining({
             thinkingConfig: {
-              thinkingBudget: undefined,
-              thinkingLevel: ThinkingLevel.HIGH,
+              thinkingBudget: 8192,
             },
           }),
         }),
@@ -992,7 +987,7 @@ describe('GeminiChat', () => {
       );
     });
 
-    it('should use thinkingBudget and remove thinkingLevel for non-gemini-3 models', async () => {
+    it('should use thinkingBudget for non-gemini-3 models', async () => {
       const response = (async function* () {
         yield {
           candidates: [
@@ -1024,7 +1019,6 @@ describe('GeminiChat', () => {
           config: expect.objectContaining({
             thinkingConfig: {
               thinkingBudget: 8192,
-              thinkingLevel: undefined,
             },
           }),
         }),

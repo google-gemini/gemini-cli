@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ThinkingLevel } from '@google/genai';
 import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
 import { DEFAULT_THINKING_MODE } from './models.js';
 
@@ -49,7 +48,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       modelConfig: {
         generateContentConfig: {
           thinkingConfig: {
-            thinkingLevel: ThinkingLevel.HIGH,
+            thinkingBudget: DEFAULT_THINKING_MODE,
           },
         },
       },

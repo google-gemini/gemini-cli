@@ -27,7 +27,6 @@ import {
 import * as tomlLoader from './agentLoader.js';
 import { SimpleExtensionLoader } from '../utils/extensionLoader.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
-import { ThinkingLevel } from '@google/genai';
 import type { AcknowledgedAgentsService } from './acknowledgedAgents.js';
 import { PolicyDecision } from '../policy/types.js';
 
@@ -170,7 +169,7 @@ describe('AgentRegistry', () => {
         investigatorDef?.modelConfig.generateContentConfig?.thinkingConfig,
       ).toStrictEqual({
         includeThoughts: true,
-        thinkingLevel: ThinkingLevel.HIGH,
+        thinkingBudget: DEFAULT_THINKING_MODE,
       });
     });
 

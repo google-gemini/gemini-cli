@@ -19,7 +19,6 @@ import {
 } from '../config/models.js';
 import { z } from 'zod';
 import type { Config } from '../config/config.js';
-import { ThinkingLevel } from '@google/genai';
 
 // Define a type that matches the outputConfig schema for type safety.
 const CodebaseInvestigationReportSchema = z.object({
@@ -99,7 +98,7 @@ export const CodebaseInvestigatorAgent = (
         thinkingConfig: supportsModernFeatures(model)
           ? {
               includeThoughts: true,
-              thinkingLevel: ThinkingLevel.HIGH,
+              thinkingBudget: DEFAULT_THINKING_MODE,
             }
           : {
               includeThoughts: true,
