@@ -19,7 +19,7 @@ import {
 } from '../index.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import {
-  MCP_QUALIFIED_NAME_SEPARATOR,
+  isMcpToolName,
   DiscoveredMCPTool,
   DiscoveredMCPToolInvocation,
 } from '../tools/mcp-tool.js';
@@ -218,7 +218,7 @@ export class ToolExecutor {
     // We truncate string output for tools that can produce arbitrarily large
     // text, like shell or MCP tools.
     const isMcpTool =
-      toolName.includes(MCP_QUALIFIED_NAME_SEPARATOR) ||
+      isMcpToolName(toolName) ||
       call.tool instanceof DiscoveredMCPTool ||
       ('invocation' in call &&
         call.invocation instanceof DiscoveredMCPToolInvocation);

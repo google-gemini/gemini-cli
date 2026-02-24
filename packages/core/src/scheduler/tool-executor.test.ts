@@ -244,6 +244,7 @@ describe('ToolExecutor', () => {
     vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(
       threshold,
     );
+    vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue('/tmp');
 
     const longOutput =
       'This is a very long MCP tool output that exceeds threshold';
@@ -317,6 +318,7 @@ describe('ToolExecutor', () => {
     vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(
       threshold,
     );
+    vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue('/tmp');
 
     const longOutput =
       'This is a very long MCP tool output in a Part that exceeds threshold';
