@@ -70,7 +70,8 @@
       "wrap-ansi": "7.0.0"
     },
     "glob": "^12.0.0",
-    "node-domexception": "^1.0.0"
+    "node-domexception": "npm:empty@^0.10.1",
+    "prebuild-install": "npm:nop@1.0.0"
   },
   "bin": {
     "gemini": "bundle/gemini.js"
@@ -97,6 +98,7 @@
     "@vitest/eslint-plugin": "^1.3.4",
     "cross-env": "^7.0.3",
     "depcheck": "^1.4.7",
+    "domexception": "^4.0.0",
     "esbuild": "^0.25.0",
     "esbuild-plugin-wasm": "^1.1.0",
     "eslint": "^9.24.0",
@@ -130,6 +132,7 @@
   "dependencies": {
     "ink": "npm:@jrichman/ink@6.4.11",
     "latest-version": "^9.0.0",
+    "node-fetch-native": "^1.6.7",
     "proper-lockfile": "^4.1.2",
     "punycode": "^2.3.1",
     "simple-git": "^3.28.0"
