@@ -2458,4 +2458,137 @@ describe('PolicyEngine', () => {
       expect(checkers[0].priority).toBe(2.5);
     });
   });
+
+  describe('isToolPotentiallyAllowed', () => {
+    it('should return true if tool is explicitly allowed', () => {
+      const engine = new PolicyEngine({
+        rules: [
+          { toolName: 'tool1', decision: PolicyDecision.ALLOW, priority: 100 },
+        ],
+      });
+      expect(engine.isToolPotentiallyAllowed('tool1')).toBe(true);
+    });
+
+    it('should return false if tool is explicitly denied', () => {
+      const engine = new PolicyEngine({
+        rules: [
+          { toolName: 'tool1', decision: PolicyDecision.DENY, priority: 100 },
+        ],
+      });
+      expect(engine.isToolPotentiallyAllowed('tool1')).toBe(false);
+    });
+
+    it('should return true if tool is allowed by wildcard', () => {
+      const engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'server__*',
+            decision: PolicyDecision.ALLOW,
+            priority: 100,
+          },
+        ],
+      });
+      expect(engine.isToolPotentiallyAllowed('tool1', 'server')).toBe(true);
+    });
+
+    it('should respect priority: higher priority deny wins', () => {
+      const engine = new PolicyEngine({
+        rules: [
+          { toolName: 'tool1', decision: PolicyDecision.DENY, priority: 200 },
+          { toolName: 'tool1', decision: PolicyDecision.ALLOW, priority: 100 },
+        ],
+      });
+      expect(engine.isToolPotentiallyAllowed('tool1')).toBe(false);
+    });
+
+    it('should respect priority: higher priority allow wins', () => {
+      const engine = new PolicyEngine({
+        rules: [
+          { toolName: 'tool1', decision: PolicyDecision.ALLOW, priority: 200 },
+          { toolName: 'tool1', decision: PolicyDecision.DENY, priority: 100 },
+        ],
+      });
+      expect(engine.isToolPotentiallyAllowed('tool1')).toBe(true);
+    });
+
+    it('should return true for conditional DENY (argsPattern) if lower priority is ALLOW', () => {
+      const engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'tool1',
+            decision: PolicyDecision.DENY,
+            priority: 200,
+            argsPattern: /something/,
+          },
+          { toolName: 'tool1', decision: PolicyDecision.ALLOW, priority: 100 },
+        ],
+      });
+      // Since it's only conditionally denied, it is "potentially" allowed
+      expect(engine.isToolPotentiallyAllowed('tool1')).toBe(true);
+    });
+
+    it('should respect global rules', () => {
+      const engine = new PolicyEngine({
+        rules: [
+          { decision: PolicyDecision.DENY, priority: 50 }, // Global deny
+        ],
+      });
+      expect(engine.isToolPotentiallyAllowed('any_tool')).toBe(false);
+    });
+
+    it('should ignore global rules when ignoreGlobalRules is true', () => {
+      const engine = new PolicyEngine({
+        rules: [
+          { decision: PolicyDecision.DENY, priority: 100 }, // Global deny
+        ],
+      });
+      // Should fallback to defaultDecision (ASK_USER by default)
+      expect(engine.isToolPotentiallyAllowed('any_tool', undefined, true)).toBe(
+        true,
+      );
+    });
+
+    it('should still respect specific tool DENY when ignoreGlobalRules is true', () => {
+      const engine = new PolicyEngine({
+        rules: [
+          { decision: PolicyDecision.DENY, priority: 100 }, // Global deny
+          { toolName: 'tool1', decision: PolicyDecision.DENY, priority: 150 }, // Specific deny
+        ],
+      });
+      expect(engine.isToolPotentiallyAllowed('tool1', undefined, true)).toBe(
+        false,
+      );
+    });
+
+    it('should respect modes', () => {
+      const engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'tool1',
+            decision: PolicyDecision.ALLOW,
+            priority: 100,
+            modes: [ApprovalMode.PLAN],
+          },
+        ],
+      });
+      expect(engine.isToolPotentiallyAllowed('tool1')).toBe(true); // Default mode is usually DEFAULT which might be allowed if defaultDecision is ASK_USER
+
+      const engineDeny = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'tool1',
+            decision: PolicyDecision.ALLOW,
+            priority: 100,
+            modes: [ApprovalMode.PLAN],
+          },
+          { decision: PolicyDecision.DENY, priority: 50 },
+        ],
+      });
+      engineDeny.setApprovalMode(ApprovalMode.DEFAULT);
+      expect(engineDeny.isToolPotentiallyAllowed('tool1')).toBe(false);
+
+      engineDeny.setApprovalMode(ApprovalMode.PLAN);
+      expect(engineDeny.isToolPotentiallyAllowed('tool1')).toBe(true);
+    });
+  });
 });

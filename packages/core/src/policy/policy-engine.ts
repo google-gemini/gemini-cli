@@ -629,6 +629,73 @@ export class PolicyEngine {
     return excludedTools;
   }
 
+  /**
+   * Checks if a tool could potentially be allowed (or ASK_USER) under the current approval mode.
+   * This is used to filter out tools that are unconditionally denied before generating the prompt schema.
+   */
+  isToolPotentiallyAllowed(
+    toolName: string,
+    serverName?: string,
+    ignoreGlobalRules = false,
+  ): boolean {
+    const aliases = getToolAliases(toolName);
+    const namesToTry = [...aliases];
+    if (serverName) {
+      for (const alias of aliases) {
+        namesToTry.push(`${serverName}__${alias}`);
+      }
+    }
+
+    let globalVerdict: PolicyDecision | undefined;
+
+    for (const rule of this.rules) {
+      // Check if rule applies to current approval mode
+      if (rule.modes && rule.modes.length > 0) {
+        if (!rule.modes.includes(this.approvalMode)) {
+          continue;
+        }
+      }
+
+      const ruleToolName = rule.toolName;
+
+      let isToolMatch = false;
+      if (!ruleToolName) {
+        if (ignoreGlobalRules) {
+          continue;
+        }
+        isToolMatch = true; // Global rule matches all tools
+        if (globalVerdict === undefined) {
+          globalVerdict = rule.decision;
+        }
+      } else if (isWildcardPattern(ruleToolName)) {
+        isToolMatch = namesToTry.some((name) =>
+          matchesWildcard(ruleToolName, name),
+        );
+      } else {
+        isToolMatch = namesToTry.includes(ruleToolName);
+      }
+
+      if (isToolMatch) {
+        if (rule.decision !== PolicyDecision.DENY) {
+          // Found a rule that might allow it (could be conditional on args)
+          return true;
+        } else if (!rule.argsPattern) {
+          // Unconditional DENY that applies to this tool (either specific or global)
+          return false;
+        }
+        // Conditional DENY (depends on args). Keep checking lower priority rules
+        // because if the args DON'T match this DENY, a lower priority rule might ALLOW it.
+      }
+    }
+
+    // No specific rule allowed it or unconditionally denied it.
+    if (globalVerdict !== undefined && !ignoreGlobalRules) {
+      return globalVerdict !== PolicyDecision.DENY;
+    }
+
+    return this.defaultDecision !== PolicyDecision.DENY;
+  }
+
   private applyNonInteractiveMode(decision: PolicyDecision): PolicyDecision {
     // In non-interactive mode, ASK_USER becomes DENY
     if (this.nonInteractive && decision === PolicyDecision.ASK_USER) {
