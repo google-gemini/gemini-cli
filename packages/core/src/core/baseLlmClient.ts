@@ -12,6 +12,8 @@ import type {
   GenerateContentParameters,
   GenerateContentConfig,
 } from '@google/genai';
+import os from 'node:os';
+import path from 'node:path';
 import type { Config } from '../config/config.js';
 import type { ContentGenerator, AuthType } from './contentGenerator.js';
 import { handleFallback } from '../fallback/handler.js';
@@ -338,18 +340,28 @@ export class BaseLlmClient {
         error instanceof Error &&
         error.message.includes('Retry attempts exhausted')
       ) {
+        const errorReportDir = path.join(
+          this.config.storage?.getProjectTempDir() ?? os.tmpdir(),
+          'error-reports',
+        );
         await reportError(
           error,
           `API returned invalid content after all retries.`,
           contents,
           `${errorContext}-invalid-content`,
+          errorReportDir,
         );
       } else {
+        const errorReportDir = path.join(
+          this.config.storage?.getProjectTempDir() ?? os.tmpdir(),
+          'error-reports',
+        );
         await reportError(
           error,
           `Error generating content via API.`,
           contents,
           `${errorContext}-api`,
+          errorReportDir,
         );
       }
 
