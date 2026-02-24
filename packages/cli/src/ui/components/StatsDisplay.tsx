@@ -168,10 +168,10 @@ const ModelUsageTable: React.FC<{
   const uncachedWidth = 15;
   const cachedWidth = 14;
   const outputTokensWidth = 15;
-  const usageLimitWidth = showQuotaColumn ? 40 : 0;
+  const usageLimitWidth = showQuotaColumn ? 85 : 0;
 
   const renderProgressBar = (usedFraction: number) => {
-    const totalSteps = 10;
+    const totalSteps = 20;
     const filledSteps = Math.min(
       totalSteps,
       Math.max(0, Math.round(usedFraction * totalSteps)),
@@ -377,18 +377,21 @@ const ModelUsageTable: React.FC<{
             alignItems="flex-end"
           >
             {row.bucket && (
-              <>
+              <Box flexDirection="row">
                 {row.bucket.remainingFraction != null &&
                   renderProgressBar(1 - row.bucket.remainingFraction)}
-                <Text color={theme.text.secondary} wrap="truncate-end">
-                  {row.bucket.remainingFraction != null
-                    ? `${((1 - row.bucket.remainingFraction) * 100).toFixed(0)}% used`
-                    : 'Quota active'}
-                  {row.bucket.resetTime && formatResetTime(row.bucket.resetTime)
-                    ? ` (Limit resets in ${formatResetTime(row.bucket.resetTime)})`
-                    : ''}
-                </Text>
-              </>
+                <Box marginLeft={1}>
+                  <Text color={theme.text.secondary} wrap="truncate-end">
+                    {row.bucket.remainingFraction != null
+                      ? `${((1 - row.bucket.remainingFraction) * 100).toFixed(0)}% used`
+                      : 'Quota active'}
+                    {row.bucket.resetTime &&
+                    formatResetTime(row.bucket.resetTime)
+                      ? ` (Limit resets in ${formatResetTime(row.bucket.resetTime)})`
+                      : ''}
+                  </Text>
+                </Box>
+              </Box>
             )}
           </Box>
         </Box>
