@@ -131,13 +131,27 @@ export class Scheduler {
   }
 
   private readonly handleMcpProgress = (payload: McpProgressPayload) => {
-    const callId = payload.callId;
+    const { callId } = payload;
+
+    const call = this.state.getToolCall(callId);
+    if (!call || call.status !== CoreToolCallStatus.Executing) {
+      return;
+    }
+
+    const validTotal =
+      payload.total !== undefined &&
+      Number.isFinite(payload.total) &&
+      payload.total > 0
+        ? payload.total
+        : undefined;
+
     this.state.updateStatus(callId, CoreToolCallStatus.Executing, {
       progressMessage: payload.message,
-      progressPercent:
-        payload.total && payload.total > 0
-          ? (payload.progress / payload.total) * 100
-          : undefined,
+      progressPercent: validTotal
+        ? Math.min(100, (payload.progress / validTotal) * 100)
+        : undefined,
+      progress: payload.progress,
+      progressTotal: validTotal,
     });
   };
 

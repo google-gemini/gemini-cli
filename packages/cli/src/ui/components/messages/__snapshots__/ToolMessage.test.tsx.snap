@@ -92,6 +92,16 @@ exports[`<ToolMessage /> > renders DiffRenderer for diff results 1`] = `
 "
 `;
 
+exports[`<ToolMessage /> > renders McpProgressIndicator with percentage and message for executing tools 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ MockRespondingSpinnertest-tool A tool for testing                            │
+│                                                                              │
+│ ████████░░░░░░░░░░░░ 42%                                                     │
+│ Working on it...                                                             │
+│ Test result                                                                  │
+"
+`;
+
 exports[`<ToolMessage /> > renders basic tool information 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool A tool for testing                                              │
@@ -112,6 +122,24 @@ exports[`<ToolMessage /> > renders emphasis correctly 2`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool A tool for testing                                              │
 │                                                                              │
+│ Test result                                                                  │
+"
+`;
+
+exports[`<ToolMessage /> > renders indeterminate progress when total is missing 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ MockRespondingSpinnertest-tool A tool for testing                            │
+│                                                                              │
+│ ███████░░░░░░░░░░░░░ 7                                                       │
+│ Test result                                                                  │
+"
+`;
+
+exports[`<ToolMessage /> > renders only percentage when progressMessage is missing 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ MockRespondingSpinnertest-tool A tool for testing                            │
+│                                                                              │
+│ ███████████████░░░░░ 75%                                                     │
 │ Test result                                                                  │
 "
 `;

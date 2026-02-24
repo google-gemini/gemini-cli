@@ -543,6 +543,11 @@ export class SchedulerStateManager {
     const progressPercent =
       execData?.progressPercent ??
       ('progressPercent' in call ? call.progressPercent : undefined);
+    const progress =
+      execData?.progress ?? ('progress' in call ? call.progress : undefined);
+    const progressTotal =
+      execData?.progressTotal ??
+      ('progressTotal' in call ? call.progressTotal : undefined);
 
     return {
       request: call.request,
@@ -555,6 +560,8 @@ export class SchedulerStateManager {
       pid,
       progressMessage,
       progressPercent,
+      progress,
+      progressTotal,
       schedulerId: call.schedulerId,
       approvalMode: call.approvalMode,
     };
