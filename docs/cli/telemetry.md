@@ -270,10 +270,10 @@ For local development and debugging, you can capture telemetry data locally:
 3. View traces at http://localhost:16686 and logs/metrics in the collector log
    file.
 
-## Logs and metrics
+## Logs, metrics, and traces
 
-The following section describes the structure of logs and metrics generated for
-Gemini CLI.
+The following section describes the structure of logs, metrics, and traces
+generated for Gemini CLI.
 
 The `session.id`, `installation.id`, `active_approval_mode`, and `user.email`
 (available only when authenticated with a Google account) are included as common
@@ -820,6 +820,31 @@ Optional performance monitoring for startup, CPU/memory, and phase timing.
     - `category` (string)
     - `current_value` (number)
     - `baseline_value` (number)
+
+### Traces (Dev Tracing)
+
+When `GEMINI_DEV_TRACING=true` is set, dev traces encapsulate agent and backend
+operations. While dev traces are inherently verbose and targeted for developers,
+we capture consistent custom span attributes:
+
+- `gen_ai.operation.name` (string): The high-level operation kind (e.g.
+  "tool_call", "llm_call").
+- `gen_ai.agent.name` (string): The service agent identifier ("gemini-cli").
+- `gen_ai.agent.description` (string): The service agent description.
+- `gen_ai.input.messages` (string): Input messages or metadata specific to the
+  operation.
+- `gen_ai.output.messages` (string): Output messages or metadata generated from
+  the operation.
+- `gen_ai.request.model` (string): The request model name.
+- `gen_ai.response.model` (string): The response model name.
+- `gen_ai.system_instructions` (json string): The system instructions.
+- `gen_ai.prompt.name` (string): The prompt name.
+- `gen_ai.tool.name` (string): The executed tool's name.
+- `gen_ai.tool.call_id` (string): The generated specific ID of the tool call.
+- `gen_ai.tool.description` (string): The executed tool's description.
+- `gen_ai.tool.definitions` (json string): The executed tool's description.
+- `gen_ai.conversation.id` (string): The current CLI session ID.
+- Additional user-defined Custom Attributes passed via the span's configuration.
 
 #### GenAI semantic convention
 

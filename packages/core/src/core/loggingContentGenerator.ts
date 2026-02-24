@@ -38,11 +38,13 @@ import { runInDevTraceSpan, type SpanMetadata } from '../telemetry/trace.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorType } from '../utils/errors.js';
 import {
-  GEMINI_CLI_GENERATE_CONTENT_CONFIG,
-  GEMINI_CLI_GENERATE_CONTENT_USAGE,
   GeminiCliOperation,
   GEN_AI_PROMPT_NAME,
   GEN_AI_REQUEST_MODEL,
+  GEN_AI_SYSTEM_INSTRUCTIONS,
+  GEN_AI_TOOL_DEFINITIONS,
+  GEN_AI_USAGE_INPUT_TOKENS,
+  GEN_AI_USAGE_OUTPUT_TOKENS,
 } from '../telemetry/constants.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 
@@ -212,7 +214,10 @@ export class LoggingContentGenerator implements ContentGenerator {
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,
           [GEN_AI_PROMPT_NAME]: userPromptId,
-          [GEMINI_CLI_GENERATE_CONTENT_CONFIG]: safeJsonStringify(req.config),
+          [GEN_AI_SYSTEM_INSTRUCTIONS]: safeJsonStringify(
+            req.config?.systemInstruction ?? [],
+          ),
+          [GEN_AI_TOOL_DEFINITIONS]: safeJsonStringify(req.config?.tools ?? []),
         },
       },
       async ({ metadata: spanMetadata }) => {
@@ -237,8 +242,10 @@ export class LoggingContentGenerator implements ContentGenerator {
             role,
           );
           spanMetadata.output = response.candidates?.[0]?.content ?? null;
-          spanMetadata.attributes[GEMINI_CLI_GENERATE_CONTENT_USAGE] =
-            safeJsonStringify(response.usageMetadata);
+          spanMetadata.attributes[GEN_AI_USAGE_INPUT_TOKENS] =
+            response.usageMetadata?.promptTokenCount ?? 0;
+          spanMetadata.attributes[GEN_AI_USAGE_OUTPUT_TOKENS] =
+            response.usageMetadata?.candidatesTokenCount ?? 0;
           const durationMs = Date.now() - startTime;
           this._logApiResponse(
             contents,
@@ -294,7 +301,10 @@ export class LoggingContentGenerator implements ContentGenerator {
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,
           [GEN_AI_PROMPT_NAME]: userPromptId,
-          [GEMINI_CLI_GENERATE_CONTENT_CONFIG]: safeJsonStringify(req.config),
+          [GEN_AI_SYSTEM_INSTRUCTIONS]: safeJsonStringify(
+            req.config?.systemInstruction ?? [],
+          ),
+          [GEN_AI_TOOL_DEFINITIONS]: safeJsonStringify(req.config?.tools ?? []),
         },
       },
       async ({ metadata: spanMetadata, endSpan }) => {
@@ -408,8 +418,10 @@ export class LoggingContentGenerator implements ContentGenerator {
         (response) => response.candidates?.[0]?.content ?? null,
       );
       if (lastUsageMetadata) {
-        spanMetadata.attributes[GEMINI_CLI_GENERATE_CONTENT_USAGE] =
-          safeJsonStringify(lastUsageMetadata);
+        spanMetadata.attributes[GEN_AI_USAGE_INPUT_TOKENS] =
+          lastUsageMetadata.promptTokenCount ?? 0;
+        spanMetadata.attributes[GEN_AI_USAGE_OUTPUT_TOKENS] =
+          lastUsageMetadata.candidatesTokenCount ?? 0;
       }
     } catch (error) {
       spanMetadata.error = error;
@@ -442,7 +454,6 @@ export class LoggingContentGenerator implements ContentGenerator {
         operation: GeminiCliOperation.LLMCall,
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,
-          [GEMINI_CLI_GENERATE_CONTENT_CONFIG]: safeJsonStringify(req.config),
         },
       },
       async ({ metadata: spanMetadata }) => {

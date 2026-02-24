@@ -40,11 +40,13 @@ import { UserTierId } from '../code_assist/types.js';
 import { ApiRequestEvent, LlmRole } from '../telemetry/types.js';
 import { FatalAuthenticationError } from '../utils/errors.js';
 import {
-  GEMINI_CLI_GENERATE_CONTENT_CONFIG,
-  GEMINI_CLI_GENERATE_CONTENT_USAGE,
   GeminiCliOperation,
   GEN_AI_PROMPT_NAME,
   GEN_AI_REQUEST_MODEL,
+  GEN_AI_SYSTEM_INSTRUCTIONS,
+  GEN_AI_TOOL_DEFINITIONS,
+  GEN_AI_USAGE_INPUT_TOKENS,
+  GEN_AI_USAGE_OUTPUT_TOKENS,
 } from '../telemetry/constants.js';
 import { type SpanMetadata } from '../telemetry/trace.js';
 
@@ -83,7 +85,8 @@ describe('LoggingContentGenerator', () => {
         contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
         model: 'gemini-pro',
         config: {
-          topK: 1,
+          systemInstruction: { parts: [{ text: 'system instructions' }] },
+          tools: [{ functionDeclarations: [{ name: 'myTool' }] }],
         },
       };
       const userPromptId = 'prompt-123';
@@ -138,7 +141,10 @@ describe('LoggingContentGenerator', () => {
           attributes: expect.objectContaining({
             [GEN_AI_REQUEST_MODEL]: 'gemini-pro',
             [GEN_AI_PROMPT_NAME]: userPromptId,
-            [GEMINI_CLI_GENERATE_CONTENT_CONFIG]: JSON.stringify(req.config),
+            [GEN_AI_SYSTEM_INSTRUCTIONS]: JSON.stringify(
+              req.config.systemInstruction,
+            ),
+            [GEN_AI_TOOL_DEFINITIONS]: JSON.stringify(req.config.tools),
           }),
         }),
         expect.any(Function),
@@ -153,9 +159,8 @@ describe('LoggingContentGenerator', () => {
         input: req.contents,
         output: response.candidates?.[0]?.content,
         attributes: {
-          [GEMINI_CLI_GENERATE_CONTENT_USAGE]: JSON.stringify(
-            response.usageMetadata,
-          ),
+          [GEN_AI_USAGE_INPUT_TOKENS]: 1,
+          [GEN_AI_USAGE_OUTPUT_TOKENS]: 2,
         },
       });
     });
@@ -165,7 +170,10 @@ describe('LoggingContentGenerator', () => {
         contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
         model: 'gemini-pro',
         config: {
-          topK: 1,
+          systemInstruction: {
+            parts: [{ text: 'stream system instructions' }],
+          },
+          tools: [{ functionDeclarations: [{ name: 'streamTool' }] }],
         },
       };
       const userPromptId = 'prompt-123';
@@ -197,7 +205,10 @@ describe('LoggingContentGenerator', () => {
           attributes: expect.objectContaining({
             [GEN_AI_REQUEST_MODEL]: 'gemini-pro',
             [GEN_AI_PROMPT_NAME]: userPromptId,
-            [GEMINI_CLI_GENERATE_CONTENT_CONFIG]: JSON.stringify(req.config),
+            [GEN_AI_SYSTEM_INSTRUCTIONS]: JSON.stringify(
+              req.config.systemInstruction,
+            ),
+            [GEN_AI_TOOL_DEFINITIONS]: JSON.stringify(req.config.tools),
           }),
         }),
         expect.any(Function),
@@ -235,7 +246,10 @@ describe('LoggingContentGenerator', () => {
         contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
         model: 'gemini-pro',
         config: {
-          topK: 1,
+          systemInstruction: {
+            parts: [{ text: 'stream system instructions' }],
+          },
+          tools: [{ functionDeclarations: [{ name: 'streamTool' }] }],
         },
       };
       const userPromptId = 'prompt-123';
@@ -299,7 +313,10 @@ describe('LoggingContentGenerator', () => {
           attributes: expect.objectContaining({
             [GEN_AI_REQUEST_MODEL]: 'gemini-pro',
             [GEN_AI_PROMPT_NAME]: userPromptId,
-            [GEMINI_CLI_GENERATE_CONTENT_CONFIG]: JSON.stringify(req.config),
+            [GEN_AI_SYSTEM_INSTRUCTIONS]: JSON.stringify(
+              req.config.systemInstruction,
+            ),
+            [GEN_AI_TOOL_DEFINITIONS]: JSON.stringify(req.config.tools),
           }),
         }),
         expect.any(Function),
@@ -322,9 +339,8 @@ describe('LoggingContentGenerator', () => {
         input: req.contents,
         output: [response.candidates?.[0]?.content],
         attributes: {
-          [GEMINI_CLI_GENERATE_CONTENT_USAGE]: JSON.stringify(
-            response.usageMetadata,
-          ),
+          [GEN_AI_USAGE_INPUT_TOKENS]: 1,
+          [GEN_AI_USAGE_OUTPUT_TOKENS]: 2,
         },
       });
     });
@@ -461,7 +477,6 @@ describe('LoggingContentGenerator', () => {
           operation: GeminiCliOperation.LLMCall,
           attributes: expect.objectContaining({
             [GEN_AI_REQUEST_MODEL]: req.model,
-            [GEMINI_CLI_GENERATE_CONTENT_CONFIG]: JSON.stringify(req.config),
           }),
         }),
         expect.any(Function),
