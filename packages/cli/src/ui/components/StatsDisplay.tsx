@@ -386,19 +386,21 @@ const ModelUsageTable: React.FC<{
             {row.bucket && row.bucket.remainingFraction != null && (
               <Box flexDirection="row">
                 {(() => {
-                  const usedFraction = 1 - row.bucket.remainingFraction;
-                  const usedPercentage = usedFraction * 100;
-                  const isUsedInSession =
-                    typeof row.requests === 'number' && row.requests > 0;
+                  const actualUsedFraction = 1 - row.bucket.remainingFraction;
+                  // If we have session activity but 0% server usage, show 0.1% as a hint.
+                  const effectiveUsedFraction =
+                    actualUsedFraction === 0 && row.isActive
+                      ? 0.001
+                      : actualUsedFraction;
+
+                  const usedPercentage = effectiveUsedFraction * 100;
 
                   const statusColor =
                     getUsedStatusColor(usedPercentage, {
                       warning: QUOTA_USED_WARNING_THRESHOLD,
                       critical: QUOTA_USED_CRITICAL_THRESHOLD,
                     }) ??
-                    (isUsedInSession
-                      ? theme.text.primary
-                      : theme.text.secondary);
+                    (row.isActive ? theme.text.primary : theme.ui.comment);
 
                   const percentageText =
                     usedPercentage > 0 && usedPercentage < 1
@@ -407,7 +409,7 @@ const ModelUsageTable: React.FC<{
 
                   return (
                     <>
-                      {renderProgressBar(usedFraction, statusColor)}
+                      {renderProgressBar(effectiveUsedFraction, statusColor)}
                       <Box marginLeft={1}>
                         <Text wrap="truncate-end">
                           {row.bucket.remainingFraction === 0 ? (
