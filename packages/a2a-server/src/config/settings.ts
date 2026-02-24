@@ -27,6 +27,12 @@ export interface Settings {
   mcpServers?: Record<string, MCPServerConfig>;
   coreTools?: string[];
   excludeTools?: string[];
+  allowedTools?: string[];
+  tools?: {
+    allowed?: string[];
+    exclude?: string[];
+    core?: string[];
+  };
   telemetry?: TelemetrySettings;
   showMemoryUsage?: boolean;
   checkpointing?: CheckpointingSettings;
