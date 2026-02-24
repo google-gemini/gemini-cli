@@ -182,8 +182,8 @@ const ModelUsageTable: React.FC<{
     const emptySteps = totalSteps - filledSteps;
     return (
       <Box flexDirection="row">
-        <Text color={theme.text.primary}>{'█'.repeat(filledSteps)}</Text>
-        <Text color={theme.ui.dark}>{'░'.repeat(emptySteps)}</Text>
+        <Text color={theme.text.primary}>{'▬'.repeat(filledSteps)}</Text>
+        <Text color={theme.text.secondary}>{'▬'.repeat(emptySteps)}</Text>
       </Box>
     );
   };

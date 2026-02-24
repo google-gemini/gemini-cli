@@ -170,8 +170,8 @@ exports[`<StatsDisplay /> > Quota Display > renders pooled quota information for
 │                                                                                                  │
 │  Model                  Reqs                                                        Model usage  │
 │  ────────────────────────────────────────────────────────────────────────────────────────────────│
-│  gemini-2.5-pro            -                                      ██████████████████░░ 90% used  │
-│  gemini-2.5-flash          -                                      ██████░░░░░░░░░░░░░░ 30% used  │
+│  gemini-2.5-pro            -                                      ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬ 90% used  │
+│  gemini-2.5-flash          -                                      ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬ 30% used  │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
@@ -196,7 +196,7 @@ exports[`<StatsDisplay /> > Quota Display > renders quota information for unused
 │  Model Usage                                                                                     │
 │  Model                  Reqs                                                        Model usage  │
 │  ────────────────────────────────────────────────────────────────────────────────────────────────│
-│  gemini-2.5-flash        ██████████░░░░░░░░░░ 50% used (Limit resets in 2 hours at 6:00 AM PST)  │
+│  gemini-2.5-flash        ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬ 50% used (Limit resets in 2 hours at 6:00 AM PST)  │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
@@ -221,7 +221,7 @@ exports[`<StatsDisplay /> > Quota Display > renders quota information when quota
 │  Model Usage                                                                                     │
 │  Model                  Reqs                                                        Model usage  │
 │  ────────────────────────────────────────────────────────────────────────────────────────────────│
-│  gemini-2.5-pro█████░░░░░░░░░░░░░░░ 25% used (Limit resets in 1 hour 30 minutes at 5:30 AM PST)  │
+│  gemini-2.5-pro▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬ 25% used (Limit resets in 1 hour 30 minutes at 5:30 AM PST)  │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
