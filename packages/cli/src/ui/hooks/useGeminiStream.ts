@@ -36,6 +36,7 @@ import {
   CoreToolCallStatus,
   buildUserSteeringHintPrompt,
   generateSteeringAckMessage,
+  GeminiCliOperation,
   getPlanModeExitMessage,
 } from '@google/gemini-cli-core';
 import type {

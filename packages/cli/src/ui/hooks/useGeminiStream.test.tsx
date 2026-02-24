@@ -40,6 +40,7 @@ import {
   coreEvents,
   CoreEvent,
   MCPDiscoveryState,
+  GeminiCliOperation,
   getPlanModeExitMessage,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
