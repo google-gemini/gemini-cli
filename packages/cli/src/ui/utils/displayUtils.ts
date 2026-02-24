@@ -53,5 +53,5 @@ export const getUsedStatusColor = (
   if (usedPercentage >= thresholds.warning) {
     return theme.status.warning;
   }
-  return theme.status.success;
+  return undefined;
 };

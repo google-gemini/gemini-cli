@@ -177,7 +177,7 @@ const ModelUsageTable: React.FC<{
     const totalSteps = 20;
     const filledSteps = Math.min(
       totalSteps,
-      Math.max(0, Math.round(usedFraction * totalSteps)),
+      Math.max(1, Math.round(usedFraction * totalSteps)),
     );
     const emptySteps = totalSteps - filledSteps;
     return (
