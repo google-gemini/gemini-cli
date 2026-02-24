@@ -29,7 +29,11 @@ import {
   getThemeTypeFromBackgroundColor,
   resolveColor,
 } from './color-utils.js';
-import { DEFAULT_BORDER_OPACITY } from '../constants.js';
+import {
+  DEFAULT_BACKGROUND_OPACITY,
+  DEFAULT_INPUT_BACKGROUND_OPACITY,
+  DEFAULT_BORDER_OPACITY,
+} from '../constants.js';
 import { ANSI } from './ansi.js';
 import { ANSILight } from './ansi-light.js';
 import { NoColorTheme } from './no-color.js';
@@ -310,7 +314,21 @@ class ThemeManager {
       this.cachedColors = {
         ...colors,
         Background: this.terminalBackground,
-        DarkGray: interpolateColor(colors.Gray, this.terminalBackground, 0.5),
+        DarkGray: interpolateColor(
+          this.terminalBackground,
+          colors.Gray,
+          DEFAULT_BORDER_OPACITY,
+        ),
+        InputBackground: interpolateColor(
+          this.terminalBackground,
+          colors.Gray,
+          DEFAULT_INPUT_BACKGROUND_OPACITY,
+        ),
+        MessageBackground: interpolateColor(
+          this.terminalBackground,
+          colors.Gray,
+          DEFAULT_BACKGROUND_OPACITY,
+        ),
       };
     } else {
       this.cachedColors = colors;
@@ -341,6 +359,16 @@ class ThemeManager {
         background: {
           ...semanticColors.background,
           primary: this.terminalBackground,
+          message: interpolateColor(
+            this.terminalBackground,
+            activeTheme.colors.Gray,
+            DEFAULT_BACKGROUND_OPACITY,
+          ),
+          input: interpolateColor(
+            this.terminalBackground,
+            activeTheme.colors.Gray,
+            DEFAULT_INPUT_BACKGROUND_OPACITY,
+          ),
         },
         border: {
           ...semanticColors.border,
@@ -353,9 +381,9 @@ class ThemeManager {
         ui: {
           ...semanticColors.ui,
           dark: interpolateColor(
-            activeTheme.colors.Gray,
             this.terminalBackground,
-            0.5,
+            activeTheme.colors.Gray,
+            DEFAULT_BORDER_OPACITY,
           ),
         },
       };
