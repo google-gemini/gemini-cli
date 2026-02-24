@@ -12,6 +12,7 @@ import {
   useEffect,
   useReducer,
   useContext,
+  useState,
 } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
@@ -32,6 +33,8 @@ import { RenderInline } from '../utils/InlineMarkdownRenderer.js';
 import { MaxSizedBox } from './shared/MaxSizedBox.js';
 import { UIStateContext } from '../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
+import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 
 /** Padding for dialog content to prevent text from touching edges. */
 const DIALOG_PADDING = 4;
@@ -183,6 +186,10 @@ interface AskUserDialogProps {
    * Height constraint for scrollable content.
    */
   availableHeight?: number;
+  /**
+   * Chat history (user messages) for Ctrl+R search in text inputs.
+   */
+  chatHistoryForSearch?: readonly string[];
 }
 
 interface ReviewViewProps {
@@ -264,6 +271,7 @@ interface TextQuestionViewProps {
   initialAnswer?: string;
   progressHeader?: React.ReactNode;
   keyboardHints?: React.ReactNode;
+  chatHistoryForSearch?: readonly string[];
 }
 
 const TextQuestionView: React.FC<TextQuestionViewProps> = ({
@@ -276,6 +284,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   initialAnswer,
   progressHeader,
   keyboardHints,
+  chatHistoryForSearch = [],
 }) => {
   const isAlternateBuffer = useAlternateBuffer();
   const prefix = '> ';
@@ -291,6 +300,19 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
 
   const { text: textValue } = buffer;
 
+  // Ctrl+R history search state
+  const [commandSearchActive, setCommandSearchActive] = useState(false);
+  const [textBeforeSearch, setTextBeforeSearch] = useState('');
+  const reversedHistory = useMemo(
+    () => [...chatHistoryForSearch].reverse(),
+    [chatHistoryForSearch],
+  );
+  const commandSearchCompletion = useReverseSearchCompletion(
+    buffer,
+    reversedHistory,
+    commandSearchActive,
+  );
+
   // Sync state change with parent - only when it actually changes
   const lastTextValueRef = useRef(textValue);
   useEffect(() => {
@@ -300,9 +322,63 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
     }
   }, [textValue, onSelectionChange]);
 
-  // Handle Ctrl+C to clear all text
+  const cancelSearch = useCallback(() => {
+    setCommandSearchActive(false);
+    commandSearchCompletion.resetCompletionState();
+    buffer.setText(textBeforeSearch);
+  }, [buffer, commandSearchCompletion, textBeforeSearch]);
+
+  const acceptSearch = useCallback(() => {
+    const { suggestions, activeSuggestionIndex, showSuggestions } =
+      commandSearchCompletion;
+    if (
+      showSuggestions &&
+      suggestions.length > 0 &&
+      activeSuggestionIndex >= 0
+    ) {
+      buffer.setText(suggestions[activeSuggestionIndex].value);
+    }
+    setCommandSearchActive(false);
+    commandSearchCompletion.resetCompletionState();
+  }, [buffer, commandSearchCompletion]);
+
   const handleExtraKeys = useCallback(
     (key: Key) => {
+      // When search is active, intercept navigation and cancel/accept keys
+      if (commandSearchActive) {
+        if (keyMatchers[Command.ESCAPE](key)) {
+          cancelSearch();
+          return true;
+        }
+        if (keyMatchers[Command.ACCEPT_SUGGESTION_REVERSE_SEARCH](key)) {
+          acceptSearch();
+          return true;
+        }
+        if (keyMatchers[Command.SUBMIT_REVERSE_SEARCH](key)) {
+          acceptSearch();
+          return true;
+        }
+        if (keyMatchers[Command.NAVIGATION_UP](key)) {
+          commandSearchCompletion.navigateUp();
+          return true;
+        }
+        if (keyMatchers[Command.NAVIGATION_DOWN](key)) {
+          commandSearchCompletion.navigateDown();
+          return true;
+        }
+      }
+
+      // Ctrl+R to enter search mode
+      if (
+        keyMatchers[Command.REVERSE_SEARCH](key) &&
+        chatHistoryForSearch.length > 0
+      ) {
+        setCommandSearchActive(true);
+        setTextBeforeSearch(buffer.text);
+        return true;
+      }
+
+      // Ctrl+C to clear text
       if (keyMatchers[Command.QUIT](key)) {
         if (textValue === '') {
           return false;
@@ -312,7 +388,15 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
       }
       return false;
     },
-    [buffer, textValue],
+    [
+      buffer,
+      textValue,
+      commandSearchActive,
+      cancelSearch,
+      acceptSearch,
+      commandSearchCompletion,
+      chatHistoryForSearch.length,
+    ],
   );
 
   useKeypress(handleExtraKeys, { isActive: true, priority: true });
@@ -343,6 +427,8 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
       ? Math.max(1, availableHeight - overhead)
       : undefined;
 
+  const suggestionsWidth = Math.max(20, availableWidth - DIALOG_PADDING);
+
   return (
     <Box flexDirection="column">
       {progressHeader}
@@ -361,13 +447,31 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
       </Box>
 
       <Box flexDirection="row" marginBottom={1}>
-        <Text color={theme.status.success}>{'> '}</Text>
+        <Text
+          color={commandSearchActive ? theme.text.accent : theme.status.success}
+        >
+          {commandSearchActive ? '(r:) ' : '> '}
+        </Text>
         <TextInput
           buffer={buffer}
           placeholder={placeholder}
           onSubmit={handleSubmit}
         />
       </Box>
+
+      {commandSearchActive && commandSearchCompletion.showSuggestions && (
+        <Box marginBottom={1}>
+          <SuggestionsDisplay
+            suggestions={commandSearchCompletion.suggestions}
+            activeIndex={commandSearchCompletion.activeSuggestionIndex}
+            isLoading={commandSearchCompletion.isLoadingSuggestions}
+            width={suggestionsWidth}
+            scrollOffset={commandSearchCompletion.visibleStartIndex}
+            userInput={buffer.text}
+            mode="reverse"
+          />
+        </Box>
+      )}
 
       {keyboardHints}
     </Box>
@@ -461,6 +565,7 @@ interface ChoiceQuestionViewProps {
   initialAnswer?: string;
   progressHeader?: React.ReactNode;
   keyboardHints?: React.ReactNode;
+  chatHistoryForSearch?: readonly string[];
 }
 
 const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
@@ -473,6 +578,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   initialAnswer,
   progressHeader,
   keyboardHints,
+  chatHistoryForSearch = [],
 }) => {
   const isAlternateBuffer = useAlternateBuffer();
   const numOptions =
@@ -567,6 +673,39 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
   const customOptionText = customBuffer.text;
 
+  // Ctrl+R history search state for custom option
+  const [commandSearchActive, setCommandSearchActive] = useState(false);
+  const [textBeforeSearch, setTextBeforeSearch] = useState('');
+  const reversedHistory = useMemo(
+    () => [...chatHistoryForSearch].reverse(),
+    [chatHistoryForSearch],
+  );
+  const commandSearchCompletion = useReverseSearchCompletion(
+    customBuffer,
+    reversedHistory,
+    commandSearchActive,
+  );
+
+  const cancelSearch = useCallback(() => {
+    setCommandSearchActive(false);
+    commandSearchCompletion.resetCompletionState();
+    customBuffer.setText(textBeforeSearch);
+  }, [customBuffer, commandSearchCompletion, textBeforeSearch]);
+
+  const acceptSearch = useCallback(() => {
+    const { suggestions, activeSuggestionIndex, showSuggestions } =
+      commandSearchCompletion;
+    if (
+      showSuggestions &&
+      suggestions.length > 0 &&
+      activeSuggestionIndex >= 0
+    ) {
+      customBuffer.setText(suggestions[activeSuggestionIndex].value);
+    }
+    setCommandSearchActive(false);
+    commandSearchCompletion.resetCompletionState();
+  }, [customBuffer, commandSearchCompletion]);
+
   // Helper to build answer string from selections
   const buildAnswerString = useCallback(
     (
@@ -608,16 +747,52 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     onSelectionChange,
   ]);
 
-  // Handle "Type-to-Jump" and Ctrl+C for custom buffer
+  // Handle Ctrl+R search, "Type-to-Jump", and Ctrl+C for custom buffer
   const handleExtraKeys = useCallback(
     (key: Key) => {
-      // If focusing custom option, handle Ctrl+C
-      if (isCustomOptionFocused && keyMatchers[Command.QUIT](key)) {
-        if (customOptionText === '') {
-          return false;
+      if (isCustomOptionFocused) {
+        // When search is active, intercept navigation and cancel/accept keys
+        if (commandSearchActive) {
+          if (keyMatchers[Command.ESCAPE](key)) {
+            cancelSearch();
+            return true;
+          }
+          if (keyMatchers[Command.ACCEPT_SUGGESTION_REVERSE_SEARCH](key)) {
+            acceptSearch();
+            return true;
+          }
+          if (keyMatchers[Command.SUBMIT_REVERSE_SEARCH](key)) {
+            acceptSearch();
+            return true;
+          }
+          if (keyMatchers[Command.NAVIGATION_UP](key)) {
+            commandSearchCompletion.navigateUp();
+            return true;
+          }
+          if (keyMatchers[Command.NAVIGATION_DOWN](key)) {
+            commandSearchCompletion.navigateDown();
+            return true;
+          }
         }
-        customBuffer.setText('');
-        return true;
+
+        // Ctrl+R to enter search mode
+        if (
+          keyMatchers[Command.REVERSE_SEARCH](key) &&
+          chatHistoryForSearch.length > 0
+        ) {
+          setCommandSearchActive(true);
+          setTextBeforeSearch(customBuffer.text);
+          return true;
+        }
+
+        // Ctrl+C to clear text
+        if (keyMatchers[Command.QUIT](key)) {
+          if (customOptionText === '') {
+            return false;
+          }
+          customBuffer.setText('');
+          return true;
+        }
       }
 
       // Don't jump if a navigation or selection key is pressed
@@ -663,6 +838,11 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       customBuffer,
       onEditingCustomOption,
       customOptionText,
+      commandSearchActive,
+      cancelSearch,
+      acceptSearch,
+      commandSearchCompletion,
+      chatHistoryForSearch.length,
     ],
   );
 
@@ -791,6 +971,8 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       ? Math.max(1, Math.floor((listHeight - questionHeight) / 2))
       : selectionItems.length;
 
+  const suggestionsWidth = Math.max(20, availableWidth - DIALOG_PADDING);
+
   return (
     <Box flexDirection="column">
       {progressHeader}
@@ -913,6 +1095,23 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
           );
         }}
       />
+
+      {isCustomOptionFocused &&
+        commandSearchActive &&
+        commandSearchCompletion.showSuggestions && (
+          <Box marginBottom={1}>
+            <SuggestionsDisplay
+              suggestions={commandSearchCompletion.suggestions}
+              activeIndex={commandSearchCompletion.activeSuggestionIndex}
+              isLoading={commandSearchCompletion.isLoadingSuggestions}
+              width={suggestionsWidth}
+              scrollOffset={commandSearchCompletion.visibleStartIndex}
+              userInput={customBuffer.text}
+              mode="reverse"
+            />
+          </Box>
+        )}
+
       {keyboardHints}
     </Box>
   );
@@ -925,6 +1124,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   onActiveTextInputChange,
   width,
   availableHeight: availableHeightProp,
+  chatHistoryForSearch = [],
 }) => {
   const uiState = useContext(UIStateContext);
   const availableHeight =
@@ -1127,20 +1327,21 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
 
   if (!currentQuestion) return null;
 
+  const isTextInput = currentQuestion.type === 'text' || isEditingCustomOption;
+  const hasSearchHistory = chatHistoryForSearch.length > 0;
+  const searchHint =
+    hasSearchHistory && isTextInput ? '  Ctrl+R search history' : '';
+
   const keyboardHints = (
     <DialogFooter
-      primaryAction={
-        currentQuestion.type === 'text' || isEditingCustomOption
-          ? 'Enter to submit'
-          : 'Enter to select'
-      }
+      primaryAction={isTextInput ? 'Enter to submit' : 'Enter to select'}
       navigationActions={
         questions.length > 1
-          ? currentQuestion.type === 'text' || isEditingCustomOption
-            ? 'Tab/Shift+Tab to switch questions'
+          ? isTextInput
+            ? `Tab/Shift+Tab to switch questions${searchHint}`
             : '←/→ to switch questions'
-          : currentQuestion.type === 'text' || isEditingCustomOption
-            ? undefined
+          : isTextInput
+            ? searchHint.trim() || undefined
             : '↑/↓ to navigate'
       }
     />
@@ -1159,6 +1360,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
         initialAnswer={answers[currentQuestionIndex]}
         progressHeader={progressHeader}
         keyboardHints={keyboardHints}
+        chatHistoryForSearch={chatHistoryForSearch}
       />
     ) : (
       <ChoiceQuestionView
@@ -1172,6 +1374,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
         initialAnswer={answers[currentQuestionIndex]}
         progressHeader={progressHeader}
         keyboardHints={keyboardHints}
+        chatHistoryForSearch={chatHistoryForSearch}
       />
     );
 

@@ -52,6 +52,7 @@ export interface ToolConfirmationMessageProps {
   isFocused?: boolean;
   availableTerminalHeight?: number;
   terminalWidth: number;
+  userMessages?: readonly string[];
 }
 
 export const ToolConfirmationMessage: React.FC<
@@ -63,6 +64,7 @@ export const ToolConfirmationMessage: React.FC<
   isFocused = true,
   availableTerminalHeight,
   terminalWidth,
+  userMessages = [],
 }) => {
   const { confirm, isDiffingEnabled } = useToolActions();
   const [mcpDetailsExpansionState, setMcpDetailsExpansionState] = useState<{
@@ -410,6 +412,7 @@ export const ToolConfirmationMessage: React.FC<
           }}
           width={terminalWidth}
           availableHeight={availableBodyContentHeight()}
+          chatHistoryForSearch={userMessages}
         />
       );
       return {
@@ -629,6 +632,7 @@ export const ToolConfirmationMessage: React.FC<
     hasMcpToolDetails,
     mcpToolDetailsText,
     expandDetailsHintKey,
+    userMessages,
   ]);
 
   const bodyOverflowDirection: 'top' | 'bottom' =
