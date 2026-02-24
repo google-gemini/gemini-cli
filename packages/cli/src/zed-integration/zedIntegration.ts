@@ -38,6 +38,7 @@ import {
   LlmRole,
   ApprovalMode,
   getVersion,
+  convertSessionToClientHistory,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -58,10 +59,7 @@ import { randomUUID } from 'node:crypto';
 import type { CliArgs } from '../config/config.js';
 import { loadCliConfig } from '../config/config.js';
 import { runExitCleanup } from '../utils/cleanup.js';
-import {
-  SessionSelector,
-  convertSessionToHistoryFormats,
-} from '../utils/sessionUtils.js';
+import { SessionSelector } from '../utils/sessionUtils.js';
 
 export async function runZedIntegration(
   config: Config,
@@ -279,9 +277,7 @@ export class GeminiAgent {
       config.setFileSystemService(acpFileSystemService);
     }
 
-    const { clientHistory } = convertSessionToHistoryFormats(
-      sessionData.messages,
-    );
+    const clientHistory = convertSessionToClientHistory(sessionData.messages);
 
     const geminiClient = config.getGeminiClient();
     await geminiClient.initialize();
@@ -541,7 +537,10 @@ export class Session {
       const functionCalls: FunctionCall[] = [];
 
       try {
-        const model = resolveModel(this.config.getModel());
+        const model = resolveModel(
+          this.config.getModel(),
+          (await this.config.getGemini31Launched?.()) ?? false,
+        );
         const responseStream = await chat.sendMessageStream(
           { model },
           nextMessage?.parts ?? [],
@@ -704,6 +703,13 @@ export class Session {
             path: confirmationDetails.fileName,
             oldText: confirmationDetails.originalContent,
             newText: confirmationDetails.newContent,
+            _meta: {
+              kind: !confirmationDetails.originalContent
+                ? 'add'
+                : confirmationDetails.newContent === ''
+                  ? 'delete'
+                  : 'modify',
+            },
           });
         }
 
@@ -720,6 +726,7 @@ export class Session {
           },
         };
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const output = await this.connection.requestPermission(params);
         const outcome =
           output.outcome.outcome === CoreToolCallStatus.Cancelled
@@ -1224,6 +1231,13 @@ function toToolCallContent(toolResult: ToolResult): acp.ToolCallContent | null {
           path: toolResult.returnDisplay.fileName,
           oldText: toolResult.returnDisplay.originalContent,
           newText: toolResult.returnDisplay.newContent,
+          _meta: {
+            kind: !toolResult.returnDisplay.originalContent
+              ? 'add'
+              : toolResult.returnDisplay.newContent === ''
+                ? 'delete'
+                : 'modify',
+          },
         };
       }
       return null;
@@ -1312,14 +1326,16 @@ function toAcpToolKind(kind: Kind): acp.ToolKind {
   switch (kind) {
     case Kind.Read:
     case Kind.Edit:
+    case Kind.Execute:
+    case Kind.Search:
     case Kind.Delete:
     case Kind.Move:
-    case Kind.Search:
-    case Kind.Execute:
     case Kind.Think:
     case Kind.Fetch:
+    case Kind.SwitchMode:
     case Kind.Other:
       return kind as acp.ToolKind;
+    case Kind.Plan:
     case Kind.Communicate:
     default:
       return 'other';

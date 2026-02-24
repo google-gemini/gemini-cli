@@ -14,6 +14,7 @@ import {
   GOOGLE_ACCOUNTS_FILENAME,
   isSubpath,
   resolveToRealPath,
+  normalizePath,
 } from '../utils/paths.js';
 import { ProjectRegistry } from './projectRegistry.js';
 import { StorageMigration } from './storageMigration.js';
@@ -22,6 +23,8 @@ export const OAUTH_FILE = 'oauth_creds.json';
 const TMP_DIR_NAME = 'tmp';
 const BIN_DIR_NAME = 'bin';
 const AGENTS_DIR_NAME = '.agents';
+
+export const AUTO_SAVED_POLICY_FILENAME = 'auto-saved.toml';
 
 export class Storage {
   private readonly targetDir: string;
@@ -140,6 +143,17 @@ export class Storage {
     return path.join(this.targetDir, GEMINI_DIR);
   }
 
+  /**
+   * Checks if the current workspace storage location is the same as the global/user storage location.
+   * This handles symlinks and platform-specific path normalization.
+   */
+  isWorkspaceHomeDir(): boolean {
+    return (
+      normalizePath(resolveToRealPath(this.targetDir)) ===
+      normalizePath(resolveToRealPath(homedir()))
+    );
+  }
+
   getAgentsDir(): string {
     return path.join(this.targetDir, AGENTS_DIR_NAME);
   }
@@ -152,6 +166,13 @@ export class Storage {
 
   getWorkspacePoliciesDir(): string {
     return path.join(this.getGeminiDir(), 'policies');
+  }
+
+  getAutoSavedPolicyPath(): string {
+    return path.join(
+      this.getWorkspacePoliciesDir(),
+      AUTO_SAVED_POLICY_FILENAME,
+    );
   }
 
   ensureProjectTempDirExists(): void {

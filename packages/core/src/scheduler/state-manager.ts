@@ -17,8 +17,7 @@ import type {
   ExecutingToolCall,
   ToolCallResponseInfo,
 } from './types.js';
-import { CoreToolCallStatus } from './types.js';
-import { ROOT_SCHEDULER_ID } from './types.js';
+import { CoreToolCallStatus, ROOT_SCHEDULER_ID } from './types.js';
 import type {
   ToolConfirmationOutcome,
   ToolResultDisplay,
@@ -186,6 +185,19 @@ export class SchedulerStateManager {
 
     this.activeCalls.set(callId, this.patchCall(call, { outcome }));
     this.emitUpdate();
+  }
+
+  /**
+   * Replaces the currently active call with a new call, placing the new call
+   * at the front of the queue to be processed immediately in the next tick.
+   * Used for Tail Calls to chain execution without finalizing the original call.
+   */
+  replaceActiveCallWithTailCall(callId: string, nextCall: ToolCall): void {
+    if (this.activeCalls.has(callId)) {
+      this.activeCalls.delete(callId);
+      this.queue.unshift(nextCall);
+      this.emitUpdate();
+    }
   }
 
   cancelAllQueued(reason: string): void {
