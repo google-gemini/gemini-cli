@@ -646,6 +646,27 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `{}`
   - **Requires restart:** Yes
 
+- **`agents.browser.sessionMode`** (enum):
+  - **Description:** Session mode: 'persistent', 'isolated', or 'existing'.
+  - **Default:** `"persistent"`
+  - **Values:** `"persistent"`, `"isolated"`, `"existing"`
+  - **Requires restart:** Yes
+
+- **`agents.browser.headless`** (boolean):
+  - **Description:** Run browser in headless mode.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`agents.browser.profilePath`** (string):
+  - **Description:** Path to browser profile directory for session persistence.
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
+- **`agents.browser.visualModel`** (string):
+  - **Description:** Model override for the visual agent.
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
 #### `context`
 
 - **`context.fileName`** (string | string[]):

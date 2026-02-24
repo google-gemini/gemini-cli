@@ -26,7 +26,6 @@ import {
   DISCOVERED_TOOL_PREFIX,
   TOOL_LEGACY_ALIASES,
   getToolAliases,
-  PLAN_MODE_TOOLS,
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
 } from './tool-names.js';
@@ -445,7 +444,13 @@ export class ToolRegistry {
     const toolMetadata = new Map<string, Record<string, unknown>>();
     for (const [name, tool] of this.allKnownTools) {
       if (tool.toolAnnotations) {
-        toolMetadata.set(name, tool.toolAnnotations);
+        const metadata: Record<string, unknown> = { ...tool.toolAnnotations };
+        // Include server name so the policy engine can resolve composite
+        // wildcard patterns (e.g. "*__*") against unqualified tool names.
+        if (tool instanceof DiscoveredMCPTool) {
+          metadata['_serverName'] = tool.serverName;
+        }
+        toolMetadata.set(name, metadata);
       }
     }
     return toolMetadata;
@@ -456,9 +461,10 @@ export class ToolRegistry {
    */
   private getActiveTools(): AnyDeclarativeTool[] {
     const toolMetadata = this.buildToolMetadata();
+    const allKnownNames = new Set(this.allKnownTools.keys());
     const excludedTools =
       this.expandExcludeToolsWithAliases(
-        this.config.getExcludeTools(toolMetadata),
+        this.config.getExcludeTools(toolMetadata, allKnownNames),
       ) ?? new Set([]);
     const activeTools: AnyDeclarativeTool[] = [];
     for (const tool of this.allKnownTools.values()) {
@@ -500,32 +506,11 @@ export class ToolRegistry {
   ): boolean {
     excludeTools ??=
       this.expandExcludeToolsWithAliases(
-        this.config.getExcludeTools(this.buildToolMetadata()),
+        this.config.getExcludeTools(
+          this.buildToolMetadata(),
+          new Set(this.allKnownTools.keys()),
+        ),
       ) ?? new Set([]);
-
-    // Filter tools in Plan Mode to only allow approved read-only tools.
-    const isPlanMode =
-      typeof this.config.getApprovalMode === 'function' &&
-      this.config.getApprovalMode() === ApprovalMode.PLAN;
-    if (isPlanMode) {
-      const allowedToolNames = new Set<string>(PLAN_MODE_TOOLS);
-      // We allow write_file and replace for writing plans specifically.
-      allowedToolNames.add(WRITE_FILE_TOOL_NAME);
-      allowedToolNames.add(EDIT_TOOL_NAME);
-
-      // Discovered MCP tools are allowed if they are read-only.
-      if (
-        tool instanceof DiscoveredMCPTool &&
-        tool.isReadOnly &&
-        !allowedToolNames.has(tool.name)
-      ) {
-        allowedToolNames.add(tool.name);
-      }
-
-      if (!allowedToolNames.has(tool.name)) {
-        return false;
-      }
-    }
 
     const normalizedClassName = tool.constructor.name.replace(/^_+/, '');
     const possibleNames = [tool.name, normalizedClassName];
