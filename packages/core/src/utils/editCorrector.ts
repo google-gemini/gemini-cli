@@ -200,29 +200,7 @@ export async function ensureCorrectEdit(
       );
     }
   } else if (occurrences > expectedReplacements) {
-    const expectedReplacements = originalParams.expected_replacements ?? 1;
-
-    // If user expects multiple replacements, return as-is
-    if (occurrences === expectedReplacements) {
-      const result: CorrectedEditResult = {
-        params: { ...originalParams },
-        occurrences,
-      };
-      editCorrectionCache.set(cacheKey, result);
-      return result;
-    }
-
-    // If user expects 1 but found multiple, try to correct (existing behavior)
-    if (expectedReplacements === 1) {
-      const result: CorrectedEditResult = {
-        params: { ...originalParams },
-        occurrences,
-      };
-      editCorrectionCache.set(cacheKey, result);
-      return result;
-    }
-
-    // If occurrences don't match expected, return as-is (will fail validation later)
+    // Occurrences exceed expected — return as-is (will fail validation later)
     const result: CorrectedEditResult = {
       params: { ...originalParams },
       occurrences,
