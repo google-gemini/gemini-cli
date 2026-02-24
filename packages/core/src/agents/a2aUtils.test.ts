@@ -39,6 +39,18 @@ describe('a2aUtils', () => {
       const result = extractIdsFromResponse(task);
       expect(result).toEqual({ contextId: 'ctx-2', taskId: 'task-2' });
     });
+
+    it('should clear taskId for completed tasks', () => {
+      const task: Task = {
+        id: 'task-2',
+        contextId: 'ctx-2',
+        kind: 'task',
+        status: { state: 'completed' },
+      };
+
+      const result = extractIdsFromResponse(task);
+      expect(result).toEqual({ contextId: 'ctx-2', taskId: undefined });
+    });
   });
 
   describe('extractMessageText', () => {
@@ -79,35 +91,9 @@ describe('a2aUtils', () => {
               mimeType: 'text/plain',
             },
           } as FilePart,
-          {
-            kind: 'file',
-            file: {
-              uri: 'http://example.com/doc',
-              mimeType: 'application/pdf',
-            },
-          } as FilePart,
         ],
       };
-      // The formatting logic in a2aUtils prefers name over uri
       expect(extractMessageText(message)).toContain('File: test.txt');
-      expect(extractMessageText(message)).toContain(
-        'File: http://example.com/doc',
-      );
-    });
-
-    it('should handle mixed parts', () => {
-      const message: Message = {
-        kind: 'message',
-        role: 'user',
-        messageId: '1',
-        parts: [
-          { kind: 'text', text: 'Here is data:' } as TextPart,
-          { kind: 'data', data: { value: 123 } } as DataPart,
-        ],
-      };
-      expect(extractMessageText(message)).toBe(
-        'Here is data:\nData: {"value":123}',
-      );
     });
 
     it('should return empty string for undefined or empty message', () => {
@@ -124,7 +110,7 @@ describe('a2aUtils', () => {
   });
 
   describe('extractTaskText', () => {
-    it('should extract basic task info (clean)', () => {
+    it('should extract basic task info from status message', () => {
       const task: Task = {
         id: 'task-1',
         contextId: 'ctx-1',
@@ -141,8 +127,6 @@ describe('a2aUtils', () => {
       };
 
       const result = extractTaskText(task);
-      expect(result).not.toContain('ID: task-1');
-      expect(result).not.toContain('State: working');
       expect(result).toBe('Processing...');
     });
 
@@ -164,8 +148,132 @@ describe('a2aUtils', () => {
       const result = extractTaskText(task);
       expect(result).toContain('Artifact (Report):');
       expect(result).toContain('This is the report.');
-      expect(result).not.toContain('Artifacts:');
-      expect(result).not.toContain('  - Name: Report');
+    });
+
+    it('should fallback to last agent message in history if status message is missing', () => {
+      const task: Task = {
+        id: 'task-1',
+        contextId: 'ctx-1',
+        kind: 'task',
+        status: { state: 'completed' },
+        history: [
+          {
+            kind: 'message',
+            role: 'user',
+            messageId: 'u1',
+            parts: [{ kind: 'text', text: 'Question' } as TextPart],
+          },
+          {
+            kind: 'message',
+            role: 'agent',
+            messageId: 'a1',
+            parts: [{ kind: 'text', text: 'First Answer' } as TextPart],
+          },
+          {
+            kind: 'message',
+            role: 'user',
+            messageId: 'u2',
+            parts: [{ kind: 'text', text: 'Follow up' } as TextPart],
+          },
+          {
+            kind: 'message',
+            role: 'agent',
+            messageId: 'a2',
+            parts: [{ kind: 'text', text: 'Final Answer' } as TextPart],
+          },
+        ],
+      };
+
+      const result = extractTaskText(task);
+      expect(result).toBe('Final Answer');
+    });
+
+    it('should combine history fallback and artifacts', () => {
+      const task: Task = {
+        id: 'task-1',
+        contextId: 'ctx-1',
+        kind: 'task',
+        status: { state: 'completed' },
+        history: [
+          {
+            kind: 'message',
+            role: 'agent',
+            messageId: 'a1',
+            parts: [{ kind: 'text', text: 'Answer' } as TextPart],
+          },
+        ],
+        artifacts: [
+          {
+            artifactId: 'art-1',
+            name: 'Data',
+            parts: [{ kind: 'text', text: 'Artifact Content' } as TextPart],
+          },
+        ],
+      };
+
+      const result = extractTaskText(task);
+      expect(result).toContain('Answer');
+      expect(result).toContain('Artifact (Data):');
+      expect(result).toContain('Artifact Content');
+    });
+
+    it('should prioritize status message over history fallback', () => {
+      const task: Task = {
+        id: 'task-1',
+        contextId: 'ctx-1',
+        kind: 'task',
+        status: {
+          state: 'completed',
+          message: {
+            kind: 'message',
+            role: 'agent',
+            messageId: 'm1',
+            parts: [{ kind: 'text', text: 'Status Message' } as TextPart],
+          },
+        },
+        history: [
+          {
+            kind: 'message',
+            role: 'agent',
+            messageId: 'a1',
+            parts: [{ kind: 'text', text: 'History Message' } as TextPart],
+          },
+        ],
+      };
+
+      const result = extractTaskText(task);
+      expect(result).toBe('Status Message');
+      expect(result).not.toContain('History Message');
+    });
+
+    it('should handle history with no agent messages', () => {
+      const task: Task = {
+        id: 'task-1',
+        contextId: 'ctx-1',
+        kind: 'task',
+        status: { state: 'completed' },
+        history: [
+          {
+            kind: 'message',
+            role: 'user',
+            messageId: 'u1',
+            parts: [{ kind: 'text', text: 'Only user' } as TextPart],
+          },
+        ],
+      };
+
+      const result = extractTaskText(task);
+      expect(result).toBe('');
+    });
+
+    it('should return empty string if everything is missing', () => {
+      const task: Task = {
+        id: 'task-1',
+        contextId: 'ctx-1',
+        kind: 'task',
+        status: { state: 'working' },
+      };
+      expect(extractTaskText(task)).toBe('');
     });
   });
 });

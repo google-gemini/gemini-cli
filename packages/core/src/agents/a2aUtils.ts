@@ -18,7 +18,7 @@ import type {
  * Handles Text, Data (JSON), and File parts.
  */
 export function extractMessageText(message: Message | undefined): string {
-  if (!message) {
+  if (!message || !message.parts || !Array.isArray(message.parts)) {
     return '';
   }
 
@@ -34,13 +34,12 @@ function extractPartText(part: Part): string {
   }
 
   if (isDataPart(part)) {
-    // Attempt to format known data types if metadata exists, otherwise JSON stringify
     return `Data: ${JSON.stringify(part.data)}`;
   }
 
   if (isFilePart(part)) {
     const fileData = part.file;
-    if (fileData.name) {
+    if ('name' in fileData && fileData.name) {
       return `File: ${fileData.name}`;
     }
     if ('uri' in fileData && fileData.uri) {
@@ -55,18 +54,31 @@ function extractPartText(part: Part): string {
 /**
  * Extracts a clean, human-readable text summary from a Task object.
  * Includes the status message and any artifact content with context headers.
- * Technical metadata like ID and State are omitted for better clarity and token efficiency.
  */
 export function extractTaskText(task: Task): string {
   const parts: string[] = [];
 
-  // Status Message
+  // 1. Status Message (Current "what is happening" update)
   const statusMessageText = extractMessageText(task.status?.message);
   if (statusMessageText) {
     parts.push(statusMessageText);
   }
 
-  // Artifacts
+  // 2. History Fallback (The "Answer" for Orcas/ADK agents in blocking calls)
+  // If the status message is empty, we look for the most recent agent message in the history.
+  if (!parts.length && task.history && task.history.length > 0) {
+    const lastAgentMsg = [...task.history]
+      .reverse()
+      .find((m) => m.role === 'agent');
+    if (lastAgentMsg) {
+      const historyText = extractMessageText(lastAgentMsg);
+      if (historyText) {
+        parts.push(historyText);
+      }
+    }
+  }
+
+  // 3. Artifacts
   if (task.artifacts) {
     for (const artifact of task.artifacts) {
       const artifactContent = extractPartsText(artifact.parts);
