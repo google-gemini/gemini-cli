@@ -236,7 +236,7 @@ describe('InputPrompt', () => {
       visualToLogicalMap: [[0, 0]],
       visualToTransformedMap: [0],
       transformationsByLine: [],
-      getOffset: vi.fn(() => mockBuffer.text.length),
+      getOffset: vi.fn(() => cpLen(mockBuffer.text)),
       pastedContent: {},
     } as unknown as TextBuffer;
 
