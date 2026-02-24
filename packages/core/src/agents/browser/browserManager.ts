@@ -279,11 +279,24 @@ export class BrowserManager {
       `Launching chrome-devtools-mcp (${sessionMode} mode) with args: ${mcpArgs.join(' ')}`,
     );
 
-    // Create stdio transport to npx chrome-devtools-mcp
+    // Create stdio transport to npx chrome-devtools-mcp.
+    // stderr is piped (not inherited) to prevent MCP server banners and
+    // warnings from corrupting the UI in alternate buffer mode.
     this.mcpTransport = new StdioClientTransport({
       command: 'npx',
       args: mcpArgs,
+      stderr: 'pipe',
     });
+
+    // Forward piped stderr to debugLogger so it's visible with --debug.
+    const stderrStream = this.mcpTransport.stderr;
+    if (stderrStream) {
+      stderrStream.on('data', (chunk: Buffer) => {
+        debugLogger.log(
+          `[chrome-devtools-mcp stderr] ${chunk.toString().trimEnd()}`,
+        );
+      });
+    }
 
     this.mcpTransport.onclose = () => {
       debugLogger.error(

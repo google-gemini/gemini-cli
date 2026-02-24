@@ -31,6 +31,7 @@ vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
   StdioClientTransport: vi.fn().mockImplementation(() => ({
     close: vi.fn().mockResolvedValue(undefined),
+    stderr: null,
   })),
 }));
 
@@ -144,14 +145,16 @@ describe('BrowserManager', () => {
       await manager.ensureConnection();
 
       // Verify StdioClientTransport was created with correct args
-      expect(StdioClientTransport).toHaveBeenCalledWith({
-        command: 'npx',
-        args: expect.arrayContaining([
-          '-y',
-          expect.stringMatching(/chrome-devtools-mcp@/),
-          '--experimental-vision',
-        ]),
-      });
+      expect(StdioClientTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'npx',
+          args: expect.arrayContaining([
+            '-y',
+            expect.stringMatching(/chrome-devtools-mcp@/),
+            '--experimental-vision',
+          ]),
+        }),
+      );
       // Persistent mode should NOT include --isolated or --autoConnect
       const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
         ?.args as string[];
@@ -180,10 +183,12 @@ describe('BrowserManager', () => {
       const manager = new BrowserManager(headlessConfig);
       await manager.ensureConnection();
 
-      expect(StdioClientTransport).toHaveBeenCalledWith({
-        command: 'npx',
-        args: expect.arrayContaining(['--headless']),
-      });
+      expect(StdioClientTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'npx',
+          args: expect.arrayContaining(['--headless']),
+        }),
+      );
     });
 
     it('should pass profilePath as --userDataDir when configured', async () => {
@@ -203,10 +208,12 @@ describe('BrowserManager', () => {
       const manager = new BrowserManager(profileConfig);
       await manager.ensureConnection();
 
-      expect(StdioClientTransport).toHaveBeenCalledWith({
-        command: 'npx',
-        args: expect.arrayContaining(['--userDataDir', '/path/to/profile']),
-      });
+      expect(StdioClientTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'npx',
+          args: expect.arrayContaining(['--userDataDir', '/path/to/profile']),
+        }),
+      );
     });
 
     it('should pass --isolated when sessionMode is isolated', async () => {
