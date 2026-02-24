@@ -77,7 +77,7 @@ describe('HookSystem Integration', () => {
             matcher: 'TestTool',
             hooks: [
               {
-                type: HookType.Command,
+                type: HookType.Command as const,
                 command: 'echo',
                 timeout: 5000,
               },
@@ -164,7 +164,8 @@ describe('HookSystem Integration', () => {
                 {
                   type: 'invalid-type' as HookType, // Invalid hook type for testing
                   command: './test.sh',
-                },
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                } as any,
               ],
             },
           ],
@@ -279,12 +280,12 @@ describe('HookSystem Integration', () => {
               matcher: 'TestTool',
               hooks: [
                 {
-                  type: HookType.Command,
+                  type: HookType.Command as const,
                   command: 'echo "enabled-hook"',
                   timeout: 5000,
                 },
                 {
-                  type: HookType.Command,
+                  type: HookType.Command as const,
                   command: 'echo "disabled-hook"',
                   timeout: 5000,
                 },
@@ -350,7 +351,7 @@ describe('HookSystem Integration', () => {
               matcher: 'TestTool',
               hooks: [
                 {
-                  type: HookType.Command,
+                  type: HookType.Command as const,
                   command: 'echo "will-be-disabled"',
                   timeout: 5000,
                 },
