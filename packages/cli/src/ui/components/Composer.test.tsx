@@ -385,7 +385,7 @@ describe('Composer', () => {
       const { lastFrame } = await renderComposer(uiState, settings);
 
       const output = lastFrame();
-      expect(output).toContain('LoadingIndicator: Thinking about code');
+      expect(output).toContain('LoadingIndicator: Thinking...');
     });
 
     it('hides shortcuts hint while loading', async () => {
