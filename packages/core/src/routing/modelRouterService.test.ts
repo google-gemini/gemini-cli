@@ -19,6 +19,7 @@ import { ClassifierStrategy } from './strategies/classifierStrategy.js';
 import { NumericalClassifierStrategy } from './strategies/numericalClassifierStrategy.js';
 import { logModelRouting } from '../telemetry/loggers.js';
 import { ModelRoutingEvent } from '../telemetry/types.js';
+import { ApprovalMode } from '../policy/types.js';
 
 vi.mock('../config/config.js');
 vi.mock('../core/baseLlmClient.js');
@@ -47,6 +48,9 @@ describe('ModelRouterService', () => {
     vi.spyOn(mockConfig, 'getBaseLlmClient').mockReturnValue(mockBaseLlmClient);
     vi.spyOn(mockConfig, 'getNumericalRoutingEnabled').mockResolvedValue(false);
     vi.spyOn(mockConfig, 'getClassifierThreshold').mockResolvedValue(undefined);
+    vi.spyOn(mockConfig, 'getApprovalMode').mockReturnValue(
+      ApprovalMode.DEFAULT,
+    );
 
     mockCompositeStrategy = new CompositeStrategy(
       [
@@ -131,6 +135,7 @@ describe('ModelRouterService', () => {
         'Strategy reasoning',
         false,
         undefined,
+        ApprovalMode.DEFAULT,
         false,
         undefined,
       );
@@ -157,6 +162,7 @@ describe('ModelRouterService', () => {
         'An exception occurred during routing.',
         true,
         'Strategy failed',
+        ApprovalMode.DEFAULT,
         false,
         undefined,
       );

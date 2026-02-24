@@ -1370,7 +1370,7 @@ export class ModelRoutingEvent implements BaseTelemetryEvent {
   error_message?: string;
   enable_numerical_routing?: boolean;
   classifier_threshold?: string;
-  approval_mode: string;
+  approval_mode: ApprovalMode;
 
   constructor(
     decision_model: string,
@@ -1379,7 +1379,7 @@ export class ModelRoutingEvent implements BaseTelemetryEvent {
     reasoning: string | undefined,
     failed: boolean,
     error_message: string | undefined,
-    approval_mode: string,
+    approval_mode: ApprovalMode,
     enable_numerical_routing?: boolean,
     classifier_threshold?: string,
   ) {
