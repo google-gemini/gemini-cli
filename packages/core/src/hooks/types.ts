@@ -21,6 +21,7 @@ import { defaultHookTranslator } from './hookTranslator.js';
  * Configuration source levels in precedence order (highest to lowest)
  */
 export enum ConfigSource {
+  Runtime = 'runtime',
   Project = 'project',
   User = 'user',
   System = 'system',
@@ -50,11 +51,43 @@ export enum HookEventName {
 export const HOOKS_CONFIG_FIELDS = ['enabled', 'disabled', 'notifications'];
 
 /**
- * Hook configuration entry
+ * Hook implementation types
+ */
+export enum HookType {
+  Command = 'command',
+  Runtime = 'runtime',
+}
+
+/**
+ * Hook action function
+ */
+export type HookAction = (
+  input: HookInput,
+  options?: { signal: AbortSignal },
+) => Promise<HookOutput | void | null>;
+
+/**
+ * Runtime hook configuration
+ */
+export interface RuntimeHookConfig {
+  type: HookType.Runtime;
+  /** Unique name for the runtime hook */
+  name: string;
+  /** Function to execute when the hook is triggered */
+  action: HookAction;
+  command?: never;
+  source?: ConfigSource;
+  /** Maximum time allowed for hook execution in milliseconds */
+  timeout?: number;
+}
+
+/**
+ * Command hook configuration entry
  */
 export interface CommandHookConfig {
   type: HookType.Command;
   command: string;
+  action?: never;
   name?: string;
   description?: string;
   timeout?: number;
@@ -62,7 +95,7 @@ export interface CommandHookConfig {
   env?: Record<string, string>;
 }
 
-export type HookConfig = CommandHookConfig;
+export type HookConfig = CommandHookConfig | RuntimeHookConfig;
 
 /**
  * Hook definition with matcher
@@ -74,18 +107,11 @@ export interface HookDefinition {
 }
 
 /**
- * Hook implementation types
- */
-export enum HookType {
-  Command = 'command',
-}
-
-/**
  * Generate a unique key for a hook configuration
  */
 export function getHookKey(hook: HookConfig): string {
   const name = hook.name || '';
-  const command = hook.command || '';
+  const command = hook.type === HookType.Command ? hook.command : '';
   return `${name}:${command}`;
 }
 
