@@ -757,6 +757,9 @@ export interface ToolMcpConfirmationDetails {
   serverName: string;
   toolName: string;
   toolDisplayName: string;
+  toolArgs?: Record<string, unknown>;
+  toolDescription?: string;
+  toolParameterSchema?: unknown;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
 }
 

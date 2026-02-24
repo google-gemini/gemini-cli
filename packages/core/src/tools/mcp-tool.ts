@@ -80,6 +80,8 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     readonly trust?: boolean,
     params: ToolParams = {},
     private readonly cliConfig?: Config,
+    private readonly toolDescription?: string,
+    private readonly toolParameterSchema?: unknown,
   ) {
     // Use composite format for policy checks: serverName__toolName
     // This enables server wildcards (e.g., "google-workspace__*")
@@ -123,6 +125,9 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       serverName: this.serverName,
       toolName: this.serverToolName, // Display original tool name in confirmation
       toolDisplayName: this.displayName, // Display global registry name exposed to model and user
+      toolArgs: this.params,
+      toolDescription: this.toolDescription,
+      toolParameterSchema: this.toolParameterSchema,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlwaysServer) {
           DiscoveredMCPToolInvocation.allowlist.add(serverAllowListKey);
@@ -317,6 +322,8 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.trust,
       params,
       this.cliConfig,
+      this.description,
+      this.parameterSchema,
     );
   }
 }
