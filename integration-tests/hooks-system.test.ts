@@ -286,6 +286,113 @@ describe('Hooks System Integration', () => {
     });
   });
 
+  describe('Command Hooks - Tail Tool Calls', () => {
+    it('should execute a tail tool call from AfterTool hooks and replace original response', async () => {
+      // Create a script that acts as the hook.
+      // It will trigger on "read_file" and issue a tail call to "write_file".
+      rig.setup('should execute a tail tool call from AfterTool hooks', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.tail-tool-call.responses',
+        ),
+      });
+
+      const hookOutput = {
+        decision: 'allow',
+        hookSpecificOutput: {
+          hookEventName: 'AfterTool',
+          tailToolCallRequest: {
+            name: 'write_file',
+            args: {
+              file_path: 'tail-called-file.txt',
+              content: 'Content from tail call',
+            },
+          },
+        },
+      };
+
+      const hookScript = `console.log(JSON.stringify(${JSON.stringify(
+        hookOutput,
+      )})); process.exit(0);`;
+
+      const scriptPath = join(rig.testDir!, 'tail_call_hook.js');
+      writeFileSync(scriptPath, hookScript);
+      const commandPath = scriptPath.replace(/\\/g, '/');
+
+      rig.setup('should execute a tail tool call from AfterTool hooks', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.tail-tool-call.responses',
+        ),
+        settings: {
+          hooksConfig: {
+            enabled: true,
+          },
+          hooks: {
+            AfterTool: [
+              {
+                matcher: 'read_file',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${commandPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      // Create a test file to trigger the read_file tool
+      rig.createFile('original.txt', 'Original content');
+
+      const cliOutput = await rig.run({
+        args: 'Read original.txt', // Fake responses should trigger read_file on this
+      });
+
+      // 1. Verify that write_file was called (as a tail call replacing read_file)
+      // Since read_file was replaced before finalizing, it will not appear in the tool logs.
+      const foundWriteFile = await rig.waitForToolCall('write_file');
+      expect(foundWriteFile).toBeTruthy();
+
+      // Ensure hook logs are flushed and the final LLM response is received.
+      // The mock LLM is configured to respond with "Tail call completed successfully."
+      expect(cliOutput).toContain('Tail call completed successfully.');
+
+      // Ensure telemetry is written to disk
+      await rig.waitForTelemetryReady();
+
+      // Read hook logs to debug
+      const hookLogs = rig.readHookLogs();
+      const relevantHookLog = hookLogs.find(
+        (l) => l.hookCall.hook_event_name === 'AfterTool',
+      );
+
+      expect(relevantHookLog).toBeDefined();
+
+      // 2. Verify write_file was executed.
+      // In non-interactive mode, the CLI deduplicates tool execution logs by callId.
+      // Since a tail call reuses the original callId, "Tool: write_file" is not printed.
+      // Instead, we verify the side-effect (file creation) and the telemetry log.
+
+      // 3. Verify the tail-called tool actually wrote the file
+      const modifiedContent = rig.readFile('tail-called-file.txt');
+      expect(modifiedContent).toBe('Content from tail call');
+
+      // 4. Verify telemetry for the final tool call.
+      // The original 'read_file' call is replaced, so only 'write_file' is finalized and logged.
+      const toolLogs = rig.readToolLogs();
+      const successfulTools = toolLogs.filter((t) => t.toolRequest.success);
+      expect(
+        successfulTools.some((t) => t.toolRequest.name === 'write_file'),
+      ).toBeTruthy();
+      // The original request name should be preserved in the log payload if possible,
+      // but the executed tool name is 'write_file'.
+    });
+  });
+
   describe('BeforeModel Hooks - LLM Request Modification', () => {
     it('should modify LLM requests with BeforeModel hooks', async () => {
       // Create a hook script that replaces the LLM request with a modified version

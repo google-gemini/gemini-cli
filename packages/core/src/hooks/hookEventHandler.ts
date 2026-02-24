@@ -76,12 +76,16 @@ export class HookEventHandler {
     toolName: string,
     toolInput: Record<string, unknown>,
     mcpContext?: McpToolContext,
+    originalRequestName?: string,
   ): Promise<AggregatedHookResult> {
     const input: BeforeToolInput = {
       ...this.createBaseInput(HookEventName.BeforeTool),
       tool_name: toolName,
       tool_input: toolInput,
       ...(mcpContext && { mcp_context: mcpContext }),
+      ...(originalRequestName && {
+        original_request_name: originalRequestName,
+      }),
     };
 
     const context: HookEventContext = { toolName };
@@ -97,6 +101,7 @@ export class HookEventHandler {
     toolInput: Record<string, unknown>,
     toolResponse: Record<string, unknown>,
     mcpContext?: McpToolContext,
+    originalRequestName?: string,
   ): Promise<AggregatedHookResult> {
     const input: AfterToolInput = {
       ...this.createBaseInput(HookEventName.AfterTool),
@@ -104,6 +109,9 @@ export class HookEventHandler {
       tool_input: toolInput,
       tool_response: toolResponse,
       ...(mcpContext && { mcp_context: mcpContext }),
+      ...(originalRequestName && {
+        original_request_name: originalRequestName,
+      }),
     };
 
     const context: HookEventContext = { toolName };

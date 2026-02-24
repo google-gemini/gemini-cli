@@ -275,5 +275,20 @@ describe('toolMapping', () => {
       expect(result.tools[0].resultDisplay).toBeUndefined();
       expect(result.tools[0].status).toBe(CoreToolCallStatus.Scheduled);
     });
+
+    it('propagates originalRequestName correctly', () => {
+      const toolCall: ScheduledToolCall = {
+        status: CoreToolCallStatus.Scheduled,
+        request: {
+          ...mockRequest,
+          originalRequestName: 'original_tool',
+        },
+        tool: mockTool,
+        invocation: mockInvocation,
+      };
+
+      const result = mapToDisplay(toolCall);
+      expect(result.tools[0].originalRequestName).toBe('original_tool');
+    });
   });
 });
