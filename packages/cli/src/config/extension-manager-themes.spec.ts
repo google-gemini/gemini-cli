@@ -93,6 +93,7 @@ describe('ExtensionManager theme loading', () => {
         startExtension: vi.fn().mockResolvedValue(undefined),
       }),
       getGeminiClient: () => ({
+        getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
         isInitialized: () => false,
         updateSystemInstruction: vi.fn(),
         setTools: vi.fn(),
@@ -203,6 +204,7 @@ describe('ExtensionManager theme loading', () => {
       setGeminiMdFilePaths: vi.fn(),
       getEnableExtensionReloading: () => true,
       getGeminiClient: () => ({
+        getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
         isInitialized: () => false,
         updateSystemInstruction: vi.fn(),
         setTools: vi.fn(),

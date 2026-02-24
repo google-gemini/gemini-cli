@@ -113,6 +113,7 @@ describe('GeminiAgent', () => {
       getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getGeminiClient: vi.fn().mockReturnValue({
+        getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
         startChat: vi.fn().mockResolvedValue({}),
       }),
       getMessageBus: vi.fn().mockReturnValue({

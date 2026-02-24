@@ -26,6 +26,7 @@ describe('authCommand', () => {
       services: {
         config: {
           getGeminiClient: vi.fn(),
+          getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
         },
       },
     });

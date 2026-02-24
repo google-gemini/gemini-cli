@@ -701,6 +701,7 @@ export class Config {
   private lastModeSwitchTime: number = performance.now();
   readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
+  private sessionPrimaryAgent: string | null = null;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -1934,6 +1935,14 @@ export class Config {
 
   getTelemetryUseCliAuth(): boolean {
     return this.telemetrySettings.useCliAuth ?? false;
+  }
+
+  getSessionPrimaryAgent(): string | null {
+    return this.sessionPrimaryAgent;
+  }
+
+  setSessionPrimaryAgent(agentName: string | null): void {
+    this.sessionPrimaryAgent = agentName;
   }
 
   getGeminiClient(): GeminiClient {

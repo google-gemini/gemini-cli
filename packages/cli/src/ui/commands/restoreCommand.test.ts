@@ -48,6 +48,7 @@ describe('restoreCommand', () => {
         getProjectTempDir: vi.fn().mockReturnValue(geminiTempDir),
       },
       getGeminiClient: vi.fn().mockReturnValue({
+        getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
         setHistory: mockSetHistory,
       }),
     } as unknown as Config;

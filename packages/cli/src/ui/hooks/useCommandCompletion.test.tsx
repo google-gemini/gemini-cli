@@ -95,6 +95,7 @@ describe('useCommandCompletion', () => {
   const mockCommandContext = {} as CommandContext;
   const mockConfig = {
     getGeminiClient: vi.fn(),
+    getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
   } as unknown as Config;
   const testRootDir = '/';
 
@@ -499,6 +500,7 @@ describe('useCommandCompletion', () => {
     it('should not trigger prompt completion for line comments', async () => {
       const mockConfig = {
         getGeminiClient: vi.fn(),
+        getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
       } as unknown as Config;
 
       let hookResult: ReturnType<typeof useCommandCompletion> & {
@@ -531,6 +533,7 @@ describe('useCommandCompletion', () => {
     it('should not trigger prompt completion for block comments', async () => {
       const mockConfig = {
         getGeminiClient: vi.fn(),
+        getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
       } as unknown as Config;
 
       let hookResult: ReturnType<typeof useCommandCompletion> & {
@@ -565,6 +568,7 @@ describe('useCommandCompletion', () => {
     it('should trigger prompt completion for regular text when enabled', async () => {
       const mockConfig = {
         getGeminiClient: vi.fn(),
+        getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
       } as unknown as Config;
 
       let hookResult: ReturnType<typeof useCommandCompletion> & {

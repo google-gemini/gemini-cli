@@ -66,6 +66,7 @@ describe('GeminiAgent Session Resume', () => {
       getFileSystemService: vi.fn(),
       setFileSystemService: vi.fn(),
       getGeminiClient: vi.fn().mockReturnValue({
+        getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
         initialize: vi.fn().mockResolvedValue(undefined),
         resumeChat: vi.fn().mockResolvedValue(undefined),
         getChat: vi.fn().mockReturnValue({}),

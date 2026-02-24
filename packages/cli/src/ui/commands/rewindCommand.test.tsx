@@ -99,6 +99,7 @@ describe('rewindCommand', () => {
       services: {
         config: {
           getGeminiClient: () => ({
+            getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
             getChatRecordingService: mockGetChatRecordingService,
             setHistory: mockSetHistory,
             sendMessageStream: mockSendMessageStream,
@@ -293,7 +294,10 @@ describe('rewindCommand', () => {
   it('should fail if client is not initialized', () => {
     const context = createMockCommandContext({
       services: {
-        config: { getGeminiClient: () => undefined },
+        config: {
+          getGeminiClient: () => undefined,
+          getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
+        },
       },
     }) as unknown as CommandContext;
 
@@ -311,6 +315,7 @@ describe('rewindCommand', () => {
       services: {
         config: {
           getGeminiClient: () => ({ getChatRecordingService: () => undefined }),
+          getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
         },
       },
     }) as unknown as CommandContext;

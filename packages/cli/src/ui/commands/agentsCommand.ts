@@ -265,6 +265,72 @@ async function configAction(
   };
 }
 
+async function useAction(
+  context: CommandContext,
+  args: string,
+): Promise<SlashCommandActionReturn | void> {
+  const { config } = context.services;
+  if (!config) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    };
+  }
+
+  const agentName = args.trim();
+  if (!agentName) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Usage: /agents use <agent-name> (or /agents use default)',
+    };
+  }
+
+  if (agentName.toLowerCase() === 'default') {
+    config.setSessionPrimaryAgent(null);
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: 'Reverted to default primary agent.',
+    };
+  }
+
+  const agentRegistry = config.getAgentRegistry();
+  if (!agentRegistry) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Agent registry not found.',
+    };
+  }
+
+  const definition = agentRegistry.getDiscoveredDefinition(agentName);
+  if (!definition) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Agent '${agentName}' not found.`,
+    };
+  }
+
+  if (definition.kind !== 'remote') {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Agent '${agentName}' is not a remote (A2A) agent. Only remote agents can be set as the primary agent currently.`,
+    };
+  }
+
+  config.setSessionPrimaryAgent(agentName);
+
+  return {
+    type: 'message',
+    messageType: 'info',
+    content: `Set primary agent to '${agentName}' for this session.`,
+  };
+}
+
 function completeAgentsToEnable(context: CommandContext, partialArg: string) {
   const { config, settings } = context.services;
   if (!config) return [];
@@ -295,6 +361,20 @@ function completeAllAgents(context: CommandContext, partialArg: string) {
   return allAgents.filter((name: string) => name.startsWith(partialArg));
 }
 
+function completeRemoteAgents(context: CommandContext, partialArg: string) {
+  const { config } = context.services;
+  if (!config) return [];
+
+  const agentRegistry = config.getAgentRegistry();
+  if (!agentRegistry) return ['default'];
+  const remoteAgents = agentRegistry
+    .getAllDefinitions()
+    .filter((d) => d.kind === 'remote')
+    .map((d) => d.name);
+  remoteAgents.push('default');
+  return remoteAgents.filter((name: string) => name.startsWith(partialArg));
+}
+
 const enableCommand: SlashCommand = {
   name: 'enable',
   description: 'Enable a disabled agent',
@@ -320,6 +400,15 @@ const configCommand: SlashCommand = {
   autoExecute: false,
   action: configAction,
   completion: completeAllAgents,
+};
+
+const useCommand: SlashCommand = {
+  name: 'use',
+  description: 'Use a specific agent for the current session',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: false,
+  action: useAction,
+  completion: completeRemoteAgents,
 };
 
 const agentsRefreshCommand: SlashCommand = {
@@ -363,6 +452,7 @@ export const agentsCommand: SlashCommand = {
     enableCommand,
     disableCommand,
     configCommand,
+    useCommand,
   ],
   action: async (context: CommandContext, args) =>
     // Default to list if no subcommand is provided

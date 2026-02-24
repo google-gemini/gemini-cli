@@ -173,6 +173,7 @@ describe('runNonInteractive', () => {
         publish: vi.fn(),
       }),
       getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+      getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getMaxSessionTurns: vi.fn().mockReturnValue(10),
       getSessionId: vi.fn().mockReturnValue('test-session-id'),

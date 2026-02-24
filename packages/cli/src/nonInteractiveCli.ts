@@ -9,9 +9,8 @@ import type {
   ToolCallRequestInfo,
   ResumedSessionData,
   UserFeedbackPayload,
+  ServerGeminiStreamEvent,
 } from '@google/gemini-cli-core';
-import { isSlashCommand } from './ui/utils/commandUtils.js';
-import type { LoadedSettings } from './config/settings.js';
 import {
   convertSessionToClientHistory,
   GeminiEventType,
@@ -30,7 +29,10 @@ import {
   ToolErrorType,
   Scheduler,
   ROOT_SCHEDULER_ID,
+  A2AStreamingAdapter,
 } from '@google/gemini-cli-core';
+import { isSlashCommand } from './ui/utils/commandUtils.js';
+import type { LoadedSettings } from './config/settings.js';
 
 import type { Content, Part } from '@google/genai';
 import readline from 'node:readline';
@@ -299,14 +301,26 @@ export async function runNonInteractive({
         }
         const toolCallRequests: ToolCallRequestInfo[] = [];
 
-        const responseStream = geminiClient.sendMessageStream(
-          currentMessages[0]?.parts || [],
-          abortController.signal,
-          prompt_id,
-          undefined,
-          false,
-          turnCount === 1 ? input : undefined,
-        );
+        let responseStream: AsyncIterable<ServerGeminiStreamEvent>;
+        const primaryAgent = config.getSessionPrimaryAgent();
+        if (primaryAgent) {
+          const adapter = new A2AStreamingAdapter(config);
+          responseStream = adapter.sendMessageStream(
+            primaryAgent,
+            currentMessages[0]?.parts || [],
+            abortController.signal,
+            prompt_id,
+          );
+        } else {
+          responseStream = geminiClient.sendMessageStream(
+            currentMessages[0]?.parts || [],
+            abortController.signal,
+            prompt_id,
+            undefined,
+            false,
+            turnCount === 1 ? input : undefined,
+          );
+        }
 
         let responseText = '';
         for await (const event of responseStream) {

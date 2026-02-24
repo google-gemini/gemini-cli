@@ -195,6 +195,7 @@ export * from './hooks/types.js';
 
 // Export agent types
 export * from './agents/types.js';
+export * from './agents/a2aStreamingAdapter.js';
 
 // Export stdio utils
 export * from './utils/stdio.js';

@@ -25,6 +25,7 @@ describe('useSessionResume', () => {
 
   const mockConfig = {
     getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+    getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
   };
 
   const createMockHistoryManager = (): UseHistoryManagerReturn => ({
@@ -286,6 +287,7 @@ describe('useSessionResume', () => {
 
       const newMockConfig = {
         getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+        getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
       };
 
       rerender({ config: newMockConfig as unknown as Config });

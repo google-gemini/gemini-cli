@@ -36,6 +36,7 @@ import {
   CoreToolCallStatus,
   buildUserSteeringHintPrompt,
   generateSteeringAckMessage,
+  A2AStreamingAdapter,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -1324,14 +1325,26 @@ export const useGeminiStream = (
             lastPromptIdRef.current = prompt_id!;
 
             try {
-              const stream = geminiClient.sendMessageStream(
-                queryToSend,
-                abortSignal,
-                prompt_id!,
-                undefined,
-                false,
-                query,
-              );
+              let stream: AsyncIterable<GeminiEvent>;
+              const primaryAgent = config.getSessionPrimaryAgent();
+              if (primaryAgent) {
+                const adapter = new A2AStreamingAdapter(config);
+                stream = adapter.sendMessageStream(
+                  primaryAgent,
+                  queryToSend,
+                  abortSignal,
+                  prompt_id!,
+                );
+              } else {
+                stream = geminiClient.sendMessageStream(
+                  queryToSend,
+                  abortSignal,
+                  prompt_id!,
+                  undefined,
+                  false,
+                  query,
+                );
+              }
               const processingStatus = await processGeminiStreamEvents(
                 stream,
                 userMessageTimestamp,

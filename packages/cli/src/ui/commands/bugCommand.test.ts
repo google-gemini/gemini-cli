@@ -88,6 +88,7 @@ describe('bugCommand', () => {
           getBugCommand: () => undefined,
           getIdeMode: () => true,
           getGeminiClient: () => ({
+            getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
             getChat: () => ({
               getHistory: () => [],
             }),
@@ -131,6 +132,7 @@ describe('bugCommand', () => {
           getBugCommand: () => undefined,
           getIdeMode: () => true,
           getGeminiClient: () => ({
+            getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
             getChat: () => ({
               getHistory: () => history,
             }),
@@ -177,6 +179,7 @@ describe('bugCommand', () => {
           getBugCommand: () => ({ urlTemplate: customTemplate }),
           getIdeMode: () => true,
           getGeminiClient: () => ({
+            getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
             getChat: () => ({
               getHistory: () => [],
             }),

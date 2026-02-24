@@ -32,6 +32,7 @@ describe('copyCommand', () => {
       services: {
         config: {
           getGeminiClient: () => ({
+            getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
             getChat: mockGetChat,
           }),
         },

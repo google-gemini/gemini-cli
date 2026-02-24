@@ -246,6 +246,7 @@ describe('useGeminiStream', () => {
     getProjectRoot: vi.fn(() => '/test/dir'),
     getCheckpointingEnabled: vi.fn(() => false),
     getGeminiClient: mockGetGeminiClient,
+    getSessionPrimaryAgent: vi.fn().mockReturnValue(null),
     getMcpClientManager: () => mockMcpClientManager as any,
     getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
     getUsageStatisticsEnabled: () => true,

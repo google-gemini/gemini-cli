@@ -122,7 +122,10 @@ export function extractIdsFromResponse(result: Message | Task): {
   let taskId: string | undefined;
 
   if (result.kind === 'message') {
-    taskId = result.taskId;
+    // We explicitly DO NOT return the taskId for a 'message' response.
+    // In the A2A SDK, when a server returns a final Message instead of a Task,
+    // the task is implicitly complete and should not be passed to subsequent requests,
+    // otherwise the server will throw a TaskNotFoundError.
     contextId = result.contextId;
   } else if (result.kind === 'task') {
     taskId = result.id;
