@@ -554,6 +554,10 @@ export class Session {
 
     let nextMessage: Content | null = { role: 'user', parts };
 
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    const modelUsageMap = new Map<string, { input: number; output: number }>();
+
     while (nextMessage !== null) {
       if (pendingSend.signal.aborted) {
         chat.addHistory(nextMessage);
@@ -576,9 +580,18 @@ export class Session {
         );
         nextMessage = null;
 
+        let turnInputTokens = 0;
+        let turnOutputTokens = 0;
+
         for await (const resp of responseStream) {
           if (pendingSend.signal.aborted) {
             return { stopReason: CoreToolCallStatus.Cancelled };
+          }
+
+          if (resp.type === StreamEventType.CHUNK && resp.value.usageMetadata) {
+            turnInputTokens = resp.value.usageMetadata.promptTokenCount ?? 0;
+            turnOutputTokens =
+              resp.value.usageMetadata.candidatesTokenCount ?? 0;
           }
 
           if (
@@ -610,6 +623,19 @@ export class Session {
           if (resp.type === StreamEventType.CHUNK && resp.value.functionCalls) {
             functionCalls.push(...resp.value.functionCalls);
           }
+        }
+
+        totalInputTokens += turnInputTokens;
+        totalOutputTokens += turnOutputTokens;
+
+        if (turnInputTokens > 0 || turnOutputTokens > 0) {
+          const existingModelUsage = modelUsageMap.get(model) || {
+            input: 0,
+            output: 0,
+          };
+          existingModelUsage.input += turnInputTokens;
+          existingModelUsage.output += turnOutputTokens;
+          modelUsageMap.set(model, existingModelUsage);
         }
 
         if (pendingSend.signal.aborted) {
@@ -648,7 +674,28 @@ export class Session {
       }
     }
 
-    return { stopReason: 'end_turn' };
+    const modelUsageArray = Array.from(modelUsageMap.entries()).map(
+      ([m, usage]) => ({
+        model: m,
+        token_count: {
+          input_tokens: usage.input,
+          output_tokens: usage.output,
+        },
+      }),
+    );
+
+    return {
+      stopReason: 'end_turn',
+      _meta: {
+        quota: {
+          token_count: {
+            input_tokens: totalInputTokens,
+            output_tokens: totalOutputTokens,
+          },
+          model_usage: modelUsageArray,
+        },
+      },
+    };
   }
 
   private async handleCommand(
