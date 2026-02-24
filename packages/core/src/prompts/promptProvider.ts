@@ -160,9 +160,8 @@ export class PromptProvider {
               CodebaseInvestigatorAgent.name,
             ),
             enableWriteTodosTool: enabledToolNames.has(WRITE_TODOS_TOOL_NAME),
-            enableEnterPlanModeTool: enabledToolNames.has(
-              ENTER_PLAN_MODE_TOOL_NAME,
-            ),
+            enableEnterPlanModeTool:
+              enabledToolNames.has(ENTER_PLAN_MODE_TOOL_NAME) && !isYoloMode,
             enableGrep: enabledToolNames.has(GREP_TOOL_NAME),
             enableGlob: enabledToolNames.has(GLOB_TOOL_NAME),
             approvedPlan: approvedPlanPath
@@ -192,7 +191,7 @@ export class PromptProvider {
         interactiveYoloMode: this.withSection(
           'interactiveYoloMode',
           () => true,
-          isYoloMode && interactiveMode,
+          isYoloMode,
         ),
         gitRepo: this.withSection(
           'git',
