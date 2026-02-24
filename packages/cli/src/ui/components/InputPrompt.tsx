@@ -159,7 +159,7 @@ function getTextWithNextGhostWord(
   }
 
   let i = 0;
-  const isHorizontalWhitespace = (char: string) => char === ' ' || char === '\t';
+  const isHorizontalWhitespace = (char: string) => char !== '\n' && /\s/.test(char);
 
   // Keep existing spacing before the next word.
   while (i < suffix.length && isHorizontalWhitespace(suffix[i]!)) {
