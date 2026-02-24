@@ -34,6 +34,49 @@ describe('getIdeProcessInfo', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  describe('GEMINI_CLI_IDE_PID override', () => {
+    it('should use GEMINI_CLI_IDE_PID and fetch command on Unix', async () => {
+      (os.platform as Mock).mockReturnValue('linux');
+      vi.stubEnv('GEMINI_CLI_IDE_PID', '12345');
+      mockedExec.mockResolvedValueOnce({ stdout: '0 my-ide-command' }); // getProcessInfo result
+
+      const result = await getIdeProcessInfo();
+
+      expect(result).toEqual({ pid: 12345, command: 'my-ide-command' });
+      expect(mockedExec).toHaveBeenCalledWith(
+        expect.stringContaining('ps -o ppid=,command= -p 12345'),
+      );
+    });
+
+    it('should use GEMINI_CLI_IDE_PID and fetch command on Windows', async () => {
+      (os.platform as Mock).mockReturnValue('win32');
+      vi.stubEnv('GEMINI_CLI_IDE_PID', '54321');
+      const processes = [
+        {
+          ProcessId: 54321,
+          ParentProcessId: 0,
+          Name: 'Code.exe',
+          CommandLine: 'C:\\Program Files\\VSCode\\Code.exe',
+        },
+      ];
+      mockedExec.mockResolvedValueOnce({ stdout: JSON.stringify(processes) });
+
+      const result = await getIdeProcessInfo();
+
+      expect(result).toEqual({
+        pid: 54321,
+        command: 'C:\\Program Files\\VSCode\\Code.exe',
+      });
+      expect(mockedExec).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine',
+        ),
+        expect.anything(),
+      );
+    });
   });
 
   describe('on Unix', () => {
