@@ -185,12 +185,16 @@ export async function ensureCorrectEdit(
     unescapeStringForGeminiBug(originalParams.new_string) !==
     originalParams.new_string;
 
-  const expectedReplacements = originalParams.expected_replacements ?? 1;
+  const allowMultiple = originalParams.allow_multiple ?? false;
 
   let finalOldString = originalParams.old_string;
   let occurrences = countOccurrences(currentContent, finalOldString);
 
-  if (occurrences === expectedReplacements) {
+  const isOccurrencesMatch = allowMultiple
+    ? occurrences > 0
+    : occurrences === 1;
+
+  if (isOccurrencesMatch) {
     if (newStringPotentiallyEscaped && !disableLLMCorrection) {
       finalNewString = await correctNewStringEscaping(
         baseLlmClient,
@@ -199,10 +203,7 @@ export async function ensureCorrectEdit(
         abortSignal,
       );
     }
-  } else if (occurrences > expectedReplacements) {
-    // If occurrences > expectedReplacements, return as-is (will fail validation later)
-    // Removed unreachable dead code branches since checking occurrences === expectedReplacements
-    // within an occurrences > expectedReplacements block is impossible.
+
     const result: CorrectedEditResult = {
       params: { ...originalParams },
       occurrences,
@@ -216,7 +217,11 @@ export async function ensureCorrectEdit(
     );
     occurrences = countOccurrences(currentContent, unescapedOldStringAttempt);
 
-    if (occurrences === expectedReplacements) {
+    const isUnescapedOccurrencesMatch = allowMultiple
+      ? occurrences > 0
+      : occurrences === 1;
+
+    if (isUnescapedOccurrencesMatch) {
       finalOldString = unescapedOldStringAttempt;
       if (newStringPotentiallyEscaped && !disableLLMCorrection) {
         finalNewString = await correctNewString(
@@ -276,7 +281,11 @@ export async function ensureCorrectEdit(
         llmCorrectedOldString,
       );
 
-      if (llmOldOccurrences === expectedReplacements) {
+      const isLlmOccurrencesMatch = allowMultiple
+        ? llmOldOccurrences > 0
+        : llmOldOccurrences === 1;
+
+      if (isLlmOccurrencesMatch) {
         finalOldString = llmCorrectedOldString;
         occurrences = llmOldOccurrences;
 
@@ -302,7 +311,7 @@ export async function ensureCorrectEdit(
         return result;
       }
     } else {
-      // Unescaping old_string resulted in > 1 occurrence
+      // Unescaping old_string resulted in > 1 occurrence but not allowMultiple
       const result: CorrectedEditResult = {
         params: { ...originalParams },
         occurrences, // This will be > 1
@@ -316,7 +325,7 @@ export async function ensureCorrectEdit(
     finalOldString,
     finalNewString,
     currentContent,
-    expectedReplacements,
+    allowMultiple,
   );
   finalOldString = targetString;
   finalNewString = pair;
@@ -685,7 +694,7 @@ function trimPairIfPossible(
   target: string,
   trimIfTargetTrims: string,
   currentContent: string,
-  expectedReplacements: number,
+  allowMultiple: boolean,
 ) {
   const trimmedTargetString = trimPreservingTrailingNewline(target);
   if (target.length !== trimmedTargetString.length) {
@@ -694,7 +703,11 @@ function trimPairIfPossible(
       trimmedTargetString,
     );
 
-    if (trimmedTargetOccurrences === expectedReplacements) {
+    const isMatch = allowMultiple
+      ? trimmedTargetOccurrences > 0
+      : trimmedTargetOccurrences === 1;
+
+    if (isMatch) {
       const trimmedReactiveString =
         trimPreservingTrailingNewline(trimIfTargetTrims);
       return {
