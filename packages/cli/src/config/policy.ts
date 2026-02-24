@@ -67,9 +67,15 @@ export async function resolveWorkspacePolicyState(options: {
     | undefined;
 
   if (trustedFolder) {
-    const potentialWorkspacePoliciesDir = new Storage(
-      cwd,
-    ).getWorkspacePoliciesDir();
+    const storage = new Storage(cwd);
+
+    // If we are in the home directory (or rather, our target Gemini dir is the global one),
+    // don't treat it as a workspace to avoid loading global policies twice.
+    if (storage.isWorkspaceHomeDir()) {
+      return { workspacePoliciesDir: undefined };
+    }
+
+    const potentialWorkspacePoliciesDir = storage.getWorkspacePoliciesDir();
     const integrityManager = new PolicyIntegrityManager();
     const integrityResult = await integrityManager.checkIntegrity(
       'workspace',
