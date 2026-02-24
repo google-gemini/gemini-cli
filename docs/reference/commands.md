@@ -32,6 +32,8 @@ Slash commands provide meta-level control over the CLI itself.
   conversation state interactively, or resuming a previous state from a later
   session.
 - **Sub-commands:**
+  - **`debug`**
+    - **Description:** Export the most recent API request as a JSON payload.
   - **`delete <tag>`**
     - **Description:** Deletes a saved conversation checkpoint.
   - **`list`**
@@ -128,8 +130,29 @@ Slash commands provide meta-level control over the CLI itself.
 
 ### `/extensions`
 
-- **Description:** Lists all active extensions in the current Gemini CLI
-  session. See [Gemini CLI Extensions](../extensions/index.md).
+- **Description:** Manage extensions. See
+  [Gemini CLI Extensions](../extensions/index.md).
+- **Sub-commands:**
+  - **`config`**:
+    - **Description:** Configure extension settings.
+  - **`disable`**:
+    - **Description:** Disable an extension.
+  - **`enable`**:
+    - **Description:** Enable an extension.
+  - **`explore`**:
+    - **Description:** Open extensions page in your browser.
+  - **`install`**:
+    - **Description:** Install an extension from a git repo or local path.
+  - **`link`**:
+    - **Description:** Link an extension from a local path.
+  - **`list`**:
+    - **Description:** List active extensions.
+  - **`restart`**:
+    - **Description:** Restart all extensions.
+  - **`uninstall`**:
+    - **Description:** Uninstall an extension.
+  - **`update`**:
+    - **Description:** Update extensions. Usage: update <extension-names>|--all
 
 ### `/help` (or `/?`)
 
@@ -184,6 +207,10 @@ Slash commands provide meta-level control over the CLI itself.
       servers that support OAuth authentication.
   - **`desc`**
     - **Description:** List configured MCP servers and tools with descriptions.
+  - **`disable`**
+    - **Description:** Disable an MCP server.
+  - **`enable`**
+    - **Description:** Enable a disabled MCP server.
   - **`list`** or **`ls`**:
     - **Description:** List configured MCP servers and tools. This is the
       default action if no subcommand is specified.
@@ -217,11 +244,25 @@ Slash commands provide meta-level control over the CLI itself.
       model.
   - **Note:** For more details on how `GEMINI.md` files contribute to
     hierarchical memory, see the
-    [CLI Configuration documentation](../get-started/configuration.md).
+    [CLI Configuration documentation](./configuration.md).
 
 ### `/model`
 
-- **Description:** Opens a dialog to choose your Gemini model.
+- **Description:** Manage model configuration.
+- **Sub-commands:**
+  - **`manage`**:
+    - **Description:** Opens a dialog to configure the model.
+  - **`set`**:
+    - **Description:** Set the model to use.
+    - **Usage:** `/model set <model-name> [--persist]`
+
+### `/permissions`
+
+- **Description:** Manage folder trust settings and other permissions.
+- **Sub-commands:**
+  - **`trust`**:
+    - **Description:** Manage folder trust settings.
+    - **Usage:** `/permissions trust [<directory-path>]`
 
 ### `/plan`
 
@@ -254,7 +295,7 @@ Slash commands provide meta-level control over the CLI itself.
   checkpoints to restore from.
 - **Usage:** `/restore [tool_call_id]`
 - **Note:** Only available if checkpointing is configured via
-  [settings](../get-started/configuration.md). See
+  [settings](./configuration.md). See
   [Checkpointing documentation](../cli/checkpointing.md) for more details.
 
 ### `/rewind`
@@ -293,7 +334,8 @@ Slash commands provide meta-level control over the CLI itself.
   settings that control the behavior and appearance of Gemini CLI. It is
   equivalent to manually editing the `.gemini/settings.json` file, but with
   validation and guidance to prevent errors. See the
-  [settings documentation](./settings.md) for a full list of available settings.
+  [settings documentation](../cli/settings.md) for a full list of available
+  settings.
 - **Usage:** Simply run `/settings` and the editor will open. You can then
   browse or search for specific settings, view their current values, and modify
   them as desired. Changes to some settings are applied immediately, while
@@ -330,10 +372,16 @@ Slash commands provide meta-level control over the CLI itself.
 ### `/stats`
 
 - **Description:** Display detailed statistics for the current Gemini CLI
-  session, including token usage, cached token savings (when available), and
-  session duration. Note: Cached token information is only displayed when cached
-  tokens are being used, which occurs with API key authentication but not with
-  OAuth authentication at this time.
+  session.
+- **Sub-commands:**
+  - **`session`**:
+    - **Description:** Show session-specific usage statistics, including
+      duration, tool calls, and performance metrics. This is the default view.
+  - **`model`**:
+    - **Description:** Show model-specific usage statistics, including token
+      counts and quota information.
+  - **`tools`**:
+    - **Description:** Show tool-specific usage statistics.
 
 ### `/terminal-setup`
 
@@ -380,7 +428,8 @@ Slash commands provide meta-level control over the CLI itself.
 
 Custom commands allow you to create personalized shortcuts for your most-used
 prompts. For detailed instructions on how to create, manage, and use them,
-please see the dedicated [Custom Commands documentation](./custom-commands.md).
+please see the dedicated
+[Custom Commands documentation](../cli/custom-commands.md).
 
 ## Input prompt shortcuts
 

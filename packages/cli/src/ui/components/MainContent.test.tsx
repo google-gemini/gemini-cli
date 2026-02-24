@@ -493,7 +493,8 @@ describe('MainContent', () => {
         isAlternateBuffer: true,
         embeddedShellFocused: true,
         constrainHeight: true,
-        shouldShowLine1: true,
+        shouldShowLine1: false,
+        staticAreaMaxItemHeight: 15,
       },
       {
         name: 'ASB mode - Unfocused shell',
@@ -501,6 +502,7 @@ describe('MainContent', () => {
         embeddedShellFocused: false,
         constrainHeight: true,
         shouldShowLine1: false,
+        staticAreaMaxItemHeight: 15,
       },
       {
         name: 'Normal mode - Constrained height',
@@ -508,13 +510,15 @@ describe('MainContent', () => {
         embeddedShellFocused: false,
         constrainHeight: true,
         shouldShowLine1: false,
+        staticAreaMaxItemHeight: 15,
       },
       {
         name: 'Normal mode - Unconstrained height',
         isAlternateBuffer: false,
         embeddedShellFocused: false,
         constrainHeight: false,
-        shouldShowLine1: false,
+        shouldShowLine1: true,
+        staticAreaMaxItemHeight: 15,
       },
     ];
 
@@ -525,6 +529,7 @@ describe('MainContent', () => {
         embeddedShellFocused,
         constrainHeight,
         shouldShowLine1,
+        staticAreaMaxItemHeight,
       }) => {
         vi.mocked(useAlternateBuffer).mockReturnValue(isAlternateBuffer);
         const ptyId = 123;
@@ -554,6 +559,7 @@ describe('MainContent', () => {
             },
           ],
           availableTerminalHeight: 30, // In ASB mode, focused shell should get ~28 lines
+          staticAreaMaxItemHeight,
           terminalHeight: 50,
           terminalWidth: 100,
           mainAreaWidth: 100,

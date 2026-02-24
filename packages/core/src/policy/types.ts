@@ -116,6 +116,12 @@ export interface PolicyRule {
   argsPattern?: RegExp;
 
   /**
+   * Metadata annotations provided by the tool (e.g. readOnlyHint).
+   * All keys and values in this record must match the tool's annotations.
+   */
+  toolAnnotations?: Record<string, unknown>;
+
+  /**
    * The decision to make when this rule matches.
    */
   decision: PolicyDecision;
@@ -166,6 +172,12 @@ export interface SafetyCheckerRule {
   argsPattern?: RegExp;
 
   /**
+   * Metadata annotations provided by the tool (e.g. readOnlyHint).
+   * All keys and values in this record must match the tool's annotations.
+   */
+  toolAnnotations?: Record<string, unknown>;
+
+  /**
    * Priority of this checker. Higher numbers run first.
    * Default is 0.
    */
@@ -182,6 +194,12 @@ export interface SafetyCheckerRule {
    * If undefined or empty, it applies to all modes.
    */
   modes?: ApprovalMode[];
+
+  /**
+   * Source of the rule.
+   * e.g. "my-policies.toml", "Workspace: project.toml", etc.
+   */
+  source?: string;
 }
 
 export interface HookExecutionContext {
@@ -272,7 +290,9 @@ export interface PolicySettings {
     allowed?: string[];
   };
   mcpServers?: Record<string, { trust?: boolean }>;
+  // User provided policies that will replace the USER level policies in ~/.gemini/policies
   policyPaths?: string[];
+  workspacePoliciesDir?: string;
 }
 
 export interface CheckResult {

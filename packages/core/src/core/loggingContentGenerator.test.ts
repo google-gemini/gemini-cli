@@ -32,6 +32,7 @@ import { LoggingContentGenerator } from './loggingContentGenerator.js';
 import type { Config } from '../config/config.js';
 import { UserTierId } from '../code_assist/types.js';
 import { ApiRequestEvent, LlmRole } from '../telemetry/types.js';
+import { FatalAuthenticationError } from '../utils/errors.js';
 
 describe('LoggingContentGenerator', () => {
   let wrapped: ContentGenerator;
@@ -136,6 +137,19 @@ describe('LoggingContentGenerator', () => {
       );
       const errorEvent = vi.mocked(logApiError).mock.calls[0][1];
       expect(errorEvent.duration_ms).toBe(1000);
+    });
+
+    describe('error type extraction', () => {
+      it('should extract error type correctly', async () => {
+        const req = { contents: [], model: 'm' };
+        const error = new FatalAuthenticationError('test');
+        vi.mocked(wrapped.generateContent).mockRejectedValue(error);
+        await expect(
+          loggingContentGenerator.generateContent(req, 'id', LlmRole.MAIN),
+        ).rejects.toThrow();
+        const errorEvent = vi.mocked(logApiError).mock.calls[0][1];
+        expect(errorEvent.error_type).toBe('FatalAuthenticationError');
+      });
     });
   });
 

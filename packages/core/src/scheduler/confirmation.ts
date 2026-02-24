@@ -59,7 +59,7 @@ export interface ResolutionResult {
  * @param correlationId The correlationId to match.
  * @param signal An AbortSignal to cancel the wait and cleanup listeners.
  */
-export async function awaitConfirmation(
+async function awaitConfirmation(
   messageBus: MessageBus,
   correlationId: string,
   signal: AbortSignal,

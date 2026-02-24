@@ -22,6 +22,7 @@ import type {
   Prompt,
   ReadResourceResult,
   Resource,
+  Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
   ListResourcesResultSchema,
@@ -31,7 +32,6 @@ import {
   ToolListChangedNotificationSchema,
   PromptListChangedNotificationSchema,
   ProgressNotificationSchema,
-  type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { ApprovalMode, PolicyDecision } from '../policy/types.js';
 import { parse } from 'shell-quote';
@@ -70,6 +70,7 @@ import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from '../services/environmentSanitization.js';
+import { expandEnvVars } from '../utils/envExpansion.js';
 import {
   GEMINI_CLI_IDENTIFICATION_ENV_VAR,
   GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
@@ -719,18 +720,17 @@ async function handleAutomaticOAuth(
   try {
     debugLogger.log(`🔐 '${mcpServerName}' requires OAuth authentication`);
 
-    // Always try to parse the resource metadata URI from the www-authenticate header
-    let oauthConfig;
-    const resourceMetadataUri =
-      OAuthUtils.parseWWWAuthenticateHeader(wwwAuthenticate);
-    if (resourceMetadataUri) {
-      oauthConfig = await OAuthUtils.discoverOAuthConfig(resourceMetadataUri);
-    } else if (hasNetworkTransport(mcpServerConfig)) {
+    const serverUrl = mcpServerConfig.httpUrl || mcpServerConfig.url;
+
+    // Try to discover OAuth config from the WWW-Authenticate header first
+    let oauthConfig = await OAuthUtils.discoverOAuthFromWWWAuthenticate(
+      wwwAuthenticate,
+      serverUrl,
+    );
+
+    if (!oauthConfig && hasNetworkTransport(mcpServerConfig)) {
       // Fallback: try to discover OAuth config from the base URL
-      const serverUrl = new URL(
-        mcpServerConfig.httpUrl || mcpServerConfig.url!,
-      );
-      const baseUrl = `${serverUrl.protocol}//${serverUrl.host}`;
+      const baseUrl = OAuthUtils.extractBaseUrl(serverUrl!);
       oauthConfig = await OAuthUtils.discoverOAuthConfig(baseUrl);
     }
 
@@ -754,8 +754,6 @@ async function handleAutomaticOAuth(
     };
 
     // Perform OAuth authentication
-    // Pass the server URL for proper discovery
-    const serverUrl = mcpServerConfig.httpUrl || mcpServerConfig.url;
     debugLogger.log(
       `Starting OAuth authentication for server '${mcpServerName}'...`,
     );
@@ -786,9 +784,16 @@ function createTransportRequestInit(
   mcpServerConfig: MCPServerConfig,
   headers: Record<string, string>,
 ): RequestInit {
+  const expandedHeaders: Record<string, string> = {};
+  if (mcpServerConfig.headers) {
+    for (const [key, value] of Object.entries(mcpServerConfig.headers)) {
+      expandedHeaders[key] = expandEnvVars(value, process.env);
+    }
+  }
+
   return {
     headers: {
-      ...mcpServerConfig.headers,
+      ...expandedHeaders,
       ...headers,
     },
   };
@@ -1973,15 +1978,33 @@ export async function createTransport(
   }
 
   if (mcpServerConfig.command) {
+    // 1. Sanitize the base process environment to prevent unintended leaks of system-wide secrets.
+    const sanitizedEnv = sanitizeEnvironment(process.env, {
+      ...sanitizationConfig,
+      enableEnvironmentVariableRedaction: true,
+    });
+
+    const finalEnv: Record<string, string> = {
+      [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
+        GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
+    };
+    for (const [key, value] of Object.entries(sanitizedEnv)) {
+      if (value !== undefined) {
+        finalEnv[key] = value;
+      }
+    }
+
+    // Expand and merge explicit environment variables from the MCP configuration.
+    if (mcpServerConfig.env) {
+      for (const [key, value] of Object.entries(mcpServerConfig.env)) {
+        finalEnv[key] = expandEnvVars(value, process.env);
+      }
+    }
+
     let transport: Transport = new StdioClientTransport({
       command: mcpServerConfig.command,
       args: mcpServerConfig.args || [],
-      env: {
-        ...sanitizeEnvironment(process.env, sanitizationConfig),
-        ...(mcpServerConfig.env || {}),
-        [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
-          GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
-      } as Record<string, string>,
+      env: finalEnv,
       cwd: mcpServerConfig.cwd,
       stderr: 'pipe',
     });
@@ -1999,6 +2022,7 @@ export async function createTransport(
       // The `XcodeMcpBridgeFixTransport` wrapper hides the underlying `StdioClientTransport`,
       // which exposes `stderr` for debug logging. We need to unwrap it to attach the listener.
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const underlyingTransport =
         transport instanceof XcodeMcpBridgeFixTransport
           ? // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
@@ -2010,6 +2034,7 @@ export async function createTransport(
         underlyingTransport.stderr
       ) {
         underlyingTransport.stderr.on('data', (data) => {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const stderrStr = data.toString().trim();
           debugLogger.debug(
             `[DEBUG] [MCP STDERR (${mcpServerName})]: `,

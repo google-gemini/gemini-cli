@@ -246,6 +246,7 @@ export class GCSTaskStore implements TaskStore {
       }
       const [compressedMetadata] = await metadataFile.download();
       const jsonData = gunzipSync(compressedMetadata).toString();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const loadedMetadata = JSON.parse(jsonData);
       logger.info(`Task ${taskId} metadata loaded from GCS.`);
 
@@ -282,12 +283,14 @@ export class GCSTaskStore implements TaskStore {
 
       return {
         id: taskId,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         contextId: loadedMetadata._contextId || uuidv4(),
         kind: 'task',
         status: {
           state: persistedState._taskState,
           timestamp: new Date().toISOString(),
         },
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         metadata: loadedMetadata,
         history: [],
         artifacts: [],

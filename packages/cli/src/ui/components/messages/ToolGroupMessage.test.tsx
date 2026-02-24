@@ -6,6 +6,7 @@
 
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { act } from 'react';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
 import type {
   HistoryItem,
@@ -677,5 +678,195 @@ describe('<ToolGroupMessage />', () => {
         unmount();
       },
     );
+  });
+
+  describe('Manual Overflow Detection', () => {
+    it('detects overflow for string results exceeding available height', async () => {
+      const toolCalls = [
+        createToolCall({
+          resultDisplay: 'line 1\nline 2\nline 3\nline 4\nline 5',
+        }),
+      ];
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage
+          {...baseProps}
+          item={{ id: 1, type: 'tool_group', tools: toolCalls }}
+          toolCalls={toolCalls}
+          availableTerminalHeight={6} // Very small height
+          isExpandable={true}
+        />,
+        {
+          config: baseMockConfig,
+          useAlternateBuffer: true,
+          uiState: {
+            constrainHeight: true,
+          },
+        },
+      );
+      await waitUntilReady();
+      expect(lastFrame()?.toLowerCase()).toContain(
+        'press ctrl+o to show more lines',
+      );
+      unmount();
+    });
+
+    it('detects overflow for array results exceeding available height', async () => {
+      // resultDisplay when array is expected to be AnsiLine[]
+      // AnsiLine is AnsiToken[]
+      const toolCalls = [
+        createToolCall({
+          resultDisplay: Array(5).fill([{ text: 'line', fg: 'default' }]),
+        }),
+      ];
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage
+          {...baseProps}
+          item={{ id: 1, type: 'tool_group', tools: toolCalls }}
+          toolCalls={toolCalls}
+          availableTerminalHeight={6}
+          isExpandable={true}
+        />,
+        {
+          config: baseMockConfig,
+          useAlternateBuffer: true,
+          uiState: {
+            constrainHeight: true,
+          },
+        },
+      );
+      await waitUntilReady();
+      expect(lastFrame()?.toLowerCase()).toContain(
+        'press ctrl+o to show more lines',
+      );
+      unmount();
+    });
+
+    it('respects ACTIVE_SHELL_MAX_LINES for focused shell tools', async () => {
+      const toolCalls = [
+        createToolCall({
+          name: 'run_shell_command',
+          status: CoreToolCallStatus.Executing,
+          ptyId: 1,
+          resultDisplay: Array(20).fill('line').join('\n'), // 20 lines > 15 (limit)
+        }),
+      ];
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage
+          {...baseProps}
+          item={{ id: 1, type: 'tool_group', tools: toolCalls }}
+          toolCalls={toolCalls}
+          availableTerminalHeight={100} // Plenty of terminal height
+          isExpandable={true}
+        />,
+        {
+          config: baseMockConfig,
+          useAlternateBuffer: true,
+          uiState: {
+            constrainHeight: true,
+            activePtyId: 1,
+            embeddedShellFocused: true,
+          },
+        },
+      );
+      await waitUntilReady();
+      expect(lastFrame()?.toLowerCase()).toContain(
+        'press ctrl+o to show more lines',
+      );
+      unmount();
+    });
+
+    it('does not show expansion hint when content is within limits', async () => {
+      const toolCalls = [
+        createToolCall({
+          resultDisplay: 'small result',
+        }),
+      ];
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage
+          {...baseProps}
+          item={{ id: 1, type: 'tool_group', tools: toolCalls }}
+          toolCalls={toolCalls}
+          availableTerminalHeight={20}
+          isExpandable={true}
+        />,
+        {
+          config: baseMockConfig,
+          useAlternateBuffer: true,
+          uiState: {
+            constrainHeight: true,
+          },
+        },
+      );
+      await waitUntilReady();
+      expect(lastFrame()).not.toContain('Press Ctrl+O to show more lines');
+      unmount();
+    });
+
+    it('hides expansion hint when constrainHeight is false', async () => {
+      const toolCalls = [
+        createToolCall({
+          resultDisplay: 'line 1\nline 2\nline 3\nline 4\nline 5',
+        }),
+      ];
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage
+          {...baseProps}
+          item={{ id: 1, type: 'tool_group', tools: toolCalls }}
+          toolCalls={toolCalls}
+          availableTerminalHeight={6}
+          isExpandable={true}
+        />,
+        {
+          config: baseMockConfig,
+          useAlternateBuffer: true,
+          uiState: {
+            constrainHeight: false,
+          },
+        },
+      );
+      await waitUntilReady();
+      expect(lastFrame()).not.toContain('Press Ctrl+O to show more lines');
+      unmount();
+    });
+
+    it('isolates overflow hint in ASB mode (ignores global overflow state)', async () => {
+      // In this test, the tool output is SHORT (no local overflow).
+      // We will inject a dummy ID into the global overflow state.
+      // ToolGroupMessage should still NOT show the hint because it calculates
+      // overflow locally and passes it as a prop.
+      const toolCalls = [
+        createToolCall({
+          resultDisplay: 'short result',
+        }),
+      ];
+      const { lastFrame, unmount, waitUntilReady, capturedOverflowActions } =
+        renderWithProviders(
+          <ToolGroupMessage
+            {...baseProps}
+            item={{ id: 1, type: 'tool_group', tools: toolCalls }}
+            toolCalls={toolCalls}
+            availableTerminalHeight={100}
+            isExpandable={true}
+          />,
+          {
+            config: baseMockConfig,
+            useAlternateBuffer: true,
+            uiState: {
+              constrainHeight: true,
+            },
+          },
+        );
+      await waitUntilReady();
+
+      // Manually trigger a global overflow
+      act(() => {
+        expect(capturedOverflowActions).toBeDefined();
+        capturedOverflowActions!.addOverflowingId('unrelated-global-id');
+      });
+
+      // The hint should NOT appear because ToolGroupMessage is isolated by its prop logic
+      expect(lastFrame()).not.toContain('Press Ctrl+O to show more lines');
+      unmount();
+    });
   });
 });

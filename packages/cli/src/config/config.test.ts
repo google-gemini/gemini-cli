@@ -21,7 +21,11 @@ import {
   type MCPServerConfig,
 } from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
-import { type Settings, createTestMergedSettings } from './settings.js';
+import {
+  type Settings,
+  type MergedSettings,
+  createTestMergedSettings,
+} from './settings.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
@@ -2012,6 +2016,40 @@ describe('loadCliConfig useRipgrep', () => {
   });
 });
 
+describe('loadCliConfig directWebFetch', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should be false by default when directWebFetch is not set in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getDirectWebFetch()).toBe(false);
+  });
+
+  it('should be true when directWebFetch is set to true in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      experimental: {
+        directWebFetch: true,
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getDirectWebFetch()).toBe(true);
+  });
+});
+
 describe('screenReader configuration', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -2597,6 +2635,21 @@ describe('loadCliConfig approval mode', () => {
 
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
+  });
+
+  it('should pass planSettings.directory from settings to config', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      general: {
+        plan: {
+          directory: '.custom-plans',
+        },
+      },
+    } as unknown as MergedSettings);
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    const plansDir = config.storage.getPlansDir();
+    expect(plansDir).toContain('.custom-plans');
   });
 
   // --- Untrusted Folder Scenarios ---

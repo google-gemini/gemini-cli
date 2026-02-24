@@ -89,9 +89,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
-        getProjectTempPlansDir: vi
-          .fn()
-          .mockReturnValue('/tmp/project-temp/plans'),
+        getPlansDir: vi.fn().mockReturnValue('/tmp/project-temp/plans'),
       },
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
@@ -509,9 +507,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
           ApprovalMode.PLAN,
         );
-        vi.mocked(mockConfig.storage.getProjectTempPlansDir).mockReturnValue(
-          '/tmp/plans',
-        );
+        vi.mocked(mockConfig.storage.getPlansDir).mockReturnValue('/tmp/plans');
       });
 
       it('should include approved plan path when set in config', () => {
