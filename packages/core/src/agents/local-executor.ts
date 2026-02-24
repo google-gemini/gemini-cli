@@ -35,7 +35,7 @@ import {
   AgentFinishEvent,
   LlmRole,
   RecoveryAttemptEvent,
-} from '../telemetry/types.js';
+ LlmRole } from '../telemetry/types.js';
 import type {
   LocalAgentDefinition,
   AgentInputs,
@@ -171,7 +171,18 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     } else {
       // If no tools are explicitly configured, default to all available tools.
       for (const toolName of parentToolRegistry.getAllToolNames()) {
-        registerToolByName(toolName);
+        const tool = parentToolRegistry.getTool(toolName);
+        if (
+          tool instanceof DiscoveredMCPTool &&
+          !toolName.includes(MCP_QUALIFIED_NAME_SEPARATOR)
+        ) {
+          // When auto-populating all tools, register MCP tools directly
+          // to avoid the qualified-name check (which is only meant for
+          // explicit tool references in agent definitions).
+          agentToolRegistry.registerTool(tool);
+        } else {
+          registerToolByName(toolName);
+        }
       }
     }
 
