@@ -201,6 +201,7 @@ export interface AgentOverride {
 
 export interface AgentSettings {
   overrides?: Record<string, AgentOverride>;
+  verbose?: boolean;
 }
 
 export interface CustomTheme {

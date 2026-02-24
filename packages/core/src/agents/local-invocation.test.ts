@@ -217,7 +217,58 @@ describe('LocalSubagentInvocation', () => {
       expect(updateOutput).toHaveBeenCalledTimes(3); // Initial message + 2 thoughts
     });
 
-    it('should NOT stream other activities (e.g., TOOL_CALL_START, ERROR)', async () => {
+    it('should stream all activity types when verbose is true (default)', async () => {
+      mockExecutorInstance.run.mockImplementation(async () => {
+        const onActivity = MockLocalAgentExecutor.create.mock.calls[0][2];
+
+        if (onActivity) {
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'TOOL_CALL_START',
+            data: { name: 'read_file', args: { path: '/foo' } },
+          } as SubagentActivityEvent);
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'TOOL_CALL_END',
+            data: { name: 'read_file', output: 'file contents' },
+          } as SubagentActivityEvent);
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'ERROR',
+            data: { error: 'Something failed', context: 'tool_call' },
+          } as SubagentActivityEvent);
+        }
+        return { result: 'Done', terminate_reason: AgentTerminateMode.GOAL };
+      });
+
+      await invocation.execute(signal, updateOutput);
+
+      expect(updateOutput).toHaveBeenCalledWith('Subagent starting...\n');
+      expect(updateOutput).toHaveBeenCalledWith(
+        expect.stringContaining('Calling tool: read_file'),
+      );
+      expect(updateOutput).toHaveBeenCalledWith(
+        expect.stringContaining('Tool read_file finished: file contents'),
+      );
+      expect(updateOutput).toHaveBeenCalledWith(
+        expect.stringMatching(/Error.*Something failed/),
+      );
+    });
+
+    it('should NOT stream tool/error activities when verbose is false', async () => {
+      const configWithVerboseOff = makeFakeConfig({
+        agents: { verbose: false },
+      });
+      const invocationVerboseOff = new LocalSubagentInvocation(
+        testDefinition,
+        configWithVerboseOff,
+        { task: 'Analyze' },
+        mockMessageBus,
+      );
+
       mockExecutorInstance.run.mockImplementation(async () => {
         const onActivity = MockLocalAgentExecutor.create.mock.calls[0][2];
 
@@ -238,7 +289,7 @@ describe('LocalSubagentInvocation', () => {
         return { result: 'Done', terminate_reason: AgentTerminateMode.GOAL };
       });
 
-      await invocation.execute(signal, updateOutput);
+      await invocationVerboseOff.execute(signal, updateOutput);
 
       // Should only contain the initial "Subagent starting..." message
       expect(updateOutput).toHaveBeenCalledTimes(1);
