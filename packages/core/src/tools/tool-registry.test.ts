@@ -553,7 +553,7 @@ describe('ToolRegistry', () => {
       expect(discoveredTool).toBeDefined();
 
       mockSpawn.mockReturnValueOnce(
-        createExecutionProcess(1, 'Something went wrong') as any,
+        createExecutionProcess(2, 'Something went wrong') as any,
       );
 
       const invocation = (discoveredTool as DiscoveredTool).build({});
@@ -563,7 +563,7 @@ describe('ToolRegistry', () => {
         ToolErrorType.DISCOVERED_TOOL_EXECUTION_ERROR,
       );
       expect(result.llmContent).toContain('Stderr: Something went wrong');
-      expect(result.llmContent).toContain('Exit Code: 1');
+      expect(result.llmContent).toContain('Exit Code: 2');
     });
 
     it('should pass MessageBus to DiscoveredTool and its invocations', async () => {
