@@ -8,7 +8,6 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import { HalfLinePaddedBox } from '../shared/HalfLinePaddedBox.js';
-import { DEFAULT_BACKGROUND_OPACITY } from '../../constants.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
 
 interface UserShellMessageProps {
@@ -28,8 +27,8 @@ export const UserShellMessage: React.FC<UserShellMessageProps> = ({
 
   return (
     <HalfLinePaddedBox
-      backgroundBaseColor={theme.text.secondary}
-      backgroundOpacity={DEFAULT_BACKGROUND_OPACITY}
+      backgroundBaseColor={theme.background.message}
+      backgroundOpacity={1}
       useBackgroundColor={useBackgroundColor}
     >
       <Box
