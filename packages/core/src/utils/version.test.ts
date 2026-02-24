@@ -44,7 +44,7 @@ describe('version', () => {
   });
 
   it('should cache the version and only call getPackageJson once', async () => {
-    delete process.env['CLI_VERSION'];
+    vi.stubEnv('CLI_VERSION', '');
     vi.mocked(getPackageJson).mockResolvedValue({ version: '1.2.3' });
 
     const version1 = await getVersion();
