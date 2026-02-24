@@ -177,7 +177,7 @@ describe('GeminiAgent', () => {
 
     expect(response.protocolVersion).toBe(acp.PROTOCOL_VERSION);
     expect(response.authMethods).toHaveLength(3);
-    const geminiAuth = response.authMethods.find(
+    const geminiAuth = response.authMethods?.find(
       (m) => m.id === AuthType.USE_GEMINI,
     );
     expect(geminiAuth?._meta).toEqual({
