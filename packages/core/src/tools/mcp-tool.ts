@@ -10,14 +10,12 @@ import type {
   ToolInvocation,
   ToolMcpConfirmationDetails,
   ToolResult,
-} from './tools.js';
-import {
+
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
   ToolConfirmationOutcome,
-  type PolicyUpdateOptions,
-} from './tools.js';
+  type PolicyUpdateOptions} from './tools.js';
 import type { CallableTool, FunctionCall, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
 import type { Config } from '../config/config.js';
@@ -28,6 +26,16 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
  * e.g. "server_name__tool_name"
  */
 export const MCP_QUALIFIED_NAME_SEPARATOR = '__';
+
+/**
+ * Returns true if `name` matches the MCP qualified name format: "server__tool",
+ * i.e. exactly two non-empty parts separated by the MCP_QUALIFIED_NAME_SEPARATOR.
+ */
+export function isMcpToolName(name: string): boolean {
+  if (!name.includes(MCP_QUALIFIED_NAME_SEPARATOR)) return false;
+  const parts = name.split(MCP_QUALIFIED_NAME_SEPARATOR);
+  return parts.length === 2 && parts[0].length > 0 && parts[1].length > 0;
+}
 
 type ToolParams = Record<string, unknown>;
 

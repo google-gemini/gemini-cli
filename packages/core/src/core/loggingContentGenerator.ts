@@ -37,29 +37,18 @@ import { isStructuredError } from '../utils/quotaErrorDetection.js';
 import { runInDevTraceSpan, type SpanMetadata } from '../telemetry/trace.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorType } from '../utils/errors.js';
-import { MCP_QUALIFIED_NAME_SEPARATOR } from '../tools/mcp-tool.js';
+import { isMcpToolName } from '../tools/mcp-tool.js';
+import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 
 interface StructuredError {
   status: number;
 }
 
 /**
- * Returns true if `name` matches the MCP qualified name format: "server__tool",
- * i.e. exactly two non-empty parts separated by the MCP_QUALIFIED_NAME_SEPARATOR.
+ * Rough token estimate for non-Part config objects (tool definitions, etc.)
+ * where estimateTokenCountSync cannot be used directly.
  */
-function isMcpToolName(name: string): boolean {
-  if (!name.includes(MCP_QUALIFIED_NAME_SEPARATOR)) return false;
-  const parts = name.split(MCP_QUALIFIED_NAME_SEPARATOR);
-  return parts.length === 2 && parts[0].length > 0 && parts[1].length > 0;
-}
-
-/**
- * Rough estimate of token count from a JSON-serializable value.
- * Uses ~4 characters per token as a heuristic. This is NOT real tokenization;
- * it includes JSON serialization overhead (keys, quotes, braces) and assumes
- * a uniform character-to-token ratio. Useful for relative size comparisons.
- */
-function estimateTokens(value: unknown): number {
+function estimateConfigTokens(value: unknown): number {
   return Math.floor(JSON.stringify(value).length / 4);
 }
 
@@ -70,8 +59,11 @@ function estimateTokens(value: unknown): number {
  * - system_instructions: tokens from system instruction config
  * - tool_definitions: tokens from non-MCP tool definitions
  * - history: tokens from conversation history, excluding tool call/response parts
- * - tool_calls: per-tool token counts for function call + response parts
+ * - tool_calls: per-tool token counts for non-MCP function call + response parts
  * - mcp_servers: tokens from MCP tool definitions + MCP tool call/response parts
+ *
+ * MCP tool calls are excluded from tool_calls and counted only in mcp_servers
+ * to keep fields non-overlapping and avoid leaking MCP server names in telemetry.
  */
 export function estimateContextBreakdown(
   contents: Content[],
@@ -84,12 +76,12 @@ export function estimateContextBreakdown(
   const toolCalls: Record<string, number> = {};
 
   if (config?.systemInstruction) {
-    systemInstructions += estimateTokens(config.systemInstruction);
+    systemInstructions += estimateConfigTokens(config.systemInstruction);
   }
 
   if (config?.tools) {
     for (const tool of config.tools) {
-      const toolTokens = estimateTokens(tool);
+      const toolTokens = estimateConfigTokens(tool);
       if (
         tool &&
         typeof tool === 'object' &&
@@ -99,7 +91,7 @@ export function estimateContextBreakdown(
         let mcpTokensInTool = 0;
         for (const func of tool.functionDeclarations) {
           if (func.name && isMcpToolName(func.name)) {
-            mcpTokensInTool += estimateTokens(func);
+            mcpTokensInTool += estimateConfigTokens(func);
           }
         }
         mcpServers += mcpTokensInTool;
@@ -111,27 +103,27 @@ export function estimateContextBreakdown(
   }
 
   for (const content of contents) {
-    let toolTokensInContent = 0;
     for (const part of content.parts || []) {
       if (part.functionCall) {
         const name = part.functionCall.name || 'unknown';
-        const tokens = estimateTokens(part.functionCall);
-        toolCalls[name] = (toolCalls[name] || 0) + tokens;
+        const tokens = estimateTokenCountSync([part]);
         if (isMcpToolName(name)) {
           mcpServers += tokens;
+        } else {
+          toolCalls[name] = (toolCalls[name] || 0) + tokens;
         }
-        toolTokensInContent += tokens;
       } else if (part.functionResponse) {
         const name = part.functionResponse.name || 'unknown';
-        const tokens = estimateTokens(part.functionResponse);
-        toolCalls[name] = (toolCalls[name] || 0) + tokens;
+        const tokens = estimateTokenCountSync([part]);
         if (isMcpToolName(name)) {
           mcpServers += tokens;
+        } else {
+          toolCalls[name] = (toolCalls[name] || 0) + tokens;
         }
-        toolTokensInContent += tokens;
+      } else {
+        history += estimateTokenCountSync([part]);
       }
     }
-    history += estimateTokens(content) - toolTokensInContent;
   }
 
   return {

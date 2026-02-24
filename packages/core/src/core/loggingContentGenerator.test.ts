@@ -491,8 +491,8 @@ describe('estimateContextBreakdown', () => {
     ];
     const result = estimateContextBreakdown(contents);
     expect(result.tool_calls['read_file']).toBeGreaterThan(0);
-    // history should still have some tokens (the content wrapper minus tool parts)
-    expect(result.history).toBeGreaterThanOrEqual(0);
+    // history should be zero since all parts are tool calls
+    expect(result.history).toBe(0);
   });
 
   it('should produce additive (non-overlapping) fields', () => {
@@ -538,22 +538,18 @@ describe('estimateContextBreakdown', () => {
     } as unknown as GenerateContentConfig;
     const result = estimateContextBreakdown(contents, config);
 
-    // Sum of tool_calls values
-    const totalToolCalls = Object.values(result.tool_calls).reduce(
-      (a, b) => a + b,
-      0,
-    );
-    // mcp_servers includes both definitions and call/response parts for MCP tools
-    // but does NOT overlap with tool_definitions or history
-    // tool_calls overlaps with mcp_servers (MCP call/responses are in both)
-    // so the additive total is: system + tool_defs + history + tool_calls_non_mcp + mcp
+    // All fields should be non-overlapping
     expect(result.system_instructions).toBeGreaterThan(0);
     expect(result.tool_definitions).toBeGreaterThan(0);
-    expect(result.history).toBeGreaterThanOrEqual(0);
-    expect(totalToolCalls).toBeGreaterThan(0);
+    expect(result.history).toBeGreaterThan(0);
+    // tool_calls should only contain non-MCP tools
+    expect(result.tool_calls['read_file']).toBeGreaterThan(0);
+    expect(result.tool_calls['myserver__search']).toBeUndefined();
+    // MCP tokens are only in mcp_servers
+    expect(result.mcp_servers).toBeGreaterThan(0);
   });
 
-  it('should classify MCP tool calls into mcp_servers', () => {
+  it('should classify MCP tool calls into mcp_servers only, not tool_calls', () => {
     const contents: Content[] = [
       {
         role: 'model',
@@ -579,10 +575,10 @@ describe('estimateContextBreakdown', () => {
       },
     ];
     const result = estimateContextBreakdown(contents);
-    expect(result.tool_calls['myserver__search']).toBeGreaterThan(0);
+    // MCP tool calls should NOT appear in tool_calls
+    expect(result.tool_calls['myserver__search']).toBeUndefined();
+    // MCP call tokens should only be counted in mcp_servers
     expect(result.mcp_servers).toBeGreaterThan(0);
-    // MCP call tokens should be counted in mcp_servers
-    expect(result.mcp_servers).toBe(result.tool_calls['myserver__search']);
   });
 
   it('should handle mixed MCP and non-MCP tool calls', () => {
@@ -606,10 +602,12 @@ describe('estimateContextBreakdown', () => {
       },
     ];
     const result = estimateContextBreakdown(contents);
+    // Non-MCP tools should be in tool_calls
     expect(result.tool_calls['read_file']).toBeGreaterThan(0);
-    expect(result.tool_calls['myserver__search']).toBeGreaterThan(0);
-    // Only MCP tool calls should be in mcp_servers
-    expect(result.mcp_servers).toBe(result.tool_calls['myserver__search']);
+    // MCP tools should NOT be in tool_calls
+    expect(result.tool_calls['myserver__search']).toBeUndefined();
+    // MCP tool calls should only be in mcp_servers
+    expect(result.mcp_servers).toBeGreaterThan(0);
   });
 
   it('should use "unknown" for tool calls without a name', () => {
