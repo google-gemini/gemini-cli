@@ -43,6 +43,7 @@ import { sanitizeHookName } from './sanitize.js';
 import { getFileDiffFromResultDisplay } from '../utils/fileDiffUtils.js';
 import { LlmRole } from './llmRole.js';
 export { LlmRole };
+import type { HookType } from '../hooks/types.js';
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -876,6 +877,105 @@ export class NextSpeakerCheckEvent implements BaseTelemetryEvent {
 
   toLogBody(): string {
     return `Next speaker check.`;
+  }
+}
+
+export const EVENT_CONSECA_POLICY_GENERATION =
+  'gemini_cli.conseca.policy_generation';
+export class ConsecaPolicyGenerationEvent implements BaseTelemetryEvent {
+  'event.name': 'conseca_policy_generation';
+  'event.timestamp': string;
+  user_prompt: string;
+  trusted_content: string;
+  policy: string;
+  error?: string;
+
+  constructor(
+    user_prompt: string,
+    trusted_content: string,
+    policy: string,
+    error?: string,
+  ) {
+    this['event.name'] = 'conseca_policy_generation';
+    this['event.timestamp'] = new Date().toISOString();
+    this.user_prompt = user_prompt;
+    this.trusted_content = trusted_content;
+    this.policy = policy;
+    this.error = error;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_CONSECA_POLICY_GENERATION,
+      'event.timestamp': this['event.timestamp'],
+      user_prompt: this.user_prompt,
+      trusted_content: this.trusted_content,
+      policy: this.policy,
+    };
+
+    if (this.error) {
+      attributes['error'] = this.error;
+    }
+
+    return attributes;
+  }
+
+  toLogBody(): string {
+    return `Conseca Policy Generation.`;
+  }
+}
+
+export const EVENT_CONSECA_VERDICT = 'gemini_cli.conseca.verdict';
+export class ConsecaVerdictEvent implements BaseTelemetryEvent {
+  'event.name': 'conseca_verdict';
+  'event.timestamp': string;
+  user_prompt: string;
+  policy: string;
+  tool_call: string;
+  verdict: string;
+  verdict_rationale: string;
+  error?: string;
+
+  constructor(
+    user_prompt: string,
+    policy: string,
+    tool_call: string,
+    verdict: string,
+    verdict_rationale: string,
+    error?: string,
+  ) {
+    this['event.name'] = 'conseca_verdict';
+    this['event.timestamp'] = new Date().toISOString();
+    this.user_prompt = user_prompt;
+    this.policy = policy;
+    this.tool_call = tool_call;
+    this.verdict = verdict;
+    this.verdict_rationale = verdict_rationale;
+    this.error = error;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_CONSECA_VERDICT,
+      'event.timestamp': this['event.timestamp'],
+      user_prompt: this.user_prompt,
+      policy: this.policy,
+      tool_call: this.tool_call,
+      verdict: this.verdict,
+      verdict_rationale: this.verdict_rationale,
+    };
+
+    if (this.error) {
+      attributes['error'] = this.error;
+    }
+
+    return attributes;
+  }
+
+  toLogBody(): string {
+    return `Conseca Verdict: ${this.verdict}.`;
   }
 }
 
@@ -2067,7 +2167,7 @@ export class HookCallEvent implements BaseTelemetryEvent {
   'event.name': string;
   'event.timestamp': string;
   hook_event_name: string;
-  hook_type: 'command';
+  hook_type: HookType;
   hook_name: string;
   hook_input: Record<string, unknown>;
   hook_output?: Record<string, unknown>;
@@ -2080,7 +2180,7 @@ export class HookCallEvent implements BaseTelemetryEvent {
 
   constructor(
     hookEventName: string,
-    hookType: 'command',
+    hookType: HookType,
     hookName: string,
     hookInput: Record<string, unknown>,
     durationMs: number,
