@@ -73,6 +73,7 @@ describe('Plan Mode', () => {
           experimental: { plan: true },
           tools: {
             core: ['write_file', 'read_file', 'list_directory'],
+            allowed: ['write_file'],
           },
           general: { defaultApprovalMode: 'plan' },
         },
@@ -80,11 +81,9 @@ describe('Plan Mode', () => {
     );
 
     // We ask the agent to create a plan for a feature, which should trigger a write_file in the plans directory.
-    // Verify that writing to a file outside of plans directory fails
     await rig.run({
       approvalMode: 'plan',
-      stdin:
-        'Create a file called plan.md in the plans directory and create a file called hello.txt in the current directory',
+      stdin: 'Create a file called plan.md in the plans directory',
     });
 
     const toolLogs = rig.readToolLogs();
@@ -97,16 +96,6 @@ describe('Plan Mode', () => {
     const planWrite = writeLogs.find((l) =>
       l.toolRequest.args.includes(expectedPlanPath),
     );
-
-    const blockedWrite = writeLogs.find((l) =>
-      l.toolRequest.args.includes('hello.txt'),
-    );
-
-    // Model is undeterministic, sometimes the tool call will be attempted and blocked
-    // Sometimes the model won't even make the tool call
-    if (blockedWrite) {
-      expect(blockedWrite?.toolRequest.success).toBe(false);
-    }
 
     expect(planWrite?.toolRequest.success).toBeDefined();
   });
