@@ -204,6 +204,11 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
     const payload = this.approvalPayload;
     if (payload?.approved) {
       const newMode = payload.approvalMode ?? ApprovalMode.DEFAULT;
+
+      if (newMode === ApprovalMode.PLAN || newMode === ApprovalMode.YOLO) {
+        throw new Error(`Unexpected approval mode: ${newMode}`);
+      }
+
       this.config.setApprovalMode(newMode);
       this.config.setApprovedPlanPath(resolvedPlanPath);
 
