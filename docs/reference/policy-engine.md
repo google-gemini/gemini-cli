@@ -205,6 +205,10 @@ toolName = "run_shell_command"
 # to form a composite name like "mcpName__toolName".
 mcpName = "my-custom-server"
 
+# (Optional) Metadata hints provided by the tool. A rule matches if all
+# key-value pairs provided here are present in the tool's annotations.
+toolAnnotations = { readOnlyHint = true }
+
 # (Optional) A regex to match against the tool's arguments.
 argsPattern = '"command":"(git|npm)'
 

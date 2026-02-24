@@ -2375,6 +2375,75 @@ describe('PolicyEngine', () => {
         expect(Array.from(excluded).sort()).toEqual(expected.sort());
       },
     );
+
+    it('should skip annotation-based rules when no metadata is provided', () => {
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolAnnotations: { destructiveHint: true },
+            decision: PolicyDecision.DENY,
+            priority: 10,
+          },
+        ],
+      });
+      const excluded = engine.getExcludedTools();
+      expect(Array.from(excluded)).toEqual([]);
+    });
+
+    it('should exclude tools matching annotation-based DENY rule when metadata is provided', () => {
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolAnnotations: { destructiveHint: true },
+            decision: PolicyDecision.DENY,
+            priority: 10,
+          },
+        ],
+      });
+      const metadata = new Map<string, Record<string, unknown>>([
+        ['dangerous_tool', { destructiveHint: true }],
+        ['safe_tool', { readOnlyHint: true }],
+      ]);
+      const excluded = engine.getExcludedTools(metadata);
+      expect(Array.from(excluded)).toEqual(['dangerous_tool']);
+    });
+
+    it('should NOT exclude tools whose annotations do not match', () => {
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolAnnotations: { destructiveHint: true },
+            decision: PolicyDecision.DENY,
+            priority: 10,
+          },
+        ],
+      });
+      const metadata = new Map<string, Record<string, unknown>>([
+        ['safe_tool', { readOnlyHint: true }],
+      ]);
+      const excluded = engine.getExcludedTools(metadata);
+      expect(Array.from(excluded)).toEqual([]);
+    });
+
+    it('should exclude tools matching both toolName pattern AND annotations', () => {
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'server__*',
+            toolAnnotations: { destructiveHint: true },
+            decision: PolicyDecision.DENY,
+            priority: 10,
+          },
+        ],
+      });
+      const metadata = new Map<string, Record<string, unknown>>([
+        ['server__dangerous_tool', { destructiveHint: true }],
+        ['other__dangerous_tool', { destructiveHint: true }],
+        ['server__safe_tool', { readOnlyHint: true }],
+      ]);
+      const excluded = engine.getExcludedTools(metadata);
+      expect(Array.from(excluded)).toEqual(['server__dangerous_tool']);
+    });
   });
 
   describe('YOLO mode with ask_user tool', () => {
