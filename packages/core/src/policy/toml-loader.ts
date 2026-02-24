@@ -138,7 +138,8 @@ export interface PolicyFile {
  */
 export async function readPolicyFiles(
   policyPath: string,
-): Promise<PolicyFile[]> {
+  tierName: 'default' | 'user' | 'workspace' | 'admin',
+): Promise<{ files: PolicyFile[]; errors: PolicyFileError[] }> {
   let filesToLoad: string[] = [];
   let baseDir = '';
 
@@ -160,23 +161,32 @@ export async function readPolicyFiles(
     }
   } catch (e) {
     if (isNodeError(e) && e.code === 'ENOENT') {
-      return [];
+      return { files: [], errors: [] };
     }
     throw e;
   }
 
   const results: PolicyFile[] = [];
+  const errors: PolicyFileError[] = [];
   for (const file of filesToLoad) {
     const filePath = path.join(baseDir, file);
     try {
       const content = await fs.readFile(filePath, 'utf-8');
       results.push({ path: filePath, content });
     } catch (e) {
-      // Ignore individual file read errors (e.g., broken symlinks or directories)
-      // so we don't skip the entire directory.
+      errors.push({
+        filePath,
+        fileName: file,
+        tier: tierName,
+        errorType: 'file_read',
+        message: 'Failed to read policy file',
+        details: isNodeError(e) ? e.message : String(e),
+        suggestion:
+          'Check if the file is a broken symbolic link or an unreadable directory.',
+      });
     }
   }
-  return results;
+  return { files: results, errors };
 }
 
 /**
@@ -287,7 +297,9 @@ export async function loadPoliciesFromToml(
     let policyFiles: PolicyFile[] = [];
 
     try {
-      policyFiles = await readPolicyFiles(p);
+      const readResult = await readPolicyFiles(p, tierName);
+      policyFiles = readResult.files;
+      errors.push(...readResult.errors);
     } catch (e) {
       errors.push({
         filePath: p,

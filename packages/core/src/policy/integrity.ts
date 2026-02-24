@@ -88,7 +88,8 @@ export class PolicyIntegrityManager {
     policyDir: string,
   ): Promise<{ hash: string; fileCount: number }> {
     try {
-      const files = await readPolicyFiles(policyDir);
+      const readResult = await readPolicyFiles(policyDir, 'workspace');
+      const files = readResult.files;
 
       // Sort files by path to ensure deterministic hashing
       files.sort((a, b) => a.path.localeCompare(b.path));
