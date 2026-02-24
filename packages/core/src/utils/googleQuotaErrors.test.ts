@@ -617,4 +617,48 @@ describe('classifyGoogleError', () => {
     expect(result).toBe(originalError);
     expect(result).not.toBeInstanceOf(ValidationRequiredError);
   });
+
+  it('should return RetryableQuotaError for 503 Service Unavailable', () => {
+    const errorMessage =
+      'No capacity available for model gemini-3-flash-preview on the server';
+    const apiError: GoogleApiError = {
+      code: 503,
+      message: errorMessage,
+      details: [],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    expect((result as RetryableQuotaError).message).toBe(errorMessage);
+    expect((result as RetryableQuotaError).retryDelayMs).toBe(10000); // 10 seconds
+  });
+
+  it('should handle 503 error with nested JSON message', () => {
+    const errorMessage = JSON.stringify({
+      error: {
+        code: 503,
+        message: 'The model is overloaded. Please try again later.',
+        status: 'UNAVAILABLE',
+      },
+    });
+    const apiError: GoogleApiError = {
+      code: 503,
+      message: errorMessage,
+      details: [],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    expect((result as RetryableQuotaError).retryDelayMs).toBe(10000);
+  });
+
+  it('should classify 503 error without parsed googleApiError', () => {
+    const errorMessage = 'Service unavailable: capacity exceeded';
+    const error = new Error(errorMessage);
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(null);
+    // When parseGoogleApiError returns null, the status check will fail too
+    // The function will return the original error
+    const result = classifyGoogleError(error);
+    expect(result).toBe(error);
+  });
 });
