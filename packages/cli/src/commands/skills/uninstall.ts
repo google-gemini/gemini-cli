@@ -64,10 +64,14 @@ export const uninstallCommand: CommandModule = {
       }),
   handler: async (argv) => {
     await handleUninstall({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      name: argv['name'] as string,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      scope: argv['scope'] as 'user' | 'workspace',
+      name:
+        typeof argv['name'] === 'string'
+          ? argv['name']
+          : String(argv['name'] || ''),
+      scope:
+        argv['scope'] === 'user' || argv['scope'] === 'workspace'
+          ? argv['scope']
+          : 'user',
     });
     await exitCli();
   },

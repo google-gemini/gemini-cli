@@ -5,7 +5,7 @@
  */
 
 import type { CommandModule } from 'yargs';
-import type { ExtensionSettingScope } from '../../config/extensions/extensionSettings.js';
+import { ExtensionSettingScope } from '../../config/extensions/extensionSettings.js';
 import {
   configureAllExtensions,
   configureExtension,
@@ -65,32 +65,27 @@ export const configureCommand: CommandModule<object, ConfigureArgs> = {
 
     const extensionManager = await getExtensionManager();
 
+    const resolvedScope =
+      scope === 'workspace'
+        ? ExtensionSettingScope.WORKSPACE
+        : ExtensionSettingScope.USER;
+
     // Case 1: Configure specific setting for an extension
     if (name && setting) {
       await configureSpecificSetting(
         extensionManager,
         name,
         setting,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        scope as ExtensionSettingScope,
+        resolvedScope,
       );
     }
     // Case 2: Configure all settings for an extension
     else if (name) {
-      await configureExtension(
-        extensionManager,
-        name,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        scope as ExtensionSettingScope,
-      );
+      await configureExtension(extensionManager, name, resolvedScope);
     }
     // Case 3: Configure all extensions
     else {
-      await configureAllExtensions(
-        extensionManager,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        scope as ExtensionSettingScope,
-      );
+      await configureAllExtensions(extensionManager, resolvedScope);
     }
 
     await exitCli();
