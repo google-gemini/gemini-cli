@@ -105,10 +105,11 @@ lines containing matches, along with their file paths and line numbers.
 
 ## 6. `replace` (Edit)
 
-`replace` replaces text within a file. By default, replaces a single occurrence,
-but can replace multiple occurrences when `expected_replacements` is specified.
-This tool is designed for precise, targeted changes and requires significant
-context around the `old_string` to ensure it modifies the correct location.
+`replace` replaces text within a file. By default, the tool expects to find and
+replace exactly ONE occurrence of `old_string`. If you want to replace multiple
+occurrences of the exact same string, set `allow_multiple` to `true`. This tool
+is designed for precise, targeted changes and requires significant context
+around the `old_string` to ensure it modifies the correct location.
 
 - **Tool name:** `replace`
 - **Arguments:**
@@ -116,14 +117,6 @@ context around the `old_string` to ensure it modifies the correct location.
   - `instruction` (string, required): Semantic description of the change.
   - `old_string` (string, required): Exact literal text to find.
   - `new_string` (string, required): Exact literal text to replace with.
-  - `expected_replacements` (number, optional): Expected number of replacements.
-    Defaults to 1.
-- **Behavior:**
-  - If the number of occurrences of `old_string` found in the file exceeds
-    `expected_replacements`, the replacement fails to prevent accidental
-    cascading replacements, and the language model is instructed to either
-    provide more specific context in `old_string` or explicitly increase
-    `expected_replacements`.
 - **Confirmation:** Requires manual user approval.
 
 ## Next steps
