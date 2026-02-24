@@ -27,6 +27,7 @@ import {
   calculateToolContentMaxLines,
 } from '../../utils/toolLayoutUtils.js';
 import { getToolGroupBorderAppearance } from '../../utils/borderStyles.js';
+import { CopySafeBox } from '../shared/CopySafeBox.js';
 
 interface ToolGroupMessageProps {
   item: HistoryItem | HistoryItemWithoutId;
@@ -251,7 +252,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               <ToolMessage {...commonProps} />
             )}
             {tool.outputFile && (
-              <Box
+              <CopySafeBox
                 borderLeft={true}
                 borderRight={true}
                 borderTop={false}
@@ -268,7 +269,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                     Output too long and was saved to: {tool.outputFile}
                   </Text>
                 </Box>
-              </Box>
+              </CopySafeBox>
             )}
           </Box>
         );

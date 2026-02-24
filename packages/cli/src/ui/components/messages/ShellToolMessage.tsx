@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Box, type DOMElement } from 'ink';
+import { type DOMElement } from 'ink';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import { StickyHeader } from '../StickyHeader.js';
 import { useUIActions } from '../../contexts/UIActionsContext.js';
@@ -26,6 +26,7 @@ import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { type Config } from '@google/gemini-cli-core';
 import { calculateShellMaxLines } from '../../utils/toolLayoutUtils.js';
+import { CopySafeBox } from '../shared/CopySafeBox.js';
 
 export interface ShellToolMessageProps extends ToolMessageProps {
   config?: Config;
@@ -58,9 +59,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   borderColor,
 
   borderDimColor,
-
   isExpandable,
-
   originalRequestName,
 }) => {
   const {
@@ -143,7 +142,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
         {emphasis === 'high' && <TrailingIndicator />}
       </StickyHeader>
 
-      <Box
+      <CopySafeBox
         ref={contentRef}
         width={terminalWidth}
         borderStyle="round"
@@ -178,7 +177,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
             scrollPageSize={availableTerminalHeight ?? ACTIVE_SHELL_MAX_LINES}
           />
         )}
-      </Box>
+      </CopySafeBox>
     </>
   );
 };

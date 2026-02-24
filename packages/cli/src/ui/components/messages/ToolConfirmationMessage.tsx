@@ -44,6 +44,7 @@ import {
   toUnicodeUrl,
   type DeceptiveUrlDetails,
 } from '../../utils/urlSecurityUtils.js';
+import { CopySafeBox } from '../shared/CopySafeBox.js';
 
 export interface ToolConfirmationMessageProps {
   callId: string;
@@ -639,7 +640,7 @@ export const ToolConfirmationMessage: React.FC<
   if (confirmationDetails.type === 'edit') {
     if (confirmationDetails.isModifying) {
       return (
-        <Box
+        <CopySafeBox
           width={terminalWidth}
           borderStyle="round"
           borderColor={theme.border.default}
@@ -652,13 +653,13 @@ export const ToolConfirmationMessage: React.FC<
           <Text color={theme.status.success}>
             Save and close external editor to continue
           </Text>
-        </Box>
+        </CopySafeBox>
       );
     }
   }
 
   return (
-    <Box
+    <CopySafeBox
       flexDirection="column"
       paddingTop={0}
       paddingBottom={handlesOwnUI ? 0 : 1}
@@ -696,6 +697,6 @@ export const ToolConfirmationMessage: React.FC<
           </Box>
         </>
       )}
-    </Box>
+    </CopySafeBox>
   );
 };
