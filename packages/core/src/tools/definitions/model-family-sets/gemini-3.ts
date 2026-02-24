@@ -73,7 +73,7 @@ export const GEMINI_3_SET: CoreToolSet = {
         },
         content: {
           description:
-            "The complete content to write. Provide the full file; do not use placeholders like '// ... rest of code'.",
+            "The complete content to write. Provide the full file; do not use placeholders like '// ... rest of code'. IMPORTANT: If writing code that contains string literals with escape sequences (e.g., \\n, \\t), you MUST double-escape the backslashes in this JSON field (e.g., use \\\\n or \\\\t) so that the literal backslash and the character are written to the file.",
           type: 'string',
         },
       },
@@ -291,7 +291,8 @@ export const GEMINI_3_SET: CoreToolSet = {
   replace: {
     name: EDIT_TOOL_NAME,
     description: `Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool requires providing significant context around the change to ensure precise targeting.
-The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.`,
+The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
+IMPORTANT: If writing code that contains string literals with escape sequences (e.g., \\n, \\t), you MUST double-escape the backslashes in the \`new_string\` JSON field (e.g., use \\\\n or \\\\t) so that the literal backslash and the character are written to the file.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {

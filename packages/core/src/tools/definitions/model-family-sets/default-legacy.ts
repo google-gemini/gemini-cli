@@ -72,7 +72,7 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
         },
         content: {
           description:
-            "The content to write to the file. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide complete literal content.",
+            "The content to write to the file. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide complete literal content. IMPORTANT: If writing code that contains string literals with escape sequences (e.g., \\n, \\t), you MUST double-escape the backslashes in this JSON field (e.g., use \\\\n or \\\\t) so that the literal backslash and the character are written to the file.",
           type: 'string',
         },
       },
@@ -292,6 +292,8 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
     description: `Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool to examine the file's current content before attempting a text replacement.
       
       The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
+      
+      IMPORTANT: If writing code that contains string literals with escape sequences (e.g., \\n, \\t), you MUST double-escape the backslashes in the \`new_string\` JSON field (e.g., use \\\\n or \\\\t) so that the literal backslash and the character are written to the file.
       
       Expectation for required parameters:
       1. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
