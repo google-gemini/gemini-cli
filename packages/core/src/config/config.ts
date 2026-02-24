@@ -1360,9 +1360,16 @@ export class Config {
     const models = this.getCycleableModels();
     const currentModel = this.getModel();
     const currentIndex = models.indexOf(currentModel);
-    const nextIndex = reverse
-      ? (currentIndex - 1 + models.length) % models.length
-      : (currentIndex + 1) % models.length;
+
+    let nextIndex;
+    if (currentIndex === -1) {
+      nextIndex = reverse ? models.length - 1 : 0;
+    } else {
+      nextIndex = reverse
+        ? (currentIndex - 1 + models.length) % models.length
+        : (currentIndex + 1) % models.length;
+    }
+
     const nextModel = models[nextIndex];
     this.setModel(nextModel, false);
     return nextModel;

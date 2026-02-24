@@ -121,7 +121,8 @@ available combinations.
 | Clear the terminal screen and redraw the UI.                                                                                                       | `Ctrl + L`       |
 | Restart the application.                                                                                                                           | `R`              |
 | Suspend the CLI and move it to the background.                                                                                                     | `Ctrl + Z`       |
-| Cycle through available Gemini models.                                                                                                             | `Alt + C`        |
+| Cycle forward through available Gemini models.                                                                                                     | `Alt + C`        |
+| Cycle backward through available Gemini models.                                                                                                    | `Alt + X`        |
 
 <!-- KEYBINDINGS-AUTOGEN:END -->
 
@@ -151,6 +152,7 @@ available combinations.
   the numbered radio option and confirm when the full number is entered.
 - `Ctrl + O`: Expand or collapse paste placeholders (`[Pasted Text: X lines]`)
   inline when the cursor is over the placeholder.
-- `Alt + C`: Cycle through available Gemini models.
+- `Alt + C`: Cycle forward through available Gemini models.
+- `Alt + X`: Cycle backward through available Gemini models.
 - `Double-click` on a paste placeholder (alternate buffer mode only): Expand to
   view full content inline. Double-click again to collapse.
