@@ -147,7 +147,7 @@ function getTextWithNextGhostWord(
   ghostText: string,
 ): string | null {
   const strippedGhostText = stripUnsafeCharacters(ghostText);
-  const trimmedCurrentText = currentText.trimEnd();
+  const trimmedCurrentText = currentText.replace(/[^\S\r\n]+$/, '');
   if (!strippedGhostText || !strippedGhostText.startsWith(trimmedCurrentText)) {
     return null;
   }
