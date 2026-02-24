@@ -177,7 +177,12 @@ const ModelUsageTable: React.FC<{
       Math.max(0, Math.round(usedFraction * totalSteps)),
     );
     const emptySteps = totalSteps - filledSteps;
-    return '█'.repeat(filledSteps) + '░'.repeat(emptySteps);
+    return (
+      <Box flexDirection="row">
+        <Text color={theme.status.success}>{'█'.repeat(filledSteps)}</Text>
+        <Text backgroundColor={theme.ui.dark}>{' '.repeat(emptySteps)}</Text>
+      </Box>
+    );
   };
 
   const cacheEfficiencyColor = getStatusColor(cacheEfficiency, {
@@ -371,9 +376,7 @@ const ModelUsageTable: React.FC<{
               row.bucket.remainingFraction != null &&
               row.bucket.resetTime && (
                 <>
-                  <Text color={theme.text.secondary}>
-                    {renderProgressBar(1 - row.bucket.remainingFraction)}
-                  </Text>
+                  {renderProgressBar(1 - row.bucket.remainingFraction)}
                   <Text color={theme.text.secondary} wrap="truncate-end">
                     {((1 - row.bucket.remainingFraction) * 100).toFixed(0)}%
                     used (Limit resets in{' '}
