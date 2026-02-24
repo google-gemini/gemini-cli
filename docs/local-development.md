@@ -96,29 +96,34 @@ Here is a basic example:
 
 ```typescript
 import { runInDevTraceSpan } from '@google/gemini-cli-core';
+import { GeminiCliOperation } from '@google/gemini-cli-core/lib/telemetry/constants.js';
 
-await runInDevTraceSpan({ name: 'my-custom-span' }, async ({ metadata }) => {
-  // The `metadata` object allows you to record the input and output of the
-  // operation as well as other attributes.
-  metadata.input = { key: 'value' };
-  // Set custom attributes.
-  metadata.attributes['gen_ai.request.model'] = 'gemini-4.0-mega';
+await runInDevTraceSpan(
+  { operation: GeminiCliOperation.ToolCall },
+  async ({ metadata }) => {
+    // The `metadata` object allows you to record the input and output of the
+    // operation as well as other attributes.
+    metadata.input = { key: 'value' };
+    // Set custom attributes.
+    metadata.attributes['gen_ai.request.model'] = 'gemini-4.0-mega';
 
-  // Your code to be traced goes here
-  try {
-    const output = await somethingRisky();
-    metadata.output = output;
-    return output;
-  } catch (e) {
-    metadata.error = e;
-    throw e;
-  }
-});
+    // Your code to be traced goes here
+    try {
+      const output = await somethingRisky();
+      metadata.output = output;
+      return output;
+    } catch (e) {
+      metadata.error = e;
+      throw e;
+    }
+  },
+);
 ```
 
 In this example:
 
-- `name`: The name of the span, which will be displayed in the trace.
+- `operation`: The operation type of the span, represented by the
+  `GeminiCliOperation` enum.
 - `metadata.input`: (Optional) An object containing the input data for the
   traced operation.
 - `metadata.output`: (Optional) An object containing the output data from the
