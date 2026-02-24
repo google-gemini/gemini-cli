@@ -453,6 +453,63 @@ describe('PolicyEngine', () => {
   });
 
   describe('MCP server wildcard patterns', () => {
+    it('should match global wildcard (*)', async () => {
+      engine = new PolicyEngine({
+        rules: [
+          { toolName: '*', decision: PolicyDecision.ALLOW, priority: 10 },
+        ],
+      });
+
+      expect(
+        (await engine.check({ name: 'read_file' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'my-server__tool' }, 'my-server')).decision,
+      ).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should match any MCP tool when toolName is *__*', async () => {
+      engine = new PolicyEngine({
+        rules: [
+          { toolName: '*__*', decision: PolicyDecision.ALLOW, priority: 10 },
+        ],
+        defaultDecision: PolicyDecision.DENY,
+      });
+
+      expect((await engine.check({ name: 'mcp__tool' }, 'mcp')).decision).toBe(
+        PolicyDecision.ALLOW,
+      );
+      expect(
+        (await engine.check({ name: 'other__tool' }, 'other')).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'read_file' }, undefined)).decision,
+      ).toBe(PolicyDecision.DENY);
+    });
+
+    it('should match specific tool across all servers when using *__tool', async () => {
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: '*__search',
+            decision: PolicyDecision.ALLOW,
+            priority: 10,
+          },
+        ],
+        defaultDecision: PolicyDecision.DENY,
+      });
+
+      expect((await engine.check({ name: 'ws__search' }, 'ws')).decision).toBe(
+        PolicyDecision.ALLOW,
+      );
+      expect((await engine.check({ name: 'gh__search' }, 'gh')).decision).toBe(
+        PolicyDecision.ALLOW,
+      );
+      expect((await engine.check({ name: 'gh__list' }, 'gh')).decision).toBe(
+        PolicyDecision.DENY,
+      );
+    });
+
     it('should match MCP server wildcard patterns', async () => {
       const rules: PolicyRule[] = [
         {
@@ -471,26 +528,35 @@ describe('PolicyEngine', () => {
 
       // Should match my-server tools
       expect(
-        (await engine.check({ name: 'my-server__tool1' }, undefined)).decision,
+        (await engine.check({ name: 'my-server__tool1' }, 'my-server'))
+          .decision,
       ).toBe(PolicyDecision.ALLOW);
       expect(
-        (await engine.check({ name: 'my-server__another_tool' }, undefined))
+        (await engine.check({ name: 'my-server__another_tool' }, 'my-server'))
           .decision,
       ).toBe(PolicyDecision.ALLOW);
 
       // Should match blocked-server tools
       expect(
-        (await engine.check({ name: 'blocked-server__tool1' }, undefined))
-          .decision,
+        (
+          await engine.check(
+            { name: 'blocked-server__tool1' },
+            'blocked-server',
+          )
+        ).decision,
       ).toBe(PolicyDecision.DENY);
       expect(
-        (await engine.check({ name: 'blocked-server__dangerous' }, undefined))
-          .decision,
+        (
+          await engine.check(
+            { name: 'blocked-server__dangerous' },
+            'blocked-server',
+          )
+        ).decision,
       ).toBe(PolicyDecision.DENY);
 
       // Should not match other patterns
       expect(
-        (await engine.check({ name: 'other-server__tool' }, undefined))
+        (await engine.check({ name: 'other-server__tool' }, 'other-server'))
           .decision,
       ).toBe(PolicyDecision.ASK_USER);
       expect(
@@ -519,11 +585,11 @@ describe('PolicyEngine', () => {
 
       // Specific tool deny should override server allow
       expect(
-        (await engine.check({ name: 'my-server__dangerous-tool' }, undefined))
+        (await engine.check({ name: 'my-server__dangerous-tool' }, 'my-server'))
           .decision,
       ).toBe(PolicyDecision.DENY);
       expect(
-        (await engine.check({ name: 'my-server__safe-tool' }, undefined))
+        (await engine.check({ name: 'my-server__safe-tool' }, 'my-server'))
           .decision,
       ).toBe(PolicyDecision.ALLOW);
     });
@@ -2284,6 +2350,39 @@ describe('PolicyEngine', () => {
         ],
         expected: [],
       },
+      {
+        name: 'should handle global wildcard * in getExcludedTools',
+        rules: [
+          {
+            toolName: '*',
+            decision: PolicyDecision.DENY,
+            priority: 10,
+          },
+        ],
+        expected: ['*'],
+      },
+      {
+        name: 'should handle MCP category wildcard *__* in getExcludedTools',
+        rules: [
+          {
+            toolName: '*__*',
+            decision: PolicyDecision.DENY,
+            priority: 10,
+          },
+        ],
+        expected: ['*__*'],
+      },
+      {
+        name: 'should handle tool wildcard *__search in getExcludedTools',
+        rules: [
+          {
+            toolName: '*__search',
+            decision: PolicyDecision.DENY,
+            priority: 10,
+          },
+        ],
+        expected: ['*__search'],
+      },
     ];
 
     it.each(testCases)(
@@ -2478,6 +2577,70 @@ describe('PolicyEngine', () => {
       const checkers = engine.getCheckers();
       expect(checkers).toHaveLength(1);
       expect(checkers[0].priority).toBe(2.5);
+    });
+  });
+
+  describe('Tool Annotations', () => {
+    it('should match tools by semantic annotations', async () => {
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolAnnotations: { readOnlyHint: true },
+            decision: PolicyDecision.ALLOW,
+            priority: 10,
+          },
+        ],
+        defaultDecision: PolicyDecision.DENY,
+      });
+
+      const readOnlyTool = { name: 'read', args: {} };
+      const readOnlyMeta = { readOnlyHint: true, extra: 'info' };
+
+      const writeTool = { name: 'write', args: {} };
+      const writeMeta = { readOnlyHint: false };
+
+      expect(
+        (await engine.check(readOnlyTool, undefined, readOnlyMeta)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check(writeTool, undefined, writeMeta)).decision,
+      ).toBe(PolicyDecision.DENY);
+      expect((await engine.check(writeTool, undefined, {})).decision).toBe(
+        PolicyDecision.DENY,
+      );
+    });
+
+    it('should support scoped annotation rules', async () => {
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: '*__*',
+            toolAnnotations: { experimental: true },
+            decision: PolicyDecision.DENY,
+            priority: 20,
+          },
+          {
+            toolName: '*__*',
+            decision: PolicyDecision.ALLOW,
+            priority: 10,
+          },
+        ],
+      });
+
+      expect(
+        (
+          await engine.check({ name: 'mcp__test' }, 'mcp', {
+            experimental: true,
+          })
+        ).decision,
+      ).toBe(PolicyDecision.DENY);
+      expect(
+        (
+          await engine.check({ name: 'mcp__stable' }, 'mcp', {
+            experimental: false,
+          })
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
     });
   });
 });

@@ -68,7 +68,9 @@ import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
-import { logRipgrepFallback, logFlashFallback ,
+import {
+  logRipgrepFallback,
+  logFlashFallback,
   logApprovalModeSwitch,
   logApprovalModeDuration,
 } from '../telemetry/loggers.js';
@@ -106,7 +108,11 @@ import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
-import type { UserTierId , RetrieveUserQuotaResponse , AdminControlsSettings } from '../code_assist/types.js';
+import type {
+  UserTierId,
+  RetrieveUserQuotaResponse,
+  AdminControlsSettings,
+} from '../code_assist/types.js';
 import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
@@ -285,6 +291,7 @@ export interface ExtensionInstallMetadata {
   allowPreRelease?: boolean;
 }
 
+import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import type { FileFilteringOptions } from './constants.js';
 import {
   DEFAULT_FILE_FILTERING_OPTIONS,
@@ -460,16 +467,17 @@ export interface ConfigParameters {
   skipNextSpeakerCheck?: boolean;
   shellExecutionConfig?: ShellExecutionConfig;
   extensionManagement?: boolean;
-  enablePromptCompletion?: boolean;
   truncateToolOutputThreshold?: number;
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
+  directWebFetch?: boolean;
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
   output?: OutputSettings;
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
+  maxAttempts?: number;
   enableShellOutputEfficiency?: boolean;
   shellToolInactivityTimeout?: number;
   fakeResponses?: string;
@@ -573,7 +581,8 @@ export class Config {
   private readonly bugCommand: BugCommandSettings | undefined;
   private model: string;
   private readonly disableLoopDetection: boolean;
-  private hasAccessToPreviewModel: boolean = false;
+  // null = unknown (quota not fetched); true = has access; false = definitively no access
+  private hasAccessToPreviewModel: boolean | null = null;
   private readonly noBrowser: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
@@ -628,13 +637,13 @@ export class Config {
   private interactiveOverride: boolean | undefined;
   private readonly ptyInfo: string;
   private readonly trustedFolder: boolean | undefined;
+  private readonly directWebFetch: boolean;
   private readonly useRipgrep: boolean;
   private readonly enableInteractiveShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
   private readonly useBackgroundColor: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
-  private readonly enablePromptCompletion: boolean = false;
   private readonly truncateToolOutputThreshold: number;
   private compressionTruncationCounter = 0;
   private initialized = false;
@@ -651,6 +660,7 @@ export class Config {
   private readonly outputSettings: OutputSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
+  private readonly maxAttempts: number;
   private readonly enableShellOutputEfficiency: boolean;
   private readonly shellToolInactivityTimeout: number;
   readonly fakeResponses?: string;
@@ -694,7 +704,7 @@ export class Config {
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
-  private lastModeSwitchTime: number = Date.now();
+  private lastModeSwitchTime: number = performance.now();
   readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
   private headlessSnapshot:
@@ -828,6 +838,7 @@ export class Config {
     this.interactive = params.interactive ?? false;
     this.ptyInfo = params.ptyInfo ?? 'child_process';
     this.trustedFolder = params.trustedFolder;
+    this.directWebFetch = params.directWebFetch ?? false;
     this.useRipgrep = params.useRipgrep ?? true;
     this.useBackgroundColor = params.useBackgroundColor ?? true;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
@@ -862,7 +873,6 @@ export class Config {
 
     this.fakeResponses = params.fakeResponses;
     this.recordResponses = params.recordResponses;
-    this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
     this.policyEngine = new PolicyEngine({
@@ -879,6 +889,10 @@ export class Config {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
+    this.maxAttempts = Math.min(
+      params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+      DEFAULT_MAX_ATTEMPTS,
+    );
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.rawOutput = params.rawOutput ?? false;
     this.acceptRawOutputRisk = params.acceptRawOutputRisk ?? false;
@@ -1117,8 +1131,9 @@ export class Config {
       this.setHasAccessToPreviewModel(true);
     }
 
-    // Update model if user no longer has access to the preview model
-    if (!this.hasAccessToPreviewModel && isPreviewModel(this.model)) {
+    // Only reset when we have explicit "no access" (hasAccessToPreviewModel === false).
+    // When null (quota not fetched) or true, we preserve the saved model.
+    if (isPreviewModel(this.model) && this.hasAccessToPreviewModel === false) {
       this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
     }
 
@@ -1455,10 +1470,10 @@ export class Config {
   }
 
   getHasAccessToPreviewModel(): boolean {
-    return this.hasAccessToPreviewModel;
+    return this.hasAccessToPreviewModel !== false;
   }
 
-  setHasAccessToPreviewModel(hasAccess: boolean): void {
+  setHasAccessToPreviewModel(hasAccess: boolean | null): void {
     this.hasAccessToPreviewModel = hasAccess;
   }
 
@@ -1501,7 +1516,8 @@ export class Config {
       }
 
       const hasAccess =
-        quota.buckets?.some((b) => b.modelId === PREVIEW_GEMINI_MODEL) ?? false;
+        quota.buckets?.some((b) => b.modelId && isPreviewModel(b.modelId)) ??
+        false;
       this.setHasAccessToPreviewModel(hasAccess);
       return quota;
     } catch (e) {
@@ -1831,12 +1847,11 @@ export class Config {
 
     const currentMode = this.getApprovalMode();
     if (currentMode !== mode) {
-      this.logCurrentModeDuration(this.getApprovalMode());
+      this.logCurrentModeDuration(currentMode);
       logApprovalModeSwitch(
         this,
         new ApprovalModeSwitchEvent(currentMode, mode),
       );
-      this.lastModeSwitchTime = Date.now();
     }
 
     this.policyEngine.setApprovalMode(mode);
@@ -1899,12 +1914,15 @@ export class Config {
    * Logs the duration of the current approval mode.
    */
   logCurrentModeDuration(mode: ApprovalMode): void {
-    const now = Date.now();
+    const now = performance.now();
     const duration = now - this.lastModeSwitchTime;
-    logApprovalModeDuration(
-      this,
-      new ApprovalModeDurationEvent(mode, duration),
-    );
+    if (duration > 0) {
+      logApprovalModeDuration(
+        this,
+        new ApprovalModeDurationEvent(mode, duration),
+      );
+    }
+    this.lastModeSwitchTime = now;
   }
 
   isYoloModeDisabled(): boolean {
@@ -2114,6 +2132,10 @@ export class Config {
 
   getApprovedPlanPath(): string | undefined {
     return this.approvedPlanPath;
+  }
+
+  getDirectWebFetch(): boolean {
+    return this.directWebFetch;
   }
 
   setApprovedPlanPath(path: string | undefined): void {
@@ -2439,6 +2461,10 @@ export class Config {
     return this.retryFetchErrors;
   }
 
+  getMaxAttempts(): number {
+    return this.maxAttempts;
+  }
+
   getEnableShellOutputEfficiency(): boolean {
     return this.enableShellOutputEfficiency;
   }
@@ -2466,10 +2492,6 @@ export class Config {
   }
   getScreenReader(): boolean {
     return this.accessibility.screenReader ?? false;
-  }
-
-  getEnablePromptCompletion(): boolean {
-    return this.enablePromptCompletion;
   }
 
   getTruncateToolOutputThreshold(): number {

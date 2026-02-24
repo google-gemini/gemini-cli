@@ -7,7 +7,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { glob } from 'glob';
-import yaml from 'js-yaml';
+import { load } from 'js-yaml';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
 
@@ -40,7 +40,7 @@ function parseFrontmatter(
   content: string,
 ): { name: string; description: string } | null {
   try {
-    const parsed = yaml.load(content);
+    const parsed = load(content);
     if (parsed && typeof parsed === 'object') {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const { name, description } = parsed as Record<string, unknown>;
