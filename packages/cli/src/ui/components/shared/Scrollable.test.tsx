@@ -67,6 +67,57 @@ describe('<Scrollable />', () => {
     unmount();
   });
 
+  it('disables scrolling and removes padding in copy mode', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <Scrollable hasFocus={false} height={5}>
+        <Text>Line 1</Text>
+        <Text>Line 2</Text>
+        <Text>Line 3</Text>
+      </Scrollable>,
+      { uiState: { copyModeEnabled: true } },
+    );
+    await waitUntilReady();
+    // In copy mode, right padding should be gone.
+    // The snapshot will verify overflowY="hidden" and paddingRight=0.
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('clamps scrollTop to maxScroll in copy mode to prevent layout collapse', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <Scrollable hasFocus={true} height={5} scrollToBottom={true}>
+        <Text>Line 1</Text>
+        <Text>Line 2</Text>
+        <Text>Line 3</Text>
+        <Text>Line 4</Text>
+        <Text>Line 5</Text>
+        <Text>Line 6</Text>
+        <Text>Line 7</Text>
+        <Text>Line 8</Text>
+        <Text>Line 9</Text>
+        <Text>Line 10</Text>
+      </Scrollable>,
+      { uiState: { copyModeEnabled: true } },
+    );
+    await waitUntilReady();
+
+    // With 10 lines and height 5, maxScroll is 5.
+    // If scrollToBottom is true, scrollTop becomes Number.MAX_SAFE_INTEGER.
+    // Without the fix, marginTop = -Number.MAX_SAFE_INTEGER, content disappears.
+    // With the fix, marginTop = -5, Line 6-10 should be visible.
+
+    await waitFor(() => {
+      const frame = lastFrame();
+      expect(frame).toContain('Line 6');
+      expect(frame).toContain('Line 7');
+      expect(frame).toContain('Line 8');
+      expect(frame).toContain('Line 9');
+      expect(frame).toContain('Line 10');
+    });
+
+    unmount();
+  });
+
   it('updates scroll position correctly when scrollBy is called multiple times in the same tick', async () => {
     let capturedEntry: ScrollProviderModule.ScrollableEntry | undefined;
     vi.spyOn(ScrollProviderModule, 'useScrollable').mockImplementation(

@@ -10,6 +10,10 @@ import { useAnimatedScrollbar } from './useAnimatedScrollbar.js';
 import { debugState } from '../debug.js';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
+vi.mock('../contexts/UIStateContext.js', () => ({
+  useUIState: () => ({ copyModeEnabled: false }),
+}));
+
 const TestComponent = ({ isFocused = false }: { isFocused?: boolean }) => {
   useAnimatedScrollbar(isFocused, () => {});
   return null;

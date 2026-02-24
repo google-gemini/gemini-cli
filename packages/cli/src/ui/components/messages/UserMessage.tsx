@@ -9,6 +9,7 @@ import { useMemo } from 'react';
 import { Text, Box } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import { SCREEN_READER_USER_PREFIX } from '../../textConstants.js';
+import { useUIState } from '../../contexts/UIStateContext.js';
 import { isSlashCommand as checkIsSlashCommand } from '../../utils/commandUtils.js';
 import {
   calculateTransformationsForLine,
@@ -49,6 +50,8 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
       .join('\n');
   }, [text]);
 
+  const { copyModeEnabled } = useUIState();
+
   return (
     <HalfLinePaddedBox
       backgroundBaseColor={theme.background.message}
@@ -59,7 +62,7 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
         flexDirection="row"
         paddingY={0}
         marginY={useBackgroundColor ? 0 : 1}
-        paddingX={useBackgroundColor ? 1 : 0}
+        paddingX={useBackgroundColor && !copyModeEnabled ? 1 : 0}
         alignSelf="flex-start"
         width={width}
       >
