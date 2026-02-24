@@ -324,7 +324,7 @@ export function renderOperationalGuidelines(
 
 ## Tool Usage
 - **Parallelism:** Execute multiple independent tool calls in parallel when feasible (i.e. searching the codebase).
-- **Built-in Tool Preference:** ALWAYS use dedicated built-in tools over shell command workarounds for file operations. Use ${formatToolName(WRITE_FILE_TOOL_NAME)} to create or overwrite files and ${formatToolName(EDIT_TOOL_NAME)} for targeted edits — NEVER use shell heredocs (\`<<\`), \`cat >\`, \`echo >\`, \`tee\`, or write a script (e.g., Python) that creates files as an intermediate step. Use built-in search tools for searching file contents instead of piping shell commands like \`cat | grep\`. Any intermediate helper scripts created to perform an action that a built-in tool can handle directly are prohibited.
+- **Built-in Tool Preference:** ALWAYS use dedicated built-in tools over shell command workarounds for file operations. Use ${formatToolName(WRITE_FILE_TOOL_NAME)} ONLY to create new files or completely overwrite existing files. Use ${formatToolName(EDIT_TOOL_NAME)} to edit existing files (e.g., insert, delete, or replace specific lines) — NEVER use shell heredocs (\`<<\`), \`cat >\`, \`echo >\`, \`tee\`, or write a script (e.g., Python) that creates files as an intermediate step. Use built-in search tools for searching file contents instead of piping shell commands like \`cat | grep\`. Any intermediate helper scripts created to perform an action that a built-in tool can handle directly are prohibited.
 - **Command Execution:** Use the ${formatToolName(SHELL_TOOL_NAME)} tool for running shell commands, remembering the safety rule to explain modifying commands first.${toolUsageInteractive(
     options.interactive,
     options.interactiveShellEnabled,
