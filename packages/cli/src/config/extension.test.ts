@@ -280,6 +280,17 @@ describe('extension tests', () => {
       ]);
     });
 
+    it('should ignore .env directory in extensions folder', async () => {
+      // Create a .env directory
+      const envDir = path.join(userExtensionsDir, '.env');
+      fs.mkdirSync(envDir);
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toEqual([]);
+      const { debugLogger } = await import('@google/gemini-cli-core');
+      expect(debugLogger.error).not.toHaveBeenCalled();
+    });
+
     it('should annotate disabled extensions', async () => {
       createExtension({
         extensionsDir: userExtensionsDir,

@@ -124,6 +124,15 @@ export async function maybePromptForSettings(
 
   const envContent = formatEnvContent(nonSensitiveSettings);
 
+  if (
+    fsSync.existsSync(envFilePath) &&
+    fsSync.statSync(envFilePath).isDirectory()
+  ) {
+    throw new Error(
+      `Cannot update ${scope}-scoped settings because "${envFilePath}" is a directory.`,
+    );
+  }
+
   await fs.writeFile(envFilePath, envContent);
 }
 
@@ -172,7 +181,7 @@ export async function getScopedEnvContents(
   );
   const envFilePath = getEnvFilePath(extensionName, scope, workspaceDir);
   let customEnv: Record<string, string> = {};
-  if (fsSync.existsSync(envFilePath)) {
+  if (fsSync.existsSync(envFilePath) && fsSync.statSync(envFilePath).isFile()) {
     const envFile = fsSync.readFileSync(envFilePath, 'utf-8');
     customEnv = dotenv.parse(envFile);
   }
@@ -258,6 +267,16 @@ export async function updateSetting(
   // For non-sensitive settings, we need to read the existing .env file,
   // update the value, and write it back, preserving any other values.
   const envFilePath = getEnvFilePath(extensionName, scope, workspaceDir);
+
+  if (
+    fsSync.existsSync(envFilePath) &&
+    fsSync.statSync(envFilePath).isDirectory()
+  ) {
+    throw new Error(
+      `Cannot update ${scope}-scoped settings because "${envFilePath}" is a directory.`,
+    );
+  }
+
   let envContent = '';
   if (fsSync.existsSync(envFilePath)) {
     envContent = await fs.readFile(envFilePath, 'utf-8');
@@ -323,7 +342,7 @@ async function clearSettings(
   envFilePath: string,
   keychain: KeychainTokenStorage,
 ) {
-  if (fsSync.existsSync(envFilePath)) {
+  if (fsSync.existsSync(envFilePath) && fsSync.statSync(envFilePath).isFile()) {
     await fs.writeFile(envFilePath, '');
   }
   if (!(await keychain.isAvailable())) {

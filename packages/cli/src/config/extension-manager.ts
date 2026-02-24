@@ -530,6 +530,7 @@ Would you like to attempt to install via "git clone" instead?`,
       return this.loadedExtensions;
     }
     for (const subdir of fs.readdirSync(extensionsDir)) {
+      if (subdir === '.env') continue;
       const extensionDir = path.join(extensionsDir, subdir);
       await this.loadExtension(extensionDir);
     }

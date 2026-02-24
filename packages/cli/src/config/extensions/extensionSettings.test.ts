@@ -468,6 +468,32 @@ describe('extensionSettings', () => {
       expect(mockIsAvailable).toHaveBeenCalled();
       expect(mockListSecrets).not.toHaveBeenCalled();
     });
+
+    it('should throw error if .env is a directory when prompting for settings', async () => {
+      const config: ExtensionConfig = {
+        name: 'test-ext',
+        version: '1.0.0',
+        settings: [{ name: 's1', description: 'd1', envVar: 'VAR1' }],
+      };
+      const envFilePath = path.join(extensionDir, '.env');
+      if (fs.existsSync(envFilePath)) {
+        fs.unlinkSync(envFilePath);
+      }
+      fs.mkdirSync(envFilePath);
+      mockRequestSetting.mockResolvedValue('new-value');
+
+      await expect(
+        maybePromptForSettings(
+          config,
+          '12345',
+          mockRequestSetting,
+          undefined,
+          undefined,
+        ),
+      ).rejects.toThrow(
+        `Cannot update user-scoped settings because "${envFilePath}" is a directory.`,
+      );
+    });
   });
 
   describe('promptForSetting', () => {
@@ -589,6 +615,23 @@ describe('extensionSettings', () => {
         VAR1: 'workspace-value1',
         SENSITIVE_VAR: 'workspace-secret',
       });
+    });
+
+    it('should ignore .env if it is a directory', async () => {
+      const userEnvPath = path.join(extensionDir, EXTENSION_SETTINGS_FILENAME);
+      if (fs.existsSync(userEnvPath)) {
+        fs.unlinkSync(userEnvPath);
+      }
+      fs.mkdirSync(userEnvPath);
+
+      const contents = await getScopedEnvContents(
+        config,
+        extensionId,
+        ExtensionSettingScope.USER,
+        tempWorkspaceDir,
+      );
+
+      expect(contents).toEqual({});
     });
   });
 
@@ -889,6 +932,28 @@ describe('extensionSettings', () => {
       const expectedEnvPath = path.join(extensionDir, '.env');
       const actualContent = await fsPromises.readFile(expectedEnvPath, 'utf-8');
       expect(actualContent).toContain('VAR1="value with \\"quotes\\""');
+    });
+
+    it('should throw error if .env is a directory when updating a non-sensitive setting', async () => {
+      const envFilePath = path.join(extensionDir, '.env');
+      if (fs.existsSync(envFilePath)) {
+        fs.unlinkSync(envFilePath);
+      }
+      fs.mkdirSync(envFilePath);
+      mockRequestSetting.mockResolvedValue('new-value');
+
+      await expect(
+        updateSetting(
+          config,
+          '12345',
+          'VAR1',
+          mockRequestSetting,
+          ExtensionSettingScope.USER,
+          tempWorkspaceDir,
+        ),
+      ).rejects.toThrow(
+        `Cannot update user-scoped settings because "${envFilePath}" is a directory.`,
+      );
     });
   });
 });
