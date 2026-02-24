@@ -142,6 +142,11 @@ their corresponding top-level category object in your `settings.json` file.
     request" errors.
   - **Default:** `false`
 
+- **`general.maxAttempts`** (number):
+  - **Description:** Maximum number of attempts for requests to the main chat
+    model. Cannot exceed 10.
+  - **Default:** `10`
+
 - **`general.debugKeystrokeLogging`** (boolean):
   - **Description:** Enable debug logging of keystrokes to the console.
   - **Default:** `false`
@@ -968,6 +973,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable model steering (user hints) to guide the model
     during tool execution.
   - **Default:** `false`
+
+- **`experimental.directWebFetch`** (boolean):
+  - **Description:** Enable web fetch behavior that bypasses LLM summarization.
+  - **Default:** `false`
+  - **Requires restart:** Yes
 
 #### `skills`
 

@@ -29,6 +29,7 @@ they appear in the UI.
 | Enable Auto Update      | `general.enableAutoUpdate`         | Enable automatic updates.                                                                                                                                                      | `true`      |
 | Enable Notifications    | `general.enableNotifications`      | Enable run-event notifications for action-required prompts and session completion. Currently macOS only.                                                                       | `false`     |
 | Plan Directory          | `general.plan.directory`           | The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.                                                               | `undefined` |
+| Max Chat Model Attempts | `general.maxAttempts`              | Maximum number of attempts for requests to the main chat model. Cannot exceed 10.                                                                                              | `10`        |
 | Debug Keystroke Logging | `general.debugKeystrokeLogging`    | Enable debug logging of keystrokes to the console.                                                                                                                             | `false`     |
 | Enable Session Cleanup  | `general.sessionRetention.enabled` | Enable automatic session cleanup                                                                                                                                               | `false`     |
 | Keep chat history       | `general.sessionRetention.maxAge`  | Automatically delete chats older than this time period (e.g., "30d", "7d", "24h", "1w")                                                                                        | `undefined` |
@@ -135,6 +136,7 @@ they appear in the UI.
 | Use OSC 52 Copy            | `experimental.useOSC52Copy`              | Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
 | Plan                       | `experimental.plan`                      | Enable planning features (Plan Mode and tools).                                                                                                           | `false` |
 | Model Steering             | `experimental.modelSteering`             | Enable model steering (user hints) to guide the model during tool execution.                                                                              | `false` |
+| Direct Web Fetch           | `experimental.directWebFetch`            | Enable web fetch behavior that bypasses LLM summarization.                                                                                                | `false` |
 
 ### Skills
 
