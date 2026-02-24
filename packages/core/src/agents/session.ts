@@ -53,6 +53,15 @@ export class AgentSession {
       schedulerId: this.schedulerId,
     });
     this.compressionService = new ChatCompressionService();
+
+    // Ensure system instruction is set from AgentConfig
+    if (this.config.systemInstruction) {
+      if (this.client.isInitialized()) {
+        this.client
+          .getChat()
+          .setSystemInstruction(this.config.systemInstruction);
+      }
+    }
   }
 
   /**
@@ -66,6 +75,11 @@ export class AgentSession {
       resumedSessionData.conversation.messages,
     );
     await this.client.resumeChat(clientHistory, resumedSessionData);
+
+    // Re-apply system instruction after resume since resume re-creates the chat
+    if (this.config.systemInstruction) {
+      this.client.getChat().setSystemInstruction(this.config.systemInstruction);
+    }
   }
 
   /**
@@ -76,6 +90,11 @@ export class AgentSession {
     input: string | Part[],
     signal?: AbortSignal,
   ): AsyncIterable<AgentEvent> {
+    const internalController = new AbortController();
+    const combinedSignal = signal
+      ? AbortSignal.any([signal, internalController.signal])
+      : internalController.signal;
+
     yield {
       type: 'agent_start',
       value: { sessionId: this.sessionId },
@@ -91,7 +110,7 @@ export class AgentSession {
 
     try {
       while (maxTurns === -1 || this.totalTurns < maxTurns) {
-        if (signal?.aborted) {
+        if (combinedSignal.aborted) {
           terminationReason = AgentTerminateMode.ABORTED;
           break;
         }
@@ -108,7 +127,7 @@ export class AgentSession {
           currentInput,
           promptId,
           isContinuation ? undefined : input,
-          signal,
+          combinedSignal,
         );
 
         for await (const event of results.events) {
@@ -121,13 +140,13 @@ export class AgentSession {
           break;
         }
 
-        if (signal?.aborted) {
+        if (combinedSignal.aborted) {
           terminationReason = AgentTerminateMode.ABORTED;
           break;
         }
 
         if (results.toolCalls.length > 0) {
-          const toolRun = this.executeTools(results.toolCalls, signal);
+          const toolRun = this.executeTools(results.toolCalls, combinedSignal);
           let resultsTools;
           while (true) {
             const { value, done } = await toolRun.next();
@@ -138,8 +157,8 @@ export class AgentSession {
             yield value;
           }
 
-          if (resultsTools.stopExecution || (signal && signal.aborted)) {
-            if (signal && signal.aborted) {
+          if (resultsTools.stopExecution || combinedSignal.aborted) {
+            if (combinedSignal.aborted) {
               terminationReason = AgentTerminateMode.ABORTED;
             } else if (resultsTools.stopExecutionInfo) {
               terminationReason = AgentTerminateMode.ERROR;
@@ -166,6 +185,7 @@ export class AgentSession {
         }
       }
     } finally {
+      internalController.abort();
       yield {
         type: 'agent_finish',
         value: {
@@ -196,6 +216,17 @@ export class AgentSession {
     const parts = Array.isArray(input) ? input : [{ text: input }];
     const toolCalls: ToolCallRequestInfo[] = [];
     let loopDetected = false;
+
+    // Ensure client is initialized before sending message
+    if (!this.client.isInitialized()) {
+      await this.client.initialize();
+      // Re-apply system instruction after initialization
+      if (this.config.systemInstruction) {
+        this.client
+          .getChat()
+          .setSystemInstruction(this.config.systemInstruction);
+      }
+    }
 
     const stream = this.client.sendMessageStream(
       parts,

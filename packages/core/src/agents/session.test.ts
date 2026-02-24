@@ -24,6 +24,7 @@ import {
   type ToolCallRequestInfo,
 } from '../scheduler/types.js';
 import { type ResumedSessionData } from '../services/chatRecordingService.js';
+import { type GeminiClient } from '../core/client.js';
 
 vi.mock('../core/client.js');
 vi.mock('../scheduler/scheduler.js');
@@ -33,6 +34,8 @@ describe('AgentSession', () => {
   let mockConfig: ReturnType<typeof makeFakeConfig>;
   let mockClient: {
     sendMessageStream: ReturnType<typeof vi.fn>;
+    isInitialized: ReturnType<typeof vi.fn>;
+    initialize: ReturnType<typeof vi.fn>;
     getChat: ReturnType<typeof vi.fn>;
     getCurrentSequenceModel: ReturnType<typeof vi.fn>;
     getHistory: ReturnType<typeof vi.fn>;
@@ -56,10 +59,13 @@ describe('AgentSession', () => {
 
     mockClient = {
       sendMessageStream: vi.fn(),
+      isInitialized: vi.fn().mockReturnValue(false),
+      initialize: vi.fn().mockResolvedValue(undefined),
       getChat: vi.fn().mockReturnValue({
         recordCompletedToolCalls: vi.fn(),
         setHistory: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
+        setSystemInstruction: vi.fn(),
       }),
       getCurrentSequenceModel: vi.fn().mockReturnValue('test-model'),
       getHistory: vi.fn().mockReturnValue([]),
@@ -78,7 +84,7 @@ describe('AgentSession', () => {
     };
 
     vi.spyOn(mockConfig, 'getGeminiClient').mockReturnValue(
-      mockClient as unknown as import('../core/client.js').GeminiClient,
+      mockClient as unknown as GeminiClient,
     );
     vi.mocked(Scheduler).mockImplementation(
       (options) =>
@@ -426,6 +432,53 @@ describe('AgentSession', () => {
     >;
     expect(finishEvent.type).toBe('agent_finish');
     expect(finishEvent.value.reason).toBe(AgentTerminateMode.ABORTED);
+  });
+
+  it('should apply systemInstruction from AgentConfig', async () => {
+    const customConfig: AgentConfig = {
+      ...agentConfig,
+      systemInstruction: 'You are a helpful assistant.',
+    };
+
+    // Mock isInitialized to true so constructor can set it
+    mockClient.isInitialized.mockReturnValue(true);
+    const mockChat = { setSystemInstruction: vi.fn() };
+    mockClient.getChat.mockReturnValue(mockChat);
+
+    // Re-create to trigger constructor logic
+    new AgentSession('test-session-3', customConfig, mockConfig);
+    expect(mockChat.setSystemInstruction).toHaveBeenCalledWith(
+      'You are a helpful assistant.',
+    );
+  });
+
+  it('should abort internal operations if caller stops iterating', async () => {
+    let internalSignal: AbortSignal | undefined;
+
+    mockClient.sendMessageStream.mockImplementation(async function* (
+      _parts: unknown,
+      signal: AbortSignal,
+    ) {
+      internalSignal = signal;
+      yield { type: GeminiEventType.Content, value: 'Part 1' };
+      yield { type: GeminiEventType.Content, value: 'Part 2' };
+    });
+
+    const promptStream = session.prompt('Test cancellation');
+    const iterator = promptStream[Symbol.asyncIterator]();
+
+    const firstEvent = await iterator.next();
+    expect(firstEvent.value?.type).toBe('agent_start');
+
+    const secondEvent = await iterator.next(); // content Part 1
+    expect(secondEvent.value?.type).toBe(GeminiEventType.Content);
+
+    // Caller stops here and closes the generator
+    if (iterator.return) {
+      await iterator.return();
+    }
+
+    expect(internalSignal?.aborted).toBe(true);
   });
 
   it('should respect maxTurns from config', async () => {
