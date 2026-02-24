@@ -287,16 +287,6 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      enablePromptCompletion: {
-        type: 'boolean',
-        label: 'Enable Prompt Completion',
-        category: 'General',
-        requiresRestart: true,
-        default: false,
-        description:
-          'Enable AI-powered prompt completion suggestions while typing.',
-        showInDialog: true,
-      },
       retryFetchErrors: {
         type: 'boolean',
         label: 'Retry Fetch Errors',
@@ -306,6 +296,16 @@ const SETTINGS_SCHEMA = {
         description:
           'Retry on "exception TypeError: fetch failed sending request" errors.',
         showInDialog: false,
+      },
+      maxAttempts: {
+        type: 'number',
+        label: 'Max Chat Model Attempts',
+        category: 'General',
+        requiresRestart: false,
+        default: 10,
+        description:
+          'Maximum number of attempts for requests to the main chat model. Cannot exceed 10.',
+        showInDialog: true,
       },
       debugKeystrokeLogging: {
         type: 'boolean',
@@ -1493,6 +1493,16 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      enableConseca: {
+        type: 'boolean',
+        label: 'Enable Context-Aware Security',
+        category: 'Security',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.',
+        showInDialog: true,
+      },
     },
   },
 
@@ -1701,6 +1711,16 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Enable model steering (user hints) to guide the model during tool execution.',
+        showInDialog: true,
+      },
+      directWebFetch: {
+        type: 'boolean',
+        label: 'Direct Web Fetch',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable web fetch behavior that bypasses LLM summarization.',
         showInDialog: true,
       },
     },

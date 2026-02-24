@@ -2016,6 +2016,40 @@ describe('loadCliConfig useRipgrep', () => {
   });
 });
 
+describe('loadCliConfig directWebFetch', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should be false by default when directWebFetch is not set in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getDirectWebFetch()).toBe(false);
+  });
+
+  it('should be true when directWebFetch is set to true in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      experimental: {
+        directWebFetch: true,
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getDirectWebFetch()).toBe(true);
+  });
+});
+
 describe('screenReader configuration', () => {
   beforeEach(() => {
     vi.resetAllMocks();
