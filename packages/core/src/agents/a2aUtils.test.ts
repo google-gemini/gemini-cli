@@ -188,7 +188,7 @@ describe('a2aUtils', () => {
       expect(result).toBe('Final Answer');
     });
 
-    it('should combine history fallback and artifacts', () => {
+    it('should fallback to history only if status message and artifacts are missing', () => {
       const task: Task = {
         id: 'task-1',
         contextId: 'ctx-1',
@@ -212,7 +212,7 @@ describe('a2aUtils', () => {
       };
 
       const result = extractTaskText(task);
-      expect(result).toContain('Answer');
+      expect(result).not.toContain('Answer');
       expect(result).toContain('Artifact (Data):');
       expect(result).toContain('Artifact Content');
     });

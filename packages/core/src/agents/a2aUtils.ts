@@ -39,10 +39,10 @@ function extractPartText(part: Part): string {
 
   if (isFilePart(part)) {
     const fileData = part.file;
-    if ('name' in fileData && fileData.name) {
+    if ('name' in fileData) {
       return `File: ${fileData.name}`;
     }
-    if ('uri' in fileData && fileData.uri) {
+    if ('uri' in fileData) {
       return `File: ${fileData.uri}`;
     }
     return `File: [binary/unnamed]`;
@@ -64,21 +64,7 @@ export function extractTaskText(task: Task): string {
     parts.push(statusMessageText);
   }
 
-  // 2. History Fallback (The "Answer" for Orcas/ADK agents in blocking calls)
-  // If the status message is empty, we look for the most recent agent message in the history.
-  if (!parts.length && task.history && task.history.length > 0) {
-    const lastAgentMsg = [...task.history]
-      .reverse()
-      .find((m) => m.role === 'agent');
-    if (lastAgentMsg) {
-      const historyText = extractMessageText(lastAgentMsg);
-      if (historyText) {
-        parts.push(historyText);
-      }
-    }
-  }
-
-  // 3. Artifacts
+  // 2. Artifacts
   if (task.artifacts) {
     for (const artifact of task.artifacts) {
       const artifactContent = extractPartsText(artifact.parts);
@@ -88,6 +74,21 @@ export function extractTaskText(task: Task): string {
           ? `Artifact (${artifact.name}):`
           : 'Artifact:';
         parts.push(`${header}\n${artifactContent}`);
+      }
+    }
+  }
+
+  // 3. History Fallback
+  // If we still have no content (no status message and no artifacts),
+  // we look for the most recent agent message in the history.
+  if (!parts.length && task.history && task.history.length > 0) {
+    const lastAgentMsg = [...task.history]
+      .reverse()
+      .find((m) => m.role === 'agent');
+    if (lastAgentMsg) {
+      const historyText = extractMessageText(lastAgentMsg);
+      if (historyText) {
+        parts.push(historyText);
       }
     }
   }
