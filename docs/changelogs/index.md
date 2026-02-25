@@ -18,6 +18,38 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.30.0 - 2026-02-25
+
+- **SDK & Custom Skills:** Introduced the initial SDK package, enabling dynamic
+  system instructions, `SessionContext` for SDK tool calls, and support for
+  custom skills
+  ([#18861](https://github.com/google-gemini/gemini-cli/pull/18861),
+  [#18862](https://github.com/google-gemini/gemini-cli/pull/18862),
+  [#18863](https://github.com/google-gemini/gemini-cli/pull/18863),
+  [#19031](https://github.com/google-gemini/gemini-cli/pull/19031) by @mbleigh).
+- **Policy Engine Enhancements:** Added a new `--policy` flag for user-defined
+  policies, introduced strict seatbelt profiles, and deprecated
+  `--allowed-tools` in favor of the policy engine
+  ([#18500](https://github.com/google-gemini/gemini-cli/pull/18500) by
+  @allenhutchison,
+  [#18508](https://github.com/google-gemini/gemini-cli/pull/18508) by
+  @Abhijit-2592,
+  [#18876](https://github.com/google-gemini/gemini-cli/pull/18876) by
+  @SandyTao520).
+- **UI & Themes:** Added a generic searchable list for settings and extensions,
+  new Solarized themes, text wrapping for markdown tables, and a clean UI toggle
+  prototype ([#18838](https://github.com/google-gemini/gemini-cli/pull/18838) by
+  @chrstnb, [#19064](https://github.com/google-gemini/gemini-cli/pull/19064) by
+  @rmedranollamas,
+  [#18240](https://github.com/google-gemini/gemini-cli/pull/18240) by @devr0306,
+  [#18683](https://github.com/google-gemini/gemini-cli/pull/18683) by
+  @LyalinDotCom).
+- **Vim & Terminal Interaction:** Improved Vim support to feel more complete and
+  added support for Ctrl-Z terminal suspension
+  ([#18755](https://github.com/google-gemini/gemini-cli/pull/18755) by
+  @ppgranger, [#18931](https://github.com/google-gemini/gemini-cli/pull/18931)
+  by @scidomino).
+
 ## Announcements: v0.29.0 - 2026-02-17
 
 - **Plan Mode:** A new comprehensive planning capability with `/plan`,
