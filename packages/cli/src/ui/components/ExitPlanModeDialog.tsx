@@ -15,6 +15,7 @@ import {
   type Config,
   type EditorType,
   processSingleFileContent,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
 import { useConfig } from '../contexts/ConfigContext.js';
@@ -153,8 +154,12 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
   const [showLoading, setShowLoading] = useState(false);
 
   const handleOpenEditor = useCallback(async () => {
-    await openFileInEditor(planPath, stdin, setRawMode, getPreferredEditor());
-    refresh();
+    try {
+      await openFileInEditor(planPath, stdin, setRawMode, getPreferredEditor());
+      refresh();
+    } catch (err) {
+      debugLogger.error('Failed to open plan in editor:', err);
+    }
   }, [planPath, stdin, setRawMode, getPreferredEditor, refresh]);
 
   useKeypress(

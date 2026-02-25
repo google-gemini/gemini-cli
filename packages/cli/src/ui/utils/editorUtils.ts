@@ -70,8 +70,12 @@ export async function openFileInEditor(
   setRawMode?.(false);
 
   try {
+    const commandParts = command.split(' ');
+    const executable = commandParts[0];
+    const initialArgs = commandParts.slice(1);
+
     if (isTerminal) {
-      const result = spawnSync(command, args, {
+      const result = spawnSync(executable, [...initialArgs, ...args], {
         stdio: 'inherit',
         shell: process.platform === 'win32',
       });
@@ -96,7 +100,7 @@ export async function openFileInEditor(
       }
     } else {
       await new Promise<void>((resolve, reject) => {
-        const child = spawn(command, args, {
+        const child = spawn(executable, [...initialArgs, ...args], {
           stdio: 'inherit',
           shell: process.platform === 'win32',
         });
