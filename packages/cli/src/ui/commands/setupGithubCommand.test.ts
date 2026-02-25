@@ -197,9 +197,9 @@ describe('setupGithubCommand', async () => {
     const fakeReleaseVersion = 'v1.2.3';
 
     vi.mocked(global.fetch).mockResolvedValue(
-      new Response('Internal Server Error', {
-        status: 500,
-        statusText: 'Internal Server Error',
+      new Response('Not Found', {
+        status: 404,
+        statusText: 'Not Found',
       }),
     );
 
@@ -215,9 +215,7 @@ describe('setupGithubCommand', async () => {
 
     await expect(
       setupGithubCommand.action?.({} as CommandContext, ''),
-    ).rejects.toThrow(
-      /Invalid response code downloading.*500 - Internal Server Error/,
-    );
+    ).rejects.toThrow(/Invalid response code downloading.*404 - Not Found/);
   });
 });
 
