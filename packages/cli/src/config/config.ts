@@ -56,10 +56,7 @@ import { resolvePath } from '../utils/resolvePath.js';
 import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
-import {
-  createPolicyEngineConfig,
-  resolveWorkspacePolicyState,
-} from './policy.js';
+import { createPolicyEngineConfig } from './policy.js';
 import { ExtensionManager } from './extension-manager.js';
 import { McpServerEnablementManager } from './mcp/mcpServerEnablement.js';
 import type { ExtensionEvents } from '@google/gemini-cli-core/src/utils/extensionLoader.js';
@@ -434,6 +431,89 @@ export function isDebugMode(argv: CliArgs): boolean {
   );
 }
 
+export interface ResolveApprovalModeParams {
+  rawApprovalMode: string | undefined;
+  trustedFolder: boolean;
+  isSecureMode: boolean;
+  disableYoloMode: boolean;
+  isPlanEnabled: boolean;
+}
+
+export function resolveApprovalMode(
+  params: ResolveApprovalModeParams,
+): ApprovalMode {
+  const {
+    rawApprovalMode,
+    trustedFolder,
+    isSecureMode,
+    disableYoloMode,
+    isPlanEnabled,
+  } = params;
+
+  // Gate 1: Literal String Parsing
+  let approvalMode: ApprovalMode;
+  if (rawApprovalMode) {
+    switch (rawApprovalMode) {
+      case 'yolo':
+        approvalMode = ApprovalMode.YOLO;
+        break;
+      case 'auto_edit':
+        approvalMode = ApprovalMode.AUTO_EDIT;
+        break;
+      case 'plan':
+        if (!isPlanEnabled) {
+          debugLogger.warn(
+            'Approval mode "plan" is only available when experimental.plan is enabled. Falling back to "default".',
+          );
+          approvalMode = ApprovalMode.DEFAULT;
+        } else {
+          approvalMode = ApprovalMode.PLAN;
+        }
+        break;
+      case 'default':
+        approvalMode = ApprovalMode.DEFAULT;
+        break;
+      default:
+        throw new Error(
+          `Invalid approval mode: ${rawApprovalMode}. Valid values are: yolo, auto_edit, plan, default`,
+        );
+    }
+  } else {
+    approvalMode = ApprovalMode.DEFAULT;
+  }
+
+  // Gate 2: Admin Security Override Lock
+  // Matches exact YOLO-blocking semantics from original code
+  if (disableYoloMode || isSecureMode) {
+    if (approvalMode === ApprovalMode.YOLO) {
+      if (isSecureMode) {
+        debugLogger.error(
+          'YOLO mode is disabled by "secureModeEnabled" setting.',
+        );
+      } else {
+        debugLogger.error(
+          'YOLO mode is disabled by the "disableYolo" setting.',
+        );
+      }
+      throw new FatalConfigError(getAdminErrorMessage('YOLO mode', undefined));
+    }
+  } else if (approvalMode === ApprovalMode.YOLO) {
+    debugLogger.warn(
+      'YOLO mode is enabled. All tool calls will be automatically approved.',
+    );
+  }
+
+  // Gate 3: Folder Trust Downgrade
+  if (!trustedFolder && approvalMode !== ApprovalMode.DEFAULT) {
+    debugLogger.warn(
+      `Approval mode overridden to "default" because the current folder is not trusted.`,
+    );
+    approvalMode = ApprovalMode.DEFAULT;
+  }
+
+  return approvalMode;
+}
+
 export interface LoadCliConfigOptions {
   cwd?: string;
   projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
@@ -695,17 +775,9 @@ export async function loadCliConfig(
     policyPaths: argv.policy,
   };
 
-  const { workspacePoliciesDir, policyUpdateConfirmationRequest } =
-    await resolveWorkspacePolicyState({
-      cwd,
-      trustedFolder,
-      interactive,
-    });
-
   const policyEngineConfig = await createPolicyEngineConfig(
     effectiveSettings,
     approvalMode,
-    workspacePoliciesDir,
   );
   policyEngineConfig.nonInteractive = !interactive;
 
@@ -769,7 +841,6 @@ export async function loadCliConfig(
     coreTools: settings.tools?.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
     policyEngineConfig,
-    policyUpdateConfirmationRequest,
     excludeTools,
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
@@ -826,8 +897,6 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
-    directWebFetch: settings.experimental?.directWebFetch,
-    planSettings: settings.general?.plan,
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
@@ -849,6 +918,7 @@ export async function loadCliConfig(
     enableShellOutputEfficiency:
       settings.tools?.shell?.enableShellOutputEfficiency ?? true,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
+    enablePromptCompletion: settings.general?.enablePromptCompletion,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
     eventEmitter: coreEvents,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
@@ -878,7 +948,6 @@ export async function loadCliConfig(
         agents: refreshedSettings.merged.agents,
       };
     },
-    enableConseca: settings.security?.enableConseca,
   });
 }
 
@@ -891,4 +960,80 @@ function mergeExcludeTools(
     ...extraExcludes,
   ]);
   return Array.from(allExcludeTools);
+}
+
+export interface MinimalCliConfigOptions {
+  cwd?: string;
+}
+
+/**
+ * A lightweight boot flow that bypasses heavy memory/tool subsystems for lightweight commands (like login, settings).
+ * It retains strict policy engine security while skipping the ~5ms getPty() syscall and hierarchical memory loads.
+ * @returns Config Object without memory, extension, or tool execution support.
+ */
+export async function loadMinimalCliConfig(
+  settings: MergedSettings,
+  sessionId: string,
+  argv: CliArgs,
+  options: MinimalCliConfigOptions = {},
+): Promise<Config> {
+  const { cwd = process.cwd() } = options;
+  const debugMode = isDebugMode(argv);
+
+  const rawApprovalMode =
+    argv.approvalMode ||
+    (argv.yolo ? 'yolo' : undefined) ||
+    ((settings.general?.defaultApprovalMode as string) !== 'yolo'
+      ? settings.general?.defaultApprovalMode
+      : undefined);
+
+  const resolvedApprovalMode = resolveApprovalMode({
+    rawApprovalMode: rawApprovalMode as string | undefined,
+    // Provide a hardcoded false trust barrier here; minimal commands never act on trusted contexts
+    trustedFolder: false,
+    isSecureMode: settings.admin?.secureModeEnabled ?? false,
+    disableYoloMode: settings.security?.disableYoloMode ?? false,
+    isPlanEnabled: settings.experimental?.plan ?? false,
+  });
+
+  // Resolve interactive just like in full loadCliConfig
+  const interactive =
+    !!argv.promptInteractive ||
+    !!argv.experimentalAcp ||
+    (!isHeadlessMode({ prompt: argv.prompt, query: argv.query }) &&
+      !argv.isCommand);
+
+  // Strict Policy Execution
+  // Force interactive: true to completely prevent headless auto-acceptance of policies.
+  const policyState = await resolveWorkspacePolicyState(cwd, {
+    interactive,
+    trustedFolder: false,
+  });
+  const finalSettings = applyWorkspacePolicies(settings, policyState.settings);
+
+  const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
+  const specifiedModel =
+    argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
+
+  const resolvedModel =
+    specifiedModel === GEMINI_MODEL_ALIAS_AUTO
+      ? defaultModel
+      : specifiedModel || defaultModel;
+
+  // Note: minimal boot flow purposefully omits ptyInfo syscall telemetry
+  return new Config({
+    sessionId,
+    clientVersion: await getVersion(),
+    embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
+    targetDir: cwd,
+    debugMode,
+    question: argv.promptInteractive || argv.prompt || '',
+    approvalMode: resolvedApprovalMode,
+    disableYoloMode:
+      finalSettings.security?.disableYoloMode ||
+      finalSettings.admin?.secureModeEnabled,
+    interactive,
+    cwd,
+    model: resolvedModel,
+  });
 }
