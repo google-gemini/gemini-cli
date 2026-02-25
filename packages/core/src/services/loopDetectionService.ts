@@ -518,12 +518,14 @@ export class LoopDetectionService {
       return { isLoop: false };
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const flashConfidence = flashResult[
-      'unproductive_state_confidence'
-    ] as number;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const flashAnalysis = flashResult['unproductive_state_analysis'] as string;
+    const flashConfidence =
+      typeof flashResult['unproductive_state_confidence'] === 'number'
+        ? flashResult['unproductive_state_confidence']
+        : 0;
+    const flashAnalysis =
+      typeof flashResult['unproductive_state_analysis'] === 'string'
+        ? flashResult['unproductive_state_analysis']
+        : '';
 
     const doubleCheckModelName =
       this.config.modelConfigService.getResolvedConfig({
@@ -561,14 +563,16 @@ export class LoopDetectionService {
       signal,
     );
 
-    const mainModelConfidence = mainModelResult
-      ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        (mainModelResult['unproductive_state_confidence'] as number)
-      : 0;
-    const mainModelAnalysis = mainModelResult
-      ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        (mainModelResult['unproductive_state_analysis'] as string)
-      : undefined;
+    const mainModelConfidence =
+      mainModelResult &&
+      typeof mainModelResult['unproductive_state_confidence'] === 'number'
+        ? mainModelResult['unproductive_state_confidence']
+        : 0;
+    const mainModelAnalysis =
+      mainModelResult &&
+      typeof mainModelResult['unproductive_state_analysis'] === 'string'
+        ? mainModelResult['unproductive_state_analysis']
+        : undefined;
 
     logLlmLoopCheck(
       this.config,
@@ -636,16 +640,23 @@ export class LoopDetectionService {
     ) {
       debugLogger.warn(result['unproductive_state_analysis']);
     }
+    const analysis =
+      typeof result['unproductive_state_analysis'] === 'string'
+        ? result['unproductive_state_analysis']
+        : undefined;
+    const confidence =
+      typeof result['unproductive_state_confidence'] === 'number'
+        ? result['unproductive_state_confidence']
+        : undefined;
+
     logLoopDetected(
       this.config,
       new LoopDetectedEvent(
         LoopType.LLM_DETECTED_LOOP,
         this.promptId,
         modelName,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        result['unproductive_state_analysis'] as string,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        result['unproductive_state_confidence'] as number,
+        analysis,
+        confidence,
       ),
     );
   }
