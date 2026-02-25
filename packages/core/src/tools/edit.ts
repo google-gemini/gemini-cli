@@ -127,6 +127,27 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
 }
 
+/**
+ * Counts the number of newline characters in a string.
+ * @param str The string to search.
+ * @param start The index to start searching from. Defaults to 0.
+ * @param end The index to stop searching at. Defaults to str.length.
+ * @returns The number of newline characters.
+ */
+function countNewlines(
+  str: string,
+  start: number = 0,
+  end: number = str.length,
+): number {
+  let count = 0;
+  for (let i = start; i < end; i++) {
+    if (str[i] === '\n') {
+      count++;
+    }
+  }
+  return count;
+}
+
 async function calculateExactReplacement(
   context: ReplacementContext,
 ): Promise<ReplacementResult | null> {
@@ -138,19 +159,14 @@ async function calculateExactReplacement(
   const normalizedReplace = new_string.replace(/\r\n/g, '\n');
 
   const matchRanges: Array<{ start: number; end: number }> = [];
-  const searchNewlines = (normalizedSearch.match(/\n/g) || []).length;
+  const searchNewlines = countNewlines(normalizedSearch);
   let currentLine = 1;
   let lastIndex = 0;
   let index = normalizedCode.indexOf(normalizedSearch);
 
   while (index !== -1) {
     // Count newlines from the last match to the current match.
-    const prefix = normalizedCode.substring(lastIndex, index);
-    for (let i = 0; i < prefix.length; i++) {
-      if (prefix[i] === '\n') {
-        currentLine++;
-      }
-    }
+    currentLine += countNewlines(normalizedCode, lastIndex, index);
 
     const startLine = currentLine;
     const endLine = startLine + searchNewlines;
@@ -301,15 +317,10 @@ async function calculateRegexReplacement(
   let currentLine = 1;
   let lastIndex = 0;
   while ((match = globalRegex.exec(currentContent)) !== null) {
-    const prefix = currentContent.substring(lastIndex, match.index);
-    for (let i = 0; i < prefix.length; i++) {
-      if (prefix[i] === '\n') {
-        currentLine++;
-      }
-    }
+    currentLine += countNewlines(currentContent, lastIndex, match.index);
     const startLine = currentLine;
     const matchContent = match[0];
-    const matchNewlines = (matchContent.match(/\n/g) || []).length;
+    const matchNewlines = countNewlines(matchContent);
     matchRanges.push({ start: startLine, end: startLine + matchNewlines });
 
     currentLine += matchNewlines;
@@ -935,7 +946,7 @@ class EditToolInvocation
         };
       }
 
-      const totalLength = finalContent.split('\n').length;
+      const totalLength = countNewlines(finalContent) + 1;
       const metadataParts = [];
       if (editData.matchRanges && editData.matchRanges.length > 0) {
         if (editData.matchRanges.length === 1) {
