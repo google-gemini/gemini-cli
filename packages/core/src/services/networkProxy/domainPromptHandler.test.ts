@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
@@ -10,8 +10,9 @@ import { DomainPromptHandler } from './domainPromptHandler.js';
 import { DomainFilterAction } from './types.js';
 import type { NetworkProxyManager } from './networkProxyManager.js';
 
-function createMockManager(): EventEmitter & Partial<NetworkProxyManager> {
-  return new EventEmitter();
+function createMockManager(): NetworkProxyManager {
+  // We only need the EventEmitter interface for testing domainCheck events
+  return new EventEmitter() as unknown as NetworkProxyManager;
 }
 
 describe('DomainPromptHandler', () => {
@@ -19,7 +20,7 @@ describe('DomainPromptHandler', () => {
     const manager = createMockManager();
     const callback = vi.fn().mockResolvedValue(DomainFilterAction.ALLOW);
     const handler = new DomainPromptHandler(
-      manager as NetworkProxyManager,
+      manager,
       callback,
     );
 
@@ -38,7 +39,7 @@ describe('DomainPromptHandler', () => {
     const manager = createMockManager();
     const callback = vi.fn().mockResolvedValue(DomainFilterAction.ALLOW);
     const handler = new DomainPromptHandler(
-      manager as NetworkProxyManager,
+      manager,
       callback,
     );
 
@@ -53,7 +54,7 @@ describe('DomainPromptHandler', () => {
     const manager = createMockManager();
     const callback = vi.fn().mockResolvedValue(DomainFilterAction.ALLOW);
     const handler = new DomainPromptHandler(
-      manager as NetworkProxyManager,
+      manager,
       callback,
     );
 
@@ -73,7 +74,7 @@ describe('DomainPromptHandler', () => {
     const manager = createMockManager();
     const callback = vi.fn().mockResolvedValue(DomainFilterAction.DENY);
     const handler = new DomainPromptHandler(
-      manager as NetworkProxyManager,
+      manager,
       callback,
     );
 
@@ -92,7 +93,7 @@ describe('DomainPromptHandler', () => {
     const manager = createMockManager();
     const callback = vi.fn().mockRejectedValue(new Error('prompt failed'));
     const handler = new DomainPromptHandler(
-      manager as NetworkProxyManager,
+      manager,
       callback,
     );
 
@@ -111,7 +112,7 @@ describe('DomainPromptHandler', () => {
     const manager = createMockManager();
     const callback = vi.fn().mockResolvedValue(DomainFilterAction.ALLOW);
     const handler = new DomainPromptHandler(
-      manager as NetworkProxyManager,
+      manager,
       callback,
     );
 

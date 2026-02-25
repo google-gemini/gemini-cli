@@ -43,6 +43,8 @@ import {
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
+  DomainFilterAction,
+  type NetworkProxyConfig,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -901,16 +903,7 @@ function mergeExcludeTools(
  */
 function buildNetworkProxyConfig(
   settings: MergedSettings,
-): {
-  enabled: boolean;
-  httpPort: number;
-  socksPort: number;
-  defaultAction: 'allow' | 'deny' | 'prompt';
-  rules: Array<{ pattern: string; action: 'allow' | 'deny' }>;
-  enableLogging: boolean;
-  maxLogEntries: number;
-  promptForUnknownDomains: boolean;
-} | undefined {
+): NetworkProxyConfig | undefined {
   const proxySettings = settings.security?.networkProxy;
   if (!proxySettings?.enabled) {
     return undefined;
@@ -918,26 +911,33 @@ function buildNetworkProxyConfig(
 
   // Build rules from allowedDomains and blockedDomains.
   // Allowed domains come first so they take priority over blocked domains.
-  const rules: Array<{ pattern: string; action: 'allow' | 'deny' }> = [];
+  const rules: Array<{ pattern: string; action: DomainFilterAction }> = [];
 
   const allowed = proxySettings.allowedDomains ?? [];
   for (const pattern of allowed) {
-    rules.push({ pattern, action: 'allow' });
+    rules.push({ pattern, action: DomainFilterAction.ALLOW });
   }
 
   const blocked = proxySettings.blockedDomains ?? [];
   for (const pattern of blocked) {
-    rules.push({ pattern, action: 'deny' });
+    rules.push({ pattern, action: DomainFilterAction.DENY });
   }
+
+  const defaultActionStr = proxySettings.defaultAction ?? 'prompt';
+  const defaultAction = defaultActionStr === 'allow'
+    ? DomainFilterAction.ALLOW
+    : defaultActionStr === 'deny'
+      ? DomainFilterAction.DENY
+      : DomainFilterAction.PROMPT;
 
   return {
     enabled: true,
     httpPort: proxySettings.httpPort ?? 0,
     socksPort: proxySettings.socksPort ?? 0,
-    defaultAction: proxySettings.defaultAction ?? 'prompt',
+    defaultAction,
     rules,
     enableLogging: proxySettings.enableLogging ?? false,
     maxLogEntries: 1000,
-    promptForUnknownDomains: proxySettings.defaultAction === 'prompt',
+    promptForUnknownDomains: defaultAction === DomainFilterAction.PROMPT,
   };
 }

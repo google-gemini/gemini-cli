@@ -6,6 +6,7 @@
 
 import * as http from 'node:http';
 import * as net from 'node:net';
+import type { Duplex } from 'node:stream';
 import { EventEmitter } from 'node:events';
 import { checkDomain, extractHostname, extractPort } from './domainMatcher.js';
 import type {
@@ -127,7 +128,7 @@ export class HttpProxy extends EventEmitter {
    */
   private async handleConnect(
     req: http.IncomingMessage,
-    clientSocket: net.Socket,
+    clientSocket: Duplex,
     head: Buffer,
   ): Promise<void> {
     const target = req.url ?? '';
