@@ -880,6 +880,7 @@ export async function loadCliConfig(
       };
     },
     enableConseca: settings.security?.enableConseca,
+    networkProxy: buildNetworkProxyConfig(settings),
   });
 }
 
@@ -892,4 +893,51 @@ function mergeExcludeTools(
     ...extraExcludes,
   ]);
   return Array.from(allExcludeTools);
+}
+
+/**
+ * Builds NetworkProxyConfig from user settings.
+ * Converts the allowedDomains/blockedDomains arrays into ordered rules.
+ */
+function buildNetworkProxyConfig(
+  settings: MergedSettings,
+): {
+  enabled: boolean;
+  httpPort: number;
+  socksPort: number;
+  defaultAction: 'allow' | 'deny' | 'prompt';
+  rules: Array<{ pattern: string; action: 'allow' | 'deny' }>;
+  enableLogging: boolean;
+  maxLogEntries: number;
+  promptForUnknownDomains: boolean;
+} | undefined {
+  const proxySettings = settings.security?.networkProxy;
+  if (!proxySettings?.enabled) {
+    return undefined;
+  }
+
+  // Build rules from allowedDomains and blockedDomains.
+  // Allowed domains come first so they take priority over blocked domains.
+  const rules: Array<{ pattern: string; action: 'allow' | 'deny' }> = [];
+
+  const allowed = proxySettings.allowedDomains ?? [];
+  for (const pattern of allowed) {
+    rules.push({ pattern, action: 'allow' });
+  }
+
+  const blocked = proxySettings.blockedDomains ?? [];
+  for (const pattern of blocked) {
+    rules.push({ pattern, action: 'deny' });
+  }
+
+  return {
+    enabled: true,
+    httpPort: proxySettings.httpPort ?? 0,
+    socksPort: proxySettings.socksPort ?? 0,
+    defaultAction: (proxySettings.defaultAction as 'allow' | 'deny' | 'prompt') ?? 'prompt',
+    rules,
+    enableLogging: proxySettings.enableLogging ?? false,
+    maxLogEntries: 1000,
+    promptForUnknownDomains: proxySettings.defaultAction === 'prompt',
+  };
 }

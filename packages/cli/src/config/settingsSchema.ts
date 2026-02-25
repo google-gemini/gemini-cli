@@ -1567,6 +1567,95 @@ const SETTINGS_SCHEMA = {
           'Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.',
         showInDialog: true,
       },
+      networkProxy: {
+        type: 'object',
+        label: 'Network Proxy',
+        category: 'Security',
+        requiresRestart: true,
+        default: {},
+        description:
+          'Network traffic proxy for sandboxed command execution. Routes traffic through a controlled gateway with domain filtering.',
+        showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Network Proxy',
+            category: 'Security',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Enable the network proxy layer for sandboxed commands. Routes HTTP/HTTPS and TCP traffic through a local proxy with domain filtering.',
+            showInDialog: true,
+          },
+          defaultAction: {
+            type: 'enum',
+            label: 'Default Domain Action',
+            category: 'Security',
+            requiresRestart: true,
+            default: 'prompt',
+            description:
+              'Action to take when a domain does not match any rule. "allow" permits traffic, "deny" blocks it, "prompt" asks the user.',
+            showInDialog: true,
+            options: [
+              { value: 'allow', label: 'Allow' },
+              { value: 'deny', label: 'Deny' },
+              { value: 'prompt', label: 'Prompt' },
+            ] as const,
+          },
+          allowedDomains: {
+            type: 'array',
+            label: 'Allowed Domains',
+            category: 'Security',
+            requiresRestart: false,
+            default: [] as string[],
+            description:
+              'Domains to always allow. Supports wildcards: *.example.com matches all subdomains.',
+            showInDialog: true,
+            items: { type: 'string' },
+          },
+          blockedDomains: {
+            type: 'array',
+            label: 'Blocked Domains',
+            category: 'Security',
+            requiresRestart: false,
+            default: [] as string[],
+            description:
+              'Domains to always block. Supports wildcards: *.evil.com blocks all subdomains.',
+            showInDialog: true,
+            items: { type: 'string' },
+          },
+          enableLogging: {
+            type: 'boolean',
+            label: 'Enable Traffic Logging',
+            category: 'Security',
+            requiresRestart: false,
+            default: false,
+            description:
+              'Log proxy traffic for security auditing. Logs are kept in memory only for the session duration.',
+            showInDialog: true,
+          },
+          httpPort: {
+            type: 'number',
+            label: 'HTTP Proxy Port',
+            category: 'Security',
+            requiresRestart: true,
+            default: 0,
+            description:
+              'Port for the HTTP/HTTPS proxy. Use 0 for auto-assignment.',
+            showInDialog: false,
+          },
+          socksPort: {
+            type: 'number',
+            label: 'SOCKS5 Proxy Port',
+            category: 'Security',
+            requiresRestart: true,
+            default: 0,
+            description:
+              'Port for the SOCKS5 proxy (non-HTTP traffic). Use 0 for auto-assignment.',
+            showInDialog: false,
+          },
+        },
+      },
     },
   },
 

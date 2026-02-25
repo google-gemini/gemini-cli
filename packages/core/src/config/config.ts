@@ -136,6 +136,8 @@ import { CheckerRunner } from '../safety/checker-runner.js';
 import { ContextBuilder } from '../safety/context-builder.js';
 import { CheckerRegistry } from '../safety/registry.js';
 import { ConsecaSafetyChecker } from '../safety/conseca/conseca.js';
+import type { NetworkProxyConfig } from '../services/networkProxy/types.js';
+import { NetworkProxyManager } from '../services/networkProxy/networkProxyManager.js';
 
 export interface AccessibilitySettings {
   /** @deprecated Use ui.loadingPhrases instead. */
@@ -549,6 +551,7 @@ export interface ConfigParameters {
     agents?: AgentSettings;
   }>;
   enableConseca?: boolean;
+  networkProxy?: NetworkProxyConfig;
 }
 
 export class Config {
@@ -577,6 +580,8 @@ export class Config {
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
   readonly enableConseca: boolean;
+  private networkProxyManager?: NetworkProxyManager;
+  private readonly networkProxyConfig?: NetworkProxyConfig;
 
   private readonly coreTools: string[] | undefined;
   /** @deprecated Use Policy Engine instead */
@@ -908,6 +913,7 @@ export class Config {
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
     this.enableConseca = params.enableConseca ?? false;
+    this.networkProxyConfig = params.networkProxy;
 
     // Initialize Safety Infrastructure
     const contextBuilder = new ContextBuilder(this);
@@ -2088,6 +2094,27 @@ export class Config {
 
   getProxy(): string | undefined {
     return this.proxy;
+  }
+
+  /**
+   * Returns the NetworkProxyManager, lazily creating it if configured.
+   * The proxy is not started until startNetworkProxy() is called.
+   */
+  getNetworkProxyManager(): NetworkProxyManager | undefined {
+    if (!this.networkProxyConfig?.enabled) {
+      return undefined;
+    }
+    if (!this.networkProxyManager) {
+      this.networkProxyManager = new NetworkProxyManager(this.networkProxyConfig);
+    }
+    return this.networkProxyManager;
+  }
+
+  /**
+   * Returns the network proxy config if set.
+   */
+  getNetworkProxyConfig(): NetworkProxyConfig | undefined {
+    return this.networkProxyConfig;
   }
 
   getWorkingDir(): string {
