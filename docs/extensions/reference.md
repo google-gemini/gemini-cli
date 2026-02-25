@@ -130,7 +130,8 @@ The manifest file defines the extension's behavior and configuration.
   extension and for conflict resolution when extension commands have the same
   name as user or project commands. The name should be lowercase or numbers and
   use dashes instead of underscores or spaces. This is how users will refer to
-  your extension in the CLI. It does not need to match the extension directory name.
+  your extension in the CLI. It does not need to match the extension directory
+  name.
 - `version`: The version of the extension.
 - `description`: A short description of the extension. This will be displayed on
   [geminicli.com/extensions](https://geminicli.com/extensions).
