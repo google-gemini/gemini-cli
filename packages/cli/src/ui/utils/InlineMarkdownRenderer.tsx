@@ -14,7 +14,6 @@ import { stripUnsafeCharacters } from './textUtils.js';
 const BOLD_MARKER_LENGTH = 2; // For "**"
 const ITALIC_MARKER_LENGTH = 1; // For "*" or "_"
 const STRIKETHROUGH_MARKER_LENGTH = 2; // For "~~")
-const INLINE_CODE_MARKER_LENGTH = 1; // For "`"
 const UNDERLINE_TAG_START_LENGTH = 3; // For "<u>"
 const UNDERLINE_TAG_END_LENGTH = 4; // For "</u>"
 
@@ -31,8 +30,54 @@ export type MarkdownSegment =
   | { type: 'underline'; content: string }
   | { type: 'url'; content: string };
 
+// Code spans are handled by a dedicated scanner (see scanCodeSpan) rather
+// than a regex alternation, because backtick-delimited spans can contain
+// backticks of shorter run-length (e.g. ``a`b`` → code "a`b").
 const INLINE_REGEX =
-  /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+)/g;
+  /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|<u>.*?<\/u>|https?:\/\/\S+)/g;
+
+/**
+ * Scan for a CommonMark code span starting at position `pos` in `text`.
+ *
+ * Algorithm: count the opening backtick run length N, then scan forward
+ * for a closing run of exactly N backticks that is not part of a longer
+ * run.  Returns `{ content, end }` on success, or `null` if no matching
+ * closing run is found.
+ */
+function scanCodeSpan(
+  text: string,
+  pos: number,
+): { content: string; end: number } | null {
+  // Count opening backtick run length.
+  let openLen = 0;
+  while (pos + openLen < text.length && text[pos + openLen] === '`') {
+    openLen++;
+  }
+  if (openLen === 0) return null;
+
+  // Scan for a closing run of exactly `openLen` backticks.
+  let i = pos + openLen;
+  while (i < text.length) {
+    if (text[i] !== '`') {
+      i++;
+      continue;
+    }
+    // Count this backtick run.
+    const runStart = i;
+    while (i < text.length && text[i] === '`') {
+      i++;
+    }
+    if (i - runStart === openLen) {
+      const content = text.slice(pos + openLen, runStart);
+      // CommonMark requires non-empty content for code spans.
+      if (content.length > 0) {
+        return { content, end: i };
+      }
+    }
+    // Otherwise keep scanning — the run length didn't match.
+  }
+  return null;
+}
 
 /**
  * Parse inline markdown into typed segments.
@@ -47,108 +92,146 @@ export function parseInlineMarkdown(text: string): MarkdownSegment[] {
 
   // Create a fresh regex instance so concurrent calls don't share state.
   const regex = new RegExp(INLINE_REGEX.source, INLINE_REGEX.flags);
-  let match;
 
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      segments.push({
-        type: 'text',
-        content: text.slice(lastIndex, match.index),
-      });
-    }
+  // We interleave two scanners:
+  //  1. A character-level scanner for code spans (backtick-delimited).
+  //  2. The INLINE_REGEX for everything else.
+  //
+  // At each position we check for a backtick first (code spans have
+  // highest priority in CommonMark).  If found, we emit the code segment
+  // and advance past it.  Otherwise we let the regex find the next
+  // non-code inline marker.
 
-    const fullMatch = match[0];
-    let segment: MarkdownSegment | null = null;
+  while (lastIndex < text.length) {
+    // Find the next backtick in the remaining text.
+    const nextBacktick = text.indexOf('`', lastIndex);
 
-    // Bold: **text**
-    if (
-      fullMatch.startsWith('**') &&
-      fullMatch.endsWith('**') &&
-      fullMatch.length > BOLD_MARKER_LENGTH * 2
-    ) {
-      segment = {
-        type: 'bold',
-        content: fullMatch.slice(BOLD_MARKER_LENGTH, -BOLD_MARKER_LENGTH),
-      };
-    }
-    // Italic: *text* or _text_ (with boundary checks)
-    else if (
-      fullMatch.length > ITALIC_MARKER_LENGTH * 2 &&
-      ((fullMatch.startsWith('*') && fullMatch.endsWith('*')) ||
-        (fullMatch.startsWith('_') && fullMatch.endsWith('_'))) &&
-      !/\w/.test(text.substring(match.index - 1, match.index)) &&
-      !/\w/.test(text.substring(regex.lastIndex, regex.lastIndex + 1)) &&
-      !/\S[./\\]/.test(text.substring(match.index - 2, match.index)) &&
-      !/[./\\]\S/.test(text.substring(regex.lastIndex, regex.lastIndex + 2))
-    ) {
-      segment = {
-        type: 'italic',
-        content: fullMatch.slice(ITALIC_MARKER_LENGTH, -ITALIC_MARKER_LENGTH),
-      };
-    }
-    // Strikethrough: ~~text~~
-    else if (
-      fullMatch.startsWith('~~') &&
-      fullMatch.endsWith('~~') &&
-      fullMatch.length > STRIKETHROUGH_MARKER_LENGTH * 2
-    ) {
-      segment = {
-        type: 'strikethrough',
-        content: fullMatch.slice(
-          STRIKETHROUGH_MARKER_LENGTH,
-          -STRIKETHROUGH_MARKER_LENGTH,
-        ),
-      };
-    }
-    // Inline code: `text` or ``text``
-    else if (
-      fullMatch.startsWith('`') &&
-      fullMatch.endsWith('`') &&
-      fullMatch.length > INLINE_CODE_MARKER_LENGTH
-    ) {
-      const codeMatch = fullMatch.match(/^(`+)(.+?)\1$/s);
-      if (codeMatch && codeMatch[2]) {
-        segment = { type: 'code', content: codeMatch[2] };
+    // Find the next regex match starting at or after lastIndex.
+    regex.lastIndex = lastIndex;
+    const regexMatch = regex.exec(text);
+
+    // Determine which comes first: a backtick or a regex match.
+    const backtickFirst =
+      nextBacktick !== -1 &&
+      (regexMatch === null || nextBacktick <= regexMatch.index);
+
+    if (backtickFirst) {
+      // Emit any text before the backtick.
+      if (nextBacktick > lastIndex) {
+        segments.push({
+          type: 'text',
+          content: text.slice(lastIndex, nextBacktick),
+        });
       }
-    }
-    // Link: [text](url)
-    else if (
-      fullMatch.startsWith('[') &&
-      fullMatch.includes('](') &&
-      fullMatch.endsWith(')')
-    ) {
-      const linkMatch = fullMatch.match(/\[(.*?)\]\((.*?)\)/);
-      if (linkMatch) {
-        segment = { type: 'link', text: linkMatch[1], url: linkMatch[2] };
+
+      const codeSpan = scanCodeSpan(text, nextBacktick);
+      if (codeSpan) {
+        segments.push({ type: 'code', content: codeSpan.content });
+        lastIndex = codeSpan.end;
+      } else {
+        // No matching close — emit the backtick run as plain text and
+        // advance past it so we don't loop forever.
+        let runEnd = nextBacktick + 1;
+        while (runEnd < text.length && text[runEnd] === '`') runEnd++;
+        segments.push({
+          type: 'text',
+          content: text.slice(nextBacktick, runEnd),
+        });
+        lastIndex = runEnd;
       }
-    }
-    // Underline: <u>text</u>
-    else if (
-      fullMatch.startsWith('<u>') &&
-      fullMatch.endsWith('</u>') &&
-      fullMatch.length >
-        UNDERLINE_TAG_START_LENGTH + UNDERLINE_TAG_END_LENGTH - 1
-    ) {
-      segment = {
-        type: 'underline',
-        content: fullMatch.slice(
-          UNDERLINE_TAG_START_LENGTH,
-          -UNDERLINE_TAG_END_LENGTH,
-        ),
-      };
-    }
-    // Bare URL: https://...
-    else if (fullMatch.match(/^https?:\/\//)) {
-      segment = { type: 'url', content: fullMatch };
-    }
+    } else if (regexMatch) {
+      // Emit any text before the regex match.
+      if (regexMatch.index > lastIndex) {
+        segments.push({
+          type: 'text',
+          content: text.slice(lastIndex, regexMatch.index),
+        });
+      }
 
-    // Fall back to plain text for unrecognized matches
-    segments.push(segment ?? { type: 'text', content: fullMatch });
-    lastIndex = regex.lastIndex;
-  }
+      const fullMatch = regexMatch[0];
+      let segment: MarkdownSegment | null = null;
 
-  if (lastIndex < text.length) {
-    segments.push({ type: 'text', content: text.slice(lastIndex) });
+      // Bold: **text**
+      if (
+        fullMatch.startsWith('**') &&
+        fullMatch.endsWith('**') &&
+        fullMatch.length > BOLD_MARKER_LENGTH * 2
+      ) {
+        segment = {
+          type: 'bold',
+          content: fullMatch.slice(BOLD_MARKER_LENGTH, -BOLD_MARKER_LENGTH),
+        };
+      }
+      // Italic: *text* or _text_ (with boundary checks)
+      else if (
+        fullMatch.length > ITALIC_MARKER_LENGTH * 2 &&
+        ((fullMatch.startsWith('*') && fullMatch.endsWith('*')) ||
+          (fullMatch.startsWith('_') && fullMatch.endsWith('_'))) &&
+        !/\w/.test(text.substring(regexMatch.index - 1, regexMatch.index)) &&
+        !/\w/.test(text.substring(regex.lastIndex, regex.lastIndex + 1)) &&
+        !/\S[./\\]/.test(
+          text.substring(regexMatch.index - 2, regexMatch.index),
+        ) &&
+        !/[./\\]\S/.test(text.substring(regex.lastIndex, regex.lastIndex + 2))
+      ) {
+        segment = {
+          type: 'italic',
+          content: fullMatch.slice(ITALIC_MARKER_LENGTH, -ITALIC_MARKER_LENGTH),
+        };
+      }
+      // Strikethrough: ~~text~~
+      else if (
+        fullMatch.startsWith('~~') &&
+        fullMatch.endsWith('~~') &&
+        fullMatch.length > STRIKETHROUGH_MARKER_LENGTH * 2
+      ) {
+        segment = {
+          type: 'strikethrough',
+          content: fullMatch.slice(
+            STRIKETHROUGH_MARKER_LENGTH,
+            -STRIKETHROUGH_MARKER_LENGTH,
+          ),
+        };
+      }
+      // Link: [text](url)
+      else if (
+        fullMatch.startsWith('[') &&
+        fullMatch.includes('](') &&
+        fullMatch.endsWith(')')
+      ) {
+        const linkMatch = fullMatch.match(/\[(.*?)\]\((.*?)\)/);
+        if (linkMatch) {
+          segment = { type: 'link', text: linkMatch[1], url: linkMatch[2] };
+        }
+      }
+      // Underline: <u>text</u>
+      else if (
+        fullMatch.startsWith('<u>') &&
+        fullMatch.endsWith('</u>') &&
+        fullMatch.length >
+          UNDERLINE_TAG_START_LENGTH + UNDERLINE_TAG_END_LENGTH - 1
+      ) {
+        segment = {
+          type: 'underline',
+          content: fullMatch.slice(
+            UNDERLINE_TAG_START_LENGTH,
+            -UNDERLINE_TAG_END_LENGTH,
+          ),
+        };
+      }
+      // Bare URL: https://...
+      else if (fullMatch.match(/^https?:\/\//)) {
+        segment = { type: 'url', content: fullMatch };
+      }
+
+      // Fall back to plain text for unrecognized matches
+      segments.push(segment ?? { type: 'text', content: fullMatch });
+      lastIndex = regex.lastIndex;
+    } else {
+      // No more matches — emit the rest as text.
+      segments.push({ type: 'text', content: text.slice(lastIndex) });
+      lastIndex = text.length;
+    }
   }
 
   return segments;

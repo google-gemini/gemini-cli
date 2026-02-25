@@ -48,6 +48,22 @@ describe('InlineMarkdownRenderer', () => {
       ]);
     });
 
+    it('parses code span containing backticks (CommonMark double-backtick delimiter)', () => {
+      // Per CommonMark spec, ``a`b`` is a code span with content "a`b"
+      const segments = parseInlineMarkdown('use ``a`b`` here');
+      expect(segments).toEqual([
+        { type: 'text', content: 'use ' },
+        { type: 'code', content: 'a`b' },
+        { type: 'text', content: ' here' },
+      ]);
+    });
+
+    it('parses triple-backtick code span containing double backticks', () => {
+      // CommonMark: ```a``b``` → code span with content "a``b"
+      const segments = parseInlineMarkdown('```a``b```');
+      expect(segments).toEqual([{ type: 'code', content: 'a``b' }]);
+    });
+
     it('parses strikethrough', () => {
       const segments = parseInlineMarkdown('~~removed~~');
       expect(segments).toEqual([{ type: 'strikethrough', content: 'removed' }]);
@@ -130,6 +146,14 @@ describe('InlineMarkdownRenderer', () => {
       expect(stripInlineMarkdown('visit https://example.com today')).toBe(
         'visit https://example.com today',
       );
+    });
+
+    it('strips double-backtick code span containing a single backtick', () => {
+      expect(stripInlineMarkdown('``a`b``')).toBe('a`b');
+    });
+
+    it('strips triple-backtick code span containing double backticks', () => {
+      expect(stripInlineMarkdown('```a``b```')).toBe('a``b');
     });
 
     it('handles multiple inline markers in one string', () => {
