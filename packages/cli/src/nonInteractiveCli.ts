@@ -96,6 +96,7 @@ export async function runNonInteractive({
 
     const startTime = Date.now();
     let retryCount = 0;
+    const debugMode = config.getDebugMode();
     const streamFormatter =
       config.getOutputFormat() === OutputFormat.STREAM_JSON
         ? new StreamJsonFormatter()
@@ -185,6 +186,7 @@ export async function runNonInteractive({
 
     const handleRetryAttempt = (payload: RetryAttemptPayload) => {
       retryCount++;
+      if (!debugMode) return;
       if (streamFormatter) {
         streamFormatter.emitEvent({
           type: JsonStreamEventType.RETRY,
@@ -252,8 +254,10 @@ export async function runNonInteractive({
       }
 
       // Emit init event for streaming JSON
-      const authMethod = config.getContentGeneratorConfig()?.authType;
-      const userTier = config.getUserTierName();
+      const authMethod = debugMode
+        ? config.getContentGeneratorConfig()?.authType
+        : undefined;
+      const userTier = debugMode ? config.getUserTierName() : undefined;
       if (streamFormatter) {
         streamFormatter.emitEvent({
           type: JsonStreamEventType.INIT,
@@ -373,18 +377,27 @@ export async function runNonInteractive({
             }
             toolCallRequests.push(event.value);
           } else if (event.type === GeminiEventType.LoopDetected) {
-            const loopType = event.value?.loopType;
-            if (streamFormatter) {
+            if (debugMode) {
+              const loopType = event.value?.loopType;
+              if (streamFormatter) {
+                streamFormatter.emitEvent({
+                  type: JsonStreamEventType.LOOP_DETECTED,
+                  timestamp: new Date().toISOString(),
+                  ...(loopType && { loop_type: loopType }),
+                });
+              } else if (config.getOutputFormat() === OutputFormat.TEXT) {
+                const loopTypeStr = loopType ? ` (${loopType})` : '';
+                process.stderr.write(
+                  `[WARNING] Loop detected${loopTypeStr}, stopping execution\n`,
+                );
+              }
+            } else if (streamFormatter) {
               streamFormatter.emitEvent({
-                type: JsonStreamEventType.LOOP_DETECTED,
+                type: JsonStreamEventType.ERROR,
                 timestamp: new Date().toISOString(),
-                ...(loopType && { loop_type: loopType }),
+                severity: 'warning',
+                message: 'Loop detected, stopping execution',
               });
-            } else if (config.getOutputFormat() === OutputFormat.TEXT) {
-              const loopTypeStr = loopType ? ` (${loopType})` : '';
-              process.stderr.write(
-                `[WARNING] Loop detected${loopTypeStr}, stopping execution\n`,
-              );
             }
           } else if (event.type === GeminiEventType.MaxSessionTurns) {
             if (streamFormatter) {
@@ -413,7 +426,7 @@ export async function runNonInteractive({
                 stats: streamFormatter.convertToStreamStats(
                   metrics,
                   durationMs,
-                  retryCount,
+                  { retryCount, includeDiagnostics: debugMode },
                 ),
               });
             }
@@ -513,7 +526,7 @@ export async function runNonInteractive({
                 stats: streamFormatter.convertToStreamStats(
                   metrics,
                   durationMs,
-                  retryCount,
+                  { retryCount, includeDiagnostics: debugMode },
                 ),
               });
             } else if (config.getOutputFormat() === OutputFormat.JSON) {
@@ -545,11 +558,10 @@ export async function runNonInteractive({
               type: JsonStreamEventType.RESULT,
               timestamp: new Date().toISOString(),
               status: 'success',
-              stats: streamFormatter.convertToStreamStats(
-                metrics,
-                durationMs,
+              stats: streamFormatter.convertToStreamStats(metrics, durationMs, {
                 retryCount,
-              ),
+                includeDiagnostics: debugMode,
+              }),
             });
           } else if (config.getOutputFormat() === OutputFormat.JSON) {
             const formatter = new JsonFormatter();

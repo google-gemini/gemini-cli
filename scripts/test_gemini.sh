@@ -96,8 +96,8 @@ for model in "${MODELS[@]}"; do
   STDERRFILE=$(mktemp)
   exit_code=0
 
-  echo -e "  ${DIM}Running with -o stream-json ...${RESET}"
-  node "$CLI" -p "$PROMPT" -y -m "$model" -o stream-json \
+  echo -e "  ${DIM}Running with -o stream-json -d ...${RESET}"
+  node "$CLI" -p "$PROMPT" -y -m "$model" -o stream-json -d \
     >"$TMPFILE" 2>"$STDERRFILE" || exit_code=$?
 
   if [[ $exit_code -ne 0 ]]; then

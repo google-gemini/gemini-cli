@@ -39,25 +39,21 @@ export class StreamJsonFormatter {
   convertToStreamStats(
     metrics: SessionMetrics,
     durationMs: number,
-    retryCount?: number,
+    options?: { retryCount?: number; includeDiagnostics?: boolean },
   ): StreamStats {
     let totalTokens = 0;
     let inputTokens = 0;
     let outputTokens = 0;
     let cached = 0;
     let input = 0;
-    let apiRequests = 0;
-    let apiErrors = 0;
 
-    // Aggregate token counts and API stats across all models
+    // Aggregate token counts across all models
     for (const modelMetrics of Object.values(metrics.models)) {
       totalTokens += modelMetrics.tokens.total;
       inputTokens += modelMetrics.tokens.prompt;
       outputTokens += modelMetrics.tokens.candidates;
       cached += modelMetrics.tokens.cached;
       input += modelMetrics.tokens.input;
-      apiRequests += modelMetrics.api.totalRequests;
-      apiErrors += modelMetrics.api.totalErrors;
     }
 
     const stats: StreamStats = {
@@ -68,12 +64,21 @@ export class StreamJsonFormatter {
       input,
       duration_ms: durationMs,
       tool_calls: metrics.tools.totalCalls,
-      api_requests: apiRequests,
-      api_errors: apiErrors,
     };
 
-    if (retryCount && retryCount > 0) {
-      stats.retry_count = retryCount;
+    if (options?.includeDiagnostics) {
+      let apiRequests = 0;
+      let apiErrors = 0;
+      for (const modelMetrics of Object.values(metrics.models)) {
+        apiRequests += modelMetrics.api.totalRequests;
+        apiErrors += modelMetrics.api.totalErrors;
+      }
+      stats.api_requests = apiRequests;
+      stats.api_errors = apiErrors;
+
+      if (options.retryCount && options.retryCount > 0) {
+        stats.retry_count = options.retryCount;
+      }
     }
 
     return stats;
