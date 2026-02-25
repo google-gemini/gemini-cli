@@ -1598,7 +1598,7 @@ const SETTINGS_SCHEMA = {
         label: 'Task Tracker',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: 'Enable task tracker tools.',
         showInDialog: true,
       },
