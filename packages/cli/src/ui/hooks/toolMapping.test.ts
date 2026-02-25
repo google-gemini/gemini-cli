@@ -263,6 +263,41 @@ describe('toolMapping', () => {
       expect(result.borderBottom).toBe(false);
     });
 
+    it('maps raw progress and progressTotal from Executing calls', () => {
+      const toolCall: ExecutingToolCall = {
+        status: CoreToolCallStatus.Executing,
+        request: mockRequest,
+        tool: mockTool,
+        invocation: mockInvocation,
+        progressMessage: 'Downloading...',
+        progress: 5,
+        progressTotal: 10,
+      };
+
+      const result = mapToDisplay(toolCall);
+      const displayTool = result.tools[0];
+
+      expect(displayTool.progress).toBe(5);
+      expect(displayTool.progressTotal).toBe(10);
+      expect(displayTool.progressMessage).toBe('Downloading...');
+    });
+
+    it('leaves progress fields undefined for non-Executing calls', () => {
+      const toolCall: SuccessfulToolCall = {
+        status: CoreToolCallStatus.Success,
+        request: mockRequest,
+        tool: mockTool,
+        invocation: mockInvocation,
+        response: mockResponse,
+      };
+
+      const result = mapToDisplay(toolCall);
+      const displayTool = result.tools[0];
+
+      expect(displayTool.progress).toBeUndefined();
+      expect(displayTool.progressTotal).toBeUndefined();
+    });
+
     it('sets resultDisplay to undefined for pre-execution statuses', () => {
       const toolCall: ScheduledToolCall = {
         status: CoreToolCallStatus.Scheduled,
