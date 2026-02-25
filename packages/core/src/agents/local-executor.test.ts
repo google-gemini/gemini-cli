@@ -582,6 +582,12 @@ describe('LocalAgentExecutor', () => {
 
       // Verify other properties still work
       expect(passedConfig.getMessageBus()).toBe(mockConfig.getMessageBus());
+
+      // Verify referential equality for methods
+      const bus1 = passedConfig.getMessageBus();
+      const bus2 = passedConfig.getMessageBus();
+      expect(bus1).toBe(bus2);
+      expect(bus1).toBeDefined();
     });
   });
 

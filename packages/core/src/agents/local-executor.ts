@@ -824,15 +824,23 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     try {
       const subagentSessionId = createSessionId();
+      const boundFunctionCache = new Map<object, object>();
       const subagentConfig = new Proxy(this.runtimeContext, {
         get(target, prop, receiver) {
           if (prop === 'getSessionId') {
             return () => subagentSessionId;
           }
-          const value = Reflect.get(target, prop, receiver) as unknown;
+          const value: unknown = Reflect.get(target, prop, receiver);
           if (typeof value === 'function') {
-            const bound: unknown = value.bind(target);
-            return bound;
+            // Cache bound functions to ensure referential equality.
+            const cached = boundFunctionCache.get(value);
+            if (cached) {
+              return cached;
+            }
+            const boundFunc = (...args: unknown[]) =>
+              Reflect.apply(value, target, args) as unknown;
+            boundFunctionCache.set(value, boundFunc);
+            return boundFunc;
           }
           return value;
         },
