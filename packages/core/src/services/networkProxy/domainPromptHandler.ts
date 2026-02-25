@@ -8,6 +8,16 @@ import type { NetworkProxyManager } from './networkProxyManager.js';
 import { DomainFilterAction } from './types.js';
 
 /**
+ * Strips ANSI escape sequences and control characters from a hostname
+ * to prevent terminal injection attacks.
+ */
+function sanitizeHostname(hostname: string): string {
+  // Remove ANSI escape sequences
+  // eslint-disable-next-line no-control-regex
+  return hostname.replace(/[\x00-\x1f\x7f-\x9f]|\x1b\[[0-9;]*[a-zA-Z]/g, '');
+}
+
+/**
  * Prompt callback for asking the user whether to allow or deny a domain.
  * Implementation is UI-agnostic (CLI readline, Ink, VS Code, etc.).
  */
@@ -89,9 +99,10 @@ export function createConsoleDomainPrompt(): DomainPromptCallback {
       output: process.stderr,
     });
 
+    const safe = sanitizeHostname(hostname);
     return new Promise<DomainFilterAction>((resolve) => {
       rl.question(
-        `\nNetwork proxy: "${hostname}" wants to connect. Allow? [y/N] `,
+        `\nNetwork proxy: "${safe}" wants to connect. Allow? [y/N] `,
         (answer) => {
           rl.close();
           const normalized = answer.trim().toLowerCase();

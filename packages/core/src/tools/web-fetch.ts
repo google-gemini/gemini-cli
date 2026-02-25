@@ -188,14 +188,15 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     // For now, we only support one URL for fallback
     let url = urls[0];
 
-    // Check domain policy before fetching
+    // Convert GitHub blob URL to raw URL before policy check so the
+    // actual destination domain is evaluated, not the original.
+    url = convertGithubUrlToRaw(url);
+
+    // Check domain policy after URL transformation
     const domainBlock = this.checkDomainPolicy(url);
     if (domainBlock) {
       return domainBlock;
     }
-
-    // Convert GitHub blob URL to raw URL
-    url = convertGithubUrlToRaw(url);
 
     try {
       const response = await retryWithBackoff(
@@ -395,7 +396,8 @@ ${textContent}
     // Convert GitHub blob URL to raw URL
     url = convertGithubUrlToRaw(url);
 
-    // Check domain policy before fetching
+    // Check domain policy after URL transformation so the actual
+    // destination domain is evaluated.
     const domainBlock = this.checkDomainPolicy(url);
     if (domainBlock) {
       return domainBlock;
@@ -532,8 +534,15 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
     }
 
     const result = checkDomainWithConfig(hostname, proxyConfig);
-    if (result.action === 'deny') {
-      const errorMessage = `Domain '${hostname}' is blocked by network proxy policy.`;
+    if (result.action === 'deny' || result.action === 'prompt') {
+      const reason =
+        result.action === 'deny'
+          ? 'is blocked by network proxy policy'
+          : 'requires approval, which is not supported by the web-fetch tool';
+      // Sanitize hostname to prevent terminal injection via control characters
+      // eslint-disable-next-line no-control-regex
+      const safeHost = hostname.replace(/[\x00-\x1f\x7f-\x9f]|\x1b\[[0-9;]*[a-zA-Z]/g, '');
+      const errorMessage = `Domain '${safeHost}' ${reason}.`;
       debugLogger.warn(`[WebFetchTool] ${errorMessage}`);
       return {
         llmContent: `Error: ${errorMessage}`,
