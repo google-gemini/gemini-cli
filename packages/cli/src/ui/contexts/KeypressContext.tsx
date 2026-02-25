@@ -604,7 +604,7 @@ function* emitKeys(
     } else if (ch === ' ') {
       name = 'space';
       alt = escaped;
-      insertable = true;
+      insertable = !escaped;
     } else if (!escaped && ch <= '\x1a') {
       // ctrl+letter
       name = String.fromCharCode(ch.charCodeAt(0) + 'a'.charCodeAt(0) - 1);
@@ -614,7 +614,7 @@ function* emitKeys(
       name = ch.toLowerCase();
       shift = /^[A-Z]$/.exec(ch) !== null;
       alt = escaped;
-      insertable = true;
+      insertable = !escaped;
     } else if (MAC_ALT_KEY_CHARACTER_MAP[ch]) {
       // Note: we do this even if we are not on Mac, because mac users may
       // remotely connect to non-Mac systems.
