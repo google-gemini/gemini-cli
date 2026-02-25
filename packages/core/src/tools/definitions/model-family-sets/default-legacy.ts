@@ -62,7 +62,8 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
     name: WRITE_FILE_TOOL_NAME,
     description: `Writes content to a specified file in the local filesystem.
 
-      The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
+      The user has the ability to modify \`content\`. If modified, this will be stated in the response.
+      IMPORTANT FOR STRINGS: When generating \`content\`, you must ensure it survives the JSON string parsing. First escape the string using the rules of the target language (e.g. \`\\n\`), and then escape it again to be safely passed as a JSON string (e.g. \`\\\\n\`).`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -297,9 +298,10 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
       1. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
       2. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic and that \`old_string\` and \`new_string\` are different.
       3. \`instruction\` is the detailed instruction of what needs to be changed. It is important to Make it specific and detailed so developers or large language models can understand what needs to be changed and perform the changes on their own if necessary. 
-      4. NEVER escape \`old_string\`, that would break the exact literal text requirement.
+      4. NEVER manually escape \`old_string\`, that would break the exact literal text requirement. The JSON parser will handle the standard encoding.
+      5. IMPORTANT FOR NEWLINES: When generating \`new_string\`, you must ensure it survives the JSON string parsing. First escape the string using the rules of the target language (e.g. \`\\n\`), and then escape it again to be safely passed as a JSON string (e.g. \`\\\\n\`).
       **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the instance(s) to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations and \`allow_multiple\` is not true, the tool will fail.
-      5. Prefer to break down complex and long changes into multiple smaller atomic calls to this tool. Always check the content of the file after changes or not finding a string to match.
+      6. Prefer to break down complex and long changes into multiple smaller atomic calls to this tool. Always check the content of the file after changes or not finding a string to match.
       **Multiple replacements:** Set \`allow_multiple\` to true if you want to replace ALL occurrences that match \`old_string\` exactly.`,
     parametersJsonSchema: {
       type: 'object',

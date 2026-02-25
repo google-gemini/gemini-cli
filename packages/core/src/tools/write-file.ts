@@ -30,7 +30,7 @@ import {
   ensureCorrectEdit,
   ensureCorrectFileContent,
 } from '../utils/editCorrector.js';
-import { detectLineEnding, sanitizeBackslashes } from '../utils/textUtils.js';
+import { detectLineEnding } from '../utils/textUtils.js';
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
 import { getDiffContextSnippet } from './diff-utils.js';
 import type {
@@ -256,7 +256,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     }
 
     const { ai_proposed_content, modified_by_user } = this.params;
-    const content = sanitizeBackslashes(this.params.content, this.resolvedPath);
+    const content = this.params.content;
     const correctedContentResult = await getCorrectedFileContent(
       this.config,
       this.resolvedPath,

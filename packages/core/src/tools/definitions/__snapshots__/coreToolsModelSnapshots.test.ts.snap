@@ -511,9 +511,10 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
       1. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
       2. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic and that \`old_string\` and \`new_string\` are different.
       3. \`instruction\` is the detailed instruction of what needs to be changed. It is important to Make it specific and detailed so developers or large language models can understand what needs to be changed and perform the changes on their own if necessary. 
-      4. NEVER escape \`old_string\`, that would break the exact literal text requirement.
+      4. NEVER manually escape \`old_string\`, that would break the exact literal text requirement. The JSON parser will handle the standard encoding.
+      5. IMPORTANT FOR NEWLINES: When generating \`new_string\`, you must ensure it survives the JSON string parsing. First escape the string using the rules of the target language (e.g. \`\\n\`), and then escape it again to be safely passed as a JSON string (e.g. \`\\\\n\`).
       **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the instance(s) to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations and \`allow_multiple\` is not true, the tool will fail.
-      5. Prefer to break down complex and long changes into multiple smaller atomic calls to this tool. Always check the content of the file after changes or not finding a string to match.
+      6. Prefer to break down complex and long changes into multiple smaller atomic calls to this tool. Always check the content of the file after changes or not finding a string to match.
       **Multiple replacements:** Set \`allow_multiple\` to true if you want to replace ALL occurrences that match \`old_string\` exactly.",
   "name": "replace",
   "parametersJsonSchema": {
@@ -658,7 +659,8 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 {
   "description": "Writes content to a specified file in the local filesystem.
 
-      The user has the ability to modify \`content\`. If modified, this will be stated in the response.",
+      The user has the ability to modify \`content\`. If modified, this will be stated in the response.
+      IMPORTANT FOR STRINGS: When generating \`content\`, you must ensure it survives the JSON string parsing. First escape the string using the rules of the target language (e.g. \`\\n\`), and then escape it again to be safely passed as a JSON string (e.g. \`\\\\n\`).",
   "name": "write_file",
   "parametersJsonSchema": {
     "properties": {
@@ -1291,7 +1293,9 @@ Use this tool when the user's query implies needing the content of several files
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: replace 1`] = `
 {
   "description": "Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool requires providing significant context around the change to ensure precise targeting.
-The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.",
+The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
+NEVER manually escape \`old_string\`, that would break the exact literal text requirement. The JSON parser will handle the standard encoding.
+IMPORTANT FOR STRINGS: When generating \`new_string\`, you must ensure it survives the JSON string parsing. First escape the string using the rules of the target language (e.g. \`\\n\`), and then escape it again to be safely passed as a JSON string (e.g. \`\\\\n\`).",
   "name": "replace",
   "parametersJsonSchema": {
     "properties": {
@@ -1412,7 +1416,8 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: write_file 1`] = `
 {
-  "description": "Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use 'replace' for targeted edits to large files.",
+  "description": "Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use 'replace' for targeted edits to large files.
+IMPORTANT FOR STRINGS: When generating \`content\`, you must ensure it survives the JSON string parsing. First escape the string using the rules of the target language (e.g. \`\\n\`), and then escape it again to be safely passed as a JSON string (e.g. \`\\\\n\`).",
   "name": "write_file",
   "parametersJsonSchema": {
     "properties": {
