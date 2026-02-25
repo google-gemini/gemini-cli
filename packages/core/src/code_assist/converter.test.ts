@@ -14,12 +14,12 @@ import {
 import type {
   ContentListUnion,
   GenerateContentParameters,
+  Part,
 } from '@google/genai';
 import {
   GenerateContentResponse,
   FinishReason,
   BlockedReason,
-  type Part,
 } from '@google/genai';
 
 describe('converter', () => {
