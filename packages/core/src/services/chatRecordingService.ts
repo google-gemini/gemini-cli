@@ -135,9 +135,9 @@ export class ChatRecordingService {
   private queuedTokens: TokensSummary | null = null;
   private config: Config;
 
-  constructor(config: Config) {
+  constructor(config: Config, sessionId?: string) {
     this.config = config;
-    this.sessionId = config.getSessionId();
+    this.sessionId = sessionId ?? config.getSessionId();
     this.projectHash = getProjectHash(config.getProjectRoot());
   }
 

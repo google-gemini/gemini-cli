@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { randomUUID } from 'node:crypto';
 import type { Config } from '../config/config.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
@@ -830,6 +831,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         undefined,
         undefined,
         'subagent',
+        randomUUID(), // unique session ID for subagent
       );
     } catch (e: unknown) {
       await reportError(
