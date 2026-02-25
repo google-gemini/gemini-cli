@@ -129,7 +129,7 @@ describe('parsingUtils', () => {
       const input = 'Check [this link](https://example.com)';
       const output = parseMarkdownToANSI(input);
       expect(output).toBe(
-        `${primary('Check ')}\x1b]8;;https://example.com\x07${link('this link')}\x1b]8;;\x07`,
+        `${primary('Check this link (')}${link('https://example.com')}${primary(')')}`,
       );
     });
 
@@ -155,7 +155,7 @@ describe('parsingUtils', () => {
       expect(output).toBe(
         `${chalk.bold(primary('Bold'))}${primary(' and ')}${chalk.italic(primary('italic'))}${primary(' and ')}${accent(
           'code',
-        )}${primary(' and ')}\x1b]8;;url\x07${link('link')}\x1b]8;;\x07`,
+        )}${primary(' and link (')}${link('url')}${primary(')')}`,
       );
     });
 
@@ -191,10 +191,7 @@ describe('parsingUtils', () => {
       const input = 'Check [link](url)';
       const output = parseMarkdownToANSI(input, 'red');
       const red = (str: string) => chalk.red(str);
-      const blue = (str: string) => chalk.blue(str);
-      expect(output).toBe(
-        `${red('Check ')}\x1b]8;;url\x07${blue('link')}\x1b]8;;\x07`,
-      );
+      expect(output).toBe(`${red('Check link (')}${link('url')}${red(')')}`);
     });
 
     it('should override default color with accent color for code', () => {

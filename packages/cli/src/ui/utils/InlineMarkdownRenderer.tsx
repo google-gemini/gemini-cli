@@ -24,9 +24,6 @@ const INLINE_CODE_MARKER_LENGTH = 1; // For "`"
 const UNDERLINE_TAG_START_LENGTH = 3; // For "<u>"
 const UNDERLINE_TAG_END_LENGTH = 4; // For "</u>"
 
-const HYPERLINK_ESCAPE_START = '\x1b]8;;';
-const HYPERLINK_ESCAPE_END = '\x07';
-
 interface RenderInlineProps {
   text: string;
   defaultColor?: string;
@@ -186,9 +183,11 @@ export const parseMarkdownToANSI = (
         if (linkMatch) {
           const linkText = linkMatch[1];
           const url = linkMatch[2];
-          // Use OSC 8 terminal hyperlink escape sequence:
-          // \x1b]8;;URL\x07 TEXT \x1b]8;;\x07
-          styledPart = `${HYPERLINK_ESCAPE_START}${url}${HYPERLINK_ESCAPE_END}${parseMarkdownToANSI(linkText, theme.text.link)}${HYPERLINK_ESCAPE_START}${HYPERLINK_ESCAPE_END}`;
+          styledPart =
+            parseMarkdownToANSI(linkText, baseColor) +
+            ' (' +
+            ansiColorize(url, theme.text.link) +
+            ')';
         }
       } else if (
         fullMatch.startsWith('<u>') &&
