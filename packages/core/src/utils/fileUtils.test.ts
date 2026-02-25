@@ -20,7 +20,7 @@ import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-// eslint-disable-next-line import/no-internal-modules
+ 
 import mime from 'mime/lite';
 
 import {
@@ -948,6 +948,26 @@ describe('fileUtils', () => {
       expect(result.isTruncated).toBe(true);
       expect(result.originalLineCount).toBe(20);
       expect(result.linesShown).toEqual([6, 10]);
+    });
+
+    it('should support startLine and endLine for text files', async () => {
+      const lines = Array.from({ length: 20 }, (_, i) => `Line ${i + 1}`);
+      actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
+
+      const result = await processSingleFileContent(
+        testTextFilePath,
+        tempRootDir,
+        new StandardFileSystemService(),
+        5,
+        10,
+      ); // Read lines 5-10 (1-based)
+      const expectedContent = lines.slice(4, 10).join('\n');
+
+      expect(result.llmContent).toBe(expectedContent);
+      expect(result.returnDisplay).toBe('Read lines 5-10 of 20 from test.txt');
+      expect(result.isTruncated).toBe(true);
+      expect(result.originalLineCount).toBe(20);
+      expect(result.linesShown).toEqual([5, 10]);
     });
 
     it('should identify truncation when reading the end of a file', async () => {

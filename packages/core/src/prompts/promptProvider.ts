@@ -175,6 +175,7 @@ export class PromptProvider {
           'operationalGuidelines',
           () => ({
             interactive: interactiveMode,
+            isGemini3: isModernModel,
             enableShellEfficiency: config.getEnableShellOutputEfficiency(),
             interactiveShellEnabled: config.isInteractiveShellEnabled(),
           }),
@@ -195,13 +196,9 @@ export class PromptProvider {
           : this.withSection('finalReminder', () => ({
               readFileToolName: READ_FILE_TOOL_NAME,
             })),
-      } as snippets.SystemPromptOptions;
+      };
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const getCoreSystemPrompt = activeSnippets.getCoreSystemPrompt as (
-        options: snippets.SystemPromptOptions,
-      ) => string;
-      basePrompt = getCoreSystemPrompt(options);
+      basePrompt = activeSnippets.getCoreSystemPrompt(options);
     }
 
     // --- Finalization (Shell) ---

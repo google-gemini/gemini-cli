@@ -10,11 +10,11 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 import type { ToolInvocation, ToolLocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-
-import type { PartUnion } from '@google/genai';
+import type { FunctionDeclaration, PartUnion } from '@google/genai';
 import {
   processSingleFileContent,
   getSpecificMimeType,
+  DEFAULT_MAX_LINES_TEXT_FILE,
 } from '../utils/fileUtils.js';
 import type { Config } from '../config/config.js';
 import { FileOperation } from '../telemetry/metrics.js';
@@ -23,8 +23,11 @@ import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
 import { READ_FILE_TOOL_NAME, READ_FILE_DISPLAY_NAME } from './tool-names.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import {
+  isPreviewModel,
+  supportsMultimodalFunctionResponse,
+} from '../config/models.js';
 import { READ_FILE_DEFINITION } from './definitions/coreTools.js';
-import { resolveToolDeclaration } from './definitions/resolver.js';
 
 /**
  * Parameters for the ReadFile tool
@@ -83,6 +86,11 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   }
 
   async execute(): Promise<ToolResult> {
+    const activeModel = this.config.getActiveModel();
+    const isGemini3 =
+      supportsMultimodalFunctionResponse(activeModel) ||
+      isPreviewModel(activeModel);
+
     const validationError = this.config.validatePathAccess(
       this.resolvedPath,
       'read',
@@ -122,13 +130,26 @@ class ReadFileToolInvocation extends BaseToolInvocation<
       const [start, end] = result.linesShown!;
       const total = result.originalLineCount!;
 
-      llmContent = `
+      if (isGemini3) {
+        llmContent = `
+IMPORTANT: The file content has been truncated.
+Status: Showing lines ${start}-${end} of ${total} total lines.
+Action: 
+- To find specific patterns, use the 'grep_search' tool.
+- For surgical extraction of code blocks (especially ranges larger than 2,000 lines), prefer 'run_shell_command' with 'sed'. For example: 'sed -n "500,600p" ${this.params.file_path}'.
+- You can also use other Unix utilities like 'awk', 'head', or 'tail' via 'run_shell_command'.
+
+--- FILE CONTENT (truncated) ---
+${result.llmContent}`;
+      } else {
+        llmContent = `
 IMPORTANT: The file content has been truncated.
 Status: Showing lines ${start}-${end} of ${total} total lines.
 Action: To read more of the file, you can use the 'start_line' and 'end_line' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use start_line: ${end + 1}.
 
 --- FILE CONTENT (truncated) ---
 ${result.llmContent}`;
+      }
     } else {
       llmContent = result.llmContent || '';
     }
@@ -188,6 +209,41 @@ export class ReadFileTool extends BaseDeclarativeTool<
       config.getTargetDir(),
       config.getFileFilteringOptions(),
     );
+  }
+
+  override getSchema(modelId?: string): FunctionDeclaration {
+    const activeModel = modelId ?? this.config.getActiveModel();
+    const isGemini3 =
+      supportsMultimodalFunctionResponse(activeModel) ||
+      isPreviewModel(activeModel);
+
+    const properties: Record<string, unknown> = {
+      file_path: {
+        description: 'The path to the file to read.',
+        type: 'string',
+      },
+      start_line: {
+        description: 'Optional: The 1-based line number to start reading from.',
+        type: 'number',
+      },
+      end_line: {
+        description:
+          'Optional: The 1-based line number to end reading at (inclusive).',
+        type: 'number',
+      },
+    };
+
+    return {
+      name: this.name,
+      description: isGemini3
+        ? `Reads a specific range of a file (up to ${DEFAULT_MAX_LINES_TEXT_FILE} lines). **Important:** For high token efficiency, avoid reading large files in their entirety. Use 'grep_search' to find symbols or 'run_shell_command' with 'sed' for surgical block extraction instead of broad file reads. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files.`
+        : `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'start_line' and 'end_line' parameters. Handles text, images, audio, and PDF files. For text files, it can read specific line ranges.`,
+      parametersJsonSchema: {
+        properties,
+        required: ['file_path'],
+        type: 'object',
+      },
+    };
   }
 
   protected override validateToolParamValues(
@@ -250,9 +306,5 @@ export class ReadFileTool extends BaseDeclarativeTool<
       _toolName,
       _toolDisplayName,
     );
-  }
-
-  override getSchema(modelId?: string) {
-    return resolveToolDeclaration(READ_FILE_DEFINITION, modelId);
   }
 }

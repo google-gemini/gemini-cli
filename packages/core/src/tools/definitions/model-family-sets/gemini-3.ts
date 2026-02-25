@@ -38,7 +38,7 @@ import {
 export const GEMINI_3_SET: CoreToolSet = {
   read_file: {
     name: READ_FILE_TOOL_NAME,
-    description: `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'start_line' and 'end_line' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
+    description: `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'start_line' and 'end_line' parameters. **Important:** For high token efficiency, avoid reading large files in their entirety. Use 'grep_search' to find symbols or 'run_shell_command' with 'sed' for surgical block extraction instead of broad file reads. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -84,7 +84,7 @@ export const GEMINI_3_SET: CoreToolSet = {
   grep_search: {
     name: GREP_TOOL_NAME,
     description:
-      'Searches for a regular expression pattern within file contents. Max 100 matches.',
+      'FAST regular expression search. This is the **primary discovery tool** for locating code. Use context parameters (`context`, `after`, `before`) to read code surrounding matches in a single turn, often eliminating the need for a separate `read_file` call. (max 100 matches).',
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -211,7 +211,7 @@ export const GEMINI_3_SET: CoreToolSet = {
   glob: {
     name: GLOB_TOOL_NAME,
     description:
-      'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.',
+      'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases. **Avoid using this tool just to list files before reading them;** if you know the symbols you need, use `grep_search` directly.',
     parametersJsonSchema: {
       type: 'object',
       properties: {
