@@ -285,17 +285,17 @@ const SETTINGS_SCHEMA = {
               'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.',
             showInDialog: true,
           },
+          modelRouting: {
+            type: 'boolean',
+            label: 'Plan Model Routing',
+            category: 'General',
+            requiresRestart: false,
+            default: true,
+            description:
+              'Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro for the planning phase and Flash for the implementation phase.',
+            showInDialog: true,
+          },
         },
-      },
-      enablePromptCompletion: {
-        type: 'boolean',
-        label: 'Enable Prompt Completion',
-        category: 'General',
-        requiresRestart: true,
-        default: false,
-        description:
-          'Enable AI-powered prompt completion suggestions while typing.',
-        showInDialog: true,
       },
       retryFetchErrors: {
         type: 'boolean',
@@ -306,6 +306,16 @@ const SETTINGS_SCHEMA = {
         description:
           'Retry on "exception TypeError: fetch failed sending request" errors.',
         showInDialog: false,
+      },
+      maxAttempts: {
+        type: 'number',
+        label: 'Max Chat Model Attempts',
+        category: 'General',
+        requiresRestart: false,
+        default: 10,
+        description:
+          'Maximum number of attempts for requests to the main chat model. Cannot exceed 10.',
+        showInDialog: true,
       },
       debugKeystrokeLogging: {
         type: 'boolean',
@@ -974,6 +984,60 @@ const SETTINGS_SCHEMA = {
           ref: 'AgentOverride',
         },
       },
+      browser: {
+        type: 'object',
+        label: 'Browser Agent',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: {},
+        description: 'Settings specific to the browser agent.',
+        showInDialog: false,
+        properties: {
+          sessionMode: {
+            type: 'enum',
+            label: 'Browser Session Mode',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: 'persistent',
+            description:
+              "Session mode: 'persistent', 'isolated', or 'existing'.",
+            showInDialog: false,
+            options: [
+              { value: 'persistent', label: 'Persistent' },
+              { value: 'isolated', label: 'Isolated' },
+              { value: 'existing', label: 'Existing' },
+            ],
+          },
+          headless: {
+            type: 'boolean',
+            label: 'Browser Headless',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description: 'Run browser in headless mode.',
+            showInDialog: false,
+          },
+          profilePath: {
+            type: 'string',
+            label: 'Browser Profile Path',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as string | undefined,
+            description:
+              'Path to browser profile directory for session persistence.',
+            showInDialog: false,
+          },
+          visualModel: {
+            type: 'string',
+            label: 'Browser Visual Model',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as string | undefined,
+            description: 'Model override for the visual agent.',
+            showInDialog: false,
+          },
+        },
+      },
     },
   },
 
@@ -1493,6 +1557,16 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      enableConseca: {
+        type: 'boolean',
+        label: 'Enable Context-Aware Security',
+        category: 'Security',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.',
+        showInDialog: true,
+      },
     },
   },
 
@@ -1701,6 +1775,16 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Enable model steering (user hints) to guide the model during tool execution.',
+        showInDialog: true,
+      },
+      directWebFetch: {
+        type: 'boolean',
+        label: 'Direct Web Fetch',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable web fetch behavior that bypasses LLM summarization.',
         showInDialog: true,
       },
     },
