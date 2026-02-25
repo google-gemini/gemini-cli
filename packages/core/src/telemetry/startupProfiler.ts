@@ -142,6 +142,23 @@ export class StartupProfiler {
   }
 
   /**
+   * Returns current startup phases with duration (for in-CLI perf snapshot).
+   * Only includes ended phases that have a performance measure.
+   */
+  getStartupPhases(): Array<{ name: string; duration_ms: number }> {
+    const measures = performance.getEntriesByType('measure');
+    const result: Array<{ name: string; duration_ms: number }> = [];
+    for (const phase of this.phases.values()) {
+      if (!phase.ended) continue;
+      const measure = measures.find((m) => m.name === phase.name);
+      if (measure) {
+        result.push({ name: phase.name, duration_ms: measure.duration });
+      }
+    }
+    return result;
+  }
+
+  /**
    * Flushes buffered metrics to the telemetry system.
    */
   flush(config: Config): void {

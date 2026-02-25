@@ -211,6 +211,11 @@ export type HistoryItemToolStats = HistoryItemBase & {
   type: 'tool_stats';
 };
 
+export type HistoryItemPerf = HistoryItemBase & {
+  type: 'perf';
+  view?: 'startup' | 'memory' | 'tools' | 'api' | 'session';
+};
+
 export type HistoryItemModel = HistoryItemBase & {
   type: 'model';
   model: string;
@@ -374,6 +379,7 @@ export type HistoryItemWithoutId =
   | HistoryItemStats
   | HistoryItemModelStats
   | HistoryItemToolStats
+  | HistoryItemPerf
   | HistoryItemModel
   | HistoryItemQuit
   | HistoryItemCompression
@@ -411,6 +417,7 @@ export enum MessageType {
   CHAT_LIST = 'chat_list',
   HOOKS_LIST = 'hooks_list',
   HINT = 'hint',
+  PERF = 'perf',
 }
 
 // Simplified message structure for internal feedback
@@ -452,6 +459,12 @@ export type Message =
   | {
       type: MessageType.TOOL_STATS;
       timestamp: Date;
+      content?: string;
+    }
+  | {
+      type: MessageType.PERF;
+      timestamp: Date;
+      view?: 'startup' | 'memory' | 'tools' | 'api' | 'session';
       content?: string;
     }
   | {
