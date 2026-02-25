@@ -224,8 +224,6 @@ jobs:
     if: |
       always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
     runs-on: 'gemini-cli-windows-16-core'
-    continue-on-error: true
-
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
@@ -315,6 +313,7 @@ jobs:
     needs:
       - 'e2e_linux'
       - 'e2e_mac'
+      - 'e2e_windows'
       - 'evals'
       - 'merge_queue_skipper'
     runs-on: 'gemini-cli-ubuntu-16-core'
@@ -323,6 +322,7 @@ jobs:
         run: |
           if [[ ${NEEDS_E2E_LINUX_RESULT} != 'success' || \
                ${NEEDS_E2E_MAC_RESULT} != 'success' || \
+               ${NEEDS_E2E_WINDOWS_RESULT} != 'success' || \
                ${NEEDS_EVALS_RESULT} != 'success' ]]; then
             echo "One or more E2E jobs failed."
             exit 1
@@ -331,6 +331,7 @@ jobs:
         env:
           NEEDS_E2E_LINUX_RESULT: ${{ needs.e2e_linux.result }}
           NEEDS_E2E_MAC_RESULT: ${{ needs.e2e_mac.result }}
+          NEEDS_E2E_WINDOWS_RESULT: ${{ needs.e2e_windows.result }}
           NEEDS_EVALS_RESULT: ${{ needs.evals.result }}
 
   set_workflow_status:

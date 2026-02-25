@@ -360,7 +360,6 @@ jobs:
     runs-on: 'gemini-cli-windows-16-core'
     needs: 'merge_queue_skipper'
     if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
-    continue-on-error: true
     timeout-minutes: 60
     strategy:
       matrix:
@@ -458,6 +457,7 @@ jobs:
       - 'link_checker'
       - 'test_linux'
       - 'test_mac'
+      - 'test_windows'
       - 'codeql'
       - 'bundle_size'
     runs-on: 'gemini-cli-ubuntu-16-core'
@@ -468,6 +468,7 @@ jobs:
                (${NEEDS_LINK_CHECKER_RESULT} != 'success' && ${NEEDS_LINK_CHECKER_RESULT} != 'skipped') || \
                (${NEEDS_TEST_LINUX_RESULT} != 'success' && ${NEEDS_TEST_LINUX_RESULT} != 'skipped') || \
                (${NEEDS_TEST_MAC_RESULT} != 'success' && ${NEEDS_TEST_MAC_RESULT} != 'skipped') || \
+               (${NEEDS_TEST_WINDOWS_RESULT} != 'success' && ${NEEDS_TEST_WINDOWS_RESULT} != 'skipped') || \
                (${NEEDS_CODEQL_RESULT} != 'success' && ${NEEDS_CODEQL_RESULT} != 'skipped') || \
                (${NEEDS_BUNDLE_SIZE_RESULT} != 'success' && ${NEEDS_BUNDLE_SIZE_RESULT} != 'skipped') ]]; then
             echo "One or more CI jobs failed."
@@ -479,5 +480,6 @@ jobs:
           NEEDS_LINK_CHECKER_RESULT: ${{ needs.link_checker.result }}
           NEEDS_TEST_LINUX_RESULT: ${{ needs.test_linux.result }}
           NEEDS_TEST_MAC_RESULT: ${{ needs.test_mac.result }}
+          NEEDS_TEST_WINDOWS_RESULT: ${{ needs.test_windows.result }}
           NEEDS_CODEQL_RESULT: ${{ needs.codeql.result }}
           NEEDS_BUNDLE_SIZE_RESULT: ${{ needs.bundle_size.result }}

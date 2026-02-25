@@ -146,6 +146,7 @@ export class OAuthUtils {
   ): MCPOAuthConfig {
     return {
       authorizationUrl: metadata.authorization_endpoint,
+      issuer: metadata.issuer,
       tokenUrl: metadata.token_endpoint,
       scopes: metadata.scopes_supported || [],
       registrationUrl: metadata.registration_endpoint,
@@ -408,6 +409,7 @@ export class OAuthUtils {
    */
   static parseTokenExpiry(idToken: string): number | undefined {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const payload = JSON.parse(
         Buffer.from(idToken.split('.')[1], 'base64').toString(),
       );

@@ -617,7 +617,7 @@ let baselineComparisonHistogram: Histogram | undefined;
 let isMetricsInitialized = false;
 let isPerformanceMonitoringEnabled = false;
 
-export function getMeter(): Meter | undefined {
+function getMeter(): Meter | undefined {
   if (!cliMeter) {
     cliMeter = metrics.getMeter(SERVICE_NAME);
   }
@@ -863,6 +863,7 @@ export function recordModelRoutingMetrics(
     'routing.decision_model': event.decision_model,
     'routing.decision_source': event.decision_source,
     'routing.failed': event.failed,
+    'routing.approval_mode': event.approval_mode,
   };
 
   if (event.reasoning) {
@@ -1019,7 +1020,7 @@ function getGenAiOperationName(): GenAiOperationName {
 
 // Performance Monitoring Functions
 
-export function initializePerformanceMonitoring(config: Config): void {
+function initializePerformanceMonitoring(config: Config): void {
   const meter = getMeter();
   if (!meter) return;
 

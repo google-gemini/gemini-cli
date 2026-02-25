@@ -80,19 +80,23 @@ export function useFocusHint(
   isThisShellFocused: boolean,
   resultDisplay: ToolResultDisplay | undefined,
 ) {
-  const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
   const [userHasFocused, setUserHasFocused] = useState(false);
+
+  // Derive a stable reset key for the inactivity timer. For strings and arrays
+  // (shell output), we use the length to capture updates without referential
+  // identity issues or expensive deep comparisons.
+  const resetKey =
+    typeof resultDisplay === 'string'
+      ? resultDisplay.length
+      : Array.isArray(resultDisplay)
+        ? resultDisplay.length
+        : !!resultDisplay;
+
   const showFocusHint = useInactivityTimer(
     isThisShellFocusable,
-    lastUpdateTime ? lastUpdateTime.getTime() : 0,
+    resetKey,
     SHELL_FOCUS_HINT_DELAY_MS,
   );
-
-  useEffect(() => {
-    if (resultDisplay) {
-      setLastUpdateTime(new Date());
-    }
-  }, [resultDisplay]);
 
   useEffect(() => {
     if (isThisShellFocused) {
@@ -183,6 +187,7 @@ type ToolInfoProps = {
   description: string;
   status: CoreToolCallStatus;
   emphasis: TextEmphasis;
+  originalRequestName?: string;
 };
 
 export const ToolInfo: React.FC<ToolInfoProps> = ({
@@ -190,6 +195,7 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
   description,
   status: coreStatus,
   emphasis,
+  originalRequestName,
 }) => {
   const status = mapCoreStatusToDisplayStatus(coreStatus);
   const nameColor = React.useMemo<string>(() => {
@@ -216,6 +222,12 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
         <Text color={nameColor} bold>
           {name}
         </Text>
+        {originalRequestName && originalRequestName !== name && (
+          <Text color={theme.text.secondary} italic>
+            {' '}
+            (redirection from {originalRequestName})
+          </Text>
+        )}
         {!isCompletedAskUser && (
           <>
             {' '}
@@ -223,6 +235,54 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
           </>
         )}
       </Text>
+    </Box>
+  );
+};
+
+export interface McpProgressIndicatorProps {
+  progress: number;
+  total?: number;
+  message?: string;
+  barWidth: number;
+}
+
+export const McpProgressIndicator: React.FC<McpProgressIndicatorProps> = ({
+  progress,
+  total,
+  message,
+  barWidth,
+}) => {
+  const percentage =
+    total && total > 0
+      ? Math.min(100, Math.round((progress / total) * 100))
+      : null;
+
+  let rawFilled: number;
+  if (total && total > 0) {
+    rawFilled = Math.round((progress / total) * barWidth);
+  } else {
+    rawFilled = Math.floor(progress) % (barWidth + 1);
+  }
+
+  const filled = Math.max(
+    0,
+    Math.min(Number.isFinite(rawFilled) ? rawFilled : 0, barWidth),
+  );
+  const empty = Math.max(0, barWidth - filled);
+  const progressBar = '\u2588'.repeat(filled) + '\u2591'.repeat(empty);
+
+  return (
+    <Box flexDirection="column">
+      <Box>
+        <Text color={theme.text.accent}>
+          {progressBar} {percentage !== null ? `${percentage}%` : `${progress}`}
+        </Text>
+      </Box>
+      {message && (
+        <Text color={theme.text.secondary} wrap="truncate">
+          {message}
+        </Text>
+      )}
     </Box>
   );
 };

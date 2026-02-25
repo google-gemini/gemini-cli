@@ -19,7 +19,8 @@ exports[`<ModelStatsDisplay /> > should display a single model correctly 1`] = `
 │    ↳ Thoughts                2                                                                   │
 │    ↳ Tool                    1                                                                   │
 │    ↳ Output                  20                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ModelStatsDisplay /> > should display conditional rows if at least one model has data 1`] = `
@@ -41,7 +42,8 @@ exports[`<ModelStatsDisplay /> > should display conditional rows if at least one
 │    ↳ Thoughts                2                                0                                  │
 │    ↳ Tool                    0                                3                                  │
 │    ↳ Output                  20                               10                                 │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ModelStatsDisplay /> > should display role breakdown correctly 1`] = `
@@ -67,7 +69,8 @@ exports[`<ModelStatsDisplay /> > should display role breakdown correctly 1`] = `
 │    ↳ Input                   10                                                                  │
 │    ↳ Output                  20                                                                  │
 │    ↳ Cache Reads             5                                                                   │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ModelStatsDisplay /> > should display stats for multiple models correctly 1`] = `
@@ -89,7 +92,8 @@ exports[`<ModelStatsDisplay /> > should display stats for multiple models correc
 │    ↳ Thoughts                10                               20                                 │
 │    ↳ Tool                    5                                10                                 │
 │    ↳ Output                  200                              400                                │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ModelStatsDisplay /> > should filter out invalid role names 1`] = `
@@ -108,7 +112,8 @@ exports[`<ModelStatsDisplay /> > should filter out invalid role names 1`] = `
 │  Total                       30                                                                  │
 │    ↳ Input                   10                                                                  │
 │    ↳ Output                  20                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ModelStatsDisplay /> > should handle large values without wrapping or overlapping 1`] = `
@@ -130,7 +135,8 @@ exports[`<ModelStatsDisplay /> > should handle large values without wrapping or 
 │    ↳ Thoughts                111,111,111                                                         │
 │    ↳ Tool                    222,222,222                                                         │
 │    ↳ Output                  123,456,789                                                         │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ModelStatsDisplay /> > should handle long role name layout 1`] = `
@@ -155,29 +161,8 @@ exports[`<ModelStatsDisplay /> > should handle long role name layout 1`] = `
 │    ↳ Input                   10                                                                  │
 │    ↳ Output                  20                                                                  │
 │    ↳ Cache Reads             0                                                                   │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
-`;
-
-exports[`<ModelStatsDisplay /> > should handle models with long names (gemini-3-*-preview) without layout breaking 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│                                                                              │
-│  Auto (Gemini 3) Stats For Nerds                                             │
-│                                                                              │
-│                                                                              │
-│  Metric                      gemini-3-pro-preview   gemini-3-flash-preview   │
-│  ──────────────────────────────────────────────────────────────────────────  │
-│  API                                                                         │
-│  Requests                    10                     20                       │
-│  Errors                      0 (0.0%)               0 (0.0%)                 │
-│  Avg Latency                 200ms                  50ms                     │
-│  Tokens                                                                      │
-│  Total                       6,000                  12,000                   │
-│    ↳ Input                   1,000                  2,000                    │
-│    ↳ Cache Reads             500 (25.0%)            1,000 (25.0%)            │
-│    ↳ Thoughts                100                    200                      │
-│    ↳ Tool                    50                     100                      │
-│    ↳ Output                  4,000                  8,000                    │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ModelStatsDisplay /> > should not display conditional rows if no model has data for them 1`] = `
@@ -196,12 +181,14 @@ exports[`<ModelStatsDisplay /> > should not display conditional rows if no model
 │  Total                       30                                                                  │
 │    ↳ Input                   10                                                                  │
 │    ↳ Output                  20                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ModelStatsDisplay /> > should render "no API calls" message when there are no active models 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
 │  No API calls have been made in this session.                                                    │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;

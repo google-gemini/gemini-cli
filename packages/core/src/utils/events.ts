@@ -13,6 +13,7 @@ import type {
   TokenStorageInitializationEvent,
   KeychainAvailabilityEvent,
 } from '../telemetry/types.js';
+import { debugLogger } from './debugLogger.js';
 
 /**
  * Defines the severity level for user-facing feedback.
@@ -125,6 +126,18 @@ export interface ConsentRequestPayload {
 }
 
 /**
+ * Payload for the 'mcp-progress' event.
+ */
+export interface McpProgressPayload {
+  serverName: string;
+  callId: string;
+  progressToken: string | number;
+  progress: number;
+  total?: number;
+  message?: string;
+}
+
+/**
  * Payload for the 'agents-discovered' event.
  */
 export interface AgentsDiscoveredPayload {
@@ -167,6 +180,7 @@ export enum CoreEvent {
   AdminSettingsChanged = 'admin-settings-changed',
   RetryAttempt = 'retry-attempt',
   ConsentRequest = 'consent-request',
+  McpProgress = 'mcp-progress',
   AgentsDiscovered = 'agents-discovered',
   RequestEditorSelection = 'request-editor-selection',
   EditorSelected = 'editor-selected',
@@ -200,6 +214,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.AdminSettingsChanged]: never[];
   [CoreEvent.RetryAttempt]: [RetryAttemptPayload];
   [CoreEvent.ConsentRequest]: [ConsentRequestPayload];
+  [CoreEvent.McpProgress]: [McpProgressPayload];
   [CoreEvent.AgentsDiscovered]: [AgentsDiscoveredPayload];
   [CoreEvent.RequestEditorSelection]: never[];
   [CoreEvent.EditorSelected]: [EditorSelectedPayload];
@@ -333,6 +348,17 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
    */
   emitConsentRequest(payload: ConsentRequestPayload): void {
     this._emitOrQueue(CoreEvent.ConsentRequest, payload);
+  }
+
+  /**
+   * Notifies subscribers that progress has been made on an MCP tool call.
+   */
+  emitMcpProgress(payload: McpProgressPayload): void {
+    if (!Number.isFinite(payload.progress) || payload.progress < 0) {
+      debugLogger.log(`Invalid progress value: ${payload.progress}`);
+      return;
+    }
+    this.emit(CoreEvent.McpProgress, payload);
   }
 
   /**

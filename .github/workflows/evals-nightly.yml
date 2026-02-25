@@ -27,6 +27,7 @@ jobs:
       fail-fast: false
       matrix:
         model:
+          - 'gemini-3.1-pro-preview-customtools'
           - 'gemini-3-pro-preview'
           - 'gemini-3-flash-preview'
           - 'gemini-2.5-pro'

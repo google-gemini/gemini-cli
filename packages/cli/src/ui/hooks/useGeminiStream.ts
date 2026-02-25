@@ -34,6 +34,9 @@ import {
   coreEvents,
   CoreEvent,
   CoreToolCallStatus,
+  buildUserSteeringHintPrompt,
+  generateSteeringAckMessage,
+  getPlanModeExitMessage,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -55,6 +58,7 @@ import type {
   HistoryItemThinking,
   HistoryItemWithoutId,
   HistoryItemToolGroup,
+  HistoryItemInfo,
   IndividualToolCallDisplay,
   SlashCommandProcessorResult,
   HistoryItemModel,
@@ -191,6 +195,7 @@ export const useGeminiStream = (
   terminalWidth: number,
   terminalHeight: number,
   isShellFocused?: boolean,
+  consumeUserHint?: () => string | null,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const [retryStatus, setRetryStatus] = useState<RetryAttemptPayload | null>(
@@ -199,6 +204,9 @@ export const useGeminiStream = (
   const abortControllerRef = useRef<AbortController | null>(null);
   const turnCancelledRef = useRef(false);
   const activeQueryIdRef = useRef<string | null>(null);
+  const previousApprovalModeRef = useRef<ApprovalMode>(
+    config.getApprovalMode(),
+  );
   const [isResponding, setIsResponding] = useState<boolean>(false);
   const [thought, thoughtRef, setThought] =
     useStateAndRef<ThoughtSummary | null>(null);
@@ -819,16 +827,18 @@ export const useGeminiStream = (
         // broken up so that there are more "statically" rendered.
         const beforeText = newGeminiMessageBuffer.substring(0, splitPoint);
         const afterText = newGeminiMessageBuffer.substring(splitPoint);
-        addItem(
-          {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            type: pendingHistoryItemRef.current?.type as
-              | 'gemini'
-              | 'gemini_content',
-            text: beforeText,
-          },
-          userMessageTimestamp,
-        );
+        if (beforeText.length > 0) {
+          addItem(
+            {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              type: pendingHistoryItemRef.current?.type as
+                | 'gemini'
+                | 'gemini_content',
+              text: beforeText,
+            },
+            userMessageTimestamp,
+          );
+        }
         setPendingHistoryItem({ type: 'gemini_content', text: afterText });
         newGeminiMessageBuffer = afterText;
       }
@@ -961,6 +971,10 @@ export const useGeminiStream = (
           'Response stopped due to prohibited image content.',
         [FinishReason.NO_IMAGE]:
           'Response stopped because no image was generated.',
+        [FinishReason.IMAGE_RECITATION]:
+          'Response stopped due to image recitation policy.',
+        [FinishReason.IMAGE_OTHER]:
+          'Response stopped due to other image-related reasons.',
       };
 
       const message = finishReasonMessages[finishReason];
@@ -1425,6 +1439,34 @@ export const useGeminiStream = (
 
   const handleApprovalModeChange = useCallback(
     async (newApprovalMode: ApprovalMode) => {
+      if (
+        previousApprovalModeRef.current === ApprovalMode.PLAN &&
+        newApprovalMode !== ApprovalMode.PLAN &&
+        streamingState === StreamingState.Idle
+      ) {
+        if (geminiClient) {
+          try {
+            await geminiClient.addHistory({
+              role: 'user',
+              parts: [
+                {
+                  text: getPlanModeExitMessage(newApprovalMode, true),
+                },
+              ],
+            });
+          } catch (error) {
+            onDebugMessage(
+              `Failed to notify model of Plan Mode exit: ${getErrorMessage(error)}`,
+            );
+            addItem({
+              type: MessageType.ERROR,
+              text: 'Failed to update the model about exiting Plan Mode. The model might be out of sync. Please consider restarting the session if you see unexpected behavior.',
+            });
+          }
+        }
+      }
+      previousApprovalModeRef.current = newApprovalMode;
+
       // Auto-approve pending tool calls when switching to auto-approval modes
       if (
         newApprovalMode === ApprovalMode.YOLO ||
@@ -1463,7 +1505,7 @@ export const useGeminiStream = (
         }
       }
     },
-    [config, toolCalls],
+    [config, toolCalls, geminiClient, streamingState, addItem, onDebugMessage],
   );
 
   const handleCompletedTools = useCallback(
@@ -1602,6 +1644,29 @@ export const useGeminiStream = (
       const responsesToSend: Part[] = geminiTools.flatMap(
         (toolCall) => toolCall.response.responseParts,
       );
+
+      if (consumeUserHint) {
+        const userHint = consumeUserHint();
+        if (userHint && userHint.trim().length > 0) {
+          const hintText = userHint.trim();
+          responsesToSend.unshift({
+            text: buildUserSteeringHintPrompt(hintText),
+          });
+          void generateSteeringAckMessage(
+            config.getBaseLlmClient(),
+            hintText,
+          ).then((ackText) => {
+            addItem({
+              type: 'info',
+              icon: '· ',
+              color: theme.text.secondary,
+              marginBottom: 1,
+              text: ackText,
+            } as HistoryItemInfo);
+          });
+        }
+      }
+
       const callIdsToMarkAsSubmitted = geminiTools.map(
         (toolCall) => toolCall.request.callId,
       );
@@ -1634,6 +1699,8 @@ export const useGeminiStream = (
       modelSwitchedFromQuotaError,
       addItem,
       registerBackgroundShell,
+      consumeUserHint,
+      config,
     ],
   );
 

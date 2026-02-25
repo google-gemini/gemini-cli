@@ -11,20 +11,23 @@ import { LoopDetectionConfirmation } from './LoopDetectionConfirmation.js';
 describe('LoopDetectionConfirmation', () => {
   const onComplete = vi.fn();
 
-  it('renders correctly', () => {
-    const { lastFrame } = renderWithProviders(
+  it('renders correctly', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <LoopDetectionConfirmation onComplete={onComplete} />,
       { width: 101 },
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('contains the expected options', () => {
-    const { lastFrame } = renderWithProviders(
+  it('contains the expected options', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <LoopDetectionConfirmation onComplete={onComplete} />,
       { width: 100 },
     );
-    const output = lastFrame()!.toString();
+    await waitUntilReady();
+    const output = lastFrame();
 
     expect(output).toContain('A potential loop was detected');
     expect(output).toContain('Keep loop detection enabled (esc)');
@@ -32,5 +35,6 @@ describe('LoopDetectionConfirmation', () => {
     expect(output).toContain(
       'This can happen due to repetitive tool calls or other model behavior',
     );
+    unmount();
   });
 });
