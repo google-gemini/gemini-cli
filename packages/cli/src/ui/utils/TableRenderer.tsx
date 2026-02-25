@@ -6,6 +6,7 @@
 
 import React, { useMemo } from 'react';
 import { Text, Box } from 'ink';
+import type { StyledChar } from 'ink';
 import * as ink from 'ink';
 const {
   toStyledCharacters,
