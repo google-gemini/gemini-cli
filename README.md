@@ -284,8 +284,8 @@ gemini
   auth configuration.
 - [**Configuration Guide**](./docs/reference/configuration.md) - Settings and
   customization.
-- [**Keyboard Shortcuts**](./docs/reference/keyboard-shortcuts.md) - Productivity
-  tips.
+- [**Keyboard Shortcuts**](./docs/reference/keyboard-shortcuts.md) -
+  Productivity tips.
 
 ### Core Features
 
@@ -323,14 +323,15 @@ gemini
 - [**Enterprise Guide**](./docs/cli/enterprise.md) - Deploy and manage in a
   corporate environment.
 - [**Telemetry & Monitoring**](./docs/cli/telemetry.md) - Usage tracking.
-- [**Tools API Development**](./docs/reference/tools-api.md) - Create custom tools.
+- [**Tools API Development**](./docs/reference/tools-api.md) - Create custom
+  tools.
 - [**Local development**](./docs/local-development.md) - Local development
   tooling.
 
 ### Troubleshooting & Support
 
-- [**Troubleshooting Guide**](./docs/resources/troubleshooting.md) - Common issues and
-  solutions.
+- [**Troubleshooting Guide**](./docs/resources/troubleshooting.md) - Common
+  issues and solutions.
 - [**FAQ**](./docs/resources/faq.md) - Frequently asked questions.
 - Use `/bug` command to report issues directly from the CLI.
 
@@ -377,7 +378,8 @@ for planned features and priorities.
 
 ### Uninstall
 
-See the [Uninstall Guide](./docs/resources/uninstall.md) for removal instructions.
+See the [Uninstall Guide](./docs/resources/uninstall.md) for removal
+instructions.
 
 ## 📄 Legal
 
