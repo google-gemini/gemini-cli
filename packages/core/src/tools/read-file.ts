@@ -98,12 +98,22 @@ class ReadFileToolInvocation extends BaseToolInvocation<
       };
     }
 
+    const isDocxExtensionActive = this.config
+      .getExtensionLoader()
+      .getExtensions()
+      .some(
+        (e) =>
+          e.isActive &&
+          (e.id === 'usejunior/safe-docx' || e.name === 'safe-docx'),
+      );
+
     const result = await processSingleFileContent(
       this.resolvedPath,
       this.config.getTargetDir(),
       this.config.getFileSystemService(),
       this.params.start_line,
       this.params.end_line,
+      isDocxExtensionActive,
     );
 
     if (result.error) {

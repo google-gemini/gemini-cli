@@ -20,7 +20,7 @@ import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
- 
+
 import mime from 'mime/lite';
 
 import {
@@ -801,6 +801,25 @@ describe('fileUtils', () => {
       );
       expect(result.error).toContain('Simulated read error');
       expect(result.returnDisplay).toContain('Simulated read error');
+    });
+
+    it('should provide specific guidance when an active docx extension is detected', async () => {
+      const docxPath = path.join(tempRootDir, 'test.docx');
+      actualNodeFs.writeFileSync(docxPath, 'fake docx content');
+      const result = await processSingleFileContent(
+        docxPath,
+        tempRootDir,
+        new StandardFileSystemService(),
+        undefined,
+        undefined,
+        true, // isDocxExtensionActive
+      );
+      expect(result.llmContent).toContain(
+        "is currently installed and active. You should use the 'safe-docx' tools",
+      );
+      expect(result.returnDisplay).toBe(
+        `Detected Word document: test.docx. Support is provided via the active 'safe-docx' extension.`,
+      );
     });
 
     it('should provide guidance when encountering a .docx file', async () => {

@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import type { PartUnion } from '@google/genai';
- 
+
 import mime from 'mime/lite';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from '../tools/tool-error.js';
@@ -416,6 +416,7 @@ export async function processSingleFileContent(
   _fileSystemService: FileSystemService,
   startLine?: number,
   endLine?: number,
+  isDocxExtensionActive?: boolean,
 ): Promise<ProcessedFileReadResult> {
   try {
     if (!fs.existsSync(filePath)) {
@@ -462,13 +463,15 @@ export async function processSingleFileContent(
         };
       }
       case 'docx': {
-        // TODO: In the future, explicitly check if a .docx extension is active.
-        // For now, suggest installing the safe-docx extension as per #20298.
+        const sanitizedPath = relativePathForDisplay.replace(/"/g, '\\"');
+        if (isDocxExtensionActive) {
+          return {
+            llmContent: `The file "${sanitizedPath}" is a Word document (.docx). Support for reading this document is provided via the 'safe-docx' extension, which is currently installed and active. You should use the 'safe-docx' tools to read or edit this file.`,
+            returnDisplay: `Detected Word document: ${relativePathForDisplay}. Support is provided via the active 'safe-docx' extension.`,
+          };
+        }
         return {
-          llmContent: `The file "${relativePathForDisplay.replace(
-            /"/g,
-            '\\"',
-          )}" is a Word document (.docx). Support for reading this document is provided via the 'safe-docx' extension.`,
+          llmContent: `The file "${sanitizedPath}" is a Word document (.docx). Support for reading this document is provided via the 'safe-docx' extension.`,
           returnDisplay: `Detected Word document: ${relativePathForDisplay}. Support is provided via the 'safe-docx' extension.\nTo install it, run: gemini extensions install usejunior/safe-docx`,
         };
       }
