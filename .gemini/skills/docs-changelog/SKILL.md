@@ -77,7 +77,8 @@ detailed **highlights** section for the release-specific page.
         use the existing announcements in `docs/changelogs/index.md` and the
         example within
         `.gemini/skills/docs-changelog/references/index_template.md` as your
-        guide. This format includes PR links and authors.
+        guide. This format includes PR links and authors. Stick to 1 or 2 PR
+        links and authors.
     -   Add this new announcement to the top of `docs/changelogs/index.md`.
 
 2.  **Create Highlights and Update `latest.md`**:
@@ -161,5 +162,5 @@ instructions for the other section.
 
 ## Finalize
 
-- After making changes, run `npm run format` to ensure consistency.
+- After making changes, run `npm run format` ONLY to ensure consistency.
 - Delete any temporary files created during the process.
