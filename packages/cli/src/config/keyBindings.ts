@@ -70,6 +70,7 @@ export enum Command {
   SUBMIT = 'input.submit',
   NEWLINE = 'input.newline',
   OPEN_EXTERNAL_EDITOR = 'input.openExternalEditor',
+  OPEN_FILE_LOCATION = 'input.openFileLocation',
   PASTE_CLIPBOARD = 'input.paste',
 
   BACKGROUND_SHELL_ESCAPE = 'backgroundShellEscape',
@@ -267,6 +268,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 'j', ctrl: true },
   ],
   [Command.OPEN_EXTERNAL_EDITOR]: [{ key: 'x', ctrl: true }],
+  [Command.OPEN_FILE_LOCATION]: [{ key: 'o', alt: true }],
   [Command.PASTE_CLIPBOARD]: [
     { key: 'v', ctrl: true },
     { key: 'v', cmd: true },
@@ -392,6 +394,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.SUBMIT,
       Command.NEWLINE,
       Command.OPEN_EXTERNAL_EDITOR,
+      Command.OPEN_FILE_LOCATION,
       Command.PASTE_CLIPBOARD,
     ],
   },
@@ -496,6 +499,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.NEWLINE]: 'Insert a newline without submitting.',
   [Command.OPEN_EXTERNAL_EDITOR]:
     'Open the current prompt in an external editor.',
+  [Command.OPEN_FILE_LOCATION]: 'Open the directory containing the file.',
   [Command.PASTE_CLIPBOARD]: 'Paste from the clipboard.',
 
   // App Controls
