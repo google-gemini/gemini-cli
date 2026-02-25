@@ -23,7 +23,7 @@ Files to Modify
       Approves plan but requires confirmation for each tool
   3.  Type your feedback...
 
-Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel
+Enter to select · ↑/↓ to navigate · Ctrl+P to edit plan · Esc to cancel
 "
 `;
 
@@ -50,7 +50,7 @@ Files to Modify
       Approves plan but requires confirmation for each tool
   3.  Type your feedback...
 
-Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel
+Enter to select · ↑/↓ to navigate · Ctrl+P to edit plan · Esc to cancel
 "
 `;
 
@@ -82,7 +82,7 @@ Implementation Steps
       Approves plan but requires confirmation for each tool
   3.  Type your feedback...
 
-Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel
+Enter to select · ↑/↓ to navigate · Ctrl+P to edit plan · Esc to cancel
 "
 `;
 
@@ -109,7 +109,7 @@ Files to Modify
       Approves plan but requires confirmation for each tool
   3.  Type your feedback...
 
-Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel
+Enter to select · ↑/↓ to navigate · Ctrl+P to edit plan · Esc to cancel
 "
 `;
 
@@ -136,7 +136,7 @@ Files to Modify
       Approves plan but requires confirmation for each tool
   3.  Type your feedback...
 
-Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel
+Enter to select · ↑/↓ to navigate · Ctrl+P to edit plan · Esc to cancel
 "
 `;
 
@@ -163,7 +163,7 @@ Files to Modify
       Approves plan but requires confirmation for each tool
   3.  Type your feedback...
 
-Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel
+Enter to select · ↑/↓ to navigate · Ctrl+P to edit plan · Esc to cancel
 "
 `;
 
@@ -216,7 +216,7 @@ Testing Strategy
       Approves plan but requires confirmation for each tool
   3.  Type your feedback...
 
-Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel
+Enter to select · ↑/↓ to navigate · Ctrl+P to edit plan · Esc to cancel
 "
 `;
 
@@ -243,6 +243,6 @@ Files to Modify
       Approves plan but requires confirmation for each tool
   3.  Type your feedback...
 
-Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel
+Enter to select · ↑/↓ to navigate · Ctrl+P to edit plan · Esc to cancel
 "
 `;
