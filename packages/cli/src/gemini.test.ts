@@ -6,22 +6,25 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-  setupSignalHandlers,
-  setupTtyCheck,
   validateDnsResolutionOrder,
   getNodeMemoryArgs,
   setupUnhandledRejectionHandler,
 } from './gemini.js';
+import { setupSignalHandlers, setupTtyCheck } from './utils/cleanup.js';
 
-// Mock the cleanup module
+// Mock the cleanup module — must be before imports due to vi.mock hoisting
 const mockRunExitCleanup = vi.fn().mockResolvedValue(undefined);
-vi.mock('./utils/cleanup.js', () => ({
-  runExitCleanup: () => mockRunExitCleanup(),
-  registerCleanup: vi.fn(),
-  registerSyncCleanup: vi.fn(),
-  cleanupCheckpoints: vi.fn(),
-  registerTelemetryConfig: vi.fn(),
-}));
+vi.mock('./utils/cleanup.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('./utils/cleanup.js')>();
+  return {
+    ...original,
+    runExitCleanup: () => mockRunExitCleanup(),
+    registerCleanup: vi.fn(),
+    registerSyncCleanup: vi.fn(),
+    cleanupCheckpoints: vi.fn(),
+    registerTelemetryConfig: vi.fn(),
+  };
+});
 
 // Mock debugLogger
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -167,7 +170,9 @@ describe('gemini.tsx signal handling', () => {
     it('should exit when both stdin and stdout are not TTY', async () => {
       // Reset modules to get fresh isShuttingDown state
       vi.resetModules();
-      const { setupTtyCheck: freshSetupTtyCheck } = await import('./gemini.js');
+      const { setupTtyCheck: freshSetupTtyCheck } = await import(
+        './utils/cleanup.js'
+      );
 
       // Set both as non-TTY to simulate lost terminal
       Object.defineProperty(process.stdin, 'isTTY', {
