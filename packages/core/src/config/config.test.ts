@@ -938,6 +938,31 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('UseAlternateBuffer Configuration', () => {
+    it('should default useAlternateBuffer to false when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getUseAlternateBuffer()).toBe(false);
+    });
+
+    it('should set useAlternateBuffer to true when provided as true', () => {
+      const paramsWithAlternateBuffer: ConfigParameters = {
+        ...baseParams,
+        useAlternateBuffer: true,
+      };
+      const config = new Config(paramsWithAlternateBuffer);
+      expect(config.getUseAlternateBuffer()).toBe(true);
+    });
+
+    it('should set useAlternateBuffer to false when explicitly provided as false', () => {
+      const paramsWithAlternateBuffer: ConfigParameters = {
+        ...baseParams,
+        useAlternateBuffer: false,
+      };
+      const config = new Config(paramsWithAlternateBuffer);
+      expect(config.getUseAlternateBuffer()).toBe(false);
+    });
+  });
+
   describe('UseWriteTodos Configuration', () => {
     it('should default useWriteTodos to true when not provided', () => {
       const config = new Config(baseParams);
