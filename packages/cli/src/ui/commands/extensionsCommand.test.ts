@@ -44,6 +44,7 @@ import {
 import { SettingScope } from '../../config/settings.js';
 import { stat } from 'node:fs/promises';
 import { type RegistryExtension } from '../../config/extensionRegistryClient.js';
+import { waitFor } from '../../test-utils/async.js';
 
 vi.mock('../../config/extension-manager.js', async (importOriginal) => {
   const actual =
@@ -476,10 +477,12 @@ describe('extensionsCommand', () => {
       // Call onSelect
       component.props.onSelect?.(extension);
 
-      expect(inferInstallMetadata).toHaveBeenCalledWith(extension.url);
-      expect(mockInstallExtension).toHaveBeenCalledWith({
-        source: extension.url,
-        type: 'git',
+      await waitFor(() => {
+        expect(inferInstallMetadata).toHaveBeenCalledWith(extension.url);
+        expect(mockInstallExtension).toHaveBeenCalledWith({
+          source: extension.url,
+          type: 'git',
+        });
       });
       expect(mockContext.ui.removeComponent).toHaveBeenCalledTimes(1);
 
