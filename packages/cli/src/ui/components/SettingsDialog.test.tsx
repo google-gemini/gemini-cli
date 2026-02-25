@@ -263,16 +263,11 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { lastFrame, waitUntilReady, unmount } = renderDialog(
-        settings,
-        onSelect,
-      );
-      await waitUntilReady();
+      const renderResult = renderDialog(settings, onSelect);
+      await renderResult.waitUntilReady();
 
-      const output = lastFrame();
-      // Use snapshot to capture visual layout including indicators
-      expect(output).toMatchSnapshot();
-      unmount();
+      await expect(renderResult).toMatchSvgSnapshot();
+      renderResult.unmount();
     });
 
     it('should use almost full height of the window but no more when the window height is 25 rows', async () => {
@@ -1830,18 +1825,15 @@ describe('SettingsDialog', () => {
         });
         const onSelect = vi.fn();
 
-        const { lastFrame, stdin, waitUntilReady, unmount } = renderDialog(
-          settings,
-          onSelect,
-        );
-        await waitUntilReady();
+        const renderResult = renderDialog(settings, onSelect);
+        await renderResult.waitUntilReady();
 
         if (stdinActions) {
-          await stdinActions(stdin, waitUntilReady);
+          await stdinActions(renderResult.stdin, renderResult.waitUntilReady);
         }
 
-        expect(lastFrame()).toMatchSnapshot();
-        unmount();
+        await expect(renderResult).toMatchSvgSnapshot();
+        renderResult.unmount();
       },
     );
   });

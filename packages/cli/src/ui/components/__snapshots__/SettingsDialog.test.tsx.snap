@@ -43,8 +43,7 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings enabled' correctly 1`] = `
@@ -90,8 +89,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings disabled' correctly 1`] = `
@@ -137,8 +135,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'default state' correctly 1`] = `
@@ -184,8 +181,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'file filtering settings configured' correctly 1`] = `
@@ -231,8 +227,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selector' correctly 1`] = `
@@ -278,8 +273,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and number settings' correctly 1`] = `
@@ -325,8 +319,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'tools and security settings' correctly 1`] = `
@@ -372,8 +365,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settings enabled' correctly 1`] = `
@@ -419,6 +411,5 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;

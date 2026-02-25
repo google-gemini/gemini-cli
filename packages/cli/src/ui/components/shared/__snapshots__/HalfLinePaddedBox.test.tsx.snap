@@ -2,7 +2,7 @@
 
 exports[`<HalfLinePaddedBox /> > renders iTerm2-specific blocks when iTerm2 is detected 1`] = `
 "▄▄▄▄▄▄▄▄▄▄
-Content
+Content   
 ▀▀▀▀▀▀▀▀▀▀
 "
 `;
@@ -19,7 +19,7 @@ exports[`<HalfLinePaddedBox /> > renders nothing when useBackgroundColor is fals
 
 exports[`<HalfLinePaddedBox /> > renders standard background and blocks when not iTerm2 1`] = `
 "▀▀▀▀▀▀▀▀▀▀
-Content
+Content   
 ▄▄▄▄▄▄▄▄▄▄
 "
 `;

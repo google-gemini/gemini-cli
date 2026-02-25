@@ -2,14 +2,14 @@
 
 exports[`AlternateBufferQuittingDisplay > renders with a tool awaiting confirmation > with_confirming_tool 1`] = `
 "
- ███         █████████
+ ███         █████████ 
 ░░░███      ███░░░░░███
-  ░░░███   ███     ░░░
-    ░░░███░███
+  ░░░███   ███     ░░░ 
+    ░░░███░███         
      ███░ ░███    █████
-   ███░   ░░███  ░░███
- ███░      ░░█████████
-░░░         ░░░░░░░░░
+   ███░   ░░███  ░░███ 
+ ███░      ░░█████████ 
+░░░         ░░░░░░░░░  
 
 Tips for getting started:
 1. Ask questions, edit files, or run commands.
@@ -25,14 +25,14 @@ Action Required (was prompted):
 
 exports[`AlternateBufferQuittingDisplay > renders with active and pending tool messages > with_history_and_pending 1`] = `
 "
- ███         █████████
+ ███         █████████ 
 ░░░███      ███░░░░░███
-  ░░░███   ███     ░░░
-    ░░░███░███
+  ░░░███   ███     ░░░ 
+    ░░░███░███         
      ███░ ░███    █████
-   ███░   ░░███  ░░███
- ███░      ░░█████████
-░░░         ░░░░░░░░░
+   ███░   ░░███  ░░███ 
+ ███░      ░░█████████ 
+░░░         ░░░░░░░░░  
 
 Tips for getting started:
 1. Ask questions, edit files, or run commands.
@@ -52,14 +52,14 @@ Tips for getting started:
 
 exports[`AlternateBufferQuittingDisplay > renders with empty history and no pending items > empty 1`] = `
 "
- ███         █████████
+ ███         █████████ 
 ░░░███      ███░░░░░███
-  ░░░███   ███     ░░░
-    ░░░███░███
+  ░░░███   ███     ░░░ 
+    ░░░███░███         
      ███░ ░███    █████
-   ███░   ░░███  ░░███
- ███░      ░░█████████
-░░░         ░░░░░░░░░
+   ███░   ░░███  ░░███ 
+ ███░      ░░█████████ 
+░░░         ░░░░░░░░░  
 
 Tips for getting started:
 1. Ask questions, edit files, or run commands.
@@ -71,14 +71,14 @@ Tips for getting started:
 
 exports[`AlternateBufferQuittingDisplay > renders with history but no pending items > with_history_no_pending 1`] = `
 "
- ███         █████████
+ ███         █████████ 
 ░░░███      ███░░░░░███
-  ░░░███   ███     ░░░
-    ░░░███░███
+  ░░░███   ███     ░░░ 
+    ░░░███░███         
      ███░ ░███    █████
-   ███░   ░░███  ░░███
- ███░      ░░█████████
-░░░         ░░░░░░░░░
+   ███░   ░░███  ░░███ 
+ ███░      ░░█████████ 
+░░░         ░░░░░░░░░  
 
 Tips for getting started:
 1. Ask questions, edit files, or run commands.
@@ -98,14 +98,14 @@ Tips for getting started:
 
 exports[`AlternateBufferQuittingDisplay > renders with pending items but no history > with_pending_no_history 1`] = `
 "
- ███         █████████
+ ███         █████████ 
 ░░░███      ███░░░░░███
-  ░░░███   ███     ░░░
-    ░░░███░███
+  ░░░███   ███     ░░░ 
+    ░░░███░███         
      ███░ ░███    █████
-   ███░   ░░███  ░░███
- ███░      ░░█████████
-░░░         ░░░░░░░░░
+   ███░   ░░███  ░░███ 
+ ███░      ░░█████████ 
+░░░         ░░░░░░░░░  
 
 Tips for getting started:
 1. Ask questions, edit files, or run commands.
@@ -117,14 +117,14 @@ Tips for getting started:
 
 exports[`AlternateBufferQuittingDisplay > renders with user and gemini messages > with_user_gemini_messages 1`] = `
 "
- ███         █████████
+ ███         █████████ 
 ░░░███      ███░░░░░███
-  ░░░███   ███     ░░░
-    ░░░███░███
+  ░░░███   ███     ░░░ 
+    ░░░███░███         
      ███░ ░███    █████
-   ███░   ░░███  ░░███
- ███░      ░░█████████
-░░░         ░░░░░░░░░
+   ███░   ░░███  ░░███ 
+ ███░      ░░█████████ 
+░░░         ░░░░░░░░░  
 
 Tips for getting started:
 1. Ask questions, edit files, or run commands.
@@ -132,7 +132,7 @@ Tips for getting started:
 3. Create GEMINI.md files to customize your interactions with Gemini.
 4. /help for more information.
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > Hello Gemini
+ > Hello Gemini                                                                 
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
 ✦  Hello User!
 "

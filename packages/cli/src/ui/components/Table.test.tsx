@@ -19,10 +19,8 @@ describe('Table', () => {
       { id: 2, name: 'Bob' },
     ];
 
-    const { lastFrame, waitUntilReady } = render(
-      <Table columns={columns} data={data} />,
-      100,
-    );
+    const renderResult = render(<Table columns={columns} data={data} />, 100);
+    const { lastFrame, waitUntilReady } = renderResult;
     await waitUntilReady?.();
     const output = lastFrame();
 
@@ -32,7 +30,7 @@ describe('Table', () => {
     expect(output).toContain('Alice');
     expect(output).toContain('2');
     expect(output).toContain('Bob');
-    expect(lastFrame()).toMatchSnapshot();
+    await expect(renderResult).toMatchSvgSnapshot();
   });
 
   it('should support custom cell rendering', async () => {
@@ -48,15 +46,13 @@ describe('Table', () => {
     ];
     const data = [{ value: 10 }];
 
-    const { lastFrame, waitUntilReady } = render(
-      <Table columns={columns} data={data} />,
-      100,
-    );
+    const renderResult = render(<Table columns={columns} data={data} />, 100);
+    const { lastFrame, waitUntilReady } = renderResult;
     await waitUntilReady?.();
     const output = lastFrame();
 
     expect(output).toContain('20');
-    expect(lastFrame()).toMatchSnapshot();
+    await expect(renderResult).toMatchSvgSnapshot();
   });
 
   it('should handle undefined values gracefully', async () => {
@@ -69,5 +65,27 @@ describe('Table', () => {
     await waitUntilReady?.();
     const output = lastFrame();
     expect(output).toContain('undefined');
+  });
+
+  it('should support inverse text rendering', async () => {
+    const columns = [
+      {
+        key: 'status',
+        header: 'Status',
+        flexGrow: 1,
+        renderCell: (item: { status: string }) => (
+          <Text inverse>{item.status}</Text>
+        ),
+      },
+    ];
+    const data = [{ status: 'Active' }];
+
+    const renderResult = render(<Table columns={columns} data={data} />, 100);
+    const { lastFrame, waitUntilReady } = renderResult;
+    await waitUntilReady?.();
+    const output = lastFrame();
+
+    expect(output).toContain('Active');
+    await expect(renderResult).toMatchSvgSnapshot();
   });
 });

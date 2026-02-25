@@ -12,7 +12,7 @@ import {
   type McpClient,
   MCPServerStatus,
 } from '@google/gemini-cli-core';
-import { GeminiSpinner } from './GeminiRespondingSpinner.js';
+import { GeminiSpinner } from './GeminiSpinner.js';
 import { theme } from '../semantic-colors.js';
 
 export const ConfigInitDisplay = ({

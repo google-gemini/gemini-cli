@@ -337,7 +337,7 @@ describe('usePhraseCycler', () => {
     await act(async () => {
       setStateExternally?.({
         isActive: true,
-        customPhrases: [],
+        customPhrases: [] as string[],
       });
     });
     await waitUntilReady();
