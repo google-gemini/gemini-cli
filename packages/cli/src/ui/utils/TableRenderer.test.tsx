@@ -366,4 +366,78 @@ describe('TableRenderer', () => {
     });
     expect(output).toMatchSnapshot();
   });
+
+  it('aligns rows when cells contain backtick-wrapped inline code', async () => {
+    const headers = ['Command', 'Description'];
+    const rows = [
+      ['`/help`', 'Show available commands'],
+      ['`/about`', 'Show version, model, and system info'],
+      ['`/quit`', 'Exit the CLI'],
+      ['help', 'Show help information'],
+    ];
+    const terminalWidth = 80;
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <TableRenderer
+        headers={headers}
+        rows={rows}
+        terminalWidth={terminalWidth}
+      />,
+    );
+    await waitUntilReady();
+
+    const output = lastFrame();
+    const lines = output
+      .split(String.fromCharCode(10))
+      .filter((l) => l.length > 0);
+
+    // eslint-disable-next-line no-control-regex
+    const stripAnsi = (s: string) => s.replace(/\x1B\[[0-9;]*m/g, '');
+
+    const widths = lines.map((l) => stripAnsi(l).length);
+    const maxWidth = Math.max(...widths);
+
+    // Every line in the table must have the same visual width.
+    // Regression: backticks were counted in width measurement but stripped
+    // by RenderInline, causing rows with inline code to be too narrow.
+    for (let i = 0; i < lines.length; i++) {
+      expect(widths[i]).toBe(maxWidth);
+    }
+    unmount();
+  });
+
+  it('aligns rows when cells contain bold and mixed inline markdown', async () => {
+    const headers = ['Name', 'Status'];
+    const rows = [
+      ['**Important**', 'Active'],
+      ['Normal', '~~Deprecated~~'],
+      ['`code`', '**Bold** and `code`'],
+    ];
+    const terminalWidth = 60;
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <TableRenderer
+        headers={headers}
+        rows={rows}
+        terminalWidth={terminalWidth}
+      />,
+    );
+    await waitUntilReady();
+
+    const output = lastFrame();
+    const lines = output
+      .split(String.fromCharCode(10))
+      .filter((l) => l.length > 0);
+
+    // eslint-disable-next-line no-control-regex
+    const stripAnsi = (s: string) => s.replace(/\x1B\[[0-9;]*m/g, '');
+
+    const widths = lines.map((l) => stripAnsi(l).length);
+    const maxWidth = Math.max(...widths);
+
+    for (let i = 0; i < lines.length; i++) {
+      expect(widths[i]).toBe(maxWidth);
+    }
+    unmount();
+  });
 });

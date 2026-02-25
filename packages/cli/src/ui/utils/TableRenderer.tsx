@@ -16,7 +16,7 @@ import {
   widestLineFromStyledChars,
 } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { RenderInline } from './InlineMarkdownRenderer.js';
+import { RenderInline, stripInlineMarkdown } from './InlineMarkdownRenderer.js';
 
 interface TableRendererProps {
   headers: string[];
@@ -197,8 +197,11 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     isHeader = false,
   ): React.ReactNode => {
     const contentWidth = Math.max(0, width - COLUMN_PADDING);
-    // Use pre-calculated width to avoid re-parsing
-    const displayWidth = content.width;
+    // Measure the text as RenderInline will display it (with markdown
+    // markers stripped) so that padding compensates for removed characters.
+    const displayWidth = styledCharsWidth(
+      toStyledCharacters(stripInlineMarkdown(content.text)),
+    );
     const paddingNeeded = Math.max(0, contentWidth - displayWidth);
 
     return (
