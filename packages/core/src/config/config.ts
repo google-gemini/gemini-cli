@@ -1885,11 +1885,9 @@ export class Config {
 
     this.policyEngine.setApprovalMode(mode);
 
-    const isExitingPlanMode =
-      currentMode === ApprovalMode.PLAN && mode !== ApprovalMode.PLAN;
-    const isEnteringPlanMode =
-      currentMode !== ApprovalMode.PLAN && mode === ApprovalMode.PLAN;
-    const isPlanModeTransition = isExitingPlanMode || isEnteringPlanMode;
+    const isPlanModeTransition =
+      currentMode !== mode &&
+      (currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN);
     const isYoloModeTransition =
       currentMode !== mode &&
       (currentMode === ApprovalMode.YOLO || mode === ApprovalMode.YOLO);

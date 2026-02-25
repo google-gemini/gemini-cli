@@ -5,12 +5,12 @@
  */
 
 import { describe, expect } from 'vitest';
+import { ApprovalMode } from '@google/gemini-cli-core';
 import { evalTest } from './test-helper.js';
 import {
   assertModelHasOutput,
   checkModelOutputContent,
 } from './test-helper.js';
-import { ApprovalMode } from '@google/gemini-cli-core';
 
 describe('plan_mode', () => {
   const TEST_PREFIX = 'Plan Mode: ';

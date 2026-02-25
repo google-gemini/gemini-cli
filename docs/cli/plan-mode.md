@@ -80,19 +80,40 @@ manually during a session.
 
 ### Planning Workflow
 
-The planning workflow adapts its depth based on a `level` parameter (`minimal`,
-`standard`, `thorough`) passed to [`enter_plan_mode`]. The model selects the
-appropriate level automatically, or you can request one explicitly (e.g., "plan
-a thorough redesign of the auth system"). The default is **standard**.
+Plan Mode uses an adaptive planning workflow where the depth and structure of
+the implementation plan are proportional to the task's complexity.
 
-| Level        | Use case                                         | Plan sections                                                                                                                                | Workflow                                                                     |
-| ------------ | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| **Minimal**  | Small, targeted changes (1–3 files, clear scope) | Changes, Verification                                                                                                                        | Explore, Draft, Approval                                                     |
-| **Standard** | Typical features or moderate refactoring         | Objective, Implementation Plan, Verification                                                                                                 | Explore & Analyze, Consult, Draft, Review & Approval                         |
-| **Thorough** | Architectural or cross-cutting changes           | Background & Motivation, Scope & Impact, Proposed Solution, Alternatives Considered, Implementation Plan, Verification, Migration & Rollback | Deep Exploration, Alternatives Considered, Consult, Draft, Review & Approval |
+#### 1. Assessment & Discovery
 
-If during exploration the model discovers the task is more complex than
-initially assessed, it escalates the plan depth and informs you.
+Gemini CLI analyzes your requirements and explores the codebase to map affected
+modules, trace data flow, and identify dependencies.
+
+#### 2. Consultation
+
+For non-trivial changes or when multiple viable approaches exist, Gemini CLI
+will present a summary of the alternatives (including pros/cons and
+recommendations) and wait for your decision before drafting the detailed plan.
+
+#### 3. Drafting the Plan
+
+Gemini CLI writes the implementation plan to your
+[plans directory](#custom-plan-directory-and-policies). The plan's structure
+adapts to the task:
+
+- **Simple Tasks:** Focused on a list of specific **Changes** and
+  **Verification** steps.
+- **Standard Features:** Includes an **Objective**, a detailed **Implementation
+  Plan**, and **Verification**.
+- **Architectural Changes:** Comprehensive plans including **Background &
+  Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives
+  Considered**, and **Migration & Rollback** strategies.
+
+#### 4. Review & Approval
+
+Once the plan is drafted, Gemini CLI presents a summary and calls
+[`exit_plan_mode`] to request your approval. If you discover the task is more
+complex than initially assessed during any phase, Gemini CLI will automatically
+increase the depth of its planning.
 
 For more complex or specialized planning tasks, you can
 [customize the planning workflow with skills](#customizing-planning-with-skills).
