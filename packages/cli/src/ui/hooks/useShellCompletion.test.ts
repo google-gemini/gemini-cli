@@ -384,6 +384,10 @@ describe('useShellCompletion utilities', () => {
       // Very basic sanity check: common commands should be found
       if (process.platform !== 'win32') {
         expect(results).toContain('ls');
+      } else {
+        expect(results).toContain('dir');
+        expect(results).toContain('cls');
+        expect(results).toContain('copy');
       }
     });
 
