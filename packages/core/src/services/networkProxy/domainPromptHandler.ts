@@ -102,11 +102,11 @@ export function createConsoleDomainPrompt(): DomainPromptCallback {
     const safe = sanitizeHostname(hostname);
     return new Promise<DomainFilterAction>((resolve) => {
       rl.question(
-        `\nNetwork proxy: "${safe}" wants to connect. Allow? [y/N] `,
+        `\nNetwork proxy: "${safe}" wants to connect. Allow? [Y/n] `,
         (answer) => {
           rl.close();
           const normalized = answer.trim().toLowerCase();
-          if (normalized === 'y' || normalized === 'yes') {
+          if (normalized === 'y' || normalized === '') {
             resolve(DomainFilterAction.ALLOW);
           } else {
             resolve(DomainFilterAction.DENY);

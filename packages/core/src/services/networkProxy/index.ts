@@ -5,6 +5,8 @@
  */
 
 export { NetworkProxyManager } from './networkProxyManager.js';
+export { BaseProxy } from './baseProxy.js';
+export type { BaseProxyOptions } from './baseProxy.js';
 export { HttpProxy } from './httpProxy.js';
 export { SocksProxy } from './socksProxy.js';
 export { TrafficLogger } from './trafficLogger.js';

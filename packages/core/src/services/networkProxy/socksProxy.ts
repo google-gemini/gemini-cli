@@ -5,10 +5,9 @@
  */
 
 import * as net from 'node:net';
-import { EventEmitter } from 'node:events';
-import { checkDomain } from './domainMatcher.js';
 import type { DomainRule, ProxyConnectionRecord } from './types.js';
 import { DomainFilterAction } from './types.js';
+import { BaseProxy } from './baseProxy.js';
 
 // SOCKS5 protocol constants
 const SOCKS_VERSION = 0x05;
@@ -87,19 +86,12 @@ export interface SocksProxyOptions {
  * - 'domainCheck': Emitted when a domain needs user prompting.
  * - 'error': Emitted on server-level errors.
  */
-export class SocksProxy extends EventEmitter {
+export class SocksProxy extends BaseProxy {
   private server: net.Server | null = null;
   private boundPort: number = 0;
-  private rules: DomainRule[];
-  private defaultAction: DomainFilterAction;
-  private connectionCount = 0;
-  private deniedCount = 0;
-  private sessionDecisions = new Map<string, DomainFilterAction>();
 
   constructor(private readonly options: SocksProxyOptions) {
-    super();
-    this.rules = options.rules;
-    this.defaultAction = options.defaultAction;
+    super(options);
   }
 
   async start(): Promise<number> {
@@ -139,26 +131,6 @@ export class SocksProxy extends EventEmitter {
 
   getPort(): number {
     return this.boundPort;
-  }
-
-  getConnectionCount(): number {
-    return this.connectionCount;
-  }
-
-  getDeniedCount(): number {
-    return this.deniedCount;
-  }
-
-  updateRules(rules: DomainRule[]): void {
-    this.rules = rules;
-  }
-
-  updateDefaultAction(action: DomainFilterAction): void {
-    this.defaultAction = action;
-  }
-
-  recordSessionDecision(domain: string, action: DomainFilterAction): void {
-    this.sessionDecisions.set(domain.toLowerCase(), action);
   }
 
   /**
@@ -343,29 +315,5 @@ export class SocksProxy extends EventEmitter {
     response.writeUInt16BE(0, 8);
 
     socket.write(response);
-  }
-
-  private async resolveAction(hostname: string): Promise<DomainFilterAction> {
-    const sessionAction = this.sessionDecisions.get(hostname.toLowerCase());
-    if (sessionAction !== undefined) {
-      return sessionAction;
-    }
-
-    const result = checkDomain(hostname, this.rules, this.defaultAction);
-
-    if (result.action !== DomainFilterAction.PROMPT) {
-      return result.action;
-    }
-
-    return new Promise<DomainFilterAction>((resolve) => {
-      const hasListeners = this.emit('domainCheck', hostname, (decision: DomainFilterAction) => {
-        this.sessionDecisions.set(hostname.toLowerCase(), decision);
-        resolve(decision);
-      });
-
-      if (!hasListeners) {
-        resolve(DomainFilterAction.DENY);
-      }
-    });
   }
 }

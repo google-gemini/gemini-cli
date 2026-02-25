@@ -7,14 +7,13 @@
 import * as http from 'node:http';
 import * as net from 'node:net';
 import type { Duplex } from 'node:stream';
-import { EventEmitter } from 'node:events';
-import { checkDomain, extractHostname, extractPort } from './domainMatcher.js';
+import { extractHostname, extractPort } from './domainMatcher.js';
 import type {
   DomainRule,
-  DomainCheckResult,
   ProxyConnectionRecord,
 } from './types.js';
 import { DomainFilterAction } from './types.js';
+import { BaseProxy } from './baseProxy.js';
 
 export interface HttpProxyOptions {
   port: number;
@@ -31,21 +30,12 @@ export interface HttpProxyOptions {
  *                  Listener should resolve/reject the provided promise callbacks.
  * - 'error': Fired on server-level errors.
  */
-export class HttpProxy extends EventEmitter {
+export class HttpProxy extends BaseProxy {
   private server: http.Server | null = null;
   private boundPort: number = 0;
-  private rules: DomainRule[];
-  private defaultAction: DomainFilterAction;
-  private connectionCount = 0;
-  private deniedCount = 0;
-
-  // Tracks domains that the user has approved/denied during this session
-  private sessionDecisions = new Map<string, DomainFilterAction>();
 
   constructor(private readonly options: HttpProxyOptions) {
-    super();
-    this.rules = options.rules;
-    this.defaultAction = options.defaultAction;
+    super(options);
   }
 
   /**
@@ -97,29 +87,6 @@ export class HttpProxy extends EventEmitter {
 
   getPort(): number {
     return this.boundPort;
-  }
-
-  getConnectionCount(): number {
-    return this.connectionCount;
-  }
-
-  getDeniedCount(): number {
-    return this.deniedCount;
-  }
-
-  updateRules(rules: DomainRule[]): void {
-    this.rules = rules;
-  }
-
-  updateDefaultAction(action: DomainFilterAction): void {
-    this.defaultAction = action;
-  }
-
-  /**
-   * Records a user's session-level decision for a domain so we don't prompt again.
-   */
-  recordSessionDecision(domain: string, action: DomainFilterAction): void {
-    this.sessionDecisions.set(domain.toLowerCase(), action);
   }
 
   /**
@@ -252,43 +219,5 @@ export class HttpProxy extends EventEmitter {
     });
 
     clientReq.pipe(proxyReq, { end: true });
-  }
-
-  /**
-   * Resolves the filtering action for a given hostname.
-   * Checks session-level decisions first, then rules, then default.
-   * If the resolved action is PROMPT, emits 'domainCheck' and waits
-   * for a response.
-   */
-  private async resolveAction(hostname: string): Promise<DomainFilterAction> {
-    // Check session-level overrides first
-    const sessionAction = this.sessionDecisions.get(hostname.toLowerCase());
-    if (sessionAction !== undefined) {
-      return sessionAction;
-    }
-
-    const result: DomainCheckResult = checkDomain(
-      hostname,
-      this.rules,
-      this.defaultAction,
-    );
-
-    if (result.action !== DomainFilterAction.PROMPT) {
-      return result.action;
-    }
-
-    // Need to prompt - emit event and wait for response
-    return new Promise<DomainFilterAction>((resolve) => {
-      const hasListeners = this.emit('domainCheck', hostname, (decision: DomainFilterAction) => {
-        // Save session decision so we don't prompt again
-        this.sessionDecisions.set(hostname.toLowerCase(), decision);
-        resolve(decision);
-      });
-
-      // If nobody is listening for prompts, deny by default for safety
-      if (!hasListeners) {
-        resolve(DomainFilterAction.DENY);
-      }
-    });
   }
 }
