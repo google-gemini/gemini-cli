@@ -14,6 +14,7 @@ import type {
   UserFeedbackPayload,
 } from '@google/gemini-cli-core';
 import {
+  AuthType,
   ToolErrorType,
   GeminiEventType,
   OutputFormat,
@@ -787,7 +788,7 @@ describe('runNonInteractive', () => {
     vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
     vi.mocked(mockConfig.getDebugMode).mockReturnValue(true);
     vi.mocked(mockConfig.getContentGeneratorConfig).mockReturnValue({
-      authType: 'gemini-api-key',
+      authType: AuthType.USE_GEMINI,
     });
     vi.mocked(mockConfig.getUserTierName).mockReturnValue('free');
     vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(debugMetrics);
@@ -1811,7 +1812,7 @@ describe('runNonInteractive', () => {
     );
     vi.mocked(mockConfig.getDebugMode).mockReturnValue(true);
     vi.mocked(mockConfig.getContentGeneratorConfig).mockReturnValue({
-      authType: 'oauth-personal',
+      authType: AuthType.LOGIN_WITH_GOOGLE,
     });
     vi.mocked(mockConfig.getUserTierName).mockReturnValue('pro');
     vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
