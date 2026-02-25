@@ -75,10 +75,7 @@ export class StreamJsonFormatter {
       }
       stats.api_requests = apiRequests;
       stats.api_errors = apiErrors;
-
-      if (options.retryCount && options.retryCount > 0) {
-        stats.retry_count = options.retryCount;
-      }
+      stats.retry_count = options.retryCount ?? 0;
     }
 
     return stats;

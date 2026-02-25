@@ -96,6 +96,8 @@ export async function runNonInteractive({
 
     const startTime = Date.now();
     let retryCount = 0;
+    let loopDetected = false;
+    let detectedLoopType: string | undefined;
     const debugMode = config.getDebugMode();
     const streamFormatter =
       config.getOutputFormat() === OutputFormat.STREAM_JSON
@@ -377,13 +379,25 @@ export async function runNonInteractive({
             }
             toolCallRequests.push(event.value);
           } else if (event.type === GeminiEventType.LoopDetected) {
+            const loopType = event.value?.loopType;
+            loopDetected = true;
+            if (loopType) {
+              detectedLoopType = loopType;
+            }
+
             if (debugMode) {
-              const loopType = event.value?.loopType;
               if (streamFormatter) {
                 streamFormatter.emitEvent({
                   type: JsonStreamEventType.LOOP_DETECTED,
                   timestamp: new Date().toISOString(),
                   ...(loopType && { loop_type: loopType }),
+                });
+                // Keep emitting the legacy warning event for existing parsers.
+                streamFormatter.emitEvent({
+                  type: JsonStreamEventType.ERROR,
+                  timestamp: new Date().toISOString(),
+                  severity: 'warning',
+                  message: 'Loop detected, stopping execution',
                 });
               } else if (config.getOutputFormat() === OutputFormat.TEXT) {
                 const loopTypeStr = loopType ? ` (${loopType})` : '';
@@ -540,6 +554,12 @@ export async function runNonInteractive({
                   undefined,
                   authMethod,
                   userTier,
+                  {
+                    includeDiagnostics: debugMode,
+                    retryCount,
+                    loopDetected,
+                    loopType: detectedLoopType,
+                  },
                 ),
               );
             } else {
@@ -574,6 +594,12 @@ export async function runNonInteractive({
                 undefined,
                 authMethod,
                 userTier,
+                {
+                  includeDiagnostics: debugMode,
+                  retryCount,
+                  loopDetected,
+                  loopType: detectedLoopType,
+                },
               ),
             );
           } else {

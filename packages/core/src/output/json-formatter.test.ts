@@ -41,6 +41,25 @@ describe('JsonFormatter', () => {
     expect(parsed.response).toBe('Red text and Green text');
   });
 
+  it('should include auth method and user tier when provided', () => {
+    const formatter = new JsonFormatter();
+    const formatted = formatter.format(
+      'test-session-id',
+      'hello',
+      undefined,
+      undefined,
+      'gemini-api-key',
+      'free',
+    );
+
+    expect(JSON.parse(formatted)).toEqual({
+      session_id: 'test-session-id',
+      auth_method: 'gemini-api-key',
+      user_tier: 'free',
+      response: 'hello',
+    });
+  });
+
   it('should strip control characters from response text', () => {
     const formatter = new JsonFormatter();
     const responseWithControlChars =
@@ -136,6 +155,87 @@ describe('JsonFormatter', () => {
       stats,
     };
     expect(JSON.parse(formatted)).toEqual(expected);
+  });
+
+  it('should include debug diagnostic stats when enabled', () => {
+    const formatter = new JsonFormatter();
+    const stats: SessionMetrics = {
+      models: {
+        'gemini-2.5-pro': {
+          api: {
+            totalRequests: 2,
+            totalErrors: 1,
+            totalLatencyMs: 1234,
+          },
+          tokens: {
+            input: 10,
+            prompt: 10,
+            candidates: 5,
+            total: 15,
+            cached: 0,
+            thoughts: 0,
+            tool: 0,
+          },
+          roles: {},
+        },
+        'gemini-2.5-flash': {
+          api: {
+            totalRequests: 3,
+            totalErrors: 0,
+            totalLatencyMs: 2345,
+          },
+          tokens: {
+            input: 10,
+            prompt: 10,
+            candidates: 5,
+            total: 15,
+            cached: 0,
+            thoughts: 0,
+            tool: 0,
+          },
+          roles: {},
+        },
+      },
+      tools: {
+        totalCalls: 0,
+        totalSuccess: 0,
+        totalFail: 0,
+        totalDurationMs: 0,
+        totalDecisions: {
+          accept: 0,
+          reject: 0,
+          modify: 0,
+          auto_accept: 0,
+        },
+        byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
+      },
+    };
+
+    const formatted = formatter.format(
+      'test-session-id',
+      'hello',
+      stats,
+      undefined,
+      'oauth-personal',
+      'pro',
+      {
+        includeDiagnostics: true,
+        retryCount: 0,
+        loopDetected: true,
+        loopType: 'llm_detected_loop',
+      },
+    );
+
+    const parsed = JSON.parse(formatted);
+    expect(parsed.stats.api_requests).toBe(5);
+    expect(parsed.stats.api_errors).toBe(1);
+    expect(parsed.stats.retry_count).toBe(0);
+    expect(parsed.stats.loop_detected).toBe(true);
+    expect(parsed.stats.loop_type).toBe('llm_detected_loop');
   });
 
   it('should format error as JSON', () => {

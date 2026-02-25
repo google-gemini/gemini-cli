@@ -18,12 +18,20 @@ export interface JsonError {
   code?: string | number;
 }
 
+export interface JsonOutputStats extends SessionMetrics {
+  api_requests?: number;
+  api_errors?: number;
+  retry_count?: number;
+  loop_detected?: boolean;
+  loop_type?: string;
+}
+
 export interface JsonOutput {
   session_id?: string;
   auth_method?: string;
   user_tier?: string;
   response?: string;
-  stats?: SessionMetrics;
+  stats?: JsonOutputStats;
   error?: JsonError;
 }
 
