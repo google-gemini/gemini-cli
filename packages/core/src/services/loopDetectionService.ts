@@ -66,6 +66,34 @@ const MAX_LLM_CHECK_INTERVAL = 15;
 const LLM_CONFIDENCE_THRESHOLD = 0.9;
 const DOUBLE_CHECK_MODEL_ALIAS = 'loop-detection-double-check';
 
+const LOOP_DETECTION_SYSTEM_PROMPT = `You are a sophisticated AI diagnostic agent specializing in identifying when a conversational AI is stuck in an unproductive state. Your task is to analyze the provided conversation history and determine if the assistant has ceased to make meaningful progress.
+
+An unproductive state is characterized by one or more of the following patterns over the last 5 or more assistant turns:
+
+Repetitive Actions: The assistant repeats the same tool calls or conversational responses a decent number of times. This includes simple loops (e.g., tool_A, tool_A, tool_A) and alternating patterns (e.g., tool_A, tool_B, tool_A, tool_B, ...).
+
+Cognitive Loop: The assistant seems unable to determine the next logical step. It might express confusion, repeatedly ask the same questions, or generate responses that don't logically follow from the previous turns, indicating it's stuck and not advancing the task.
+
+Crucially, differentiate between a true unproductive state and legitimate, incremental progress.
+For example, a series of 'tool_A' or 'tool_B' tool calls that make small, distinct changes to the same file (like adding docstrings to functions one by one) is considered forward progress and is NOT a loop. A loop would be repeatedly replacing the same text with the same content, or cycling between a small set of files with no net change.`;
+
+const LOOP_DETECTION_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  properties: {
+    unproductive_state_analysis: {
+      type: 'string',
+      description:
+        'Your reasoning on if the conversation is looping without forward progress.',
+    },
+    unproductive_state_confidence: {
+      type: 'number',
+      description:
+        'A number between 0.0 and 1.0 representing your confidence that the conversation is in an unproductive state.',
+    },
+  },
+  required: ['unproductive_state_analysis', 'unproductive_state_confidence'],
+};
+
 /**
  * Result of a loop detection check.
  */
@@ -565,48 +593,33 @@ export class LoopDetectionService {
   }
 
   private async queryLoopDetectionModel(
-    modelAlias: string,
+    model: string,
     contents: Content[],
     signal: AbortSignal,
   ): Promise<Record<string, unknown> | null> {
-    const diagnosticPrompt = `You are a diagnostic assistant. Your task is to evaluate a conversation history between a user and an AI agent to determine if the agent is stuck in a repetitive loop.
-
-Analyze the history for patterns such as:
-1. "Cognitive Loops": The AI agent keeps performing the same sequence of actions without making forward progress.
-2. "Repetitive Actions": The agent makes the same tool calls with the same arguments repeatedly.
-
-Analyze the last several turns closely.
-
-You MUST respond in JSON with the following fields:
-- "unproductive_state_confidence": A number between 0 and 1, representing your confidence that the agent is in a repetitive loop.
-- "unproductive_state_analysis": A string explaining your reasoning.
-
-Focus on the most recent activity. High confidence should be reserved for clear signs of repetitive, non-productive behavior.`;
-
     try {
-      return await this.config.getBaseLlmClient().generateJson({
-        modelConfigKey: { model: modelAlias },
-        systemInstruction: diagnosticPrompt,
+      const result = await this.config.getBaseLlmClient().generateJson({
+        modelConfigKey: { model },
         contents,
-        schema: {
-          type: 'object',
-          properties: {
-            unproductive_state_confidence: { type: 'number' },
-            unproductive_state_analysis: { type: 'string' },
-          },
-          required: [
-            'unproductive_state_confidence',
-            'unproductive_state_analysis',
-          ],
-        },
-        promptId: this.promptId,
+        schema: LOOP_DETECTION_SCHEMA,
+        systemInstruction: LOOP_DETECTION_SYSTEM_PROMPT,
         abortSignal: signal,
+        promptId: this.promptId,
+        maxAttempts: 2,
         role: LlmRole.UTILITY_LOOP_DETECTOR,
       });
+
+      if (
+        result &&
+        typeof result['unproductive_state_confidence'] === 'number'
+      ) {
+        return result;
+      }
+      return null;
     } catch (error) {
       if (this.config.getDebugMode()) {
         debugLogger.warn(
-          `Error querying loop detection model (${modelAlias}): ${String(error)}`,
+          `Error querying loop detection model (${model}): ${String(error)}`,
         );
       }
       return null;
