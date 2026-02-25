@@ -433,6 +433,31 @@ describe('useCommandCompletion', () => {
       expect(result.current.textBuffer.text).toBe('@src/file1.txt ');
     });
 
+    it('should insert canonical slash command text when suggestion provides insertValue', async () => {
+      setupMocks({
+        slashSuggestions: [
+          {
+            label: 'list',
+            value: 'list',
+            insertValue: 'resume list',
+          },
+        ],
+        slashCompletionRange: { completionStart: 1, completionEnd: 5 },
+      });
+
+      const { result } = renderCommandCompletionHook('/resu');
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBe(1);
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(result.current.textBuffer.text).toBe('/resume list ');
+    });
+
     it('should complete a file path when cursor is not at the end of the line', async () => {
       const text = '@src/fi is a good file';
       const cursorOffset = 7; // after "i"

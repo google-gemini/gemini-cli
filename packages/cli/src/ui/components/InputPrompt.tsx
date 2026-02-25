@@ -926,6 +926,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               const isEnterKey = key.name === 'return' && !key.ctrl;
 
               if (isEnterKey && buffer.text.startsWith('/')) {
+                if (suggestion.submitValue) {
+                  setExpandedSuggestionIndex(-1);
+                  handleSubmit(suggestion.submitValue.trim());
+                  return true;
+                }
+
                 const { isArgumentCompletion, leafCommand } =
                   completion.slashCompletionRange;
 

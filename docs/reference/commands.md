@@ -28,24 +28,33 @@ Slash commands provide meta-level control over the CLI itself.
 
 ### `/chat`
 
-- **Description:** Save and resume conversation history for branching
-  conversation state interactively, or resuming a previous state from a later
-  session.
+- **Description:** Alias for `/resume`. Both commands now expose the same
+  session browser action and checkpoint subcommands.
+- **Menu layout when typing `/chat` (or `/resume`)**:
+  - `-- auto --`
+    - `list` (selecting this opens the auto-saved session browser)
+  - `-- checkpoints --`
+    - `list`, `save`, `resume`, `delete`, `share` (manual tagged checkpoints)
+  - **Note:** Unique prefixes (for example `/cha` or `/resum`) resolve to the
+    same grouped menu.
 - **Sub-commands:**
   - **`debug`**
     - **Description:** Export the most recent API request as a JSON payload.
   - **`delete <tag>`**
     - **Description:** Deletes a saved conversation checkpoint.
+    - **Equivalent:** `/resume delete <tag>`
   - **`list`**
-    - **Description:** Lists available tags for chat state resumption.
+    - **Description:** Lists available tags for manually saved checkpoints.
     - **Note:** This command only lists chats saved within the current project.
       Because chat history is project-scoped, chats saved in other project
       directories will not be displayed.
+    - **Equivalent:** `/resume list`
   - **`resume <tag>`**
     - **Description:** Resumes a conversation from a previous save.
     - **Note:** You can only resume chats that were saved within the current
       project. To resume a chat from a different project, you must run the
       Gemini CLI from that project's directory.
+    - **Equivalent:** `/resume resume <tag>`
   - **`save <tag>`**
     - **Description:** Saves the current conversation history. You must add a
       `<tag>` for identifying the conversation state.
@@ -60,10 +69,12 @@ Slash commands provide meta-level control over the CLI itself.
         conversation states. For automatic checkpoints created before file
         modifications, see the
         [Checkpointing documentation](../cli/checkpointing.md).
+      - **Equivalent:** `/resume save <tag>`
   - **`share [filename]`**
     - **Description** Writes the current conversation to a provided Markdown or
       JSON file. If no filename is provided, then the CLI will generate one.
     - **Usage** `/chat share file.md` or `/chat share file.json`.
+    - **Equivalent:** `/resume share [filename]`
 
 ### `/clear`
 
@@ -311,10 +322,13 @@ Slash commands provide meta-level control over the CLI itself.
 
 ### `/resume`
 
-- **Description:** Browse and resume previous conversation sessions. Opens an
-  interactive session browser where you can search, filter, and select from
-  automatically saved conversations.
+- **Description:** Browse and resume previous conversation sessions, and manage
+  manual chat checkpoints.
 - **Features:**
+  - **Auto sessions:** Run `/resume` to open the interactive session browser for
+    automatically saved conversations.
+  - **Chat checkpoints:** Use checkpoint subcommands directly (`/resume save`,
+    `/resume resume`, etc.).
   - **Management:** Delete unwanted sessions directly from the browser
   - **Resume:** Select any session to resume and continue the conversation
   - **Search:** Use `/` to search through conversation content across all
@@ -325,6 +339,23 @@ Slash commands provide meta-level control over the CLI itself.
 - **Note:** All conversations are automatically saved as you chat - no manual
   saving required. See [Session Management](../cli/session-management.md) for
   complete details.
+- **Alias:** `/chat` provides the same behavior and subcommands.
+- **Sub-commands:**
+  - **`list`**
+    - **Description:** Lists available tags for manual chat checkpoints.
+  - **`save <tag>`**
+    - **Description:** Saves the current conversation as a tagged checkpoint.
+  - **`resume <tag>`** (alias: `load`)
+    - **Description:** Loads a previously saved tagged checkpoint.
+  - **`delete <tag>`**
+    - **Description:** Deletes a tagged checkpoint.
+  - **`share [filename]`**
+    - **Description:** Exports the current conversation to Markdown or JSON.
+  - **`debug`**
+    - **Description:** Export the most recent API request as JSON payload
+      (nightly builds).
+  - **Compatibility alias:** `/resume checkpoints ...` is still accepted for the
+    same checkpoint commands.
 
 ### `/settings`
 

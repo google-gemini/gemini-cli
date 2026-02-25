@@ -61,6 +61,15 @@ Browser**:
 /resume
 ```
 
+When typing `/resume` (or `/chat`) in slash completion, commands are grouped
+under titled separators:
+
+- `-- auto --` (session browser)
+  - `list` is selectable and opens the session browser
+- `-- checkpoints --` (manual tagged checkpoint commands)
+
+Unique prefixes such as `/resum` and `/cha` resolve to the same grouped menu.
+
 The Session Browser provides an interactive interface where you can perform the
 following actions:
 
@@ -71,6 +80,21 @@ following actions:
   or content.
 - **Select:** Press **Enter** to resume the selected session.
 - **Esc:** Press **Esc** to exit the Session Browser.
+
+### Manual chat checkpoints
+
+For named branch points inside a session, use chat checkpoints:
+
+```text
+/resume save decision-point
+/resume list
+/resume resume decision-point
+```
+
+Compatibility aliases:
+
+- `/chat ...` works for the same commands.
+- `/resume checkpoints ...` also remains supported during migration.
 
 ## Managing sessions
 
