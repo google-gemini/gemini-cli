@@ -544,7 +544,7 @@ Implement a comprehensive authentication system with multiple providers.
         expect(onFeedback).not.toHaveBeenCalled();
       });
 
-      it('opens plan in external editor when Ctrl+P is pressed', async () => {
+      it('opens plan in external editor when Ctrl+X is pressed', async () => {
         const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
 
         await act(async () => {
@@ -558,9 +558,9 @@ Implement a comprehensive authentication system with multiple providers.
         // Reset the mock to track the second call during refresh
         vi.mocked(processSingleFileContent).mockClear();
 
-        // Press Ctrl+P
+        // Press Ctrl+X
         await act(async () => {
-          writeKey(stdin, '\x10'); // Ctrl+P
+          writeKey(stdin, '\x18'); // Ctrl+X
         });
 
         await waitFor(() => {
