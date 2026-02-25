@@ -41,6 +41,17 @@ export const LARGE_PASTE_CHAR_THRESHOLD = 500;
 export const PASTED_TEXT_PLACEHOLDER_REGEX =
   /\[Pasted Text: \d+ (?:lines|chars)(?: #\d+)?\]/g;
 
+// Replace paste placeholder strings with their actual pasted content.
+export function expandPastePlaceholders(
+  text: string,
+  pastedContent: Record<string, string>,
+): string {
+  return text.replace(
+    PASTED_TEXT_PLACEHOLDER_REGEX,
+    (match) => pastedContent[match] || match,
+  );
+}
+
 export type Direction =
   | 'left'
   | 'right'
@@ -3089,10 +3100,7 @@ export function useTextBuffer({
     const tmpDir = fs.mkdtempSync(pathMod.join(os.tmpdir(), 'gemini-edit-'));
     const filePath = pathMod.join(tmpDir, 'buffer.txt');
     // Expand paste placeholders so user sees full content in editor
-    const expandedText = text.replace(
-      PASTED_TEXT_PLACEHOLDER_REGEX,
-      (match) => pastedContent[match] || match,
-    );
+    const expandedText = expandPastePlaceholders(text, pastedContent);
     fs.writeFileSync(filePath, expandedText, 'utf8');
 
     let command: string | undefined = undefined;

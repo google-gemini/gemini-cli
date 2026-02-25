@@ -17,7 +17,8 @@ vi.mock('../../hooks/useKeypress.js', () => ({
   useKeypress: vi.fn(),
 }));
 
-vi.mock('./text-buffer.js', () => {
+vi.mock('./text-buffer.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./text-buffer.js')>();
   const mockTextBuffer = {
     text: '',
     lines: [''],
@@ -60,6 +61,7 @@ vi.mock('./text-buffer.js', () => {
   };
 
   return {
+    ...actual,
     useTextBuffer: vi.fn(() => mockTextBuffer as unknown as TextBuffer),
     TextBuffer: vi.fn(() => mockTextBuffer as unknown as TextBuffer),
   };
@@ -82,6 +84,7 @@ describe('TextInput', () => {
       cursor: [0, 0],
       visualCursor: [0, 0],
       viewportVisualLines: [''],
+      pastedContent: {} as Record<string, string>,
       handleInput: vi.fn((key) => {
         if (key.sequence) {
           buffer.text += key.sequence;
@@ -301,10 +304,8 @@ describe('TextInput', () => {
   it('expands paste placeholder to real content on submit', async () => {
     const placeholder = '[Pasted Text: 6 lines]';
     const realContent = 'line1\nline2\nline3\nline4\nline5\nline6';
-    mockBuffer.text = placeholder;
-    (mockBuffer as unknown as Record<string, unknown>).pastedContent = {
-      [placeholder]: realContent,
-    };
+    mockBuffer.setText(placeholder);
+    mockBuffer.pastedContent = { [placeholder]: realContent };
     const { waitUntilReady, unmount } = render(
       <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
     );
@@ -328,8 +329,8 @@ describe('TextInput', () => {
   });
 
   it('submits text unchanged when pastedContent is empty', async () => {
-    mockBuffer.text = 'normal text';
-    (mockBuffer as unknown as Record<string, unknown>).pastedContent = {};
+    mockBuffer.setText('normal text');
+    mockBuffer.pastedContent = {};
     const { waitUntilReady, unmount } = render(
       <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
     );
