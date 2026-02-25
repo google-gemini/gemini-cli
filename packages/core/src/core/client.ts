@@ -805,6 +805,11 @@ export class GeminiClient {
     isInvalidStreamRetry: boolean = false,
     displayContent?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    const sharedErrorReportDir = path.join(
+      this.config.storage?.getProjectTempDir() ?? os.tmpdir(),
+      'error-reports',
+    );
+
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
     }
@@ -829,27 +834,13 @@ export class GeminiClient {
           // Add user message to history before returning so it's kept in the transcript
           this.getChat().addHistory(createUserContent(request));
           yield hookResult;
-          return new Turn(
-            this.getChat(),
-            prompt_id,
-            path.join(
-              this.config.storage?.getProjectTempDir() ?? os.tmpdir(),
-              'error-reports',
-            ),
-          );
+          return new Turn(this.getChat(), prompt_id, sharedErrorReportDir);
         } else if (
           'type' in hookResult &&
           hookResult.type === GeminiEventType.AgentExecutionBlocked
         ) {
           yield hookResult;
-          return new Turn(
-            this.getChat(),
-            prompt_id,
-            path.join(
-              this.config.storage?.getProjectTempDir() ?? os.tmpdir(),
-              'error-reports',
-            ),
-          );
+          return new Turn(this.getChat(), prompt_id, sharedErrorReportDir);
         } else if ('additionalContext' in hookResult) {
           const additionalContext = hookResult.additionalContext;
           if (additionalContext) {
@@ -864,14 +855,7 @@ export class GeminiClient {
     }
 
     const boundedTurns = Math.min(turns, MAX_TURNS);
-    let turn = new Turn(
-      this.getChat(),
-      prompt_id,
-      path.join(
-        this.config.storage?.getProjectTempDir() ?? os.tmpdir(),
-        'error-reports',
-      ),
-    );
+    let turn = new Turn(this.getChat(), prompt_id, sharedErrorReportDir);
 
     try {
       turn = yield* this.processTurn(

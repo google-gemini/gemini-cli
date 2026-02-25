@@ -336,14 +336,15 @@ export class BaseLlmClient {
       }
 
       // Check if the error is from exhausting retries, and report accordingly.
+      const errorReportDir = path.join(
+        this.config.storage?.getProjectTempDir() ?? os.tmpdir(),
+        'error-reports',
+      );
+
       if (
         error instanceof Error &&
         error.message.includes('Retry attempts exhausted')
       ) {
-        const errorReportDir = path.join(
-          this.config.storage?.getProjectTempDir() ?? os.tmpdir(),
-          'error-reports',
-        );
         await reportError(
           error,
           `API returned invalid content after all retries.`,
@@ -352,10 +353,6 @@ export class BaseLlmClient {
           errorReportDir,
         );
       } else {
-        const errorReportDir = path.join(
-          this.config.storage?.getProjectTempDir() ?? os.tmpdir(),
-          'error-reports',
-        );
         await reportError(
           error,
           `Error generating content via API.`,
