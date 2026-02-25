@@ -137,22 +137,7 @@ async function calculateExactReplacement(
   const normalizedSearch = old_string.replace(/\r\n/g, '\n');
   const normalizedReplace = new_string.replace(/\r\n/g, '\n');
 
-  const matchRanges: Array<{ start: number; end: number }> = [];
-  let index = normalizedCode.indexOf(normalizedSearch);
-  while (index !== -1) {
-    const startLine = normalizedCode
-      .substring(0, index)
-      .split(String.fromCharCode(10)).length;
-    const endLine =
-      startLine + normalizedSearch.split(String.fromCharCode(10)).length - 1;
-    matchRanges.push({ start: startLine, end: endLine });
-    index = normalizedCode.indexOf(
-      normalizedSearch,
-      index + normalizedSearch.length,
-    );
-  }
-
-  const exactOccurrences = matchRanges.length;
+  const exactOccurrences = normalizedCode.split(normalizedSearch).length - 1;
 
   if (!params.allow_multiple && exactOccurrences > 1) {
     return {
@@ -160,8 +145,6 @@ async function calculateExactReplacement(
       occurrences: exactOccurrences,
       finalOldString: normalizedSearch,
       finalNewString: normalizedReplace,
-      strategy: 'exact',
-      matchRanges,
     };
   }
 
@@ -177,8 +160,6 @@ async function calculateExactReplacement(
       occurrences: exactOccurrences,
       finalOldString: normalizedSearch,
       finalNewString: normalizedReplace,
-      strategy: 'exact',
-      matchRanges,
     };
   }
 
@@ -197,9 +178,9 @@ async function calculateFlexibleReplacement(
 
   const sourceLines = normalizedCode.match(/.*(?:\n|$)/g)?.slice(0, -1) ?? [];
   const searchLinesStripped = normalizedSearch
-    .split(String.fromCharCode(10))
+    .split('\n')
     .map((line: string) => line.trim());
-  const replaceLines = normalizedReplace.split(String.fromCharCode(10));
+  const replaceLines = normalizedReplace.split('\n');
 
   let flexibleOccurrences = 0;
   let i = 0;
@@ -257,13 +238,11 @@ async function calculateRegexReplacement(
 
   let processedString = normalizedSearch;
   for (const delim of delimiters) {
-    processedString = processedString
-      .split(String.fromCharCode(10))
-      .join(` ${delim} `);
+    processedString = processedString.split(delim).join(` ${delim} `);
   }
 
   // Split by any whitespace and remove empty strings.
-  const tokens = processedString.split(String.fromCharCode(10)).filter(Boolean);
+  const tokens = processedString.split(/\s+/).filter(Boolean);
 
   if (tokens.length === 0) {
     return null;
@@ -286,7 +265,7 @@ async function calculateRegexReplacement(
   }
 
   const occurrences = matches.length;
-  const newLines = normalizedReplace.split(String.fromCharCode(10));
+  const newLines = normalizedReplace.split('\n');
 
   // Use the appropriate regex for replacement based on allow_multiple.
   const replaceRegex = new RegExp(
@@ -786,13 +765,11 @@ class EditToolInvocation
     }
 
     const oldStringSnippet =
-      this.params.old_string
-        .split(String.fromCharCode(10))[0]
-        .substring(0, 30) + (this.params.old_string.length > 30 ? '...' : '');
+      this.params.old_string.split('\n')[0].substring(0, 30) +
+      (this.params.old_string.length > 30 ? '...' : '');
     const newStringSnippet =
-      this.params.new_string
-        .split(String.fromCharCode(10))[0]
-        .substring(0, 30) + (this.params.new_string.length > 30 ? '...' : '');
+      this.params.new_string.split('\n')[0].substring(0, 30) +
+      (this.params.new_string.length > 30 ? '...' : '');
 
     if (this.params.old_string === this.params.new_string) {
       return `No file changes to ${shortenPath(relativePath)}`;
@@ -900,26 +877,10 @@ class EditToolInvocation
         };
       }
 
-      const totalLength = finalContent.split(String.fromCharCode(10)).length;
-      const metadataParts = [];
-      if (editData.matchRanges && editData.matchRanges.length > 0) {
-        if (editData.matchRanges.length === 1) {
-          metadataParts.push(
-            `start_line: ${editData.matchRanges[0].start}, end_line: ${editData.matchRanges[0].end}`,
-          );
-        } else {
-          const ranges = editData.matchRanges
-            .map((r) => `${r.start}-${r.end}`)
-            .join(', ');
-          metadataParts.push(`ranges: ${ranges}`);
-        }
-      }
-      metadataParts.push(`file_length: ${totalLength}`);
-
       const llmSuccessMessageParts = [
         editData.isNewFile
-          ? `Created new file: ${this.params.file_path} with provided content. [file_length: ${totalLength}]`
-          : `Successfully modified file: ${this.params.file_path}. [${metadataParts.join(', ')}]`,
+          ? `Created new file: ${this.params.file_path} with provided content.`
+          : `Successfully modified file: ${this.params.file_path} (${editData.occurrences} replacements).`,
       ];
 
       // Return a diff of the file before and after the write so that the agent
@@ -1250,7 +1211,7 @@ async function calculateFuzzyReplacement(
     // so that indices remain valid
     selectedMatches.sort((a, b) => b.index - a.index);
 
-    const newLines = normalizedReplace.split(String.fromCharCode(10));
+    const newLines = normalizedReplace.split('\n');
 
     for (const match of selectedMatches) {
       // If we want to preserve the indentation of the first line of the match:
