@@ -48,3 +48,34 @@ execution:
 - Follow the [Automation tutorial](./tutorials/automation.md) for practical
   scripting examples.
 - See the [CLI reference](./cli-reference.md) for all available flags.
+
+## Practical Scripting Examples
+
+**1. Summarize a text file:**
+```bash
+cat report.txt | gemini "Summarize this document in 3 bullet points"
+```
+**2. Analyze a code file:**
+```bash
+cat script.py | gemini "Review this code for potential bugs and security issues"
+```
+**3. Process CSV data:**
+```bash
+head -n 10 data.csv | gemini "Analyze this CSV structure and suggest improvements"
+```
+**4. Automated Review Script:**
+```bash
+cat > temp_code.txt
+echo "What aspect should I review? (bugs/performance/security/readability)"
+read review_type
+cat temp_code.txt | gemini "Review this code for $review_type issues" > review_results.txt
+echo "Review saved to review_results.txt"
+```
+## Tips for Scripting:
+* Use positional arguments for queries
+
+* Chain with other CLI tools: grep, awk, sed
+
+* Set API key as environment variable: export GEMINI_API_KEY="your-key"
+
+* Add error handling: gemini ... || echo "Processing failed"
