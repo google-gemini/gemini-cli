@@ -36,6 +36,8 @@ const semanticColors: SemanticColors = {
   },
   background: {
     primary: '#002b36',
+    message: '#073642',
+    input: '#073642',
     diff: {
       added: '#00382f',
       removed: '#3d0115',
