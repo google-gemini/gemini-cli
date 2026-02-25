@@ -137,6 +137,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`general.plan.modelRouting`** (boolean):
+  - **Description:** Automatically switch between Pro and Flash models based on
+    Plan Mode status. Uses Pro for the planning phase and Flash for the
+    implementation phase.
+  - **Default:** `true`
+
 - **`general.retryFetchErrors`** (boolean):
   - **Description:** Retry on "exception TypeError: fetch failed sending
     request" errors.
@@ -644,6 +650,27 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Override settings for specific agents, e.g. to disable the
     agent, set a custom model config, or run config.
   - **Default:** `{}`
+  - **Requires restart:** Yes
+
+- **`agents.browser.sessionMode`** (enum):
+  - **Description:** Session mode: 'persistent', 'isolated', or 'existing'.
+  - **Default:** `"persistent"`
+  - **Values:** `"persistent"`, `"isolated"`, `"existing"`
+  - **Requires restart:** Yes
+
+- **`agents.browser.headless`** (boolean):
+  - **Description:** Run browser in headless mode.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`agents.browser.profilePath`** (string):
+  - **Description:** Path to browser profile directory for session persistence.
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
+- **`agents.browser.visualModel`** (string):
+  - **Description:** Model override for the visual agent.
+  - **Default:** `undefined`
   - **Requires restart:** Yes
 
 #### `context`

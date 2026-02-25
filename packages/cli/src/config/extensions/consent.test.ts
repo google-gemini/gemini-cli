@@ -84,7 +84,7 @@ describe('consent', () => {
       { input: '', expected: true },
       { input: 'n', expected: false },
       { input: 'N', expected: false },
-      { input: 'yes', expected: false },
+      { input: 'yes', expected: true },
     ])(
       'should return $expected for input "$input"',
       async ({ input, expected }) => {

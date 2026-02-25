@@ -1347,6 +1347,74 @@ describe('Server Config (config.ts)', () => {
       expect(mockCoreEvents.emitFeedback).not.toHaveBeenCalled();
     });
   });
+
+  describe('BrowserAgentConfig', () => {
+    it('should return default browser agent config when not provided', () => {
+      const config = new Config(baseParams);
+      const browserConfig = config.getBrowserAgentConfig();
+
+      expect(browserConfig.enabled).toBe(false);
+      expect(browserConfig.model).toBeUndefined();
+      expect(browserConfig.customConfig.sessionMode).toBe('persistent');
+      expect(browserConfig.customConfig.headless).toBe(false);
+      expect(browserConfig.customConfig.profilePath).toBeUndefined();
+      expect(browserConfig.customConfig.visualModel).toBeUndefined();
+    });
+
+    it('should return custom browser agent config from agents.overrides', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+              modelConfig: { model: 'custom-model' },
+            },
+          },
+          browser: {
+            sessionMode: 'existing',
+            headless: true,
+            profilePath: '/path/to/profile',
+            visualModel: 'custom-visual-model',
+          },
+        },
+      };
+      const config = new Config(params);
+      const browserConfig = config.getBrowserAgentConfig();
+
+      expect(browserConfig.enabled).toBe(true);
+      expect(browserConfig.model).toBe('custom-model');
+      expect(browserConfig.customConfig.sessionMode).toBe('existing');
+      expect(browserConfig.customConfig.headless).toBe(true);
+      expect(browserConfig.customConfig.profilePath).toBe('/path/to/profile');
+      expect(browserConfig.customConfig.visualModel).toBe(
+        'custom-visual-model',
+      );
+    });
+
+    it('should apply defaults for partial custom config', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: true,
+          },
+        },
+      };
+      const config = new Config(params);
+      const browserConfig = config.getBrowserAgentConfig();
+
+      expect(browserConfig.enabled).toBe(true);
+      expect(browserConfig.customConfig.headless).toBe(true);
+      // Defaults for unspecified fields
+      expect(browserConfig.customConfig.sessionMode).toBe('persistent');
+    });
+  });
 });
 
 describe('setApprovalMode with folder trust', () => {
@@ -1860,7 +1928,7 @@ describe('Config getHooks', () => {
     const mockHooks = {
       BeforeTool: [
         {
-          hooks: [{ type: HookType.Command, command: 'echo 1' }],
+          hooks: [{ type: HookType.Command, command: 'echo 1' } as const],
         },
       ],
     };
@@ -2167,7 +2235,7 @@ describe('Hooks configuration', () => {
     const initialHooks = {
       BeforeAgent: [
         {
-          hooks: [{ type: HookType.Command, command: 'initial' }],
+          hooks: [{ type: HookType.Command as const, command: 'initial' }],
         },
       ],
     };
@@ -2463,6 +2531,29 @@ describe('Config Quota & Preview Model Access', () => {
         plan: false,
       });
       expect(config.isPlanEnabled()).toBe(false);
+    });
+  });
+
+  describe('getPlanModeRoutingEnabled', () => {
+    it('should default to true when not provided', async () => {
+      const config = new Config(baseParams);
+      expect(await config.getPlanModeRoutingEnabled()).toBe(true);
+    });
+
+    it('should return true when explicitly enabled in planSettings', async () => {
+      const config = new Config({
+        ...baseParams,
+        planSettings: { modelRouting: true },
+      });
+      expect(await config.getPlanModeRoutingEnabled()).toBe(true);
+    });
+
+    it('should return false when explicitly disabled in planSettings', async () => {
+      const config = new Config({
+        ...baseParams,
+        planSettings: { modelRouting: false },
+      });
+      expect(await config.getPlanModeRoutingEnabled()).toBe(false);
     });
   });
 });
