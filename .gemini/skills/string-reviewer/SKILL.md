@@ -22,8 +22,8 @@ asks you to do so.
 
 Use these basic principles of good UX writing as a guide for your suggestions. 
 
-- **Clarity:** Text is easy to understand. Text is easy to follow. 60 or higher
-  readability score based on the Flesch-Kincaid model. No errors or typos.
+- **Clarity:** Text is easy to understand. Text is easy to follow. No errors or
+  typos.
 - **Usefulness:** Users get the info they need, when they need it. Use plain,
   familiar language. Concepts are explained; value props are user-focused.
 - **Brevity:** Language is precise. Short, simple sentences; active voice. Text
@@ -34,9 +34,8 @@ Use these basic principles of good UX writing as a guide for your suggestions.
 
 ### Enforce general style guidelines
 
-1. Don't use a period after a single sentence. When a sentence appears by itself
-   on its own line, do not end it with a period. Use a period if the sentence is
-   particularly long or complex.
+1. Do not use a period for single sentences under 10 words. Use periods only for
+   multi-sentence blocks or exceptionally complex instructions.
 2. Use contractions. However, don't make a sentence harder to understand just to
    follow this rule. For example, "do not" can give more emphasis than "don't"
    when needed. 
@@ -46,24 +45,27 @@ Use these basic principles of good UX writing as a guide for your suggestions.
 4. Use ampersands instead of “and” sparingly. Don't use "+" instead of "&".
 5. Only capitalize the first word in titles and headings.
 6. Use a serial/Oxford comma to separate items in a list.
+7. When reviewing strings with variables or placeholders, ensure the surrounding
+   text remains grammatically correct regardless of the variable's value.
 
-### Ensure consistent style for settings and options
+### Ensure consistent style for settings
 
-If the file `packages/cli/src/config/settingsSchema.ts` has been modified,
-confirm that labels and descriptions adhere to the criteria in [Settings
-guidelines](./references/settings.md).
+If `packages/cli/src/config/settingsSchema.ts` is modified, confirm labels and 
+descriptions follow the [Settings guidelines](./references/settings.md).
 
 ### Ensure that error messages are actionable by the end user
 
 If a file contains an error message, ensure that it provides actionable
-information to the end user. Review the reference at [error message
-guidelines](./references/error-messages.md) for more details.
+information to the end user. Review the reference at [error message guidelines](./references/error-messages.md) 
+for more details.
 
 ### Ensure consistent use of keyboard shortcuts
 
-If the string contains a keyboard shortcut, ensure it is rendered as
-`Modifier+Key`. Modifiers should be capitalized, and the key should be
-uppercase. There should be no additional spaces.
+Render shortcuts as `Modifier+Key` (for example, `Ctrl+S`). Modifiers should be 
+capitalized; keys should be uppercase. No extra spaces.
+
+- Use `Esc` instead of "Escape".
+- Use Unicode symbols (`⇧`, `⏎`) only if there are tight space constraints.
 
 - **"Escape"** should be written as `Esc` for brevity.
 - If there are space constraints, it is acceptable to use Unicode symbols for
@@ -71,17 +73,17 @@ uppercase. There should be no additional spaces.
 
 ### Use consistent terminology
 
-Finally, review the text to ensure that strings adhere to our word list that
-shows preferred terms, terms that we do not use, and terms that should be used
-with caution.Reference the [word list](./references/word-list.md) for a complete
-list.
+Ensure all terminology aligns with the project [word list](./references/word-list.md). 
+
+If a string uses a term marked "do not use" or "use with caution," provide a
+correction based on the preferred terms.
 
 ### Output format
 When suggesting changes, always present your review using the following list
-format. Do not provide suggestions outside of this list.
+format. Do not provide suggestions outside of this list..
 
 ```
-1. **{rationale}**
+1. **{Rationale/Principle Violated}**
   - ❌ "{incorrect phrase}"
   - ✅ `"{corrected phrase}"`
 ```
