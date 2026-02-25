@@ -212,6 +212,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
   const initEpoch = useRef(0);
   const searchAbortController = useRef<AbortController | null>(null);
   const slowSearchTimer = useRef<NodeJS.Timeout | null>(null);
+  const searchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setSuggestions(state.suggestions);
@@ -265,7 +266,13 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
         state.status === AtCompletionStatus.SEARCHING) &&
       pattern.toLowerCase() !== state.pattern // Only search if the pattern has changed
     ) {
-      dispatch({ type: 'SEARCH', payload: pattern.toLowerCase() });
+      if (searchDebounceTimer.current) {
+        clearTimeout(searchDebounceTimer.current);
+      }
+      searchDebounceTimer.current = setTimeout(() => {
+        dispatch({ type: 'SEARCH', payload: pattern.toLowerCase() });
+        searchDebounceTimer.current = null;
+      }, 150);
     }
   }, [enabled, pattern, state.status, state.pattern]);
 
@@ -444,6 +451,9 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
       searchAbortController.current?.abort();
       if (slowSearchTimer.current) {
         clearTimeout(slowSearchTimer.current);
+      }
+      if (searchDebounceTimer.current) {
+        clearTimeout(searchDebounceTimer.current);
       }
     };
   }, [state.status, state.pattern, config, cwd]);

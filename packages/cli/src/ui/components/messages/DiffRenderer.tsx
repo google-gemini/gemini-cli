@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/* eslint-disable react/prop-types */
+
 import type React from 'react';
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import crypto from 'node:crypto';
 import { colorizeCode, colorizeLine } from '../../utils/CodeColorizer.js';
@@ -92,108 +94,114 @@ interface DiffRendererProps {
 
 const DEFAULT_TAB_WIDTH = 4; // Spaces per tab for normalization
 
-export const DiffRenderer: React.FC<DiffRendererProps> = ({
-  diffContent,
-  filename,
-  tabWidth = DEFAULT_TAB_WIDTH,
-  availableTerminalHeight,
-  terminalWidth,
-  theme,
-}) => {
-  const settings = useSettings();
-
-  const screenReaderEnabled = useIsScreenReaderEnabled();
-
-  const parsedLines = useMemo(() => {
-    if (!diffContent || typeof diffContent !== 'string') {
-      return [];
-    }
-    return parseDiffWithLineNumbers(diffContent);
-  }, [diffContent]);
-
-  const isNewFile = useMemo(() => {
-    if (parsedLines.length === 0) return false;
-    return parsedLines.every(
-      (line) =>
-        line.type === 'add' ||
-        line.type === 'hunk' ||
-        line.type === 'other' ||
-        line.content.startsWith('diff --git') ||
-        line.content.startsWith('new file mode'),
-    );
-  }, [parsedLines]);
-
-  const renderedOutput = useMemo(() => {
-    if (!diffContent || typeof diffContent !== 'string') {
-      return <Text color={semanticTheme.status.warning}>No diff content.</Text>;
-    }
-
-    if (parsedLines.length === 0) {
-      return (
-        <Box
-          borderStyle="round"
-          borderColor={semanticTheme.border.default}
-          padding={1}
-        >
-          <Text dimColor>No changes detected.</Text>
-        </Box>
-      );
-    }
-    if (screenReaderEnabled) {
-      return (
-        <Box flexDirection="column">
-          {parsedLines.map((line, index) => (
-            <Text key={index}>
-              {line.type}: {line.content}
-            </Text>
-          ))}
-        </Box>
-      );
-    }
-
-    if (isNewFile) {
-      // Extract only the added lines' content
-      const addedContent = parsedLines
-        .filter((line) => line.type === 'add')
-        .map((line) => line.content)
-        .join('\n');
-      // Attempt to infer language from filename, default to plain text if no filename
-      const fileExtension = filename?.split('.').pop() || null;
-      const language = fileExtension
-        ? getLanguageFromExtension(fileExtension)
-        : null;
-      return colorizeCode({
-        code: addedContent,
-        language,
-        availableHeight: availableTerminalHeight,
-        maxWidth: terminalWidth,
-        theme,
-        settings,
-      });
-    } else {
-      return renderDiffContent(
-        parsedLines,
-        filename,
-        tabWidth,
-        availableTerminalHeight,
-        terminalWidth,
-      );
-    }
-  }, [
+export const DiffRenderer: React.FC<DiffRendererProps> = memo(
+  ({
     diffContent,
-    parsedLines,
-    screenReaderEnabled,
-    isNewFile,
     filename,
+    tabWidth = DEFAULT_TAB_WIDTH,
     availableTerminalHeight,
     terminalWidth,
     theme,
-    settings,
-    tabWidth,
-  ]);
+  }) => {
+    const settings = useSettings();
 
-  return renderedOutput;
-};
+    const screenReaderEnabled = useIsScreenReaderEnabled();
+
+    const parsedLines = useMemo(() => {
+      if (!diffContent || typeof diffContent !== 'string') {
+        return [];
+      }
+      return parseDiffWithLineNumbers(diffContent);
+    }, [diffContent]);
+
+    const isNewFile = useMemo(() => {
+      if (parsedLines.length === 0) return false;
+      return parsedLines.every(
+        (line) =>
+          line.type === 'add' ||
+          line.type === 'hunk' ||
+          line.type === 'other' ||
+          line.content.startsWith('diff --git') ||
+          line.content.startsWith('new file mode'),
+      );
+    }, [parsedLines]);
+
+    const renderedOutput = useMemo(() => {
+      if (!diffContent || typeof diffContent !== 'string') {
+        return (
+          <Text color={semanticTheme.status.warning}>No diff content.</Text>
+        );
+      }
+
+      if (parsedLines.length === 0) {
+        return (
+          <Box
+            borderStyle="round"
+            borderColor={semanticTheme.border.default}
+            padding={1}
+          >
+            <Text dimColor>No changes detected.</Text>
+          </Box>
+        );
+      }
+      if (screenReaderEnabled) {
+        return (
+          <Box flexDirection="column">
+            {parsedLines.map((line, index) => (
+              <Text key={index}>
+                {line.type}: {line.content}
+              </Text>
+            ))}
+          </Box>
+        );
+      }
+
+      if (isNewFile) {
+        // Extract only the added lines' content
+        const addedContent = parsedLines
+          .filter((line) => line.type === 'add')
+          .map((line) => line.content)
+          .join('\n');
+        // Attempt to infer language from filename, default to plain text if no filename
+        const fileExtension = filename?.split('.').pop() || null;
+        const language = fileExtension
+          ? getLanguageFromExtension(fileExtension)
+          : null;
+        return colorizeCode({
+          code: addedContent,
+          language,
+          availableHeight: availableTerminalHeight,
+          maxWidth: terminalWidth,
+          theme,
+          settings,
+        });
+      } else {
+        return renderDiffContent(
+          parsedLines,
+          filename,
+          tabWidth,
+          availableTerminalHeight,
+          terminalWidth,
+        );
+      }
+    }, [
+      diffContent,
+      parsedLines,
+      screenReaderEnabled,
+      isNewFile,
+      filename,
+      availableTerminalHeight,
+      terminalWidth,
+      theme,
+      settings,
+      tabWidth,
+    ]);
+
+    return renderedOutput;
+  },
+);
+
+DiffRenderer.displayName = 'DiffRenderer';
 
 const renderDiffContent = (
   parsedLines: DiffLine[],

@@ -1369,16 +1369,42 @@ Logging in with Google... Restarting Gemini CLI to continue.
     !proQuotaRequest;
 
   const [controlsHeight, setControlsHeight] = useState(0);
+  const lastMeasurementTimeRef = useRef(0);
+  const measurementTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useLayoutEffect(() => {
     if (mainControlsRef.current) {
-      const fullFooterMeasurement = measureElement(mainControlsRef.current);
-      const roundedHeight = Math.round(fullFooterMeasurement.height);
-      if (roundedHeight > 0 && roundedHeight !== controlsHeight) {
-        setControlsHeight(roundedHeight);
+      const now = Date.now();
+      const timeSinceLastMeasurement = now - lastMeasurementTimeRef.current;
+
+      const performMeasurement = () => {
+        if (!mainControlsRef.current) return;
+        const fullFooterMeasurement = measureElement(mainControlsRef.current);
+        const roundedHeight = Math.round(fullFooterMeasurement.height);
+        if (roundedHeight > 0 && roundedHeight !== controlsHeight) {
+          setControlsHeight(roundedHeight);
+        }
+        lastMeasurementTimeRef.current = Date.now();
+        measurementTimeoutRef.current = null;
+      };
+
+      if (timeSinceLastMeasurement > 100) {
+        if (measurementTimeoutRef.current) {
+          clearTimeout(measurementTimeoutRef.current);
+          measurementTimeoutRef.current = null;
+        }
+        performMeasurement();
+      } else if (!measurementTimeoutRef.current) {
+        measurementTimeoutRef.current = setTimeout(performMeasurement, 100);
       }
     }
   }, [buffer, terminalWidth, terminalHeight, controlsHeight]);
+
+  useEffect(() => () => {
+      if (measurementTimeoutRef.current) {
+        clearTimeout(measurementTimeoutRef.current);
+      }
+    }, []);
 
   // Compute available terminal height based on controls measurement
   const availableTerminalHeight = Math.max(
