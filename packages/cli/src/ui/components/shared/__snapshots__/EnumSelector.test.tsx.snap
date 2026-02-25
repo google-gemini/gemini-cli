@@ -11,7 +11,7 @@ exports[`<EnumSelector /> > renders with numeric options and matches snapshot 1`
 `;
 
 exports[`<EnumSelector /> > renders with single option and matches snapshot 1`] = `
-"  Only Option
+"  Only Option  
 "
 `;
 

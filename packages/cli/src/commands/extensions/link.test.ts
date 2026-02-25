@@ -13,34 +13,21 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
-import { format } from 'node:util';
+import { coreEvents } from '@google/gemini-cli-core';
 import { type Argv } from 'yargs';
 import { handleLink, linkCommand } from './link.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
 import { getErrorMessage } from '../../utils/errors.js';
 
-// Mock dependencies
-const emitConsoleLog = vi.hoisted(() => vi.fn());
-const debugLogger = vi.hoisted(() => ({
-  log: vi.fn((message, ...args) => {
-    emitConsoleLog('log', format(message, ...args));
-  }),
-  error: vi.fn((message, ...args) => {
-    emitConsoleLog('error', format(message, ...args));
-  }),
-}));
-
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
-  return {
-    ...actual,
-    coreEvents: {
-      emitConsoleLog,
-    },
-    debugLogger,
-  };
+  const { mockCoreDebugLogger } = await import(
+    '../../test-utils/mockDebugLogger.js'
+  );
+  return mockCoreDebugLogger(
+    await importOriginal<typeof import('@google/gemini-cli-core')>(),
+    { stripAnsi: true },
+  );
 });
 
 vi.mock('../../config/extension-manager.js');
@@ -95,7 +82,7 @@ describe('extensions link command', () => {
         source: '/local/path/to/extension',
         type: 'link',
       });
-      expect(emitConsoleLog).toHaveBeenCalledWith(
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
         'Extension "my-linked-extension" linked successfully and enabled.',
       );
@@ -116,7 +103,7 @@ describe('extensions link command', () => {
 
       await handleLink({ path: '/local/path/to/extension' });
 
-      expect(emitConsoleLog).toHaveBeenCalledWith(
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'error',
         'Link failed message',
       );

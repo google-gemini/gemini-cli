@@ -5,33 +5,22 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { format } from 'node:util';
+import { coreEvents } from '@google/gemini-cli-core';
 import { handleList, listCommand } from './list.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
 import { getErrorMessage } from '../../utils/errors.js';
 
-// Mock dependencies
-const emitConsoleLog = vi.hoisted(() => vi.fn());
-const debugLogger = vi.hoisted(() => ({
-  log: vi.fn((message, ...args) => {
-    emitConsoleLog('log', format(message, ...args));
-  }),
-  error: vi.fn((message, ...args) => {
-    emitConsoleLog('error', format(message, ...args));
-  }),
-}));
-
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
-  return {
-    ...actual,
-    coreEvents: {
-      emitConsoleLog,
+  const { mockCoreDebugLogger } = await import(
+    '../../test-utils/mockDebugLogger.js'
+  );
+  return mockCoreDebugLogger(
+    await importOriginal<typeof import('@google/gemini-cli-core')>(),
+    {
+      stripAnsi: false,
     },
-    debugLogger,
-  };
+  );
 });
 
 vi.mock('../../config/extension-manager.js');
@@ -71,7 +60,7 @@ describe('extensions list command', () => {
         .mockResolvedValue([]);
       await handleList();
 
-      expect(emitConsoleLog).toHaveBeenCalledWith(
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
         'No extensions installed.',
       );
@@ -85,7 +74,7 @@ describe('extensions list command', () => {
         .mockResolvedValue([]);
       await handleList({ outputFormat: 'json' });
 
-      expect(emitConsoleLog).toHaveBeenCalledWith('log', '[]');
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith('log', '[]');
       mockCwd.mockRestore();
     });
 
@@ -103,7 +92,7 @@ describe('extensions list command', () => {
       );
       await handleList();
 
-      expect(emitConsoleLog).toHaveBeenCalledWith(
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
         'ext1@1.0.0\n\next2@2.0.0',
       );
@@ -121,7 +110,7 @@ describe('extensions list command', () => {
         .mockResolvedValue(extensions);
       await handleList({ outputFormat: 'json' });
 
-      expect(emitConsoleLog).toHaveBeenCalledWith(
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
         JSON.stringify(extensions, null, 2),
       );
@@ -142,7 +131,7 @@ describe('extensions list command', () => {
 
       await handleList();
 
-      expect(emitConsoleLog).toHaveBeenCalledWith(
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'error',
         'List failed message',
       );
