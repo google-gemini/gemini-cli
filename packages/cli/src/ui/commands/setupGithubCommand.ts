@@ -23,11 +23,11 @@ import { getUrlOpenCommand } from '../../ui/utils/commandUtils.js';
 import { debugLogger } from '@google/gemini-cli-core';
 
 export const GITHUB_WORKFLOW_PATHS = [
-  'gemini-dispatch/gemini-dispatch.yml',
   'gemini-assistant/gemini-invoke.yml',
   'gemini-assistant/gemini-plan-execute.yml',
-  'issue-triage/gemini-triage.yml',
+  'gemini-dispatch/gemini-dispatch.yml',
   'issue-triage/gemini-scheduled-triage.yml',
+  'issue-triage/gemini-triage.yml',
   'pr-review/gemini-review.yml',
 ];
 
