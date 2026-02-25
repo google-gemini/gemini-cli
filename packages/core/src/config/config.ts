@@ -308,6 +308,7 @@ export interface GeminiCLIExtension {
   mcpServers?: Record<string, MCPServerConfig>;
   contextFiles: string[];
   excludeTools?: string[];
+  plan?: PlanSettings;
   id: string;
   hooks?: { [K in HookEventName]?: HookDefinition[] };
   settings?: ExtensionSetting[];

@@ -862,6 +862,7 @@ Would you like to attempt to install via "git clone" instead?`,
         installMetadata,
         mcpServers: config.mcpServers,
         excludeTools: config.excludeTools,
+        plan: config.plan,
         hooks,
         isActive: this.extensionEnablementManager.isEnabled(
           config.name,
