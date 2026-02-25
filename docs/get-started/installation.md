@@ -26,6 +26,7 @@ installation methods:
 - npm
 - Homebrew
 - MacPorts
+- Arch Linux (pacman)
 - Anaconda
 
 Note that Gemini CLI comes pre-installed on
@@ -48,6 +49,12 @@ brew install gemini-cli
 
 ```bash
 sudo port install gemini-cli
+```
+
+### Install globally with Arch Linux (pacman)
+
+```bash
+sudo pacman -S gemini-cli
 ```
 
 ### Install with Anaconda (for restricted environments)
