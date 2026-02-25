@@ -6,7 +6,7 @@
 
 import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { PerformanceDataService } from '@google/gemini-cli-core';
+import { PerformanceDataService, debugLogger } from '@google/gemini-cli-core';
 import type { HistoryItemPerf } from '../types.js';
 import {
   type CommandContext,
@@ -151,8 +151,9 @@ function checkRegression(context: CommandContext): void {
         text: 'Performance regression detected',
       });
     }
-  } catch {
-    // Ignore invalid or missing baseline
+  } catch (e) {
+    // Ignore invalid or missing baseline, but log for debugging.
+    debugLogger.debug('Could not check for performance regression:', e);
   }
 }
 
