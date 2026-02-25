@@ -938,6 +938,5 @@ function buildNetworkProxyConfig(
     rules,
     enableLogging: proxySettings.enableLogging ?? false,
     maxLogEntries: 1000,
-    promptForUnknownDomains: defaultAction === DomainFilterAction.PROMPT,
   };
 }

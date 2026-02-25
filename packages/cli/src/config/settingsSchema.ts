@@ -1591,7 +1591,7 @@ const SETTINGS_SCHEMA = {
             type: 'enum',
             label: 'Default Domain Action',
             category: 'Security',
-            requiresRestart: true,
+            requiresRestart: false,
             default: 'prompt',
             description:
               'Action to take when a domain does not match any rule. "allow" permits traffic, "deny" blocks it, "prompt" asks the user.',

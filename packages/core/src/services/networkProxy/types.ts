@@ -71,7 +71,6 @@ export interface NetworkProxyConfig {
 
   enableLogging: boolean;
   maxLogEntries: number;
-  promptForUnknownDomains: boolean;
 }
 
 /**
@@ -103,5 +102,4 @@ export const DEFAULT_NETWORK_PROXY_CONFIG: NetworkProxyConfig = {
   rules: [],
   enableLogging: false,
   maxLogEntries: 1000,
-  promptForUnknownDomains: true,
 };

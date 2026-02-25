@@ -91,13 +91,11 @@ export function createConsoleDomainPrompt(): DomainPromptCallback {
 
     return new Promise<DomainFilterAction>((resolve) => {
       rl.question(
-        `\nNetwork proxy: "${hostname}" wants to connect. Allow? [y/N/a(always)] `,
+        `\nNetwork proxy: "${hostname}" wants to connect. Allow? [y/N] `,
         (answer) => {
           rl.close();
           const normalized = answer.trim().toLowerCase();
           if (normalized === 'y' || normalized === 'yes') {
-            resolve(DomainFilterAction.ALLOW);
-          } else if (normalized === 'a' || normalized === 'always') {
             resolve(DomainFilterAction.ALLOW);
           } else {
             resolve(DomainFilterAction.DENY);

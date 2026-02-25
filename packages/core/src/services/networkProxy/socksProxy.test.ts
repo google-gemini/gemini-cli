@@ -323,4 +323,56 @@ describe('SocksProxy', () => {
     expect(replyCode).toBe(0x02);
     socket.destroy();
   });
+
+  it('handles IPv6 CONNECT requests with canonical address format', async () => {
+    proxy = new SocksProxy({
+      port: 0,
+      rules: [{ pattern: '::1', action: DomainFilterAction.DENY }],
+      defaultAction: DomainFilterAction.ALLOW,
+    });
+    const proxyPort = await proxy.start();
+
+    // Send a SOCKS5 CONNECT with IPv6 address type (ATYP 0x04)
+    const result = await new Promise<{ replyCode: number; host: string }>((resolve, reject) => {
+      const socket = net.connect(proxyPort, '127.0.0.1', () => {
+        socket.write(Buffer.from([0x05, 0x01, 0x00]));
+      });
+
+      let phase: 'greeting' | 'request' | 'done' = 'greeting';
+
+      socket.on('data', (data: Buffer) => {
+        if (phase === 'greeting') {
+          if (data[0] !== 0x05 || data[1] !== 0x00) {
+            socket.destroy();
+            reject(new Error('Bad greeting'));
+            return;
+          }
+          phase = 'request';
+
+          // Build IPv6 CONNECT for ::1 (all zeros except last byte = 1)
+          const ipv6Bytes = Buffer.alloc(16, 0);
+          ipv6Bytes[15] = 1; // ::1
+          const portBuf = Buffer.alloc(2);
+          portBuf.writeUInt16BE(8080);
+
+          const request = Buffer.concat([
+            Buffer.from([0x05, 0x01, 0x00, 0x04]), // VER, CMD=CONNECT, RSV, ATYP=IPv6
+            ipv6Bytes,
+            portBuf,
+          ]);
+          socket.write(request);
+        } else if (phase === 'request') {
+          phase = 'done';
+          resolve({ replyCode: data[1], host: '' });
+          socket.destroy();
+        }
+      });
+
+      socket.on('error', reject);
+    });
+
+    // ::1 should match the deny rule and be blocked
+    expect(result.replyCode).toBe(0x02);
+    expect(proxy.getDeniedCount()).toBe(1);
+  });
 });

@@ -71,20 +71,15 @@ export function checkDomainWithConfig(
 
 /**
  * Extracts the hostname from an HTTP request URL or CONNECT target.
- * Handles both "host:port" format (from CONNECT) and full URLs.
+ * Handles both "host:port" format (from CONNECT) and full URLs,
+ * including IPv6 address literals like [::1]:8080.
  */
 export function extractHostname(target: string): string {
-  // CONNECT requests come in as "host:port"
-  if (!target.includes('://')) {
-    const colonIdx = target.lastIndexOf(':');
-    if (colonIdx > 0) {
-      return target.substring(0, colonIdx);
-    }
-    return target;
-  }
-
   try {
-    return new URL(target).hostname;
+    // Prepend a dummy protocol for bare host:port strings so the URL
+    // parser can handle them, including IPv6 bracket notation.
+    const urlString = target.includes('://') ? target : `dummy://${target}`;
+    return new URL(urlString).hostname;
   } catch {
     return target;
   }
@@ -93,23 +88,20 @@ export function extractHostname(target: string): string {
 /**
  * Extracts the port from an HTTP request URL or CONNECT target.
  * Returns the default port for the protocol if not specified.
+ * Handles IPv6 address literals like [::1]:8080.
  */
 export function extractPort(target: string, defaultPort: number = 80): number {
-  if (!target.includes('://')) {
-    const colonIdx = target.lastIndexOf(':');
-    if (colonIdx > 0) {
-      const port = parseInt(target.substring(colonIdx + 1), 10);
-      return isNaN(port) ? defaultPort : port;
-    }
-    return defaultPort;
-  }
-
   try {
-    const url = new URL(target);
+    const hasProtocol = target.includes('://');
+    const urlString = hasProtocol ? target : `dummy://${target}`;
+    const url = new URL(urlString);
     if (url.port) {
       return parseInt(url.port, 10);
     }
-    return url.protocol === 'https:' ? 443 : 80;
+    if (hasProtocol) {
+      return url.protocol === 'https:' ? 443 : 80;
+    }
+    return defaultPort;
   } catch {
     return defaultPort;
   }

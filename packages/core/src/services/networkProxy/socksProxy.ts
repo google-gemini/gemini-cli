@@ -33,6 +33,41 @@ const REP_HOST_UNREACHABLE = 0x04;
 const REP_COMMAND_NOT_SUPPORTED = 0x07;
 const REP_ADDRESS_TYPE_NOT_SUPPORTED = 0x08;
 
+/**
+ * Converts an array of 8 hex-string groups into a canonical compressed
+ * IPv6 string (e.g. ["0","0","0","0","0","0","0","1"] -> "::1").
+ */
+function compressIPv6(groups: string[]): string {
+  // Find the longest run of consecutive "0" groups.
+  let bestStart = -1;
+  let bestLen = 0;
+  let curStart = -1;
+  let curLen = 0;
+
+  for (let i = 0; i < groups.length; i++) {
+    if (groups[i] === '0') {
+      if (curStart === -1) curStart = i;
+      curLen++;
+      if (curLen > bestLen) {
+        bestStart = curStart;
+        bestLen = curLen;
+      }
+    } else {
+      curStart = -1;
+      curLen = 0;
+    }
+  }
+
+  if (bestLen < 2) {
+    // No run worth compressing — return the plain colon-separated form.
+    return groups.join(':');
+  }
+
+  const head = groups.slice(0, bestStart).join(':');
+  const tail = groups.slice(bestStart + bestLen).join(':');
+  return `${head}::${tail}`;
+}
+
 export interface SocksProxyOptions {
   port: number;
   host?: string;
@@ -231,12 +266,14 @@ export class SocksProxy extends EventEmitter {
           clientSocket.destroy();
           return;
         }
-        // Format IPv6 as bracket notation for readability
-        const parts: string[] = [];
+        // Build a canonical IPv6 string by writing the 16 raw bytes
+        // into a temporary buffer, then converting with net.Socket logic.
+        const groups: string[] = [];
         for (let i = 0; i < 16; i += 2) {
-          parts.push(data.readUInt16BE(4 + i).toString(16));
+          groups.push(data.readUInt16BE(4 + i).toString(16));
         }
-        hostname = parts.join(':');
+        // Collapse the longest run of consecutive 0 groups with "::".
+        hostname = compressIPv6(groups);
         port = data.readUInt16BE(20);
         break;
       }

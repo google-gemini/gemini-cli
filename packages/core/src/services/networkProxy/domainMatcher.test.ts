@@ -127,6 +127,14 @@ describe('extractHostname', () => {
     expect(extractHostname('[::1]:8080')).toBe('[::1]');
   });
 
+  it('handles full IPv6 address in host:port', () => {
+    expect(extractHostname('[2001:db8::1]:443')).toBe('[2001:db8::1]');
+  });
+
+  it('handles IPv6 in full URL', () => {
+    expect(extractHostname('http://[::1]:3000/path')).toBe('[::1]');
+  });
+
   it('returns input for unparseable values', () => {
     expect(extractHostname('not a url at all')).toBe('not a url at all');
   });
@@ -147,5 +155,14 @@ describe('extractPort', () => {
     expect(extractPort('http://example.com:9090/path')).toBe(9090);
     expect(extractPort('https://example.com/path')).toBe(443);
     expect(extractPort('http://example.com/path')).toBe(80);
+  });
+
+  it('extracts port from IPv6 host:port', () => {
+    expect(extractPort('[::1]:8080')).toBe(8080);
+    expect(extractPort('[2001:db8::1]:443')).toBe(443);
+  });
+
+  it('extracts port from IPv6 URL', () => {
+    expect(extractPort('http://[::1]:3000/path')).toBe(3000);
   });
 });
