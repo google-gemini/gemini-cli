@@ -9,6 +9,11 @@ export { HttpProxy } from './httpProxy.js';
 export { SocksProxy } from './socksProxy.js';
 export { TrafficLogger } from './trafficLogger.js';
 export {
+  DomainPromptHandler,
+  createConsoleDomainPrompt,
+} from './domainPromptHandler.js';
+export type { DomainPromptCallback } from './domainPromptHandler.js';
+export {
   matchesDomainPattern,
   checkDomain,
   checkDomainWithConfig,
