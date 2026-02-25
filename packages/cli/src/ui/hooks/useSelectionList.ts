@@ -407,16 +407,6 @@ export function useSelectionList<T>({
         return true;
       }
 
-      if (keyMatchers[Command.CYCLE_MODEL_FORWARD](key)) {
-        dispatch({ type: 'MOVE_DOWN' });
-        return true;
-      }
-
-      if (keyMatchers[Command.CYCLE_MODEL_BACKWARD](key)) {
-        dispatch({ type: 'MOVE_UP' });
-        return true;
-      }
-
       if (keyMatchers[Command.RETURN](key)) {
         dispatch({ type: 'SELECT_CURRENT' });
         return true;

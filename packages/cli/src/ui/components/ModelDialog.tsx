@@ -233,7 +233,9 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
           initialIndex={initialIndex}
           showNumbers={true}
           renderItem={(item, { titleColor }) => {
-            const isFavorite = (item as (typeof options)[number]).isFavorite;
+            const isFavorite = options.find(
+              (o) => o.value === item.value,
+            )?.isFavorite;
             return (
               <Box
                 flexDirection="row"

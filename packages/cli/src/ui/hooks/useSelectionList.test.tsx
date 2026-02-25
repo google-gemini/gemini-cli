@@ -266,29 +266,6 @@ describe('useSelectionList', () => {
       expect(result.current.activeIndex).toBe(3);
     });
 
-    it('should cycle forward with alt+c and backward with alt+x', async () => {
-      const { result, waitUntilReady } = await renderSelectionListHook({
-        items,
-        onSelect: mockOnSelect,
-      });
-      expect(result.current.activeIndex).toBe(0);
-
-      // alt+c -> move down (0 -> 2, skipping disabled 1)
-      pressKey('c', undefined, { alt: true });
-      await waitUntilReady();
-      expect(result.current.activeIndex).toBe(2);
-
-      // alt+x -> move up (2 -> 0)
-      pressKey('x', undefined, { alt: true });
-      await waitUntilReady();
-      expect(result.current.activeIndex).toBe(0);
-
-      // alt+x wrap around (0 -> 3)
-      pressKey('x', undefined, { alt: true });
-      await waitUntilReady();
-      expect(result.current.activeIndex).toBe(3);
-    });
-
     it('should call onHighlight when index changes', async () => {
       const { waitUntilReady } = await renderSelectionListHook({
         items,
