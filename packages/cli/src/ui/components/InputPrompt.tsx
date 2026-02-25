@@ -90,7 +90,7 @@ export function isTerminalPasteTrusted(
 
 export interface InputPromptProps {
   buffer: TextBuffer;
-  onSubmit: (value: string) => void;
+  onSubmit: (value: string, isPasted?: boolean) => void;
   userMessages: readonly string[];
   onClearScreen: () => void;
   config: Config;
@@ -333,10 +333,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (shellModeActive) {
         shellHistory.addCommandToHistory(processedValue);
       }
+      // Detect if the submitted text originated from a paste event
+      const wasPasted =
+        recentUnsafePasteTime !== null ||
+        Object.keys(buffer.pastedContent ?? {}).length > 0; // ADD THIS
       // Clear the buffer *before* calling onSubmit to prevent potential re-submission
       // if onSubmit triggers a re-render while the buffer still holds the old value.
       buffer.setText('');
-      onSubmit(processedValue);
+      onSubmit(processedValue, wasPasted);
       resetCompletionState();
       resetReverseSearchCompletionState();
     },
@@ -347,6 +351,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shellModeActive,
       shellHistory,
       resetReverseSearchCompletionState,
+      recentUnsafePasteTime,
     ],
   );
 

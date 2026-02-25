@@ -664,6 +664,7 @@ export const useGeminiStream = (
       userMessageTimestamp: number,
       abortSignal: AbortSignal,
       prompt_id: string,
+      isPasted: boolean = false,
     ): Promise<{
       queryToSend: PartListUnion | null;
       shouldProceed: boolean;
@@ -741,6 +742,7 @@ export const useGeminiStream = (
             onDebugMessage,
             messageId: userMessageTimestamp,
             signal: abortSignal,
+            isPasted,
           });
 
           if (atCommandResult.error) {
@@ -1258,7 +1260,7 @@ export const useGeminiStream = (
   const submitQuery = useCallback(
     async (
       query: PartListUnion,
-      options?: { isContinuation: boolean },
+      options?: { isContinuation: boolean; isPasted?: boolean },
       prompt_id?: string,
     ) =>
       runInDevTraceSpan(
@@ -1296,6 +1298,7 @@ export const useGeminiStream = (
               userMessageTimestamp,
               abortSignal,
               prompt_id!,
+              options?.isPasted ?? false,
             );
 
             if (!shouldProceed || queryToSend === null) {
