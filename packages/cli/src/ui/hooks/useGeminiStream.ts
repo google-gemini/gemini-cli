@@ -203,11 +203,16 @@ export const useGeminiStream = (
   const abortControllerRef = useRef<AbortController | null>(null);
   const turnCancelledRef = useRef(false);
   const activeQueryIdRef = useRef<string | null>(null);
+  const isRespondingRef = useRef(false);
   const [isResponding, setIsResponding] = useState<boolean>(false);
   const [thought, thoughtRef, setThought] =
     useStateAndRef<ThoughtSummary | null>(null);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
+  const setRespondingState = useCallback((value: boolean) => {
+    isRespondingRef.current = value;
+    setIsResponding(value);
+  }, []);
 
   const [lastGeminiActivityTime, setLastGeminiActivityTime] =
     useState<number>(0);
@@ -307,11 +312,14 @@ export const useGeminiStream = (
     return (executingShellTool as TrackedExecutingToolCall | undefined)?.pid;
   }, [toolCalls]);
 
-  const onExec = useCallback(async (done: Promise<void>) => {
-    setIsResponding(true);
-    await done;
-    setIsResponding(false);
-  }, []);
+  const onExec = useCallback(
+    async (done: Promise<void>) => {
+      setRespondingState(true);
+      await done;
+      setRespondingState(false);
+    },
+    [setRespondingState],
+  );
 
   const {
     handleShellCommand,
@@ -522,10 +530,10 @@ export const useGeminiStream = (
       activeShellPtyId === null
     ) {
       addItem({ type: MessageType.INFO, text: 'Request cancelled.' });
-      setIsResponding(false);
+      setRespondingState(false);
     }
     prevActiveShellPtyIdRef.current = activeShellPtyId;
-  }, [activeShellPtyId, addItem]);
+  }, [activeShellPtyId, addItem, setRespondingState]);
 
   useEffect(() => {
     if (
@@ -623,7 +631,7 @@ export const useGeminiStream = (
           type: MessageType.INFO,
           text: 'Request cancelled.',
         });
-        setIsResponding(false);
+        setRespondingState(false);
       }
     }
 
@@ -639,6 +647,7 @@ export const useGeminiStream = (
     cancelAllToolCalls,
     toolCalls,
     activeShellPtyId,
+    setRespondingState,
   ]);
 
   useKeypress(
@@ -891,10 +900,16 @@ export const useGeminiStream = (
         { type: MessageType.INFO, text: 'User cancelled the request.' },
         userMessageTimestamp,
       );
-      setIsResponding(false);
+      setRespondingState(false);
       setThought(null); // Reset thought when user cancels
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem, setThought],
+    [
+      addItem,
+      pendingHistoryItemRef,
+      setPendingHistoryItem,
+      setThought,
+      setRespondingState,
+    ],
   );
 
   const handleErrorEvent = useCallback(
@@ -1090,9 +1105,9 @@ export const useGeminiStream = (
           userMessageTimestamp,
         );
       }
-      setIsResponding(false);
+      setRespondingState(false);
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem, setIsResponding],
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem, setRespondingState],
   );
 
   const handleAgentExecutionBlockedEvent = useCallback(
@@ -1262,14 +1277,16 @@ export const useGeminiStream = (
         async ({ metadata: spanMetadata }) => {
           spanMetadata.input = query;
 
-          const queryId = `${Date.now()}-${Math.random()}`;
-          activeQueryIdRef.current = queryId;
           if (
-            (streamingState === StreamingState.Responding ||
+            (isRespondingRef.current ||
               streamingState === StreamingState.WaitingForConfirmation) &&
             !options?.isContinuation
           )
             return;
+
+          const queryId = `${Date.now()}-${Math.random()}`;
+          activeQueryIdRef.current = queryId;
+          isRespondingRef.current = true;
 
           const userMessageTimestamp = Date.now();
 
@@ -1316,7 +1333,7 @@ export const useGeminiStream = (
               setThought(null); // Reset thought when starting a new prompt
             }
 
-            setIsResponding(true);
+            setRespondingState(true);
             setInitError(null);
 
             // Store query and prompt_id for potential retry on loop detection
@@ -1350,7 +1367,7 @@ export const useGeminiStream = (
                 loopDetectedRef.current = false;
                 // Show the confirmation dialog to choose whether to disable loop detection
                 setLoopDetectionConfirmationRequest({
-                  onComplete: (result: {
+                  onComplete: async (result: {
                     userSelection: 'disable' | 'keep';
                   }) => {
                     setLoopDetectionConfirmationRequest(null);
@@ -1366,8 +1383,7 @@ export const useGeminiStream = (
                       });
 
                       if (lastQueryRef.current && lastPromptIdRef.current) {
-                        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                        submitQuery(
+                        await submitQuery(
                           lastQueryRef.current,
                           { isContinuation: true },
                           lastPromptIdRef.current,
@@ -1409,7 +1425,7 @@ export const useGeminiStream = (
               }
             } finally {
               if (activeQueryIdRef.current === queryId) {
-                setIsResponding(false);
+                setRespondingState(false);
               }
             }
           });
@@ -1423,6 +1439,7 @@ export const useGeminiStream = (
       pendingHistoryItemRef,
       addItem,
       setPendingHistoryItem,
+      setRespondingState,
       setInitError,
       geminiClient,
       onAuthError,
@@ -1564,7 +1581,7 @@ export const useGeminiStream = (
           type: MessageType.INFO,
           text: `Agent execution stopped: ${stopExecutionTool.response.error.message}`,
         });
-        setIsResponding(false);
+        setRespondingState(false);
 
         const callIdsToMarkAsSubmitted = geminiTools.map(
           (toolCall) => toolCall.request.callId,
@@ -1587,7 +1604,7 @@ export const useGeminiStream = (
             text: 'Request cancelled.',
           });
         }
-        setIsResponding(false);
+        setRespondingState(false);
 
         if (geminiClient) {
           // We need to manually add the function responses to the history
@@ -1669,6 +1686,7 @@ export const useGeminiStream = (
       registerBackgroundShell,
       consumeUserHint,
       config,
+      setRespondingState,
     ],
   );
 
