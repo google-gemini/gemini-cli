@@ -252,20 +252,15 @@ class GrepToolInvocation extends BaseToolInvocation<
       }
 
       // Filter matches to exclude sensitive files
-      const uniqueFiles = Array.from(
-        new Set(allMatches.map((m) => m.filePath)),
-      );
-      const absoluteFilePaths = uniqueFiles.map((f) =>
-        path.resolve(this.config.getTargetDir(), f),
+      const uniqueAbsolutePaths = Array.from(
+        new Set(allMatches.map((m) => m.absolutePath)),
       );
 
       // We always filter sensitive files
       const allowedFiles =
-        this.fileDiscoveryService.filterFiles(absoluteFilePaths);
+        this.fileDiscoveryService.filterFiles(uniqueAbsolutePaths);
       const allowedSet = new Set(allowedFiles);
-      allMatches = allMatches.filter((m) =>
-        allowedSet.has(path.resolve(this.config.getTargetDir(), m.filePath)),
-      );
+      allMatches = allMatches.filter((m) => allowedSet.has(m.absolutePath));
 
       let searchLocationDescription: string;
       if (searchDirAbs === null) {

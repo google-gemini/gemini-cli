@@ -264,16 +264,13 @@ class GrepToolInvocation extends BaseToolInvocation<
       }
 
       // Filter matches to exclude sensitive files
-      const uniqueFiles = Array.from(
-        new Set(allMatches.map((m) => m.filePath)),
-      );
-      const absoluteFilePaths = uniqueFiles.map((f) =>
-        path.resolve(searchDirAbs, f),
+      const uniqueAbsolutePaths = Array.from(
+        new Set(allMatches.map((m) => m.absolutePath)),
       );
 
       // We always filter sensitive files regardless of no_ignore param
       const allowedFiles = this.fileDiscoveryService.filterFiles(
-        absoluteFilePaths,
+        uniqueAbsolutePaths,
         {
           // If no_ignore is true, we ONLY filter sensitive files (which are always filtered by filterFiles)
           // and don't respect .gitignore/.geminiignore.
@@ -282,9 +279,7 @@ class GrepToolInvocation extends BaseToolInvocation<
         },
       );
       const allowedSet = new Set(allowedFiles);
-      allMatches = allMatches.filter((m) =>
-        allowedSet.has(path.resolve(searchDirAbs, m.filePath)),
-      );
+      allMatches = allMatches.filter((m) => allowedSet.has(m.absolutePath));
 
       const matchCount = allMatches.filter((m) => !m.isContext).length;
       allMatches = await this.enrichWithRipgrepAutoContext(
