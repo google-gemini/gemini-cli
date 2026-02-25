@@ -19,17 +19,24 @@ import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
  */
 export class TerminalQuotaError extends Error {
   retryDelayMs?: number;
+  reason?: string;
 
   constructor(
     message: string,
     override readonly cause: GoogleApiError,
     retryDelaySeconds?: number,
+    reason?: string,
   ) {
     super(message);
     this.name = 'TerminalQuotaError';
     this.retryDelayMs = retryDelaySeconds
       ? retryDelaySeconds * 1000
       : undefined;
+    this.reason = reason;
+  }
+
+  get isInsufficientCredits(): boolean {
+    return this.reason === 'INSUFFICIENT_G1_CREDITS_BALANCE';
   }
 }
 
@@ -121,6 +128,7 @@ function classifyValidationRequiredError(
   }
 
   if (
+    !errorInfo.domain ||
     !CLOUDCODE_DOMAINS.includes(errorInfo.domain) ||
     errorInfo.reason !== 'VALIDATION_REQUIRED'
   ) {
@@ -293,6 +301,16 @@ export function classifyGoogleError(error: unknown): unknown {
   }
 
   if (errorInfo) {
+    // INSUFFICIENT_G1_CREDITS_BALANCE is always terminal, regardless of domain
+    if (errorInfo.reason === 'INSUFFICIENT_G1_CREDITS_BALANCE') {
+      return new TerminalQuotaError(
+        `${googleApiError.message}`,
+        googleApiError,
+        delaySeconds,
+        errorInfo.reason,
+      );
+    }
+
     // New Cloud Code API quota handling
     if (errorInfo.domain) {
       const validDomains = [
@@ -313,6 +331,7 @@ export function classifyGoogleError(error: unknown): unknown {
             `${googleApiError.message}`,
             googleApiError,
             delaySeconds,
+            errorInfo.reason,
           );
         }
       }

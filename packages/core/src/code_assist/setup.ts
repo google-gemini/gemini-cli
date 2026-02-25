@@ -51,6 +51,7 @@ export interface UserData {
   projectId: string;
   userTier: UserTierId;
   userTierName?: string;
+  paidTier?: GeminiUserTier;
 }
 
 /**
@@ -136,6 +137,7 @@ export async function setupUser(
           projectId,
           userTier: loadRes.paidTier?.id ?? loadRes.currentTier.id,
           userTierName: loadRes.paidTier?.name ?? loadRes.currentTier.name,
+          paidTier: loadRes.paidTier ?? undefined,
         };
       }
 
@@ -146,6 +148,7 @@ export async function setupUser(
       projectId: loadRes.cloudaicompanionProject,
       userTier: loadRes.paidTier?.id ?? loadRes.currentTier.id,
       userTierName: loadRes.paidTier?.name ?? loadRes.currentTier.name,
+      paidTier: loadRes.paidTier ?? undefined,
     };
   }
 

@@ -27,12 +27,14 @@ import type {
   ToolConfig,
 } from '@google/genai';
 import { GenerateContentResponse } from '@google/genai';
+import type { Credits } from './types.js';
 
 export interface CAGenerateContentRequest {
   model: string;
   project?: string;
   user_prompt_id?: string;
   request: VertexGenerateContentRequest;
+  enabled_credit_types?: string[];
 }
 
 interface VertexGenerateContentRequest {
@@ -74,6 +76,8 @@ interface VertexGenerationConfig {
 export interface CaGenerateContentResponse {
   response: VertexGenerateContentResponse;
   traceId?: string;
+  consumedCredits?: Credits[];
+  remainingCredits?: Credits[];
 }
 
 interface VertexGenerateContentResponse {
@@ -121,12 +125,14 @@ export function toGenerateContentRequest(
   userPromptId: string,
   project?: string,
   sessionId?: string,
+  enabledCreditTypes?: string[],
 ): CAGenerateContentRequest {
   return {
     model: req.model,
     project,
     user_prompt_id: userPromptId,
     request: toVertexGenerateContentRequest(req, sessionId),
+    enabled_credit_types: enabledCreditTypes,
   };
 }
 
@@ -297,5 +303,18 @@ function toVertexGenerationConfig(
     speechConfig: config.speechConfig,
     audioTimestamp: config.audioTimestamp,
     thinkingConfig: config.thinkingConfig,
+  };
+}
+
+export function fromGenerateContentResponseUsage(
+  metadata?: GenerateContentResponseUsageMetadata,
+): GenerateContentResponseUsageMetadata | undefined {
+  if (!metadata) {
+    return undefined;
+  }
+  return {
+    promptTokenCount: metadata.promptTokenCount,
+    candidatesTokenCount: metadata.candidatesTokenCount,
+    totalTokenCount: metadata.totalTokenCount,
   };
 }
