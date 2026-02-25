@@ -80,13 +80,12 @@ manually during a session.
 
 ### Planning Workflow
 
-The planning workflow adapts its depth based on a `complexity` parameter
-(`minimal`, `standard`, `thorough`) passed to [`enter_plan_mode`]. The model
-selects the appropriate level automatically, or you can request one explicitly
-(e.g., "plan a thorough redesign of the auth system"). The default is
-**standard**.
+The planning workflow adapts its depth based on a `level` parameter (`minimal`,
+`standard`, `thorough`) passed to [`enter_plan_mode`]. The model selects the
+appropriate level automatically, or you can request one explicitly (e.g., "plan
+a thorough redesign of the auth system"). The default is **standard**.
 
-| Complexity   | Use case                                         | Plan sections                                                                                                                                | Workflow                                                                     |
+| Level        | Use case                                         | Plan sections                                                                                                                                | Workflow                                                                     |
 | ------------ | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | **Minimal**  | Small, targeted changes (1–3 files, clear scope) | Changes, Verification                                                                                                                        | Explore, Draft, Approval                                                     |
 | **Standard** | Typical features or moderate refactoring         | Objective, Implementation Plan, Verification                                                                                                 | Explore & Analyze, Consult, Draft, Review & Approval                         |

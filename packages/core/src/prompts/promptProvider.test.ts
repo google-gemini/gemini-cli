@@ -9,7 +9,7 @@ import { PromptProvider } from './promptProvider.js';
 import { renderPlanningWorkflow } from './snippets.js';
 import type { Config } from '../config/config.js';
 import type { PlanningWorkflowOptions } from './snippets.js';
-import { PlanComplexity } from '../plan/types.js';
+import { PlanLevel } from '../plan/types.js';
 import {
   getAllGeminiMdFilenames,
   DEFAULT_CONTEXT_FILENAME,
@@ -59,7 +59,7 @@ describe('PromptProvider', () => {
       }),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       getApprovalMode: vi.fn(),
-      getPlanComplexity: vi.fn().mockReturnValue(PlanComplexity.STANDARD),
+      getPlanLevel: vi.fn().mockReturnValue(PlanLevel.STANDARD),
     } as unknown as Config;
   });
 
@@ -186,7 +186,7 @@ describe('renderPlanningWorkflow', () => {
   const baseOptions: PlanningWorkflowOptions = {
     planModeToolsList: '<tool>read_file</tool>',
     plansDir: '/tmp/plans',
-    complexity: PlanComplexity.STANDARD,
+    level: PlanLevel.STANDARD,
   };
 
   it('should return empty string when options are undefined', () => {
@@ -199,10 +199,10 @@ describe('renderPlanningWorkflow', () => {
     expect(result).toMatchSnapshot();
   });
 
-  it('should update active assignment based on complexity', () => {
+  it('should update active assignment based on level', () => {
     const result = renderPlanningWorkflow({
       ...baseOptions,
-      complexity: PlanComplexity.THOROUGH,
+      level: PlanLevel.THOROUGH,
     });
     expect(result).toContain('**Target Level:** **thorough**');
   });

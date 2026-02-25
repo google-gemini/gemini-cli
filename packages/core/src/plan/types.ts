@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export enum PlanComplexity {
+export enum PlanLevel {
   MINIMAL = 'minimal',
   STANDARD = 'standard',
   THOROUGH = 'thorough',

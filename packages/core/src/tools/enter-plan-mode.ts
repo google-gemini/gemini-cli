@@ -16,13 +16,13 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { Config } from '../config/config.js';
 import { ENTER_PLAN_MODE_TOOL_NAME } from './tool-names.js';
 import { ApprovalMode } from '../policy/types.js';
-import { PlanComplexity } from '../plan/types.js';
+import { PlanLevel } from '../plan/types.js';
 import { ENTER_PLAN_MODE_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 
 export interface EnterPlanModeParams {
   reason?: string;
-  complexity?: PlanComplexity;
+  level?: PlanLevel;
 }
 
 export class EnterPlanModeTool extends BaseDeclarativeTool<
@@ -61,11 +61,8 @@ export class EnterPlanModeTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: EnterPlanModeParams,
   ): string | null {
-    if (
-      params.complexity &&
-      !Object.values(PlanComplexity).includes(params.complexity)
-    ) {
-      return `Invalid complexity "${params.complexity}". Must be one of: ${Object.values(PlanComplexity).join(', ')}.`;
+    if (params.level && !Object.values(PlanLevel).includes(params.level)) {
+      return `Invalid level "${params.level}". Must be one of: ${Object.values(PlanLevel).join(', ')}.`;
     }
     return null;
   }
@@ -93,8 +90,8 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
 
   getDescription(): string {
     const reason = this.params.reason || 'Initiating Plan Mode';
-    const complexity = this.params.complexity || PlanComplexity.STANDARD;
-    return `${reason} (${complexity})`;
+    const level = this.params.level || PlanLevel.STANDARD;
+    return `${reason} (${level})`;
   }
 
   override async shouldConfirmExecute(
@@ -134,16 +131,16 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
       };
     }
 
-    const complexity = this.params.complexity || PlanComplexity.STANDARD;
-    this.config.setPlanComplexity(complexity);
+    const level = this.params.level || PlanLevel.STANDARD;
+    this.config.setPlanLevel(level);
     this.config.setApprovedPlanPath(undefined);
     this.config.setApprovalMode(ApprovalMode.PLAN);
 
     return {
-      llmContent: `Switching to Plan mode (${complexity}).`,
+      llmContent: `Switching to Plan mode (${level}).`,
       returnDisplay: this.params.reason
-        ? `Switching to Plan mode (${complexity}): ${this.params.reason}`
-        : `Switching to Plan mode (${complexity})`,
+        ? `Switching to Plan mode (${level}): ${this.params.reason}`
+        : `Switching to Plan mode (${level})`,
     };
   }
 }

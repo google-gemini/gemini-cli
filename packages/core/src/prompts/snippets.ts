@@ -20,9 +20,9 @@ import {
 } from '../tools/tool-names.js';
 import type { HierarchicalMemory } from '../config/memory.js';
 import { DEFAULT_CONTEXT_FILENAME } from '../tools/memoryTool.js';
-import type { PlanComplexity } from '../plan/types.js';
+import type { PlanLevel } from '../plan/types.js';
 
-const COMPLEXITY_CRITERIA = {
+const PLAN_LEVEL_CRITERIA = {
   minimal:
     'Single-purpose changes to 1-3 files where the fix is obvious (e.g., rename a variable, fix a typo, update a config value, add a simple test).',
   standard:
@@ -83,7 +83,7 @@ export interface PlanningWorkflowOptions {
   planModeToolsList: string;
   plansDir: string;
   approvedPlanPath?: string;
-  complexity: PlanComplexity;
+  level: PlanLevel;
 }
 
 export interface AgentSkillOptions {
@@ -469,7 +469,7 @@ export function renderPlanningWorkflow(
   options?: PlanningWorkflowOptions,
 ): string {
   if (!options) return '';
-  const complexity = options.complexity;
+  const level = options.level;
 
   return `
 # Active Approval Mode: Plan
@@ -494,10 +494,11 @@ ${options.planModeToolsList}
 
 ## Planning Workflow
 
-Choose the appropriate level based on the task complexity. If you discover the task is more complex than initially assessed, you MUST escalate to a higher level and inform the user.
+Choose the appropriate level based on the task complexity. If the target level was not explicitly chosen, assess the task and select the level that best matches the criteria below.
+If you discover the task is more complex than initially assessed, you MUST escalate to a higher level and inform the user.
 
 ### Level: minimal
-- **Criteria:** ${COMPLEXITY_CRITERIA.minimal}
+- **Criteria:** ${PLAN_LEVEL_CRITERIA.minimal}
 - **Workflow:**
   1. **Explore:** Quickly read relevant files to confirm the change is straightforward.
   2. **Draft:** Write the plan to \`${options.plansDir}/\`.
@@ -509,7 +510,7 @@ Choose the appropriate level based on the task complexity. If you discover the t
   (How to verify the changes work — test command or manual check)
 
 ### Level: standard
-- **Criteria:** ${COMPLEXITY_CRITERIA.standard}
+- **Criteria:** ${PLAN_LEVEL_CRITERIA.standard}
 - **Workflow:**
   1. **Explore & Analyze:** Analyze requirements and use search/read tools to explore the codebase. Identify at least two viable implementation approaches.
   2. **Consult:** Present a concise summary of identified approaches (including pros/cons and your recommendation) to the user via ${formatToolName(ASK_USER_TOOL_NAME)} and wait for their selection.
@@ -524,7 +525,7 @@ Choose the appropriate level based on the task complexity. If you discover the t
   (Specific unit tests, manual checks, or build commands to verify success)
 
 ### Level: thorough
-- **Criteria:** ${COMPLEXITY_CRITERIA.thorough}
+- **Criteria:** ${PLAN_LEVEL_CRITERIA.thorough}
 - **Workflow:**
   1. **Deep Exploration:** Systematically map all affected modules. Trace data flow, identify dependencies, and read all relevant files. Document assumptions.
   2. **Alternatives Considered:** Identify at least two viable approaches. For each, analyze: complexity, risk, performance impact, and maintenance burden.
@@ -548,7 +549,7 @@ Choose the appropriate level based on the task complexity. If you discover the t
   (If applicable: how to migrate existing data/state, and how to roll back if something goes wrong)
 
 ## Active Assignment
-**Target Level:** **${complexity}**
+**Target Level:** **${level}**
 Follow the criteria, workflow, and structure for this level.
 
 ${renderApprovedPlanSection(options.approvedPlanPath)}`.trim();
@@ -592,10 +593,10 @@ function mandateContinueWork(interactive: boolean): string {
 function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
   let suggestion = '';
   if (options.enableEnterPlanModeTool) {
-    suggestion = ` When the task requires planning, use the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool with the appropriate complexity:
-- complexity="minimal": ${COMPLEXITY_CRITERIA.minimal}
-- complexity="standard": ${COMPLEXITY_CRITERIA.standard}
-- complexity="thorough": ${COMPLEXITY_CRITERIA.thorough}
+    suggestion = ` When the task requires planning, use the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool with the appropriate level based on task complexity:
+- level="minimal": ${PLAN_LEVEL_CRITERIA.minimal}
+- level="standard": ${PLAN_LEVEL_CRITERIA.standard}
+- level="thorough": ${PLAN_LEVEL_CRITERIA.thorough}
 Do NOT use Plan Mode for answering questions or simple inquiries.`;
   }
 

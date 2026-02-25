@@ -23,7 +23,8 @@ The following tools are available in Plan Mode:
 
 ## Planning Workflow
 
-Choose the appropriate level based on the task complexity. If you discover the task is more complex than initially assessed, you MUST escalate to a higher level and inform the user.
+Choose the appropriate level based on the task complexity. If the target level was not explicitly chosen, assess the task and select the level that best matches the criteria below.
+If you discover the task is more complex than initially assessed, you MUST escalate to a higher level and inform the user.
 
 ### Level: minimal
 - **Criteria:** Single-purpose changes to 1-3 files where the fix is obvious (e.g., rename a variable, fix a typo, update a config value, add a simple test).
