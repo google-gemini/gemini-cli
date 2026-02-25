@@ -1,14 +1,9 @@
 /**
  * @license
- * Copyrimport type { AnsiOutput } from '../../utils/terminalSerializer.js';
-import type { SendMessageResult } from './a2a-client-manager.js';
-import {
-  A2AAgentError,
-  AgentCardNotFoundError,
-  AgentCardAuthError,
-  AgentAuthConfigMissingError,
-} from './a2a-errors.js';oogle LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * @license
  */
 
 import type {
