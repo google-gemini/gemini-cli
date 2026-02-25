@@ -14,9 +14,9 @@ import {
   HookType,
   HOOKS_CONFIG_FIELDS,
   type CommandHookConfig,
+  type HookDefinition,
 } from './types.js';
 import type { Config } from '../config/config.js';
-import type { HookDefinition } from './types.js';
 
 // Mock fs
 vi.mock('fs', () => ({
