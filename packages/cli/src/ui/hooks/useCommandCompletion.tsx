@@ -13,7 +13,7 @@ import { isSlashCommand } from '../utils/commandUtils.js';
 import { toCodePoints } from '../utils/textUtils.js';
 import { useAtCompletion } from './useAtCompletion.js';
 import { useSlashCompletion } from './useSlashCompletion.js';
-import { useShellCompletion, getTokenAtCursor } from './useShellCompletion.js';
+import { useShellCompletion } from './useShellCompletion.js';
 import type { PromptCompletion } from './usePromptCompletion.js';
 import {
   usePromptCompletion,
@@ -103,53 +103,22 @@ export function useCommandCompletion({
 
   const {
     completionMode,
-    query,
+    query: memoQuery,
     completionStart,
     completionEnd,
-    shellTokenIsCommand,
-    shellTokens,
-    shellCursorIndex,
-    shellCommandToken,
   } = useMemo(() => {
     const currentLine = buffer.lines[cursorRow] || '';
     const codePoints = toCodePoints(currentLine);
 
     if (shellModeActive) {
-      if (currentLine.trim().length === 0) {
-        return {
-          completionMode: CompletionMode.IDLE,
-          query: null,
-          completionStart: -1,
-          completionEnd: -1,
-          shellTokenIsCommand: false,
-          shellTokens: [],
-          shellCursorIndex: -1,
-          shellCommandToken: '',
-        };
-      }
-
-      const tokenInfo = getTokenAtCursor(currentLine, cursorCol);
-      if (tokenInfo) {
-        return {
-          completionMode: CompletionMode.SHELL,
-          query: tokenInfo.token,
-          completionStart: tokenInfo.start,
-          completionEnd: tokenInfo.end,
-          shellTokenIsCommand: tokenInfo.isFirstToken,
-          shellTokens: tokenInfo.tokens,
-          shellCursorIndex: tokenInfo.cursorIndex,
-          shellCommandToken: tokenInfo.commandToken,
-        };
-      }
       return {
-        completionMode: CompletionMode.SHELL,
+        completionMode:
+          currentLine.trim().length === 0
+            ? CompletionMode.IDLE
+            : CompletionMode.SHELL,
         query: '',
-        completionStart: cursorCol,
-        completionEnd: cursorCol,
-        shellTokenIsCommand: currentLine.trim().length === 0,
-        shellTokens: [''],
-        shellCursorIndex: 0,
-        shellCommandToken: '',
+        completionStart: -1,
+        completionEnd: -1,
       };
     }
 
@@ -189,10 +158,6 @@ export function useCommandCompletion({
           query: partialPath,
           completionStart: pathStart,
           completionEnd: end,
-          shellTokenIsCommand: false,
-          shellTokens: [],
-          shellCursorIndex: -1,
-          shellCommandToken: '',
         };
       }
     }
@@ -204,10 +169,6 @@ export function useCommandCompletion({
         query: currentLine,
         completionStart: 0,
         completionEnd: currentLine.length,
-        shellTokenIsCommand: false,
-        shellTokens: [],
-        shellCursorIndex: -1,
-        shellCommandToken: '',
       };
     }
 
@@ -225,10 +186,6 @@ export function useCommandCompletion({
         query: trimmedText,
         completionStart: 0,
         completionEnd: trimmedText.length,
-        shellTokenIsCommand: false,
-        shellTokens: [],
-        shellCursorIndex: -1,
-        shellCommandToken: '',
       };
     }
 
@@ -237,16 +194,12 @@ export function useCommandCompletion({
       query: null,
       completionStart: -1,
       completionEnd: -1,
-      shellTokenIsCommand: false,
-      shellTokens: [],
-      shellCursorIndex: -1,
-      shellCommandToken: '',
     };
   }, [cursorRow, cursorCol, buffer.lines, buffer.text, shellModeActive]);
 
   useAtCompletion({
     enabled: active && completionMode === CompletionMode.AT,
-    pattern: query || '',
+    pattern: memoQuery || '',
     config,
     cwd,
     setSuggestions,
@@ -256,7 +209,7 @@ export function useCommandCompletion({
   const slashCompletionRange = useSlashCompletion({
     enabled:
       active && completionMode === CompletionMode.SLASH && !shellModeActive,
-    query,
+    query: memoQuery,
     slashCommands,
     commandContext,
     setSuggestions,
@@ -264,17 +217,19 @@ export function useCommandCompletion({
     setIsPerfectMatch,
   });
 
-  useShellCompletion({
+  const shellCompletionRange = useShellCompletion({
     enabled: active && completionMode === CompletionMode.SHELL,
-    query: query || '',
-    isCommandPosition: shellTokenIsCommand,
-    tokens: shellTokens,
-    cursorIndex: shellCursorIndex,
-    commandToken: shellCommandToken,
+    line: buffer.lines[cursorRow] || '',
+    cursorCol,
     cwd,
     setSuggestions,
     setIsLoadingSuggestions,
   });
+
+  const query =
+    completionMode === CompletionMode.SHELL
+      ? shellCompletionRange.query
+      : memoQuery;
 
   const promptCompletion = usePromptCompletion({
     buffer,
@@ -334,6 +289,9 @@ export function useCommandCompletion({
       if (completionMode === CompletionMode.SLASH) {
         start = slashCompletionRange.completionStart;
         end = slashCompletionRange.completionEnd;
+      } else if (completionMode === CompletionMode.SHELL) {
+        start = shellCompletionRange.completionStart;
+        end = shellCompletionRange.completionEnd;
       }
 
       if (start === -1 || end === -1) {
@@ -363,6 +321,7 @@ export function useCommandCompletion({
       completionStart,
       completionEnd,
       slashCompletionRange,
+      shellCompletionRange,
     ],
   );
 
@@ -383,6 +342,9 @@ export function useCommandCompletion({
       if (completionMode === CompletionMode.SLASH) {
         start = slashCompletionRange.completionStart;
         end = slashCompletionRange.completionEnd;
+      } else if (completionMode === CompletionMode.SHELL) {
+        start = shellCompletionRange.completionStart;
+        end = shellCompletionRange.completionEnd;
       }
 
       // Add space padding for Tab completion (auto-execute gets padding from getCompletedText)
@@ -421,6 +383,7 @@ export function useCommandCompletion({
       completionStart,
       completionEnd,
       slashCompletionRange,
+      shellCompletionRange,
       getCompletedText,
     ],
   );

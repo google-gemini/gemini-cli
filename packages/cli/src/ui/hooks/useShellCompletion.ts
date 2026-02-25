@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useMemo } from 'react';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -405,16 +405,10 @@ export async function resolvePathCompletions(
 export interface UseShellCompletionProps {
   /** Whether shell completion is active. */
   enabled: boolean;
-  /** The partial query string (the token under the cursor). */
-  query: string;
-  /** Whether the token is in command position (first word). */
-  isCommandPosition: boolean;
-  /** The full list of parsed tokens */
-  tokens: string[];
-  /** The cursor index in the full list of parsed tokens */
-  cursorIndex: number;
-  /** The root command token */
-  commandToken: string;
+  /** The current line text. */
+  line: string;
+  /** The current cursor column. */
+  cursorCol: number;
   /** The current working directory for path resolution. */
   cwd: string;
   /** Callback to set suggestions on the parent state. */
@@ -423,33 +417,51 @@ export interface UseShellCompletionProps {
   setIsLoadingSuggestions: (isLoading: boolean) => void;
 }
 
+export interface UseShellCompletionReturn {
+  completionStart: number;
+  completionEnd: number;
+  query: string;
+}
+
 export function useShellCompletion({
   enabled,
-  query,
-  isCommandPosition,
-  tokens,
-  cursorIndex,
-  commandToken,
+  line,
+  cursorCol,
   cwd,
   setSuggestions,
   setIsLoadingSuggestions,
-}: UseShellCompletionProps): void {
-  const pathCacheRef = useRef<string[] | null>(null);
+}: UseShellCompletionProps): UseShellCompletionReturn {
+  const pathCachePromiseRef = useRef<Promise<string[]> | null>(null);
   const pathEnvRef = useRef<string>(process.env['PATH'] ?? '');
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  const tokenInfo = useMemo(
+    () => (enabled ? getTokenAtCursor(line, cursorCol) : null),
+    [enabled, line, cursorCol],
+  );
+
+  const {
+    token: query = '',
+    start: completionStart = -1,
+    end: completionEnd = -1,
+    isFirstToken: isCommandPosition = false,
+    tokens = [],
+    cursorIndex = -1,
+    commandToken = '',
+  } = tokenInfo || {};
 
   // Invalidate PATH cache when $PATH changes
   useEffect(() => {
     const currentPath = process.env['PATH'] ?? '';
     if (currentPath !== pathEnvRef.current) {
-      pathCacheRef.current = null;
+      pathCachePromiseRef.current = null;
       pathEnvRef.current = currentPath;
     }
   });
 
   const performCompletion = useCallback(async () => {
-    if (!enabled) {
+    if (!enabled || !tokenInfo) {
       setSuggestions([]);
       return;
     }
@@ -474,14 +486,17 @@ export function useShellCompletion({
       if (isCommandPosition) {
         setIsLoadingSuggestions(true);
 
-        if (!pathCacheRef.current) {
-          pathCacheRef.current = await scanPathExecutables(signal);
+        if (!pathCachePromiseRef.current) {
+          // We don't pass the signal here because we want the cache to finish
+          // even if this specific completion request is aborted.
+          pathCachePromiseRef.current = scanPathExecutables();
         }
 
+        const executables = await pathCachePromiseRef.current;
         if (signal.aborted) return;
 
         const queryLower = query.toLowerCase();
-        results = pathCacheRef.current
+        results = executables
           .filter((cmd) => cmd.toLowerCase().startsWith(queryLower))
           .sort((a, b) => {
             // Prioritize shorter commands as they are likely common built-ins
@@ -548,6 +563,7 @@ export function useShellCompletion({
     }
   }, [
     enabled,
+    tokenInfo,
     query,
     isCommandPosition,
     tokens,
@@ -595,4 +611,10 @@ export function useShellCompletion({
     },
     [],
   );
+
+  return {
+    completionStart,
+    completionEnd,
+    query,
+  };
 }
