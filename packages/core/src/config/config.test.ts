@@ -2534,6 +2534,29 @@ describe('Config Quota & Preview Model Access', () => {
       expect(config.isPlanEnabled()).toBe(false);
     });
   });
+
+  describe('getPlanModeRoutingEnabled', () => {
+    it('should default to true when not provided', async () => {
+      const config = new Config(baseParams);
+      expect(await config.getPlanModeRoutingEnabled()).toBe(true);
+    });
+
+    it('should return true when explicitly enabled in planSettings', async () => {
+      const config = new Config({
+        ...baseParams,
+        planSettings: { modelRouting: true },
+      });
+      expect(await config.getPlanModeRoutingEnabled()).toBe(true);
+    });
+
+    it('should return false when explicitly disabled in planSettings', async () => {
+      const config = new Config({
+        ...baseParams,
+        planSettings: { modelRouting: false },
+      });
+      expect(await config.getPlanModeRoutingEnabled()).toBe(false);
+    });
+  });
 });
 
 describe('Config JIT Initialization', () => {

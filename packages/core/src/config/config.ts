@@ -154,6 +154,7 @@ export interface SummarizeToolOutputSettings {
 
 export interface PlanSettings {
   directory?: string;
+  modelRouting?: boolean;
 }
 
 export interface TelemetrySettings {
@@ -739,6 +740,7 @@ export class Config {
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
+  private readonly planModeRoutingEnabled: boolean;
   private readonly modelSteering: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
@@ -830,6 +832,7 @@ export class Config {
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
+    this.planModeRoutingEnabled = params.planSettings?.modelRouting ?? true;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];
@@ -2384,6 +2387,10 @@ export class Config {
     await this.ensureExperimentsLoaded();
 
     return this.experiments?.flags[ExperimentFlags.USER_CACHING]?.boolValue;
+  }
+
+  async getPlanModeRoutingEnabled(): Promise<boolean> {
+    return this.planModeRoutingEnabled;
   }
 
   async getNumericalRoutingEnabled(): Promise<boolean> {
