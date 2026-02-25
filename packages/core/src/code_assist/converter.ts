@@ -72,12 +72,12 @@ interface VertexGenerationConfig {
 }
 
 export interface CaGenerateContentResponse {
-  response: VertexGenerateContentResponse;
+  response?: VertexGenerateContentResponse;
   traceId?: string;
 }
 
 interface VertexGenerateContentResponse {
-  candidates: Candidate[];
+  candidates?: Candidate[];
   automaticFunctionCallingHistory?: Content[];
   promptFeedback?: GenerateContentResponsePromptFeedback;
   usageMetadata?: GenerateContentResponseUsageMetadata;
@@ -94,7 +94,7 @@ interface VertexCountTokenRequest {
 }
 
 export interface CaCountTokenResponse {
-  totalTokens: number;
+  totalTokens?: number;
 }
 
 export function toCountTokenRequest(
@@ -112,7 +112,7 @@ export function fromCountTokenResponse(
   res: CaCountTokenResponse,
 ): CountTokensResponse {
   return {
-    totalTokens: res.totalTokens,
+    totalTokens: res.totalTokens ?? 0,
   };
 }
 

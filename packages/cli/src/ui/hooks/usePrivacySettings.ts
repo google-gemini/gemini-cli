@@ -103,7 +103,7 @@ async function getRemoteDataCollectionOptIn(
 ): Promise<boolean> {
   try {
     const resp = await server.getCodeAssistGlobalUserSetting();
-    return resp.freeTierDataCollectionOptin;
+    return resp.freeTierDataCollectionOptin ?? true;
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'response' in error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -128,5 +128,5 @@ async function setRemoteDataCollectionOptIn(
     cloudaicompanionProject: server.projectId,
     freeTierDataCollectionOptin: optIn,
   });
-  return resp.freeTierDataCollectionOptin;
+  return resp.freeTierDataCollectionOptin ?? optIn;
 }
