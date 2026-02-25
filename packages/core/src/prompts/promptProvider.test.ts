@@ -6,9 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PromptProvider } from './promptProvider.js';
-import { renderPlanningWorkflow } from './snippets.js';
 import type { Config } from '../config/config.js';
-import type { PlanningWorkflowOptions } from './snippets.js';
 import {
   getAllGeminiMdFilenames,
   DEFAULT_CONTEXT_FILENAME,
@@ -177,31 +175,5 @@ describe('PromptProvider', () => {
       );
       expect(prompt).toContain('/tmp/project-temp/plans/');
     });
-  });
-});
-
-describe('renderPlanningWorkflow', () => {
-  const baseOptions: PlanningWorkflowOptions = {
-    planModeToolsList: '<tool>read_file</tool>',
-    plansDir: '/tmp/plans',
-  };
-
-  it('should return empty string when options are undefined', () => {
-    expect(renderPlanningWorkflow(undefined)).toBe('');
-  });
-
-  it('should render the full planning workflow', () => {
-    const result = renderPlanningWorkflow(baseOptions);
-    expect(result).toMatchSnapshot();
-  });
-
-  it('should include approved plan section when path is provided', () => {
-    const result = renderPlanningWorkflow({
-      ...baseOptions,
-      approvedPlanPath: '/tmp/plans/my-plan.md',
-    });
-
-    expect(result).toContain('## Approved Plan');
-    expect(result).toContain('/tmp/plans/my-plan.md');
   });
 });
