@@ -373,6 +373,67 @@ describe('EditTool', () => {
       expect(result.occurrences).toBe(1);
     });
 
+    it('should correctly calculate matchRanges for exact multi-line replacements', async () => {
+      const content = 'line1\nmatch\nline\nline3\nmatch\nline\nline5';
+      const oldString = 'match\nline';
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string: oldString,
+          new_string: 'replacement',
+          allow_multiple: true,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.occurrences).toBe(2);
+      expect(result.matchRanges).toEqual([
+        { start: 2, end: 3 },
+        { start: 5, end: 6 },
+      ]);
+    });
+
+    it('should correctly calculate matchRanges for flexible multi-line replacements', async () => {
+      const content =
+        '  line1\n  match\n  line\n  line3\n  match\n  line\n  line5';
+      const oldString = 'match\nline';
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string: oldString,
+          new_string: 'replacement',
+          allow_multiple: true,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.occurrences).toBe(2);
+      expect(result.strategy).toBe('flexible');
+      expect(result.matchRanges).toEqual([
+        { start: 2, end: 3 },
+        { start: 5, end: 6 },
+      ]);
+    });
+
+    it('should correctly calculate matchRanges for regex replacements', async () => {
+      const content = '  function  foo() {\n    return 1;\n  }';
+      const oldString = 'function foo() {';
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.js',
+          old_string: oldString,
+          new_string: 'function bar() {',
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.strategy).toBe('regex');
+      expect(result.matchRanges).toEqual([{ start: 1, end: 1 }]);
+    });
+
     it('should perform a fuzzy replacement when exact match fails but similarity is high', async () => {
       const content =
         'const myConfig = {\n  enableFeature: true,\n  retries: 3\n};';

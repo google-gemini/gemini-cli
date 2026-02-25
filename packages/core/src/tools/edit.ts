@@ -138,18 +138,28 @@ async function calculateExactReplacement(
   const normalizedReplace = new_string.replace(/\r\n/g, '\n');
 
   const matchRanges: Array<{ start: number; end: number }> = [];
+  const searchNewlines = (normalizedSearch.match(/\n/g) || []).length;
+  let currentLine = 1;
+  let lastIndex = 0;
   let index = normalizedCode.indexOf(normalizedSearch);
+
   while (index !== -1) {
-    const startLine = normalizedCode
-      .substring(0, index)
-      .split(String.fromCharCode(10)).length;
-    const endLine =
-      startLine + normalizedSearch.split(String.fromCharCode(10)).length - 1;
+    // Count newlines from the last match to the current match.
+    const prefix = normalizedCode.substring(lastIndex, index);
+    for (let i = 0; i < prefix.length; i++) {
+      if (prefix[i] === '\n') {
+        currentLine++;
+      }
+    }
+
+    const startLine = currentLine;
+    const endLine = startLine + searchNewlines;
     matchRanges.push({ start: startLine, end: endLine });
-    index = normalizedCode.indexOf(
-      normalizedSearch,
-      index + normalizedSearch.length,
-    );
+
+    // Move currentLine past the newlines in the current match.
+    currentLine += searchNewlines;
+    lastIndex = index + normalizedSearch.length;
+    index = normalizedCode.indexOf(normalizedSearch, lastIndex);
   }
 
   const exactOccurrences = matchRanges.length;
@@ -197,11 +207,13 @@ async function calculateFlexibleReplacement(
 
   const sourceLines = normalizedCode.match(/.*(?:\n|$)/g)?.slice(0, -1) ?? [];
   const searchLinesStripped = normalizedSearch
-    .split(String.fromCharCode(10))
+    .split('\n')
     .map((line: string) => line.trim());
-  const replaceLines = normalizedReplace.split(String.fromCharCode(10));
+  const replaceLines = normalizedReplace.split('\n');
 
   let flexibleOccurrences = 0;
+  const matchRanges: Array<{ start: number; end: number }> = [];
+  let lineOffset = 0;
   let i = 0;
   while (i <= sourceLines.length - searchLinesStripped.length) {
     const window = sourceLines.slice(i, i + searchLinesStripped.length);
@@ -212,6 +224,10 @@ async function calculateFlexibleReplacement(
 
     if (isMatch) {
       flexibleOccurrences++;
+      matchRanges.push({
+        start: i + 1 - lineOffset,
+        end: i + searchLinesStripped.length - lineOffset,
+      });
       const firstLineInMatch = window[0];
       const indentationMatch = firstLineInMatch.match(/^([ \t]*)/);
       const indentation = indentationMatch ? indentationMatch[1] : '';
@@ -221,6 +237,7 @@ async function calculateFlexibleReplacement(
         searchLinesStripped.length,
         newBlockWithIndent.join('\n'),
       );
+      lineOffset += replaceLines.length - searchLinesStripped.length;
       i += replaceLines.length;
     } else {
       i++;
@@ -235,6 +252,8 @@ async function calculateFlexibleReplacement(
       occurrences: flexibleOccurrences,
       finalOldString: normalizedSearch,
       finalNewString: normalizedReplace,
+      strategy: 'flexible',
+      matchRanges,
     };
   }
 
@@ -257,13 +276,11 @@ async function calculateRegexReplacement(
 
   let processedString = normalizedSearch;
   for (const delim of delimiters) {
-    processedString = processedString
-      .split(String.fromCharCode(10))
-      .join(` ${delim} `);
+    processedString = processedString.split(delim).join(` ${delim} `);
   }
 
   // Split by any whitespace and remove empty strings.
-  const tokens = processedString.split(String.fromCharCode(10)).filter(Boolean);
+  const tokens = processedString.split(/\s+/).filter(Boolean);
 
   if (tokens.length === 0) {
     return null;
@@ -279,14 +296,32 @@ async function calculateRegexReplacement(
 
   // Always use a global regex to count all potential occurrences for accurate validation.
   const globalRegex = new RegExp(finalPattern, 'gm');
-  const matches = currentContent.match(globalRegex);
+  const matchRanges: Array<{ start: number; end: number }> = [];
+  let match;
+  let currentLine = 1;
+  let lastIndex = 0;
+  while ((match = globalRegex.exec(currentContent)) !== null) {
+    const prefix = currentContent.substring(lastIndex, match.index);
+    for (let i = 0; i < prefix.length; i++) {
+      if (prefix[i] === '\n') {
+        currentLine++;
+      }
+    }
+    const startLine = currentLine;
+    const matchContent = match[0];
+    const matchNewlines = (matchContent.match(/\n/g) || []).length;
+    matchRanges.push({ start: startLine, end: startLine + matchNewlines });
 
-  if (!matches) {
+    currentLine += matchNewlines;
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (matchRanges.length === 0) {
     return null;
   }
 
-  const occurrences = matches.length;
-  const newLines = normalizedReplace.split(String.fromCharCode(10));
+  const occurrences = matchRanges.length;
+  const newLines = normalizedReplace.split('\n');
 
   // Use the appropriate regex for replacement based on allow_multiple.
   const replaceRegex = new RegExp(
@@ -305,6 +340,8 @@ async function calculateRegexReplacement(
     occurrences,
     finalOldString: normalizedSearch,
     finalNewString: normalizedReplace,
+    strategy: 'regex',
+    matchRanges,
   };
 }
 
@@ -786,13 +823,11 @@ class EditToolInvocation
     }
 
     const oldStringSnippet =
-      this.params.old_string
-        .split(String.fromCharCode(10))[0]
-        .substring(0, 30) + (this.params.old_string.length > 30 ? '...' : '');
+      this.params.old_string.split('\n')[0].substring(0, 30) +
+      (this.params.old_string.length > 30 ? '...' : '');
     const newStringSnippet =
-      this.params.new_string
-        .split(String.fromCharCode(10))[0]
-        .substring(0, 30) + (this.params.new_string.length > 30 ? '...' : '');
+      this.params.new_string.split('\n')[0].substring(0, 30) +
+      (this.params.new_string.length > 30 ? '...' : '');
 
     if (this.params.old_string === this.params.new_string) {
       return `No file changes to ${shortenPath(relativePath)}`;
@@ -900,7 +935,7 @@ class EditToolInvocation
         };
       }
 
-      const totalLength = finalContent.split(String.fromCharCode(10)).length;
+      const totalLength = finalContent.split('\n').length;
       const metadataParts = [];
       if (editData.matchRanges && editData.matchRanges.length > 0) {
         if (editData.matchRanges.length === 1) {
@@ -1250,7 +1285,7 @@ async function calculateFuzzyReplacement(
     // so that indices remain valid
     selectedMatches.sort((a, b) => b.index - a.index);
 
-    const newLines = normalizedReplace.split(String.fromCharCode(10));
+    const newLines = normalizedReplace.split('\n');
 
     for (const match of selectedMatches) {
       // If we want to preserve the indentation of the first line of the match:
