@@ -214,7 +214,10 @@ on GitHub.
     plan, pull in extra details as needed, ultimately to give the LLM guardrails
     with artifacts. Measure twice, implement once!
 
+    `gemini extensions install https://github.com/gemini-cli-extensions/conductor`
+
     Blog:
+    [https://developers.googleblog.com/conductor-introducing-context-driven-development-for-gemini-cli/](https://developers.googleblog.com/conductor-introducing-context-driven-development-for-gemini-cli/)
 
   - **Endor Labs:** Perform code analysis, vulnerability scanning, and
     dependency checks using natural language.

@@ -251,10 +251,10 @@ describe('ExtensionRegistryClient', () => {
           hasSkills: false,
         },
         {
-          id: 'dummy-ext',
-          extensionName: 'dummy-ext',
-          extensionDescription: 'A dummy extension that actually matches.',
-          fullName: 'someone/dummy-ext',
+          id: 'conductor',
+          extensionName: 'conductor',
+          extensionDescription: 'A conductor extension that actually matches.',
+          fullName: 'someone/conductor',
           rank: 100,
           stars: 100,
           url: '',
@@ -273,10 +273,10 @@ describe('ExtensionRegistryClient', () => {
       ],
     });
 
-    const results = await client.searchExtensions('dummy-ext');
+    const results = await client.searchExtensions('conductor');
     const ids = results.map((r) => r.id);
 
     expect(ids).not.toContain('dataplex');
-    expect(ids).toContain('dummy-ext');
+    expect(ids).toContain('conductor');
   });
 });
