@@ -76,44 +76,23 @@ manually during a session.
 
 - **Natural Language:** Ask Gemini CLI to "start a plan for...". Gemini CLI then
   calls the [`enter_plan_mode`] tool to switch modes.
-  > **Note:** This tool is not available when Gemini CLI is in [YOLO mode].
 
 ### Planning Workflow
 
 Plan Mode uses an adaptive planning workflow where the depth and structure of
-the implementation plan are proportional to the task's complexity.
+the implementation plan are proportional to the task's complexity:
 
-#### 1. Assessment & Discovery
-
-Gemini CLI analyzes your requirements and explores the codebase to map affected
-modules, trace data flow, and identify dependencies.
-
-#### 2. Consultation
-
-For non-trivial changes or when multiple viable approaches exist, Gemini CLI
-will present a summary of the alternatives (including pros/cons and
-recommendations) and wait for your decision before drafting the detailed plan.
-
-#### 3. Drafting the Plan
-
-Gemini CLI writes the implementation plan to your
-[plans directory](#custom-plan-directory-and-policies). The plan's structure
-adapts to the task:
-
-- **Simple Tasks:** Focused on a list of specific **Changes** and
-  **Verification** steps.
-- **Standard Features:** Includes an **Objective**, a detailed **Implementation
-  Plan**, and **Verification**.
-- **Architectural Changes:** Comprehensive plans including **Background &
-  Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives
-  Considered**, and **Migration & Rollback** strategies.
-
-#### 4. Review & Approval
-
-Once the plan is drafted, Gemini CLI presents a summary and calls
-[`exit_plan_mode`] to request your approval. If you discover the task is more
-complex than initially assessed during any phase, Gemini CLI will automatically
-increase the depth of its planning.
+1.  **Explore & Analyze:** Analyze requirements and use read-only tools to map
+    affected modules and identify dependencies.
+2.  **Consult:** For non-trivial changes, present viable implementation
+    approaches via [`ask_user`] and wait for a selection.
+3.  **Draft:** Write a detailed implementation plan to the
+    [plans directory](#custom-plan-directory-and-policies). The plan's structure
+    adapts to the task (e.g., simple fixes vs. architectural changes).
+4.  **Review & Approval:** Use the [`exit_plan_mode`] tool to present the plan
+    and formally request approval.
+    - **Approve:** Exit Plan Mode and start implementation.
+    - **Iterate:** Provide feedback to refine the plan.
 
 For more complex or specialized planning tasks, you can
 [customize the planning workflow with skills](#customizing-planning-with-skills).
