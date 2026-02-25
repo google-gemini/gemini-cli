@@ -279,6 +279,12 @@ describe('Gemini Client (client.ts)', () => {
 
     client = new GeminiClient(mockConfig);
     await client.initialize();
+    vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue({
+      count: 0,
+    });
+    vi.spyOn(client['loopDetector'], 'addAndCheck').mockReturnValue({
+      count: 0,
+    });
     vi.mocked(mockConfig.getGeminiClient).mockReturnValue(client);
 
     vi.mocked(uiTelemetryService.setLastPromptTokenCount).mockClear();
@@ -1174,6 +1180,13 @@ ${JSON.stringify(
       })();
       mockTurnRunFn.mockReturnValue(mockStream);
 
+      vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue({
+        count: 0,
+      });
+      vi.spyOn(client['loopDetector'], 'addAndCheck').mockReturnValue({
+        count: 0,
+      });
+
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
         setTools: vi.fn(),
@@ -1908,6 +1921,13 @@ ${JSON.stringify(
         .mockReturnValueOnce(mockStream1)
         .mockReturnValueOnce(mockStream2);
 
+      vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue({
+        count: 0,
+      });
+      vi.spyOn(client['loopDetector'], 'addAndCheck').mockReturnValue({
+        count: 0,
+      });
+
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
         setTools: vi.fn(),
@@ -2001,6 +2021,13 @@ ${JSON.stringify(
           yield { type: GeminiEventType.InvalidStream };
         })(),
       );
+
+      vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue({
+        count: 0,
+      });
+      vi.spyOn(client['loopDetector'], 'addAndCheck').mockReturnValue({
+        count: 0,
+      });
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
@@ -2866,10 +2893,12 @@ ${JSON.stringify(
 
     it('should abort linked signal when loop is detected', async () => {
       // Arrange
-      vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue(false);
+      vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue({
+        count: 0,
+      });
       vi.spyOn(client['loopDetector'], 'addAndCheck')
-        .mockReturnValueOnce(false)
-        .mockReturnValueOnce(true);
+        .mockReturnValueOnce({ count: 0 })
+        .mockReturnValueOnce({ count: 2 });
 
       let capturedSignal: AbortSignal;
       mockTurnRunFn.mockImplementation((_modelConfigKey, _request, signal) => {
@@ -3014,6 +3043,13 @@ ${JSON.stringify(
           const response = `Response ${callCount}`;
           this.getResponseText.mockReturnValue(response);
           yield { type: GeminiEventType.Content, value: response };
+        });
+
+        vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue({
+          count: 0,
+        });
+        vi.spyOn(client['loopDetector'], 'addAndCheck').mockReturnValue({
+          count: 0,
         });
 
         const stream = client.sendMessageStream(request, signal, promptId);

@@ -634,9 +634,26 @@ export class GeminiClient {
     const controller = new AbortController();
     const linkedSignal = AbortSignal.any([signal, controller.signal]);
 
-    const loopDetected = await this.loopDetector.turnStarted(signal);
-    if (loopDetected) {
+    const loopResult = await this.loopDetector.turnStarted(signal);
+    if (loopResult.count > 1) {
       yield { type: GeminiEventType.LoopDetected };
+      return turn;
+    } else if (loopResult.count === 1) {
+      const feedback = [
+        {
+          text: `System: A loop has been detected. Details: ${loopResult.detail || 'Repetitive patterns identified'}. 
+Please take a step back, analyze your previous actions, and think about the problem again from a different perspective. Ensure you are making forward progress toward the goal and avoid repeating the same tool calls or responses without new results.`,
+        },
+      ];
+      // Recursive call with feedback
+      turn = yield* this.sendMessageStream(
+        feedback,
+        signal,
+        prompt_id,
+        boundedTurns - 1,
+        isInvalidStreamRetry,
+        displayContent,
+      );
       return turn;
     }
 
@@ -688,9 +705,28 @@ export class GeminiClient {
     let isInvalidStream = false;
 
     for await (const event of resultStream) {
-      if (this.loopDetector.addAndCheck(event)) {
+      const loopResult = this.loopDetector.addAndCheck(event);
+      if (loopResult.count > 1) {
         yield { type: GeminiEventType.LoopDetected };
         controller.abort();
+        return turn;
+      } else if (loopResult.count === 1) {
+        controller.abort();
+        const feedback = [
+          {
+            text: `System: A loop has been detected. Details: ${loopResult.detail || 'Repetitive patterns identified'}. 
+Please take a step back, analyze your previous actions, and think about the problem again from a different perspective. Ensure you are making forward progress toward the goal and avoid repeating the same tool calls or responses without new results.`,
+          },
+        ];
+        // Recursive call with feedback
+        turn = yield* this.sendMessageStream(
+          feedback,
+          signal,
+          prompt_id,
+          boundedTurns - 1,
+          isInvalidStreamRetry,
+          displayContent,
+        );
         return turn;
       }
       yield event;
