@@ -88,6 +88,7 @@ import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
+import { getPlanModeExitMessage } from '@google/gemini-cli-core/src/utils/approvalModeUtils.js';
 
 type ToolResponseWithParts = ToolCallResponseInfo & {
   llmContent?: PartListUnion;
@@ -123,24 +124,6 @@ function showCitations(settings: LoadedSettings): boolean {
     return enabled;
   }
   return true;
-}
-
-function getPlanModeExitMessage(
-  newMode: ApprovalMode,
-  isManual: boolean = false,
-): string {
-  const description =
-    newMode === ApprovalMode.AUTO_EDIT
-      ? 'Auto-Edit mode (edits will be applied automatically)'
-      : newMode === ApprovalMode.DEFAULT
-        ? 'Default mode (edits will require confirmation)'
-        : newMode === ApprovalMode.PLAN
-          ? 'Plan mode (read-only planning)'
-          : 'YOLO mode (all tool calls auto-approved)';
-  const prefix = isManual
-    ? 'User has manually exited Plan Mode.'
-    : 'Plan approved.';
-  return `${prefix} Switching to ${description}.`;
 }
 
 /**
