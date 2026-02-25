@@ -483,6 +483,13 @@ export function useShellCompletion({
         const queryLower = query.toLowerCase();
         results = pathCacheRef.current
           .filter((cmd) => cmd.toLowerCase().startsWith(queryLower))
+          .sort((a, b) => {
+            // Prioritize shorter commands as they are likely common built-ins
+            if (a.length !== b.length) {
+              return a.length - b.length;
+            }
+            return a.localeCompare(b);
+          })
           .slice(0, MAX_SHELL_SUGGESTIONS)
           .map((cmd) => ({
             label: cmd,
