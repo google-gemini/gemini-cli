@@ -184,6 +184,11 @@ describe('commandUtils', () => {
       expect(isAtCommand('hello@file')).toBe(false);
       expect(isAtCommand('text@path')).toBe(false);
     });
+
+    it('should return false for non-string input', () => {
+      expect(isAtCommand(123 as unknown as string)).toBe(false);
+      expect(isAtCommand({ text: '@file' } as unknown as string)).toBe(false);
+    });
   });
 
   describe('isSlashCommand', () => {
@@ -214,6 +219,11 @@ describe('commandUtils', () => {
       expect(isSlashCommand('/* This is a block comment */')).toBe(false);
       expect(isSlashCommand('/*\n * Multi-line comment\n */')).toBe(false);
       expect(isSlashCommand('/*comment without space*/')).toBe(false);
+    });
+
+    it('should return false for non-string input', () => {
+      expect(isSlashCommand(123 as unknown as string)).toBe(false);
+      expect(isSlashCommand({ cmd: '/help' } as unknown as string)).toBe(false);
     });
   });
 

@@ -20,6 +20,19 @@ export type TerminalBackgroundColor = string | undefined;
 
 const TERMINAL_CLEANUP_SEQUENCE = '\x1b[<u\x1b[>4;0m\x1b[?2004l';
 
+const GENERIC_TERMS = new Set([
+  'xterm',
+  'xterm-256color',
+  'screen',
+  'screen-256color',
+  'tmux',
+  'tmux-256color',
+  'vt100',
+  'linux',
+  'ansi',
+  'dumb',
+]);
+
 export function cleanupTerminalOnExit() {
   try {
     if (process.stdout?.fd !== undefined) {
@@ -104,6 +117,15 @@ export class TerminalCapabilityManager {
 
     if (!process.stdin.isTTY || !process.stdout.isTTY) {
       this.detectionComplete = true;
+      return;
+    }
+
+    if (this.shouldSkipActiveProbing(process.env)) {
+      debugLogger.log(
+        'Skipping active terminal capability probes for generic SSH terminal to avoid input corruption.',
+      );
+      this.detectionComplete = true;
+      this.enableSupportedModes();
       return;
     }
 
@@ -241,6 +263,25 @@ export class TerminalCapabilityManager {
         cleanup();
       }
     });
+  }
+
+  private shouldSkipActiveProbing(env: NodeJS.ProcessEnv): boolean {
+    const forceProbe =
+      env['GEMINI_CLI_FORCE_TERMINAL_CAPABILITY_PROBES'] === '1' ||
+      env['GEMINI_CLI_FORCE_TERMINAL_CAPABILITY_PROBES'] === 'true';
+    if (forceProbe) {
+      return false;
+    }
+
+    const isSsh = Boolean(
+      env['SSH_TTY'] || env['SSH_CONNECTION'] || env['SSH_CLIENT'],
+    );
+    if (!isSsh) {
+      return false;
+    }
+
+    const term = (env['TERM'] ?? '').toLowerCase();
+    return GENERIC_TERMS.has(term);
   }
 
   enableSupportedModes() {

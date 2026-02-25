@@ -10,6 +10,7 @@ import { EventEmitter } from 'node:events';
 import {
   enableKittyKeyboardProtocol,
   enableModifyOtherKeys,
+  enableBracketedPasteMode,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 
@@ -182,6 +183,23 @@ describe('TerminalCapabilityManager', () => {
 
     await promise;
     expect(manager.isKittyProtocolEnabled()).toBe(true);
+  });
+
+  it('should skip active probing on generic SSH terminals', async () => {
+    process.env['SSH_TTY'] = '/dev/pts/0';
+    process.env['TERM'] = 'xterm-256color';
+
+    const manager = TerminalCapabilityManager.getInstance();
+    await manager.detectCapabilities();
+
+    expect(fs.writeSync).not.toHaveBeenCalled();
+    expect(enableKittyKeyboardProtocol).not.toHaveBeenCalled();
+    expect(enableModifyOtherKeys).not.toHaveBeenCalled();
+    expect(enableBracketedPasteMode).toHaveBeenCalled();
+    expect(manager.isKittyProtocolEnabled()).toBe(false);
+
+    delete process.env['SSH_TTY'];
+    delete process.env['TERM'];
   });
 
   describe('modifyOtherKeys detection', () => {

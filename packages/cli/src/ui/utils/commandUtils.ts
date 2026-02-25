@@ -20,8 +20,9 @@ import type { Settings } from '../../config/settingsSchema.js';
  * @returns True if the query looks like an '@' command, false otherwise.
  */
 export const isAtCommand = (query: string): boolean =>
+  typeof query === 'string' &&
   // Check if starts with @ OR has a space, then @
-  query.startsWith('@') || /\s@/.test(query);
+  (query.startsWith('@') || /\s@/.test(query));
 
 /**
  * Checks if a query string potentially represents an '/' command.
@@ -31,6 +32,10 @@ export const isAtCommand = (query: string): boolean =>
  * @returns True if the query looks like an '/' command, false otherwise.
  */
 export const isSlashCommand = (query: string): boolean => {
+  if (typeof query !== 'string') {
+    return false;
+  }
+
   if (!query.startsWith('/')) {
     return false;
   }
