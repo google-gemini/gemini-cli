@@ -59,6 +59,10 @@ To standardize the process of updating changelog files (`latest.md`,
 
 *Use this path if the version number ends in `.0`.*
 
+**Important:** Based on the version, you must choose to follow either section
+A.1 for stable releases or A.2 for preview releases. Do not follow the
+instructions for the other section.
+
 ### A.1: Stable Release (e.g., `v0.28.0`)
 
 For a stable release, you will generate two distinct summaries from the
@@ -105,6 +109,10 @@ detailed **highlights** section for the release-specific page.
 
 *Use this path if the version number does **not** end in `.0`.*
 
+**Important:** Based on the version, you must choose to follow either section
+B.1 for stable patches or B.2 for preview patches. Do not follow the
+instructions for the other section.
+
 ### B.1: Stable Patch (e.g., `v0.28.1`)
 
 - **Target File**: `docs/changelogs/latest.md`
@@ -113,10 +121,12 @@ detailed **highlights** section for the release-specific page.
         `# Latest stable release: {{version}}`
     2.  Update the rease date. The line should read,
         `Released: {{release_date_month_dd_yyyy}}`
-    3.  **Prepend** the processed "What's Changed" list from the temporary file
+    3.  Determine if a "What's Changed" section exists in the temporary file
+        If so, continue to step 4. Otherwise, skip to step 5.
+    4.  **Prepend** the processed "What's Changed" list from the temporary file
         to the existing "What's Changed" list in `latest.md`. Do not change or
         replace the existing list, **only add** to the beginning of it.
-    4.  In the "Full Changelog", edit **only** the end of the URL. Identify the
+    5.  In the "Full Changelog", edit **only** the end of the URL. Identify the
         last part of the URL that looks like `...{previous_version}` and update
         it to be `...{version}`.
 
@@ -133,10 +143,12 @@ detailed **highlights** section for the release-specific page.
         `# Preview release: {{version}}`
     2.  Update the rease date. The line should read,
         `Released: {{release_date_month_dd_yyyy}}`
-    3.  **Prepend** the processed "What's Changed" list from the temporary file
+    3.  Determine if a "What's Changed" section exists in the temporary file
+        If so, continue to step 4. Otherwise, skip to step 5.
+    4.  **Prepend** the processed "What's Changed" list from the temporary file
         to the existing "What's Changed" list in `preview.md`. Do not change or
         replace the existing list, **only add** to the beginning of it.
-    4.  In the "Full Changelog", edit **only** the end of the URL. Identify the
+    5.  In the "Full Changelog", edit **only** the end of the URL. Identify the
         last part of the URL that looks like `...{previous_version}` and update
         it to be `...{version}`.
 
