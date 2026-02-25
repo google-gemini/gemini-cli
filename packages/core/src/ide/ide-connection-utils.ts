@@ -135,6 +135,9 @@ export async function getConnectionConfigFromFile(
   const portFileDir = path.join(os.tmpdir(), 'gemini', 'ide');
   let portFiles;
   try {
+    if (!fs.existsSync(portFileDir)) {
+      return undefined;
+    }
     portFiles = await fs.promises.readdir(portFileDir);
   } catch (e) {
     logger.debug('Failed to read IDE connection directory:', e);
