@@ -5,12 +5,22 @@
  */
 
 import { describe, expect } from 'vitest';
-import { ApprovalMode } from '@google/gemini-cli-core';
+import { ApprovalMode, PlanComplexity } from '@google/gemini-cli-core';
 import { evalTest } from './test-helper.js';
 import {
   assertModelHasOutput,
   checkModelOutputContent,
 } from './test-helper.js';
+
+function hasComplexity(expected: PlanComplexity): (args: string) => boolean {
+  return (args: string) => {
+    try {
+      return JSON.parse(args).complexity === expected;
+    } catch {
+      return false;
+    }
+  };
+}
 
 describe('plan_mode', () => {
   const TEST_PREFIX = 'Plan Mode: ';
@@ -164,6 +174,92 @@ describe('plan_mode', () => {
       }
 
       assertModelHasOutput(result);
+    },
+  });
+
+  // --- Complexity selection evals ---
+
+  evalTest('USUALLY_PASSES', {
+    name: 'should select minimal complexity for a single-file rename',
+    approvalMode: ApprovalMode.DEFAULT,
+    params: {
+      settings,
+    },
+    files: {
+      'src/utils.ts':
+        'export function calculateTotal(items: number[]): number {\n  return items.reduce((sum, item) => sum + item, 0);\n}\n',
+    },
+    prompt:
+      'Rename the function calculateTotal to computeSum in src/utils.ts. Plan the change first.',
+    assert: async (rig) => {
+      const wasCalled = await rig.waitForToolCall(
+        'enter_plan_mode',
+        undefined,
+        hasComplexity(PlanComplexity.MINIMAL),
+      );
+      expect(
+        wasCalled,
+        `Expected enter_plan_mode with complexity="${PlanComplexity.MINIMAL}"`,
+      ).toBe(true);
+    },
+  });
+
+  evalTest('USUALLY_PASSES', {
+    name: 'should select standard complexity for a typical feature',
+    approvalMode: ApprovalMode.DEFAULT,
+    params: {
+      settings,
+    },
+    files: {
+      'src/app.ts':
+        'export class App {\n  start() { console.log("started"); }\n}\n',
+      'src/config.ts': 'export const config = { port: 3000 };\n',
+    },
+    prompt:
+      'Add a health check endpoint that returns the app version and uptime. Plan this feature.',
+    assert: async (rig) => {
+      const wasCalled = await rig.waitForToolCall(
+        'enter_plan_mode',
+        undefined,
+        hasComplexity(PlanComplexity.STANDARD),
+      );
+      expect(
+        wasCalled,
+        `Expected enter_plan_mode with complexity="${PlanComplexity.STANDARD}"`,
+      ).toBe(true);
+    },
+  });
+
+  evalTest('USUALLY_PASSES', {
+    name: 'should select thorough complexity for an architectural redesign',
+    approvalMode: ApprovalMode.DEFAULT,
+    params: {
+      settings,
+    },
+    files: {
+      'src/auth/login.ts':
+        'export function login(user: string, pass: string) { return true; }\n',
+      'src/auth/session.ts':
+        'export function createSession() { return { id: "abc" }; }\n',
+      'src/db/users.ts':
+        'export function getUser(id: string) { return { id, name: "test" }; }\n',
+      'src/api/routes.ts':
+        'export const routes = ["/login", "/logout", "/dashboard"];\n',
+      'src/middleware/auth.ts':
+        'export function authMiddleware(req: any) { return true; }\n',
+    },
+    prompt:
+      'Redesign the authentication system to replace the current session-based auth with JWT tokens. This affects the login flow, session management, user database queries, API routes, and auth middleware. Plan this architectural change.',
+    assert: async (rig) => {
+      const wasCalled = await rig.waitForToolCall(
+        'enter_plan_mode',
+        undefined,
+        hasComplexity(PlanComplexity.THOROUGH),
+      );
+      expect(
+        wasCalled,
+        `Expected enter_plan_mode with complexity="${PlanComplexity.THOROUGH}"`,
+      ).toBe(true);
     },
   });
 });

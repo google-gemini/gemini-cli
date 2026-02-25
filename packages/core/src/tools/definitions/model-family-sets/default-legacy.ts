@@ -31,6 +31,7 @@ import {
   getExitPlanModeDeclaration,
   getActivateSkillDeclaration,
 } from '../dynamic-declaration-helpers.js';
+import { PlanComplexity } from '../../../plan/types.js';
 
 export const DEFAULT_LEGACY_SET: CoreToolSet = {
   read_file: {
@@ -667,6 +668,12 @@ The agent did not use the todo list because this task could be completed by a ti
           type: 'string',
           description:
             'Short reason explaining why you are entering plan mode.',
+        },
+        complexity: {
+          type: 'string',
+          enum: Object.values(PlanComplexity),
+          description:
+            'The required complexity of the planning phase. Use "minimal" for small, targeted fixes (1-3 files, clear scope). Use "standard" (default) for self-contained features or refactors. Use "thorough" for architectural changes, cross-cutting features, or when you need user feedback on design before implementation.',
         },
       },
     },

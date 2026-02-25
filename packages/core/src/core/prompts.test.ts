@@ -24,6 +24,7 @@ import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
 } from '../config/models.js';
 import { ApprovalMode } from '../policy/types.js';
+import { PlanComplexity } from '../plan/types.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import type { AnyDeclarativeTool } from '../tools/tools.js';
 import type { CallableTool } from '@google/genai';
@@ -113,6 +114,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       }),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
+      getPlanComplexity: vi.fn().mockReturnValue(PlanComplexity.STANDARD),
     } as unknown as Config;
   });
 
@@ -652,7 +654,16 @@ describe('Core System Prompt (prompts.ts)', () => {
     const prompt = getCoreSystemPrompt(mockConfig);
 
     expect(prompt).toContain(
-      'If the request is ambiguous, broad in scope, or involves creating a new feature/application, you MUST use the `enter_plan_mode` tool to design your approach before making changes. Do NOT use Plan Mode for straightforward bug fixes, answering questions, or simple inquiries.',
+      'When the task requires planning, use the `enter_plan_mode` tool with the appropriate complexity:',
+    );
+    expect(prompt).toContain('complexity="minimal"');
+    expect(prompt).toContain('complexity="standard"');
+    expect(prompt).toContain('complexity="thorough"');
+    expect(prompt).toContain(
+      'When in doubt between standard and thorough, prefer thorough',
+    );
+    expect(prompt).toContain(
+      'Do NOT use Plan Mode for answering questions or simple inquiries.',
     );
     expect(prompt).toMatchSnapshot();
   });
