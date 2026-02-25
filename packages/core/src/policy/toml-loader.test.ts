@@ -274,7 +274,7 @@ modes = ["autoEdit"]
 `,
       );
 
-      const getPolicyTier3 = (_dir: string) => 3; // Tier 3 (Workspace)
+      const getPolicyTier3 = (_dir: string) => 3; // Tier 3 (User)
       const result3 = await loadPoliciesFromToml([tempDir], getPolicyTier3);
 
       expect(result3.rules).toHaveLength(1);

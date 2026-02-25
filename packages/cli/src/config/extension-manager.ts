@@ -51,7 +51,7 @@ import {
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
   CoreToolCallStatus,
-  WORKSPACE_POLICY_TIER,
+  EXTENSION_POLICY_TIER,
   loadPoliciesFromToml,
   PolicyDecision,
   ApprovalMode,
@@ -780,7 +780,7 @@ Would you like to attempt to install via "git clone" instead?`,
       if (fs.existsSync(policyDir)) {
         const result = await loadPoliciesFromToml(
           [policyDir],
-          () => WORKSPACE_POLICY_TIER,
+          () => EXTENSION_POLICY_TIER,
         );
         rules = result.rules;
         checkers = result.checkers;
@@ -834,7 +834,7 @@ Would you like to attempt to install via "git clone" instead?`,
         if (result.errors.length > 0) {
           for (const error of result.errors) {
             debugLogger.warn(
-              `[ExtensionManager] Error loading policies from ${config.name}: ${error.message}`,
+              `[ExtensionManager] Error loading policies from ${config.name}: ${error.message}${error.details ? `\nDetails: ${error.details}` : ''}`,
             );
           }
         }
