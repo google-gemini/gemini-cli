@@ -6,6 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { calculateMainAreaWidth } from './ui-sizing.js';
+import type { Config } from '@google/gemini-cli-core';
 
 describe('ui-sizing', () => {
   describe('calculateMainAreaWidth', () => {
@@ -18,7 +19,10 @@ describe('ui-sizing', () => {
     ])(
       'should return %i when width=%i and altBuffer=%s',
       (expected, width, altBuffer) => {
-        expect(calculateMainAreaWidth(width, altBuffer)).toBe(expected);
+        const mockConfig = {
+          getUseAlternateBuffer: () => altBuffer,
+        } as unknown as Config;
+        expect(calculateMainAreaWidth(width, mockConfig)).toBe(expected);
       },
     );
   });

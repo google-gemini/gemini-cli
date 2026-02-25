@@ -566,10 +566,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
     useConsoleMessages();
 
-  const mainAreaWidth = calculateMainAreaWidth(
-    terminalWidth,
-    isAlternateBuffer,
-  );
+  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, config);
   // Derive widths for InputPrompt using shared helper
   const { inputWidth, suggestionsWidth } = useMemo(() => {
     const { inputWidth, suggestionsWidth } =

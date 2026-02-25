@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,7 +10,7 @@ import {
   useAlternateBuffer,
   isAlternateBufferEnabled,
 } from './useAlternateBuffer.js';
-import type { LoadedSettings } from '../../config/settings.js';
+import type { Config } from '@google/gemini-cli-core';
 
 vi.mock('../contexts/ConfigContext.js', () => ({
   useConfig: vi.fn(),
@@ -62,37 +62,19 @@ describe('useAlternateBuffer', () => {
 });
 
 describe('isAlternateBufferEnabled', () => {
-  it('should return true when settings.merged.ui.useAlternateBuffer is true', () => {
-    const settings = {
-      merged: {
-        ui: {
-          useAlternateBuffer: true,
-        },
-      },
-    } as unknown as LoadedSettings;
+  it('should return true when config.getUseAlternateBuffer returns true', () => {
+    const config = {
+      getUseAlternateBuffer: () => true,
+    } as unknown as Config;
 
-    expect(isAlternateBufferEnabled(settings)).toBe(true);
+    expect(isAlternateBufferEnabled(config)).toBe(true);
   });
 
-  it('should return false when settings.merged.ui.useAlternateBuffer is false', () => {
-    const settings = {
-      merged: {
-        ui: {
-          useAlternateBuffer: false,
-        },
-      },
-    } as unknown as LoadedSettings;
+  it('should return false when config.getUseAlternateBuffer returns false', () => {
+    const config = {
+      getUseAlternateBuffer: () => false,
+    } as unknown as Config;
 
-    expect(isAlternateBufferEnabled(settings)).toBe(false);
-  });
-
-  it('should return false when settings.merged.ui.useAlternateBuffer is undefined', () => {
-    const settings = {
-      merged: {
-        ui: {},
-      },
-    } as unknown as LoadedSettings;
-
-    expect(isAlternateBufferEnabled(settings)).toBe(false);
+    expect(isAlternateBufferEnabled(config)).toBe(false);
   });
 });
