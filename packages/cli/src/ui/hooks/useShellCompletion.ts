@@ -497,13 +497,16 @@ export function useShellCompletion({
     setIsLoadingSuggestions,
   ]);
 
-  // Debounced effect to trigger completion
   useEffect(() => {
     if (!enabled) {
       setSuggestions([]);
       setIsLoadingSuggestions(false);
-      return;
     }
+  }, [enabled, setSuggestions, setIsLoadingSuggestions]);
+
+  // Debounced effect to trigger completion
+  useEffect(() => {
+    if (!enabled) return;
 
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -519,7 +522,7 @@ export function useShellCompletion({
         clearTimeout(debounceRef.current);
       }
     };
-  }, [enabled, performCompletion, setSuggestions, setIsLoadingSuggestions]);
+  }, [enabled, performCompletion]);
 
   // Cleanup on unmount
   useEffect(
