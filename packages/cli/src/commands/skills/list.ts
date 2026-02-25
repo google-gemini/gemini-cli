@@ -20,7 +20,34 @@ export async function handleList(args: { all?: boolean }) {
   const workspaceDir = process.cwd();
   const settings = loadSettings(workspaceDir);
 
-  const configArgs = z.custom<CliArgs>().parse({ debug: false });
+  const configArgs: CliArgs = {
+    debug: false,
+    query: undefined,
+    model: undefined,
+    sandbox: undefined,
+    prompt: undefined,
+    promptInteractive: undefined,
+    yolo: undefined,
+    approvalMode: undefined,
+    policy: undefined,
+    allowedMcpServerNames: undefined,
+    allowedTools: undefined,
+    experimentalAcp: undefined,
+    extensions: undefined,
+    listExtensions: undefined,
+    resume: undefined,
+    listSessions: undefined,
+    deleteSession: undefined,
+    includeDirectories: undefined,
+    screenReader: undefined,
+    useWriteTodos: undefined,
+    outputFormat: undefined,
+    fakeResponses: undefined,
+    recordResponses: undefined,
+    rawOutput: undefined,
+    acceptRawOutputRisk: undefined,
+    isCommand: undefined,
+  };
   const config = await loadCliConfig(
     settings.merged,
     'skills-list-session',

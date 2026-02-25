@@ -248,8 +248,8 @@ export const addCommand: CommandModule = {
         timeout: parsedArgs.timeout,
         trust: parsedArgs.trust,
         description: parsedArgs.description,
-        includeTools: parsedArgs['include-tools'],
-        excludeTools: parsedArgs['exclude-tools'],
+        includeTools: parsedArgs['include-tools']?.flatMap((s) => s.split(',')),
+        excludeTools: parsedArgs['exclude-tools']?.flatMap((s) => s.split(',')),
       },
     );
     await exitCli();
