@@ -153,16 +153,30 @@ export function getTokenAtCursor(
     }
   }
 
-  // Cursor is past all tokens — treat as starting a new token at cursor position
-  // (useful when the user types a space and then presses Tab)
+  // Cursor is in whitespace between tokens, or at the start/end of the line.
+  // Find the appropriate insertion index for a new empty token.
+  let insertIndex = tokensInfo.length;
+  for (let idx = 0; idx < tokensInfo.length; idx++) {
+    if (cursorCol < tokensInfo[idx].start) {
+      insertIndex = idx;
+      break;
+    }
+  }
+
+  const newTokens = [
+    ...rawTokens.slice(0, insertIndex),
+    '',
+    ...rawTokens.slice(insertIndex),
+  ];
+
   return {
     token: '',
     start: cursorCol,
     end: cursorCol,
-    isFirstToken: tokensInfo.length === 0,
-    tokens: [...rawTokens, ''],
-    cursorIndex: rawTokens.length,
-    commandToken,
+    isFirstToken: insertIndex === 0,
+    tokens: newTokens,
+    cursorIndex: insertIndex,
+    commandToken: newTokens.length > 0 ? newTokens[0] : '',
   };
 }
 
