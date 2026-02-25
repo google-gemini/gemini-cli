@@ -62,7 +62,31 @@ vi.mock('node:path', async (importOriginal) => {
   };
 });
 
-// Mock ReadManyFilesTool
+vi.mock('../utils/sessionUtils.js', () => ({
+  SessionSelector: vi.fn().mockImplementation(() => ({
+    resolveSession: vi.fn().mockResolvedValue({
+      sessionData: {
+        messages: [
+          { type: 'user', content: [{ text: 'Hello' }] },
+          {
+            type: 'gemini',
+            content: [{ text: 'Hi' }],
+            toolCalls: [
+              {
+                id: 'call-1',
+                name: 'test_tool',
+                status: 'success',
+                resultDisplay: 'Tool output',
+              },
+            ],
+          },
+        ],
+      },
+      sessionPath: '/path/to/session.json',
+    }),
+  })),
+}));
+
 vi.mock(
   '@google/gemini-cli-core',
   async (
@@ -84,6 +108,13 @@ vi.mock(
       })),
       logToolCall: vi.fn(),
       isWithinRoot: vi.fn().mockReturnValue(true),
+      convertSessionToClientHistory: vi.fn().mockReturnValue([]),
+      partListUnionToString: vi.fn().mockImplementation((content) => {
+        if (Array.isArray(content)) {
+          return content.map((p) => p.text || '').join('');
+        }
+        return '';
+      }),
       LlmRole: {
         MAIN: 'main',
         SUBAGENT: 'subagent',
@@ -215,6 +246,27 @@ describe('GeminiAgent', () => {
     expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
       AuthType.USE_GEMINI,
       'test-api-key',
+    );
+    expect(mockSettings.setValue).toHaveBeenCalledWith(
+      SettingScope.User,
+      'security.auth.selectedType',
+      AuthType.USE_GEMINI,
+    );
+  });
+
+  it('should authenticate correctly with gemini-custom-url and base-url in _meta', async () => {
+    await agent.authenticate({
+      methodId: 'gemini-custom-url',
+      _meta: {
+        'api-key': 'test-api-key',
+        'base-url': 'https://custom.api.endpoint',
+      },
+    } as unknown as acp.AuthenticateRequest);
+
+    expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
+      AuthType.USE_GEMINI,
+      'test-api-key',
+      'https://custom.api.endpoint',
     );
     expect(mockSettings.setValue).toHaveBeenCalledWith(
       SettingScope.User,
@@ -437,6 +489,17 @@ describe('GeminiAgent', () => {
         modeId: 'plan',
       }),
     ).rejects.toThrow('Session not found: unknown');
+  });
+
+  it('should load an existing session', async () => {
+    const response = await agent.loadSession({
+      sessionId: 'test-session-id',
+      cwd: '/tmp',
+      mcpServers: [],
+    });
+
+    expect(mockConfig.getGeminiClient).toHaveBeenCalled();
+    expect(response.modes).toBeDefined();
   });
 });
 
