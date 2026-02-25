@@ -682,4 +682,63 @@ describe('SchedulerStateManager', () => {
       expect(snapshot[2].request.callId).toBe('3');
     });
   });
+
+  describe('progress field preservation', () => {
+    it('should preserve progress and progressTotal in toExecuting', () => {
+      const call = createValidatingCall('progress-1');
+      stateManager.enqueue([call]);
+      stateManager.dequeue();
+
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Executing,
+        {
+          progress: 5,
+          progressTotal: 10,
+          progressMessage: 'Working',
+          progressPercent: 50,
+        },
+      );
+
+      const active = stateManager.firstActiveCall as ExecutingToolCall;
+      expect(active.status).toBe(CoreToolCallStatus.Executing);
+      expect(active.progress).toBe(5);
+      expect(active.progressTotal).toBe(10);
+      expect(active.progressMessage).toBe('Working');
+      expect(active.progressPercent).toBe(50);
+    });
+
+    it('should preserve progress fields after a liveOutput update', () => {
+      const call = createValidatingCall('progress-2');
+      stateManager.enqueue([call]);
+      stateManager.dequeue();
+
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Executing,
+        {
+          progress: 5,
+          progressTotal: 10,
+          progressMessage: 'Working',
+          progressPercent: 50,
+        },
+      );
+
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Executing,
+        {
+          liveOutput: 'some output',
+        },
+      );
+
+      const active = stateManager.firstActiveCall as ExecutingToolCall;
+      expect(active.status).toBe(CoreToolCallStatus.Executing);
+      expect(active.liveOutput).toBe('some output');
+      expect(active.progress).toBe(5);
+      expect(active.progressTotal).toBe(10);
+      expect(active.progressMessage).toBe('Working');
+      expect(active.progressPercent).toBe(50);
+    });
+  });
 });
