@@ -322,10 +322,7 @@ export async function startInteractiveUI(
 
   registerCleanup(() => instance.unmount());
 
-  // Set up TTY check for interactive mode as defense-in-depth
-  // against orphaned processes when terminal closes without sending SIGHUP
-  const stopTtyCheck = setupTtyCheck();
-  registerCleanup(stopTtyCheck);
+  registerCleanup(setupTtyCheck());
 }
 
 export async function main() {
@@ -654,8 +651,7 @@ export async function main() {
       // input showing up in the output.
       process.stdin.setRawMode(true);
 
-      // Register raw mode restoration for cleanup on exit
-      // This ensures terminal is restored even on signal-induced exits
+      // This cleanup isn't strictly needed but may help in certain situations.
       registerSyncCleanup(() => {
         process.stdin.setRawMode(wasRaw);
       });

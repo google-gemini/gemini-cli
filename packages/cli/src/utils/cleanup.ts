@@ -10,7 +10,6 @@ import {
   Storage,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
-  debugLogger,
   ExitCodes,
 } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
@@ -18,6 +17,7 @@ import type { Config } from '@google/gemini-cli-core';
 const cleanupFunctions: Array<(() => void) | (() => Promise<void>)> = [];
 const syncCleanupFunctions: Array<() => void> = [];
 let configForTelemetry: Config | null = null;
+let isShuttingDown = false;
 
 export function registerCleanup(fn: (() => void) | (() => Promise<void>)) {
   cleanupFunctions.push(fn);
@@ -104,69 +104,44 @@ async function drainStdin() {
 }
 
 /**
- * Sets up signal handlers to ensure graceful shutdown and prevent orphaned
- * processes from consuming 100% CPU when the terminal is closed.
- *
- * Handles:
- * - SIGHUP: Terminal hangup (terminal window closed)
- * - SIGTERM: Termination request
- * - SIGINT: Interrupt (Ctrl+C) - as fallback, Ink handles this in interactive mode
+ * Gracefully shuts down the process, ensuring cleanup runs exactly once.
+ * Guards against concurrent shutdown from signals (SIGHUP, SIGTERM, SIGINT)
+ * and TTY loss detection racing each other.
  *
  * @see https://github.com/google-gemini/gemini-cli/issues/15874
  */
-let isShuttingDown = false;
-
-const gracefulShutdown = async (reason: string) => {
-  // Prevent multiple concurrent shutdown attempts
+async function gracefulShutdown(_reason: string) {
   if (isShuttingDown) {
     return;
   }
   isShuttingDown = true;
 
-  debugLogger.debug(`Shutting down gracefully due to ${reason}...`);
-  try {
-    await runExitCleanup();
-  } catch (err) {
-    debugLogger.debug(`Error during cleanup for ${reason}:`, err);
-  }
+  await runExitCleanup();
   process.exit(ExitCodes.SUCCESS);
-};
+}
 
 export function setupSignalHandlers() {
-  // SIGHUP is sent when terminal is closed - critical for preventing orphans
   process.on('SIGHUP', () => gracefulShutdown('SIGHUP'));
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-  // SIGINT is handled by Ink in interactive mode, but we need it for non-interactive
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
-/**
- * Sets up periodic TTY check to detect lost controlling terminal.
- * This is a defense-in-depth measure for cases where SIGHUP is not received
- * or not processed correctly (e.g., certain terminal emulators, tmux detach).
- *
- * @returns Cleanup function to stop the TTY check interval
- */
 export function setupTtyCheck(): () => void {
   let intervalId: ReturnType<typeof setInterval> | null = null;
   let isCheckingTty = false;
 
   intervalId = setInterval(async () => {
-    // Prevent concurrent TTY checks
     if (isCheckingTty || isShuttingDown) {
       return;
     }
 
-    // Skip check in sandbox mode or if explicitly running non-interactively
-    if (process.env['SANDBOX'] || process.env['GEMINI_NON_INTERACTIVE']) {
+    if (process.env['SANDBOX']) {
       return;
     }
 
-    // Check if we've lost both stdin and stdout TTY
     if (!process.stdin.isTTY && !process.stdout.isTTY) {
       isCheckingTty = true;
 
-      // Clear interval BEFORE starting cleanup to prevent race condition
       if (intervalId) {
         clearInterval(intervalId);
         intervalId = null;

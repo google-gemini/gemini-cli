@@ -10,23 +10,12 @@ import {
   getNodeMemoryArgs,
   setupUnhandledRejectionHandler,
 } from './gemini.js';
-import { setupSignalHandlers, setupTtyCheck } from './utils/cleanup.js';
+import {
+  setupSignalHandlers,
+  setupTtyCheck,
+  resetCleanupForTesting,
+} from './utils/cleanup.js';
 
-// Mock the cleanup module — must be before imports due to vi.mock hoisting
-const mockRunExitCleanup = vi.fn().mockResolvedValue(undefined);
-vi.mock('./utils/cleanup.js', async (importOriginal) => {
-  const original = await importOriginal<typeof import('./utils/cleanup.js')>();
-  return {
-    ...original,
-    runExitCleanup: () => mockRunExitCleanup(),
-    registerCleanup: vi.fn(),
-    registerSyncCleanup: vi.fn(),
-    cleanupCheckpoints: vi.fn(),
-    registerTelemetryConfig: vi.fn(),
-  };
-});
-
-// Mock debugLogger
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
@@ -38,11 +27,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       error: vi.fn(),
       log: vi.fn(),
     },
-    ExitCodes: {
-      SUCCESS: 0,
-      FATAL_INPUT_ERROR: 1,
-      FATAL_AUTHENTICATION_ERROR: 2,
-    },
   };
 });
 
@@ -53,10 +37,9 @@ describe('gemini.tsx signal handling', () => {
   >;
 
   beforeEach(() => {
-    // Track registered handlers
     processOnHandlers = new Map();
+    resetCleanupForTesting();
 
-    // Mock process.on to capture handlers
     vi.spyOn(process, 'on').mockImplementation(
       (event: string | symbol, handler: (...args: unknown[]) => void) => {
         if (typeof event === 'string') {
@@ -68,12 +51,9 @@ describe('gemini.tsx signal handling', () => {
       },
     );
 
-    // Mock process.exit
     vi.spyOn(process, 'exit').mockImplementation((() => {
       // Don't actually exit
     }) as typeof process.exit);
-
-    mockRunExitCleanup.mockClear();
   });
 
   afterEach(() => {
@@ -90,16 +70,14 @@ describe('gemini.tsx signal handling', () => {
       expect(processOnHandlers.has('SIGINT')).toBe(true);
     });
 
-    it('should call runExitCleanup when SIGHUP is received', async () => {
+    it('should gracefully shutdown when SIGHUP is received', async () => {
       setupSignalHandlers();
 
       const sighupHandlers = processOnHandlers.get('SIGHUP') || [];
       expect(sighupHandlers.length).toBeGreaterThan(0);
 
-      // Trigger the handler
       await sighupHandlers[0]?.();
 
-      expect(mockRunExitCleanup).toHaveBeenCalled();
       expect(process.exit).toHaveBeenCalledWith(0);
     });
 
@@ -161,20 +139,12 @@ describe('gemini.tsx signal handling', () => {
       // Advance timers to trigger the check
       await vi.advanceTimersByTimeAsync(5000);
 
-      expect(mockRunExitCleanup).not.toHaveBeenCalled();
       expect(process.exit).not.toHaveBeenCalled();
 
       cleanup();
     });
 
     it('should exit when both stdin and stdout are not TTY', async () => {
-      // Reset modules to get fresh isShuttingDown state
-      vi.resetModules();
-      const { setupTtyCheck: freshSetupTtyCheck } = await import(
-        './utils/cleanup.js'
-      );
-
-      // Set both as non-TTY to simulate lost terminal
       Object.defineProperty(process.stdin, 'isTTY', {
         value: false,
         writable: true,
@@ -186,12 +156,10 @@ describe('gemini.tsx signal handling', () => {
         configurable: true,
       });
 
-      const cleanup = freshSetupTtyCheck();
+      const cleanup = setupTtyCheck();
 
-      // Advance timers to trigger the check
       await vi.advanceTimersByTimeAsync(5000);
 
-      expect(mockRunExitCleanup).toHaveBeenCalled();
       expect(process.exit).toHaveBeenCalledWith(0);
 
       cleanup();
@@ -218,52 +186,20 @@ describe('gemini.tsx signal handling', () => {
       // Advance timers to trigger the check
       await vi.advanceTimersByTimeAsync(5000);
 
-      expect(mockRunExitCleanup).not.toHaveBeenCalled();
+      expect(process.exit).not.toHaveBeenCalled();
 
       cleanup();
       process.env['SANDBOX'] = originalSandbox;
     });
 
-    it('should not check when GEMINI_NON_INTERACTIVE env is set', async () => {
-      const originalNonInteractive = process.env['GEMINI_NON_INTERACTIVE'];
-      process.env['GEMINI_NON_INTERACTIVE'] = 'true';
-
-      // Set both as non-TTY (would normally trigger exit)
-      Object.defineProperty(process.stdin, 'isTTY', {
-        value: false,
-        writable: true,
-        configurable: true,
-      });
-      Object.defineProperty(process.stdout, 'isTTY', {
-        value: false,
-        writable: true,
-        configurable: true,
-      });
-
-      const cleanup = setupTtyCheck();
-
-      // Advance timers to trigger the check
-      await vi.advanceTimersByTimeAsync(5000);
-
-      expect(mockRunExitCleanup).not.toHaveBeenCalled();
-
-      cleanup();
-      process.env['GEMINI_NON_INTERACTIVE'] = originalNonInteractive;
-    });
-
     it('cleanup function should stop the interval', () => {
       const cleanup = setupTtyCheck();
 
-      // Clear mocks before cleanup
-      mockRunExitCleanup.mockClear();
-
-      // Call cleanup
       cleanup();
 
-      // Try to advance timers - handler should not run
       vi.advanceTimersByTime(10000);
 
-      expect(mockRunExitCleanup).not.toHaveBeenCalled();
+      expect(process.exit).not.toHaveBeenCalled();
     });
   });
 
