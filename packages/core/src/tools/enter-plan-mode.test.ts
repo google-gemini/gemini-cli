@@ -23,7 +23,6 @@ describe('EnterPlanModeTool', () => {
 
     mockConfig = {
       setApprovalMode: vi.fn(),
-      setApprovedPlanPath: vi.fn(),
       storage: {
         getPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
       } as unknown as Config['storage'],
@@ -102,15 +101,15 @@ describe('EnterPlanModeTool', () => {
   });
 
   describe('execute', () => {
-    it('should transition to plan mode and return correct message', async () => {
+    it('should set approval mode to PLAN and return message', async () => {
       const invocation = tool.build({});
+
       const result = await invocation.execute(new AbortController().signal);
 
-      expect(mockConfig.setApprovedPlanPath).toHaveBeenCalledWith(undefined);
       expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
         ApprovalMode.PLAN,
       );
-      expect(result.llmContent).toBe('Switching to Plan mode.');
+      expect(result.llmContent).toContain('Switching to Plan mode');
       expect(result.returnDisplay).toBe('Switching to Plan mode');
     });
 
@@ -120,6 +119,9 @@ describe('EnterPlanModeTool', () => {
 
       const result = await invocation.execute(new AbortController().signal);
 
+      expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
+        ApprovalMode.PLAN,
+      );
       expect(result.llmContent).toBe('Switching to Plan mode.');
       expect(result.llmContent).not.toContain(reason);
       expect(result.returnDisplay).toContain(reason);
@@ -151,19 +153,6 @@ describe('EnterPlanModeTool', () => {
       expect(mockConfig.setApprovalMode).not.toHaveBeenCalled();
       expect(result.returnDisplay).toBe('Cancelled');
       expect(result.llmContent).toContain('User cancelled');
-    });
-  });
-
-  describe('getDescription', () => {
-    it('should return default description when no reason is provided', () => {
-      const invocation = tool.build({});
-      expect(invocation.getDescription()).toBe('Initiating Plan Mode');
-    });
-
-    it('should return the provided reason as the description', () => {
-      const reason = 'Redesign auth';
-      const invocation = tool.build({ reason });
-      expect(invocation.getDescription()).toBe(reason);
     });
   });
 

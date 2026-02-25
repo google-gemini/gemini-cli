@@ -56,12 +56,6 @@ export class EnterPlanModeTool extends BaseDeclarativeTool<
     );
   }
 
-  protected override validateToolParamValues(
-    _params: EnterPlanModeParams,
-  ): string | null {
-    return null;
-  }
-
   override getSchema(modelId?: string) {
     return resolveToolDeclaration(ENTER_PLAN_MODE_DEFINITION, modelId);
   }
@@ -124,14 +118,13 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
       };
     }
 
-    this.config.setApprovedPlanPath(undefined);
     this.config.setApprovalMode(ApprovalMode.PLAN);
 
     return {
-      llmContent: `Switching to Plan mode.`,
+      llmContent: 'Switching to Plan mode.',
       returnDisplay: this.params.reason
         ? `Switching to Plan mode: ${this.params.reason}`
-        : `Switching to Plan mode`,
+        : 'Switching to Plan mode',
     };
   }
 }
