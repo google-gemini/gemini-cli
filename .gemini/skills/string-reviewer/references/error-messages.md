@@ -2,22 +2,22 @@
 
 Bad error messages frustrate users. Good error messages provide critical
 information when things are not working as expected. Error messages are often
-the main way developers interact with users when problems occur. 
+the main way developers interact with users when problems occur.
 
 Some error messages are caused by invalid user inputs or misuse of certain
 features and some are caused by product defects; all error messages require
 users to figure out what to do next.
 
-Great error messages answer two questions as clearly and concisely as possible: 
+Great error messages answer two questions as clearly and concisely as possible:
 
-1. What went wrong? 
+1. What went wrong?
 2. How can I fix it?
 
 ## Principles
 
 - Write concise error messages. Emphasize what's important. Cut unnecessary
   text.
-- Avoid double negatives. Readers find double negatives hard to parse. 
+- Avoid double negatives. Readers find double negatives hard to parse.
 - Converting from passive voice to active voice often makes sentences conciser
   and easier to understand.
 - Use terminology consistently for all error messages within a single feature.
@@ -42,4 +42,3 @@ for the following reasons:
 
 If possible, focus the error message on what went wrong rather than assigning
 blame.
-
