@@ -1,23 +1,23 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AyuDark } from './builtin/dark/ayu.js';
+import { AyuDark } from './builtin/dark/ayu-dark.js';
 import { AyuLight } from './builtin/light/ayu-light.js';
 import { AtomOneDark } from './builtin/dark/atom-one-dark.js';
-import { Dracula } from './builtin/dark/dracula.js';
+import { Dracula } from './builtin/dark/dracula-dark.js';
 import { GitHubDark } from './builtin/dark/github-dark.js';
 import { GitHubLight } from './builtin/light/github-light.js';
-import { GoogleCode } from './builtin/light/googlecode.js';
-import { Holiday } from './builtin/dark/holiday.js';
+import { GoogleCode } from './builtin/light/googlecode-light.js';
+import { Holiday } from './builtin/dark/holiday-dark.js';
 import { DefaultLight } from './builtin/light/default-light.js';
-import { DefaultDark } from './builtin/dark/default.js';
-import { ShadesOfPurple } from './builtin/dark/shades-of-purple.js';
+import { DefaultDark } from './builtin/dark/default-dark.js';
+import { ShadesOfPurple } from './builtin/dark/shades-of-purple-dark.js';
 import { SolarizedDark } from './builtin/dark/solarized-dark.js';
 import { SolarizedLight } from './builtin/light/solarized-light.js';
-import { XCode } from './builtin/light/xcode.js';
+import { XCode } from './builtin/light/xcode-light.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Theme, ThemeType, ColorsTheme } from './theme.js';
@@ -34,9 +34,9 @@ import {
   DEFAULT_INPUT_BACKGROUND_OPACITY,
   DEFAULT_BORDER_OPACITY,
 } from '../constants.js';
-import { ANSI } from './builtin/dark/ansi.js';
+import { ANSI } from './builtin/dark/ansi-dark.js';
 import { ANSILight } from './builtin/light/ansi-light.js';
-import { NoColorTheme } from './builtin/dark/no-color.js';
+import { NoColorTheme } from './builtin/no-color.js';
 import process from 'node:process';
 import { debugLogger, homedir } from '@google/gemini-cli-core';
 
