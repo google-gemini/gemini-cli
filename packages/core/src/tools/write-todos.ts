@@ -4,14 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ToolInvocation } from './tools.js';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
-  Kind,
-  type Todo,
-  type ToolResult,
-} from './tools.js';
+import type { ToolInvocation, Todo, ToolResult } from './tools.js';
+import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { WRITE_TODOS_TOOL_NAME } from './tool-names.js';
 import { WRITE_TODOS_DEFINITION } from './definitions/coreTools.js';

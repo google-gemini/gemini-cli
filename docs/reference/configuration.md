@@ -131,16 +131,27 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`general.enablePromptCompletion`** (boolean):
-  - **Description:** Enable AI-powered prompt completion suggestions while
-    typing.
-  - **Default:** `false`
+- **`general.plan.directory`** (string):
+  - **Description:** The directory where planning artifacts are stored. If not
+    specified, defaults to the system temporary directory.
+  - **Default:** `undefined`
   - **Requires restart:** Yes
+
+- **`general.plan.modelRouting`** (boolean):
+  - **Description:** Automatically switch between Pro and Flash models based on
+    Plan Mode status. Uses Pro for the planning phase and Flash for the
+    implementation phase.
+  - **Default:** `true`
 
 - **`general.retryFetchErrors`** (boolean):
   - **Description:** Retry on "exception TypeError: fetch failed sending
     request" errors.
   - **Default:** `false`
+
+- **`general.maxAttempts`** (number):
+  - **Description:** Maximum number of attempts for requests to the main chat
+    model. Cannot exceed 10.
+  - **Default:** `10`
 
 - **`general.debugKeystrokeLogging`** (boolean):
   - **Description:** Enable debug logging of keystrokes to the console.
@@ -641,6 +652,27 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `{}`
   - **Requires restart:** Yes
 
+- **`agents.browser.sessionMode`** (enum):
+  - **Description:** Session mode: 'persistent', 'isolated', or 'existing'.
+  - **Default:** `"persistent"`
+  - **Values:** `"persistent"`, `"isolated"`, `"existing"`
+  - **Requires restart:** Yes
+
+- **`agents.browser.headless`** (boolean):
+  - **Description:** Run browser in headless mode.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`agents.browser.profilePath`** (string):
+  - **Description:** Path to browser profile directory for session persistence.
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
+- **`agents.browser.visualModel`** (string):
+  - **Description:** Model override for the visual agent.
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
 #### `context`
 
 - **`context.fileName`** (string | string[]):
@@ -868,6 +900,14 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`security.enableConseca`** (boolean):
+  - **Description:** Enable the context-aware security checker. This feature
+    uses an LLM to dynamically generate and enforce security policies for tool
+    use based on your prompt, providing an additional layer of protection
+    against unintended actions.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 #### `advanced`
 
 - **`advanced.autoConfigureMemory`** (boolean):
@@ -968,6 +1008,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable model steering (user hints) to guide the model
     during tool execution.
   - **Default:** `false`
+
+- **`experimental.directWebFetch`** (boolean):
+  - **Description:** Enable web fetch behavior that bypasses LLM summarization.
+  - **Default:** `false`
+  - **Requires restart:** Yes
 
 #### `skills`
 
@@ -1228,8 +1273,8 @@ within your user's home folder.
 Environment variables are a common way to configure applications, especially for
 sensitive information like API keys or for settings that might change between
 environments. For authentication setup, see the
-[Authentication documentation](./authentication.md) which covers all available
-authentication methods.
+[Authentication documentation](../get-started/authentication.md) which covers
+all available authentication methods.
 
 The CLI automatically loads environment variables from an `.env` file. The
 loading order is:
@@ -1248,13 +1293,19 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 
 - **`GEMINI_API_KEY`**:
   - Your API key for the Gemini API.
-  - One of several available [authentication methods](./authentication.md).
+  - One of several available
+    [authentication methods](../get-started/authentication.md).
   - Set this in your shell profile (e.g., `~/.bashrc`, `~/.zshrc`) or an `.env`
     file.
 - **`GEMINI_MODEL`**:
   - Specifies the default Gemini model to use.
   - Overrides the hardcoded default
   - Example: `export GEMINI_MODEL="gemini-3-flash-preview"`
+- **`GEMINI_CLI_IDE_PID`**:
+  - Manually specifies the PID of the IDE process to use for integration. This
+    is useful when running Gemini CLI in a standalone terminal while still
+    wanting to associate it with a specific IDE instance.
+  - Overrides the automatic IDE detection logic.
 - **`GEMINI_CLI_HOME`**:
   - Specifies the root directory for Gemini CLI's user-level configuration and
     storage.
@@ -1594,15 +1645,15 @@ conventions and context.
   about the active instructional context.
 - **Importing content:** You can modularize your context files by importing
   other Markdown files using the `@path/to/file.md` syntax. For more details,
-  see the [Memory Import Processor documentation](../core/memport.md).
+  see the [Memory Import Processor documentation](./memport.md).
 - **Commands for memory management:**
   - Use `/memory refresh` to force a re-scan and reload of all context files
     from all configured locations. This updates the AI's instructional context.
   - Use `/memory show` to display the combined instructional context currently
     loaded, allowing you to verify the hierarchy and content being used by the
     AI.
-  - See the [Commands documentation](../cli/commands.md#memory) for full details
-    on the `/memory` command and its sub-commands (`show` and `refresh`).
+  - See the [Commands documentation](./commands.md#memory) for full details on
+    the `/memory` command and its sub-commands (`show` and `refresh`).
 
 By understanding and utilizing these configuration layers and the hierarchical
 nature of context files, you can effectively manage the AI's memory and tailor

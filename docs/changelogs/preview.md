@@ -1,6 +1,6 @@
-# Preview release: v0.30.0-preview.1
+# Preview release: v0.30.0-preview.5
 
-Released: February 19, 2026
+Released: February 24, 2026
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
@@ -25,6 +25,10 @@ npm install -g @google/gemini-cli@preview
 
 ## What's Changed
 
+- fix(patch): cherry-pick 2c1d6f8 to release/v0.30.0-preview.4-pr-19369 to patch
+  version v0.30.0-preview.4 and create version 0.30.0-preview.5 by
+  @gemini-cli-robot in
+  [#20086](https://github.com/google-gemini/gemini-cli/pull/20086)
 - fix(patch): cherry-pick 261788c to release/v0.30.0-preview.0-pr-19453 to patch
   version v0.30.0-preview.0 and create version 0.30.0-preview.1 by
   @gemini-cli-robot in
@@ -311,4 +315,4 @@ npm install -g @google/gemini-cli@preview
   [#19008](https://github.com/google-gemini/gemini-cli/pull/19008)
 
 **Full changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.29.0-preview.5...v0.30.0-preview.1
+https://github.com/google-gemini/gemini-cli/compare/v0.29.0-preview.5...v0.30.0-preview.5

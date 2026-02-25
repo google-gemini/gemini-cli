@@ -21,8 +21,10 @@ Jump in to Gemini CLI.
   personal and enterprise accounts.
 - **[Examples](./get-started/examples.md):** Practical examples of Gemini CLI in
   action.
-- **[Cheatsheet](./cli/cli-reference.md):** A quick reference for common
+- **[CLI cheatsheet](./cli/cli-reference.md):** A quick reference for common
   commands and options.
+- **[Gemini 3 on Gemini CLI](./get-started/gemini-3.md):** Learn about Gemini 3
+  support in Gemini CLI.
 
 ## Use Gemini CLI
 
@@ -48,68 +50,31 @@ User-focused guides and tutorials for daily development workflows.
 
 ## Features
 
-Technical reference documentation for each capability of Gemini CLI.
+Technical documentation for each capability of Gemini CLI.
 
-- **[/about](./cli/commands.md#about):** About Gemini CLI.
-- **[/auth](./get-started/authentication.md):** Authentication.
-- **[/bug](./cli/commands.md#bug):** Report a bug.
-- **[/chat](./cli/commands.md#chat):** Chat history.
-- **[/clear](./cli/commands.md#clear):** Clear screen.
-- **[/compress](./cli/commands.md#compress):** Compress context.
-- **[/copy](./cli/commands.md#copy):** Copy output.
-- **[/directory](./cli/commands.md#directory-or-dir):** Manage workspace.
-- **[/docs](./cli/commands.md#docs):** Open documentation.
-- **[/editor](./cli/commands.md#editor):** Select editor.
-- **[/extensions](./extensions/index.md):** Manage extensions.
-- **[/help](./cli/commands.md#help-or):** Show help.
-- **[/hooks](./hooks/index.md):** Hooks.
-- **[/ide](./ide-integration/index.md):** IDE integration.
-- **[/init](./cli/commands.md#init):** Initialize context.
-- **[/mcp](./tools/mcp-server.md):** MCP servers.
-- **[/memory](./cli/commands.md#memory):** Manage memory.
-- **[/model](./cli/model.md):** Model selection.
-- **[/policies](./cli/commands.md#policies):** Manage policies.
-- **[/privacy](./cli/commands.md#privacy):** Privacy notice.
-- **[/quit](./cli/commands.md#quit-or-exit):** Exit CLI.
-- **[/restore](./cli/checkpointing.md):** Restore files.
-- **[/resume](./cli/commands.md#resume):** Resume session.
-- **[/rewind](./cli/rewind.md):** Rewind.
-- **[/settings](./cli/settings.md):** Settings.
-- **[/setup-github](./cli/commands.md#setup-github):** GitHub setup.
-- **[/shells](./cli/commands.md#shells-or-bashes):** Manage processes.
-- **[/skills](./cli/skills.md):** Agent skills.
-- **[/stats](./cli/commands.md#stats):** Session statistics.
-- **[/terminal-setup](./cli/commands.md#terminal-setup):** Terminal keybindings.
-- **[/theme](./cli/themes.md):** Themes.
-- **[/tools](./cli/commands.md#tools):** List tools.
-- **[/vim](./cli/commands.md#vim):** Vim mode.
-- **[Activate skill (tool)](./tools/activate-skill.md):** Internal mechanism for
-  loading expert procedures.
-- **[Ask user (tool)](./tools/ask-user.md):** Internal dialog system for
-  clarification.
-- **[Checkpointing](./cli/checkpointing.md):** Automatic session snapshots.
-- **[File system (tool)](./tools/file-system.md):** Technical details for local
-  file operations.
-- **[Headless mode](./cli/headless.md):** Programmatic and scripting interface.
-- **[Internal documentation (tool)](./tools/internal-docs.md):** Technical
-  lookup for CLI features.
-- **[Memory (tool)](./tools/memory.md):** Storage details for persistent facts.
-- **[Model routing](./cli/model-routing.md):** Automatic fallback resilience.
-- **[Plan mode 🧪](./cli/plan-mode.md):** Use a safe, read-only mode for
-  planning complex changes.
-- **[Remote subagents 🧪](./core/remote-agents.md):** Connecting to and using
-  remote agents.
-- **[Sandboxing](./cli/sandbox.md):** Isolate tool execution.
-- **[Shell (tool)](./tools/shell.md):** Detailed system execution parameters.
-- **[Subagents 🧪](./core/subagents.md):** Using specialized agents for specific
+- **[Extensions](./extensions/index.md):** Extend Gemini CLI with new tools and
+  capabilities.
+- **[Agent Skills](./cli/skills.md):** Use specialized agents for specific
   tasks.
+- **[Checkpointing](./cli/checkpointing.md):** Automatic session snapshots.
+- **[Headless mode](./cli/headless.md):** Programmatic and scripting interface.
+- **[Hooks](./hooks/index.md):** Customize Gemini CLI behavior with scripts.
+- **[IDE integration](./ide-integration/index.md):** Integrate Gemini CLI with
+  your favorite IDE.
+- **[MCP servers](./tools/mcp-server.md):** Connect to and use remote agents.
+- **[Model routing](./cli/model-routing.md):** Automatic fallback resilience.
+- **[Model selection](./cli/model.md):** Choose the best model for your needs.
+- **[Plan mode 🔬](./cli/plan-mode.md):** Use a safe, read-only mode for
+  planning complex changes.
+- **[Subagents 🔬](./core/subagents.md):** Using specialized agents for specific
+  tasks.
+- **[Remote subagents 🔬](./core/remote-agents.md):** Connecting to and using
+  remote agents.
+- **[Rewind](./cli/rewind.md):** Rewind and replay sessions.
+- **[Sandboxing](./cli/sandbox.md):** Isolate tool execution.
+- **[Settings](./cli/settings.md):** Full configuration reference.
 - **[Telemetry](./cli/telemetry.md):** Usage and performance metric details.
-- **[Todo (tool)](./tools/todos.md):** Progress tracking specification.
 - **[Token caching](./cli/token-caching.md):** Performance optimization.
-- **[Web fetch (tool)](./tools/web-fetch.md):** URL retrieval and extraction
-  details.
-- **[Web search (tool)](./tools/web-search.md):** Google Search integration
-  technicals.
 
 ## Configuration
 
@@ -124,7 +89,6 @@ Settings and customization options for Gemini CLI.
   parameters like temperature and thinking budget.
 - **[Project context (GEMINI.md)](./cli/gemini-md.md):** Technical hierarchy of
   context files.
-- **[Settings](./cli/settings.md):** Full configuration reference.
 - **[System prompt override](./cli/system-prompt.md):** Instruction replacement
   logic.
 - **[Themes](./cli/themes.md):** UI personalization technical guide.
@@ -134,23 +98,31 @@ Settings and customization options for Gemini CLI.
 
 Deep technical documentation and API specifications.
 
-- **[Command reference](./cli/commands.md):** Detailed slash command guide.
-- **[Configuration reference](./get-started/configuration.md):** Settings and
+- **[Command reference](./reference/commands.md):** Detailed slash command
+  guide.
+- **[Configuration reference](./reference/configuration.md):** Settings and
   environment variables.
-- **[Keyboard shortcuts](./cli/keyboard-shortcuts.md):** Productivity tips.
-- **[Memory import processor](./core/memport.md):** How Gemini CLI processes
-  memory from various sources.
-- **[Policy engine](./core/policy-engine.md):** Fine-grained execution control.
-- **[Tools API](./core/tools-api.md):** The API for defining and using tools.
+- **[Keyboard shortcuts](./reference/keyboard-shortcuts.md):** Productivity
+  tips.
+- **[Memory import processor](./reference/memport.md):** How Gemini CLI
+  processes memory from various sources.
+- **[Policy engine](./reference/policy-engine.md):** Fine-grained execution
+  control.
+- **[Tools API](./reference/tools-api.md):** The API for defining and using
+  tools.
 
 ## Resources
 
 Support, release history, and legal information.
 
-- **[FAQ](./faq.md):** Answers to frequently asked questions.
-- **[Changelogs](./changelogs/index.md):** Highlights and notable changes.
-- **[Quota and pricing](./quota-and-pricing.md):** Limits and billing details.
-- **[Terms and privacy](./tos-privacy.md):** Official notices and terms.
+- **[FAQ](./resources/faq.md):** Answers to frequently asked questions.
+- **[Quota and pricing](./resources/quota-and-pricing.md):** Limits and billing
+  details.
+- **[Terms and privacy](./resources/tos-privacy.md):** Official notices and
+  terms.
+- **[Troubleshooting](./resources/troubleshooting.md):** Common issues and
+  solutions.
+- **[Uninstall](./resources/uninstall.md):** How to uninstall Gemini CLI.
 
 ## Development
 
