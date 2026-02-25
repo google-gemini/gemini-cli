@@ -17,7 +17,7 @@ import {
   widestLineFromStyledChars,
 } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { parseMarkdownToANSI } from './markdownParsingUtils.js';
+import { parseMarkdownToANSI } from './InlineMarkdownRenderer.js';
 import { stripUnsafeCharacters } from './textUtils.js';
 
 interface TableRendererProps {

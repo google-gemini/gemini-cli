@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import chalk from 'chalk';
-import { parseMarkdownToANSI } from './markdownParsingUtils.js';
+import { parseMarkdownToANSI } from './InlineMarkdownRenderer.js';
 
 // Mock the theme to use explicit colors instead of empty strings from the default theme.
 // This ensures that ansiColorize actually applies ANSI codes that we can verify.
