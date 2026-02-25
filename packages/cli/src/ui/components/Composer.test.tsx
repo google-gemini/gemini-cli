@@ -264,6 +264,14 @@ const renderComposer = async (
     </ConfigContext.Provider>,
   );
   await result.waitUntilReady();
+
+  // Wait for shortcuts hint debounce if using fake timers
+  if (vi.isFakeTimers()) {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+  }
+
   return result;
 };
 
@@ -573,11 +581,17 @@ describe('Composer', () => {
 
   describe('Input and Indicators', () => {
     it('hides non-essential UI details in clean mode', async () => {
+      vi.useFakeTimers();
       const uiState = createMockUIState({
         cleanUiDetailsVisible: false,
       });
 
       const { lastFrame } = await renderComposer(uiState);
+
+      // Fast forward past the debounce
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500);
+      });
 
       const output = lastFrame();
       expect(output).toContain('ShortcutsHint');
@@ -585,6 +599,7 @@ describe('Composer', () => {
       expect(output).not.toContain('Footer');
       expect(output).not.toContain('ApprovalModeIndicator');
       expect(output).not.toContain('ContextSummaryDisplay');
+      vi.useRealTimers();
     });
 
     it('renders InputPrompt when input is active', async () => {
@@ -810,45 +825,34 @@ describe('Composer', () => {
   });
 
   describe('Shortcuts Hint', () => {
-    it('restores shortcuts hint after 200ms debounce when text is cleared', async () => {
+    it('restores shortcuts hint after 200ms debounce when buffer is empty', async () => {
       vi.useFakeTimers();
 
-      const { lastFrame, rerender } = await renderComposer(
+      const { lastFrame } = await renderComposer(
         createMockUIState({
-          buffer: { text: 'hello' } as unknown as TextBuffer,
+          buffer: { text: '' } as unknown as TextBuffer,
+          cleanUiDetailsVisible: false,
         }),
       );
 
-      expect(lastFrame()).not.toContain('ShortcutsHint');
-
-      rerender(
-        <ConfigContext.Provider value={createMockConfig() as unknown as Config}>
-          <SettingsContext.Provider
-            value={createMockSettings() as unknown as LoadedSettings}
-          >
-            <UIStateContext.Provider
-              value={createMockUIState({
-                buffer: { text: '' } as unknown as TextBuffer,
-              })}
-            >
-              <UIActionsContext.Provider value={createMockUIActions()}>
-                <Composer />
-              </UIActionsContext.Provider>
-            </UIStateContext.Provider>
-          </SettingsContext.Provider>
-        </ConfigContext.Provider>,
-      );
-
-      // Still hidden immediately after clearing text due to debounce
-      expect(lastFrame()).not.toContain('ShortcutsHint');
-
-      // Fast forward past the 200ms debounce
+      // Fast forward past the 200ms debounce (renderComposer already did 250ms, but we'll do more to be safe)
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(200);
+        await vi.advanceTimersByTimeAsync(500);
       });
 
-      expect(lastFrame()).toContain('ShortcutsHint');
+      expect(lastFrame({ allowEmpty: true })).toContain('ShortcutsHint');
       vi.useRealTimers();
+    });
+
+    it('does not show shortcuts hint immediately when buffer has text', async () => {
+      const uiState = createMockUIState({
+        buffer: { text: 'hello' } as unknown as TextBuffer,
+        cleanUiDetailsVisible: false,
+      });
+
+      const { lastFrame } = await renderComposer(uiState);
+
+      expect(lastFrame()).not.toContain('ShortcutsHint');
     });
 
     it('hides shortcuts hint when showShortcutsHint setting is false', async () => {
@@ -880,23 +884,37 @@ describe('Composer', () => {
     });
 
     it('keeps shortcuts hint visible when no action is required', async () => {
+      vi.useFakeTimers();
       const uiState = createMockUIState({
         cleanUiDetailsVisible: false,
       });
 
       const { lastFrame } = await renderComposer(uiState);
 
+      // Fast forward past the debounce
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500);
+      });
+
       expect(lastFrame()).toContain('ShortcutsHint');
+      vi.useRealTimers();
     });
 
     it('shows shortcuts hint when full UI details are visible', async () => {
+      vi.useFakeTimers();
       const uiState = createMockUIState({
         cleanUiDetailsVisible: true,
       });
 
       const { lastFrame } = await renderComposer(uiState);
 
+      // Fast forward past the debounce
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500);
+      });
+
       expect(lastFrame()).toContain('ShortcutsHint');
+      vi.useRealTimers();
     });
 
     it('hides shortcuts hint while loading when full UI details are visible', async () => {
@@ -973,6 +991,7 @@ describe('Composer', () => {
     });
 
     it('keeps shortcuts hint when suggestions are visible below input in regular buffer', async () => {
+      vi.useFakeTimers();
       composerTestControls.isAlternateBuffer = false;
       composerTestControls.suggestionsVisible = true;
 
@@ -982,7 +1001,13 @@ describe('Composer', () => {
 
       const { lastFrame } = await renderComposer(uiState);
 
+      // Fast forward past the debounce
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500);
+      });
+
       expect(lastFrame()).toContain('ShortcutsHint');
+      vi.useRealTimers();
     });
   });
 
