@@ -2,10 +2,11 @@
 
 Bad error messages frustrate users. Good error messages provide critical
 information when things are not working as expected. Error messages are often
-the main way developers interact with users when problems occur. Some error
-messages are caused by invalid user inputs or misuse of certain features and
-some are caused by product defects; all error messages require users to figure
-out what to do next.
+the main way developers interact with users when problems occur. 
+
+Some error messages are caused by invalid user inputs or misuse of certain
+features and some are caused by product defects; all error messages require
+users to figure out what to do next.
 
 Great error messages answer two questions as clearly and concisely as possible: 
 

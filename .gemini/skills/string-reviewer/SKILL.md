@@ -14,90 +14,25 @@ Act as a Senior UX Writer. Look for user-facing strings that are too long,
 unclear, or inconsistent. This includes inline text, error messages, and other
 user-facing text.
 
-Do NOT automatically change strings without user approval, as the context may be  
-important. You must only suggest changes and do not attempt to rewrite them
-directly unless the user explicitly asks you to do so.
+Do NOT automatically change strings without user approval. You must only suggest
+changes and do not attempt to rewrite them directly unless the user explicitly
+asks you to do so.
 
-### Step 1: Determine if the text adheres to good UX writing principles
+### Determine if the text adheres to good UX writing principles
 
 Use these basic principles of good UX writing as a guide for your suggestions. 
-These principles include clarity, usefulness, brevity, and style:
 
-#### Clarity
+- **Clarity:** Text is easy to understand. Text is easy to follow. 60 or higher
+  readability score based on the Flesch-Kincaid model. No errors or typos.
+- **Usefulness:** Users get the info they need, when they need it. Use plain,
+  familiar language. Concepts are explained; value props are user-focused.
+- **Brevity:** Language is precise. Short, simple sentences; active voice. Text
+  is broken up; scannable.
+- **Style:** Friendly, helpful, positive, and humble tone. Sentence-style
+  capitalization. Solitary sentences aren't punctuated. Speaks to the user
+  ("you").
 
-- Text is easy to understand
-- Text is easy to follow
-- 60 or higher readability score based on the Flesch-Kincaid model
-- No errors or typos
-
-#### Usefulness
-
-- Users get the info they need, when they need it
-- Use plain, familiar language
-- Concepts are explained; value props are user-focused
-
-#### Brevity
-
-- Language is precise
-- Short, simple sentences; active voice
-- Text is broken up; scannable
-
-#### Style
-
-- Friendly, helpful, positive, and humble tone
-- Sentence-style capitalization
-- Solitary sentences aren't punctuated
-- Speaks to the user ("you")
-
-### Step 2: Ensure that error messages are actionable by the end user
-
-If the text is an error message, ensure that it provides actionable information 
-to the end user. Review the reference at [error message guidelines](./references/error-messages.md) 
-for more details.
-
-### Step 3: Ensure consistent use of keyboard shortcuts
-
-Our preferred style is `Modifier+Key`. Modifiers should be capitalized, and the
-key should be uppercase. There should be no additional spaces.
-
-- **"Escape"** should be written as `Esc` for brevity.
-- If there are space constraints, it is acceptable to use Unicode symbols for
-  modifiers, for example `⇧+K` for `Shift+K`, or `⏎` for `Enter`. 
-
-#### Examples
-
-- `Ctrl+C`
-- `Esc`
-- `Shift+Tab`
-
-### Step 4: Ensure that settings and options are presented in a consistent format
-
-#### Noun-First Labeling (Scannability):
-
-Labels must start with the subject of the setting, not the action. This allows
-users to scan for the feature they want to change.
-
-- **Rule:** `[Noun]` `[Attribute/Action]`
-- **Example:** `Show line numbers` becomes simply `Line numbers`
-
-#### Positive Boolean Logic (Cognitive Ease):
-
-Eliminate "double negatives." Booleans should represent the presence of a
-feature, not its absence.
-
-   - **Rule:** Replace `Disable {feature}` or `Hide {Feature}` with `{Feature} enabled` or simply `{Feature}`.
-   - **Example:** Change "Disable auto update" to "Auto update".
-   - **Implementation:** Invert the boolean value in your config loader so true always equals `On`
-
-#### Verb Stripping (Brevity):
-  
-Remove redundant leading verbs like "Enable," "Use," "Display," or "Show" unless
-they are part of a specific technical term.
-
-- **Rule**: If the label works without the verb, remove it
-- **Example**: Change `Enable prompt completion` to `Prompt completion`
-
-### Step 5: Enforce general style guidelines
+### Enforce general style guidelines
 
 1. Don't use a period after a single sentence. When a sentence appears by itself
    on its own line, do not end it with a period. Use a period if the sentence is
@@ -111,20 +46,42 @@ they are part of a specific technical term.
 4. Use ampersands instead of “and” sparingly. Don't use "+" instead of "&".
 5. Only capitalize the first word in titles and headings.
 6. Use a serial/Oxford comma to separate items in a list.
-7. Avoid pleasantries like “sorry”. Instead, be clear about the issue and
-   promote a positive solution.
 
-### Step 6: Use consistent terminology
+### Ensure consistent style for settings and options
 
-Finally, review the text for consistent use of terminology. A full list of
-preferred terminology can be found in the [terminology reference](./references/terminology.md).
+If the file `packages/cli/src/config/settingsSchema.ts` has been modified,
+confirm that labels and descriptions adhere to the criteria in [Settings
+guidelines](./references/settings.md).
 
-### Step 7: Output format
+### Ensure that error messages are actionable by the end user
+
+If a file contains an error message, ensure that it provides actionable
+information to the end user. Review the reference at [error message
+guidelines](./references/error-messages.md) for more details.
+
+### Ensure consistent use of keyboard shortcuts
+
+If the string contains a keyboard shortcut, ensure it is rendered as
+`Modifier+Key`. Modifiers should be capitalized, and the key should be
+uppercase. There should be no additional spaces.
+
+- **"Escape"** should be written as `Esc` for brevity.
+- If there are space constraints, it is acceptable to use Unicode symbols for
+  modifiers, for example `⇧+K` for `Shift+K`, or `⏎` for `Enter`. 
+
+### Use consistent terminology
+
+Finally, review the text to ensure that strings adhere to our word list that
+shows preferred terms, terms that we do not use, and terms that should be used
+with caution.Reference the [word list](./references/word-list.md) for a complete
+list.
+
+### Output format
 When suggesting changes, always present your review using the following list
 format. Do not provide suggestions outside of this list.
 
 ```
-1. {rationale}
+1. **{rationale}**
   - ❌ "{incorrect phrase}"
   - ✅ `"{corrected phrase}"`
 ```
