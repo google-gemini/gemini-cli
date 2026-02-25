@@ -39,7 +39,6 @@ export const BINARY_FILE_PATTERNS: string[] = [
   '**/*.rar',
   '**/*.7z',
   '**/*.doc',
-  '**/*.docx',
   '**/*.xls',
   '**/*.xlsx',
   '**/*.ppt',

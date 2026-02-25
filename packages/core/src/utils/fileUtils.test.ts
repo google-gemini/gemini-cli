@@ -20,7 +20,7 @@ import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-// eslint-disable-next-line import/no-internal-modules
+ 
 import mime from 'mime/lite';
 
 import {
@@ -724,7 +724,6 @@ describe('fileUtils', () => {
       // filePathForDetectTest is already a text file by default from beforeEach
       expect(await detectFileType(filePathForDetectTest)).toBe('text');
     });
-
     it('should detect .adp files with XML content as text, not audio (#16888)', async () => {
       const adpFilePath = path.join(tempRootDir, 'test.adp');
       const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
@@ -741,6 +740,14 @@ describe('fileUtils', () => {
       expect(await detectFileType(adpFilePath)).toBe('text');
 
       actualNodeFs.unlinkSync(adpFilePath);
+    });
+
+    it('should detect docx type for .docx files', async () => {
+      expect(await detectFileType('document.docx')).toBe('docx');
+    });
+
+    it('should treat .doc as binary', async () => {
+      expect(await detectFileType('legacy.doc')).toBe('binary');
     });
   });
 
@@ -794,6 +801,29 @@ describe('fileUtils', () => {
       );
       expect(result.error).toContain('Simulated read error');
       expect(result.returnDisplay).toContain('Simulated read error');
+    });
+
+    it('should provide guidance when encountering a .docx file', async () => {
+      const docxPath = path.join(tempRootDir, 'test.docx');
+      actualNodeFs.writeFileSync(docxPath, 'fake docx content');
+      const result = await processSingleFileContent(
+        docxPath,
+        tempRootDir,
+        new StandardFileSystemService(),
+      );
+      expect(result.llmContent).toContain(
+        "Support for reading this document is provided via the 'safe-docx' extension",
+      );
+      // Installation command should NOT be in llmContent (security mitigation)
+      expect(result.llmContent).not.toContain(
+        'gemini extensions install usejunior/safe-docx',
+      );
+      // Sanitized filename check
+      expect(result.llmContent).toContain('"test.docx"');
+
+      expect(result.returnDisplay).toBe(
+        `Detected Word document: test.docx. Support is provided via the 'safe-docx' extension.\nTo install it, run: gemini extensions install usejunior/safe-docx`,
+      );
     });
 
     it('should handle read errors for image/pdf files', async () => {

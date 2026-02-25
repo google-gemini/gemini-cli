@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import type { PartUnion } from '@google/genai';
-// eslint-disable-next-line import/no-internal-modules
+ 
 import mime from 'mime/lite';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from '../tools/tool-error.js';
@@ -336,8 +336,14 @@ export async function isBinaryFile(filePath: string): Promise<boolean> {
  */
 export async function detectFileType(
   filePath: string,
-): Promise<'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' | 'svg'> {
+): Promise<
+  'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' | 'svg' | 'docx'
+> {
   const ext = path.extname(filePath).toLowerCase();
+
+  if (ext === '.docx') {
+    return 'docx';
+  }
 
   // The mimetype for various TypeScript extensions (ts, mts, cts, tsx) can be
   // MPEG transport stream (a video format), but we want to assume these are
@@ -453,6 +459,17 @@ export async function processSingleFileContent(
         return {
           llmContent: `Cannot display content of binary file: ${relativePathForDisplay}`,
           returnDisplay: `Skipped binary file: ${relativePathForDisplay}`,
+        };
+      }
+      case 'docx': {
+        // TODO: In the future, explicitly check if a .docx extension is active.
+        // For now, suggest installing the safe-docx extension as per #20298.
+        return {
+          llmContent: `The file "${relativePathForDisplay.replace(
+            /"/g,
+            '\\"',
+          )}" is a Word document (.docx). Support for reading this document is provided via the 'safe-docx' extension.`,
+          returnDisplay: `Detected Word document: ${relativePathForDisplay}. Support is provided via the 'safe-docx' extension.\nTo install it, run: gemini extensions install usejunior/safe-docx`,
         };
       }
       case 'svg': {
