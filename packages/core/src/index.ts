@@ -83,7 +83,6 @@ export * from './utils/fileDiffUtils.js';
 export * from './utils/retry.js';
 export * from './utils/shell-utils.js';
 export { PolicyDecision, ApprovalMode } from './policy/types.js';
-export { PlanLevel } from './plan/types.js';
 export * from './utils/tool-utils.js';
 export * from './utils/terminalSerializer.js';
 export * from './utils/systemEncoding.js';

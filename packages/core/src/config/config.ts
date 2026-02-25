@@ -107,7 +107,6 @@ import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
-import { PlanLevel } from '../plan/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type {
   UserTierId,
@@ -745,7 +744,6 @@ export class Config {
   private lastModeSwitchTime: number = performance.now();
   readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
-  private planLevel: PlanLevel = PlanLevel.STANDARD;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -1896,10 +1894,6 @@ export class Config {
       currentMode !== mode &&
       (currentMode === ApprovalMode.YOLO || mode === ApprovalMode.YOLO);
 
-    if (isExitingPlanMode) {
-      this.planLevel = PlanLevel.STANDARD;
-    }
-
     if (isPlanModeTransition || isYoloModeTransition) {
       this.syncPlanModeTools();
       this.updateSystemInstructionIfInitialized();
@@ -2177,14 +2171,6 @@ export class Config {
 
   setApprovedPlanPath(path: string | undefined): void {
     this.approvedPlanPath = path;
-  }
-
-  getPlanLevel(): PlanLevel {
-    return this.planLevel;
-  }
-
-  setPlanLevel(level: PlanLevel): void {
-    this.planLevel = level;
   }
 
   isAgentsEnabled(): boolean {

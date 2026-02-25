@@ -11,7 +11,6 @@ import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { ApprovalMode } from '../policy/types.js';
-import { PlanLevel } from '../plan/types.js';
 
 describe('EnterPlanModeTool', () => {
   let tool: EnterPlanModeTool;
@@ -24,7 +23,6 @@ describe('EnterPlanModeTool', () => {
 
     mockConfig = {
       setApprovalMode: vi.fn(),
-      setPlanLevel: vi.fn(),
       setApprovedPlanPath: vi.fn(),
       storage: {
         getPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
@@ -104,48 +102,17 @@ describe('EnterPlanModeTool', () => {
   });
 
   describe('execute', () => {
-    it.each([
-      {
-        name: 'default level',
-        params: {},
-        expectedLevel: PlanLevel.STANDARD,
-        expectedLlmContent: 'Switching to Plan mode (standard).',
-        expectedDisplay: 'Switching to Plan mode (standard)',
-      },
-      {
-        name: 'thorough level',
-        params: { level: PlanLevel.THOROUGH },
-        expectedLevel: PlanLevel.THOROUGH,
-        expectedLlmContent: 'Switching to Plan mode (thorough).',
-        expectedDisplay: 'Switching to Plan mode (thorough)',
-      },
-      {
-        name: 'minimal level with reason',
-        params: { reason: 'Quick rename', level: PlanLevel.MINIMAL },
-        expectedLevel: PlanLevel.MINIMAL,
-        expectedLlmContent: 'Switching to Plan mode (minimal).',
-        expectedDisplay: 'Switching to Plan mode (minimal): Quick rename',
-      },
-    ])(
-      'should set level and return correct message ($name)',
-      async ({
-        params,
-        expectedLevel,
-        expectedLlmContent,
-        expectedDisplay,
-      }) => {
-        const invocation = tool.build(params);
-        const result = await invocation.execute(new AbortController().signal);
+    it('should transition to plan mode and return correct message', async () => {
+      const invocation = tool.build({});
+      const result = await invocation.execute(new AbortController().signal);
 
-        expect(mockConfig.setPlanLevel).toHaveBeenCalledWith(expectedLevel);
-        expect(mockConfig.setApprovedPlanPath).toHaveBeenCalledWith(undefined);
-        expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
-          ApprovalMode.PLAN,
-        );
-        expect(result.llmContent).toBe(expectedLlmContent);
-        expect(result.returnDisplay).toBe(expectedDisplay);
-      },
-    );
+      expect(mockConfig.setApprovedPlanPath).toHaveBeenCalledWith(undefined);
+      expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
+        ApprovalMode.PLAN,
+      );
+      expect(result.llmContent).toBe('Switching to Plan mode.');
+      expect(result.returnDisplay).toBe('Switching to Plan mode');
+    });
 
     it('should include optional reason in output display but not in llmContent', async () => {
       const reason = 'Design new database schema';
@@ -153,7 +120,7 @@ describe('EnterPlanModeTool', () => {
 
       const result = await invocation.execute(new AbortController().signal);
 
-      expect(result.llmContent).toBe('Switching to Plan mode (standard).');
+      expect(result.llmContent).toBe('Switching to Plan mode.');
       expect(result.llmContent).not.toContain(reason);
       expect(result.returnDisplay).toContain(reason);
     });
@@ -188,23 +155,15 @@ describe('EnterPlanModeTool', () => {
   });
 
   describe('getDescription', () => {
-    it.each([
-      {
-        name: 'default',
-        params: {},
-        expected: 'Initiating Plan Mode (standard)',
-      },
-      {
-        name: 'with reason and level',
-        params: {
-          reason: 'Redesign auth',
-          level: PlanLevel.THOROUGH,
-        },
-        expected: 'Redesign auth (thorough)',
-      },
-    ])('$name', ({ params, expected }) => {
-      const invocation = tool.build(params);
-      expect(invocation.getDescription()).toBe(expected);
+    it('should return default description when no reason is provided', () => {
+      const invocation = tool.build({});
+      expect(invocation.getDescription()).toBe('Initiating Plan Mode');
+    });
+
+    it('should return the provided reason as the description', () => {
+      const reason = 'Redesign auth';
+      const invocation = tool.build({ reason });
+      expect(invocation.getDescription()).toBe(reason);
     });
   });
 
@@ -216,13 +175,6 @@ describe('EnterPlanModeTool', () => {
 
     it('should allow reason param', () => {
       const result = tool.validateToolParams({ reason: 'test' });
-      expect(result).toBeNull();
-    });
-
-    it('should allow valid level param', () => {
-      const result = tool.validateToolParams({
-        level: PlanLevel.THOROUGH,
-      });
       expect(result).toBeNull();
     });
   });
