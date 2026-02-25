@@ -8,7 +8,7 @@
 - Use **canceled**, not **cancelled**.
 - Use **configure** to refer to the process of changing the attributes of a 
   feature, even if that includes turning on or off the feature.
-- Use **delete**  when the action being performed is destructive.
+- Use **delete** when the action being performed is destructive.
 - Use **enable** for binary operations that turn a feature or API on. Use "turn 
   on" and "turn off" instead of "enable" and "disable" for other situations.
 - Use **key combination** to refer to pressing multiple keys simultaneously.
