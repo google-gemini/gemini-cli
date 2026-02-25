@@ -183,6 +183,7 @@ describe('runNonInteractive', () => {
       getIdeMode: vi.fn().mockReturnValue(false),
 
       getContentGeneratorConfig: vi.fn().mockReturnValue({}),
+      getUserTierName: vi.fn().mockReturnValue(undefined),
       getDebugMode: vi.fn().mockReturnValue(false),
       getOutputFormat: vi.fn().mockReturnValue('text'),
       getModel: vi.fn().mockReturnValue('test-model'),

@@ -14,11 +14,21 @@ export class JsonFormatter {
     response?: string,
     stats?: SessionMetrics,
     error?: JsonError,
+    authMethod?: string,
+    userTier?: string,
   ): string {
     const output: JsonOutput = {};
 
     if (sessionId) {
       output.session_id = sessionId;
+    }
+
+    if (authMethod) {
+      output.auth_method = authMethod;
+    }
+
+    if (userTier) {
+      output.user_tier = userTier;
     }
 
     if (response !== undefined) {
