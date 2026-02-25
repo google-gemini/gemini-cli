@@ -25,6 +25,7 @@ import {
   KeychainTokenStorage,
   loadAgentsFromDirectory,
   loadSkillsFromDir,
+  getRealPath,
 } from '@google/gemini-cli-core';
 import {
   loadSettings,
@@ -186,11 +187,11 @@ describe('extension tests', () => {
       errors: [],
     });
     vi.mocked(loadSkillsFromDir).mockResolvedValue([]);
-    tempHomeDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'gemini-cli-test-home-'),
+    tempHomeDir = getRealPath(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-cli-test-home-')),
     );
-    tempWorkspaceDir = fs.mkdtempSync(
-      path.join(tempHomeDir, 'gemini-cli-test-workspace-'),
+    tempWorkspaceDir = getRealPath(
+      fs.mkdtempSync(path.join(tempHomeDir, 'gemini-cli-test-workspace-')),
     );
     userExtensionsDir = path.join(tempHomeDir, EXTENSIONS_DIRECTORY_NAME);
     mockRequestConsent = vi.fn();
@@ -350,12 +351,14 @@ describe('extension tests', () => {
     });
 
     it('should load a linked extension correctly', async () => {
-      const sourceExtDir = createExtension({
-        extensionsDir: tempWorkspaceDir,
-        name: 'my-linked-extension',
-        version: '1.0.0',
-        contextFileName: 'context.md',
-      });
+      const sourceExtDir = getRealPath(
+        createExtension({
+          extensionsDir: tempWorkspaceDir,
+          name: 'my-linked-extension',
+          version: '1.0.0',
+          contextFileName: 'context.md',
+        }),
+      );
       fs.writeFileSync(path.join(sourceExtDir, 'context.md'), 'linked context');
 
       await extensionManager.loadExtensions();
@@ -487,18 +490,20 @@ name = "yolo-checker"
     });
 
     it('should hydrate ${extensionPath} correctly for linked extensions', async () => {
-      const sourceExtDir = createExtension({
-        extensionsDir: tempWorkspaceDir,
-        name: 'my-linked-extension-with-path',
-        version: '1.0.0',
-        mcpServers: {
-          'test-server': {
-            command: 'node',
-            args: ['${extensionPath}${/}server${/}index.js'],
-            cwd: '${extensionPath}${/}server',
+      const sourceExtDir = getRealPath(
+        createExtension({
+          extensionsDir: tempWorkspaceDir,
+          name: 'my-linked-extension-with-path',
+          version: '1.0.0',
+          mcpServers: {
+            'test-server': {
+              command: 'node',
+              args: ['${extensionPath}${/}server${/}index.js'],
+              cwd: '${extensionPath}${/}server',
+            },
           },
-        },
-      });
+        }),
+      );
 
       await extensionManager.loadExtensions();
       await extensionManager.installOrUpdateExtension({
@@ -970,11 +975,13 @@ name = "yolo-checker"
 
       it('should generate id from the original source for linked extensions', async () => {
         const extDevelopmentDir = path.join(tempHomeDir, 'local_extensions');
-        const actualExtensionDir = createExtension({
-          extensionsDir: extDevelopmentDir,
-          name: 'link-ext-name',
-          version: '1.0.0',
-        });
+        const actualExtensionDir = getRealPath(
+          createExtension({
+            extensionsDir: extDevelopmentDir,
+            name: 'link-ext-name',
+            version: '1.0.0',
+          }),
+        );
         await extensionManager.loadExtensions();
         await extensionManager.installOrUpdateExtension({
           type: 'link',
@@ -1120,11 +1127,13 @@ name = "yolo-checker"
 
   describe('installExtension', () => {
     it('should install an extension from a local path', async () => {
-      const sourceExtDir = createExtension({
-        extensionsDir: tempHomeDir,
-        name: 'my-local-extension',
-        version: '1.0.0',
-      });
+      const sourceExtDir = getRealPath(
+        createExtension({
+          extensionsDir: tempHomeDir,
+          name: 'my-local-extension',
+          version: '1.0.0',
+        }),
+      );
       const targetExtDir = path.join(userExtensionsDir, 'my-local-extension');
       const metadataPath = path.join(targetExtDir, INSTALL_METADATA_FILENAME);
 
@@ -1166,7 +1175,7 @@ name = "yolo-checker"
     });
 
     it('should throw an error and cleanup if gemini-extension.json is missing', async () => {
-      const sourceExtDir = path.join(tempHomeDir, 'bad-extension');
+      const sourceExtDir = getRealPath(path.join(tempHomeDir, 'bad-extension'));
       fs.mkdirSync(sourceExtDir, { recursive: true });
       const configPath = path.join(sourceExtDir, EXTENSIONS_CONFIG_FILENAME);
 
@@ -1182,7 +1191,7 @@ name = "yolo-checker"
     });
 
     it('should throw an error for invalid JSON in gemini-extension.json', async () => {
-      const sourceExtDir = path.join(tempHomeDir, 'bad-json-ext');
+      const sourceExtDir = getRealPath(path.join(tempHomeDir, 'bad-json-ext'));
       fs.mkdirSync(sourceExtDir, { recursive: true });
       const configPath = path.join(sourceExtDir, EXTENSIONS_CONFIG_FILENAME);
       fs.writeFileSync(configPath, '{ "name": "bad-json", "version": "1.0.0"'); // Malformed JSON
@@ -1192,22 +1201,17 @@ name = "yolo-checker"
           source: sourceExtDir,
           type: 'local',
         }),
-      ).rejects.toThrow(
-        new RegExp(
-          `^Failed to load extension config from ${configPath.replace(
-            /\\/g,
-            '\\\\',
-          )}`,
-        ),
-      );
+      ).rejects.toThrow(`Failed to load extension config from ${configPath}`);
     });
 
     it('should throw an error for missing name in gemini-extension.json', async () => {
-      const sourceExtDir = createExtension({
-        extensionsDir: tempHomeDir,
-        name: 'missing-name-ext',
-        version: '1.0.0',
-      });
+      const sourceExtDir = getRealPath(
+        createExtension({
+          extensionsDir: tempHomeDir,
+          name: 'missing-name-ext',
+          version: '1.0.0',
+        }),
+      );
       const configPath = path.join(sourceExtDir, EXTENSIONS_CONFIG_FILENAME);
       // Overwrite with invalid config
       fs.writeFileSync(configPath, JSON.stringify({ version: '1.0.0' }));
@@ -1260,11 +1264,13 @@ name = "yolo-checker"
     });
 
     it('should install a linked extension', async () => {
-      const sourceExtDir = createExtension({
-        extensionsDir: tempHomeDir,
-        name: 'my-linked-extension',
-        version: '1.0.0',
-      });
+      const sourceExtDir = getRealPath(
+        createExtension({
+          extensionsDir: tempHomeDir,
+          name: 'my-linked-extension',
+          version: '1.0.0',
+        }),
+      );
       const targetExtDir = path.join(userExtensionsDir, 'my-linked-extension');
       const metadataPath = path.join(targetExtDir, INSTALL_METADATA_FILENAME);
       const configPath = path.join(targetExtDir, EXTENSIONS_CONFIG_FILENAME);
@@ -1565,11 +1571,13 @@ ${INSTALL_WARNING_MESSAGE}`,
     });
 
     it('should save the autoUpdate flag to the install metadata', async () => {
-      const sourceExtDir = createExtension({
-        extensionsDir: tempHomeDir,
-        name: 'my-local-extension',
-        version: '1.0.0',
-      });
+      const sourceExtDir = getRealPath(
+        createExtension({
+          extensionsDir: tempHomeDir,
+          name: 'my-local-extension',
+          version: '1.0.0',
+        }),
+      );
       const targetExtDir = path.join(userExtensionsDir, 'my-local-extension');
       const metadataPath = path.join(targetExtDir, INSTALL_METADATA_FILENAME);
 
