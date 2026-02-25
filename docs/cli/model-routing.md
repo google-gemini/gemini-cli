@@ -28,7 +28,7 @@ policies.
 
 ### Local Model Routing (Experimental)
 
-Gemini CLI supports using a local model for routing decisions. When configured, Gemini CLI 
+Gemini CLI supports using a local model for routing decisions. When configured, Gemini CLI
 will use a locally-running **Gemma** model to make routing decisions (instead of sending routing
 decisions to a hosted model). This feature can help reduce costs associated with hosted model
 usage while offering similar routing decision latency and quality.
