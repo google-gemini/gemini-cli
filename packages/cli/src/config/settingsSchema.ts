@@ -285,6 +285,16 @@ const SETTINGS_SCHEMA = {
               'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.',
             showInDialog: true,
           },
+          modelRouting: {
+            type: 'boolean',
+            label: 'Plan Model Routing',
+            category: 'General',
+            requiresRestart: false,
+            default: true,
+            description:
+              'Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro for the planning phase and Flash for the implementation phase.',
+            showInDialog: true,
+          },
         },
       },
       retryFetchErrors: {
@@ -972,6 +982,60 @@ const SETTINGS_SCHEMA = {
         additionalProperties: {
           type: 'object',
           ref: 'AgentOverride',
+        },
+      },
+      browser: {
+        type: 'object',
+        label: 'Browser Agent',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: {},
+        description: 'Settings specific to the browser agent.',
+        showInDialog: false,
+        properties: {
+          sessionMode: {
+            type: 'enum',
+            label: 'Browser Session Mode',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: 'persistent',
+            description:
+              "Session mode: 'persistent', 'isolated', or 'existing'.",
+            showInDialog: false,
+            options: [
+              { value: 'persistent', label: 'Persistent' },
+              { value: 'isolated', label: 'Isolated' },
+              { value: 'existing', label: 'Existing' },
+            ],
+          },
+          headless: {
+            type: 'boolean',
+            label: 'Browser Headless',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description: 'Run browser in headless mode.',
+            showInDialog: false,
+          },
+          profilePath: {
+            type: 'string',
+            label: 'Browser Profile Path',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as string | undefined,
+            description:
+              'Path to browser profile directory for session persistence.',
+            showInDialog: false,
+          },
+          visualModel: {
+            type: 'string',
+            label: 'Browser Visual Model',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as string | undefined,
+            description: 'Model override for the visual agent.',
+            showInDialog: false,
+          },
         },
       },
     },
