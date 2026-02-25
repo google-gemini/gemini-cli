@@ -101,6 +101,40 @@ describe('ChatRecordingService', () => {
       expect(conversation.kind).toBe('subagent');
     });
 
+    it('should generate a unique session ID for subagents', () => {
+      chatRecordingService.initialize(undefined, 'subagent');
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'ping',
+        model: 'm',
+      });
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const conversation = JSON.parse(
+        fs.readFileSync(sessionFile, 'utf8'),
+      ) as ConversationRecord;
+
+      // The subagent session ID should differ from the parent config's ID
+      expect(conversation.sessionId).not.toBe('test-session-id');
+    });
+
+    it('should use the parent session ID for main sessions', () => {
+      chatRecordingService.initialize(undefined, 'main');
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'ping',
+        model: 'm',
+      });
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const conversation = JSON.parse(
+        fs.readFileSync(sessionFile, 'utf8'),
+      ) as ConversationRecord;
+
+      // Main sessions should keep the config-provided session ID
+      expect(conversation.sessionId).toBe('test-session-id');
+    });
+
     it('should resume from an existing session if provided', () => {
       const chatsDir = path.join(testTempDir, 'chats');
       fs.mkdirSync(chatsDir, { recursive: true });
