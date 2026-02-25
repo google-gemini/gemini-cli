@@ -51,6 +51,15 @@ describe('matchesDomainPattern', () => {
   it('trims whitespace', () => {
     expect(matchesDomainPattern('  example.com  ', 'example.com')).toBe(true);
   });
+
+  it('normalizes trailing dots in hostnames', () => {
+    expect(matchesDomainPattern('example.com', 'example.com.')).toBe(true);
+    expect(matchesDomainPattern('example.com.', 'example.com')).toBe(true);
+  });
+
+  it('normalizes trailing dots with wildcard patterns', () => {
+    expect(matchesDomainPattern('*.example.com', 'sub.example.com.')).toBe(true);
+  });
 });
 
 describe('checkDomain', () => {

@@ -11,6 +11,7 @@ export { TrafficLogger } from './trafficLogger.js';
 export {
   DomainPromptHandler,
   createConsoleDomainPrompt,
+  sanitizeHostname,
 } from './domainPromptHandler.js';
 export type { DomainPromptCallback } from './domainPromptHandler.js';
 export {

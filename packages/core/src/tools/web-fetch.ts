@@ -32,6 +32,7 @@ import { WEB_FETCH_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { LRUCache } from 'mnemonist';
 import { checkDomainWithConfig, extractHostname } from '../services/networkProxy/domainMatcher.js';
+import { sanitizeHostname } from '../services/networkProxy/domainPromptHandler.js';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
@@ -540,8 +541,7 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
           ? 'is blocked by network proxy policy'
           : 'requires approval, which is not supported by the web-fetch tool';
       // Sanitize hostname to prevent terminal injection via control characters
-      // eslint-disable-next-line no-control-regex
-      const safeHost = hostname.replace(/[\x00-\x1f\x7f-\x9f]|\x1b\[[0-9;]*[a-zA-Z]/g, '');
+      const safeHost = sanitizeHostname(hostname);
       const errorMessage = `Domain '${safeHost}' ${reason}.`;
       debugLogger.warn(`[WebFetchTool] ${errorMessage}`);
       return {

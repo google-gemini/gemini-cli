@@ -17,8 +17,15 @@ import type { DomainRule, DomainCheckResult, NetworkProxyConfig, DomainFilterAct
  * Matching is case-insensitive.
  */
 export function matchesDomainPattern(pattern: string, hostname: string): boolean {
-  const normalizedPattern = pattern.toLowerCase().trim();
-  const normalizedHost = hostname.toLowerCase().trim();
+  let normalizedPattern = pattern.toLowerCase().trim();
+  if (normalizedPattern.endsWith('.') && normalizedPattern.length > 1) {
+    normalizedPattern = normalizedPattern.slice(0, -1);
+  }
+
+  let normalizedHost = hostname.toLowerCase().trim();
+  if (normalizedHost.endsWith('.') && normalizedHost.length > 1) {
+    normalizedHost = normalizedHost.slice(0, -1);
+  }
 
   if (normalizedPattern === '*') {
     return true;

@@ -11,7 +11,7 @@ import { DomainFilterAction } from './types.js';
  * Strips ANSI escape sequences and control characters from a hostname
  * to prevent terminal injection attacks.
  */
-function sanitizeHostname(hostname: string): string {
+export function sanitizeHostname(hostname: string): string {
   // Remove ANSI escape sequences
   // eslint-disable-next-line no-control-regex
   return hostname.replace(/[\x00-\x1f\x7f-\x9f]|\x1b\[[0-9;]*[a-zA-Z]/g, '');
