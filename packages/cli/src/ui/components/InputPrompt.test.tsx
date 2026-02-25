@@ -406,7 +406,7 @@ describe('InputPrompt', () => {
       expect(mockShellHistory.addCommandToHistory).toHaveBeenCalledWith(
         'ls -l',
       );
-      expect(props.onSubmit).toHaveBeenCalledWith('ls -l');
+      expect(props.onSubmit).toHaveBeenCalledWith('ls -l', false);
     });
     unmount();
   });
@@ -433,7 +433,7 @@ describe('InputPrompt', () => {
       stdin.write('\r'); // Enter
     });
     await waitFor(() =>
-      expect(props.onSubmit).toHaveBeenCalledWith('some text'),
+      expect(props.onSubmit).toHaveBeenCalledWith('some text', false),
     );
 
     expect(mockShellHistory.getPreviousCommand).not.toHaveBeenCalled();
@@ -985,7 +985,9 @@ describe('InputPrompt', () => {
     await act(async () => {
       stdin.write('\r');
     });
-    await waitFor(() => expect(props.onSubmit).toHaveBeenCalledWith('/clear'));
+    await waitFor(() =>
+      expect(props.onSubmit).toHaveBeenCalledWith('/clear', false),
+    );
     unmount();
   });
 
@@ -1011,7 +1013,7 @@ describe('InputPrompt', () => {
     });
 
     await waitFor(() => {
-      expect(props.onSubmit).toHaveBeenCalledWith('/review');
+      expect(props.onSubmit).toHaveBeenCalledWith('/review', false);
     });
     unmount();
   });
@@ -1061,7 +1063,9 @@ describe('InputPrompt', () => {
     await act(async () => {
       stdin.write('\r');
     });
-    await waitFor(() => expect(props.onSubmit).toHaveBeenCalledWith('/clear'));
+    await waitFor(() =>
+      expect(props.onSubmit).toHaveBeenCalledWith('/clear', false),
+    );
     unmount();
   });
 
@@ -1086,7 +1090,7 @@ describe('InputPrompt', () => {
 
     await waitFor(() => {
       // Should submit directly
-      expect(props.onSubmit).toHaveBeenCalledWith('@file.txt');
+      expect(props.onSubmit).toHaveBeenCalledWith('@file.txt', false);
     });
     unmount();
   });
@@ -1159,7 +1163,7 @@ describe('InputPrompt', () => {
 
     await waitFor(() => {
       // Should submit the full command constructed from buffer + suggestion
-      expect(props.onSubmit).toHaveBeenCalledWith('/about');
+      expect(props.onSubmit).toHaveBeenCalledWith('/about', false);
       // Should NOT handle autocomplete (which just fills text)
       expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
     });
@@ -1359,7 +1363,7 @@ describe('InputPrompt', () => {
 
     await waitFor(() => {
       // Should auto-execute with the completed command
-      expect(props.onSubmit).toHaveBeenCalledWith('/mcp auth server1');
+      expect(props.onSubmit).toHaveBeenCalledWith('/mcp auth server1', false);
       expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
     });
     unmount();
@@ -2258,7 +2262,10 @@ describe('InputPrompt', () => {
       });
 
       await waitFor(() => {
-        expect(props.onSubmit).toHaveBeenCalledWith(`Check this: ${largeText}`);
+        expect(props.onSubmit).toHaveBeenCalledWith(
+          `Check this: ${largeText}`,
+          true,
+        );
       });
 
       unmount();
@@ -2372,7 +2379,7 @@ describe('InputPrompt', () => {
         await vi.runAllTimersAsync();
       });
 
-      expect(props.onSubmit).toHaveBeenCalledWith('pasted text');
+      expect(props.onSubmit).toHaveBeenCalledWith('pasted text', false);
       expect(props.buffer.newline).not.toHaveBeenCalled();
 
       unmount();
@@ -2417,7 +2424,7 @@ describe('InputPrompt', () => {
         });
 
         // Verify that onSubmit was called
-        expect(props.onSubmit).toHaveBeenCalledWith('pasted command');
+        expect(props.onSubmit).toHaveBeenCalledWith('pasted command', false);
         unmount();
       },
     );
@@ -2442,7 +2449,7 @@ describe('InputPrompt', () => {
       });
 
       // Verify that onSubmit was called normally
-      expect(props.onSubmit).toHaveBeenCalledWith('normal command');
+      expect(props.onSubmit).toHaveBeenCalledWith('normal command', false);
 
       unmount();
     });
@@ -2809,7 +2816,7 @@ describe('InputPrompt', () => {
         expect(stdout.lastFrame()).not.toContain('(r:)');
       });
 
-      expect(props.onSubmit).toHaveBeenCalledWith('echo hello');
+      expect(props.onSubmit).toHaveBeenCalledWith('echo hello', false);
       unmount();
     });
 
@@ -3806,7 +3813,7 @@ describe('InputPrompt', () => {
         });
         await waitFor(() => {
           if (shouldSubmit) {
-            expect(props.onSubmit).toHaveBeenCalledWith(bufferText);
+            expect(props.onSubmit).toHaveBeenCalledWith(bufferText, false);
             expect(props.setQueueErrorMessage).not.toHaveBeenCalled();
           } else {
             expect(props.onSubmit).not.toHaveBeenCalled();

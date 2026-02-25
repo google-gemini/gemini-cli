@@ -90,7 +90,7 @@ export function isTerminalPasteTrusted(
 
 export interface InputPromptProps {
   buffer: TextBuffer;
-  onSubmit: (value: string) => void;
+  onSubmit: (value: string, isPasted?: boolean) => void;
   userMessages: readonly string[];
   onClearScreen: () => void;
   config: Config;
@@ -253,6 +253,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     number | null
   >(null);
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const wasPastedRef = useRef(false);
   const innerBoxRef = useRef<DOMElement>(null);
 
   const [reverseSearchActive, setReverseSearchActive] = useState(false);
@@ -333,10 +334,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (shellModeActive) {
         shellHistory.addCommandToHistory(processedValue);
       }
+      // Detect if the submitted text originated from a paste event
+      const wasPasted = wasPastedRef.current;
+      wasPastedRef.current = false;
+
       // Clear the buffer *before* calling onSubmit to prevent potential re-submission
       // if onSubmit triggers a re-render while the buffer still holds the old value.
       buffer.setText('');
-      onSubmit(processedValue);
+      onSubmit(processedValue, wasPasted);
       resetCompletionState();
       resetReverseSearchCompletionState();
     },
@@ -468,6 +473,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         stdout.write('\x1b]52;c;?\x07');
       } else {
         const textToInsert = await clipboardy.read();
+        wasPastedRef.current = true;
         buffer.insert(textToInsert, { paste: true });
         if (isLargePaste(textToInsert)) {
           appEvents.emit(AppEvent.TransientMessage, {
@@ -658,6 +664,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (key.name === 'paste') {
+        wasPastedRef.current = true;
         if (shortcutsHelpVisible) {
           setShortcutsHelpVisible(false);
         }

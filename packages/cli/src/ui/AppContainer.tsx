@@ -1249,7 +1249,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   );
 
   const handleFinalSubmit = useCallback(
-    async (submittedValue: string) => {
+    async (submittedValue: string, isPasted: boolean = false) => {
       reset();
       // Explicitly hide the expansion hint and clear its x-second timer when a new turn begins.
       setShowIsExpandableHint(false);
@@ -1291,14 +1291,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
                     config.getWorkspaceContext().addReadOnlyPath(p),
                   );
                 }
-                void submitQuery(submittedValue);
+                void submitQuery(submittedValue, {
+                  isContinuation: false,
+                  isPasted,
+                });
               },
             });
             addInput(submittedValue);
             return;
           }
         }
-        void submitQuery(submittedValue);
+        void submitQuery(submittedValue, { isContinuation: false, isPasted });
       } else {
         // Check messageQueue.length === 0 to only notify on the first queued item
         if (isIdle && !isMcpReady && messageQueue.length === 0) {

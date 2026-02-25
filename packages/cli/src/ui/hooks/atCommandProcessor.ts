@@ -49,6 +49,7 @@ interface HandleAtCommandParams {
   onDebugMessage: (message: string) => void;
   messageId: number;
   signal: AbortSignal;
+  isPasted?: boolean;
 }
 
 interface HandleAtCommandResult {
@@ -631,7 +632,13 @@ export async function handleAtCommand({
   onDebugMessage,
   messageId: userMessageTimestamp,
   signal,
+  isPasted,
 }: HandleAtCommandParams): Promise<HandleAtCommandResult> {
+  if (isPasted) {
+    onDebugMessage('Skipping @ expansion: input was pasted.');
+    return { processedQuery: [{ text: query }] };
+  }
+
   const commandParts = parseAllAtCommands(query);
 
   const { agentParts, resourceParts, fileParts } = categorizeAtCommands(
