@@ -24,6 +24,7 @@ import {
 } from '@a2a-js/sdk/client';
 import { v4 as uuidv4 } from 'uuid';
 import { debugLogger } from '../utils/debugLogger.js';
+import { classifyAgentError } from './a2a-errors.js';
 
 export type SendMessageResult =
   | Message
@@ -97,18 +98,22 @@ export class A2AClientManager {
       },
     );
 
-    const factory = new ClientFactory(options);
-    const client = await factory.createFromUrl(agentCardUrl, '');
-    const agentCard = await client.getAgentCard();
+    try {
+      const factory = new ClientFactory(options);
+      const client = await factory.createFromUrl(agentCardUrl, '');
+      const agentCard = await client.getAgentCard();
 
-    this.clients.set(name, client);
-    this.agentCards.set(name, agentCard);
+      this.clients.set(name, client);
+      this.agentCards.set(name, agentCard);
 
-    debugLogger.debug(
-      `[A2AClientManager] Loaded agent '${name}' from ${agentCardUrl}`,
-    );
+      debugLogger.debug(
+        `[A2AClientManager] Loaded agent '${name}' from ${agentCardUrl}`,
+      );
 
-    return agentCard;
+      return agentCard;
+    } catch (error: unknown) {
+      throw classifyAgentError(name, agentCardUrl, error);
+    }
   }
 
   /**
