@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
@@ -172,9 +172,7 @@ describe('NetworkProxyManager', () => {
       records.push(record);
     });
 
-    const httpPort = parseInt(
-      manager.getAddresses().httpProxy!.split(':')[1],
-    );
+    const httpPort = parseInt(manager.getAddresses().httpProxy!.split(':')[1], 10);
     await httpGetViaProxy(
       httpPort,
       `http://127.0.0.1:${echoPort}/test`,
@@ -198,9 +196,7 @@ describe('NetworkProxyManager', () => {
       deniedRecords.push(record);
     });
 
-    const httpPort = parseInt(
-      manager.getAddresses().httpProxy!.split(':')[1],
-    );
+    const httpPort = parseInt(manager.getAddresses().httpProxy!.split(':')[1], 10);
     await httpGetViaProxy(httpPort, 'http://example.com/test');
 
     expect(deniedRecords).toHaveLength(1);
@@ -218,9 +214,7 @@ describe('NetworkProxyManager', () => {
 
     await manager.start();
 
-    const httpPort = parseInt(
-      manager.getAddresses().httpProxy!.split(':')[1],
-    );
+    const httpPort = parseInt(manager.getAddresses().httpProxy!.split(':')[1], 10);
     await httpGetViaProxy(
       httpPort,
       `http://127.0.0.1:${echoPort}/logged`,
@@ -246,9 +240,7 @@ describe('NetworkProxyManager', () => {
       { pattern: 'example.com', action: DomainFilterAction.DENY },
     ]);
 
-    const httpPort = parseInt(
-      manager.getAddresses().httpProxy!.split(':')[1],
-    );
+    const httpPort = parseInt(manager.getAddresses().httpProxy!.split(':')[1], 10);
     const result = await httpGetViaProxy(httpPort, 'http://example.com/test');
 
     expect(result.statusCode).toBe(403);
@@ -265,9 +257,7 @@ describe('NetworkProxyManager', () => {
 
     manager.updateDefaultAction(DomainFilterAction.DENY);
 
-    const httpPort = parseInt(
-      manager.getAddresses().httpProxy!.split(':')[1],
-    );
+    const httpPort = parseInt(manager.getAddresses().httpProxy!.split(':')[1], 10);
     const result = await httpGetViaProxy(httpPort, 'http://example.com/test');
 
     expect(result.statusCode).toBe(403);
@@ -286,9 +276,7 @@ describe('NetworkProxyManager', () => {
 
     manager.recordSessionDecision('127.0.0.1', DomainFilterAction.ALLOW);
 
-    const httpPort = parseInt(
-      manager.getAddresses().httpProxy!.split(':')[1],
-    );
+    const httpPort = parseInt(manager.getAddresses().httpProxy!.split(':')[1], 10);
     const result = await httpGetViaProxy(
       httpPort,
       `http://127.0.0.1:${echoPort}/session`,

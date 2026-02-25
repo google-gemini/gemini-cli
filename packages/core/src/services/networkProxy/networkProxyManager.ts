@@ -14,8 +14,9 @@ import type {
   ProxyServerAddresses,
   ProxyStatus,
   DomainRule,
+  DomainFilterAction,
 } from './types.js';
-import { DomainFilterAction, DEFAULT_NETWORK_PROXY_CONFIG } from './types.js';
+import { DEFAULT_NETWORK_PROXY_CONFIG } from './types.js';
 
 /**
  * Central manager for the network proxy system.
@@ -92,7 +93,7 @@ export class NetworkProxyManager extends EventEmitter {
    * Stops both proxy servers and cleans up.
    */
   async stop(): Promise<void> {
-    const shutdowns: Promise<void>[] = [];
+    const shutdowns: Array<Promise<void>> = [];
 
     if (this.httpProxy) {
       shutdowns.push(this.httpProxy.stop());

@@ -44,14 +44,14 @@ export class TrafficLogger {
   /**
    * Returns all recorded connection logs.
    */
-  getRecords(): ReadonlyArray<ProxyConnectionRecord> {
+  getRecords(): readonly ProxyConnectionRecord[] {
     return this.records;
   }
 
   /**
    * Returns the most recent N records.
    */
-  getRecentRecords(count: number): ReadonlyArray<ProxyConnectionRecord> {
+  getRecentRecords(count: number): readonly ProxyConnectionRecord[] {
     if (count >= this.records.length) {
       return this.records;
     }
@@ -61,7 +61,7 @@ export class TrafficLogger {
   /**
    * Returns records filtered by hostname.
    */
-  getRecordsByHost(hostname: string): ReadonlyArray<ProxyConnectionRecord> {
+  getRecordsByHost(hostname: string): readonly ProxyConnectionRecord[] {
     const normalized = hostname.toLowerCase();
     return this.records.filter((r) => r.host.toLowerCase() === normalized);
   }
@@ -71,7 +71,7 @@ export class TrafficLogger {
    */
   getRecordsByAction(
     action: ProxyConnectionRecord['action'],
-  ): ReadonlyArray<ProxyConnectionRecord> {
+  ): readonly ProxyConnectionRecord[] {
     return this.records.filter((r) => r.action === action);
   }
 

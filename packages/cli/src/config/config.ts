@@ -934,7 +934,7 @@ function buildNetworkProxyConfig(
     enabled: true,
     httpPort: proxySettings.httpPort ?? 0,
     socksPort: proxySettings.socksPort ?? 0,
-    defaultAction: (proxySettings.defaultAction as 'allow' | 'deny' | 'prompt') ?? 'prompt',
+    defaultAction: proxySettings.defaultAction ?? 'prompt',
     rules,
     enableLogging: proxySettings.enableLogging ?? false,
     maxLogEntries: 1000,

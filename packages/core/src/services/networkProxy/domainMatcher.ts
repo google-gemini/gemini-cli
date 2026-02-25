@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { DomainRule, DomainCheckResult, NetworkProxyConfig } from './types.js';
-import { DomainFilterAction } from './types.js';
+import type { DomainRule, DomainCheckResult, NetworkProxyConfig, DomainFilterAction } from './types.js';
 
 /**
  * Checks whether a domain pattern matches a given hostname.

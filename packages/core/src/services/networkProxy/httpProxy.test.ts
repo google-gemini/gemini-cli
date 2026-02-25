@@ -6,7 +6,7 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import * as http from 'node:http';
-import * as net from 'node:net';
+import type * as net from 'node:net';
 import { HttpProxy } from './httpProxy.js';
 import { DomainFilterAction } from './types.js';
 import type { ProxyConnectionRecord } from './types.js';

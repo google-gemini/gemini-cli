@@ -58,11 +58,11 @@ export class HttpProxy extends EventEmitter {
   async start(): Promise<number> {
     return new Promise((resolve, reject) => {
       this.server = http.createServer((req, res) => {
-        this.handleRequest(req, res);
+        void this.handleRequest(req, res);
       });
 
       this.server.on('connect', (req, clientSocket, head) => {
-        this.handleConnect(req, clientSocket, head);
+        void this.handleConnect(req, clientSocket, head);
       });
 
       this.server.on('error', (err) => {

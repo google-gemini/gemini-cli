@@ -178,7 +178,7 @@ export class SocksProxy extends EventEmitter {
 
     // Wait for the CONNECT request
     clientSocket.once('data', (requestData) => {
-      this.handleRequest(clientSocket, requestData);
+      void this.handleRequest(clientSocket, requestData);
     });
   }
 
@@ -204,7 +204,6 @@ export class SocksProxy extends EventEmitter {
 
     let hostname: string;
     let port: number;
-    let offset: number;
 
     switch (atyp) {
       case ATYP_IPV4: {
@@ -215,7 +214,6 @@ export class SocksProxy extends EventEmitter {
         }
         hostname = `${data[4]}.${data[5]}.${data[6]}.${data[7]}`;
         port = data.readUInt16BE(8);
-        offset = 10;
         break;
       }
 
@@ -228,7 +226,6 @@ export class SocksProxy extends EventEmitter {
         }
         hostname = data.subarray(5, 5 + domainLen).toString('ascii');
         port = data.readUInt16BE(5 + domainLen);
-        offset = 7 + domainLen;
         break;
       }
 
@@ -245,7 +242,6 @@ export class SocksProxy extends EventEmitter {
         }
         hostname = parts.join(':');
         port = data.readUInt16BE(20);
-        offset = 22;
         break;
       }
 
