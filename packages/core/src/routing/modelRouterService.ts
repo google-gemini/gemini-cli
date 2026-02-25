@@ -16,6 +16,7 @@ import { NumericalClassifierStrategy } from './strategies/numericalClassifierStr
 import { CompositeStrategy } from './strategies/compositeStrategy.js';
 import { FallbackStrategy } from './strategies/fallbackStrategy.js';
 import { OverrideStrategy } from './strategies/overrideStrategy.js';
+import { ApprovalModeStrategy } from './strategies/approvalModeStrategy.js';
 
 import { logModelRouting } from '../telemetry/loggers.js';
 import { ModelRoutingEvent } from '../telemetry/types.js';
@@ -40,6 +41,7 @@ export class ModelRouterService {
       [
         new FallbackStrategy(),
         new OverrideStrategy(),
+        new ApprovalModeStrategy(),
         new ClassifierStrategy(),
         new NumericalClassifierStrategy(),
         new DefaultStrategy(),
@@ -105,6 +107,7 @@ export class ModelRouterService {
         decision!.metadata.reasoning,
         failed,
         error_message,
+        this.config.getApprovalMode(),
         enableNumericalRouting,
         classifierThreshold,
       );
