@@ -36,7 +36,6 @@ import {
   CoreToolCallStatus,
   buildUserSteeringHintPrompt,
   generateSteeringAckMessage,
-  getPlanModeExitMessage,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -126,6 +125,24 @@ function showCitations(settings: LoadedSettings): boolean {
   return true;
 }
 
+function getPlanModeExitMessage(
+  newMode: ApprovalMode,
+  isManual: boolean = false,
+): string {
+  const description =
+    newMode === ApprovalMode.AUTO_EDIT
+      ? 'Auto-Edit mode (edits will be applied automatically)'
+      : newMode === ApprovalMode.DEFAULT
+        ? 'Default mode (edits will require confirmation)'
+        : newMode === ApprovalMode.PLAN
+          ? 'Plan mode (read-only planning)'
+          : 'YOLO mode (all tool calls auto-approved)';
+  const prefix = isManual
+    ? 'User has manually exited Plan Mode.'
+    : 'Plan approved.';
+  return `${prefix} Switching to ${description}.`;
+}
+
 /**
  * Calculates the current streaming state based on tool call status and responding flag.
  */
@@ -205,6 +222,9 @@ export const useGeminiStream = (
   const turnCancelledRef = useRef(false);
   const activeQueryIdRef = useRef<string | null>(null);
   const isRespondingRef = useRef(false);
+  const previousApprovalModeRef = useRef<ApprovalMode>(
+    config.getApprovalMode(),
+  );
   const [isResponding, setIsResponding] = useState<boolean>(false);
   const [thought, thoughtRef, setThought] =
     useStateAndRef<ThoughtSummary | null>(null);
