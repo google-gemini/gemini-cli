@@ -115,6 +115,19 @@ export function useCommandCompletion({
     const codePoints = toCodePoints(currentLine);
 
     if (shellModeActive) {
+      if (currentLine.trim().length === 0) {
+        return {
+          completionMode: CompletionMode.IDLE,
+          query: null,
+          completionStart: -1,
+          completionEnd: -1,
+          shellTokenIsCommand: false,
+          shellTokens: [],
+          shellCursorIndex: -1,
+          shellCommandToken: '',
+        };
+      }
+
       const tokenInfo = getTokenAtCursor(currentLine, cursorCol);
       if (tokenInfo) {
         return {
