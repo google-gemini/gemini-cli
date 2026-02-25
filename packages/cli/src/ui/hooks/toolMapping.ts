@@ -38,6 +38,11 @@ export function mapToDisplay(
     let renderOutputAsMarkdown = false;
 
     const displayName = call.tool?.displayName ?? call.request.name;
+    const rawOriginalRequestName: unknown = call.request.originalRequestName;
+    const originalRequestName =
+      typeof rawOriginalRequestName === 'string'
+        ? rawOriginalRequestName
+        : undefined;
 
     if (call.status === CoreToolCallStatus.Error) {
       description = JSON.stringify(call.request.args);
@@ -107,7 +112,7 @@ export function mapToDisplay(
       progressMessage,
       progressPercent,
       approvalMode: call.approvalMode,
-      originalRequestName: call.request.originalRequestName,
+      originalRequestName,
     };
   });
 
