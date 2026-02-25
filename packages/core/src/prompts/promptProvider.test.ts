@@ -9,7 +9,6 @@ import { PromptProvider } from './promptProvider.js';
 import { renderPlanningWorkflow } from './snippets.js';
 import type { Config } from '../config/config.js';
 import type { PlanningWorkflowOptions } from './snippets.js';
-import { PlanLevel } from '../plan/types.js';
 import {
   getAllGeminiMdFilenames,
   DEFAULT_CONTEXT_FILENAME,
@@ -59,7 +58,6 @@ describe('PromptProvider', () => {
       }),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       getApprovalMode: vi.fn(),
-      getPlanLevel: vi.fn().mockReturnValue(PlanLevel.STANDARD),
     } as unknown as Config;
   });
 
@@ -186,25 +184,15 @@ describe('renderPlanningWorkflow', () => {
   const baseOptions: PlanningWorkflowOptions = {
     planModeToolsList: '<tool>read_file</tool>',
     plansDir: '/tmp/plans',
-    level: PlanLevel.STANDARD,
   };
 
   it('should return empty string when options are undefined', () => {
     expect(renderPlanningWorkflow(undefined)).toBe('');
   });
 
-  it('should render the full planning workflow with standard assignment', () => {
+  it('should render the full planning workflow', () => {
     const result = renderPlanningWorkflow(baseOptions);
-    expect(result).toContain('**Target Level:** **standard**');
     expect(result).toMatchSnapshot();
-  });
-
-  it('should update active assignment based on level', () => {
-    const result = renderPlanningWorkflow({
-      ...baseOptions,
-      level: PlanLevel.THOROUGH,
-    });
-    expect(result).toContain('**Target Level:** **thorough**');
   });
 
   it('should include approved plan section when path is provided', () => {
