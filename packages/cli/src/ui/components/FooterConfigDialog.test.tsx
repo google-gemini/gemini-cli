@@ -22,23 +22,25 @@ describe('<FooterConfigDialog />', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders correctly with default settings', () => {
+  it('renders correctly with default settings', async () => {
     const settings = createMockSettings();
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
 
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('toggles an item when enter is pressed', async () => {
     const settings = createMockSettings();
-    const { lastFrame, stdin } = renderWithProviders(
+    const { lastFrame, stdin, waitUntilReady } = renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
 
+    await waitUntilReady();
     act(() => {
       stdin.write('\r'); // Enter to toggle
     });
@@ -58,11 +60,12 @@ describe('<FooterConfigDialog />', () => {
 
   it('reorders items with arrow keys', async () => {
     const settings = createMockSettings();
-    const { lastFrame, stdin } = renderWithProviders(
+    const { lastFrame, stdin, waitUntilReady } = renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
 
+    await waitUntilReady();
     // Initial order: cwd, git-branch, ...
     const output = lastFrame();
     const cwdIdx = output!.indexOf('] cwd');
@@ -88,11 +91,12 @@ describe('<FooterConfigDialog />', () => {
 
   it('closes on Esc', async () => {
     const settings = createMockSettings();
-    const { stdin } = renderWithProviders(
+    const { stdin, waitUntilReady } = renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
 
+    await waitUntilReady();
     act(() => {
       stdin.write('\x1b'); // Esc
     });
@@ -104,11 +108,12 @@ describe('<FooterConfigDialog />', () => {
 
   it('highlights the active item in the preview', async () => {
     const settings = createMockSettings();
-    const { lastFrame, stdin } = renderWithProviders(
+    const { lastFrame, stdin, waitUntilReady } = renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
 
+    await waitUntilReady();
     expect(lastFrame()).toContain('~/project/path');
 
     // Move focus down to 'git-branch'
@@ -123,11 +128,12 @@ describe('<FooterConfigDialog />', () => {
 
   it('shows an empty preview when all items are deselected', async () => {
     const settings = createMockSettings();
-    const { lastFrame, stdin } = renderWithProviders(
+    const { lastFrame, stdin, waitUntilReady } = renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
 
+    await waitUntilReady();
     for (let i = 0; i < 10; i++) {
       act(() => {
         stdin.write('\r'); // Toggle (deselect)

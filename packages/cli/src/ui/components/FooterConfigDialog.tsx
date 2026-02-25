@@ -224,7 +224,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
         return true;
       }
 
-      if (keyMatchers[Command.RETURN](key)) {
+      if (keyMatchers[Command.RETURN](key) || key.name === 'space') {
         if (isResetFocused) {
           handleResetToDefaults();
         } else if (isShowLabelsFocused) {
@@ -378,7 +378,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
 
       <Box marginTop={1} flexDirection="column">
         <Text color={theme.text.secondary}>
-          ↑/↓ navigate · ←/→ reorder · enter select · esc close
+          ↑/↓ navigate · ←/→ reorder · enter/space select · esc close
         </Text>
       </Box>
 
