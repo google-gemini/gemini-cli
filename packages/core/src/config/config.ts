@@ -21,11 +21,6 @@ import {
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import { LSTool } from '../tools/ls.js';
-import { ReadFileTool } from '../tools/read-file.js';
-import { GrepTool } from '../tools/grep.js';
-import { canUseRipgrep, RipGrepTool } from '../tools/ripGrep.js';
-import { GlobTool } from '../tools/glob.js';
 import { ActivateSkillTool } from '../tools/activate-skill.js';
 import { EditTool } from '../tools/edit.js';
 import { ShellTool } from '../tools/shell.js';
@@ -69,13 +64,11 @@ import { WriteTodosTool } from '../tools/write-todos.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import {
-  logRipgrepFallback,
   logFlashFallback,
   logApprovalModeSwitch,
   logApprovalModeDuration,
 } from '../telemetry/loggers.js';
 import {
-  RipgrepFallbackEvent,
   FlashFallbackEvent,
   ApprovalModeSwitchEvent,
   ApprovalModeDurationEvent,
@@ -2640,6 +2633,7 @@ export class Config {
       }
     };
 
+    /*
     maybeRegister(LSTool, () =>
       registry.registerTool(new LSTool(this, this.messageBus)),
     );
@@ -2674,6 +2668,7 @@ export class Config {
     maybeRegister(GlobTool, () =>
       registry.registerTool(new GlobTool(this, this.messageBus)),
     );
+    */
     maybeRegister(ActivateSkillTool, () =>
       registry.registerTool(new ActivateSkillTool(this, this.messageBus)),
     );

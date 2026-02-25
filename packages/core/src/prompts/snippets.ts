@@ -10,10 +10,7 @@ import {
   EDIT_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
-  GLOB_TOOL_NAME,
-  GREP_TOOL_NAME,
   MEMORY_TOOL_NAME,
-  READ_FILE_TOOL_NAME,
   SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
@@ -179,20 +176,20 @@ Consider the following when estimating the cost of your approach:
 
 Use the following guidelines to optimize your search and read patterns.
 <guidelines>
-- Combine turns whenever possible by utilizing parallel searching and reading and by requesting enough context by passing context, before, or after to ${GREP_TOOL_NAME}, to enable you to skip using an extra turn reading the file.
-- Prefer using tools like ${GREP_TOOL_NAME} to identify points of interest instead of reading lots of files individually.
+- Combine turns whenever possible by utilizing parallel searching and reading. When searching, request enough context (e.g., using context, before, or after flags) to enable you to skip using an extra turn reading the file.
+- Prefer using search to identify points of interest instead of reading lots of files individually.
 - If you need to read multiple ranges in a file, do so parallel, in as few turns as possible.
-- It is more important to reduce extra turns, but please also try to minimize unnecessarily large file reads and search results, when doing so doesn't result in extra turns. Do this by always providing conservative limits and scopes to tools like ${READ_FILE_TOOL_NAME} and ${GREP_TOOL_NAME}.
-- ${READ_FILE_TOOL_NAME} fails if old_string is ambiguous, causing extra turns. Take care to read enough with ${READ_FILE_TOOL_NAME} and ${GREP_TOOL_NAME} to make the edit unambiguous.
+- It is more important to reduce extra turns, but please also try to minimize unnecessarily large file reads and search results, when doing so doesn't result in extra turns. Do this by always providing conservative limits and scopes.
+- Ensure you have read enough context to make edits unambiguous. Ambiguity in the target text for an edit causes extra turns.
 - You can compensate for the risk of missing results with scoped or limited searches by doing multiple searches in parallel.
 - Your primary goal is still to do your best quality work. Efficiency is an important, but secondary concern.
 </guidelines>
 
 <examples>
-- **Searching:** utilize search tools like ${GREP_TOOL_NAME} and ${GLOB_TOOL_NAME} with a conservative result count (\`total_max_matches\`) and a narrow scope (\`include\` and \`exclude\` parameters).
-- **Searching and editing:** utilize search tools like ${GREP_TOOL_NAME} with a conservative result count and a narrow scope. Use \`context\`, \`before\`, and/or \`after\` to request enough context to avoid the need to read the file before editing matches.
+- **Searching:** utilize search tools with a conservative result count and a narrow scope.
+- **Searching and editing:** utilize search tools with a conservative result count and a narrow scope. Request enough context to avoid the need to read the file before editing matches.
 - **Understanding:** minimize turns needed to understand a file. It's most efficient to read small files in their entirety.
-- **Large files:** utilize search tools like ${GREP_TOOL_NAME} and/or ${READ_FILE_TOOL_NAME} called in parallel with 'start_line' and 'end_line' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
+- **Large files:** utilize search tools and/or file reading tools called in parallel with line ranges to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
 
@@ -495,7 +492,7 @@ function renderApprovedPlanSection(approvedPlanPath?: string): string {
   if (!approvedPlanPath) return '';
   return `## Approved Plan
 An approved plan is available for this task at \`${approvedPlanPath}\`.
-- **Read First:** You MUST read this file using the ${formatToolName(READ_FILE_TOOL_NAME)} tool before proposing any changes or starting discovery.
+- **Read First:** You MUST read this file before proposing any changes or starting discovery.
 - **Iterate:** Default to refining the existing approved plan.
 - **New Plan:** Only create a new plan file if the user explicitly asks for a "new plan".
 `;
@@ -529,32 +526,21 @@ function mandateContinueWork(interactive: boolean): string {
 function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
   let suggestion = '';
   if (options.enableEnterPlanModeTool) {
-    suggestion = ` If the request is ambiguous, broad in scope, or involves creating a new feature/application, you MUST use the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to design your approach before making changes. Do NOT use Plan Mode for straightforward bug fixes, answering questions, or simple inquiries.`;
+    suggestion = ` If the request is ambiguous, broad in scope, or involves creating a new feature/application, you MUST use the ${formatToolName(
+      ENTER_PLAN_MODE_TOOL_NAME,
+    )} tool to design your approach before making changes. Do NOT use Plan Mode for straightforward bug fixes, answering questions, or simple inquiries.`;
   }
 
-  const searchTools: string[] = [];
-  if (options.enableGrep) searchTools.push(formatToolName(GREP_TOOL_NAME));
-  if (options.enableGlob) searchTools.push(formatToolName(GLOB_TOOL_NAME));
-
-  let searchSentence =
-    ' Use search tools extensively to understand file structures, existing code patterns, and conventions.';
-  if (searchTools.length > 0) {
-    const toolsStr = searchTools.join(' and ');
-    const toolOrTools = searchTools.length > 1 ? 'tools' : 'tool';
-    searchSentence = ` Use ${toolsStr} search ${toolOrTools} extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions.`;
-  }
+  const searchSentence =
+    ' Use search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions.';
 
   if (options.enableCodebaseInvestigator) {
-    let subAgentSearch = '';
-    if (searchTools.length > 0) {
-      const toolsStr = searchTools.join(' or ');
-      subAgentSearch = ` For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use ${toolsStr} directly in parallel.`;
-    }
+    const subAgentSearch = ` For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use search tools directly in parallel.`;
 
-    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**.${subAgentSearch} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**.${subAgentSearch} Use read tools to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
   }
 
-  return `1. **Research:** Systematically map the codebase and validate assumptions.${searchSentence} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+  return `1. **Research:** Systematically map the codebase and validate assumptions.${searchSentence} Use read tools to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
 }
 
 function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
