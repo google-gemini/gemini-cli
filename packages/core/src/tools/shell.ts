@@ -36,6 +36,7 @@ import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
+  getShellConfiguration,
   initializeShellParsers,
   stripShellWrapper,
   parseCommandDetails,
@@ -50,6 +51,25 @@ export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
 // Delay so user does not see the output of the process before the process is moved to the background.
 const BACKGROUND_DELAY_MS = 200;
+const MARKDOWN_FENCE_PATTERN = /^```(?:[A-Za-z0-9_+.-]+)?\s*([\s\S]*?)\s*```$/;
+
+function normalizeShellCommand(command: string): string {
+  const trimmed = command.trim();
+  const fencedMatch = trimmed.match(MARKDOWN_FENCE_PATTERN);
+  if (fencedMatch?.[1]) {
+    return fencedMatch[1].trim();
+  }
+  return command;
+}
+
+function isLegacyWindowsPowerShell(executable: string): boolean {
+  const normalized = executable.trim().toLowerCase();
+  return (
+    normalized === 'powershell' ||
+    normalized === 'powershell.exe' ||
+    normalized.endsWith('powershell.exe')
+  );
+}
 
 export interface ShellToolParams {
   command: string;
@@ -98,7 +118,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
       outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave ||
       outcome === ToolConfirmationOutcome.ProceedAlways
     ) {
-      const command = stripShellWrapper(this.params.command);
+      const command = stripShellWrapper(
+        normalizeShellCommand(this.params.command),
+      );
       const rootCommands = [...new Set(getCommandRoots(command))];
       if (rootCommands.length > 0) {
         return { commandPrefix: rootCommands };
@@ -111,7 +133,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    const command = stripShellWrapper(this.params.command);
+    const command = stripShellWrapper(
+      normalizeShellCommand(this.params.command),
+    );
 
     const parsed = parseCommandDetails(command);
     let rootCommandDisplay = '';
@@ -153,7 +177,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
     shellExecutionConfig?: ShellExecutionConfig,
     setPidCallback?: (pid: number) => void,
   ): Promise<ToolResult> {
-    const strippedCommand = stripShellWrapper(this.params.command);
+    const strippedCommand = stripShellWrapper(
+      normalizeShellCommand(this.params.command),
+    );
 
     if (signal.aborted) {
       return {
@@ -485,8 +511,24 @@ export class ShellTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: ShellToolParams,
   ): string | null {
-    if (!params.command.trim()) {
+    const normalizedCommand = stripShellWrapper(
+      normalizeShellCommand(params.command),
+    );
+
+    if (!normalizedCommand.trim()) {
       return 'Command cannot be empty.';
+    }
+
+    const shellConfig = getShellConfiguration();
+    if (
+      shellConfig.shell === 'powershell' &&
+      isLegacyWindowsPowerShell(shellConfig.executable) &&
+      normalizedCommand.includes('&&')
+    ) {
+      const parsed = parseCommandDetails(normalizedCommand);
+      if (!parsed || parsed.hasError) {
+        return `The command appears to use "&&", which is not supported by Windows PowerShell 5.1. Use "; if ($LASTEXITCODE -eq 0) { ... }" or run the command with pwsh.`;
+      }
     }
 
     if (params.dir_path) {

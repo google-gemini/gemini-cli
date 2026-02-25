@@ -213,6 +213,24 @@ describe('ShellTool', () => {
       );
     });
 
+    it('should throw a helpful error for && when using Windows PowerShell 5.1', () => {
+      mockPlatform.mockReturnValue('win32');
+      process.env['ComSpec'] =
+        'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+      expect(() =>
+        shellTool.build({ command: 'git add . && git commit -m "no sauce"' }),
+      ).toThrow(/not supported by Windows PowerShell 5\.1/);
+    });
+
+    it('should allow && when using pwsh', () => {
+      mockPlatform.mockReturnValue('win32');
+      process.env['ComSpec'] = 'C:\\Program Files\\PowerShell\\7\\pwsh.exe';
+      const invocation = shellTool.build({
+        command: 'git add . && git commit -m "no sauce"',
+      });
+      expect(invocation).toBeDefined();
+    });
+
     it('should return an invocation for a valid relative directory path', () => {
       const invocation = shellTool.build({
         command: 'ls',
@@ -318,6 +336,26 @@ describe('ShellTool', () => {
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         path.join(tempRootDir, 'subdir'),
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        { pager: 'cat', sanitizationConfig: {} },
+      );
+    });
+
+    it('should strip markdown code fences before executing', async () => {
+      const invocation = shellTool.build({
+        command: '```bash\nls -la\n```',
+      });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution();
+      await promise;
+
+      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
+      const wrappedCommand = `{ ls -la; }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        wrappedCommand,
+        tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
         false,

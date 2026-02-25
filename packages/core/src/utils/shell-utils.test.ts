@@ -87,7 +87,7 @@ beforeEach(() => {
   mockSpawnSync.mockReturnValue({
     stdout: Buffer.from(''),
     stderr: Buffer.from(''),
-    status: 0,
+    status: 1,
     error: undefined,
   });
 });
@@ -425,19 +425,45 @@ describe('getShellConfiguration', () => {
       mockPlatform.mockReturnValue('win32');
     });
 
-    it('should return PowerShell configuration by default', () => {
+    it('should prefer pwsh when available by default', () => {
       delete process.env['ComSpec'];
+      mockSpawnSync.mockReturnValue({
+        stdout: Buffer.from('C:\\Program Files\\PowerShell\\7\\pwsh.exe'),
+        stderr: Buffer.from(''),
+        status: 0,
+        error: undefined,
+      });
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('pwsh.exe');
+      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.shell).toBe('powershell');
+    });
+
+    it('should fallback to powershell.exe when pwsh is not available', () => {
+      delete process.env['ComSpec'];
+      mockSpawnSync.mockReturnValue({
+        stdout: Buffer.from(''),
+        stderr: Buffer.from(''),
+        status: 1,
+        error: undefined,
+      });
       const config = getShellConfiguration();
       expect(config.executable).toBe('powershell.exe');
       expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
       expect(config.shell).toBe('powershell');
     });
 
-    it('should ignore ComSpec when pointing to cmd.exe', () => {
+    it('should prefer pwsh when ComSpec points to cmd.exe and pwsh is available', () => {
       const cmdPath = 'C:\\WINDOWS\\system32\\cmd.exe';
       process.env['ComSpec'] = cmdPath;
+      mockSpawnSync.mockReturnValue({
+        stdout: Buffer.from('C:\\Program Files\\PowerShell\\7\\pwsh.exe'),
+        stderr: Buffer.from(''),
+        status: 0,
+        error: undefined,
+      });
       const config = getShellConfiguration();
-      expect(config.executable).toBe('powershell.exe');
+      expect(config.executable).toBe('pwsh.exe');
       expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
       expect(config.shell).toBe('powershell');
     });

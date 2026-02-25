@@ -535,6 +535,31 @@ export function parseCommandDetails(
   return null;
 }
 
+function isPowerShellExecutable(executable: string): boolean {
+  const normalized = executable.trim().toLowerCase();
+  return (
+    normalized === 'powershell' ||
+    normalized === 'powershell.exe' ||
+    normalized === 'pwsh' ||
+    normalized === 'pwsh.exe' ||
+    normalized.endsWith('powershell.exe') ||
+    normalized.endsWith('pwsh.exe')
+  );
+}
+
+function hasExecutableOnPath(executable: string): boolean {
+  try {
+    const lookupCommand = isWindows() ? 'where' : 'which';
+    const lookup = spawnSync(lookupCommand, [executable], {
+      stdio: 'ignore',
+      windowsHide: isWindows(),
+    });
+    return !lookup.error && lookup.status === 0;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Determines the appropriate shell configuration for the current platform.
  *
@@ -546,18 +571,22 @@ export function parseCommandDetails(
 export function getShellConfiguration(): ShellConfiguration {
   if (isWindows()) {
     const comSpec = process.env['ComSpec'];
-    if (comSpec) {
-      const executable = comSpec.toLowerCase();
-      if (
-        executable.endsWith('powershell.exe') ||
-        executable.endsWith('pwsh.exe')
-      ) {
-        return {
-          executable: comSpec,
-          argsPrefix: ['-NoProfile', '-Command'],
-          shell: 'powershell',
-        };
-      }
+    if (comSpec && isPowerShellExecutable(comSpec)) {
+      return {
+        executable: comSpec,
+        argsPrefix: ['-NoProfile', '-Command'],
+        shell: 'powershell',
+      };
+    }
+
+    // Prefer PowerShell 7+ when available so generated commands can use newer
+    // syntax and behave consistently with modern PowerShell terminals.
+    if (hasExecutableOnPath('pwsh.exe')) {
+      return {
+        executable: 'pwsh.exe',
+        argsPrefix: ['-NoProfile', '-Command'],
+        shell: 'powershell',
+      };
     }
 
     // Default to PowerShell for all other Windows configurations.
