@@ -72,6 +72,7 @@ export interface CliArgs {
   query: string | undefined;
   model: string | undefined;
   sandbox: boolean | string | undefined;
+  playground: boolean | undefined;
   debug: boolean | undefined;
   prompt: string | undefined;
   promptInteractive: string | undefined;
@@ -146,6 +147,11 @@ export async function parseArguments(
           alias: 's',
           type: 'boolean',
           description: 'Run in sandbox?',
+        })
+        .option('playground', {
+          type: 'boolean',
+          description:
+            'Create a new playground directory in the Antigravity playgrounds folder and start the CLI there.',
         })
 
         .option('yolo', {

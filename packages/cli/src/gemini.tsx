@@ -370,6 +370,27 @@ export async function main() {
   const argv = await parseArguments(settings.merged);
   parseArgsHandle?.end();
 
+  // Handle --playground flag: create new playground directory and cd into it
+  if (argv.playground) {
+    const { setupPlayground, getPlaygroundsPath } = await import(
+      './utils/playground.js'
+    );
+    try {
+      const playgroundPath = setupPlayground();
+      coreEvents.emitFeedback(
+        'info',
+        `Created new playground: ${playgroundPath}`,
+      );
+    } catch (error) {
+      const playgroundsPath = getPlaygroundsPath();
+      writeToStderr(
+        `Error: Could not create playground directory in ${playgroundsPath}.\n${error instanceof Error ? error.message : String(error)}\n`,
+      );
+      await runExitCleanup();
+      process.exit(ExitCodes.FATAL_INPUT_ERROR);
+    }
+  }
+
   if (
     (argv.allowedTools && argv.allowedTools.length > 0) ||
     (settings.merged.tools?.allowed && settings.merged.tools.allowed.length > 0)
