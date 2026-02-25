@@ -1304,43 +1304,44 @@ export const useGeminiStream = (
             prompt_id = config.getSessionId() + '########' + getPromptCount();
           }
           return promptIdContext.run(prompt_id, async () => {
-            const { queryToSend, shouldProceed } = await prepareQueryForGemini(
-              query,
-              userMessageTimestamp,
-              abortSignal,
-              prompt_id!,
-            );
-
-            if (!shouldProceed || queryToSend === null) {
-              return;
-            }
-
-            if (!options?.isContinuation) {
-              if (typeof queryToSend === 'string') {
-                // logging the text prompts only for now
-                const promptText = queryToSend;
-                logUserPrompt(
-                  config,
-                  new UserPromptEvent(
-                    promptText.length,
-                    prompt_id!,
-                    config.getContentGeneratorConfig()?.authType,
-                    promptText,
-                  ),
-                );
-              }
-              startNewPrompt();
-              setThought(null); // Reset thought when starting a new prompt
-            }
-
-            setRespondingState(true);
-            setInitError(null);
-
-            // Store query and prompt_id for potential retry on loop detection
-            lastQueryRef.current = queryToSend;
-            lastPromptIdRef.current = prompt_id!;
-
             try {
+              const { queryToSend, shouldProceed } =
+                await prepareQueryForGemini(
+                  query,
+                  userMessageTimestamp,
+                  abortSignal,
+                  prompt_id!,
+                );
+
+              if (!shouldProceed || queryToSend === null) {
+                return;
+              }
+
+              if (!options?.isContinuation) {
+                if (typeof queryToSend === 'string') {
+                  // logging the text prompts only for now
+                  const promptText = queryToSend;
+                  logUserPrompt(
+                    config,
+                    new UserPromptEvent(
+                      promptText.length,
+                      prompt_id!,
+                      config.getContentGeneratorConfig()?.authType,
+                      promptText,
+                    ),
+                  );
+                }
+                startNewPrompt();
+                setThought(null); // Reset thought when starting a new prompt
+              }
+
+              setRespondingState(true);
+              setInitError(null);
+
+              // Store query and prompt_id for potential retry on loop detection
+              lastQueryRef.current = queryToSend;
+              lastPromptIdRef.current = prompt_id!;
+
               const stream = geminiClient.sendMessageStream(
                 queryToSend,
                 abortSignal,
