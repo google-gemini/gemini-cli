@@ -33,6 +33,7 @@ import {
   isEnabled,
   McpClient,
   populateMcpServerCommand,
+  type McpContext,
 } from './mcp-client.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { ResourceRegistry } from '../resources/resource-registry.js';
@@ -42,11 +43,27 @@ import * as path from 'node:path';
 import { coreEvents } from '../utils/events.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 
+interface TestableTransport {
+  _authProvider?: GoogleCredentialProvider;
+  _requestInit?: {
+    headers?: Record<string, string>;
+  };
+}
+
 const EMPTY_CONFIG: EnvironmentSanitizationConfig = {
   enableEnvironmentVariableRedaction: true,
   allowedEnvironmentVariables: [],
   blockedEnvironmentVariables: [],
 };
+
+const MOCK_CONTEXT_DEFAULT = {
+  sanitizationConfig: EMPTY_CONFIG,
+  emitMcpDiagnostic: vi.fn(),
+  setUserInteractedWithMcp: vi.fn(),
+  isTrustedFolder: vi.fn().mockReturnValue(true),
+};
+
+let MOCK_CONTEXT: McpContext = MOCK_CONTEXT_DEFAULT;
 
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
@@ -69,6 +86,12 @@ describe('mcp-client', () => {
   let testWorkspace: string;
 
   beforeEach(() => {
+    MOCK_CONTEXT = {
+      sanitizationConfig: EMPTY_CONFIG,
+      emitMcpDiagnostic: vi.fn(),
+      setUserInteractedWithMcp: vi.fn(),
+      isTrustedFolder: vi.fn().mockReturnValue(true),
+    };
     // create a tmp dir for this test
     // Create a unique temporary directory for the workspace to avoid conflicts
     testWorkspace = fs.mkdtempSync(
@@ -136,12 +159,12 @@ describe('mcp-client', () => {
         promptRegistry,
         resourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
       );
       await client.connect();
-      await client.discover({} as Config);
+      await client.discover(MOCK_CONTEXT);
       expect(mockedClient.listTools).toHaveBeenCalledWith(
         {},
         expect.objectContaining({ timeout: 600000, progressReporter: client }),
@@ -217,12 +240,12 @@ describe('mcp-client', () => {
         promptRegistry,
         resourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
       );
       await client.connect();
-      await client.discover({} as Config);
+      await client.discover(MOCK_CONTEXT);
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledTimes(2);
       expect(consoleWarnSpy).not.toHaveBeenCalled();
       consoleWarnSpy.mockRestore();
@@ -269,16 +292,17 @@ describe('mcp-client', () => {
         promptRegistry,
         resourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
       );
       await client.connect();
-      await expect(client.discover({} as Config)).rejects.toThrow('Test error');
-      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+      await expect(client.discover(MOCK_CONTEXT)).rejects.toThrow('Test error');
+      expect(MOCK_CONTEXT.emitMcpDiagnostic).toHaveBeenCalledWith(
         'error',
         `Error discovering prompts from test-server: Test error`,
         expect.any(Error),
+        'test-server',
       );
     });
 
@@ -323,12 +347,12 @@ describe('mcp-client', () => {
         promptRegistry,
         resourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
       );
       await client.connect();
-      await expect(client.discover({} as Config)).rejects.toThrow(
+      await expect(client.discover(MOCK_CONTEXT)).rejects.toThrow(
         'No prompts, tools, or resources found on the server.',
       );
     });
@@ -383,12 +407,12 @@ describe('mcp-client', () => {
         promptRegistry,
         resourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
       );
       await client.connect();
-      await client.discover({} as Config);
+      await client.discover(MOCK_CONTEXT);
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
     });
 
@@ -451,7 +475,7 @@ describe('mcp-client', () => {
         promptRegistry,
         resourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
       );
@@ -532,7 +556,7 @@ describe('mcp-client', () => {
         promptRegistry,
         resourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
       );
@@ -610,7 +634,7 @@ describe('mcp-client', () => {
         promptRegistry,
         resourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
       );
@@ -696,12 +720,12 @@ describe('mcp-client', () => {
         promptRegistry,
         resourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
       );
       await client.connect();
-      await client.discover({} as Config);
+      await client.discover(MOCK_CONTEXT);
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
       const registeredTool = vi.mocked(mockedToolRegistry.registerTool).mock
         .calls[0][0];
@@ -773,12 +797,12 @@ describe('mcp-client', () => {
         promptRegistry,
         resourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
       );
       await client.connect();
-      await client.discover({} as Config);
+      await client.discover(MOCK_CONTEXT);
       expect(resourceRegistry.setResourcesForServer).toHaveBeenCalledWith(
         'test-server',
         [
@@ -859,12 +883,12 @@ describe('mcp-client', () => {
         promptRegistry,
         resourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
       );
       await client.connect();
-      await client.discover({} as Config);
+      await client.discover(MOCK_CONTEXT);
 
       expect(mockedClient.setNotificationHandler).toHaveBeenCalledTimes(2);
       expect(resourceListHandler).toBeDefined();
@@ -878,9 +902,11 @@ describe('mcp-client', () => {
         [expect.objectContaining({ uri: 'file:///tmp/two.txt' })],
       );
 
-      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+      expect(MOCK_CONTEXT.emitMcpDiagnostic).toHaveBeenCalledWith(
         'info',
         'Resources updated for server: test-server',
+        undefined,
+        'test-server',
       );
     });
 
@@ -943,12 +969,12 @@ describe('mcp-client', () => {
         promptRegistry,
         resourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
       );
       await client.connect();
-      await client.discover({ sanitizationConfig: EMPTY_CONFIG } as Config);
+      await client.discover(MOCK_CONTEXT);
 
       expect(mockedClient.setNotificationHandler).toHaveBeenCalledTimes(2);
       expect(promptListHandler).toBeDefined();
@@ -963,9 +989,11 @@ describe('mcp-client', () => {
       expect(promptRegistry.registerPrompt).toHaveBeenLastCalledWith(
         expect.objectContaining({ name: 'two' }),
       );
-      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+      expect(MOCK_CONTEXT.emitMcpDiagnostic).toHaveBeenCalledWith(
         'info',
         'Prompts updated for server: test-server',
+        undefined,
+        'test-server',
       );
     });
 
@@ -1025,12 +1053,12 @@ describe('mcp-client', () => {
         mockedPromptRegistry,
         resourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
       );
       await client.connect();
-      await client.discover({} as Config);
+      await client.discover(MOCK_CONTEXT);
 
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
       expect(mockedPromptRegistry.registerPrompt).toHaveBeenCalledOnce();
@@ -1075,7 +1103,7 @@ describe('mcp-client', () => {
         {} as PromptRegistry,
         {} as ResourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
       );
@@ -1112,7 +1140,7 @@ describe('mcp-client', () => {
         {} as PromptRegistry,
         {} as ResourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
       );
@@ -1168,7 +1196,7 @@ describe('mcp-client', () => {
         {} as PromptRegistry,
         {} as ResourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
         onToolsUpdatedSpy,
@@ -1200,9 +1228,11 @@ describe('mcp-client', () => {
       expect(onToolsUpdatedSpy).toHaveBeenCalled();
 
       // It should emit feedback event
-      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+      expect(MOCK_CONTEXT.emitMcpDiagnostic).toHaveBeenCalledWith(
         'info',
         'Tools updated for server: test-server',
+        undefined,
+        'test-server',
       );
     });
 
@@ -1239,7 +1269,7 @@ describe('mcp-client', () => {
         {} as PromptRegistry,
         {} as ResourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
       );
@@ -1310,7 +1340,7 @@ describe('mcp-client', () => {
         {} as PromptRegistry,
         {} as ResourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
         onToolsUpdatedSpy,
@@ -1323,7 +1353,7 @@ describe('mcp-client', () => {
         {} as PromptRegistry,
         {} as ResourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
         onToolsUpdatedSpy,
@@ -1409,7 +1439,7 @@ describe('mcp-client', () => {
         {} as PromptRegistry,
         {} as ResourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
       );
@@ -1474,7 +1504,7 @@ describe('mcp-client', () => {
         {} as PromptRegistry,
         {} as ResourceRegistry,
         workspaceContext,
-        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        MOCK_CONTEXT,
         false,
         '0.0.1',
         onToolsUpdatedSpy,
@@ -1526,7 +1556,7 @@ describe('mcp-client', () => {
             httpUrl: 'http://test-server',
           },
           false,
-          EMPTY_CONFIG,
+          MOCK_CONTEXT,
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
@@ -1544,7 +1574,7 @@ describe('mcp-client', () => {
             headers: { Authorization: 'derp' },
           },
           false,
-          EMPTY_CONFIG,
+          MOCK_CONTEXT,
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
@@ -1565,7 +1595,7 @@ describe('mcp-client', () => {
             url: 'http://test-server',
           },
           false,
-          EMPTY_CONFIG,
+          MOCK_CONTEXT,
         );
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
         expect(transport).toMatchObject({
@@ -1582,7 +1612,7 @@ describe('mcp-client', () => {
             headers: { Authorization: 'derp' },
           },
           false,
-          EMPTY_CONFIG,
+          MOCK_CONTEXT,
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
@@ -1602,7 +1632,7 @@ describe('mcp-client', () => {
             type: 'http',
           },
           false,
-          EMPTY_CONFIG,
+          MOCK_CONTEXT,
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
@@ -1620,7 +1650,7 @@ describe('mcp-client', () => {
             type: 'sse',
           },
           false,
-          EMPTY_CONFIG,
+          MOCK_CONTEXT,
         );
 
         expect(transport).toBeInstanceOf(SSEClientTransport);
@@ -1637,7 +1667,7 @@ describe('mcp-client', () => {
             url: 'http://test-server',
           },
           false,
-          EMPTY_CONFIG,
+          MOCK_CONTEXT,
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
@@ -1656,7 +1686,7 @@ describe('mcp-client', () => {
             headers: { Authorization: 'Bearer token' },
           },
           false,
-          EMPTY_CONFIG,
+          MOCK_CONTEXT,
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
@@ -1677,7 +1707,7 @@ describe('mcp-client', () => {
             headers: { 'X-API-Key': 'key123' },
           },
           false,
-          EMPTY_CONFIG,
+          MOCK_CONTEXT,
         );
 
         expect(transport).toBeInstanceOf(SSEClientTransport);
@@ -1697,7 +1727,7 @@ describe('mcp-client', () => {
             url: 'http://test-server-url',
           },
           false,
-          EMPTY_CONFIG,
+          MOCK_CONTEXT,
         );
 
         // httpUrl should take priority and create HTTP transport
@@ -1723,7 +1753,7 @@ describe('mcp-client', () => {
           cwd: 'test/cwd',
         },
         false,
-        EMPTY_CONFIG,
+        MOCK_CONTEXT,
       );
 
       expect(mockedTransport).toHaveBeenCalledWith({
@@ -1749,7 +1779,7 @@ describe('mcp-client', () => {
           cwd: 'test/cwd',
         },
         false,
-        EMPTY_CONFIG,
+        MOCK_CONTEXT,
       );
 
       const callArgs = mockedTransport.mock.calls[0][0];
@@ -1784,7 +1814,7 @@ describe('mcp-client', () => {
           },
         },
         false,
-        EMPTY_CONFIG,
+        MOCK_CONTEXT,
       );
 
       const callArgs = mockedTransport.mock.calls[0][0];
@@ -1814,7 +1844,7 @@ describe('mcp-client', () => {
             },
           },
           false,
-          EMPTY_CONFIG,
+          MOCK_CONTEXT,
         );
 
         const callArgs = mockedTransport.mock.calls[0][0];
@@ -1851,17 +1881,15 @@ describe('mcp-client', () => {
             },
           },
           false,
-          EMPTY_CONFIG,
+          MOCK_CONTEXT,
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const authProvider = (transport as any)._authProvider;
+        const testableTransport = transport as unknown as TestableTransport;
+        const authProvider = testableTransport._authProvider;
         expect(authProvider).toBeInstanceOf(GoogleCredentialProvider);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const googUserProject = (transport as any)._requestInit?.headers?.[
-          'X-Goog-User-Project'
-        ];
+        const googUserProject =
+          testableTransport._requestInit?.headers?.['X-Goog-User-Project'];
         expect(googUserProject).toBe('myproject');
       });
 
@@ -1884,14 +1912,14 @@ describe('mcp-client', () => {
             },
           },
           false,
-          EMPTY_CONFIG,
+          MOCK_CONTEXT,
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
         expect(mockGetRequestHeaders).toHaveBeenCalled();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const headers = (transport as any)._requestInit?.headers;
-        expect(headers['X-Goog-User-Project']).toBe('provider-project');
+        const testableTransport = transport as unknown as TestableTransport;
+        const headers = testableTransport._requestInit?.headers;
+        expect(headers?.['X-Goog-User-Project']).toBe('provider-project');
       });
 
       it('should prioritize provider headers over config headers', async () => {
@@ -1916,13 +1944,13 @@ describe('mcp-client', () => {
             },
           },
           false,
-          EMPTY_CONFIG,
+          MOCK_CONTEXT,
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const headers = (transport as any)._requestInit?.headers;
-        expect(headers['X-Goog-User-Project']).toBe('provider-project');
+        const testableTransport = transport as unknown as TestableTransport;
+        const headers = testableTransport._requestInit?.headers;
+        expect(headers?.['X-Goog-User-Project']).toBe('provider-project');
       });
 
       it('should use GoogleCredentialProvider with SSE transport', async () => {
@@ -1937,12 +1965,12 @@ describe('mcp-client', () => {
             },
           },
           false,
-          EMPTY_CONFIG,
+          MOCK_CONTEXT,
         );
 
         expect(transport).toBeInstanceOf(SSEClientTransport);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const authProvider = (transport as any)._authProvider;
+        const testableTransport = transport as unknown as TestableTransport;
+        const authProvider = testableTransport._authProvider;
         expect(authProvider).toBeInstanceOf(GoogleCredentialProvider);
       });
 
@@ -1957,7 +1985,7 @@ describe('mcp-client', () => {
               },
             },
             false,
-            EMPTY_CONFIG,
+            MOCK_CONTEXT,
           ),
         ).rejects.toThrow(
           'URL must be provided in the config for Google Credentials provider',
@@ -2104,12 +2132,11 @@ describe('connectToMcpServer with OAuth', () => {
       scopes: ['test-scope'],
     });
 
-    // We need this to be an any type because we dig into its private state.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let capturedTransport: any;
+    // We need this to be typed to dig into its private state.
+    let capturedTransport: TestableTransport | undefined;
     vi.mocked(mockedClient.connect).mockImplementationOnce(
       async (transport) => {
-        capturedTransport = transport;
+        capturedTransport = transport as unknown as TestableTransport;
         return Promise.resolve();
       },
     );
@@ -2120,15 +2147,15 @@ describe('connectToMcpServer with OAuth', () => {
       { httpUrl: serverUrl, oauth: { enabled: true } },
       false,
       workspaceContext,
-      EMPTY_CONFIG,
+      MOCK_CONTEXT,
     );
 
     expect(client).toBe(mockedClient);
     expect(mockedClient.connect).toHaveBeenCalledTimes(2);
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
 
-    const authHeader =
-      capturedTransport._requestInit?.headers?.['Authorization'];
+    const authHeader = (capturedTransport as TestableTransport)._requestInit
+      ?.headers?.['Authorization'];
     expect(authHeader).toBe('Bearer test-access-token');
   });
 
@@ -2150,12 +2177,11 @@ describe('connectToMcpServer with OAuth', () => {
       'test-access-token-from-discovery',
     );
 
-    // We need this to be an any type because we dig into its private state.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let capturedTransport: any;
+    // We need this to be typed to dig into its private state.
+    let capturedTransport: TestableTransport | undefined;
     vi.mocked(mockedClient.connect).mockImplementationOnce(
       async (transport) => {
-        capturedTransport = transport;
+        capturedTransport = transport as unknown as TestableTransport;
         return Promise.resolve();
       },
     );
@@ -2166,7 +2192,7 @@ describe('connectToMcpServer with OAuth', () => {
       { httpUrl: serverUrl, oauth: { enabled: true } },
       false,
       workspaceContext,
-      EMPTY_CONFIG,
+      MOCK_CONTEXT,
     );
 
     expect(client).toBe(mockedClient);
@@ -2174,8 +2200,8 @@ describe('connectToMcpServer with OAuth', () => {
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
     expect(OAuthUtils.discoverOAuthConfig).toHaveBeenCalledWith(serverUrl);
 
-    const authHeader =
-      capturedTransport._requestInit?.headers?.['Authorization'];
+    const authHeader = (capturedTransport as TestableTransport)._requestInit
+      ?.headers?.['Authorization'];
     expect(authHeader).toBe('Bearer test-access-token-from-discovery');
   });
 
@@ -2206,7 +2232,7 @@ describe('connectToMcpServer with OAuth', () => {
       { httpUrl: serverUrl, oauth: { enabled: true } },
       false,
       workspaceContext,
-      EMPTY_CONFIG,
+      MOCK_CONTEXT,
     );
 
     expect(client).toBe(mockedClient);
@@ -2250,7 +2276,7 @@ describe('connectToMcpServer with OAuth', () => {
       { httpUrl: serverUrl, oauth: { enabled: true } },
       false,
       workspaceContext,
-      EMPTY_CONFIG,
+      MOCK_CONTEXT,
     );
 
     expect(client).toBe(mockedClient);
@@ -2306,7 +2332,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
         { url: 'http://test-server', type: 'http' },
         false,
         workspaceContext,
-        EMPTY_CONFIG,
+        MOCK_CONTEXT,
       ),
     ).rejects.toThrow('Connection failed');
 
@@ -2326,7 +2352,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
         { url: 'http://test-server', type: 'sse' },
         false,
         workspaceContext,
-        EMPTY_CONFIG,
+        MOCK_CONTEXT,
       ),
     ).rejects.toThrow('Connection failed');
 
@@ -2345,7 +2371,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
       { url: 'http://test-server' },
       false,
       workspaceContext,
-      EMPTY_CONFIG,
+      MOCK_CONTEXT,
     );
 
     expect(client).toBe(mockedClient);
@@ -2368,7 +2394,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
         { url: 'http://test-server' },
         false,
         workspaceContext,
-        EMPTY_CONFIG,
+        MOCK_CONTEXT,
       ),
     ).rejects.toThrow('Server error');
 
@@ -2386,7 +2412,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
       { url: 'http://test-server' },
       false,
       workspaceContext,
-      EMPTY_CONFIG,
+      MOCK_CONTEXT,
     );
 
     expect(client).toBe(mockedClient);
@@ -2471,7 +2497,7 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
       { url: 'http://test-server', oauth: { enabled: true } },
       false,
       workspaceContext,
-      EMPTY_CONFIG,
+      MOCK_CONTEXT,
     );
 
     expect(client).toBe(mockedClient);

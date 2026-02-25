@@ -25,7 +25,6 @@ import { debugLogger } from '@google/gemini-cli-core';
 export const GITHUB_WORKFLOW_PATHS = [
   'gemini-dispatch/gemini-dispatch.yml',
   'gemini-assistant/gemini-invoke.yml',
-  'gemini-assistant/gemini-plan-execute.yml',
   'issue-triage/gemini-triage.yml',
   'issue-triage/gemini-scheduled-triage.yml',
   'pr-review/gemini-review.yml',
@@ -33,7 +32,6 @@ export const GITHUB_WORKFLOW_PATHS = [
 
 export const GITHUB_COMMANDS_PATHS = [
   'gemini-assistant/gemini-invoke.toml',
-  'gemini-assistant/gemini-plan-execute.toml',
   'issue-triage/gemini-scheduled-triage.toml',
   'issue-triage/gemini-triage.toml',
   'pr-review/gemini-review.toml',

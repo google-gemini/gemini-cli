@@ -337,6 +337,7 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
       isPersistentDisabled: boolean;
     }
   >;
+  errors: Record<string, string>;
   blockedServers: Array<{ name: string; extensionName: string }>;
   discoveryInProgress: boolean;
   connectingServers: string[];

@@ -1693,6 +1693,32 @@ export class Config {
     return this.mcpClientManager;
   }
 
+  setUserInteractedWithMcp(): void {
+    this.mcpClientManager?.setUserInteractedWithMcp();
+  }
+
+  getLastMcpError(serverName: string): string | undefined {
+    return this.mcpClientManager?.getLastError(serverName);
+  }
+
+  emitMcpDiagnostic(
+    severity: 'info' | 'warning' | 'error',
+    message: string,
+    error?: unknown,
+    serverName?: string,
+  ): void {
+    if (this.mcpClientManager) {
+      this.mcpClientManager.emitDiagnostic(
+        severity,
+        message,
+        error,
+        serverName,
+      );
+    } else {
+      coreEvents.emitFeedback(severity, message, error);
+    }
+  }
+
   getAllowedMcpServers(): string[] | undefined {
     return this.allowedMcpServers;
   }
