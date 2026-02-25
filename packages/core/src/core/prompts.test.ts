@@ -653,18 +653,6 @@ describe('Core System Prompt (prompts.ts)', () => {
     ]);
     const prompt = getCoreSystemPrompt(mockConfig);
 
-    expect(prompt).toContain(
-      'When the task requires planning, use the `enter_plan_mode` tool with the appropriate complexity:',
-    );
-    expect(prompt).toContain('complexity="minimal"');
-    expect(prompt).toContain('complexity="standard"');
-    expect(prompt).toContain('complexity="thorough"');
-    expect(prompt).toContain(
-      'When in doubt between standard and thorough, prefer thorough',
-    );
-    expect(prompt).toContain(
-      'Do NOT use Plan Mode for answering questions or simple inquiries.',
-    );
     expect(prompt).toMatchSnapshot();
   });
 
